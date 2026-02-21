@@ -36,7 +36,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Sin permisos para generar órdenes de compra' }, { status: 403 })
     }
 
-    const { pedidoId, itemIds, moneda = 'USD', condicionPago = 'contado', observaciones } = await req.json()
+    const { pedidoId, itemIds, moneda = 'USD', condicionPago = 'contado', observaciones, fechaEntregaEstimada } = await req.json()
 
     if (!pedidoId) {
       return NextResponse.json({ error: 'pedidoId es requerido' }, { status: 400 })
@@ -143,6 +143,7 @@ export async function POST(req: Request) {
             igv,
             total,
             observaciones: observaciones || `Generada desde pedido ${pedido.codigo}`,
+            fechaEntregaEstimada: fechaEntregaEstimada ? new Date(fechaEntregaEstimada) : null,
             updatedAt: new Date(),
             items: { create: ocItems },
           },

@@ -116,6 +116,7 @@ export default function PedidoLogisticaDetailPage() {
   const [generandoOC, setGenerandoOC] = useState(false)
   const [monedaOC, setMonedaOC] = useState('USD')
   const [condicionPagoOC, setCondicionPagoOC] = useState('contado')
+  const [fechaEntregaOC, setFechaEntregaOC] = useState('')
 
   // 📦 Estado para edición de items
   const [editingItem, setEditingItem] = useState<{
@@ -288,6 +289,7 @@ export default function PedidoLogisticaDetailPage() {
         pedidoId: pedido.id,
         moneda: monedaOC,
         condicionPago: condicionPagoOC,
+        fechaEntregaEstimada: fechaEntregaOC || undefined,
       })
       toast.success(`Se generaron ${resultado.resumen.totalOCs} orden(es) de compra con ${resultado.resumen.totalItems} items`)
       setShowGenerarOC(false)
@@ -387,7 +389,14 @@ export default function PedidoLogisticaDetailPage() {
                 <Button
                   variant="default"
                   size="sm"
-                  onClick={() => setShowGenerarOC(true)}
+                  onClick={() => {
+                    // Default fecha entrega from pedido.fechaNecesaria
+                    const fn = pedido?.fechaNecesaria
+                      ? new Date(pedido.fechaNecesaria).toISOString().split('T')[0]
+                      : ''
+                    setFechaEntregaOC(fn)
+                    setShowGenerarOC(true)
+                  }}
                   className="h-7 text-xs"
                 >
                   <ShoppingCart className="h-3 w-3 mr-1" />
@@ -875,9 +884,21 @@ export default function PedidoLogisticaDetailPage() {
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-6">
-                    <AlertTriangle className="h-8 w-8 text-amber-400 mx-auto mb-2" />
-                    <p className="text-xs text-muted-foreground">No hay items elegibles para generar OCs</p>
+                  <div className="text-center py-6 space-y-3">
+                    <AlertTriangle className="h-8 w-8 text-amber-400 mx-auto" />
+                    <div>
+                      <p className="text-xs font-medium text-gray-700">No hay items elegibles para generar OCs</p>
+                      {sinProveedor > 0 && conOC === 0 && (
+                        <p className="text-[11px] text-muted-foreground mt-2 max-w-xs mx-auto">
+                          Los items de este pedido no tienen proveedor asignado. Para generar OCs, primero seleccione un proveedor en la cotización de cada item desde la Lista de Equipo.
+                        </p>
+                      )}
+                      {conOC > 0 && sinProveedor === 0 && (
+                        <p className="text-[11px] text-muted-foreground mt-2">
+                          Todos los items ya tienen una Orden de Compra vinculada.
+                        </p>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -885,9 +906,11 @@ export default function PedidoLogisticaDetailPage() {
                 {(sinProveedor > 0 || conOC > 0) && (
                   <div className="space-y-1.5">
                     {sinProveedor > 0 && (
-                      <div className="flex items-center gap-2 text-[10px] text-amber-600 bg-amber-50 rounded px-2.5 py-1.5">
-                        <AlertTriangle className="h-3 w-3 flex-shrink-0" />
-                        {sinProveedor} item{sinProveedor !== 1 ? 's' : ''} sin proveedor (excluidos)
+                      <div className="flex items-start gap-2 text-[10px] text-amber-700 bg-amber-50 rounded px-2.5 py-1.5">
+                        <AlertTriangle className="h-3 w-3 flex-shrink-0 mt-0.5" />
+                        <span>
+                          <strong>{sinProveedor} item{sinProveedor !== 1 ? 's' : ''} sin proveedor</strong> — para incluirlos, asigne proveedor desde la Lista de Equipo (seleccionar cotización)
+                        </span>
                       </div>
                     )}
                     {conOC > 0 && (
@@ -901,28 +924,44 @@ export default function PedidoLogisticaDetailPage() {
 
                 {/* Opciones */}
                 {grupos.length > 0 && (
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-3">
                     <div>
-                      <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Moneda</label>
-                      <select
-                        value={monedaOC}
-                        onChange={(e) => setMonedaOC(e.target.value)}
-                        className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs"
-                      >
-                        <option value="USD">USD</option>
-                        <option value="PEN">PEN</option>
-                      </select>
+                      <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
+                        Fecha de Entrega Estimada <span className="text-red-500">*</span>
+                      </label>
+                      <Input
+                        type="date"
+                        value={fechaEntregaOC}
+                        onChange={(e) => setFechaEntregaOC(e.target.value)}
+                        className="h-8 text-xs"
+                      />
+                      {!fechaEntregaOC && (
+                        <p className="text-[10px] text-red-500 mt-0.5">Requerido para generar las OCs</p>
+                      )}
                     </div>
-                    <div>
-                      <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Condición de Pago</label>
-                      <select
-                        value={condicionPagoOC}
-                        onChange={(e) => setCondicionPagoOC(e.target.value)}
-                        className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs"
-                      >
-                        <option value="contado">Contado</option>
-                        <option value="credito">Crédito</option>
-                      </select>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Moneda</label>
+                        <select
+                          value={monedaOC}
+                          onChange={(e) => setMonedaOC(e.target.value)}
+                          className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs"
+                        >
+                          <option value="USD">USD</option>
+                          <option value="PEN">PEN</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Condición de Pago</label>
+                        <select
+                          value={condicionPagoOC}
+                          onChange={(e) => setCondicionPagoOC(e.target.value)}
+                          className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs"
+                        >
+                          <option value="contado">Contado</option>
+                          <option value="credito">Crédito</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -948,7 +987,7 @@ export default function PedidoLogisticaDetailPage() {
                   <Button
                     size="sm"
                     onClick={handleGenerarOCs}
-                    disabled={generandoOC || grupos.length === 0}
+                    disabled={generandoOC || grupos.length === 0 || !fechaEntregaOC}
                     className="h-8 text-xs"
                   >
                     <ShoppingCart className="h-3 w-3 mr-1" />
