@@ -493,6 +493,39 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Pagination - top right */}
+            {equiposFiltrados.length > pageSize && (
+              <div className="flex items-center gap-1 mr-2">
+                <span className="text-xs text-muted-foreground mr-1">
+                  {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, equiposFiltrados.length)} de {equiposFiltrados.length}
+                </span>
+                <Select value={pageSize.toString()} onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(1) }}>
+                  <SelectTrigger className="h-7 w-[60px] text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {PAGE_SIZE_OPTIONS.map(n => <SelectItem key={n} value={n.toString()}>{n}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Button variant="outline" size="sm" disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(1)} className="h-7 w-7 p-0">
+                  <ChevronsLeft className="h-3.5 w-3.5" />
+                </Button>
+                <Button variant="outline" size="sm" disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(p => p - 1)} className="h-7 w-7 p-0">
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </Button>
+                <span className="text-xs px-1 text-muted-foreground">
+                  <span className="font-medium text-foreground">{currentPage}</span>/{totalPages}
+                </span>
+                <Button variant="outline" size="sm" disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(p => p + 1)} className="h-7 w-7 p-0">
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </Button>
+                <Button variant="outline" size="sm" disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(totalPages)} className="h-7 w-7 p-0">
+                  <ChevronsRight className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            )}
             {canCreate && (
               <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
                 <DialogTrigger asChild>
@@ -693,7 +726,7 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
                 )}
               </motion.div>
             ) : (
-              <div className="overflow-x-auto max-h-[calc(100vh-360px)] overflow-y-auto">
+              <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="sticky top-0 z-10">
                     <tr className="border-b bg-muted/60 backdrop-blur-sm">
@@ -841,43 +874,31 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
           </CardContent>
         </Card>
 
-        {/* Pagination */}
+        {/* Pagination - bottom (duplicated for convenience) */}
         {equiposFiltrados.length > pageSize && (
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-1">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span>
-                Mostrando {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, equiposFiltrados.length)} de {equiposFiltrados.length}
-              </span>
-              <Select value={pageSize.toString()} onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(1) }}>
-                <SelectTrigger className="h-8 w-[70px] text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {PAGE_SIZE_OPTIONS.map(n => <SelectItem key={n} value={n.toString()}>{n}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <span>por pg.</span>
-            </div>
-
-            <div className="flex items-center gap-1">
-              <Button variant="outline" size="sm" disabled={currentPage === 1}
-                onClick={() => setCurrentPage(1)} className="h-8 w-8 p-0">
-                <ChevronsLeft className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="sm" disabled={currentPage === 1}
-                onClick={() => setCurrentPage(p => p - 1)} className="h-8 w-8 p-0">
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="text-sm px-3 text-muted-foreground">
-                Pg. <span className="font-medium text-foreground">{currentPage}</span> de {totalPages}
-              </span>
-              <Button variant="outline" size="sm" disabled={currentPage === totalPages}
-                onClick={() => setCurrentPage(p => p + 1)} className="h-8 w-8 p-0">
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="sm" disabled={currentPage === totalPages}
-                onClick={() => setCurrentPage(totalPages)} className="h-8 w-8 p-0">
-                <ChevronsRight className="h-4 w-4" />
-              </Button>
-            </div>
+          <div className="flex items-center justify-end gap-1 px-1">
+            <span className="text-xs text-muted-foreground mr-2">
+              {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, equiposFiltrados.length)} de {equiposFiltrados.length}
+            </span>
+            <Button variant="outline" size="sm" disabled={currentPage === 1}
+              onClick={() => setCurrentPage(1)} className="h-7 w-7 p-0">
+              <ChevronsLeft className="h-3.5 w-3.5" />
+            </Button>
+            <Button variant="outline" size="sm" disabled={currentPage === 1}
+              onClick={() => setCurrentPage(p => p - 1)} className="h-7 w-7 p-0">
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </Button>
+            <span className="text-xs px-2 text-muted-foreground">
+              <span className="font-medium text-foreground">{currentPage}</span>/{totalPages}
+            </span>
+            <Button variant="outline" size="sm" disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage(p => p + 1)} className="h-7 w-7 p-0">
+              <ChevronRight className="h-3.5 w-3.5" />
+            </Button>
+            <Button variant="outline" size="sm" disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage(totalPages)} className="h-7 w-7 p-0">
+              <ChevronsRight className="h-3.5 w-3.5" />
+            </Button>
           </div>
         )}
 
