@@ -50,12 +50,13 @@ const ALL_COLUMNS = [
   { key: 'unidad', label: 'Unidad', align: 'left' as const },
   { key: 'marca', label: 'Marca', align: 'left' as const },
   { key: 'uso', label: 'Uso', align: 'center' as const },
+  { key: 'precioLogistica', label: 'Precio\nLogística', align: 'right' as const },
+  { key: 'precioReal', label: 'Precio\nReal', align: 'right' as const },
   { key: 'precioLista', label: 'Precio\nLista', align: 'right' as const },
   { key: 'factorCosto', label: 'Factor\nCosto', align: 'center' as const },
   { key: 'factorVenta', label: 'Factor\nVenta', align: 'center' as const },
   { key: 'precioInterno', label: 'Precio\nInterno', align: 'right' as const },
   { key: 'precioVenta', label: 'Precio\nVenta', align: 'right' as const },
-  { key: 'precioLogistica', label: 'Precio\nLogística', align: 'right' as const },
   { key: 'estado', label: 'Estado', align: 'left' as const },
   { key: 'updatedAt', label: 'Actualización', align: 'left' as const },
   { key: 'updatedBy', label: 'Editado\nPor', align: 'left' as const },
@@ -309,6 +310,10 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
         return <span className="text-sm text-muted-foreground">{eq.marca || '—'}</span>
       case 'uso':
         return renderUsageCell(eq)
+      case 'precioLogistica':
+        return <span className="font-mono text-sm text-muted-foreground">{formatCurrency(eq.precioLogistica)}</span>
+      case 'precioReal':
+        return <span className="font-mono text-sm text-muted-foreground">{formatCurrency(eq.precioReal)}</span>
       case 'precioLista':
         return <span className="text-muted-foreground font-mono text-sm">{formatCurrency(eq.precioLista)}</span>
       case 'factorCosto':
@@ -319,8 +324,6 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
         return <span className="font-mono text-sm text-muted-foreground">{formatCurrency(eq.precioInterno)}</span>
       case 'precioVenta':
         return <span className="font-mono text-sm font-medium text-emerald-600">{formatCurrency(eq.precioVenta)}</span>
-      case 'precioLogistica':
-        return <span className="font-mono text-sm text-muted-foreground">{formatCurrency(eq.precioLogistica)}</span>
       case 'estado':
         if (canEdit) {
           return (

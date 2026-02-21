@@ -549,6 +549,7 @@ export interface CatalogoEquipo {
   factorVenta: number
   precioVenta: number
   precioLogistica?: number
+  precioReal?: number
   estado: string
   createdAt: string
   updatedAt: string

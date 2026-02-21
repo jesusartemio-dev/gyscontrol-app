@@ -9,7 +9,7 @@ const VALID_VISTAS = ['admin', 'comercial', 'logistica', 'proyectos']
 function buildPrismaSelect(columnas: string[]) {
   const select: Record<string, any> = { id: true, createdAt: true, updatedAt: true }
 
-  const directFields = ['codigo', 'descripcion', 'marca', 'precioLista', 'factorCosto', 'factorVenta', 'precioInterno', 'precioVenta', 'precioLogistica', 'estado']
+  const directFields = ['codigo', 'descripcion', 'marca', 'precioLista', 'factorCosto', 'factorVenta', 'precioInterno', 'precioVenta', 'precioLogistica', 'precioReal', 'estado']
   for (const col of columnas) {
     if (directFields.includes(col)) {
       select[col] = true
