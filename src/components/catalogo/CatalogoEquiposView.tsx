@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import CatalogoEquipoForm from '@/components/catalogo/CatalogoEquipoForm'
 import { BotonesImportExport } from '@/components/catalogo/BotonesImportExport'
@@ -32,7 +33,10 @@ import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from '@/components/ui/tooltip'
 import {
-  Plus, Search, Package, Pencil, Trash2, X, Loader2, AlertCircle
+  Plus, Search, Package, Pencil, Trash2, X, Loader2, AlertCircle,
+  CheckCircle, Clock, XCircle, ChevronDown, ChevronUp,
+  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
+  BarChart3, Filter
 } from 'lucide-react'
 
 type CatalogoEquipoConId = CatalogoEquipoPayload & { id: string }
@@ -67,6 +71,25 @@ const formatCurrency = (amount: number | undefined): string => {
   }).format(amount)
 }
 
+// --- Animation variants ---
+const rowVariants = {
+  hidden: { opacity: 0, y: 8 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.2 } },
+  exit: { opacity: 0, x: -10, transition: { duration: 0.15 } }
+}
+
+// --- Status config with icons ---
+const STATUS_CONFIG: Record<string, { icon: typeof CheckCircle; color: string; bg: string }> = {
+  activo:    { icon: CheckCircle, color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200' },
+  aprobado:  { icon: CheckCircle, color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200' },
+  pendiente: { icon: Clock, color: 'text-amber-700', bg: 'bg-amber-50 border-amber-200' },
+  rechazado: { icon: XCircle, color: 'text-red-700', bg: 'bg-red-50 border-red-200' },
+}
+
+// --- Pagination ---
+const PAGE_SIZE_OPTIONS = [25, 50, 100] as const
+const DEFAULT_PAGE_SIZE = 25
+
 interface CatalogoEquiposViewProps {
   vista: Vista
 }
@@ -93,6 +116,14 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
   const [deleteTarget, setDeleteTarget] = useState<Partial<CatalogoEquipo> | null>(null)
   const [eliminando, setEliminando] = useState(false)
 
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE)
+
+  // UI state
+  const [filtersExpanded, setFiltersExpanded] = useState(true)
+  const [expandedRowId, setExpandedRowId] = useState<string | null>(null)
+
   const hasCol = (key: string) => vistaConfig?.columnas.includes(key) ?? false
   const canCreate = vistaConfig?.permisos.canCreate ?? false
   const canEdit = vistaConfig?.permisos.canEdit ?? false
@@ -103,13 +134,9 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
 
   const visibleColumns = useMemo(() =>
     ALL_COLUMNS.filter(col => {
-      // Always visible merged columns
       if (col.key === 'updatedInfo') return true
-      // codigo column merges descripcion — show if either is in config
       if (col.key === 'codigo') return vistaConfig?.columnas.includes('codigo') || vistaConfig?.columnas.includes('descripcion')
-      // catUndMarca shows if any of the 3 sub-columns is configured
       if (col.key === 'catUndMarca') return vistaConfig?.columnas.includes('categoria') || vistaConfig?.columnas.includes('unidad') || vistaConfig?.columnas.includes('marca')
-      // factores shows if either factor column is configured
       if (col.key === 'factores') return vistaConfig?.columnas.includes('factorCosto') || vistaConfig?.columnas.includes('factorVenta')
       return vistaConfig?.columnas.includes(col.key)
     }),
@@ -137,6 +164,11 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
     cargarDatos()
   }, [vista])
 
+  // Reset page on filter change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, categoriaFiltro, estadoFiltro, usoFiltro])
+
   // Memoized filter values
   const categorias = useMemo(() =>
     [...new Set(equipos.map(eq => eq.categoriaEquipo?.nombre).filter(Boolean))] as string[],
@@ -155,6 +187,45 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
       )
     })
   }, [equipos, categoriaFiltro, estadoFiltro, usoFiltro, searchTerm])
+
+  // --- Pagination ---
+  const totalPages = Math.max(1, Math.ceil(equiposFiltrados.length / pageSize))
+  const paginatedEquipos = useMemo(() => {
+    const start = (currentPage - 1) * pageSize
+    return equiposFiltrados.slice(start, start + pageSize)
+  }, [equiposFiltrados, currentPage, pageSize])
+
+  // --- Summary stats ---
+  const stats = useMemo(() => {
+    const activos = equipos.filter(eq => eq.estado === 'activo').length
+    const pendientes = equipos.filter(eq => eq.estado === 'pendiente').length
+    const aprobados = equipos.filter(eq => eq.estado === 'aprobado').length
+    const rechazados = equipos.filter(eq => eq.estado === 'rechazado').length
+    const conUso = equipos.filter(eq => {
+      const counts = (eq as any)._count
+      return (counts?.cotizacionEquipoItem || 0) + (counts?.proyectoEquipoCotizadoItem || 0) + (counts?.listaEquipoItem || 0) > 0
+    }).length
+    return { activos, pendientes, aprobados, rechazados, conUso, total: equipos.length }
+  }, [equipos])
+
+  // --- Active filters ---
+  const activeFilters = useMemo(() => {
+    const filters: { key: string; label: string; onClear: () => void }[] = []
+    if (searchTerm) filters.push({ key: 'search', label: `"${searchTerm}"`, onClear: () => setSearchTerm('') })
+    if (categoriaFiltro !== '__ALL__') filters.push({ key: 'cat', label: categoriaFiltro, onClear: () => setCategoriaFiltro('__ALL__') })
+    if (estadoFiltro !== '__ALL__') filters.push({ key: 'estado', label: `Estado: ${estadoFiltro}`, onClear: () => setEstadoFiltro('__ALL__') })
+    if (usoFiltro !== '__ALL__') filters.push({ key: 'uso', label: usoFiltro === 'con_uso' ? 'Con uso' : 'Sin uso', onClear: () => setUsoFiltro('__ALL__') })
+    return filters
+  }, [searchTerm, categoriaFiltro, estadoFiltro, usoFiltro])
+
+  const hasActiveFilters = activeFilters.length > 0
+
+  const clearAllFilters = () => {
+    setSearchTerm('')
+    setCategoriaFiltro('__ALL__')
+    setEstadoFiltro('__ALL__')
+    setUsoFiltro('__ALL__')
+  }
 
   const handleCreated = () => {
     cargarDatos()
@@ -333,21 +404,41 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
         return <span className="font-mono text-sm text-muted-foreground">{formatCurrency(eq.precioInterno)}</span>
       case 'precioVenta':
         return <span className="font-mono text-sm font-medium text-emerald-600">{formatCurrency(eq.precioVenta)}</span>
-      case 'estado':
+      case 'estado': {
+        const config = STATUS_CONFIG[eq.estado || ''] || STATUS_CONFIG.pendiente
+        const StatusIcon = config.icon
         if (canEdit) {
           return (
             <Select value={eq.estado} onValueChange={(value) => eq.id && handleEditField(eq.id, 'estado', value)}>
-              <SelectTrigger className="h-7 w-[90px] text-xs"><SelectValue /></SelectTrigger>
+              <SelectTrigger className={`h-7 w-[110px] text-xs border ${config.bg} ${config.color}`}>
+                <div className="flex items-center gap-1">
+                  <StatusIcon className="h-3 w-3 shrink-0" />
+                  <SelectValue />
+                </div>
+              </SelectTrigger>
               <SelectContent>
-                <SelectItem value="activo">Activo</SelectItem>
-                <SelectItem value="aprobado">Aprobado</SelectItem>
-                <SelectItem value="pendiente">Pendiente</SelectItem>
-                <SelectItem value="rechazado">Rechazado</SelectItem>
+                {Object.entries(STATUS_CONFIG).map(([value, cfg]) => {
+                  const Icon = cfg.icon
+                  return (
+                    <SelectItem key={value} value={value}>
+                      <div className="flex items-center gap-1.5">
+                        <Icon className={`h-3 w-3 ${cfg.color}`} />
+                        {value.charAt(0).toUpperCase() + value.slice(1)}
+                      </div>
+                    </SelectItem>
+                  )
+                })}
               </SelectContent>
             </Select>
           )
         }
-        return <Badge variant="outline" className="text-xs">{eq.estado}</Badge>
+        return (
+          <Badge variant="outline" className={`text-xs border ${config.bg} ${config.color} gap-1`}>
+            <StatusIcon className="h-3 w-3" />
+            {eq.estado}
+          </Badge>
+        )
+      }
       case 'updatedInfo':
         return (
           <div className="space-y-0.5">
@@ -367,8 +458,11 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
     return (
       <div className="space-y-4">
         <div className="flex justify-between items-center">
-          <Skeleton className="h-8 w-32" />
+          <Skeleton className="h-8 w-48" />
           <div className="flex gap-2"><Skeleton className="h-9 w-24" /><Skeleton className="h-9 w-20" /></div>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          {[1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} className="h-16 rounded-lg" />)}
         </div>
         <Skeleton className="h-10 w-full max-w-md" />
         <Card><CardContent className="p-0"><div className="divide-y">
@@ -390,9 +484,11 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
               <Package className="h-6 w-6 text-primary" />
-              <h1 className="text-xl font-semibold">{VISTA_LABELS[vista]}</h1>
+              <h1 className="text-2xl font-bold tracking-tight">{VISTA_LABELS[vista]}</h1>
             </div>
-            <Badge variant="secondary" className="font-normal">{equipos.length}</Badge>
+            <Badge variant="secondary" className="font-normal">
+              {hasActiveFilters ? `${equiposFiltrados.length}/` : ''}{equipos.length}
+            </Badge>
           </div>
 
           <div className="flex items-center gap-2">
@@ -419,61 +515,129 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative flex-1 min-w-[200px] max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar por código, descripción o marca..." value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)} className="pl-9 pr-9 h-9" />
-            {searchTerm && (
-              <Button variant="ghost" size="sm" className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
-                onClick={() => setSearchTerm('')}><X className="h-4 w-4" /></Button>
+        {/* Stats Bar */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          {[
+            { label: 'Total', value: stats.total, icon: Package, color: 'text-gray-600' },
+            { label: 'Activos', value: stats.activos, icon: CheckCircle, color: 'text-emerald-600' },
+            { label: 'Aprobados', value: stats.aprobados, icon: CheckCircle, color: 'text-blue-600' },
+            { label: 'Pendientes', value: stats.pendientes, icon: Clock, color: 'text-amber-600' },
+            { label: 'Rechazados', value: stats.rechazados, icon: XCircle, color: 'text-red-600' },
+            { label: 'Con uso', value: stats.conUso, icon: BarChart3, color: 'text-purple-600' },
+          ].map(stat => (
+            <motion.div
+              key={stat.label}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex items-center gap-2.5 p-2.5 rounded-lg border bg-card"
+            >
+              <stat.icon className={`h-4 w-4 shrink-0 ${stat.color}`} />
+              <div>
+                <p className="text-lg font-semibold leading-none">{stat.value}</p>
+                <p className="text-[11px] text-muted-foreground">{stat.label}</p>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Filters Section */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <Button variant="ghost" size="sm" onClick={() => setFiltersExpanded(!filtersExpanded)}
+              className="gap-1.5 text-muted-foreground hover:text-foreground -ml-2">
+              <Filter className="h-4 w-4" />
+              Filtros
+              {hasActiveFilters && <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">{activeFilters.length}</Badge>}
+              {filtersExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+            </Button>
+
+            {hasActiveFilters && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {activeFilters.map(f => (
+                  <Badge key={f.key} variant="secondary" className="gap-1 pr-1 text-xs">
+                    {f.label}
+                    <button onClick={f.onClear} className="ml-0.5 rounded-full hover:bg-muted-foreground/20 p-0.5">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+                <Button variant="ghost" size="sm" onClick={clearAllFilters} className="h-6 px-2 text-xs text-muted-foreground">
+                  Limpiar todo
+                </Button>
+              </div>
             )}
           </div>
 
-          {hasCol('categoria') && (
-            <Select value={categoriaFiltro} onValueChange={setCategoriaFiltro}>
-              <SelectTrigger className="w-[180px] h-9">
-                <SelectValue>{categoriaFiltro === '__ALL__' ? 'Categoría: Todas' : categoriaFiltro}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__ALL__">Todas las categorías</SelectItem>
-                {categorias.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          )}
+          <AnimatePresence>
+            {filtersExpanded && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <div className="flex flex-wrap items-center gap-3 pb-2">
+                  <div className="relative flex-1 min-w-[200px] max-w-sm">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input placeholder="Buscar por código, descripción o marca..." value={searchTerm}
+                      onChange={e => setSearchTerm(e.target.value)} className="pl-9 pr-9 h-9" />
+                    {searchTerm && (
+                      <Button variant="ghost" size="sm" className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                        onClick={() => setSearchTerm('')}><X className="h-4 w-4" /></Button>
+                    )}
+                  </div>
 
-          {hasCol('estado') && (
-            <Select value={estadoFiltro} onValueChange={setEstadoFiltro}>
-              <SelectTrigger className="w-[150px] h-9">
-                <SelectValue>{estadoFiltro === '__ALL__' ? 'Estado: Todos' : `Estado: ${estadoFiltro.charAt(0).toUpperCase() + estadoFiltro.slice(1)}`}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__ALL__">Todos los estados</SelectItem>
-                <SelectItem value="activo">Activo</SelectItem>
-                <SelectItem value="aprobado">Aprobado</SelectItem>
-                <SelectItem value="pendiente">Pendiente</SelectItem>
-                <SelectItem value="rechazado">Rechazado</SelectItem>
-              </SelectContent>
-            </Select>
-          )}
+                  {hasCol('categoria') && (
+                    <Select value={categoriaFiltro} onValueChange={setCategoriaFiltro}>
+                      <SelectTrigger className="w-[180px] h-9">
+                        <SelectValue>{categoriaFiltro === '__ALL__' ? 'Categoría: Todas' : categoriaFiltro}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__ALL__">Todas las categorías</SelectItem>
+                        {categorias.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  )}
 
-          {hasCol('uso') && (
-            <Select value={usoFiltro} onValueChange={setUsoFiltro}>
-              <SelectTrigger className="w-[140px] h-9">
-                <SelectValue>{usoFiltro === '__ALL__' ? 'Uso: Todos' : usoFiltro === 'con_uso' ? 'Con uso' : 'Sin uso'}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__ALL__">Todos</SelectItem>
-                <SelectItem value="con_uso">Con uso</SelectItem>
-                <SelectItem value="sin_uso">Sin uso</SelectItem>
-              </SelectContent>
-            </Select>
-          )}
+                  {hasCol('estado') && (
+                    <Select value={estadoFiltro} onValueChange={setEstadoFiltro}>
+                      <SelectTrigger className="w-[150px] h-9">
+                        <SelectValue>{estadoFiltro === '__ALL__' ? 'Estado: Todos' : `Estado: ${estadoFiltro.charAt(0).toUpperCase() + estadoFiltro.slice(1)}`}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__ALL__">Todos los estados</SelectItem>
+                        {Object.entries(STATUS_CONFIG).map(([value, cfg]) => {
+                          const Icon = cfg.icon
+                          return (
+                            <SelectItem key={value} value={value}>
+                              <div className="flex items-center gap-1.5">
+                                <Icon className={`h-3 w-3 ${cfg.color}`} />
+                                {value.charAt(0).toUpperCase() + value.slice(1)}
+                              </div>
+                            </SelectItem>
+                          )
+                        })}
+                      </SelectContent>
+                    </Select>
+                  )}
 
-          {(searchTerm || categoriaFiltro !== '__ALL__' || estadoFiltro !== '__ALL__' || usoFiltro !== '__ALL__') && (
-            <span className="text-sm text-muted-foreground">{equiposFiltrados.length} de {equipos.length}</span>
-          )}
+                  {hasCol('uso') && (
+                    <Select value={usoFiltro} onValueChange={setUsoFiltro}>
+                      <SelectTrigger className="w-[140px] h-9">
+                        <SelectValue>{usoFiltro === '__ALL__' ? 'Uso: Todos' : usoFiltro === 'con_uso' ? 'Con uso' : 'Sin uso'}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__ALL__">Todos</SelectItem>
+                        <SelectItem value="con_uso">Con uso</SelectItem>
+                        <SelectItem value="sin_uso">Sin uso</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Import loading */}
@@ -497,83 +661,219 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
         )}
 
         {/* Table */}
-        <Card>
+        <Card className="shadow-sm">
           <CardContent className="p-0">
             {equiposFiltrados.length === 0 ? (
-              <div className="text-center py-12">
-                <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-center py-16"
+              >
+                <div className="mx-auto w-20 h-20 bg-muted rounded-full flex items-center justify-center mb-4">
+                  <Package className="h-10 w-10 text-muted-foreground" />
+                </div>
                 <h3 className="text-lg font-semibold mb-2">
-                  {equipos.length === 0 ? 'No hay equipos' : 'Sin resultados'}
+                  {equipos.length === 0 ? 'No hay equipos en el catálogo' : 'Sin resultados para estos filtros'}
                 </h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  {equipos.length === 0 ? 'Comienza agregando equipos al catálogo' : 'Ajusta los filtros para encontrar equipos'}
+                <p className="text-sm text-muted-foreground mb-6 max-w-sm mx-auto">
+                  {equipos.length === 0
+                    ? 'Comienza agregando equipos al catálogo desde el botón "Nuevo" o importando un archivo Excel.'
+                    : 'Intenta ajustar los filtros o borrar la búsqueda para encontrar lo que buscas.'}
                 </p>
+                {hasActiveFilters && (
+                  <Button variant="outline" size="sm" onClick={clearAllFilters}>
+                    <X className="h-4 w-4 mr-2" />Limpiar filtros
+                  </Button>
+                )}
                 {equipos.length === 0 && canCreate && (
                   <Button variant="outline" size="sm" onClick={() => setShowCreateModal(true)}>
                     <Plus className="h-4 w-4 mr-2" />Crear equipo
                   </Button>
                 )}
-              </div>
+              </motion.div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto max-h-[calc(100vh-360px)] overflow-y-auto">
                 <table className="w-full">
-                  <thead>
-                    <tr className="border-b bg-muted/40">
+                  <thead className="sticky top-0 z-10">
+                    <tr className="border-b bg-muted/60 backdrop-blur-sm">
                       {visibleColumns.map(col => (
-                        <th key={col.key} className={`py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-pre-line leading-tight ${
+                        <th key={col.key} className={`py-2.5 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-pre-line leading-tight ${
                           col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'
                         } ${col.key === 'codigo' ? 'min-w-[200px]' : ''}`}>
                           {col.label}
                         </th>
                       ))}
                       {showActionsColumn && (
-                        <th className="w-24 py-2 px-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th className="w-24 py-2.5 px-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
                           Acciones
                         </th>
                       )}
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {equiposFiltrados.map(eq => (
-                      <tr key={eq.id} className="hover:bg-muted/30 transition-colors">
-                        {visibleColumns.map(col => (
-                          <td key={col.key} className={`py-2 px-3 align-top ${
-                            col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'
-                          }`}>
-                            {renderCell(eq, col.key)}
-                          </td>
-                        ))}
-                        {showActionsColumn && (
-                          <td className="py-2 px-3">
-                            <div className="flex justify-end gap-1">
-                              {canEdit && (
-                                <Tooltip><TooltipTrigger asChild>
-                                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0"
-                                    onClick={() => setEditTarget(eq)}>
-                                    <Pencil className="h-3.5 w-3.5" />
-                                  </Button>
-                                </TooltipTrigger><TooltipContent>Editar</TooltipContent></Tooltip>
-                              )}
-                              {canDelete && (
-                                <Tooltip><TooltipTrigger asChild>
-                                  <Button size="sm" variant="ghost"
-                                    className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                    onClick={() => setDeleteTarget(eq)}>
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </Button>
-                                </TooltipTrigger><TooltipContent>Eliminar</TooltipContent></Tooltip>
-                              )}
-                            </div>
-                          </td>
-                        )}
-                      </tr>
-                    ))}
+                    <AnimatePresence mode="popLayout">
+                      {paginatedEquipos.map((eq, index) => (
+                        <motion.tr
+                          key={eq.id}
+                          variants={rowVariants}
+                          initial="hidden"
+                          animate="visible"
+                          exit="exit"
+                          transition={{ delay: index * 0.02 }}
+                          className="group hover:bg-muted/50 transition-colors cursor-pointer"
+                          onClick={() => setExpandedRowId(expandedRowId === (eq.id ?? null) ? null : (eq.id ?? null))}
+                        >
+                          {visibleColumns.map(col => (
+                            <td key={col.key} className={`py-2.5 px-3 align-top ${
+                              col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'
+                            }`}>
+                              {renderCell(eq, col.key)}
+                            </td>
+                          ))}
+                          {showActionsColumn && (
+                            <td className="py-2.5 px-3">
+                              <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                {canEdit && (
+                                  <Tooltip><TooltipTrigger asChild>
+                                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0"
+                                      onClick={(e) => { e.stopPropagation(); setEditTarget(eq) }}>
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </TooltipTrigger><TooltipContent>Editar</TooltipContent></Tooltip>
+                                )}
+                                {canDelete && (
+                                  <Tooltip><TooltipTrigger asChild>
+                                    <Button size="sm" variant="ghost"
+                                      className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                      onClick={(e) => { e.stopPropagation(); setDeleteTarget(eq) }}>
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </TooltipTrigger><TooltipContent>Eliminar</TooltipContent></Tooltip>
+                                )}
+                              </div>
+                            </td>
+                          )}
+                        </motion.tr>
+                      ))}
+                    </AnimatePresence>
+
+                    {/* Expanded row detail */}
+                    <AnimatePresence>
+                      {expandedRowId && paginatedEquipos.find(eq => eq.id === expandedRowId) && (() => {
+                        const eq = paginatedEquipos.find(e => e.id === expandedRowId)!
+                        return (
+                          <motion.tr
+                            key={`${expandedRowId}-detail`}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.15 }}
+                            className="bg-muted/20"
+                          >
+                            <td colSpan={visibleColumns.length + (showActionsColumn ? 1 : 0)} className="px-6 py-4">
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-3 text-sm">
+                                <div>
+                                  <span className="text-muted-foreground text-xs">Categoría</span>
+                                  <p className="font-medium">{eq.categoriaEquipo?.nombre || '—'}</p>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground text-xs">Unidad</span>
+                                  <p className="font-medium">{eq.unidad?.nombre || '—'}</p>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground text-xs">Marca</span>
+                                  <p className="font-medium">{eq.marca || '—'}</p>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground text-xs">Creado por</span>
+                                  <p className="font-medium">{(eq as any).createdByUser?.name || '—'}</p>
+                                </div>
+                                {eq.precioLogistica != null && (
+                                  <div>
+                                    <span className="text-muted-foreground text-xs">Precio Logística</span>
+                                    <p className="font-medium font-mono">{formatCurrency(eq.precioLogistica)}</p>
+                                  </div>
+                                )}
+                                {eq.precioReal != null && (
+                                  <div>
+                                    <span className="text-muted-foreground text-xs">Precio Real</span>
+                                    <p className="font-medium font-mono">{formatCurrency(eq.precioReal)}</p>
+                                  </div>
+                                )}
+                                {eq.precioLista != null && (
+                                  <div>
+                                    <span className="text-muted-foreground text-xs">Precio Lista</span>
+                                    <p className="font-medium font-mono">{formatCurrency(eq.precioLista)}</p>
+                                  </div>
+                                )}
+                                {eq.precioInterno != null && (
+                                  <div>
+                                    <span className="text-muted-foreground text-xs">Precio Interno</span>
+                                    <p className="font-medium font-mono">{formatCurrency(eq.precioInterno)}</p>
+                                  </div>
+                                )}
+                                {eq.precioVenta != null && (
+                                  <div>
+                                    <span className="text-muted-foreground text-xs">Precio Venta</span>
+                                    <p className="font-medium font-mono text-emerald-600">{formatCurrency(eq.precioVenta)}</p>
+                                  </div>
+                                )}
+                                <div>
+                                  <span className="text-muted-foreground text-xs">Factor Costo / Venta</span>
+                                  <p className="font-medium font-mono">{(eq.factorCosto ?? 1).toFixed(2)} / {(eq.factorVenta ?? 1.15).toFixed(2)}</p>
+                                </div>
+                              </div>
+                            </td>
+                          </motion.tr>
+                        )
+                      })()}
+                    </AnimatePresence>
                   </tbody>
                 </table>
               </div>
             )}
           </CardContent>
         </Card>
+
+        {/* Pagination */}
+        {equiposFiltrados.length > pageSize && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-1">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span>
+                Mostrando {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, equiposFiltrados.length)} de {equiposFiltrados.length}
+              </span>
+              <Select value={pageSize.toString()} onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(1) }}>
+                <SelectTrigger className="h-8 w-[70px] text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {PAGE_SIZE_OPTIONS.map(n => <SelectItem key={n} value={n.toString()}>{n}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <span>por pg.</span>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="sm" disabled={currentPage === 1}
+                onClick={() => setCurrentPage(1)} className="h-8 w-8 p-0">
+                <ChevronsLeft className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="sm" disabled={currentPage === 1}
+                onClick={() => setCurrentPage(p => p - 1)} className="h-8 w-8 p-0">
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-sm px-3 text-muted-foreground">
+                Pg. <span className="font-medium text-foreground">{currentPage}</span> de {totalPages}
+              </span>
+              <Button variant="outline" size="sm" disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(p => p + 1)} className="h-8 w-8 p-0">
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="sm" disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(totalPages)} className="h-8 w-8 p-0">
+                <ChevronsRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Delete confirmation */}
         <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
