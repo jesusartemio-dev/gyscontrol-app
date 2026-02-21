@@ -732,7 +732,7 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
                           ))}
                           {showActionsColumn && (
                             <td className="py-2.5 px-3">
-                              <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <div className="flex justify-end gap-1">
                                 {canEdit && (
                                   <Tooltip><TooltipTrigger asChild>
                                     <Button size="sm" variant="ghost" className="h-7 w-7 p-0"
