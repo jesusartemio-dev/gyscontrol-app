@@ -46,20 +46,16 @@ const VISTA_LABELS: Record<Vista, string> = {
 
 const ALL_COLUMNS = [
   { key: 'codigo', label: 'Código / Descripción', align: 'left' as const },
-  { key: 'categoria', label: 'Categoría', align: 'left' as const },
-  { key: 'unidad', label: 'Unidad', align: 'left' as const },
-  { key: 'marca', label: 'Marca', align: 'left' as const },
+  { key: 'catUndMarca', label: 'Cat / Und / Marca', align: 'left' as const },
   { key: 'uso', label: 'Uso', align: 'center' as const },
   { key: 'precioLogistica', label: 'Precio\nLogística', align: 'right' as const },
   { key: 'precioReal', label: 'Precio\nReal', align: 'right' as const },
   { key: 'precioLista', label: 'Precio\nLista', align: 'right' as const },
-  { key: 'factorCosto', label: 'Factor\nCosto', align: 'center' as const },
-  { key: 'factorVenta', label: 'Factor\nVenta', align: 'center' as const },
+  { key: 'factores', label: 'Factor\nC / V', align: 'center' as const },
   { key: 'precioInterno', label: 'Precio\nInterno', align: 'right' as const },
   { key: 'precioVenta', label: 'Precio\nVenta', align: 'right' as const },
   { key: 'estado', label: 'Estado', align: 'left' as const },
-  { key: 'updatedAt', label: 'Actualización', align: 'left' as const },
-  { key: 'updatedBy', label: 'Editado\nPor', align: 'left' as const },
+  { key: 'updatedInfo', label: 'Actualización', align: 'left' as const },
 ] as const
 
 type ColumnKey = typeof ALL_COLUMNS[number]['key']
@@ -97,7 +93,7 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
   const [deleteTarget, setDeleteTarget] = useState<Partial<CatalogoEquipo> | null>(null)
   const [eliminando, setEliminando] = useState(false)
 
-  const hasCol = (key: ColumnKey) => vistaConfig?.columnas.includes(key) ?? false
+  const hasCol = (key: string) => vistaConfig?.columnas.includes(key) ?? false
   const canCreate = vistaConfig?.permisos.canCreate ?? false
   const canEdit = vistaConfig?.permisos.canEdit ?? false
   const canDelete = vistaConfig?.permisos.canDelete ?? false
@@ -107,10 +103,14 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
 
   const visibleColumns = useMemo(() =>
     ALL_COLUMNS.filter(col => {
-      // Always visible columns
-      if (col.key === 'updatedAt' || col.key === 'updatedBy') return true
+      // Always visible merged columns
+      if (col.key === 'updatedInfo') return true
       // codigo column merges descripcion — show if either is in config
       if (col.key === 'codigo') return vistaConfig?.columnas.includes('codigo') || vistaConfig?.columnas.includes('descripcion')
+      // catUndMarca shows if any of the 3 sub-columns is configured
+      if (col.key === 'catUndMarca') return vistaConfig?.columnas.includes('categoria') || vistaConfig?.columnas.includes('unidad') || vistaConfig?.columnas.includes('marca')
+      // factores shows if either factor column is configured
+      if (col.key === 'factores') return vistaConfig?.columnas.includes('factorCosto') || vistaConfig?.columnas.includes('factorVenta')
       return vistaConfig?.columnas.includes(col.key)
     }),
     [vistaConfig]
@@ -302,12 +302,17 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
             )}
           </div>
         )
-      case 'categoria':
-        return <Badge variant="secondary" className="text-xs font-normal">{eq.categoriaEquipo?.nombre || '—'}</Badge>
-      case 'unidad':
-        return <Badge variant="secondary" className="text-xs font-normal">{eq.unidad?.nombre || '—'}</Badge>
-      case 'marca':
-        return <span className="text-sm text-muted-foreground">{eq.marca || '—'}</span>
+      case 'catUndMarca':
+        return (
+          <div className="space-y-0.5">
+            <Badge variant="secondary" className="text-xs font-normal">{eq.categoriaEquipo?.nombre || '—'}</Badge>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span>{eq.unidad?.nombre || '—'}</span>
+              <span className="text-muted-foreground/40">·</span>
+              <span>{eq.marca || '—'}</span>
+            </div>
+          </div>
+        )
       case 'uso':
         return renderUsageCell(eq)
       case 'precioLogistica':
@@ -316,10 +321,14 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
         return <span className="font-mono text-sm text-muted-foreground">{formatCurrency(eq.precioReal)}</span>
       case 'precioLista':
         return <span className="text-muted-foreground font-mono text-sm">{formatCurrency(eq.precioLista)}</span>
-      case 'factorCosto':
-        return <span className="text-xs text-muted-foreground font-mono">{(eq.factorCosto ?? 1.00).toFixed(2)}</span>
-      case 'factorVenta':
-        return <span className="text-xs text-muted-foreground">{(eq.factorVenta ?? 1.15).toFixed(2)} ({(((eq.factorVenta ?? 1.15) - 1) * 100).toFixed(0)}%)</span>
+      case 'factores':
+        return (
+          <div className="text-xs text-muted-foreground font-mono text-center">
+            <span>{(eq.factorCosto ?? 1.00).toFixed(2)}</span>
+            <span className="mx-1 text-muted-foreground/40">/</span>
+            <span>{(eq.factorVenta ?? 1.15).toFixed(2)}</span>
+          </div>
+        )
       case 'precioInterno':
         return <span className="font-mono text-sm text-muted-foreground">{formatCurrency(eq.precioInterno)}</span>
       case 'precioVenta':
@@ -339,10 +348,15 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
           )
         }
         return <Badge variant="outline" className="text-xs">{eq.estado}</Badge>
-      case 'updatedAt':
-        return <span className="text-xs text-muted-foreground whitespace-nowrap">{formatDate(eq.updatedAt)}</span>
-      case 'updatedBy':
-        return <span className="text-xs text-muted-foreground whitespace-nowrap">{eq.updatedByUser?.name || '—'}</span>
+      case 'updatedInfo':
+        return (
+          <div className="space-y-0.5">
+            <span className="text-xs text-muted-foreground whitespace-nowrap">{formatDate(eq.updatedAt)}</span>
+            {eq.updatedByUser?.name && (
+              <p className="text-[11px] text-muted-foreground/70 whitespace-nowrap">{eq.updatedByUser.name}</p>
+            )}
+          </div>
+        )
       default:
         return null
     }
