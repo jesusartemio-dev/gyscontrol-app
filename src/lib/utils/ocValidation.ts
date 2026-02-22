@@ -4,6 +4,8 @@
 //              antes de permitir cambios en cotizaciones
 // ===================================================
 
+import { prisma } from '@/lib/prisma'
+
 // Estados que BLOQUEAN el cambio de cotización
 const ESTADOS_BLOQUEANTES = ['aprobada', 'enviada', 'confirmada', 'parcial']
 // Estados que permiten cambio + actualización de OC
@@ -31,7 +33,7 @@ export async function checkOCVinculada(
   pedidoEquipoItemIds?: string[],
   tx?: PrismaLike
 ): Promise<OCVinculada | null> {
-  const db = tx as any
+  const db = (tx || prisma) as any
 
   const orConditions: any[] = [{ listaEquipoItemId }]
   if (pedidoEquipoItemIds && pedidoEquipoItemIds.length > 0) {
@@ -111,7 +113,7 @@ export async function actualizarOCBorrador(
   nuevoProveedorId: string | null,
   tx?: PrismaLike
 ): Promise<{ warningProveedor: boolean; ocNumero: string }> {
-  const db = tx as any
+  const db = (tx || prisma) as any
 
   // Actualizar cada OC item vinculado con el nuevo precio
   for (const item of oc.items) {
