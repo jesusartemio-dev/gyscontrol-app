@@ -6,6 +6,7 @@ import { Loader2, Package, Wrench } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
@@ -109,6 +110,9 @@ export default function ModalAgregarItemLibre({ isOpen, tipoItem, listaId, onClo
             <IconTipo className={`h-4 w-4 ${esServicio ? 'text-purple-600' : 'text-orange-600'}`} />
             <DialogTitle className="text-sm font-semibold">{titulo}</DialogTitle>
           </div>
+          <DialogDescription className="sr-only">
+            {esServicio ? 'Formulario para agregar un servicio o trabajo' : 'Formulario para agregar un consumible o material'}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3 mt-2">

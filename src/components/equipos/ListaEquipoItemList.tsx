@@ -420,15 +420,15 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
-                <DropdownMenuItem onClick={() => setShowModalAgregarCatalogo(true)}>
+                <DropdownMenuItem onSelect={() => setTimeout(() => setShowModalAgregarCatalogo(true), 0)}>
                   <Package className="h-3.5 w-3.5 mr-2 text-blue-600" />
                   Desde catalogo
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => { setTipoItemLibre('consumible'); setShowModalItemLibre(true) }}>
+                <DropdownMenuItem onSelect={() => setTimeout(() => { setTipoItemLibre('consumible'); setShowModalItemLibre(true) }, 0)}>
                   <Tag className="h-3.5 w-3.5 mr-2 text-orange-600" />
                   Consumible / material libre
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => { setTipoItemLibre('servicio'); setShowModalItemLibre(true) }}>
+                <DropdownMenuItem onSelect={() => setTimeout(() => { setTipoItemLibre('servicio'); setShowModalItemLibre(true) }, 0)}>
                   <Wrench className="h-3.5 w-3.5 mr-2 text-purple-600" />
                   Servicio / trabajo
                 </DropdownMenuItem>
