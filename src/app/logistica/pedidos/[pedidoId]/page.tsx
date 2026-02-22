@@ -76,7 +76,11 @@ import {
   History,
   ShoppingCart,
   PackageCheck,
-  X
+  X,
+  AlertCircle,
+  Info,
+  Truck,
+  FileText,
 } from 'lucide-react'
 
 // 🔧 Utility functions
@@ -602,8 +606,177 @@ export default function PedidoLogisticaDetailPage() {
           </DialogContent>
         </Dialog>
 
+        {/* Panel: ¿Qué falta para completar este pedido? */}
+        {!['entregado', 'cancelado'].includes(pedido.estado) && (() => {
+          const items = pedido.items || []
+          // 🔴 Sin proveedor
+          const sinProveedor = items.filter((i: any) => {
+            const provId = i.proveedorId || i.listaEquipoItem?.proveedorId
+            return !provId
+          })
+          // Items con proveedor
+          const conProveedor = items.filter((i: any) => {
+            const provId = i.proveedorId || i.listaEquipoItem?.proveedorId
+            return !!provId
+          })
+          // 🟡 Con proveedor pero sin OC
+          const sinOC = conProveedor.filter((i: any) => !(i.ordenCompraItems?.length > 0))
+          // Items con OC
+          const conOC = conProveedor.filter((i: any) => i.ordenCompraItems?.length > 0)
+          // 🔵 OC pendiente de confirmar (borrador/aprobada/enviada)
+          const ocPendienteConfirmar = conOC.filter((i: any) => {
+            const oc = i.ordenCompraItems?.[0]?.ordenCompra
+            return oc && ['borrador', 'aprobada', 'enviada'].includes(oc.estado)
+          })
+          // 🟣 OC confirmada pero sin recepción (item no entregado)
+          const ocEsperandoRecepcion = conOC.filter((i: any) => {
+            const oc = i.ordenCompraItems?.[0]?.ordenCompra
+            return oc && ['confirmada', 'parcial'].includes(oc.estado) && i.estado !== 'entregado'
+          })
+
+          const hayAlertas = sinProveedor.length > 0 || sinOC.length > 0 || ocPendienteConfirmar.length > 0 || ocEsperandoRecepcion.length > 0
+          const todoCompleto = !hayAlertas && items.length > 0
+
+          if (todoCompleto) return null
+
+          return (
+            <Collapsible defaultOpen={hayAlertas}>
+              <div className="bg-white rounded-lg border">
+                <CollapsibleTrigger className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-gray-50/50 transition-colors">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-amber-500" />
+                    <span className="text-xs font-medium">¿Qué falta para completar este pedido?</span>
+                    {hayAlertas && (
+                      <Badge variant="outline" className="text-[9px] h-4 px-1.5 bg-amber-50 text-amber-700 border-amber-200">
+                        {sinProveedor.length + sinOC.length + ocPendienteConfirmar.length + ocEsperandoRecepcion.length} pendiente{sinProveedor.length + sinOC.length + ocPendienteConfirmar.length + ocEsperandoRecepcion.length !== 1 ? 's' : ''}
+                      </Badge>
+                    )}
+                  </div>
+                  <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="px-4 pb-3 space-y-2">
+                    {/* 🔴 Sin proveedor */}
+                    {sinProveedor.length > 0 && (
+                      <div className="flex items-start gap-2 text-[11px] bg-red-50 border border-red-100 rounded-md px-3 py-2">
+                        <AlertCircle className="h-3.5 w-3.5 text-red-500 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="font-medium text-red-700">
+                            {sinProveedor.length} item{sinProveedor.length !== 1 ? 's' : ''} sin proveedor asignado
+                          </p>
+                          <p className="text-red-600 mt-0.5">
+                            Asigna proveedor desde la Lista de Equipo antes de generar OC.
+                          </p>
+                          <p className="text-red-500 mt-1 font-mono text-[10px]">
+                            {sinProveedor.map((i: any) => i.codigo).join(', ')}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    {/* 🟡 Con proveedor pero sin OC */}
+                    {sinOC.length > 0 && (
+                      <div className="flex items-start gap-2 text-[11px] bg-amber-50 border border-amber-100 rounded-md px-3 py-2">
+                        <AlertTriangle className="h-3.5 w-3.5 text-amber-500 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <p className="font-medium text-amber-700">
+                            {sinOC.length} item{sinOC.length !== 1 ? 's' : ''} {sinOC.length !== 1 ? 'tienen' : 'tiene'} proveedor pero no {sinOC.length !== 1 ? 'tienen' : 'tiene'} OC generada
+                          </p>
+                          {puedeGenerarOC && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-6 text-[10px] mt-1.5 border-amber-300 text-amber-700 hover:bg-amber-100"
+                              onClick={() => {
+                                const fn = pedido?.fechaNecesaria
+                                  ? new Date(pedido.fechaNecesaria).toISOString().split('T')[0]
+                                  : ''
+                                const { grupos } = calcularGruposProveedor()
+                                const fechasIniciales: Record<string, string> = {}
+                                for (const g of grupos) {
+                                  fechasIniciales[g.id] = fn
+                                }
+                                setFechasEntregaOC(fechasIniciales)
+                                setProveedoresSeleccionados(new Set(grupos.map(g => g.id)))
+                                setShowGenerarOC(true)
+                              }}
+                            >
+                              <ShoppingCart className="h-3 w-3 mr-1" />
+                              Generar OCs pendientes
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {/* 🔵 OC pendiente de confirmar */}
+                    {ocPendienteConfirmar.length > 0 && (
+                      <div className="flex items-start gap-2 text-[11px] bg-blue-50 border border-blue-100 rounded-md px-3 py-2">
+                        <Info className="h-3.5 w-3.5 text-blue-500 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="font-medium text-blue-700">
+                            {ocPendienteConfirmar.length} item{ocPendienteConfirmar.length !== 1 ? 's' : ''} {ocPendienteConfirmar.length !== 1 ? 'tienen' : 'tiene'} OC pendiente de confirmar
+                          </p>
+                          <div className="flex flex-wrap gap-1.5 mt-1">
+                            {(() => {
+                              const ocMap = new Map<string, { id: string; numero: string; estado: string }>()
+                              ocPendienteConfirmar.forEach((i: any) => {
+                                const oc = i.ordenCompraItems?.[0]?.ordenCompra
+                                if (oc && !ocMap.has(oc.id)) ocMap.set(oc.id, oc)
+                              })
+                              return Array.from(ocMap.values()).map(oc => (
+                                <Link
+                                  key={oc.id}
+                                  href={`/logistica/ordenes-compra/${oc.id}`}
+                                  className="inline-flex items-center gap-1 text-[10px] font-medium text-blue-600 hover:text-blue-800 bg-white border border-blue-200 rounded px-1.5 py-0.5"
+                                >
+                                  {oc.numero}
+                                  <Badge variant="outline" className="text-[8px] h-3.5 px-1 border-blue-200">{oc.estado}</Badge>
+                                  <ExternalLink className="h-2.5 w-2.5" />
+                                </Link>
+                              ))
+                            })()}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {/* 🟣 OC confirmada esperando recepción */}
+                    {ocEsperandoRecepcion.length > 0 && (
+                      <div className="flex items-start gap-2 text-[11px] bg-purple-50 border border-purple-100 rounded-md px-3 py-2">
+                        <Truck className="h-3.5 w-3.5 text-purple-500 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="font-medium text-purple-700">
+                            {ocEsperandoRecepcion.length} item{ocEsperandoRecepcion.length !== 1 ? 's' : ''} {ocEsperandoRecepcion.length !== 1 ? 'tienen' : 'tiene'} OC confirmada esperando recepción
+                          </p>
+                          <div className="flex flex-wrap gap-1.5 mt-1">
+                            {(() => {
+                              const ocMap = new Map<string, { id: string; numero: string; estado: string }>()
+                              ocEsperandoRecepcion.forEach((i: any) => {
+                                const oc = i.ordenCompraItems?.[0]?.ordenCompra
+                                if (oc && !ocMap.has(oc.id)) ocMap.set(oc.id, oc)
+                              })
+                              return Array.from(ocMap.values()).map(oc => (
+                                <Link
+                                  key={oc.id}
+                                  href={`/logistica/ordenes-compra/${oc.id}`}
+                                  className="inline-flex items-center gap-1 text-[10px] font-medium text-purple-600 hover:text-purple-800 bg-white border border-purple-200 rounded px-1.5 py-0.5"
+                                >
+                                  {oc.numero}
+                                  <ExternalLink className="h-2.5 w-2.5" />
+                                </Link>
+                              ))
+                            })()}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CollapsibleContent>
+              </div>
+            </Collapsible>
+          )
+        })()}
+
         {/* Stats cards compactas */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
           <div className="bg-white rounded-lg border p-3">
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground">Progreso</span>
@@ -642,6 +815,13 @@ export default function PedidoLogisticaDetailPage() {
               {formatCurrency(pedido.items?.reduce((sum, item) => sum + (item.costoTotal || 0), 0) || 0)}
             </p>
           </div>
+          <a href="#seccion-ocs" className="bg-white rounded-lg border p-3 hover:bg-gray-50 transition-colors block">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">OCs</span>
+              <ShoppingCart className="h-3.5 w-3.5 text-blue-500" />
+            </div>
+            <p className="text-xl font-bold mt-1 text-blue-600">{(pedido as any).ordenesCompra?.length || 0}</p>
+          </a>
         </div>
 
         {/* Info rápida del pedido */}
@@ -885,7 +1065,7 @@ export default function PedidoLogisticaDetailPage() {
         </div>
 
         {/* 🛒 Órdenes de Compra vinculadas */}
-        <div className="bg-white rounded-lg border">
+        <div id="seccion-ocs" className="bg-white rounded-lg border">
           <div className="px-4 py-3 border-b bg-gray-50/50 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <ShoppingCart className="h-4 w-4 text-blue-600" />
