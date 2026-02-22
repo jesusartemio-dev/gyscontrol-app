@@ -51,8 +51,9 @@ interface OrdenCompra {
   moneda: string
   total: number
   condicionPago: string
+  diasCredito: number | null
   estado: string
-  proveedor?: { id: string; nombre: string }
+  proveedor?: { id: string; nombre: string; ruc?: string | null }
   proyecto?: { id: string; codigo: string; nombre: string } | null
 }
 
@@ -130,6 +131,7 @@ export default function CuentasPagarPage() {
     fechaRecepcion: new Date().toISOString().split('T')[0],
     fechaVencimiento: '',
     condicionPago: 'contado',
+    diasCredito: '',
     proyectoId: '',
     ordenCompraId: '',
     descripcion: '',
@@ -241,6 +243,7 @@ export default function CuentasPagarPage() {
       fechaRecepcion: new Date().toISOString().split('T')[0],
       fechaVencimiento: '',
       condicionPago: 'contado',
+      diasCredito: '',
       proyectoId: '',
       ordenCompraId: '',
       descripcion: '',
@@ -248,9 +251,26 @@ export default function CuentasPagarPage() {
     })
   }
 
+  const calcularFechaVencimiento = (fechaRecepcion: string, condicionPago: string, diasCredito: string): string => {
+    if (!fechaRecepcion) return ''
+    if (condicionPago === 'contado') return fechaRecepcion
+    let dias = parseInt(diasCredito)
+    if (isNaN(dias) && condicionPago.startsWith('credito_')) {
+      dias = parseInt(condicionPago.split('_')[1])
+    }
+    if (isNaN(dias) || dias <= 0) return ''
+    const fecha = new Date(fechaRecepcion + 'T00:00:00')
+    fecha.setDate(fecha.getDate() + dias)
+    return fecha.toISOString().split('T')[0]
+  }
+
   const handleCreate = async () => {
     if (!createForm.proveedorId || !createForm.monto || !createForm.fechaRecepcion || !createForm.fechaVencimiento) {
       toast.error('Proveedor, monto, fecha recepción y fecha vencimiento son requeridos')
+      return
+    }
+    if (createForm.ordenCompraId && !createForm.numeroFactura.trim()) {
+      toast.error('El número de factura es obligatorio al registrar desde OC')
       return
     }
     const monto = parseFloat(createForm.monto)
@@ -275,6 +295,7 @@ export default function CuentasPagarPage() {
           fechaRecepcion: createForm.fechaRecepcion,
           fechaVencimiento: createForm.fechaVencimiento,
           condicionPago: createForm.condicionPago,
+          diasCredito: createForm.diasCredito ? parseInt(createForm.diasCredito) : null,
           proyectoId: createForm.proyectoId || null,
           ordenCompraId: createForm.ordenCompraId || null,
           descripcion: createForm.descripcion || null,
@@ -485,6 +506,8 @@ export default function CuentasPagarPage() {
                       className="text-orange-700 hover:text-orange-900 hover:bg-orange-100"
                       onClick={() => {
                         resetCreateForm()
+                        const diasStr = oc.diasCredito ? String(oc.diasCredito) : ''
+                        const fechaRec = new Date().toISOString().split('T')[0]
                         setCreateForm(f => ({
                           ...f,
                           ordenCompraId: oc.id,
@@ -493,7 +516,9 @@ export default function CuentasPagarPage() {
                           moneda: oc.moneda,
                           proyectoId: oc.proyectoId || '',
                           condicionPago: oc.condicionPago || 'contado',
+                          diasCredito: diasStr,
                           descripcion: `OC ${oc.numero}`,
+                          fechaVencimiento: calcularFechaVencimiento(fechaRec, oc.condicionPago || 'contado', diasStr),
                         }))
                         setShowCreateDialog(true)
                       }}
@@ -620,55 +645,95 @@ export default function CuentasPagarPage() {
             <DialogDescription>Registrar una factura o cuenta pendiente de pago a proveedor</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            {/* Card informativa OC (solo cuando viene de una OC) */}
+            {createForm.ordenCompraId ? (() => {
+              const oc = ordenesCompra.find(o => o.id === createForm.ordenCompraId)
+              if (!oc) return null
+              return (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-1 text-sm">
+                  <div className="flex items-center justify-between">
+                    <p className="font-medium text-blue-800">Datos de la OC (referencia)</p>
+                    <Button variant="ghost" size="sm" className="h-6 text-[10px] text-blue-600" onClick={() => setCreateForm(f => ({ ...f, ordenCompraId: '', diasCredito: '' }))}>
+                      Desvincular OC
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs">
+                    <span className="text-muted-foreground">Proveedor:</span>
+                    <span className="font-medium">{oc.proveedor?.nombre}{oc.proveedor?.ruc ? ` (${oc.proveedor.ruc})` : ''}</span>
+                    <span className="text-muted-foreground">OC vinculada:</span>
+                    <span className="font-mono font-medium">{oc.numero}</span>
+                    {oc.proyecto && <>
+                      <span className="text-muted-foreground">Proyecto:</span>
+                      <span className="font-medium">{oc.proyecto.nombre}</span>
+                    </>}
+                    <span className="text-muted-foreground">Moneda:</span>
+                    <span className="font-medium">{oc.moneda}</span>
+                  </div>
+                </div>
+              )
+            })() : (
+              <>
+                <div>
+                  <Label>Orden de Compra (opcional)</Label>
+                  <Select value="none" onValueChange={v => {
+                    const ocId = v === 'none' ? '' : v
+                    if (ocId) {
+                      const oc = ordenesCompra.find(o => o.id === ocId)
+                      if (oc) {
+                        const diasStr = oc.diasCredito ? String(oc.diasCredito) : ''
+                        setCreateForm(f => ({
+                          ...f,
+                          ordenCompraId: ocId,
+                          proveedorId: oc.proveedorId,
+                          monto: oc.total.toFixed(2),
+                          moneda: oc.moneda,
+                          proyectoId: oc.proyectoId || '',
+                          condicionPago: oc.condicionPago || 'contado',
+                          diasCredito: diasStr,
+                          descripcion: f.descripcion || `OC ${oc.numero}`,
+                          fechaVencimiento: calcularFechaVencimiento(f.fechaRecepcion, oc.condicionPago || 'contado', diasStr),
+                        }))
+                      }
+                    }
+                  }}>
+                    <SelectTrigger><SelectValue placeholder="Sin OC" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sin OC</SelectItem>
+                      {ordenesCompra.map(oc => (
+                        <SelectItem key={oc.id} value={oc.id}>
+                          {oc.numero} — {oc.proveedor?.nombre || 'Proveedor'} — {formatCurrency(oc.total, oc.moneda)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Proveedor *</Label>
+                  <Select value={createForm.proveedorId} onValueChange={v => setCreateForm(f => ({ ...f, proveedorId: v }))}>
+                    <SelectTrigger><SelectValue placeholder="Seleccionar proveedor" /></SelectTrigger>
+                    <SelectContent>
+                      {proveedores.map(p => (
+                        <SelectItem key={p.id} value={p.id}>{p.nombre}{p.ruc ? ` (${p.ruc})` : ''}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Proyecto (opcional)</Label>
+                  <Select value={createForm.proyectoId || 'none'} onValueChange={v => setCreateForm(f => ({ ...f, proyectoId: v === 'none' ? '' : v }))}>
+                    <SelectTrigger><SelectValue placeholder="Sin proyecto" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sin proyecto</SelectItem>
+                      {proyectos.map(p => (
+                        <SelectItem key={p.id} value={p.id}>{p.codigo} - {p.nombre}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
             <div>
-              <Label>Orden de Compra (opcional)</Label>
-              <Select value={createForm.ordenCompraId || 'none'} onValueChange={v => {
-                const ocId = v === 'none' ? '' : v
-                if (ocId) {
-                  const oc = ordenesCompra.find(o => o.id === ocId)
-                  if (oc) {
-                    setCreateForm(f => ({
-                      ...f,
-                      ordenCompraId: ocId,
-                      proveedorId: oc.proveedorId,
-                      monto: oc.total.toFixed(2),
-                      moneda: oc.moneda,
-                      proyectoId: oc.proyectoId || '',
-                      condicionPago: oc.condicionPago || 'contado',
-                      descripcion: f.descripcion || `OC ${oc.numero}`,
-                    }))
-                  }
-                } else {
-                  setCreateForm(f => ({ ...f, ordenCompraId: '' }))
-                }
-              }}>
-                <SelectTrigger><SelectValue placeholder="Sin OC" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sin OC</SelectItem>
-                  {ordenesCompra.map(oc => (
-                    <SelectItem key={oc.id} value={oc.id}>
-                      {oc.numero} — {oc.proveedor?.nombre || 'Proveedor'} — {formatCurrency(oc.total, oc.moneda)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {createForm.ordenCompraId && (
-                <p className="text-xs text-blue-600 mt-1">Proveedor, monto, moneda y proyecto pre-llenados desde la OC. Puedes ajustarlos si la factura difiere.</p>
-              )}
-            </div>
-            <div>
-              <Label>Proveedor *</Label>
-              <Select value={createForm.proveedorId} onValueChange={v => setCreateForm(f => ({ ...f, proveedorId: v }))}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar proveedor" /></SelectTrigger>
-                <SelectContent>
-                  {proveedores.map(p => (
-                    <SelectItem key={p.id} value={p.id}>{p.nombre}{p.ruc ? ` (${p.ruc})` : ''}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>N° Factura</Label>
+              <Label>N° Factura {createForm.ordenCompraId ? '*' : ''}</Label>
               <Input placeholder="F001-00123" value={createForm.numeroFactura} onChange={e => setCreateForm(f => ({ ...f, numeroFactura: e.target.value }))} />
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -676,30 +741,30 @@ export default function CuentasPagarPage() {
                 <Label>Monto *</Label>
                 <Input type="number" step="0.01" placeholder="0.00" value={createForm.monto} onChange={e => setCreateForm(f => ({ ...f, monto: e.target.value }))} />
               </div>
-              <div>
-                <Label>Moneda</Label>
-                <Select value={createForm.moneda} onValueChange={v => setCreateForm(f => ({ ...f, moneda: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="PEN">PEN (S/)</SelectItem>
-                    <SelectItem value="USD">USD ($)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Fecha Recepción *</Label>
-                <Input type="date" value={createForm.fechaRecepcion} onChange={e => setCreateForm(f => ({ ...f, fechaRecepcion: e.target.value }))} />
-              </div>
-              <div>
-                <Label>Fecha Vencimiento *</Label>
-                <Input type="date" value={createForm.fechaVencimiento} onChange={e => setCreateForm(f => ({ ...f, fechaVencimiento: e.target.value }))} />
-              </div>
+              {!createForm.ordenCompraId && (
+                <div>
+                  <Label>Moneda</Label>
+                  <Select value={createForm.moneda} onValueChange={v => setCreateForm(f => ({ ...f, moneda: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="PEN">PEN (S/)</SelectItem>
+                      <SelectItem value="USD">USD ($)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
             <div>
               <Label>Condición de Pago</Label>
-              <Select value={createForm.condicionPago} onValueChange={v => setCreateForm(f => ({ ...f, condicionPago: v }))}>
+              <Select value={createForm.condicionPago} onValueChange={v => {
+                const diasFromCondicion = v.startsWith('credito_') ? v.split('_')[1] : ''
+                setCreateForm(f => ({
+                  ...f,
+                  condicionPago: v,
+                  diasCredito: diasFromCondicion || f.diasCredito,
+                  fechaVencimiento: calcularFechaVencimiento(f.fechaRecepcion, v, diasFromCondicion || f.diasCredito),
+                }))
+              }}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {CONDICIONES_PAGO.map(c => (
@@ -708,22 +773,47 @@ export default function CuentasPagarPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label>Proyecto (opcional)</Label>
-              <Select value={createForm.proyectoId || 'none'} onValueChange={v => setCreateForm(f => ({ ...f, proyectoId: v === 'none' ? '' : v }))}>
-                <SelectTrigger><SelectValue placeholder="Sin proyecto" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sin proyecto</SelectItem>
-                  {proyectos.map(p => (
-                    <SelectItem key={p.id} value={p.id}>{p.codigo} - {p.nombre}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            {createForm.condicionPago !== 'contado' && (
+              <div>
+                <Label>Días de crédito</Label>
+                <Input
+                  type="number"
+                  placeholder="30"
+                  value={createForm.diasCredito}
+                  onChange={e => {
+                    const dias = e.target.value
+                    setCreateForm(f => ({
+                      ...f,
+                      diasCredito: dias,
+                      fechaVencimiento: calcularFechaVencimiento(f.fechaRecepcion, f.condicionPago, dias),
+                    }))
+                  }}
+                />
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Fecha Recepción *</Label>
+                <Input type="date" value={createForm.fechaRecepcion} onChange={e => {
+                  const fecha = e.target.value
+                  setCreateForm(f => ({
+                    ...f,
+                    fechaRecepcion: fecha,
+                    fechaVencimiento: calcularFechaVencimiento(fecha, f.condicionPago, f.diasCredito),
+                  }))
+                }} />
+              </div>
+              <div>
+                <Label>Fecha Vencimiento *</Label>
+                <Input type="date" value={createForm.fechaVencimiento} onChange={e => setCreateForm(f => ({ ...f, fechaVencimiento: e.target.value }))} />
+              </div>
             </div>
-            <div>
-              <Label>Descripción</Label>
-              <Input placeholder="Descripción del gasto o servicio" value={createForm.descripcion} onChange={e => setCreateForm(f => ({ ...f, descripcion: e.target.value }))} />
-            </div>
+            {!createForm.ordenCompraId && (
+              <div>
+                <Label>Descripción</Label>
+                <Input placeholder="Descripción del gasto o servicio" value={createForm.descripcion} onChange={e => setCreateForm(f => ({ ...f, descripcion: e.target.value }))} />
+              </div>
+            )}
             <div>
               <Label>Observaciones</Label>
               <Input placeholder="Notas adicionales" value={createForm.observaciones} onChange={e => setCreateForm(f => ({ ...f, observaciones: e.target.value }))} />

@@ -13,6 +13,20 @@ const includeRelations = {
   items: {
     orderBy: { createdAt: 'asc' as const },
   },
+  cuentasPorPagar: {
+    where: { estado: { not: 'anulada' as const } },
+    select: {
+      id: true,
+      numeroFactura: true,
+      monto: true,
+      moneda: true,
+      saldoPendiente: true,
+      estado: true,
+      fechaVencimiento: true,
+      fechaRecepcion: true,
+    },
+    orderBy: { createdAt: 'desc' as const },
+  },
 }
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {

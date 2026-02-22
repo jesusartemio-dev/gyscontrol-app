@@ -7,9 +7,13 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { ArrowLeft, Loader2, CheckCircle, Send, Package, XCircle, FileDown, Building2, CreditCard, MapPin } from 'lucide-react'
+import { ArrowLeft, Loader2, CheckCircle, Send, Package, XCircle, FileDown, Building2, CreditCard, MapPin, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
+import Link from 'next/link'
 import { getOrdenCompraById, aprobarOC, enviarOC, confirmarOC, cancelarOC, deleteOrdenCompra, registrarRecepcionOC } from '@/lib/services/ordenCompra'
 import OCEstadoStepper from '@/components/logistica/OCEstadoStepper'
 import dynamic from 'next/dynamic'
@@ -50,6 +54,18 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
   const [showDelete, setShowDelete] = useState(false)
   const [recepcion, setRecepcion] = useState<Record<string, number>>({})
   const [editingRecepcion, setEditingRecepcion] = useState(false)
+  const [showFacturaModal, setShowFacturaModal] = useState(false)
+  const [facturaForm, setFacturaForm] = useState({
+    numeroFactura: '',
+    monto: '',
+    moneda: 'PEN',
+    fechaRecepcion: new Date().toISOString().split('T')[0],
+    fechaVencimiento: '',
+    condicionPago: 'contado',
+    diasCredito: '',
+    observaciones: '',
+  })
+  const [savingFactura, setSavingFactura] = useState(false)
 
   useEffect(() => { loadData() }, [id])
 
@@ -88,6 +104,105 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
       toast.error(error instanceof Error ? error.message : 'Error al eliminar')
     }
   }
+
+  const calcularFechaVencimiento = (fechaRecepcion: string, condicionPago: string, diasCredito: string): string => {
+    if (!fechaRecepcion) return ''
+    if (condicionPago === 'contado') return fechaRecepcion
+    let dias = parseInt(diasCredito)
+    if (isNaN(dias) && condicionPago.startsWith('credito_')) {
+      dias = parseInt(condicionPago.split('_')[1])
+    }
+    if (isNaN(dias) || dias <= 0) return ''
+    const fecha = new Date(fechaRecepcion + 'T00:00:00')
+    fecha.setDate(fecha.getDate() + dias)
+    return fecha.toISOString().split('T')[0]
+  }
+
+  const abrirModalFactura = () => {
+    if (!oc) return
+    const dias = oc.diasCredito ? String(oc.diasCredito) :
+      oc.condicionPago?.startsWith('credito_') ? oc.condicionPago.split('_')[1] : ''
+    const fechaRec = new Date().toISOString().split('T')[0]
+    setFacturaForm({
+      numeroFactura: '',
+      monto: oc.total.toFixed(2),
+      moneda: oc.moneda,
+      fechaRecepcion: fechaRec,
+      fechaVencimiento: calcularFechaVencimiento(fechaRec, oc.condicionPago, dias),
+      condicionPago: oc.condicionPago,
+      diasCredito: dias,
+      observaciones: '',
+    })
+    setShowFacturaModal(true)
+  }
+
+  const handleCrearFactura = async () => {
+    if (!oc) return
+    if (!facturaForm.numeroFactura.trim()) {
+      toast.error('El número de factura es obligatorio')
+      return
+    }
+    const monto = parseFloat(facturaForm.monto)
+    if (isNaN(monto) || monto <= 0) {
+      toast.error('El monto debe ser mayor a 0')
+      return
+    }
+    if (!facturaForm.fechaRecepcion || !facturaForm.fechaVencimiento) {
+      toast.error('Las fechas de recepción y vencimiento son requeridas')
+      return
+    }
+    setSavingFactura(true)
+    try {
+      const res = await fetch('/api/administracion/cuentas-pagar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          proveedorId: oc.proveedorId,
+          proyectoId: oc.proyectoId || null,
+          ordenCompraId: oc.id,
+          numeroFactura: facturaForm.numeroFactura.trim(),
+          monto,
+          moneda: facturaForm.moneda,
+          fechaRecepcion: facturaForm.fechaRecepcion,
+          fechaVencimiento: facturaForm.fechaVencimiento,
+          condicionPago: facturaForm.condicionPago,
+          diasCredito: facturaForm.diasCredito ? parseInt(facturaForm.diasCredito) : null,
+          descripcion: `OC ${oc.numero}`,
+          observaciones: facturaForm.observaciones || null,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Error al crear')
+      }
+      toast.success('Factura registrada correctamente')
+      setShowFacturaModal(false)
+      await loadData()
+    } catch (e: any) {
+      toast.error(e.message || 'Error al registrar factura')
+    } finally {
+      setSavingFactura(false)
+    }
+  }
+
+  const getEstadoCxPColor = (estado: string) => {
+    const colors: Record<string, string> = {
+      pendiente: 'bg-yellow-100 text-yellow-700',
+      parcial: 'bg-blue-100 text-blue-700',
+      pagada: 'bg-green-100 text-green-700',
+      vencida: 'bg-red-100 text-red-700',
+    }
+    return colors[estado] || 'bg-gray-100 text-gray-700'
+  }
+
+  const CONDICIONES_PAGO = [
+    { value: 'contado', label: 'Contado' },
+    { value: 'credito_15', label: 'Crédito 15 días' },
+    { value: 'credito_30', label: 'Crédito 30 días' },
+    { value: 'credito_45', label: 'Crédito 45 días' },
+    { value: 'credito_60', label: 'Crédito 60 días' },
+    { value: 'credito_90', label: 'Crédito 90 días' },
+  ]
 
   if (loading) {
     return (
@@ -428,6 +543,153 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
           {oc.fechaConfirmacion && <div className="flex gap-2"><span className="text-muted-foreground w-32">Confirmación:</span> {formatDate(oc.fechaConfirmacion)}</div>}
         </CardContent>
       </Card>
+
+      {/* Facturación */}
+      {['confirmada', 'parcial', 'completada'].includes(oc.estado) && (() => {
+        const cxps = (oc as any).cuentasPorPagar || []
+        const cxp = cxps[0]
+
+        if (cxp) {
+          return (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <CreditCard className="h-4 w-4" />
+                  Facturación
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm space-y-2">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                  <span className="font-medium">Factura registrada</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>N° Factura: <strong>{cxp.numeroFactura || '—'}</strong></div>
+                  <div>Monto: <strong>{formatCurrency(cxp.monto, cxp.moneda)}</strong></div>
+                  <div className="flex items-center gap-1">Estado: <Badge className={getEstadoCxPColor(cxp.estado)}>{cxp.estado}</Badge></div>
+                  <div>Vencimiento: <strong>{formatDate(cxp.fechaVencimiento)}</strong></div>
+                  <div>Saldo pendiente: <strong>{formatCurrency(cxp.saldoPendiente, cxp.moneda)}</strong></div>
+                </div>
+                <Link href="/administracion/cuentas-pagar" className="text-xs text-blue-600 hover:underline inline-block mt-1">
+                  Ver en CxP →
+                </Link>
+              </CardContent>
+            </Card>
+          )
+        }
+
+        if (!['confirmada', 'completada'].includes(oc.estado)) return null
+        return (
+          <Card className="border-amber-200">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm text-amber-700">
+                <AlertTriangle className="h-4 w-4" />
+                Esta OC no tiene factura registrada.
+              </div>
+              <Button size="sm" onClick={abrirModalFactura}>
+                Registrar factura
+              </Button>
+            </CardContent>
+          </Card>
+        )
+      })()}
+
+      {/* Modal registrar factura */}
+      <Dialog open={showFacturaModal} onOpenChange={open => { if (!open) setShowFacturaModal(false) }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Registrar Factura</DialogTitle>
+            <DialogDescription>Crear cuenta por pagar vinculada a OC {oc.numero}</DialogDescription>
+          </DialogHeader>
+          {oc && (
+            <div className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm">
+                <p className="font-medium text-blue-800 mb-1">Datos de la OC (referencia)</p>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs">
+                  <span className="text-muted-foreground">Proveedor:</span>
+                  <span className="font-medium">{oc.proveedor?.nombre}{(oc.proveedor as any)?.ruc ? ` (${(oc.proveedor as any).ruc})` : ''}</span>
+                  <span className="text-muted-foreground">OC vinculada:</span>
+                  <span className="font-mono font-medium">{oc.numero}</span>
+                  {oc.proyecto && <>
+                    <span className="text-muted-foreground">Proyecto:</span>
+                    <span className="font-medium">{oc.proyecto.nombre}</span>
+                  </>}
+                  <span className="text-muted-foreground">Moneda:</span>
+                  <span className="font-medium">{oc.moneda}</span>
+                </div>
+              </div>
+              <div>
+                <Label>N° Factura *</Label>
+                <Input placeholder="F001-00123" value={facturaForm.numeroFactura} onChange={e => setFacturaForm(f => ({ ...f, numeroFactura: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Monto *</Label>
+                <Input type="number" step="0.01" value={facturaForm.monto} onChange={e => setFacturaForm(f => ({ ...f, monto: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Condición de Pago</Label>
+                <Select value={facturaForm.condicionPago} onValueChange={v => {
+                  const diasFromCondicion = v.startsWith('credito_') ? v.split('_')[1] : ''
+                  setFacturaForm(f => ({
+                    ...f,
+                    condicionPago: v,
+                    diasCredito: diasFromCondicion || f.diasCredito,
+                    fechaVencimiento: calcularFechaVencimiento(f.fechaRecepcion, v, diasFromCondicion || f.diasCredito),
+                  }))
+                }}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {CONDICIONES_PAGO.map(c => (
+                      <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {facturaForm.condicionPago !== 'contado' && (
+                <div>
+                  <Label>Días de crédito</Label>
+                  <Input type="number" placeholder="30" value={facturaForm.diasCredito} onChange={e => {
+                    const dias = e.target.value
+                    setFacturaForm(f => ({
+                      ...f,
+                      diasCredito: dias,
+                      fechaVencimiento: calcularFechaVencimiento(f.fechaRecepcion, f.condicionPago, dias),
+                    }))
+                  }} />
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Fecha Recepción *</Label>
+                  <Input type="date" value={facturaForm.fechaRecepcion} onChange={e => {
+                    const fecha = e.target.value
+                    setFacturaForm(f => ({
+                      ...f,
+                      fechaRecepcion: fecha,
+                      fechaVencimiento: calcularFechaVencimiento(fecha, f.condicionPago, f.diasCredito),
+                    }))
+                  }} />
+                </div>
+                <div>
+                  <Label>Fecha Vencimiento *</Label>
+                  <Input type="date" value={facturaForm.fechaVencimiento} onChange={e => setFacturaForm(f => ({ ...f, fechaVencimiento: e.target.value }))} />
+                </div>
+              </div>
+              <div>
+                <Label>Observaciones</Label>
+                <Input placeholder="Notas adicionales" value={facturaForm.observaciones} onChange={e => setFacturaForm(f => ({ ...f, observaciones: e.target.value }))} />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowFacturaModal(false)}>Cancelar</Button>
+            <Button onClick={handleCrearFactura} disabled={savingFactura}>
+              {savingFactura && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Registrar Factura
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Cancel Dialog */}
       <AlertDialog open={showCancel} onOpenChange={setShowCancel}>
