@@ -31,6 +31,8 @@ export const EntregaItemSchema = z.object({
   costoRealUnitario: z.number().positive('Costo debe ser positivo').optional(),
   costoRealMoneda: z.enum(['PEN', 'USD']).optional(),
   precioUnitario: z.number().positive('Precio debe ser positivo').optional(),
+  tiempoEntregaDias: z.number().int().min(0, 'Debe ser 0 o más').optional(),
+  tiempoEntrega: z.string().max(100).optional(),
 });
 
 /**

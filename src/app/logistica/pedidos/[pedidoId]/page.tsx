@@ -157,9 +157,10 @@ export default function PedidoLogisticaDetailPage() {
     costoRealUnitario: string
     costoRealMoneda: string
     precioUnitario: string
-  }>({ item: null, cantidadAtendida: 0, estado: 'pendiente', fechaEntregaReal: '', observacionesEntrega: '', motivoAtencionDirecta: '', costoRealUnitario: '', costoRealMoneda: 'USD', precioUnitario: '' })
+    tiempoEntregaDias: string
+  }>({ item: null, cantidadAtendida: 0, estado: 'pendiente', fechaEntregaReal: '', observacionesEntrega: '', motivoAtencionDirecta: '', costoRealUnitario: '', costoRealMoneda: 'USD', precioUnitario: '', tiempoEntregaDias: '' })
 
-  const resetEditingItem = () => setEditingItem({ item: null, cantidadAtendida: 0, estado: 'pendiente', fechaEntregaReal: '', observacionesEntrega: '', motivoAtencionDirecta: '', costoRealUnitario: '', costoRealMoneda: 'USD', precioUnitario: '' })
+  const resetEditingItem = () => setEditingItem({ item: null, cantidadAtendida: 0, estado: 'pendiente', fechaEntregaReal: '', observacionesEntrega: '', motivoAtencionDirecta: '', costoRealUnitario: '', costoRealMoneda: 'USD', precioUnitario: '', tiempoEntregaDias: '' })
 
   // ✏️ Estado para edición inline de T.Entrega y F.Entrega
   const [inlineEdit, setInlineEdit] = useState<{ itemId: string; field: 'tiempoEntrega' | 'fechaEntregaEstimada'; value: string } | null>(null)
@@ -176,13 +177,31 @@ export default function PedidoLogisticaDetailPage() {
 
     setSavingInline(true)
     try {
-      await updatePedidoEquipoItem(inlineEdit.itemId, {
-        cantidadPedida: item.cantidadPedida,
-        ...(inlineEdit.field === 'tiempoEntrega'
-          ? { tiempoEntrega: inlineEdit.value || undefined }
-          : { fechaEntregaEstimada: inlineEdit.value || undefined }
-        ),
-      })
+      const tieneOC = ((item as any).ordenCompraItems?.length ?? 0) > 0
+
+      if (inlineEdit.field === 'tiempoEntrega') {
+        if (tieneOC) {
+          // Items with OC: save as text (tiempoEntrega)
+          await updatePedidoEquipoItem(inlineEdit.itemId, {
+            cantidadPedida: item.cantidadPedida,
+            tiempoEntrega: inlineEdit.value || undefined,
+          })
+        } else {
+          // Items without OC: save as days (tiempoEntregaDias + tiempoEntrega text)
+          const dias = inlineEdit.value ? parseInt(inlineEdit.value) : undefined
+          await updatePedidoEquipoItem(inlineEdit.itemId, {
+            cantidadPedida: item.cantidadPedida,
+            tiempoEntregaDias: dias,
+            tiempoEntrega: dias != null ? `${dias} día${dias !== 1 ? 's' : ''}` : undefined,
+          })
+        }
+      } else {
+        await updatePedidoEquipoItem(inlineEdit.itemId, {
+          cantidadPedida: item.cantidadPedida,
+          fechaEntregaEstimada: inlineEdit.value || undefined,
+        })
+      }
+
       toast.success(inlineEdit.field === 'tiempoEntrega' ? 'T. Entrega actualizado' : 'F. Entrega actualizada')
       await cargarDatos()
     } catch {
@@ -284,6 +303,7 @@ export default function PedidoLogisticaDetailPage() {
       costoRealUnitario: (item as any).costoRealUnitario ? String((item as any).costoRealUnitario) : '',
       costoRealMoneda: (item as any).costoRealMoneda || 'USD',
       precioUnitario: item.precioUnitario ? String(item.precioUnitario) : '',
+      tiempoEntregaDias: (item as any).tiempoEntregaDias ? String((item as any).tiempoEntregaDias) : '',
     })
   }
 
@@ -348,6 +368,13 @@ export default function PedidoLogisticaDetailPage() {
       // Precio unitario
       if (editingItem.precioUnitario && parseFloat(editingItem.precioUnitario) > 0) {
         payload.precioUnitario = parseFloat(editingItem.precioUnitario)
+      }
+
+      // Tiempo de entrega en días
+      if (editingItem.tiempoEntregaDias && parseInt(editingItem.tiempoEntregaDias) >= 0) {
+        const dias = parseInt(editingItem.tiempoEntregaDias)
+        payload.tiempoEntregaDias = dias
+        payload.tiempoEntrega = `${dias} día${dias !== 1 ? 's' : ''}`
       }
 
       // Campos de atención directa (solo sin OC y no servicio)
@@ -1268,24 +1295,50 @@ export default function PedidoLogisticaDetailPage() {
                         </Badge>
                       </td>
                       <td className="px-3 py-2 text-center">
-                        {inlineEdit?.itemId === item.id && inlineEdit.field === 'tiempoEntrega' ? (
-                          <Input
-                            autoFocus
-                            type="text"
-                            value={inlineEdit.value}
-                            onChange={(e) => setInlineEdit(prev => prev ? { ...prev, value: e.target.value } : null)}
-                            onBlur={saveInlineEdit}
-                            onKeyDown={(e) => { if (e.key === 'Enter') saveInlineEdit(); if (e.key === 'Escape') cancelInlineEdit() }}
-                            placeholder="Ej: 15d, 2sem"
-                            className="h-6 text-[10px] w-20 text-center px-1"
-                            disabled={savingInline}
-                          />
-                        ) : (() => {
+                        {(() => {
                           const te = (item as any).tiempoEntrega
                           const ted = (item as any).tiempoEntregaDias
+                          const tieneOC = ((item as any).ordenCompraItems?.length ?? 0) > 0
+
+                          // Display text: prefer tiempoEntregaDias with singular/plural
+                          const texto = ted != null
+                            ? `${ted} día${ted !== 1 ? 's' : ''}`
+                            : te || null
+
+                          // Inline edit: numeric for items without OC, text for items with OC
+                          if (inlineEdit?.itemId === item.id && inlineEdit.field === 'tiempoEntrega') {
+                            return tieneOC ? (
+                              <Input
+                                autoFocus
+                                type="text"
+                                value={inlineEdit.value}
+                                onChange={(e) => setInlineEdit(prev => prev ? { ...prev, value: e.target.value } : null)}
+                                onBlur={saveInlineEdit}
+                                onKeyDown={(e) => { if (e.key === 'Enter') saveInlineEdit(); if (e.key === 'Escape') cancelInlineEdit() }}
+                                placeholder="Ej: Stock, 15d"
+                                className="h-6 text-[10px] w-20 text-center px-1"
+                                disabled={savingInline}
+                              />
+                            ) : (
+                              <Input
+                                autoFocus
+                                type="number"
+                                min={0}
+                                step={1}
+                                value={inlineEdit.value}
+                                onChange={(e) => setInlineEdit(prev => prev ? { ...prev, value: e.target.value } : null)}
+                                onBlur={saveInlineEdit}
+                                onKeyDown={(e) => { if (e.key === 'Enter') saveInlineEdit(); if (e.key === 'Escape') cancelInlineEdit() }}
+                                placeholder="días"
+                                className="h-6 text-[10px] w-16 text-center px-1"
+                                disabled={savingInline}
+                              />
+                            )
+                          }
+
                           const focr = (item as any).fechaOrdenCompraRecomendada
                           const vencida = focr && new Date(focr) < new Date()
-                          const texto = te || (ted ? `${ted}d` : null)
+                          const editValue = tieneOC ? (te || '') : (ted != null ? String(ted) : '')
 
                           return (
                             <span
@@ -1296,7 +1349,7 @@ export default function PedidoLogisticaDetailPage() {
                                 texto && !vencida && 'text-gray-600',
                               )}
                               title="Click para editar"
-                              onClick={() => startInlineEdit(item.id, 'tiempoEntrega', te || '')}
+                              onClick={() => startInlineEdit(item.id, 'tiempoEntrega', editValue)}
                             >
                               {texto || '—'}
                             </span>
@@ -1789,6 +1842,27 @@ export default function PedidoLogisticaDetailPage() {
                         </span>
                       </div>
                     </div>
+
+                    {/* Tiempo real de obtención (días) — solo si no tiene tiempoEntregaDias */}
+                    {!(editingItem.item as any)?.tiempoEntregaDias && (
+                      <div>
+                        <label className="text-xs font-medium mb-1 block">
+                          Tiempo real de obtención (días)
+                          {!editingItem.tiempoEntregaDias && (
+                            <span className="ml-1.5 text-[10px] text-amber-600 font-normal">(sin registrar)</span>
+                          )}
+                        </label>
+                        <Input
+                          type="number"
+                          min={0}
+                          step={1}
+                          value={editingItem.tiempoEntregaDias}
+                          onChange={(e) => setEditingItem(prev => ({ ...prev, tiempoEntregaDias: e.target.value }))}
+                          placeholder="ej: 1 = llegó al día siguiente, 3 = tardó 3 días, 7 = una semana"
+                          className="h-9 text-xs"
+                        />
+                      </div>
+                    )}
 
                     {/* Fecha de entrega */}
                     {cantAtendida > 0 && (

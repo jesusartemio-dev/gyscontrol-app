@@ -32,6 +32,7 @@ interface UrgentItem {
   unidad: string
   cantidad: number
   precioEstimado: string
+  tiempoEntregaDias: string
 }
 
 interface Proyecto {
@@ -57,6 +58,7 @@ function newItem(): UrgentItem {
     unidad: 'unidad',
     cantidad: 1,
     precioEstimado: '',
+    tiempoEntregaDias: '',
   }
 }
 
@@ -171,6 +173,8 @@ export default function ModalPedidoUrgente({ isOpen, onClose, onCreated }: Props
             cantidadPedida: item.cantidad,
             tipoItem: item.tipoItem,
             precioUnitario: item.precioEstimado ? parseFloat(item.precioEstimado) : undefined,
+            tiempoEntregaDias: item.tiempoEntregaDias ? parseInt(item.tiempoEntregaDias) : undefined,
+            tiempoEntrega: item.tiempoEntregaDias ? `${parseInt(item.tiempoEntregaDias)} día${parseInt(item.tiempoEntregaDias) !== 1 ? 's' : ''}` : undefined,
           }),
         })
 
@@ -335,6 +339,18 @@ export default function ModalPedidoUrgente({ isOpen, onClose, onCreated }: Props
                         value={item.precioEstimado}
                         onChange={(e) => updateItem(item.tempId, 'precioEstimado', e.target.value)}
                         placeholder="—"
+                        className="h-7 text-[10px] w-full text-center"
+                      />
+                    </div>
+                    <div className="w-[90px] shrink-0">
+                      <label className="text-[10px] text-gray-500 mb-0.5 block">T. Entrega (días)</label>
+                      <Input
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={item.tiempoEntregaDias}
+                        onChange={(e) => updateItem(item.tempId, 'tiempoEntregaDias', e.target.value)}
+                        placeholder="ej: 1, 3, 7"
                         className="h-7 text-[10px] w-full text-center"
                       />
                     </div>

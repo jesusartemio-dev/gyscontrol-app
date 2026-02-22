@@ -94,6 +94,10 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
             precioUnitario: data.precioUnitario,
             costoTotal: data.precioUnitario * itemExistente.cantidadPedida,
           } : {}),
+          ...(data.tiempoEntregaDias !== undefined ? {
+            tiempoEntregaDias: data.tiempoEntregaDias,
+            tiempoEntrega: data.tiempoEntrega || `${data.tiempoEntregaDias} día${data.tiempoEntregaDias !== 1 ? 's' : ''}`,
+          } : {}),
           updatedAt: new Date()
         },
         include: {
