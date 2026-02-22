@@ -1357,6 +1357,7 @@ model User {
   // Recepciones pendientes
   recepcionesConfirmadas                RecepcionPendiente[]         @relation("RecepcionConfirmador")
   recepcionesEntregadas                 RecepcionPendiente[]         @relation("RecepcionEntregador")
+  recepcionesRechazadas                 RecepcionPendiente[]         @relation("RecepcionRechazador")
 
   @@map("user")
 }
@@ -3220,6 +3221,9 @@ model RecepcionPendiente {
   fechaConfirmacion     DateTime?
   entregadoPorId        String?
   fechaEntregaProyecto  DateTime?
+  rechazadoPorId        String?
+  fechaRechazo          DateTime?
+  motivoRechazo         String?
   observaciones         String?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
@@ -3228,6 +3232,7 @@ model RecepcionPendiente {
   ordenCompraItem  OrdenCompraItem  @relation(fields: [ordenCompraItemId], references: [id], onDelete: Cascade)
   confirmadoPor    User?            @relation("RecepcionConfirmador", fields: [confirmadoPorId], references: [id])
   entregadoPor     User?            @relation("RecepcionEntregador", fields: [entregadoPorId], references: [id])
+  rechazadoPor     User?            @relation("RecepcionRechazador", fields: [rechazadoPorId], references: [id])
 
   @@index([pedidoEquipoItemId])
   @@index([ordenCompraItemId])

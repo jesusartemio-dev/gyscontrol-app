@@ -334,6 +334,7 @@ export default function PedidoLogisticaDetailPage() {
   const [rechazarDialog, setRechazarDialog] = useState<{ open: boolean; recepcionId: string | null }>({ open: false, recepcionId: null })
   const [rechazarObservaciones, setRechazarObservaciones] = useState('')
   const [procesandoRecepcion, setProcesandoRecepcion] = useState<string | null>(null)
+  const [rechazoDetalleModal, setRechazoDetalleModal] = useState<any>(null)
 
   // Recepciones pendientes (aplanar desde items)
   const recepcionesPendientes = (pedido?.items || []).flatMap((item: any) =>
@@ -668,8 +669,14 @@ export default function PedidoLogisticaDetailPage() {
             const oc = i.ordenCompraItems?.[0]?.ordenCompra
             return oc && ['confirmada', 'parcial'].includes(oc.estado) && i.estado !== 'entregado'
           })
+          // 🔴 Recepciones rechazadas
+          const recepcionesRechazadas = items.flatMap((i: any) =>
+            (i.recepcionesPendientes || [])
+              .filter((r: any) => r.estado === 'rechazado')
+              .map((r: any) => ({ ...r, itemCodigo: i.codigo, itemDescripcion: i.descripcion }))
+          )
 
-          const hayAlertas = sinProveedor.length > 0 || sinOC.length > 0 || ocPendienteConfirmar.length > 0 || ocEsperandoRecepcion.length > 0
+          const hayAlertas = sinProveedor.length > 0 || sinOC.length > 0 || ocPendienteConfirmar.length > 0 || ocEsperandoRecepcion.length > 0 || recepcionesRechazadas.length > 0
           const todoCompleto = !hayAlertas && items.length > 0
 
           if (todoCompleto) return null
@@ -681,11 +688,14 @@ export default function PedidoLogisticaDetailPage() {
                   <div className="flex items-center gap-2">
                     <FileText className="h-4 w-4 text-amber-500" />
                     <span className="text-xs font-medium">¿Qué falta para completar este pedido?</span>
-                    {hayAlertas && (
-                      <Badge variant="outline" className="text-[9px] h-4 px-1.5 bg-amber-50 text-amber-700 border-amber-200">
-                        {sinProveedor.length + sinOC.length + ocPendienteConfirmar.length + ocEsperandoRecepcion.length} pendiente{sinProveedor.length + sinOC.length + ocPendienteConfirmar.length + ocEsperandoRecepcion.length !== 1 ? 's' : ''}
-                      </Badge>
-                    )}
+                    {hayAlertas && (() => {
+                        const total = sinProveedor.length + sinOC.length + ocPendienteConfirmar.length + ocEsperandoRecepcion.length + recepcionesRechazadas.length
+                        return (
+                          <Badge variant="outline" className={cn('text-[9px] h-4 px-1.5', recepcionesRechazadas.length > 0 ? 'bg-red-50 text-red-700 border-red-200' : 'bg-amber-50 text-amber-700 border-amber-200')}>
+                            {total} pendiente{total !== 1 ? 's' : ''}
+                          </Badge>
+                        )
+                      })()}
                   </div>
                   <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
                 </CollapsibleTrigger>
@@ -799,6 +809,32 @@ export default function PedidoLogisticaDetailPage() {
                                 </Link>
                               ))
                             })()}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {/* 🔴 Recepciones rechazadas */}
+                    {recepcionesRechazadas.length > 0 && (
+                      <div className="flex items-start gap-2 text-[11px] bg-red-50 border border-red-200 rounded-md px-3 py-2">
+                        <AlertCircle className="h-3.5 w-3.5 text-red-500 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <p className="font-medium text-red-700">
+                            {recepcionesRechazadas.length} item{recepcionesRechazadas.length !== 1 ? 's' : ''} rechazado{recepcionesRechazadas.length !== 1 ? 's' : ''} en recepción — requieren atención
+                          </p>
+                          <div className="mt-1.5 space-y-1">
+                            {recepcionesRechazadas.map((r: any) => (
+                              <div key={r.id} className="flex items-center justify-between">
+                                <span className="text-red-600">
+                                  {r.cantidadRecibida} x {r.itemCodigo} — {r.motivoRechazo || r.observaciones || 'Sin motivo'}
+                                </span>
+                                <button
+                                  onClick={() => setRechazoDetalleModal(r)}
+                                  className="text-[10px] text-red-600 hover:text-red-800 underline ml-2 flex-shrink-0"
+                                >
+                                  Ver detalle
+                                </button>
+                              </div>
+                            ))}
                           </div>
                         </div>
                       </div>
@@ -1218,6 +1254,8 @@ export default function PedidoLogisticaDetailPage() {
                         'recepcion_en_almacen': { icon: Warehouse, color: 'text-green-500' },
                         'entrega_a_proyecto': { icon: Package, color: 'text-purple-500' },
                         'recepcion_confirmada': { icon: PackageCheck, color: 'text-green-600' },
+                        'rechazo_recepcion': { icon: X, color: 'text-red-600' },
+                        'rechazo_revertido': { icon: RefreshCw, color: 'text-amber-500' },
                       }
                       const { icon: Icon, color } = iconMap[tipo] || { icon: Activity, color: 'text-gray-500' }
 
@@ -1615,6 +1653,59 @@ export default function PedidoLogisticaDetailPage() {
               </div>
             )
           })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal detalle de rechazo */}
+      <Dialog open={!!rechazoDetalleModal} onOpenChange={(open) => { if (!open) setRechazoDetalleModal(null) }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-medium flex items-center gap-2 text-red-700">
+              <AlertCircle className="h-4 w-4" />
+              Recepción Rechazada
+            </DialogTitle>
+          </DialogHeader>
+          {rechazoDetalleModal && (
+            <div className="space-y-3 text-xs">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 space-y-2">
+                <div>
+                  <span className="text-muted-foreground">Item rechazado</span>
+                  <p className="font-medium">{rechazoDetalleModal.cantidadRecibida} x {rechazoDetalleModal.itemCodigo} — {rechazoDetalleModal.itemDescripcion}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Motivo del rechazo</span>
+                  <p className="font-medium text-red-700">{rechazoDetalleModal.motivoRechazo || rechazoDetalleModal.observaciones || 'Sin motivo registrado'}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <span className="text-muted-foreground">Rechazado por</span>
+                  <p className="font-medium">{rechazoDetalleModal.rechazadoPor?.name || 'No registrado'}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Fecha de rechazo</span>
+                  <p className="font-medium">{rechazoDetalleModal.fechaRechazo ? formatDate(rechazoDetalleModal.fechaRechazo) : 'No registrada'}</p>
+                </div>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Desde OC</span>
+                <p className="font-medium">{rechazoDetalleModal.ordenCompraItem?.ordenCompra?.numero || 'N/A'}</p>
+              </div>
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                <p className="text-[10px] font-medium text-amber-800 mb-1">Posibles acciones:</p>
+                <ul className="text-[10px] text-amber-700 space-y-0.5 list-disc list-inside">
+                  <li>Contactar proveedor para reenvío</li>
+                  <li>Solicitar nuevo pedido</li>
+                  <li>Gestionar garantía / devolución</li>
+                </ul>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setRechazoDetalleModal(null)}>
+              Cerrar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

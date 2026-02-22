@@ -59,7 +59,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
               },
             },
             recepcionesPendientes: {
-              where: { estado: { in: ['pendiente', 'en_almacen'] } },
+              where: { estado: { in: ['pendiente', 'en_almacen', 'rechazado'] } },
               include: {
                 ordenCompraItem: {
                   select: {
@@ -71,6 +71,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
                   },
                 },
                 confirmadoPor: { select: { name: true } },
+                rechazadoPor: { select: { name: true } },
               },
               orderBy: { fechaRecepcion: 'desc' as const },
             },

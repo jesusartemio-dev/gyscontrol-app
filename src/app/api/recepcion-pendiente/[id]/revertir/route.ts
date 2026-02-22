@@ -13,20 +13,13 @@ export async function POST(
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    if (!['admin', 'gerente', 'logistico', 'gestor'].includes(session.user.role)) {
-      return NextResponse.json({ error: 'Sin permisos para rechazar recepción' }, { status: 403 })
+    if (!['admin', 'gerente'].includes(session.user.role)) {
+      return NextResponse.json({ error: 'Solo admin o gerente pueden revertir rechazos' }, { status: 403 })
     }
 
     const { id } = await params
     const body = await req.json()
-    const observaciones = body.observaciones
-
-    if (!observaciones || typeof observaciones !== 'string' || observaciones.trim().length === 0) {
-      return NextResponse.json(
-        { error: 'Las observaciones son obligatorias al rechazar' },
-        { status: 400 }
-      )
-    }
+    const observaciones = body.observaciones || ''
 
     const recepcion = await prisma.recepcionPendiente.findUnique({
       where: { id },
@@ -50,9 +43,9 @@ export async function POST(
       return NextResponse.json({ error: 'Recepción no encontrada' }, { status: 404 })
     }
 
-    if (!['pendiente', 'en_almacen'].includes(recepcion.estado)) {
+    if (recepcion.estado !== 'rechazado') {
       return NextResponse.json(
-        { error: `No se puede rechazar: estado actual es "${recepcion.estado}"` },
+        { error: `Solo se pueden revertir recepciones rechazadas. Estado actual: "${recepcion.estado}"` },
         { status: 409 }
       )
     }
@@ -60,18 +53,17 @@ export async function POST(
     const pedidoItem = recepcion.pedidoEquipoItem
     const pedido = pedidoItem.pedidoEquipo
     const ocNumero = recepcion.ordenCompraItem.ordenCompra.numero
-    const motivo = observaciones.trim()
 
     await prisma.$transaction(async (tx) => {
-      // 1. Actualizar RecepcionPendiente → rechazado
+      // 1. Revertir estado a pendiente, limpiar campos de rechazo
       await tx.recepcionPendiente.update({
         where: { id },
         data: {
-          estado: 'rechazado',
-          rechazadoPorId: session.user.id,
-          fechaRechazo: new Date(),
-          motivoRechazo: motivo,
-          observaciones: motivo,
+          estado: 'pendiente',
+          rechazadoPorId: null,
+          fechaRechazo: null,
+          motivoRechazo: null,
+          observaciones: observaciones.trim() || `Rechazo revertido por ${session.user.name || session.user.email}`,
         }
       })
 
@@ -81,8 +73,8 @@ export async function POST(
           id: `evt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           proyectoId: pedido.proyectoId,
           pedidoEquipoId: pedido.id,
-          tipo: 'rechazo_recepcion',
-          descripcion: `Item rechazado en recepción: ${motivo}. ${recepcion.cantidadRecibida} x ${pedidoItem.codigo} de OC ${ocNumero} no aceptados.`,
+          tipo: 'rechazo_revertido',
+          descripcion: `Rechazo revertido: ${recepcion.cantidadRecibida} x ${pedidoItem.codigo} de OC ${ocNumero} vuelve a pendiente.${observaciones.trim() ? ` Motivo: ${observaciones.trim()}` : ''}`,
           usuarioId: session.user.id,
           metadata: {
             recepcionPendienteId: id,
@@ -90,7 +82,7 @@ export async function POST(
             cantidadRecibida: recepcion.cantidadRecibida,
             pedidoCodigo: pedido.codigo,
             itemCodigo: pedidoItem.codigo,
-            motivoRechazo: motivo,
+            motivoRechazoOriginal: recepcion.motivoRechazo,
           },
           updatedAt: new Date(),
         }
@@ -99,13 +91,13 @@ export async function POST(
 
     return NextResponse.json({
       recepcionId: id,
-      estado: 'rechazado',
-      mensaje: 'Recepción rechazada correctamente'
+      estado: 'pendiente',
+      mensaje: 'Rechazo revertido correctamente'
     })
   } catch (error) {
-    console.error('Error al rechazar recepción:', error)
+    console.error('Error al revertir rechazo:', error)
     return NextResponse.json(
-      { error: 'Error al rechazar recepción: ' + String(error) },
+      { error: 'Error al revertir rechazo: ' + String(error) },
       { status: 500 }
     )
   }
