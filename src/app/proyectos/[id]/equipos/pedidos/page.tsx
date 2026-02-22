@@ -528,6 +528,7 @@ export default function PedidosProyectoPage() {
         onCreated={cargarDatos}
         proyectoId={proyectoId}
         proyectoNombre={proyecto ? `${proyecto.codigo} — ${proyecto.nombre}` : undefined}
+        redirectBase={`/proyectos/${proyectoId}/equipos/pedidos`}
       />
     </div>
   )

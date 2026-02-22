@@ -47,6 +47,7 @@ interface Props {
   onCreated?: () => void
   proyectoId?: string
   proyectoNombre?: string
+  redirectBase?: string
 }
 
 const UNIDADES = ['unidad', 'metro', 'kg', 'rollo', 'caja', 'bolsa', 'juego', 'global']
@@ -64,7 +65,7 @@ function newItem(): UrgentItem {
   }
 }
 
-export default function ModalPedidoUrgente({ isOpen, onClose, onCreated, proyectoId: proyectoIdProp, proyectoNombre }: Props) {
+export default function ModalPedidoUrgente({ isOpen, onClose, onCreated, proyectoId: proyectoIdProp, proyectoNombre, redirectBase }: Props) {
   const { data: session } = useSession()
   const router = useRouter()
   const [step, setStep] = useState(1)
@@ -190,7 +191,7 @@ export default function ModalPedidoUrgente({ isOpen, onClose, onCreated, proyect
       toast.success(`Pedido urgente creado con ${items.length} items`)
       onClose()
       onCreated?.()
-      router.push(`/logistica/pedidos/${pedidoId}`)
+      router.push(`${redirectBase || '/logistica/pedidos'}/${pedidoId}`)
     } catch (error: any) {
       toast.error(error.message || 'Error al crear pedido urgente')
     } finally {
