@@ -287,7 +287,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
     const pedidoId = getIdPedidoRelevante(resumenPedidos)
 
     if (pedidoId) {
-      router.push(`/proyectos/${proyectoId}/pedidos-equipo/${pedidoId}`)
+      router.push(`/proyectos/${proyectoId}/equipos/pedidos/${pedidoId}`)
     } else {
       toast.error('No se encontró un pedido asociado a este ítem')
     }
@@ -704,7 +704,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                                       onClick={() => {
                                         const pedidoItem = item.pedidos?.find(p => p.pedido?.codigo === codigo)
                                         if (pedidoItem?.pedido?.id) {
-                                          router.push(`/proyectos/${proyectoId}/pedidos-equipo/${pedidoItem.pedido.id}`)
+                                          router.push(`/proyectos/${proyectoId}/equipos/pedidos/${pedidoItem.pedido.id}`)
                                         }
                                       }}
                                     >
