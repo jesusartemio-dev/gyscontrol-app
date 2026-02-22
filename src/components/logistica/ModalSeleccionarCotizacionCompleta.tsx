@@ -162,6 +162,8 @@ export default function ModalSeleccionarCotizacionCompleta({
     setIsSubmitting(true)
     let successCount = 0
     let errorCount = 0
+    let warningCount = 0
+    let blockedCount = 0
 
     for (const comp of comparisons) {
       if (!selected.has(comp.listaItemId)) continue
@@ -175,8 +177,15 @@ export default function ModalSeleccionarCotizacionCompleta({
             body: JSON.stringify({ cotizacionProveedorItemId: comp.item.id }),
           }
         )
-        if (res.ok) successCount++
-        else errorCount++
+        if (res.ok) {
+          successCount++
+          const data = await res.json()
+          if (data.warningOC) warningCount++
+        } else if (res.status === 409) {
+          blockedCount++
+        } else {
+          errorCount++
+        }
       } catch {
         errorCount++
       }
@@ -186,6 +195,12 @@ export default function ModalSeleccionarCotizacionCompleta({
 
     if (successCount > 0) {
       toast.success(`${successCount} items seleccionados para ${proveedorNombre}`)
+    }
+    if (warningCount > 0) {
+      toast.warning(`${warningCount} OCs en borrador actualizadas con nuevos precios`, { duration: 8000 })
+    }
+    if (blockedCount > 0) {
+      toast.warning(`${blockedCount} items omitidos por tener OC activa`, { duration: 8000 })
     }
     if (errorCount > 0) {
       toast.error(`${errorCount} items con error`)

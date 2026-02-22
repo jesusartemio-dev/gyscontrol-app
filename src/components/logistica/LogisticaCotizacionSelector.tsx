@@ -73,6 +73,10 @@ export default function LogisticaCotizacionSelector({ item, onUpdated }: Props) 
       )
 
       if (res.ok) {
+        const data = await res.json()
+        if (data.warningOC) {
+          toast.warning(data.warningOC, { duration: 8000 })
+        }
         toast.success('Cotización seleccionada')
         onUpdated?.()
       } else {
@@ -99,6 +103,10 @@ export default function LogisticaCotizacionSelector({ item, onUpdated }: Props) 
       )
 
       if (res.ok) {
+        const data = await res.json()
+        if (data.warningOC) {
+          toast.warning(data.warningOC, { duration: 8000 })
+        }
         toast.success('Cotización deseleccionada')
         setSelectedId(null)
         onUpdated?.()

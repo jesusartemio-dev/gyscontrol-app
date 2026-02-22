@@ -71,6 +71,11 @@ export default function QuotationSelectionMode({ listaId }: { listaId: string })
 
       const result = await response.json()
 
+      // Show warning about OC if present
+      if (result.warningOC) {
+        toast.warning(result.warningOC, { duration: 8000 })
+      }
+
       // Show detailed feedback about what was updated
       const { estadisticas, pedidosActualizados } = result
 

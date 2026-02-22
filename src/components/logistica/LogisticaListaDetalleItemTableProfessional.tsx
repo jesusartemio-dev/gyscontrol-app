@@ -60,6 +60,8 @@ export default function LogisticaListaDetalleItemTableProfessional({ items, onUp
     setIsAutoSelecting(true)
     let seleccionados = 0
     let errores = 0
+    let warningCount = 0
+    let blockedCount = 0
 
     for (const item of pendientes) {
       const cots = (item.cotizaciones || []).filter((c: any) => {
@@ -79,8 +81,15 @@ export default function LogisticaListaDetalleItemTableProfessional({ items, onUp
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ cotizacionProveedorItemId: mejor.id }),
         })
-        if (res.ok) seleccionados++
-        else errores++
+        if (res.ok) {
+          seleccionados++
+          const data = await res.json()
+          if (data.warningOC) warningCount++
+        } else if (res.status === 409) {
+          blockedCount++
+        } else {
+          errores++
+        }
       } catch {
         errores++
       }
@@ -91,6 +100,12 @@ export default function LogisticaListaDetalleItemTableProfessional({ items, onUp
     if (seleccionados > 0) {
       toast.success(`Mejor precio seleccionado en ${seleccionados} items`)
       onUpdated?.()
+    }
+    if (warningCount > 0) {
+      toast.warning(`${warningCount} OCs en borrador actualizadas con nuevos precios`, { duration: 8000 })
+    }
+    if (blockedCount > 0) {
+      toast.warning(`${blockedCount} items omitidos por tener OC activa`, { duration: 8000 })
     }
     if (errores > 0) {
       toast.error(`${errores} items no se pudieron actualizar`)

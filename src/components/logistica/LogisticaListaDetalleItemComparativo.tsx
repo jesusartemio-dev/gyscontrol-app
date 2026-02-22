@@ -19,11 +19,15 @@ export default function LogisticaListaDetalleItemComparativo({ item, onUpdated }
       })
 
       if (res.ok) {
-        toast.success('🏆 Cotización seleccionada correctamente')
+        const data = await res.json()
+        if (data.warningOC) {
+          toast.warning(data.warningOC, { duration: 8000 })
+        }
+        toast.success('Cotización seleccionada correctamente')
         onUpdated?.()
       } else {
         const data = await res.json()
-        toast.error(`❌ Error: ${data.error || 'No se pudo seleccionar cotización'}`)
+        toast.error(`Error: ${data.error || 'No se pudo seleccionar cotización'}`)
       }
     } catch (error) {
       toast.error('❌ Error inesperado al seleccionar cotización')

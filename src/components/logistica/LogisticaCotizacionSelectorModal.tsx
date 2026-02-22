@@ -115,12 +115,16 @@ export default function LogisticaCotizacionSelectorModal({
       })
 
       if (res.ok) {
-        toast.success('🏆 Cotización seleccionada correctamente')
+        const data = await res.json()
+        if (data.warningOC) {
+          toast.warning(data.warningOC, { duration: 8000 })
+        }
+        toast.success('Cotización seleccionada correctamente')
         onUpdated?.()
-        setModalOpen(false) // ✅ Cerrar modal después de seleccionar
+        setModalOpen(false)
       } else {
         const data = await res.json()
-        toast.error(`❌ Error: ${data.error || 'No se pudo seleccionar cotización'}`)
+        toast.error(`Error: ${data.error || 'No se pudo seleccionar cotización'}`)
       }
     } catch (error) {
       toast.error('❌ Error inesperado al seleccionar cotización')
