@@ -90,6 +90,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
             costoRealUnitario: data.costoRealUnitario,
             costoRealMoneda: data.costoRealMoneda || 'USD',
           } : {}),
+          ...(data.precioUnitario !== undefined ? { precioUnitario: data.precioUnitario } : {}),
           updatedAt: new Date()
         },
         include: {
@@ -257,12 +258,13 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     });
 
     // 8. Propagate precioReal to catalog (outside transaction, non-critical)
-    if (data.costoRealUnitario && itemExistente.catalogoEquipoId) {
+    const precioParaCatalogo = data.costoRealUnitario || data.precioUnitario
+    if (precioParaCatalogo && itemExistente.catalogoEquipoId) {
       propagarPrecioRealCatalogo({
         catalogoEquipoId: itemExistente.catalogoEquipoId,
-        precioReal: data.costoRealUnitario,
+        precioReal: precioParaCatalogo,
         userId,
-        metadata: { source: 'atencion_directa', pedidoCodigo: pedido.codigo },
+        metadata: { source: data.costoRealUnitario ? 'atencion_directa' : 'entrega', pedidoCodigo: pedido.codigo },
       }).catch(err => logger.error('Error propagating precioReal:', err))
     }
 

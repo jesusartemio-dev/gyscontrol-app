@@ -156,9 +156,44 @@ export default function PedidoLogisticaDetailPage() {
     motivoAtencionDirecta: string
     costoRealUnitario: string
     costoRealMoneda: string
-  }>({ item: null, cantidadAtendida: 0, estado: 'pendiente', fechaEntregaReal: '', observacionesEntrega: '', motivoAtencionDirecta: '', costoRealUnitario: '', costoRealMoneda: 'USD' })
+    precioUnitario: string
+  }>({ item: null, cantidadAtendida: 0, estado: 'pendiente', fechaEntregaReal: '', observacionesEntrega: '', motivoAtencionDirecta: '', costoRealUnitario: '', costoRealMoneda: 'USD', precioUnitario: '' })
 
-  const resetEditingItem = () => setEditingItem({ item: null, cantidadAtendida: 0, estado: 'pendiente', fechaEntregaReal: '', observacionesEntrega: '', motivoAtencionDirecta: '', costoRealUnitario: '', costoRealMoneda: 'USD' })
+  const resetEditingItem = () => setEditingItem({ item: null, cantidadAtendida: 0, estado: 'pendiente', fechaEntregaReal: '', observacionesEntrega: '', motivoAtencionDirecta: '', costoRealUnitario: '', costoRealMoneda: 'USD', precioUnitario: '' })
+
+  // ✏️ Estado para edición inline de T.Entrega y F.Entrega
+  const [inlineEdit, setInlineEdit] = useState<{ itemId: string; field: 'tiempoEntrega' | 'fechaEntregaEstimada'; value: string } | null>(null)
+  const [savingInline, setSavingInline] = useState(false)
+
+  const startInlineEdit = (itemId: string, field: 'tiempoEntrega' | 'fechaEntregaEstimada', currentValue: string) => {
+    setInlineEdit({ itemId, field, value: currentValue })
+  }
+
+  const saveInlineEdit = async () => {
+    if (!inlineEdit || savingInline) return
+    const item = pedido?.items?.find(i => i.id === inlineEdit.itemId)
+    if (!item) return
+
+    setSavingInline(true)
+    try {
+      await updatePedidoEquipoItem(inlineEdit.itemId, {
+        cantidadPedida: item.cantidadPedida,
+        ...(inlineEdit.field === 'tiempoEntrega'
+          ? { tiempoEntrega: inlineEdit.value || undefined }
+          : { fechaEntregaEstimada: inlineEdit.value || undefined }
+        ),
+      })
+      toast.success(inlineEdit.field === 'tiempoEntrega' ? 'T. Entrega actualizado' : 'F. Entrega actualizada')
+      await cargarDatos()
+    } catch {
+      toast.error('Error al guardar')
+    } finally {
+      setSavingInline(false)
+      setInlineEdit(null)
+    }
+  }
+
+  const cancelInlineEdit = () => setInlineEdit(null)
 
   // 🏪 Estado para asignación de proveedor inline
   const [proveedores, setProveedores] = useState<{ id: string; nombre: string }[]>([])
@@ -248,6 +283,7 @@ export default function PedidoLogisticaDetailPage() {
       motivoAtencionDirecta: (item as any).motivoAtencionDirecta || '',
       costoRealUnitario: (item as any).costoRealUnitario ? String((item as any).costoRealUnitario) : '',
       costoRealMoneda: (item as any).costoRealMoneda || 'USD',
+      precioUnitario: item.precioUnitario ? String(item.precioUnitario) : '',
     })
   }
 
@@ -307,6 +343,11 @@ export default function PedidoLogisticaDetailPage() {
         cantidadAtendida: cantidadFinal,
         fechaEntregaReal: (cantidadFinal > 0 || esServicio) ? editingItem.fechaEntregaReal : undefined,
         observacionesEntrega: editingItem.observacionesEntrega || undefined,
+      }
+
+      // Precio unitario
+      if (editingItem.precioUnitario && parseFloat(editingItem.precioUnitario) > 0) {
+        payload.precioUnitario = parseFloat(editingItem.precioUnitario)
       }
 
       // Campos de atención directa (solo sin OC y no servicio)
@@ -1227,65 +1268,80 @@ export default function PedidoLogisticaDetailPage() {
                         </Badge>
                       </td>
                       <td className="px-3 py-2 text-center">
-                        {(() => {
+                        {inlineEdit?.itemId === item.id && inlineEdit.field === 'tiempoEntrega' ? (
+                          <Input
+                            autoFocus
+                            type="text"
+                            value={inlineEdit.value}
+                            onChange={(e) => setInlineEdit(prev => prev ? { ...prev, value: e.target.value } : null)}
+                            onBlur={saveInlineEdit}
+                            onKeyDown={(e) => { if (e.key === 'Enter') saveInlineEdit(); if (e.key === 'Escape') cancelInlineEdit() }}
+                            placeholder="Ej: 15d, 2sem"
+                            className="h-6 text-[10px] w-20 text-center px-1"
+                            disabled={savingInline}
+                          />
+                        ) : (() => {
                           const te = (item as any).tiempoEntrega
                           const ted = (item as any).tiempoEntregaDias
                           const focr = (item as any).fechaOrdenCompraRecomendada
                           const vencida = focr && new Date(focr) < new Date()
                           const texto = te || (ted ? `${ted}d` : null)
 
-                          if (!texto) return <span className="text-gray-400">—</span>
-
-                          if (vencida) {
-                            return (
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <span className="text-[10px] font-medium text-red-600 cursor-help">
-                                      {texto}
-                                    </span>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p className="text-xs">OC debería haberse emitido el {formatDate(focr)}</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            )
-                          }
-
-                          return <span className="text-[10px] text-gray-600">{texto}</span>
+                          return (
+                            <span
+                              className={cn(
+                                'text-[10px] cursor-pointer hover:bg-blue-50 hover:text-blue-700 rounded px-1.5 py-0.5 transition-colors',
+                                !texto && 'text-gray-400',
+                                texto && vencida && 'font-medium text-red-600',
+                                texto && !vencida && 'text-gray-600',
+                              )}
+                              title="Click para editar"
+                              onClick={() => startInlineEdit(item.id, 'tiempoEntrega', te || '')}
+                            >
+                              {texto || '—'}
+                            </span>
+                          )
                         })()}
                       </td>
                       <td className="px-3 py-2 text-center">
-                        {(() => {
+                        {inlineEdit?.itemId === item.id && inlineEdit.field === 'fechaEntregaEstimada' ? (
+                          <Input
+                            autoFocus
+                            type="date"
+                            value={inlineEdit.value}
+                            onChange={(e) => setInlineEdit(prev => prev ? { ...prev, value: e.target.value } : null)}
+                            onBlur={saveInlineEdit}
+                            onKeyDown={(e) => { if (e.key === 'Enter') saveInlineEdit(); if (e.key === 'Escape') cancelInlineEdit() }}
+                            className="h-6 text-[10px] w-28 text-center px-1"
+                            disabled={savingInline}
+                          />
+                        ) : (() => {
                           const fEstimada = (item as any).fechaEntregaEstimada
                           const fReal = (item as any).fechaEntregaReal
                           const fechaNec = pedido?.fechaNecesaria
 
+                          // If already delivered, show real date (not editable)
                           if (fReal) {
-                            return <span className="text-[10px] text-gray-600">{formatDate(fReal)}</span>
+                            return <span className="text-[10px] text-green-600">{formatDate(fReal)}</span>
                           }
-                          if (fEstimada) {
-                            const superaFecha = fechaNec && new Date(fEstimada) > new Date(fechaNec)
-                            if (superaFecha) {
-                              return (
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <span className="text-[10px] font-medium text-red-600 cursor-help">
-                                        {formatDate(fEstimada)}
-                                      </span>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p className="text-xs">Supera la fecha necesaria del proyecto ({formatDate(fechaNec)})</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              )
-                            }
-                            return <span className="text-[10px] text-gray-600">{formatDate(fEstimada)}</span>
-                          }
-                          return <span className="text-gray-400">—</span>
+
+                          const fEstStr = fEstimada ? new Date(fEstimada).toISOString().split('T')[0] : ''
+                          const superaFecha = fEstimada && fechaNec && new Date(fEstimada) > new Date(fechaNec)
+
+                          return (
+                            <span
+                              className={cn(
+                                'text-[10px] cursor-pointer hover:bg-blue-50 hover:text-blue-700 rounded px-1.5 py-0.5 transition-colors',
+                                !fEstimada && 'text-gray-400',
+                                fEstimada && superaFecha && 'font-medium text-red-600',
+                                fEstimada && !superaFecha && 'text-gray-600',
+                              )}
+                              title="Click para editar"
+                              onClick={() => startInlineEdit(item.id, 'fechaEntregaEstimada', fEstStr)}
+                            >
+                              {fEstimada ? formatDate(fEstimada) : '—'}
+                            </span>
+                          )
                         })()}
                       </td>
                       <td className="px-3 py-2 text-right font-medium text-emerald-600">
@@ -1699,6 +1755,38 @@ export default function PedidoLogisticaDetailPage() {
                           className={cn('h-2', esCompleta && '[&>div]:bg-green-500', esParcial && '[&>div]:bg-amber-500')}
                         />
                         <p className="text-[10px] text-muted-foreground mt-1 text-right">{porcentaje}%</p>
+                      </div>
+                    </div>
+
+                    {/* Precio unitario */}
+                    <div>
+                      <label className="text-xs font-medium mb-1 block">
+                        Precio unitario
+                        {!editingItem.precioUnitario && !editingItem.item?.precioUnitario && (
+                          <span className="ml-1.5 text-[10px] text-amber-600 font-normal">(sin precio registrado)</span>
+                        )}
+                      </label>
+                      <div className={cn(
+                        'flex items-center gap-2 rounded-md border px-3 py-1.5',
+                        !editingItem.precioUnitario && !editingItem.item?.precioUnitario
+                          ? 'border-amber-300 bg-amber-50'
+                          : 'border-input bg-background'
+                      )}>
+                        <span className="text-xs text-muted-foreground">$</span>
+                        <Input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          value={editingItem.precioUnitario}
+                          onChange={(e) => setEditingItem(prev => ({ ...prev, precioUnitario: e.target.value }))}
+                          placeholder="0.00"
+                          className="h-7 text-sm font-medium border-0 p-0 focus-visible:ring-0 shadow-none"
+                        />
+                        <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                          × {cantAtendida || editingItem.item?.cantidadPedida || 0} = <span className="font-medium text-emerald-600">
+                            ${((parseFloat(editingItem.precioUnitario) || 0) * (cantAtendida || editingItem.item?.cantidadPedida || 0)).toFixed(2)}
+                          </span>
+                        </span>
                       </div>
                     </div>
 

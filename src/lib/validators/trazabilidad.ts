@@ -30,6 +30,7 @@ export const EntregaItemSchema = z.object({
   motivoAtencionDirecta: z.string().optional(),
   costoRealUnitario: z.number().positive('Costo debe ser positivo').optional(),
   costoRealMoneda: z.enum(['PEN', 'USD']).optional(),
+  precioUnitario: z.number().positive('Precio debe ser positivo').optional(),
 });
 
 /**
