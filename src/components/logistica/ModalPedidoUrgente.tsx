@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -8,6 +8,7 @@ import { Zap, Plus, Trash2, Loader2, ArrowRight, ArrowLeft } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
@@ -114,7 +115,19 @@ export default function ModalPedidoUrgente({ isOpen, onClose, onCreated }: Props
   }
 
   const canProceedStep1 = proyectoId && fechaNecesaria && motivoUrgencia.trim()
-  const canSubmit = items.length > 0 && items.every(i => i.codigo.trim() && i.descripcion.trim() && i.unidad && i.cantidad > 0)
+
+  // Validation with per-row error details
+  const itemErrors = useMemo(() => {
+    return items.map((item, idx) => {
+      const missing: string[] = []
+      if (!item.codigo.trim()) missing.push('código')
+      if (!item.descripcion.trim()) missing.push('descripción')
+      if (!item.cantidad || item.cantidad <= 0) missing.push('cantidad')
+      return missing.length > 0 ? { fila: idx + 1, missing } : null
+    }).filter(Boolean) as { fila: number; missing: string[] }[]
+  }, [items])
+
+  const canSubmit = items.length > 0 && itemErrors.length === 0
 
   const handleSubmit = async () => {
     if (!session?.user) return
@@ -187,6 +200,7 @@ export default function ModalPedidoUrgente({ isOpen, onClose, onCreated }: Props
             <Badge variant="destructive" className="text-[9px] h-4 px-1">SIN LISTA</Badge>
             <span className="text-xs text-muted-foreground ml-auto">Paso {step} de 2</span>
           </div>
+          <DialogDescription className="sr-only">Crear pedido urgente sin lista técnica</DialogDescription>
         </DialogHeader>
 
         {step === 1 && (
@@ -283,7 +297,7 @@ export default function ModalPedidoUrgente({ isOpen, onClose, onCreated }: Props
                           value={item.codigo}
                           onChange={(e) => updateItem(item.tempId, 'codigo', e.target.value)}
                           placeholder="COD"
-                          className="h-7 text-[10px] border-0 bg-transparent px-1"
+                          className={`h-7 text-[10px] bg-transparent px-1 ${!item.codigo.trim() ? 'border border-red-300 rounded' : 'border-0'}`}
                         />
                       </td>
                       <td className="px-1 py-1">
@@ -291,7 +305,7 @@ export default function ModalPedidoUrgente({ isOpen, onClose, onCreated }: Props
                           value={item.descripcion}
                           onChange={(e) => updateItem(item.tempId, 'descripcion', e.target.value)}
                           placeholder="Descripcion del item..."
-                          className="h-7 text-[10px] border-0 bg-transparent px-1"
+                          className={`h-7 text-[10px] bg-transparent px-1 ${!item.descripcion.trim() ? 'border border-red-300 rounded' : 'border-0'}`}
                         />
                       </td>
                       <td className="px-1 py-1">
@@ -312,7 +326,7 @@ export default function ModalPedidoUrgente({ isOpen, onClose, onCreated }: Props
                           min={0}
                           value={item.cantidad || ''}
                           onChange={(e) => updateItem(item.tempId, 'cantidad', parseFloat(e.target.value) || 0)}
-                          className="h-7 text-[10px] border-0 bg-transparent px-1 text-center"
+                          className={`h-7 text-[10px] bg-transparent px-1 text-center ${!item.cantidad || item.cantidad <= 0 ? 'border border-red-300 rounded' : 'border-0'}`}
                         />
                       </td>
                       <td className="px-1 py-1">
@@ -352,6 +366,15 @@ export default function ModalPedidoUrgente({ isOpen, onClose, onCreated }: Props
             >
               <Plus className="h-3 w-3 mr-1" /> Agregar fila
             </Button>
+
+            {!canSubmit && itemErrors.length > 0 && (
+              <div className="mt-2 rounded-md bg-red-50 border border-red-200 px-3 py-2 text-[10px] text-red-600 space-y-0.5">
+                <span className="font-medium">Completa los campos requeridos:</span>
+                {itemErrors.map(err => (
+                  <div key={err.fila}>· Fila {err.fila}: falta {err.missing.join(', ')}</div>
+                ))}
+              </div>
+            )}
 
             <div className="flex items-center justify-between mt-3 pt-3 border-t">
               <Button variant="outline" size="sm" onClick={() => setStep(1)} disabled={loading} className="h-7 text-xs">
