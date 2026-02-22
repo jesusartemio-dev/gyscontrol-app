@@ -69,7 +69,7 @@ export async function PATCH(
         where: { listaEquipoItemId: id },
         include: {
           pedidoEquipo: {
-            select: { id: true, codigo: true, proyecto: { select: { nombre: true } } }
+            select: { id: true, codigo: true, fechaNecesaria: true, proyecto: { select: { nombre: true } } }
           }
         }
       })
@@ -83,6 +83,7 @@ export async function PATCH(
             costoTotal: 0,
             tiempoEntrega: null,
             tiempoEntregaDias: null,
+            fechaOrdenCompraRecomendada: null,
             proveedorId: null,
           },
         })
@@ -183,7 +184,7 @@ export async function PATCH(
       where: { listaEquipoItemId: id },
       include: {
         pedidoEquipo: {
-          select: { id: true, codigo: true, proyecto: { select: { nombre: true } } }
+          select: { id: true, codigo: true, fechaNecesaria: true, proyecto: { select: { nombre: true } } }
         }
       }
     })
@@ -192,6 +193,14 @@ export async function PATCH(
     for (const pedidoItem of pedidosAfectados) {
       const nuevoCostoTotal = precioUnitario * pedidoItem.cantidadPedida
 
+      // Recalcular fecha OC recomendada
+      let fechaOrdenCompraRecomendada: Date | null = null
+      if (tiempoEntregaDias && pedidoItem.pedidoEquipo.fechaNecesaria) {
+        const fechaNec = new Date(pedidoItem.pedidoEquipo.fechaNecesaria)
+        fechaOrdenCompraRecomendada = new Date(fechaNec)
+        fechaOrdenCompraRecomendada.setDate(fechaNec.getDate() - tiempoEntregaDias)
+      }
+
       await prisma.pedidoEquipoItem.update({
         where: { id: pedidoItem.id },
         data: {
@@ -199,6 +208,7 @@ export async function PATCH(
           costoTotal: nuevoCostoTotal,
           tiempoEntrega,
           tiempoEntregaDias,
+          fechaOrdenCompraRecomendada,
           proveedorId,
         },
       })

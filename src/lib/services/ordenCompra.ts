@@ -96,6 +96,7 @@ export async function generarOCsDesdePedido(payload: {
   condicionPago?: string
   observaciones?: string
   fechaEntregaEstimada?: string
+  fechasEntregaPorProveedor?: Record<string, string>
 }): Promise<{ ordenesCreadas: OrdenCompra[]; resumen: { totalOCs: number; totalItems: number; itemsSinProveedor: number; itemsConOCExistente: number } }> {
   const res = await fetch(`${BASE_URL}/desde-pedido`, {
     method: 'POST',

@@ -129,12 +129,21 @@ export async function POST(
           const pedidoItems = await tx.pedidoEquipoItem.findMany({
             where: { listaEquipoItemId: itemId },
             include: {
-              pedidoEquipo: { select: { id: true } }
+              pedidoEquipo: { select: { id: true, fechaNecesaria: true } }
             }
           })
 
           for (const pedidoItem of pedidoItems) {
             const nuevoCostoTotal = precioUnitario * pedidoItem.cantidadPedida
+
+            // Recalcular fecha OC recomendada
+            let fechaOrdenCompraRecomendada: Date | null = null
+            if (tiempoEntregaDias && pedidoItem.pedidoEquipo.fechaNecesaria) {
+              const fechaNec = new Date(pedidoItem.pedidoEquipo.fechaNecesaria)
+              fechaOrdenCompraRecomendada = new Date(fechaNec)
+              fechaOrdenCompraRecomendada.setDate(fechaNec.getDate() - tiempoEntregaDias)
+            }
+
             await tx.pedidoEquipoItem.update({
               where: { id: pedidoItem.id },
               data: {
@@ -142,6 +151,7 @@ export async function POST(
                 costoTotal: nuevoCostoTotal,
                 tiempoEntrega,
                 tiempoEntregaDias,
+                fechaOrdenCompraRecomendada,
                 proveedorId,
               }
             })

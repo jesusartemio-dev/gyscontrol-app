@@ -314,6 +314,14 @@ export async function POST(request: Request) {
           const costoTotal = precioUnitario * itemSel.cantidadPedida
           presupuestoTotal += costoTotal
 
+          // Calcular fecha recomendada para emitir OC
+          let fechaOrdenCompraRecomendada: Date | null = null
+          if (listaItem.tiempoEntregaDias) {
+            const fechaNec = new Date(body.fechaNecesaria)
+            fechaOrdenCompraRecomendada = new Date(fechaNec)
+            fechaOrdenCompraRecomendada.setDate(fechaNec.getDate() - listaItem.tiempoEntregaDias)
+          }
+
           await tx.pedidoEquipoItem.create({
             data: {
               id: randomUUID(),
@@ -328,6 +336,7 @@ export async function POST(request: Request) {
               costoTotal,
               tiempoEntrega: listaItem.tiempoEntrega,
               tiempoEntregaDias: listaItem.tiempoEntregaDias,
+              fechaOrdenCompraRecomendada,
               responsableId: body.responsableId,
               estado: 'pendiente',
               estadoEntrega: 'pendiente',

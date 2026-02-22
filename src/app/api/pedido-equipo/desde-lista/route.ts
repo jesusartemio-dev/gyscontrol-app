@@ -165,6 +165,14 @@ export async function POST(request: NextRequest) {
           const itemOriginal = itemsEncontrados.find(i => i.id === item.listaEquipoItemId)
           
           // Crear el item del pedido (usar precioUnitario ya calculado con fallback chain)
+          // Calcular fecha recomendada para emitir OC
+          let fechaOrdenCompraRecomendada: Date | null = null
+          if (itemOriginal?.tiempoEntregaDias) {
+            const fechaNec = payload.fechaNecesaria ? new Date(payload.fechaNecesaria) : new Date()
+            fechaOrdenCompraRecomendada = new Date(fechaNec)
+            fechaOrdenCompraRecomendada.setDate(fechaNec.getDate() - itemOriginal.tiempoEntregaDias)
+          }
+
           const pedidoItem = await tx.pedidoEquipoItem.create({
             data: {
               id: randomUUID(),
@@ -180,6 +188,7 @@ export async function POST(request: NextRequest) {
               costoTotal: item.costoTotal,
               tiempoEntrega: itemOriginal?.tiempoEntrega,
               tiempoEntregaDias: itemOriginal?.tiempoEntregaDias,
+              fechaOrdenCompraRecomendada,
               estado: 'pendiente',
               estadoEntrega: 'pendiente',
               proveedorId: itemOriginal?.proveedorId || null,

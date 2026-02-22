@@ -36,7 +36,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Sin permisos para generar órdenes de compra' }, { status: 403 })
     }
 
-    const { pedidoId, itemIds, moneda = 'USD', condicionPago = 'contado', observaciones, fechaEntregaEstimada } = await req.json()
+    const { pedidoId, itemIds, moneda = 'USD', condicionPago = 'contado', observaciones, fechaEntregaEstimada, fechasEntregaPorProveedor } = await req.json()
 
     if (!pedidoId) {
       return NextResponse.json({ error: 'pedidoId es requerido' }, { status: 400 })
@@ -133,6 +133,9 @@ export async function POST(req: Request) {
         const igv = moneda === 'USD' ? 0 : subtotal * 0.18
         const total = subtotal + igv
 
+        // Usar fecha por proveedor si disponible, fallback a fecha global
+        const fechaProveedor = fechasEntregaPorProveedor?.[proveedorId] || fechaEntregaEstimada
+
         const oc = await tx.ordenCompra.create({
           data: {
             numero,
@@ -147,7 +150,7 @@ export async function POST(req: Request) {
             igv,
             total,
             observaciones: observaciones || `Generada desde pedido ${pedido.codigo}`,
-            fechaEntregaEstimada: fechaEntregaEstimada ? new Date(fechaEntregaEstimada) : null,
+            fechaEntregaEstimada: fechaProveedor ? new Date(fechaProveedor) : null,
             updatedAt: new Date(),
             items: { create: ocItems },
           },

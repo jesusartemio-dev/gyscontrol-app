@@ -46,6 +46,12 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 
 // 🎯 Icons
@@ -124,7 +130,7 @@ export default function PedidoLogisticaDetailPage() {
   const [generandoOC, setGenerandoOC] = useState(false)
   const [monedaOC, setMonedaOC] = useState('USD')
   const [condicionPagoOC, setCondicionPagoOC] = useState('contado')
-  const [fechaEntregaOC, setFechaEntregaOC] = useState('')
+  const [fechasEntregaOC, setFechasEntregaOC] = useState<Record<string, string>>({})
 
   // 📦 Estado para edición de items
   const [editingItem, setEditingItem] = useState<{
@@ -271,16 +277,18 @@ export default function PedidoLogisticaDetailPage() {
     }
 
     // Agrupar elegibles por proveedor
-    const mapaProveedores = new Map<string, { nombre: string; items: any[]; monto: number }>()
+    const mapaProveedores = new Map<string, { nombre: string; items: any[]; monto: number; maxTiempoEntregaDias: number }>()
     for (const item of elegibles) {
       const provId = (item as any).proveedorId || (item as any).listaEquipoItem?.proveedorId
       const provNombre = (item as any).proveedor?.nombre || (item as any).proveedorNombre || (item as any).listaEquipoItem?.proveedor?.nombre || 'Sin nombre'
       if (!mapaProveedores.has(provId)) {
-        mapaProveedores.set(provId, { nombre: provNombre, items: [], monto: 0 })
+        mapaProveedores.set(provId, { nombre: provNombre, items: [], monto: 0, maxTiempoEntregaDias: 0 })
       }
       const grupo = mapaProveedores.get(provId)!
       grupo.items.push(item)
       grupo.monto += item.costoTotal || (item.cantidadPedida * (item.precioUnitario || 0))
+      const ted = (item as any).tiempoEntregaDias || 0
+      if (ted > grupo.maxTiempoEntregaDias) grupo.maxTiempoEntregaDias = ted
     }
 
     return {
@@ -298,7 +306,7 @@ export default function PedidoLogisticaDetailPage() {
         pedidoId: pedido.id,
         moneda: monedaOC,
         condicionPago: condicionPagoOC,
-        fechaEntregaEstimada: fechaEntregaOC || undefined,
+        fechasEntregaPorProveedor: fechasEntregaOC,
       })
       toast.success(`Se generaron ${resultado.resumen.totalOCs} orden(es) de compra con ${resultado.resumen.totalItems} items`)
       setShowGenerarOC(false)
@@ -459,11 +467,15 @@ export default function PedidoLogisticaDetailPage() {
                   variant="default"
                   size="sm"
                   onClick={() => {
-                    // Default fecha entrega from pedido.fechaNecesaria
                     const fn = pedido?.fechaNecesaria
                       ? new Date(pedido.fechaNecesaria).toISOString().split('T')[0]
                       : ''
-                    setFechaEntregaOC(fn)
+                    const { grupos } = calcularGruposProveedor()
+                    const fechasIniciales: Record<string, string> = {}
+                    for (const g of grupos) {
+                      fechasIniciales[g.id] = fn
+                    }
+                    setFechasEntregaOC(fechasIniciales)
                     setShowGenerarOC(true)
                   }}
                   className="h-7 text-xs"
@@ -700,6 +712,7 @@ export default function PedidoLogisticaDetailPage() {
                     <th className="px-3 py-2 text-center font-medium text-gray-600">Pedido</th>
                     <th className="px-3 py-2 text-center font-medium text-gray-600">Atendido</th>
                     <th className="px-3 py-2 text-center font-medium text-gray-600">Estado</th>
+                    <th className="px-3 py-2 text-center font-medium text-gray-600">T. Entrega</th>
                     <th className="px-3 py-2 text-center font-medium text-gray-600">F.Entrega</th>
                     <th className="px-3 py-2 text-right font-medium text-gray-600">Costo</th>
                     <th className="px-3 py-2 text-center font-medium text-gray-600">Acción</th>
@@ -743,6 +756,36 @@ export default function PedidoLogisticaDetailPage() {
                         >
                           {item.estado || 'pendiente'}
                         </Badge>
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        {(() => {
+                          const te = (item as any).tiempoEntrega
+                          const ted = (item as any).tiempoEntregaDias
+                          const focr = (item as any).fechaOrdenCompraRecomendada
+                          const vencida = focr && new Date(focr) < new Date()
+                          const texto = te || (ted ? `${ted}d` : null)
+
+                          if (!texto) return <span className="text-gray-400">—</span>
+
+                          if (vencida) {
+                            return (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="text-[10px] font-medium text-red-600 cursor-help">
+                                      {texto}
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p className="text-xs">OC debería haberse emitido el {formatDate(focr)}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )
+                          }
+
+                          return <span className="text-[10px] text-gray-600">{texto}</span>
+                        })()}
                       </td>
                       <td className="px-3 py-2 text-center text-gray-500">
                         {(item as any).fechaEntregaReal
@@ -873,7 +916,12 @@ export default function PedidoLogisticaDetailPage() {
                     const fn = pedido?.fechaNecesaria
                       ? new Date(pedido.fechaNecesaria).toISOString().split('T')[0]
                       : ''
-                    setFechaEntregaOC(fn)
+                    const { grupos } = calcularGruposProveedor()
+                    const fechasIniciales: Record<string, string> = {}
+                    for (const g of grupos) {
+                      fechasIniciales[g.id] = fn
+                    }
+                    setFechasEntregaOC(fechasIniciales)
                     setShowGenerarOC(true)
                   }}
                   className="h-7 text-xs"
@@ -1111,23 +1159,71 @@ export default function PedidoLogisticaDetailPage() {
                   </p>
                 </div>
 
-                {/* Grupos por proveedor */}
+                {/* Fecha necesaria informativa */}
+                {grupos.length > 0 && pedido?.fechaNecesaria && (
+                  <div className="flex items-center gap-1.5 text-[10px] text-gray-500 bg-gray-50 rounded px-2.5 py-1.5">
+                    <Calendar className="h-3 w-3" />
+                    <span>El proyecto necesita este pedido para: <strong className="text-gray-700">
+                      {new Date(pedido.fechaNecesaria).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                    </strong></span>
+                  </div>
+                )}
+
+                {/* Grupos por proveedor con fecha individual */}
                 {grupos.length > 0 ? (
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {grupos.map(grupo => (
-                      <div key={grupo.id} className="flex items-center justify-between bg-white border rounded-lg px-3 py-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <Building2 className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
-                          <div className="min-w-0">
-                            <p className="text-xs font-medium truncate">{grupo.nombre}</p>
-                            <p className="text-[10px] text-muted-foreground">{grupo.items.length} item{grupo.items.length !== 1 ? 's' : ''}</p>
+                  <div className="space-y-2.5 max-h-[340px] overflow-y-auto">
+                    {grupos.map(grupo => {
+                      const fechaNecStr = pedido?.fechaNecesaria
+                        ? new Date(pedido.fechaNecesaria).toISOString().split('T')[0]
+                        : ''
+                      const fechaProv = fechasEntregaOC[grupo.id] || ''
+                      const superaFecha = fechaProv && fechaNecStr && fechaProv > fechaNecStr
+                      // Fecha sugerida basada en tiempoEntregaDias más largo del grupo
+                      const fechaSugerida = grupo.maxTiempoEntregaDias > 0
+                        ? new Date(Date.now() + grupo.maxTiempoEntregaDias * 86400000).toISOString().split('T')[0]
+                        : null
+
+                      return (
+                        <div key={grupo.id} className="bg-white border rounded-lg px-3 py-2.5 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <Building2 className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+                              <div className="min-w-0">
+                                <p className="text-xs font-medium truncate">{grupo.nombre}</p>
+                                <p className="text-[10px] text-muted-foreground">
+                                  {grupo.items.length} item{grupo.items.length !== 1 ? 's' : ''} — {monedaOC} {formatCurrency(grupo.monto).replace('US$', '').trim()}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-medium text-muted-foreground mb-0.5 block">
+                              Fecha entrega estimada <span className="text-red-500">*</span>
+                            </label>
+                            <Input
+                              type="date"
+                              value={fechaProv}
+                              onChange={(e) => setFechasEntregaOC(prev => ({ ...prev, [grupo.id]: e.target.value }))}
+                              className="h-7 text-xs"
+                            />
+                            {!fechaProv && (
+                              <p className="text-[9px] text-red-500 mt-0.5">Requerido</p>
+                            )}
+                            {superaFecha && (
+                              <div className="flex items-center gap-1 text-[9px] text-amber-700 mt-0.5">
+                                <AlertTriangle className="h-2.5 w-2.5 flex-shrink-0" />
+                                <span>Supera la fecha necesaria del proyecto</span>
+                              </div>
+                            )}
+                            {fechaSugerida && (
+                              <p className="text-[9px] text-blue-600 mt-0.5">
+                                Sugerido por tiempo de entrega ({grupo.maxTiempoEntregaDias}d): {new Date(fechaSugerida).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                              </p>
+                            )}
                           </div>
                         </div>
-                        <span className="text-xs font-medium text-emerald-600 flex-shrink-0">
-                          {formatCurrency(grupo.monto)}
-                        </span>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 ) : (
                   <div className="text-center py-6 space-y-3">
@@ -1168,71 +1264,33 @@ export default function PedidoLogisticaDetailPage() {
                   </div>
                 )}
 
-                {/* Opciones */}
-                {grupos.length > 0 && (() => {
-                  const fechaNecStr = pedido?.fechaNecesaria
-                    ? new Date(pedido.fechaNecesaria).toISOString().split('T')[0]
-                    : ''
-                  const fechaNecFormateada = pedido?.fechaNecesaria
-                    ? new Date(pedido.fechaNecesaria).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })
-                    : ''
-                  const superaFechaNecesaria = fechaEntregaOC && fechaNecStr && fechaEntregaOC > fechaNecStr
-
-                  return (
-                  <div className="space-y-3">
+                {/* Opciones globales */}
+                {grupos.length > 0 && (
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
-                      {fechaNecFormateada && (
-                        <div className="flex items-center gap-1.5 text-[10px] text-gray-500 mb-1.5">
-                          <Calendar className="h-3 w-3" />
-                          <span>El proyecto necesita este pedido para: <strong className="text-gray-700">{fechaNecFormateada}</strong></span>
-                        </div>
-                      )}
-                      <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
-                        Fecha de Entrega Estimada <span className="text-red-500">*</span>
-                      </label>
-                      <Input
-                        type="date"
-                        value={fechaEntregaOC}
-                        onChange={(e) => setFechaEntregaOC(e.target.value)}
-                        className="h-8 text-xs"
-                      />
-                      {!fechaEntregaOC && (
-                        <p className="text-[10px] text-red-500 mt-0.5">Requerido para generar las OCs</p>
-                      )}
-                      {superaFechaNecesaria && (
-                        <div className="flex items-start gap-1.5 text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 mt-1.5">
-                          <AlertTriangle className="h-3 w-3 flex-shrink-0 mt-0.5" />
-                          <span>La fecha de entrega supera la fecha necesaria del proyecto ({fechaNecFormateada}). El proveedor podría no entregar a tiempo.</span>
-                        </div>
-                      )}
+                      <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Moneda</label>
+                      <select
+                        value={monedaOC}
+                        onChange={(e) => setMonedaOC(e.target.value)}
+                        className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs"
+                      >
+                        <option value="USD">USD</option>
+                        <option value="PEN">PEN</option>
+                      </select>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Moneda</label>
-                        <select
-                          value={monedaOC}
-                          onChange={(e) => setMonedaOC(e.target.value)}
-                          className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs"
-                        >
-                          <option value="USD">USD</option>
-                          <option value="PEN">PEN</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Condición de Pago</label>
-                        <select
-                          value={condicionPagoOC}
-                          onChange={(e) => setCondicionPagoOC(e.target.value)}
-                          className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs"
-                        >
-                          <option value="contado">Contado</option>
-                          <option value="credito">Crédito</option>
-                        </select>
-                      </div>
+                    <div>
+                      <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Condición de Pago</label>
+                      <select
+                        value={condicionPagoOC}
+                        onChange={(e) => setCondicionPagoOC(e.target.value)}
+                        className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs"
+                      >
+                        <option value="contado">Contado</option>
+                        <option value="credito">Crédito</option>
+                      </select>
                     </div>
                   </div>
-                  )
-                })()}
+                )}
 
                 {/* Total */}
                 {grupos.length > 0 && (
@@ -1255,7 +1313,7 @@ export default function PedidoLogisticaDetailPage() {
                   <Button
                     size="sm"
                     onClick={handleGenerarOCs}
-                    disabled={generandoOC || grupos.length === 0 || !fechaEntregaOC}
+                    disabled={generandoOC || grupos.length === 0 || grupos.some(g => !fechasEntregaOC[g.id])}
                     className="h-8 text-xs"
                   >
                     <ShoppingCart className="h-3 w-3 mr-1" />
