@@ -41,6 +41,7 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   PackageCheck,
   X,
   ChevronRight,
@@ -57,6 +58,7 @@ import Link from 'next/link'
 import type { Proyecto, PedidoEquipo } from '@/types'
 import PedidoEquipoHistorial from '@/components/equipos/PedidoEquipoHistorial'
 import PedidoEstadoFlujoBanner from '@/components/equipos/PedidoEstadoFlujoBanner'
+import TipoItemBadge from '@/components/shared/TipoItemBadge'
 import PedidoEquipoEditModal from '@/components/equipos/PedidoEquipoEditModal'
 import { PedidoItemDirectoModal } from '@/components/equipos/PedidoItemDirectoModal'
 import { formatCurrency, formatDate } from '@/lib/utils'
@@ -450,6 +452,37 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
           </div>
         </div>
 
+        {/* 🟤 Alerta: items entregados sin costo */}
+        {!['entregado', 'cancelado'].includes(pedido.estado) && (() => {
+          const sinCosto = (pedido.items || []).filter((i: any) => (i.cantidadAtendida || 0) > 0 && (!i.costoTotal || i.costoTotal === 0))
+          if (sinCosto.length === 0) return null
+          return (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+              <div className="flex items-start gap-2 text-[11px]">
+                <AlertTriangle className="h-3.5 w-3.5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="font-medium text-yellow-800">
+                    {sinCosto.length} item{sinCosto.length !== 1 ? 's' : ''} entregado{sinCosto.length !== 1 ? 's' : ''} sin costo registrado — el costo del proyecto puede estar subestimado
+                  </p>
+                  <div className="mt-1.5 space-y-0.5">
+                    {sinCosto.map((i: any) => (
+                      <div key={i.id} className="text-yellow-700">
+                        {i.codigo} — {i.descripcion}
+                      </div>
+                    ))}
+                  </div>
+                  <Link
+                    href={`/logistica/pedidos/${pedidoId}`}
+                    className="inline-flex items-center gap-1 text-[10px] font-medium text-yellow-700 hover:text-yellow-900 underline mt-1.5"
+                  >
+                    Registrar costos en Logística
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )
+        })()}
+
         {/* Info del pedido */}
         <div className="bg-white rounded-lg border p-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
@@ -538,13 +571,16 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
                   {pedido.items.map((item) => (
                     <tr key={item.id} className="hover:bg-gray-50/50">
                       <td className="px-3 py-2">
-                        <span className="font-mono font-medium">{item.codigo}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono font-medium">{item.codigo}</span>
+                          <TipoItemBadge tipoItem={(item as any).tipoItem} catalogoEquipoId={(item as any).catalogoEquipoId} />
+                        </div>
                       </td>
                       <td className="px-3 py-2 text-gray-600 max-w-[180px] truncate">
                         {item.descripcion}
                       </td>
                       <td className="px-3 py-2 text-gray-600 max-w-[120px] truncate">
-                        {(item as any).listaEquipoItem?.proveedor?.nombre || '—'}
+                        {(item as any).proveedorNombre || (item as any).listaEquipoItem?.proveedor?.nombre || '—'}
                       </td>
                       <td className="px-3 py-2 text-center text-gray-500">{item.unidad}</td>
                       <td className="px-3 py-2 text-center font-medium text-blue-600">

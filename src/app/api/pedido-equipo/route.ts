@@ -139,6 +139,8 @@ export async function GET(request: Request) {
              descripcion: true,
              unidad: true,
              tipoItem: true,
+             proveedorNombre: true,
+             catalogoEquipoId: true,
              fechaEntregaEstimada: true,
              fechaEntregaReal: true,
              estadoEntrega: true,

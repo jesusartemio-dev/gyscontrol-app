@@ -777,8 +777,10 @@ export default function PedidoLogisticaDetailPage() {
               .filter((r: any) => r.estado === 'rechazado')
               .map((r: any) => ({ ...r, itemCodigo: i.codigo, itemDescripcion: i.descripcion }))
           )
+          // 🟤 Items entregados sin costo
+          const sinCosto = items.filter((i: any) => (i.cantidadAtendida || 0) > 0 && (!i.costoTotal || i.costoTotal === 0))
 
-          const hayAlertas = sinProveedor.length > 0 || sinOC.length > 0 || ocPendienteConfirmar.length > 0 || ocEsperandoRecepcion.length > 0 || recepcionesRechazadas.length > 0
+          const hayAlertas = sinProveedor.length > 0 || sinOC.length > 0 || ocPendienteConfirmar.length > 0 || ocEsperandoRecepcion.length > 0 || recepcionesRechazadas.length > 0 || sinCosto.length > 0
           const todoCompleto = !hayAlertas && items.length > 0
 
           if (todoCompleto) return null
@@ -791,7 +793,7 @@ export default function PedidoLogisticaDetailPage() {
                     <FileText className="h-4 w-4 text-amber-500" />
                     <span className="text-xs font-medium">¿Qué falta para completar este pedido?</span>
                     {hayAlertas && (() => {
-                        const total = sinProveedor.length + sinOC.length + ocPendienteConfirmar.length + ocEsperandoRecepcion.length + recepcionesRechazadas.length
+                        const total = sinProveedor.length + sinOC.length + ocPendienteConfirmar.length + ocEsperandoRecepcion.length + recepcionesRechazadas.length + sinCosto.length
                         return (
                           <Badge variant="outline" className={cn('text-[9px] h-4 px-1.5', recepcionesRechazadas.length > 0 ? 'bg-red-50 text-red-700 border-red-200' : 'bg-amber-50 text-amber-700 border-amber-200')}>
                             {total} pendiente{total !== 1 ? 's' : ''}
@@ -936,6 +938,32 @@ export default function PedidoLogisticaDetailPage() {
                                   className="text-[10px] text-red-600 hover:text-red-800 underline ml-2 flex-shrink-0"
                                 >
                                   Ver detalle
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {/* 🟤 Items entregados sin costo */}
+                    {sinCosto.length > 0 && (
+                      <div className="flex items-start gap-2 text-[11px] bg-yellow-50 border border-yellow-200 rounded-md px-3 py-2">
+                        <AlertTriangle className="h-3.5 w-3.5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <p className="font-medium text-yellow-800">
+                            {sinCosto.length} item{sinCosto.length !== 1 ? 's' : ''} entregado{sinCosto.length !== 1 ? 's' : ''} sin costo registrado — el costo del proyecto puede estar subestimado
+                          </p>
+                          <div className="mt-1.5 space-y-1">
+                            {sinCosto.map((i: any) => (
+                              <div key={i.id} className="flex items-center justify-between">
+                                <span className="text-yellow-700">
+                                  {i.codigo} — {i.descripcion}
+                                </span>
+                                <button
+                                  onClick={() => openItemEdit(i)}
+                                  className="text-[10px] text-yellow-700 hover:text-yellow-900 underline ml-2 flex-shrink-0"
+                                >
+                                  Registrar costo
                                 </button>
                               </div>
                             ))}

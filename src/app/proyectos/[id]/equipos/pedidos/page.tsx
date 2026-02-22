@@ -286,6 +286,18 @@ const PedidosTable = memo(function PedidosTable({
                 const montoTotal = pedido.items?.reduce((sum, item) => sum + (item.costoTotal || 0), 0) || 0
                 const totalItems = pedido.items?.length || 0
 
+                // Compute proveedor label from items
+                const proveedorNames = new Set(
+                  pedido.items?.map(i =>
+                    (i as any).proveedorNombre || (i as any).listaEquipoItem?.proveedor?.nombre
+                  ).filter(Boolean) || []
+                )
+                const proveedorLabel = proveedorNames.size === 0
+                  ? ((pedido as any).esUrgente ? 'Sin asignar' : 'Sin proveedor')
+                  : proveedorNames.size === 1
+                    ? [...proveedorNames][0]
+                    : 'Varios'
+
                 return (
                   <TableRow
                     key={pedido.id}
@@ -293,11 +305,16 @@ const PedidosTable = memo(function PedidosTable({
                     onClick={() => router.push(`/proyectos/${proyectoId}/equipos/pedidos/${pedido.id}`)}
                   >
                     <TableCell className="font-mono text-xs text-muted-foreground py-2">
-                      {pedido.codigo || '-'}
+                      <div className="flex items-center gap-1.5">
+                        {pedido.codigo || '-'}
+                        {(pedido as any).esUrgente && (
+                          <Badge variant="destructive" className="text-[9px] h-4 px-1">URGENTE</Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="py-2">
                       <div>
-                        <span className="text-sm font-medium line-clamp-1">{(pedido as any).proveedor || 'Sin proveedor'}</span>
+                        <span className={`text-sm font-medium line-clamp-1 ${proveedorNames.size === 0 ? 'text-muted-foreground' : ''}`}>{proveedorLabel}</span>
                         {(pedido as any).descripcion && (
                           <span className="text-xs text-muted-foreground line-clamp-1 block">
                             {(pedido as any).descripcion}
