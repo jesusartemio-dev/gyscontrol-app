@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { propagarPrecioRealCatalogo } from '@/lib/services/catalogoPrecioSync'
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -100,6 +101,26 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         items: { orderBy: { createdAt: 'asc' } },
       },
     })
+
+    // Propagar precioReal al catálogo cuando OC se completa
+    if (nuevoEstado === 'completada') {
+      const userId = (session.user as any).id
+      for (const item of data.items) {
+        if (!item.pedidoEquipoItemId) continue
+        const pedidoItem = await prisma.pedidoEquipoItem.findUnique({
+          where: { id: item.pedidoEquipoItemId },
+          select: { catalogoEquipoId: true },
+        })
+        if (pedidoItem?.catalogoEquipoId) {
+          propagarPrecioRealCatalogo({
+            catalogoEquipoId: pedidoItem.catalogoEquipoId,
+            precioReal: item.precioUnitario,
+            userId,
+            metadata: { source: 'oc_completada', ordenCompraId: id },
+          }).catch(err => console.error('Error propagando precioReal (recepción OC):', err))
+        }
+      }
+    }
 
     return NextResponse.json({ ...data, recepcionesPendientesCreadas })
   } catch (error) {

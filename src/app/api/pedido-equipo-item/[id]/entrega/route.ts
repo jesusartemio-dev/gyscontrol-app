@@ -8,27 +8,34 @@
 
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { EntregaItemSchema } from '@/lib/validators/trazabilidad';
 import type { EntregaItemPayload } from '@/lib/validators/trazabilidad';
+import { propagarPrecioRealCatalogo } from '@/lib/services/catalogoPrecioSync';
 import { logger } from '@/lib/logger';
 
 // ✅ Registrar nueva entrega
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+    const userId = (session.user as any).id as string;
+
     const { id } = await context.params;
     const body: EntregaItemPayload = await request.json();
 
-    // 🔍 Validar datos de entrada
     const validationResult = EntregaItemSchema.safeParse(body);
     if (!validationResult.success) {
-      logger.error('❌ Datos de entrega inválidos:', validationResult.error.errors);
+      logger.error('Datos de entrega inválidos:', validationResult.error.errors);
       return NextResponse.json(
         { error: 'Datos de entrega inválidos', details: validationResult.error.errors },
         { status: 400 }
       );
     }
 
-    // 🔍 Verificar que el item existe
     const itemExistente = await prisma.pedidoEquipoItem.findUnique({
       where: { id },
       include: {
@@ -44,10 +51,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     });
 
     if (!itemExistente) {
-      return NextResponse.json(
-        { error: 'Item de pedido no encontrado' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Item de pedido no encontrado' }, { status: 404 });
     }
 
     // Auto-sync estado from estadoEntrega
@@ -58,115 +62,169 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     else if (estadoEntrega === 'cancelado') estadoDerivado = 'cancelado'
     else if (estadoEntrega === 'en_proceso') estadoDerivado = 'atendido'
 
-    // 🔄 Actualizar el item con los datos de entrega (dentro de transacción)
+    const data = validationResult.data
+    const pedido = itemExistente.pedidoEquipo
+
     const itemActualizado = await prisma.$transaction(async (tx) => {
+      // 1. Update PedidoEquipoItem
       const updatedItem = await tx.pedidoEquipoItem.update({
         where: { id },
         data: {
-          cantidadAtendida: validationResult.data.cantidadAtendida,
-          estadoEntrega: validationResult.data.estadoEntrega,
-          fechaEntregaReal: validationResult.data.fechaEntregaReal,
-          observacionesEntrega: validationResult.data.observacionesEntrega,
-          comentarioLogistica: validationResult.data.comentarioLogistica,
+          cantidadAtendida: data.cantidadAtendida,
+          estadoEntrega: data.estadoEntrega,
+          fechaEntregaReal: data.fechaEntregaReal,
+          observacionesEntrega: data.observacionesEntrega,
+          comentarioLogistica: data.comentarioLogistica,
           ...(estadoDerivado ? { estado: estadoDerivado } : {}),
+          // Direct attention fields
+          ...(data.motivoAtencionDirecta ? { motivoAtencionDirecta: data.motivoAtencionDirecta } : {}),
+          ...(data.costoRealUnitario ? {
+            costoRealUnitario: data.costoRealUnitario,
+            costoRealMoneda: data.costoRealMoneda || 'USD',
+          } : {}),
           updatedAt: new Date()
         },
         include: {
           pedidoEquipo: {
-            select: {
-              codigo: true,
-              proyecto: {
-                select: { nombre: true }
-              }
-            }
+            select: { codigo: true, proyecto: { select: { nombre: true } } }
           }
         }
       });
 
-      // Calculate costoReal = precioUnitario * cantidadAtendida
-      const precioUnitario = itemExistente.precioUnitario || 0
-      const cantidadAtendida = validationResult.data.cantidadAtendida || 0
-
-      // Update costoReal on the ListaEquipoItem by summing all related pedido items
+      // 2. Update ListaEquipoItem aggregates
       if (itemExistente.listaEquipoItemId) {
         const sumResult = await tx.pedidoEquipoItem.aggregate({
           where: { listaEquipoItemId: itemExistente.listaEquipoItemId },
           _sum: { cantidadAtendida: true }
         })
-        // Also get all items to calculate weighted costoReal
         const allLinkedItems = await tx.pedidoEquipoItem.findMany({
           where: { listaEquipoItemId: itemExistente.listaEquipoItemId },
           select: { precioUnitario: true, cantidadAtendida: true }
         })
         const costoReal = allLinkedItems.reduce((sum, item) =>
           sum + ((item.precioUnitario || 0) * (item.cantidadAtendida || 0)), 0)
-
         await tx.listaEquipoItem.update({
           where: { id: itemExistente.listaEquipoItemId },
-          data: {
-            costoReal,
-            cantidadEntregada: sumResult._sum.cantidadAtendida || 0
-          }
+          data: { costoReal, cantidadEntregada: sumResult._sum.cantidadAtendida || 0 }
         })
       }
 
-      // Recalculate PedidoEquipo.costoRealTotal
+      // 3. Recalculate PedidoEquipo.costoRealTotal
       const allPedidoItems = await tx.pedidoEquipoItem.findMany({
-        where: { pedidoId: itemExistente.pedidoEquipo.id },
+        where: { pedidoId: pedido.id },
         select: { precioUnitario: true, cantidadAtendida: true }
       })
       const costoRealTotal = allPedidoItems.reduce((sum, item) =>
         sum + ((item.precioUnitario || 0) * (item.cantidadAtendida || 0)), 0)
-
       await tx.pedidoEquipo.update({
-        where: { id: itemExistente.pedidoEquipo.id },
+        where: { id: pedido.id },
         data: { costoRealTotal, updatedAt: new Date() }
       })
 
-      // Create EntregaItem record
+      // 4. Create EntregaItem
       const entregaItemId = `ent-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-      const entregaItem = await tx.entregaItem.create({
+      await tx.entregaItem.create({
         data: {
           id: entregaItemId,
           pedidoEquipoItemId: id,
           listaEquipoItemId: itemExistente.listaEquipoItemId || null,
-          proyectoId: itemExistente.pedidoEquipo.proyectoId,
-          fechaEntrega: validationResult.data.fechaEntregaReal || new Date(),
-          estado: validationResult.data.estadoEntrega as any,
+          proyectoId: pedido.proyectoId,
+          fechaEntrega: data.fechaEntregaReal || new Date(),
+          estado: data.estadoEntrega as any,
           cantidad: itemExistente.cantidadPedida || 0,
-          cantidadEntregada: validationResult.data.cantidadAtendida || 0,
-          observaciones: validationResult.data.observacionesEntrega || null,
-          usuarioId: null, // No session available in this route currently
+          cantidadEntregada: data.cantidadAtendida || 0,
+          observaciones: data.observacionesEntrega || null,
+          usuarioId: userId,
           updatedAt: new Date()
         }
       })
 
-      // Create EventoTrazabilidad record
+      // 5. Create EventoTrazabilidad
       await tx.eventoTrazabilidad.create({
         data: {
           id: `evt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           entregaItemId: entregaItemId,
-          proyectoId: itemExistente.pedidoEquipo.proyectoId,
-          tipo: 'ENTREGA',
-          descripcion: `Entrega registrada: ${validationResult.data.cantidadAtendida} unidades - ${validationResult.data.estadoEntrega}`,
+          proyectoId: pedido.proyectoId,
+          pedidoEquipoId: pedido.id,
+          tipo: data.motivoAtencionDirecta ? 'ENTREGA_DIRECTA' : 'ENTREGA',
+          descripcion: `Entrega registrada: ${data.cantidadAtendida} unidades - ${data.estadoEntrega}${data.motivoAtencionDirecta ? ` (${data.motivoAtencionDirecta})` : ''}`,
           estadoAnterior: itemExistente.estadoEntrega as any || null,
-          estadoNuevo: validationResult.data.estadoEntrega as any,
-          usuarioId: 'system', // No session in this route
+          estadoNuevo: data.estadoEntrega as any,
+          usuarioId: userId,
           metadata: {
-            cantidadAtendida: validationResult.data.cantidadAtendida,
-            fechaEntregaReal: validationResult.data.fechaEntregaReal?.toISOString(),
-            observaciones: validationResult.data.observacionesEntrega,
-            comentarioLogistica: validationResult.data.comentarioLogistica,
-            pedidoCodigo: itemExistente.pedidoEquipo.codigo,
-            proyectoNombre: itemExistente.pedidoEquipo.proyecto.nombre
+            cantidadAtendida: data.cantidadAtendida,
+            fechaEntregaReal: data.fechaEntregaReal?.toISOString(),
+            observaciones: data.observacionesEntrega,
+            comentarioLogistica: data.comentarioLogistica,
+            pedidoCodigo: pedido.codigo,
+            proyectoNombre: pedido.proyecto.nombre,
+            motivoAtencionDirecta: data.motivoAtencionDirecta || null,
+            costoRealUnitario: data.costoRealUnitario || null,
+            costoRealMoneda: data.costoRealMoneda || null,
           },
           updatedAt: new Date()
         }
       })
 
-      // Auto-derive parent pedido state
+      // 6. Auto-create CxP for importacion_gerencia
+      if (data.motivoAtencionDirecta === 'importacion_gerencia' && data.costoRealUnitario) {
+        const montoTotal = data.costoRealUnitario * (data.cantidadAtendida || 0)
+
+        let provId = itemExistente.proveedorId
+        if (!provId) {
+          const fallback = await tx.proveedor.findFirst({
+            where: { nombre: { contains: 'Importacion' } },
+            select: { id: true },
+          })
+          provId = fallback?.id || null
+        }
+
+        if (provId) {
+          await tx.cuentaPorPagar.create({
+            data: {
+              proveedorId: provId,
+              proyectoId: pedido.proyectoId,
+              pedidoEquipoId: pedido.id,
+              pedidoEquipoItemId: id,
+              tipoOrigen: 'importacion_gerencia',
+              descripcion: `Importación directa: ${data.cantidadAtendida} x ${itemExistente.codigo} - ${itemExistente.descripcion}`,
+              monto: montoTotal,
+              moneda: data.costoRealMoneda || 'USD',
+              saldoPendiente: montoTotal,
+              fechaRecepcion: new Date(),
+              fechaVencimiento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+              condicionPago: 'contado',
+              estado: 'pendiente_documentos',
+              observaciones: `Auto-generada desde atención directa. Pedido: ${pedido.codigo}`,
+              updatedAt: new Date(),
+            }
+          })
+
+          // EventoTrazabilidad for CxP creation
+          await tx.eventoTrazabilidad.create({
+            data: {
+              id: `evt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-cxp`,
+              proyectoId: pedido.proyectoId,
+              pedidoEquipoId: pedido.id,
+              tipo: 'atencion_directa_gerencia',
+              descripcion: `Importación directa registrada. Costo real: ${data.costoRealMoneda || 'USD'} ${montoTotal.toFixed(2)}. CxP creada pendiente de documentos.`,
+              usuarioId: userId,
+              metadata: {
+                costoRealUnitario: data.costoRealUnitario,
+                costoRealMoneda: data.costoRealMoneda,
+                montoTotal,
+                itemCodigo: itemExistente.codigo,
+                pedidoCodigo: pedido.codigo,
+              },
+              updatedAt: new Date(),
+            }
+          })
+        }
+      }
+
+      // 7. Auto-derive parent pedido state
       const allItems = await tx.pedidoEquipoItem.findMany({
-        where: { pedidoId: itemExistente.pedidoEquipo.id },
+        where: { pedidoId: pedido.id },
         select: { estado: true }
       })
       const estados = allItems.map(i => i.estado)
@@ -180,7 +238,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       }
       if (nuevoEstadoPedido) {
         await tx.pedidoEquipo.update({
-          where: { id: itemExistente.pedidoEquipo.id },
+          where: { id: pedido.id },
           data: { estado: nuevoEstadoPedido, updatedAt: new Date() }
         })
       }
@@ -188,28 +246,21 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       return updatedItem
     });
 
-    // 📝 Log de trazabilidad
-    logger.info('Entrega registrada', {
-      pedidoEquipoItemId: id,
-      estado: validationResult.data.estadoEntrega,
-      descripcion: `Entrega registrada: ${validationResult.data.cantidadAtendida} unidades`,
-      metadata: {
-        cantidadAtendida: validationResult.data.cantidadAtendida,
-        fechaEntregaReal: validationResult.data.fechaEntregaReal?.toISOString(),
-        observaciones: validationResult.data.observacionesEntrega,
-        comentarioLogistica: validationResult.data.comentarioLogistica
-      }
-    });
+    // 8. Propagate precioReal to catalog (outside transaction, non-critical)
+    if (data.costoRealUnitario && itemExistente.catalogoEquipoId) {
+      propagarPrecioRealCatalogo({
+        catalogoEquipoId: itemExistente.catalogoEquipoId,
+        precioReal: data.costoRealUnitario,
+        userId,
+        metadata: { source: 'atencion_directa', pedidoCodigo: pedido.codigo },
+      }).catch(err => logger.error('Error propagating precioReal:', err))
+    }
 
-    logger.info('✅ Entrega registrada exitosamente:', {
-      itemId: id,
-      estadoEntrega: validationResult.data.estadoEntrega,
-      cantidadAtendida: validationResult.data.cantidadAtendida
-    });
+    logger.info('Entrega registrada exitosamente:', { itemId: id, estadoEntrega: data.estadoEntrega, cantidadAtendida: data.cantidadAtendida });
 
     return NextResponse.json(itemActualizado);
   } catch (error) {
-    logger.error('❌ Error al registrar entrega:', error);
+    logger.error('Error al registrar entrega:', error);
     return NextResponse.json(
       { error: 'Error interno del servidor al registrar entrega' },
       { status: 500 }

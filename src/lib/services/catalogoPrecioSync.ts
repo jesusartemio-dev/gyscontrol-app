@@ -52,3 +52,54 @@ export async function propagarPrecioLogisticaCatalogo(params: {
     console.error('Error propagating precioLogistica to catalog:', error)
   }
 }
+
+/**
+ * Propagates the real acquisition price to CatalogoEquipo.precioReal.
+ * Called from: OC confirmed, OC completed, direct attention delivery.
+ */
+export async function propagarPrecioRealCatalogo(params: {
+  catalogoEquipoId: string | null | undefined
+  precioReal: number
+  userId?: string
+  metadata?: Record<string, any>
+}): Promise<void> {
+  const { catalogoEquipoId, precioReal, userId, metadata } = params
+
+  if (!catalogoEquipoId) return
+
+  try {
+    const equipo = await prisma.catalogoEquipo.findUnique({
+      where: { id: catalogoEquipoId },
+      select: { id: true, codigo: true, precioReal: true },
+    })
+
+    if (!equipo) return
+
+    // Skip if price hasn't changed
+    if (equipo.precioReal === precioReal) return
+
+    const anterior = equipo.precioReal
+
+    await prisma.catalogoEquipo.update({
+      where: { id: catalogoEquipoId },
+      data: { precioReal, fechaActualizacion: new Date() },
+    })
+
+    // Audit logging
+    if (userId) {
+      const cambios = {
+        precioReal: { anterior, nuevo: precioReal },
+      }
+      registrarActualizacion(
+        'CATALOGO_EQUIPO',
+        catalogoEquipoId,
+        userId,
+        `Precio real actualizado: ${equipo.codigo}`,
+        cambios,
+        { vista: 'logistica', codigo: equipo.codigo, ...metadata }
+      ).catch(err => console.error('Audit log error (precioReal):', err))
+    }
+  } catch (error) {
+    console.error('Error propagating precioReal to catalog:', error)
+  }
+}

@@ -637,6 +637,7 @@ model PedidoEquipo {
   pedidoEquipoItem     PedidoEquipoItem[]
   ordenesCompra        OrdenCompra[]
   eventosTrazabilidad  EventoTrazabilidad[]
+  cuentasPorPagar      CuentaPorPagar[]
 
   @@index([estado, prioridad, createdAt(sort: Desc)], map: "idx_pedido_estado_prioridad_fecha")
   @@index([proyectoId, estado, createdAt(sort: Desc)], map: "idx_pedido_proyecto_estado_fecha")
@@ -676,6 +677,9 @@ model PedidoEquipoItem {
   observacionesEntrega        String?
   proveedorId                 String?
   proveedorNombre             String?
+  costoRealUnitario           Float?
+  costoRealMoneda             String?
+  motivoAtencionDirecta       String?
   entregaItem                 EntregaItem[]
   listaEquipoItem             ListaEquipoItem?  @relation(fields: [listaEquipoItemId], references: [id])
   listaEquipo                 ListaEquipo?      @relation(fields: [listaId], references: [id])
@@ -686,6 +690,7 @@ model PedidoEquipoItem {
   comentarioLogisticaPor      User?             @relation("PedidoEquipoItemComentarioLogistica", fields: [comentarioLogisticaPorId], references: [id])
   ordenCompraItems            OrdenCompraItem[]
   recepcionesPendientes       RecepcionPendiente[]
+  cuentasPorPagar             CuentaPorPagar[]
 
   @@map("pedido_equipo_item")
 }
@@ -1358,6 +1363,7 @@ model User {
   recepcionesConfirmadas                RecepcionPendiente[]         @relation("RecepcionConfirmador")
   recepcionesEntregadas                 RecepcionPendiente[]         @relation("RecepcionEntregador")
   recepcionesRechazadas                 RecepcionPendiente[]         @relation("RecepcionRechazador")
+  cxpAdjuntos                           CxPAdjunto[]                 @relation("CxPAdjuntoSubidoPor")
 
   @@map("user")
 }
@@ -2975,6 +2981,7 @@ enum EstadoCuentaCobrar {
 }
 
 enum EstadoCuentaPagar {
+  pendiente_documentos
   pendiente
   parcial
   pagada
@@ -3327,6 +3334,9 @@ model CuentaPorPagar {
   proveedorId       String
   proyectoId        String?
   ordenCompraId     String?
+  pedidoEquipoId    String?
+  pedidoEquipoItemId String?
+  tipoOrigen        String?            // "oc" | "atencion_directa" | "importacion_gerencia"
   numeroFactura     String?            // número de factura del proveedor
   descripcion       String?
   monto             Float
@@ -3343,14 +3353,18 @@ model CuentaPorPagar {
   createdAt         DateTime           @default(now())
   updatedAt         DateTime
 
-  proveedor   Proveedor    @relation(fields: [proveedorId], references: [id])
-  proyecto    Proyecto?    @relation(fields: [proyectoId], references: [id])
-  ordenCompra OrdenCompra? @relation(fields: [ordenCompraId], references: [id])
-  pagos       PagoPagar[]
+  proveedor        Proveedor         @relation(fields: [proveedorId], references: [id])
+  proyecto         Proyecto?         @relation(fields: [proyectoId], references: [id])
+  ordenCompra      OrdenCompra?      @relation(fields: [ordenCompraId], references: [id])
+  pedidoEquipo     PedidoEquipo?     @relation(fields: [pedidoEquipoId], references: [id])
+  pedidoEquipoItem PedidoEquipoItem? @relation(fields: [pedidoEquipoItemId], references: [id])
+  pagos            PagoPagar[]
+  adjuntos         CxPAdjunto[]
 
   @@index([proveedorId, estado])
   @@index([proyectoId, estado])
   @@index([estado, fechaVencimiento])
+  @@index([pedidoEquipoItemId])
   @@map("cuenta_por_pagar")
 }
 
@@ -3377,6 +3391,24 @@ model PagoPagar {
   @@index([cuentaPorPagarId])
   @@index([fechaPago])
   @@map("pago_pagar")
+}
+
+model CxPAdjunto {
+  id               String         @id @default(cuid())
+  cuentaPorPagarId String
+  nombreArchivo    String
+  urlArchivo       String
+  driveFileId      String?
+  tipoArchivo      String?        // "factura" | "transferencia" | "dua" | "otro"
+  tamano           Int?
+  subidoPorId      String
+  createdAt        DateTime       @default(now())
+
+  cuentaPorPagar CuentaPorPagar @relation(fields: [cuentaPorPagarId], references: [id], onDelete: Cascade)
+  subidoPor      User           @relation("CxPAdjuntoSubidoPor", fields: [subidoPorId], references: [id])
+
+  @@index([cuentaPorPagarId])
+  @@map("cxp_adjunto")
 }
 
 // ======================

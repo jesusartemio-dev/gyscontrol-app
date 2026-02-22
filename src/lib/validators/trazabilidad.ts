@@ -26,7 +26,10 @@ export const EntregaItemSchema = z.object({
   cantidadAtendida: z.number().positive('Cantidad debe ser positiva').optional(),
   fechaEntregaReal: z.date().optional(),
   observacionesEntrega: z.string().max(500, 'Observaciones muy largas').optional(),
-  comentarioLogistica: z.string().max(500, 'Comentario muy largo').optional()
+  comentarioLogistica: z.string().max(500, 'Comentario muy largo').optional(),
+  motivoAtencionDirecta: z.string().optional(),
+  costoRealUnitario: z.number().positive('Costo debe ser positivo').optional(),
+  costoRealMoneda: z.enum(['PEN', 'USD']).optional(),
 });
 
 /**

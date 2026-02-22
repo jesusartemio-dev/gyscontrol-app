@@ -144,7 +144,12 @@ export default function PedidoLogisticaDetailPage() {
     estado: string
     fechaEntregaReal: string
     observacionesEntrega: string
-  }>({ item: null, cantidadAtendida: 0, estado: 'pendiente', fechaEntregaReal: '', observacionesEntrega: '' })
+    motivoAtencionDirecta: string
+    costoRealUnitario: string
+    costoRealMoneda: string
+  }>({ item: null, cantidadAtendida: 0, estado: 'pendiente', fechaEntregaReal: '', observacionesEntrega: '', motivoAtencionDirecta: '', costoRealUnitario: '', costoRealMoneda: 'USD' })
+
+  const resetEditingItem = () => setEditingItem({ item: null, cantidadAtendida: 0, estado: 'pendiente', fechaEntregaReal: '', observacionesEntrega: '', motivoAtencionDirecta: '', costoRealUnitario: '', costoRealMoneda: 'USD' })
 
   // 🔁 Cargar datos iniciales
   useEffect(() => {
@@ -185,17 +190,19 @@ export default function PedidoLogisticaDetailPage() {
 
   // 📦 Abrir modal de edición de item
   const openItemEdit = (item: PedidoEquipoItem) => {
-    // Formatear fecha para input type="date"
     const fechaReal = (item as any).fechaEntregaReal
       ? new Date((item as any).fechaEntregaReal).toISOString().split('T')[0]
-      : new Date().toISOString().split('T')[0] // Por defecto, fecha actual
+      : new Date().toISOString().split('T')[0]
 
     setEditingItem({
       item,
       cantidadAtendida: item.cantidadAtendida || 0,
       estado: item.estado || 'pendiente',
       fechaEntregaReal: fechaReal,
-      observacionesEntrega: (item as any).observacionesEntrega || ''
+      observacionesEntrega: (item as any).observacionesEntrega || '',
+      motivoAtencionDirecta: (item as any).motivoAtencionDirecta || '',
+      costoRealUnitario: (item as any).costoRealUnitario ? String((item as any).costoRealUnitario) : '',
+      costoRealMoneda: (item as any).costoRealMoneda || 'USD',
     })
   }
 
@@ -206,34 +213,70 @@ export default function PedidoLogisticaDetailPage() {
     setEditingItem(prev => ({ ...prev, cantidadAtendida: clamped }))
   }
 
-  // 📦 Guardar cambios del item
+  // 📦 Guardar cambios del item (POST /entrega para trazabilidad completa)
   const saveItemEdit = async () => {
     if (!editingItem.item) return
+
+    const tieneOC = ((editingItem.item as any).ordenCompraItems?.length ?? 0) > 0
+
+    // Validaciones para atención directa (sin OC)
+    if (!tieneOC && editingItem.cantidadAtendida > 0 && !editingItem.motivoAtencionDirecta) {
+      toast.error('Debe seleccionar un motivo de atención directa')
+      return
+    }
+    if (editingItem.motivoAtencionDirecta === 'importacion_gerencia' && editingItem.cantidadAtendida > 0) {
+      if (!editingItem.costoRealUnitario || parseFloat(editingItem.costoRealUnitario) <= 0) {
+        toast.error('El costo real de adquisición es obligatorio para importaciones de gerencia')
+        return
+      }
+    }
 
     try {
       setUpdating(true)
 
-      // Determinar estado basado en cantidades
-      let nuevoEstado: 'pendiente' | 'entregado' | 'parcial' = 'pendiente'
+      let estadoEntrega: string = 'pendiente'
       if (editingItem.cantidadAtendida === 0) {
-        nuevoEstado = 'pendiente'
+        estadoEntrega = 'pendiente'
       } else if (editingItem.cantidadAtendida >= editingItem.item.cantidadPedida) {
-        nuevoEstado = 'entregado'
+        estadoEntrega = 'entregado'
       } else if (editingItem.cantidadAtendida > 0) {
-        nuevoEstado = 'parcial'
+        estadoEntrega = 'parcial'
       }
 
-      // La API requiere cantidadPedida, enviamos el valor actual sin cambios
-      await handleUpdateItem(editingItem.item.id, {
-        cantidadPedida: editingItem.item.cantidadPedida,
+      const payload: Record<string, any> = {
+        pedidoEquipoItemId: editingItem.item.id,
+        estadoEntrega,
         cantidadAtendida: editingItem.cantidadAtendida,
-        estado: nuevoEstado,
-        // Registrar fecha de entrega si hay cantidad atendida
         fechaEntregaReal: editingItem.cantidadAtendida > 0 ? editingItem.fechaEntregaReal : undefined,
-        observacionesEntrega: editingItem.observacionesEntrega || undefined
+        observacionesEntrega: editingItem.observacionesEntrega || undefined,
+      }
+
+      // Campos de atención directa (solo sin OC)
+      if (!tieneOC && editingItem.motivoAtencionDirecta) {
+        payload.motivoAtencionDirecta = editingItem.motivoAtencionDirecta
+        if (editingItem.motivoAtencionDirecta === 'importacion_gerencia' && editingItem.costoRealUnitario) {
+          payload.costoRealUnitario = parseFloat(editingItem.costoRealUnitario)
+          payload.costoRealMoneda = editingItem.costoRealMoneda
+        }
+      }
+
+      const res = await fetch(`/api/pedido-equipo-item/${editingItem.item.id}/entrega`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
       })
 
-      setEditingItem({ item: null, cantidadAtendida: 0, estado: 'pendiente', fechaEntregaReal: '', observacionesEntrega: '' })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Error al registrar entrega')
+      }
+
+      toast.success('Entrega registrada correctamente')
+      await cargarDatos()
+      resetEditingItem()
+    } catch (err: any) {
+      toast.error(err.message || 'Error al registrar entrega')
     } finally {
       setUpdating(false)
     }
@@ -1002,9 +1045,47 @@ export default function PedidoLogisticaDetailPage() {
                             {(item as any).ordenCompraItems[0].ordenCompra?.numero}
                           </Link>
                         )}
-                        {((item as any).proveedorId || (item as any).listaEquipoItem?.proveedorId) && !((item as any).ordenCompraItems?.length > 0) && (
-                          <span className="inline-flex items-center text-[9px] text-gray-400 mt-0.5">Sin OC</span>
-                        )}
+                        {!((item as any).ordenCompraItems?.length > 0) && (() => {
+                          const atendido = (item.cantidadAtendida || 0) > 0
+                          const motivo = (item as any).motivoAtencionDirecta
+                          if (atendido && motivo === 'importacion_gerencia') {
+                            return (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="inline-flex items-center gap-0.5 text-[9px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full mt-0.5 font-medium">
+                                      Importación
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent><p className="text-xs">Compra directa por gerencia / importación</p></TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )
+                          }
+                          if (atendido && motivo) {
+                            const motivoLabels: Record<string, string> = {
+                              'compra_directa': 'Compra directa en tienda / caja chica',
+                              'urgencia': 'Urgencia — sin tiempo para OC',
+                              'otro': 'Otro motivo',
+                            }
+                            return (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="inline-flex items-center gap-0.5 text-[9px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full mt-0.5 font-medium">
+                                      Directo
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent><p className="text-xs">{motivoLabels[motivo] || motivo}</p></TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )
+                          }
+                          if ((item as any).proveedorId || (item as any).listaEquipoItem?.proveedorId) {
+                            return <span className="inline-flex items-center text-[9px] text-gray-400 mt-0.5">Sin OC</span>
+                          }
+                          return null
+                        })()}
                       </td>
                       <td className="px-3 py-2 text-center text-gray-500">{item.unidad}</td>
                       <td className="px-3 py-2 text-center font-medium text-blue-600">
@@ -1283,7 +1364,7 @@ export default function PedidoLogisticaDetailPage() {
       {/* Modal de edición de item */}
       <Dialog
         open={!!editingItem.item}
-        onOpenChange={(open) => !open && setEditingItem({ item: null, cantidadAtendida: 0, estado: 'pendiente', fechaEntregaReal: '', observacionesEntrega: '' })}
+        onOpenChange={(open) => !open && resetEditingItem()}
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -1298,7 +1379,11 @@ export default function PedidoLogisticaDetailPage() {
             const porcentaje = cantPedida > 0 ? Math.round((cantAtendida / cantPedida) * 100) : 0
             const esCompleta = cantAtendida >= cantPedida
             const esParcial = cantAtendida > 0 && cantAtendida < cantPedida
-            const proveedor = (editingItem.item as any).listaEquipoItem?.proveedor?.nombre
+            const proveedor = (editingItem.item as any).proveedor?.nombre || (editingItem.item as any).proveedorNombre || (editingItem.item as any).listaEquipoItem?.proveedor?.nombre
+            const tieneOC = ((editingItem.item as any).ordenCompraItems?.length ?? 0) > 0
+            const ocNumero = tieneOC ? (editingItem.item as any).ordenCompraItems[0]?.ordenCompra?.numero : null
+            const userRole = session?.user?.role || ''
+            const puedeEditarCosto = ['admin', 'gerente', 'socio'].includes(userRole)
 
             return (
               <div className="space-y-4">
@@ -1318,6 +1403,73 @@ export default function PedidoLogisticaDetailPage() {
                     </div>
                   )}
                 </div>
+
+                {/* Aviso OC vinculada */}
+                {tieneOC && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-xs text-yellow-700 flex items-start gap-2">
+                    <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                    <span>Este item tiene OC <strong>{ocNumero}</strong> vinculada. Se recomienda usar el flujo de recepción de OC.</span>
+                  </div>
+                )}
+
+                {/* Motivo de atención directa (solo sin OC) */}
+                {!tieneOC && (
+                  <>
+                    <div>
+                      <label className="text-xs font-medium mb-1 block">Motivo de atención directa *</label>
+                      <select
+                        value={editingItem.motivoAtencionDirecta}
+                        onChange={(e) => setEditingItem(prev => ({ ...prev, motivoAtencionDirecta: e.target.value }))}
+                        className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <option value="">Seleccionar motivo...</option>
+                        <option value="compra_caja_chica">Compra directa en tienda / caja chica</option>
+                        <option value="urgencia_proyecto">Urgencia — sin tiempo para OC</option>
+                        <option value="importacion_gerencia">Compra directa por gerencia / importación</option>
+                        <option value="otro">Otro</option>
+                      </select>
+                    </div>
+
+                    {/* Costo real para importación gerencia */}
+                    {editingItem.motivoAtencionDirecta === 'importacion_gerencia' && (
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium block">Costo real de adquisición *</label>
+                        {puedeEditarCosto ? (
+                          <div className="flex items-center gap-2">
+                            <Input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              value={editingItem.costoRealUnitario}
+                              onChange={(e) => setEditingItem(prev => ({ ...prev, costoRealUnitario: e.target.value }))}
+                              placeholder="Costo unitario"
+                              className="h-9 text-sm flex-1"
+                            />
+                            <select
+                              value={editingItem.costoRealMoneda}
+                              onChange={(e) => setEditingItem(prev => ({ ...prev, costoRealMoneda: e.target.value }))}
+                              className="h-9 rounded-md border border-input bg-background px-2 text-xs w-20"
+                            >
+                              <option value="USD">USD</option>
+                              <option value="PEN">PEN</option>
+                            </select>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground italic bg-gray-50 rounded p-2">Solo Gerencia puede completar este campo.</p>
+                        )}
+                        <p className="text-[10px] text-red-600 bg-red-50 border border-red-200 rounded p-2">
+                          Este dato es visible para socios y directivos. Ingresar el costo total real (incluye flete, impuestos, aduanas). Se creará automáticamente una CxP pendiente de documentos.
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Aviso informativo */}
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-2.5 text-[10px] text-blue-700 flex items-start gap-2">
+                      <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                      <span>Recuerda registrar el gasto en Finanzas → Requerimientos con categoría &quot;equipos&quot;.</span>
+                    </div>
+                  </>
+                )}
 
                 {/* Cantidad section */}
                 <div>
@@ -1362,17 +1514,14 @@ export default function PedidoLogisticaDetailPage() {
                   </div>
                 </div>
 
-                {/* Fecha de entrega - solo mostrar si hay cantidad atendida */}
+                {/* Fecha de entrega */}
                 {cantAtendida > 0 && (
                   <div>
                     <label className="text-xs font-medium mb-1 block">Fecha de Entrega</label>
                     <Input
                       type="date"
                       value={editingItem.fechaEntregaReal}
-                      onChange={(e) => setEditingItem(prev => ({
-                        ...prev,
-                        fechaEntregaReal: e.target.value
-                      }))}
+                      onChange={(e) => setEditingItem(prev => ({ ...prev, fechaEntregaReal: e.target.value }))}
                       className="h-9 text-xs"
                     />
                   </div>
@@ -1383,17 +1532,14 @@ export default function PedidoLogisticaDetailPage() {
                   <label className="text-xs font-medium mb-1 block">Observaciones</label>
                   <textarea
                     value={editingItem.observacionesEntrega}
-                    onChange={(e) => setEditingItem(prev => ({
-                      ...prev,
-                      observacionesEntrega: e.target.value
-                    }))}
+                    onChange={(e) => setEditingItem(prev => ({ ...prev, observacionesEntrega: e.target.value }))}
                     placeholder="Ej: Entrega parcial, pendiente 2 unidades para la siguiente semana..."
                     rows={2}
                     className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
                   />
                 </div>
 
-                {/* Estado resultante - banner prominente */}
+                {/* Estado resultante */}
                 <div className={cn(
                   'rounded-lg px-3 py-2 flex items-center gap-2 text-xs font-medium border',
                   cantAtendida === 0 && 'bg-gray-50 text-gray-600 border-gray-200',
@@ -1414,7 +1560,7 @@ export default function PedidoLogisticaDetailPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setEditingItem({ item: null, cantidadAtendida: 0, estado: 'pendiente', fechaEntregaReal: '', observacionesEntrega: '' })}
+                    onClick={resetEditingItem}
                     className="h-8 text-xs"
                   >
                     Cancelar

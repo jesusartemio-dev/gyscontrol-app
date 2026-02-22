@@ -35,6 +35,15 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       return NextResponse.json(updated)
     }
 
+    // Transition pendiente_documentos → pendiente
+    if (body.estado === 'pendiente' && existing.estado === 'pendiente_documentos') {
+      const updated = await prisma.cuentaPorPagar.update({
+        where: { id },
+        data: { estado: 'pendiente', updatedAt: new Date() },
+      })
+      return NextResponse.json(updated)
+    }
+
     return NextResponse.json({ error: 'Operación no soportada' }, { status: 400 })
   } catch (error) {
     console.error('Error al actualizar CxP:', error)

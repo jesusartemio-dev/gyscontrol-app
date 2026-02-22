@@ -73,13 +73,27 @@ interface CuentaPorPagar {
   condicionPago: string
   estado: string
   observaciones: string | null
+  pedidoEquipoId?: string | null
+  pedidoEquipoItemId?: string | null
+  tipoOrigen?: string | null
   proveedor?: Proveedor
   proyecto?: Proyecto | null
   ordenCompra?: OrdenCompra | null
+  pedidoEquipo?: { id: string; codigo: string } | null
+  pedidoEquipoItem?: { id: string; codigo: string; descripcion: string } | null
   pagos?: PagoPagar[]
+  adjuntos?: Array<{
+    id: string
+    nombreArchivo: string
+    urlArchivo: string
+    tipoArchivo: string | null
+    createdAt: string
+    subidoPor?: { id: string; name: string | null }
+  }>
 }
 
 const ESTADOS_CXP = [
+  { value: 'pendiente_documentos', label: 'Pend. Documentos', color: 'bg-purple-100 text-purple-700' },
   { value: 'pendiente', label: 'Pendiente', color: 'bg-yellow-100 text-yellow-700' },
   { value: 'parcial', label: 'Parcial', color: 'bg-blue-100 text-blue-700' },
   { value: 'pagada', label: 'Pagada', color: 'bg-green-100 text-green-700' },
@@ -537,6 +551,19 @@ export default function CuentasPagarPage() {
         </Card>
       )}
 
+      {/* CxP pendientes de documentos */}
+      {items.filter(i => i.estado === 'pendiente_documentos').length > 0 && (
+        <Card className="border-purple-200 bg-purple-50/50">
+          <CardContent className="p-4 flex items-center gap-3">
+            <AlertTriangle className="h-5 w-5 text-purple-600 shrink-0" />
+            <div>
+              <span className="font-medium text-purple-800">{items.filter(i => i.estado === 'pendiente_documentos').length} CxP requieren documentos de respaldo</span>
+              <p className="text-xs text-purple-600 mt-0.5">Importaciones directas sin factura adjunta. Adjunte los comprobantes en el detalle de cada cuenta.</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Filtros */}
       <div className="flex gap-3 items-center flex-wrap">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
@@ -978,6 +1005,8 @@ export default function CuentasPagarPage() {
                   {showDetail.proveedor?.ruc && <div className="flex justify-between"><span>RUC</span><span className="font-mono">{showDetail.proveedor.ruc}</span></div>}
                   {showDetail.proyecto && <div className="flex justify-between"><span>Proyecto</span><span className="font-mono">{showDetail.proyecto.codigo}</span></div>}
                   {showDetail.ordenCompra && <div className="flex justify-between"><span>Orden Compra</span><span className="font-mono">{showDetail.ordenCompra.numero}</span></div>}
+                  {showDetail.pedidoEquipo && <div className="flex justify-between"><span>Pedido origen</span><a href={`/logistica/pedidos/${showDetail.pedidoEquipo.id}`} className="text-blue-600 hover:underline font-mono">{showDetail.pedidoEquipo.codigo}</a></div>}
+                  {showDetail.tipoOrigen && <div className="flex justify-between"><span>Tipo origen</span><Badge variant="outline" className="text-xs">{showDetail.tipoOrigen === 'importacion_gerencia' ? 'Importación Gerencia' : showDetail.tipoOrigen === 'atencion_directa' ? 'Atención Directa' : showDetail.tipoOrigen}</Badge></div>}
                   {showDetail.descripcion && <div className="flex justify-between"><span>Descripción</span><span className="text-right max-w-[200px] truncate">{showDetail.descripcion}</span></div>}
                   <div className="flex justify-between"><span>Recepción</span><span>{formatDate(showDetail.fechaRecepcion)}</span></div>
                   <div className="flex justify-between"><span>Vencimiento</span><span className={isVencida(showDetail.fechaVencimiento, showDetail.estado) ? 'text-red-600 font-bold' : ''}>{formatDate(showDetail.fechaVencimiento)}</span></div>
@@ -1008,6 +1037,79 @@ export default function CuentasPagarPage() {
                   </div>
                 </div>
               )}
+
+              {/* Documentos de respaldo */}
+              <div>
+                <div className="font-medium mb-2 flex items-center gap-2">
+                  Documentos de Respaldo
+                  {showDetail.tipoOrigen === 'importacion_gerencia' && showDetail.estado === 'pendiente_documentos' && (
+                    <Badge className="bg-purple-100 text-purple-700 text-[10px]">Obligatorio</Badge>
+                  )}
+                </div>
+                {showDetail.adjuntos && showDetail.adjuntos.length > 0 ? (
+                  <div className="space-y-1">
+                    {showDetail.adjuntos.map((adj) => (
+                      <div key={adj.id} className="flex items-center justify-between text-xs border rounded p-2">
+                        <a href={adj.urlArchivo} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline truncate max-w-[250px]">{adj.nombreArchivo}</a>
+                        <Badge variant="outline" className="text-[10px] shrink-0 ml-2">{adj.tipoArchivo || 'otro'}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Sin documentos adjuntos</p>
+                )}
+                {(showDetail.estado === 'pendiente_documentos' || showDetail.estado === 'pendiente') && (
+                  <div className="mt-2 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <select
+                        id="adjuntoTipo"
+                        defaultValue="factura"
+                        className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                      >
+                        <option value="factura">Factura proveedor</option>
+                        <option value="transferencia">Comprobante transferencia</option>
+                        <option value="dua">DUA Aduanas</option>
+                        <option value="otro">Otro</option>
+                      </select>
+                      <label className="flex items-center gap-1.5 cursor-pointer text-xs text-blue-600 hover:text-blue-800">
+                        <Upload className="h-3.5 w-3.5" />
+                        Adjuntar
+                        <input
+                          type="file"
+                          accept=".pdf,.png,.jpg,.jpeg,.webp"
+                          className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0]
+                            if (!file || !showDetail) return
+                            const tipoSelect = document.getElementById('adjuntoTipo') as HTMLSelectElement
+                            const tipoArchivo = tipoSelect?.value || 'otro'
+                            const fd = new FormData()
+                            fd.append('file', file)
+                            fd.append('cuentaPorPagarId', showDetail.id)
+                            fd.append('tipoArchivo', tipoArchivo)
+                            try {
+                              const res = await fetch('/api/cxp-adjunto', { method: 'POST', credentials: 'include', body: fd })
+                              if (!res.ok) throw new Error('Error al subir')
+                              toast.success('Documento adjuntado')
+                              loadData()
+                              // Refresh detail
+                              const updated = await res.json()
+                              setShowDetail(prev => prev ? {
+                                ...prev,
+                                adjuntos: [...(prev.adjuntos || []), updated],
+                                estado: prev.estado === 'pendiente_documentos' && ['factura', 'transferencia'].includes(tipoArchivo) ? 'pendiente' : prev.estado,
+                              } : null)
+                            } catch {
+                              toast.error('Error al adjuntar documento')
+                            }
+                            e.target.value = ''
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
           <DialogFooter>

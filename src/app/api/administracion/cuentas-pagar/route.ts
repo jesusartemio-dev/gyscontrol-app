@@ -9,9 +9,15 @@ const includeRelations = {
   proveedor: { select: { id: true, nombre: true, ruc: true } },
   proyecto: { select: { id: true, codigo: true, nombre: true } },
   ordenCompra: { select: { id: true, numero: true, total: true } },
+  pedidoEquipo: { select: { id: true, codigo: true } },
+  pedidoEquipoItem: { select: { id: true, codigo: true, descripcion: true } },
   pagos: {
     include: { cuentaBancaria: { select: { id: true, nombreBanco: true, numeroCuenta: true } } },
     orderBy: { fechaPago: 'desc' as const },
+  },
+  adjuntos: {
+    include: { subidoPor: { select: { id: true, name: true } } },
+    orderBy: { createdAt: 'desc' as const },
   },
 }
 
@@ -59,7 +65,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json()
-    const { proveedorId, proyectoId, ordenCompraId, numeroFactura, descripcion, monto, moneda, tipoCambio, fechaRecepcion, fechaVencimiento, condicionPago, diasCredito, observaciones } = body
+    const { proveedorId, proyectoId, ordenCompraId, pedidoEquipoId, pedidoEquipoItemId, tipoOrigen, numeroFactura, descripcion, monto, moneda, tipoCambio, fechaRecepcion, fechaVencimiento, condicionPago, diasCredito, observaciones } = body
 
     if (!proveedorId || !monto || !fechaRecepcion || !fechaVencimiento) {
       return NextResponse.json({ error: 'proveedorId, monto, fechaRecepcion y fechaVencimiento son requeridos' }, { status: 400 })
@@ -70,6 +76,9 @@ export async function POST(req: Request) {
         proveedorId,
         proyectoId: proyectoId || null,
         ordenCompraId: ordenCompraId || null,
+        pedidoEquipoId: pedidoEquipoId || null,
+        pedidoEquipoItemId: pedidoEquipoItemId || null,
+        tipoOrigen: tipoOrigen || null,
         numeroFactura: numeroFactura || null,
         descripcion: descripcion || null,
         monto,
