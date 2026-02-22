@@ -45,6 +45,8 @@ interface Props {
   isOpen: boolean
   onClose: () => void
   onCreated?: () => void
+  proyectoId?: string
+  proyectoNombre?: string
 }
 
 const UNIDADES = ['unidad', 'metro', 'kg', 'rollo', 'caja', 'bolsa', 'juego', 'global']
@@ -62,7 +64,7 @@ function newItem(): UrgentItem {
   }
 }
 
-export default function ModalPedidoUrgente({ isOpen, onClose, onCreated }: Props) {
+export default function ModalPedidoUrgente({ isOpen, onClose, onCreated, proyectoId: proyectoIdProp, proyectoNombre }: Props) {
   const { data: session } = useSession()
   const router = useRouter()
   const [step, setStep] = useState(1)
@@ -81,19 +83,21 @@ export default function ModalPedidoUrgente({ isOpen, onClose, onCreated }: Props
   useEffect(() => {
     if (isOpen) {
       setStep(1)
-      setProyectoId('')
+      setProyectoId(proyectoIdProp || '')
       setFechaNecesaria(new Date().toISOString().split('T')[0])
       setMotivoUrgencia('')
       setItems([newItem()])
 
-      setLoadingProyectos(true)
-      fetch('/api/proyecto')
-        .then(r => r.json())
-        .then((data: Proyecto[]) => setProyectos(data))
-        .catch(() => toast.error('Error cargando proyectos'))
-        .finally(() => setLoadingProyectos(false))
+      if (!proyectoIdProp) {
+        setLoadingProyectos(true)
+        fetch('/api/proyecto')
+          .then(r => r.json())
+          .then((data: Proyecto[]) => setProyectos(data))
+          .catch(() => toast.error('Error cargando proyectos'))
+          .finally(() => setLoadingProyectos(false))
+      }
     }
-  }, [isOpen])
+  }, [isOpen, proyectoIdProp])
 
   const updateItem = (tempId: string, field: keyof UrgentItem, value: any) => {
     setItems(prev => prev.map(item => {
@@ -215,18 +219,24 @@ export default function ModalPedidoUrgente({ isOpen, onClose, onCreated }: Props
 
             <div>
               <label className="text-xs font-medium mb-1 block">Proyecto *</label>
-              <Select value={proyectoId} onValueChange={setProyectoId} disabled={loadingProyectos}>
-                <SelectTrigger className="h-9 text-xs">
-                  <SelectValue placeholder={loadingProyectos ? 'Cargando...' : 'Seleccionar proyecto'} />
-                </SelectTrigger>
-                <SelectContent>
-                  {proyectos.map(p => (
-                    <SelectItem key={p.id} value={p.id} className="text-xs">
-                      {p.codigo} — {p.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {proyectoIdProp ? (
+                <div className="h-9 flex items-center px-3 text-xs bg-gray-50 border rounded-md text-gray-700 font-medium">
+                  {proyectoNombre || proyectoIdProp}
+                </div>
+              ) : (
+                <Select value={proyectoId} onValueChange={setProyectoId} disabled={loadingProyectos}>
+                  <SelectTrigger className="h-9 text-xs">
+                    <SelectValue placeholder={loadingProyectos ? 'Cargando...' : 'Seleccionar proyecto'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {proyectos.map(p => (
+                      <SelectItem key={p.id} value={p.id} className="text-xs">
+                        {p.codigo} — {p.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             <div>

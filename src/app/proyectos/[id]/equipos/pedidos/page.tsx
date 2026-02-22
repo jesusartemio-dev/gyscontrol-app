@@ -51,10 +51,12 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  ShoppingCart
+  ShoppingCart,
+  Zap
 } from 'lucide-react'
 import Link from 'next/link'
 import PedidoEquipoModalCrear from '@/components/equipos/PedidoEquipoModalCrear'
+import ModalPedidoUrgente from '@/components/logistica/ModalPedidoUrgente'
 
 // Skeleton minimalista
 function LoadingSkeleton() {
@@ -374,6 +376,7 @@ export default function PedidosProyectoPage() {
   const [listas, setListas] = useState<ListaEquipo[]>([])
   const [proyecto, setProyecto] = useState<Proyecto | null>(null)
   const [loading, setLoading] = useState(true)
+  const [showModalUrgente, setShowModalUrgente] = useState(false)
 
   const cargarDatos = async () => {
     try {
@@ -490,14 +493,24 @@ export default function PedidosProyectoPage() {
           </div>
         </div>
 
-        {/* Acción principal */}
-        <PedidoEquipoModalCrear
-          listas={listas}
-          proyectoId={proyectoId}
-          responsableId={session?.user.id || ''}
-          onCreated={handleCreatePedido}
-          onRefresh={cargarListas}
-        />
+        {/* Acciones */}
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            onClick={() => setShowModalUrgente(true)}
+            className="h-7 text-xs bg-red-600 hover:bg-red-700"
+          >
+            <Zap className="h-3 w-3 mr-1" />
+            Pedido Urgente
+          </Button>
+          <PedidoEquipoModalCrear
+            listas={listas}
+            proyectoId={proyectoId}
+            responsableId={session?.user.id || ''}
+            onCreated={handleCreatePedido}
+            onRefresh={cargarListas}
+          />
+        </div>
       </div>
 
       {/* Tabla de pedidos - El foco principal */}
@@ -507,6 +520,14 @@ export default function PedidosProyectoPage() {
         onDelete={handleDelete}
         onRefresh={cargarDatos}
         loading={loading}
+      />
+
+      <ModalPedidoUrgente
+        isOpen={showModalUrgente}
+        onClose={() => setShowModalUrgente(false)}
+        onCreated={cargarDatos}
+        proyectoId={proyectoId}
+        proyectoNombre={proyecto ? `${proyecto.codigo} — ${proyecto.nombre}` : undefined}
       />
     </div>
   )

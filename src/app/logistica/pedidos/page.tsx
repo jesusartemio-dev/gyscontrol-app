@@ -9,7 +9,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { RefreshCw, Truck, Package, Search, Filter, X, CheckCircle, AlertTriangle, Clock, Building2, Zap } from 'lucide-react'
+import { RefreshCw, Truck, Package, Search, Filter, X, CheckCircle, AlertTriangle, Clock, Building2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -22,7 +22,6 @@ import {
 } from '@/components/ui/select'
 import { getAllPedidoEquipos, deletePedidoEquipo } from '@/lib/services/pedidoEquipo'
 import LogisticaPedidosTable from '@/components/logistica/LogisticaPedidosTable'
-import ModalPedidoUrgente from '@/components/logistica/ModalPedidoUrgente'
 import type { PedidoEquipo } from '@/types'
 
 const ESTADOS_PEDIDO = [
@@ -45,8 +44,6 @@ export default function LogisticaPedidosPage() {
   const [search, setSearch] = useState('')
   const [estado, setEstado] = useState<string>('all')
   const [proyectoId, setProyectoId] = useState<string>('all')
-  const [showModalUrgente, setShowModalUrgente] = useState(false)
-
   const fetchData = async () => {
     try {
       setRefreshing(true)
@@ -148,14 +145,6 @@ export default function LogisticaPedidosPage() {
             </div>
 
             <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                onClick={() => setShowModalUrgente(true)}
-                className="h-7 text-xs bg-red-600 hover:bg-red-700"
-              >
-                <Zap className="h-3 w-3 mr-1" />
-                Pedido Urgente
-              </Button>
               <Button
                 variant="outline"
                 size="sm"
@@ -276,11 +265,6 @@ export default function LogisticaPedidosPage() {
         </div>
       </div>
 
-      <ModalPedidoUrgente
-        isOpen={showModalUrgente}
-        onClose={() => setShowModalUrgente(false)}
-        onCreated={fetchData}
-      />
     </div>
   )
 }
