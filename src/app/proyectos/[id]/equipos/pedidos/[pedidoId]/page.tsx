@@ -564,6 +564,8 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
                     <th className="px-3 py-2 text-center font-medium text-gray-600">Pedido</th>
                     <th className="px-3 py-2 text-center font-medium text-gray-600">Atendido</th>
                     <th className="px-3 py-2 text-center font-medium text-gray-600">Estado</th>
+                    <th className="px-3 py-2 text-center font-medium text-gray-600">T. Entrega</th>
+                    <th className="px-3 py-2 text-center font-medium text-gray-600">F.Entrega</th>
                     <th className="px-3 py-2 text-right font-medium text-gray-600">Costo</th>
                   </tr>
                 </thead>
@@ -596,6 +598,27 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
                         >
                           {item.estado}
                         </Badge>
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        {(() => {
+                          const ted = (item as any).tiempoEntregaDias
+                          const te = (item as any).tiempoEntrega
+                          if (ted != null) return <span className="text-[10px] text-gray-600">{ted} día{ted !== 1 ? 's' : ''}</span>
+                          if (te) return <span className="text-[10px] text-gray-600">{te}</span>
+                          return <span className="text-gray-400">—</span>
+                        })()}
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        {(() => {
+                          const fEstimada = (item as any).fechaEntregaEstimada
+                          const fReal = (item as any).fechaEntregaReal
+                          if (fReal) return <span className="text-[10px] text-green-600">{formatDate(fReal)}</span>
+                          if (fEstimada) {
+                            const superaFecha = pedido.fechaNecesaria && new Date(fEstimada) > new Date(pedido.fechaNecesaria)
+                            return <span className={cn('text-[10px]', superaFecha ? 'font-medium text-red-600' : 'text-gray-600')}>{formatDate(fEstimada)}</span>
+                          }
+                          return <span className="text-gray-400">—</span>
+                        })()}
                       </td>
                       <td className="px-3 py-2 text-right font-medium text-emerald-600">
                         {item.costoTotal ? formatCurrency(item.costoTotal) : '—'}
