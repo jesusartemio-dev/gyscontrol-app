@@ -90,7 +90,10 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
             costoRealUnitario: data.costoRealUnitario,
             costoRealMoneda: data.costoRealMoneda || 'USD',
           } : {}),
-          ...(data.precioUnitario !== undefined ? { precioUnitario: data.precioUnitario } : {}),
+          ...(data.precioUnitario !== undefined ? {
+            precioUnitario: data.precioUnitario,
+            costoTotal: data.precioUnitario * itemExistente.cantidadPedida,
+          } : {}),
           updatedAt: new Date()
         },
         include: {
