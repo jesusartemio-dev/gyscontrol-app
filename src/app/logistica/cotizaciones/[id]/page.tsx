@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { notFound } from 'next/navigation'
+import { notFound, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { getCotizacionProveedorById } from '@/lib/services/cotizacionProveedor'
 import { useSession } from 'next-auth/react'
@@ -33,6 +33,7 @@ interface PageProps {
 }
 
 export default function CotizacionProveedorDetailPage({ params }: PageProps) {
+  const router = useRouter()
   const { data: session } = useSession()
   const [cotizacion, setCotizacion] = useState<CotizacionProveedor | null>(null)
   const [loading, setLoading] = useState(true)
@@ -157,10 +158,8 @@ Equipo de Compras`
           {/* Title row */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="sm" asChild className="h-7 px-2">
-                <Link href="/logistica/cotizaciones">
-                  <ArrowLeft className="h-3.5 w-3.5" />
-                </Link>
+              <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => router.back()}>
+                <ArrowLeft className="h-3.5 w-3.5" />
               </Button>
               <div className="flex items-center gap-2">
                 <div className="h-8 w-8 rounded-lg bg-purple-100 flex items-center justify-center">
