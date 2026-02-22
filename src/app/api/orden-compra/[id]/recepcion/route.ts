@@ -44,6 +44,34 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       })
     }
 
+    // Crear RecepcionPendiente para items vinculados a pedidos
+    let recepcionesPendientesCreadas = 0
+    for (const rec of recepciones) {
+      const item = existing.items.find(i => i.id === rec.itemId)
+      if (!item || !item.pedidoEquipoItemId) continue
+
+      const cantidadEfectiva = Math.min(rec.cantidadRecibida, item.cantidad)
+      if (cantidadEfectiva <= 0) continue
+
+      // Evitar duplicados: no crear si ya existe una pendiente para este OC item
+      const existente = await prisma.recepcionPendiente.findFirst({
+        where: {
+          ordenCompraItemId: item.id,
+          estado: 'pendiente',
+        }
+      })
+      if (existente) continue
+
+      await prisma.recepcionPendiente.create({
+        data: {
+          pedidoEquipoItemId: item.pedidoEquipoItemId,
+          ordenCompraItemId: item.id,
+          cantidadRecibida: cantidadEfectiva,
+        }
+      })
+      recepcionesPendientesCreadas++
+    }
+
     // Re-fetch items to compute state
     const updatedItems = await prisma.ordenCompraItem.findMany({
       where: { ordenCompraId: id },
@@ -73,7 +101,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       },
     })
 
-    return NextResponse.json(data)
+    return NextResponse.json({ ...data, recepcionesPendientesCreadas })
   } catch (error) {
     console.error('Error al registrar recepción:', error)
     return NextResponse.json({ error: 'Error al registrar recepción' }, { status: 500 })

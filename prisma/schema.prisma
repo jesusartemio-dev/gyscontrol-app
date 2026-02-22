@@ -681,6 +681,7 @@ model PedidoEquipoItem {
   user                        User              @relation(fields: [responsableId], references: [id])
   comentarioLogisticaPor      User?             @relation("PedidoEquipoItemComentarioLogistica", fields: [comentarioLogisticaPorId], references: [id])
   ordenCompraItems            OrdenCompraItem[]
+  recepcionesPendientes       RecepcionPendiente[]
 
   @@map("pedido_equipo_item")
 }
@@ -1349,6 +1350,8 @@ model User {
   // Catálogo equipos tracking
   equiposCreadosPor                     CatalogoEquipo[]             @relation("EquipoCreadoPor")
   equiposActualizadosPor                CatalogoEquipo[]             @relation("EquipoActualizadoPor")
+  // Recepciones pendientes
+  recepcionesConfirmadas                RecepcionPendiente[]         @relation("RecepcionConfirmador")
 
   @@map("user")
 }
@@ -3195,8 +3198,33 @@ model OrdenCompraItem {
   pedidoEquipoItem PedidoEquipoItem? @relation(fields: [pedidoEquipoItemId], references: [id])
   listaEquipoItem  ListaEquipoItem?  @relation(fields: [listaEquipoItemId], references: [id])
 
+  recepcionesPendientes RecepcionPendiente[]
+
   @@index([ordenCompraId])
   @@map("orden_compra_item")
+}
+
+model RecepcionPendiente {
+  id                 String    @id @default(cuid())
+  pedidoEquipoItemId String
+  ordenCompraItemId  String
+  cantidadRecibida   Float
+  fechaRecepcion     DateTime  @default(now())
+  estado             String    @default("pendiente")
+  confirmadoPorId    String?
+  fechaConfirmacion  DateTime?
+  observaciones      String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  pedidoEquipoItem PedidoEquipoItem @relation(fields: [pedidoEquipoItemId], references: [id], onDelete: Cascade)
+  ordenCompraItem  OrdenCompraItem  @relation(fields: [ordenCompraItemId], references: [id], onDelete: Cascade)
+  confirmadoPor    User?            @relation("RecepcionConfirmador", fields: [confirmadoPorId], references: [id])
+
+  @@index([pedidoEquipoItemId])
+  @@index([ordenCompraItemId])
+  @@index([estado])
+  @@map("recepcion_pendiente")
 }
 
 // ======================

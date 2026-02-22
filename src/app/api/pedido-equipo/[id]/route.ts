@@ -58,6 +58,21 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
                 ordenCompra: { select: { id: true, numero: true, estado: true } },
               },
             },
+            recepcionesPendientes: {
+              where: { estado: 'pendiente' },
+              include: {
+                ordenCompraItem: {
+                  select: {
+                    id: true,
+                    codigo: true,
+                    descripcion: true,
+                    cantidad: true,
+                    ordenCompra: { select: { numero: true } },
+                  },
+                },
+              },
+              orderBy: { fechaRecepcion: 'desc' as const },
+            },
           },
         },
         ordenesCompra: {
