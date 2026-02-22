@@ -192,7 +192,7 @@ export default function ModalPedidoUrgente({ isOpen, onClose, onCreated }: Props
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && !loading && onClose()}>
-      <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
+      <DialogContent className="max-w-4xl w-full max-h-[85vh] flex flex-col">
         <DialogHeader>
           <div className="flex items-center gap-2">
             <Zap className="h-4 w-4 text-red-600" />
@@ -264,98 +264,96 @@ export default function ModalPedidoUrgente({ isOpen, onClose, onCreated }: Props
               Agrega los items que necesitas. Puedes mezclar equipos, consumibles y servicios.
             </div>
 
-            <div className="flex-1 overflow-auto border rounded-lg">
-              <table className="w-full text-xs table-fixed">
-                <thead className="bg-gray-50 sticky top-0 z-10">
-                  <tr className="border-b">
-                    <th className="px-2 py-1.5 text-left font-medium" style={{ width: 140 }}>Tipo</th>
-                    <th className="px-2 py-1.5 text-left font-medium" style={{ width: 140 }}>Codigo</th>
-                    <th className="px-2 py-1.5 text-left font-medium">Descripcion</th>
-                    <th className="px-2 py-1.5 text-left font-medium" style={{ width: 110 }}>Unidad</th>
-                    <th className="px-2 py-1.5 text-center font-medium" style={{ width: 70 }}>Cant</th>
-                    <th className="px-2 py-1.5 text-center font-medium" style={{ width: 80 }}>Precio</th>
-                    <th className="px-2 py-1.5" style={{ width: 40 }}></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {items.map((item) => (
-                    <tr key={item.tempId} className="hover:bg-gray-50/50">
-                      <td className="px-1 py-1">
-                        <Select value={item.tipoItem} onValueChange={(v) => updateItem(item.tempId, 'tipoItem', v)}>
-                          <SelectTrigger className="h-7 text-[10px] border-0 bg-transparent px-1 w-full">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="equipo" className="text-xs">Equipo</SelectItem>
-                            <SelectItem value="consumible" className="text-xs">Consumible</SelectItem>
-                            <SelectItem value="servicio" className="text-xs">Servicio</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </td>
-                      <td className="px-1 py-1">
-                        <Input
-                          value={item.codigo}
-                          onChange={(e) => updateItem(item.tempId, 'codigo', e.target.value)}
-                          placeholder="COD-001"
-                          className={`h-7 text-[10px] bg-transparent px-1 w-full ${!item.codigo.trim() ? 'border border-red-300 rounded' : 'border-0'}`}
-                        />
-                      </td>
-                      <td className="px-1 py-1">
-                        <Input
-                          value={item.descripcion}
-                          onChange={(e) => updateItem(item.tempId, 'descripcion', e.target.value)}
-                          placeholder="Descripcion del item..."
-                          className={`h-7 text-[10px] bg-transparent px-1 w-full ${!item.descripcion.trim() ? 'border border-red-300 rounded' : 'border-0'}`}
-                        />
-                      </td>
-                      <td className="px-1 py-1">
-                        <Select value={item.unidad} onValueChange={(v) => updateItem(item.tempId, 'unidad', v)}>
-                          <SelectTrigger className="h-7 text-[10px] border-0 bg-transparent px-1 w-full">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {UNIDADES.map(u => (
-                              <SelectItem key={u} value={u} className="text-xs">{u}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </td>
-                      <td className="px-1 py-1">
-                        <Input
-                          type="number"
-                          min={0}
-                          value={item.cantidad || ''}
-                          onChange={(e) => updateItem(item.tempId, 'cantidad', parseFloat(e.target.value) || 0)}
-                          className={`h-7 text-[10px] bg-transparent px-1 text-center w-full ${!item.cantidad || item.cantidad <= 0 ? 'border border-red-300 rounded' : 'border-0'}`}
-                        />
-                      </td>
-                      <td className="px-1 py-1">
-                        <Input
-                          type="number"
-                          min={0}
-                          step="0.01"
-                          value={item.precioEstimado}
-                          onChange={(e) => updateItem(item.tempId, 'precioEstimado', e.target.value)}
-                          placeholder="—"
-                          className="h-7 text-[10px] border-0 bg-transparent px-1 text-center w-full"
-                        />
-                      </td>
-                      <td className="px-1 py-1">
-                        {items.length > 1 && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeItem(item.tempId)}
-                            className="h-6 w-6 p-0"
-                          >
-                            <Trash2 className="h-3 w-3 text-red-400" />
-                          </Button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="max-h-64 overflow-y-auto border rounded-lg divide-y">
+              {items.map((item, idx) => (
+                <div key={item.tempId} className="px-3 py-2.5 space-y-2 hover:bg-gray-50/50">
+                  {/* Línea 1: Tipo + Código + Descripción */}
+                  <div className="flex items-end gap-2">
+                    <div className="w-[130px] shrink-0">
+                      <label className="text-[10px] text-gray-500 mb-0.5 block">Tipo</label>
+                      <Select value={item.tipoItem} onValueChange={(v) => updateItem(item.tempId, 'tipoItem', v)}>
+                        <SelectTrigger className="h-7 text-[10px] w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="equipo" className="text-xs">Equipo</SelectItem>
+                          <SelectItem value="consumible" className="text-xs">Consumible</SelectItem>
+                          <SelectItem value="servicio" className="text-xs">Servicio</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="w-[130px] shrink-0">
+                      <label className="text-[10px] text-gray-500 mb-0.5 block">Código *</label>
+                      <Input
+                        value={item.codigo}
+                        onChange={(e) => updateItem(item.tempId, 'codigo', e.target.value)}
+                        placeholder="COD-001"
+                        className={`h-7 text-[10px] w-full ${!item.codigo.trim() ? 'border-red-300 focus-visible:ring-red-300' : ''}`}
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <label className="text-[10px] text-gray-500 mb-0.5 block">Descripción *</label>
+                      <Input
+                        value={item.descripcion}
+                        onChange={(e) => updateItem(item.tempId, 'descripcion', e.target.value)}
+                        placeholder="Descripcion del item..."
+                        className={`h-7 text-[10px] w-full ${!item.descripcion.trim() ? 'border-red-300 focus-visible:ring-red-300' : ''}`}
+                      />
+                    </div>
+                  </div>
+                  {/* Línea 2: Unidad + Cantidad + Precio + Eliminar */}
+                  <div className="flex items-end gap-2">
+                    <div className="w-[110px] shrink-0">
+                      <label className="text-[10px] text-gray-500 mb-0.5 block">Unidad</label>
+                      <Select value={item.unidad} onValueChange={(v) => updateItem(item.tempId, 'unidad', v)}>
+                        <SelectTrigger className="h-7 text-[10px] w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {UNIDADES.map(u => (
+                            <SelectItem key={u} value={u} className="text-xs">{u}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="w-[80px] shrink-0">
+                      <label className="text-[10px] text-gray-500 mb-0.5 block">Cantidad *</label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={item.cantidad || ''}
+                        onChange={(e) => updateItem(item.tempId, 'cantidad', parseFloat(e.target.value) || 0)}
+                        className={`h-7 text-[10px] w-full text-center ${!item.cantidad || item.cantidad <= 0 ? 'border-red-300 focus-visible:ring-red-300' : ''}`}
+                      />
+                    </div>
+                    <div className="w-[100px] shrink-0">
+                      <label className="text-[10px] text-gray-500 mb-0.5 block">Precio est.</label>
+                      <Input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={item.precioEstimado}
+                        onChange={(e) => updateItem(item.tempId, 'precioEstimado', e.target.value)}
+                        placeholder="—"
+                        className="h-7 text-[10px] w-full text-center"
+                      />
+                    </div>
+                    <div className="w-[36px] shrink-0 flex items-center justify-center">
+                      {items.length > 1 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeItem(item.tempId)}
+                          className="h-7 w-7 p-0"
+                        >
+                          <Trash2 className="h-3 w-3 text-red-400" />
+                        </Button>
+                      )}
+                    </div>
+                    <div className="flex-1" />
+                  </div>
+                </div>
+              ))}
             </div>
 
             <Button
