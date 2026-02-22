@@ -169,6 +169,28 @@ export async function POST(req: Request) {
           })
         }
 
+        // Registrar EventoTrazabilidad: OC generada
+        await tx.eventoTrazabilidad.create({
+          data: {
+            id: `evt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            proyectoId: pedido.proyectoId || null,
+            pedidoEquipoId: pedido.id,
+            tipo: 'oc_generada',
+            descripcion: `OC ${numero} generada para ${oc.proveedor?.nombre || 'proveedor'} con ${grupoItems.length} items`,
+            usuarioId: session.user.id,
+            metadata: {
+              ordenCompraId: oc.id,
+              ordenCompraNumero: numero,
+              proveedorNombre: oc.proveedor?.nombre,
+              cantidadItems: grupoItems.length,
+              total: oc.total,
+              moneda,
+              pedidoCodigo: pedido.codigo,
+            },
+            updatedAt: new Date(),
+          }
+        })
+
         ocs.push(oc)
       }
 

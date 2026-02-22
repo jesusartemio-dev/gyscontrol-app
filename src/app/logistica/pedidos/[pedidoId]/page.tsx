@@ -17,13 +17,11 @@ import {
   PedidoEquipo,
   PedidoEquipoItem,
   PedidoEquipoItemUpdatePayload,
-  TrazabilidadEvent
 } from '@/types'
 import { getPedidoEquipoById } from '@/lib/services/pedidoEquipo'
 import {
   updatePedidoEquipoItem
 } from '@/lib/services/pedidoEquipoItem'
-import { obtenerEventosTrazabilidad } from '@/lib/services/trazabilidad'
 import { generarOCsDesdePedido } from '@/lib/services/ordenCompra'
 import PedidoEstadoStepper from '@/components/logistica/PedidoEstadoStepper'
 
@@ -81,6 +79,7 @@ import {
   Info,
   Truck,
   FileText,
+  Warehouse,
 } from 'lucide-react'
 
 // 🔧 Utility functions
@@ -124,7 +123,7 @@ export default function PedidoLogisticaDetailPage() {
 
   // 🔄 Estados principales
   const [pedido, setPedido] = useState<PedidoEquipo | null>(null)
-  const [eventos, setEventos] = useState<TrazabilidadEvent[]>([])
+  const [eventos, setEventos] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [timelineOpen, setTimelineOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -159,13 +158,10 @@ export default function PedidoLogisticaDetailPage() {
       setLoading(true)
       setError(null)
 
-      const [pedidoData, eventosData] = await Promise.all([
-        getPedidoEquipoById(pedidoId),
-        obtenerEventosTrazabilidad({ entidadId: pedidoId, entidadTipo: 'PEDIDO' })
-      ])
-
+      const pedidoData = await getPedidoEquipoById(pedidoId)
       setPedido(pedidoData)
-      setEventos(eventosData)
+      // Trazabilidad viene incluida en la respuesta del pedido
+      setEventos((pedidoData as any)?.eventosTrazabilidad || [])
     } catch (err) {
       console.error('Error cargando datos:', err)
       setError('Error al cargar los datos del pedido')
@@ -348,19 +344,19 @@ export default function PedidoLogisticaDetailPage() {
     }))
   )
 
-  const handleConfirmarRecepcion = useCallback(async (recepcionId: string) => {
+  const handleConfirmarRecepcion = useCallback(async (recepcionId: string, paso: 'almacen' | 'proyecto' = 'almacen') => {
     setProcesandoRecepcion(recepcionId)
     try {
       const res = await fetch(`/api/recepcion-pendiente/${recepcionId}/confirmar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ observaciones: null }),
+        body: JSON.stringify({ paso, observaciones: null }),
       })
       if (!res.ok) {
         const data = await res.json()
         throw new Error(data.error || 'Error al confirmar')
       }
-      toast.success('Recepción confirmada — entrega registrada')
+      toast.success(paso === 'almacen' ? 'Llegada a almacén confirmada' : 'Entrega a proyecto confirmada')
       await cargarDatos()
     } catch (err: any) {
       toast.error(err.message || 'Error al confirmar recepción')
@@ -521,58 +517,97 @@ export default function PedidoLogisticaDetailPage() {
           <PedidoEstadoStepper estado={pedido.estado} />
         </div>
 
-        {/* Banner recepciones pendientes */}
-        {recepcionesPendientes.length > 0 && puedeConfirmarRecepcion && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <PackageCheck className="h-4 w-4 text-blue-600" />
-              <span className="text-sm font-semibold text-blue-800">
-                Recepciones pendientes de confirmar ({recepcionesPendientes.length})
-              </span>
-            </div>
-            <div className="space-y-2">
-              {recepcionesPendientes.map((r: any) => (
-                <div key={r.id} className="flex items-center justify-between bg-white rounded border px-3 py-2">
-                  <div className="flex-1 min-w-0">
-                    <span className="text-sm">
-                      <strong>{r.cantidadRecibida}</strong> x {r.itemDescripcion}
-                      <span className="text-muted-foreground"> ({r.itemCodigo})</span>
-                      {' '}desde{' '}
-                      <span className="font-medium">{r.ordenCompraItem?.ordenCompra?.numero || 'OC'}</span>
-                      {' '}el{' '}
-                      <span className="text-muted-foreground">{formatDate(r.fechaRecepcion)}</span>
-                    </span>
+        {/* Banner recepciones — estado "pendiente" (llegaron, falta confirmar almacén) */}
+        {(() => {
+          const pendientes = recepcionesPendientes.filter((r: any) => r.estado === 'pendiente')
+          if (pendientes.length === 0 || !puedeConfirmarRecepcion) return null
+          return (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <PackageCheck className="h-4 w-4 text-blue-600" />
+                <span className="text-sm font-semibold text-blue-800">
+                  Recepciones por confirmar en almacén ({pendientes.length})
+                </span>
+              </div>
+              <div className="space-y-2">
+                {pendientes.map((r: any) => (
+                  <div key={r.id} className="flex items-center justify-between bg-white rounded border px-3 py-2">
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm">
+                        Llegaron <strong>{r.cantidadRecibida}</strong> x {r.itemDescripcion}
+                        <span className="text-muted-foreground"> ({r.itemCodigo})</span>
+                        {' '}desde{' '}
+                        <span className="font-medium">{r.ordenCompraItem?.ordenCompra?.numero || 'OC'}</span>
+                        {' '}el{' '}
+                        <span className="text-muted-foreground">{formatDate(r.fechaRecepcion)}</span>
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 ml-3 flex-shrink-0">
+                      <Button
+                        size="sm"
+                        variant="default"
+                        className="h-7 text-xs bg-green-600 hover:bg-green-700"
+                        disabled={procesandoRecepcion === r.id}
+                        onClick={() => handleConfirmarRecepcion(r.id, 'almacen')}
+                      >
+                        <Warehouse className="h-3 w-3 mr-1" />
+                        Confirmar llegada a almacén
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs text-red-600 border-red-200 hover:bg-red-50"
+                        disabled={procesandoRecepcion === r.id}
+                        onClick={() => {
+                          setRechazarDialog({ open: true, recepcionId: r.id })
+                          setRechazarObservaciones('')
+                        }}
+                      >
+                        <X className="h-3 w-3 mr-1" />
+                        Rechazar
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5 ml-3 flex-shrink-0">
-                    <Button
-                      size="sm"
-                      variant="default"
-                      className="h-7 text-xs bg-green-600 hover:bg-green-700"
-                      disabled={procesandoRecepcion === r.id}
-                      onClick={() => handleConfirmarRecepcion(r.id)}
-                    >
-                      <CheckCircle2 className="h-3 w-3 mr-1" />
-                      Confirmar
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 text-xs text-red-600 border-red-200 hover:bg-red-50"
-                      disabled={procesandoRecepcion === r.id}
-                      onClick={() => {
-                        setRechazarDialog({ open: true, recepcionId: r.id })
-                        setRechazarObservaciones('')
-                      }}
-                    >
-                      <X className="h-3 w-3 mr-1" />
-                      Rechazar
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          )
+        })()}
+
+        {/* Banner recepciones — estado "en_almacen" (informativo para logística) */}
+        {(() => {
+          const enAlmacen = recepcionesPendientes.filter((r: any) => r.estado === 'en_almacen')
+          if (enAlmacen.length === 0) return null
+          return (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Warehouse className="h-4 w-4 text-green-600" />
+                <span className="text-sm font-semibold text-green-800">
+                  En almacén — pendiente entrega a proyecto ({enAlmacen.length})
+                </span>
+              </div>
+              <div className="space-y-2">
+                {enAlmacen.map((r: any) => (
+                  <div key={r.id} className="flex items-center justify-between bg-white rounded border px-3 py-2">
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-green-500 inline mr-1" />
+                        <strong>{r.cantidadRecibida}</strong> x {r.itemDescripcion}
+                        <span className="text-muted-foreground"> ({r.itemCodigo})</span>
+                        {' — '}
+                        <span className="text-muted-foreground">
+                          En almacén desde {formatDate(r.fechaConfirmacion || r.fechaRecepcion)}
+                          {r.confirmadoPor?.name && ` por ${r.confirmadoPor.name}`}
+                          {' — pendiente que Proyectos confirme'}
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        })()}
 
         {/* Dialog rechazar recepción */}
         <Dialog open={rechazarDialog.open} onOpenChange={(open) => { if (!open) setRechazarDialog({ open: false, recepcionId: null }) }}>
@@ -1176,17 +1211,28 @@ export default function PedidoLogisticaDetailPage() {
               <CollapsibleContent>
                 <div className="px-4 pb-4 border-t">
                   <div className="pt-4 space-y-3">
-                    {eventos.map((evento, idx) => (
-                      <div key={evento.id || idx} className="flex items-start gap-3 text-xs">
-                        <div className="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-gray-700">{evento.descripcion}</p>
-                          <p className="text-muted-foreground text-[10px]">
-                            {formatDate(evento.fecha)} • {((evento as any).usuario)?.nombre || ((evento as any).usuario)?.name || (typeof (evento as any).usuario === 'string' ? (evento as any).usuario : 'Sistema')}
-                          </p>
+                    {eventos.map((evento: any, idx: number) => {
+                      const tipo = evento.tipo || ''
+                      const iconMap: Record<string, { icon: typeof ShoppingCart; color: string }> = {
+                        'oc_generada': { icon: ShoppingCart, color: 'text-blue-500' },
+                        'recepcion_en_almacen': { icon: Warehouse, color: 'text-green-500' },
+                        'entrega_a_proyecto': { icon: Package, color: 'text-purple-500' },
+                        'recepcion_confirmada': { icon: PackageCheck, color: 'text-green-600' },
+                      }
+                      const { icon: Icon, color } = iconMap[tipo] || { icon: Activity, color: 'text-gray-500' }
+
+                      return (
+                        <div key={evento.id || idx} className="flex items-start gap-3 text-xs">
+                          <Icon className={cn('h-3.5 w-3.5 flex-shrink-0 mt-0.5', color)} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-gray-700">{evento.descripcion}</p>
+                            <p className="text-muted-foreground text-[10px]">
+                              {formatDate(evento.fechaEvento || evento.fecha)} • {evento.user?.name || evento.usuario?.nombre || evento.usuario?.name || 'Sistema'}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
               </CollapsibleContent>

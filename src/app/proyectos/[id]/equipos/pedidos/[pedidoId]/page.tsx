@@ -25,6 +25,11 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils'
 import {
   ArrowLeft,
@@ -39,8 +44,13 @@ import {
   PackageCheck,
   X,
   ChevronRight,
+  ChevronDown,
   FileText,
   Plus,
+  Warehouse,
+  History,
+  Activity,
+  ShoppingCart,
 } from 'lucide-react'
 import Link from 'next/link'
 import type { Proyecto, PedidoEquipo } from '@/types'
@@ -124,19 +134,19 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
     if (pedidoData) setPedido(pedidoData)
   }, [pedidoId])
 
-  const handleConfirmarRecepcion = useCallback(async (recepcionId: string) => {
+  const handleConfirmarRecepcion = useCallback(async (recepcionId: string, paso: 'almacen' | 'proyecto' = 'proyecto') => {
     setProcesandoRecepcion(recepcionId)
     try {
       const res = await fetch(`/api/recepcion-pendiente/${recepcionId}/confirmar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ observaciones: null }),
+        body: JSON.stringify({ paso, observaciones: null }),
       })
       if (!res.ok) {
         const data = await res.json()
         throw new Error(data.error || 'Error al confirmar')
       }
-      toast.success('Recepción confirmada — entrega registrada')
+      toast.success(paso === 'almacen' ? 'Llegada a almacén confirmada' : 'Entrega a proyecto confirmada')
       await reloadPedido()
     } catch (err: any) {
       toast.error(err.message || 'Error al confirmar recepción')
@@ -170,7 +180,7 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
   }, [rechazarDialog.recepcionId, rechazarObservaciones, reloadPedido])
 
   const userRole = session?.user?.role || ''
-  const puedeConfirmarRecepcion = ['admin', 'gerente', 'logistico', 'gestor'].includes(userRole)
+  const puedeConfirmarRecepcion = ['admin', 'gerente', 'logistico', 'gestor', 'coordinador'].includes(userRole)
 
   if (loading) return <LoadingSkeleton />
   if (!proyecto || !pedido) notFound()
@@ -251,19 +261,21 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
           }}
         />
 
-        {/* Banner recepciones pendientes */}
-        {recepcionesPendientes.length > 0 && puedeConfirmarRecepcion && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <PackageCheck className="h-4 w-4 text-blue-600" />
-              <span className="text-sm font-semibold text-blue-800">
-                Recepciones pendientes de confirmar ({recepcionesPendientes.length})
-              </span>
-            </div>
-            <div className="space-y-2">
-              {recepcionesPendientes.map((r: any) => (
-                <div key={r.id} className="flex items-center justify-between bg-white rounded border px-3 py-2">
-                  <div className="flex-1 min-w-0">
+        {/* Banner recepciones — estado "pendiente" (solo informativo en proyectos, logística confirma) */}
+        {(() => {
+          const pendientes = recepcionesPendientes.filter((r: any) => r.estado === 'pendiente')
+          if (pendientes.length === 0) return null
+          return (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <PackageCheck className="h-4 w-4 text-blue-600" />
+                <span className="text-sm font-semibold text-blue-800">
+                  Recepciones reportadas — pendiente confirmación de Logística ({pendientes.length})
+                </span>
+              </div>
+              <div className="space-y-2">
+                {pendientes.map((r: any) => (
+                  <div key={r.id} className="flex items-center bg-white rounded border px-3 py-2">
                     <span className="text-sm">
                       <strong>{r.cantidadRecibida}</strong> x {r.itemDescripcion}
                       <span className="text-muted-foreground"> ({r.itemCodigo})</span>
@@ -273,36 +285,70 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
                       <span className="text-muted-foreground">{formatDate(r.fechaRecepcion)}</span>
                     </span>
                   </div>
-                  <div className="flex items-center gap-1.5 ml-3 flex-shrink-0">
-                    <Button
-                      size="sm"
-                      variant="default"
-                      className="h-7 text-xs bg-green-600 hover:bg-green-700"
-                      disabled={procesandoRecepcion === r.id}
-                      onClick={() => handleConfirmarRecepcion(r.id)}
-                    >
-                      <CheckCircle2 className="h-3 w-3 mr-1" />
-                      Confirmar
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 text-xs text-red-600 border-red-200 hover:bg-red-50"
-                      disabled={procesandoRecepcion === r.id}
-                      onClick={() => {
-                        setRechazarDialog({ open: true, recepcionId: r.id })
-                        setRechazarObservaciones('')
-                      }}
-                    >
-                      <X className="h-3 w-3 mr-1" />
-                      Rechazar
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          )
+        })()}
+
+        {/* Banner recepciones — estado "en_almacen" (proyectos puede confirmar entrega) */}
+        {(() => {
+          const enAlmacen = recepcionesPendientes.filter((r: any) => r.estado === 'en_almacen')
+          if (enAlmacen.length === 0 || !puedeConfirmarRecepcion) return null
+          return (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Warehouse className="h-4 w-4 text-green-600" />
+                <span className="text-sm font-semibold text-green-800">
+                  En almacén — confirmar entrega a proyecto ({enAlmacen.length})
+                </span>
+              </div>
+              <div className="space-y-2">
+                {enAlmacen.map((r: any) => (
+                  <div key={r.id} className="flex items-center justify-between bg-white rounded border px-3 py-2">
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-green-500 inline mr-1" />
+                        <strong>{r.cantidadRecibida}</strong> x {r.itemDescripcion}
+                        <span className="text-muted-foreground"> ({r.itemCodigo})</span>
+                        {' — '}
+                        <span className="text-muted-foreground">
+                          Recibido en almacén{r.confirmadoPor?.name && ` por ${r.confirmadoPor.name}`}
+                          {' el '}{formatDate(r.fechaConfirmacion || r.fechaRecepcion)}
+                        </span>
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 ml-3 flex-shrink-0">
+                      <Button
+                        size="sm"
+                        variant="default"
+                        className="h-7 text-xs bg-green-600 hover:bg-green-700"
+                        disabled={procesandoRecepcion === r.id}
+                        onClick={() => handleConfirmarRecepcion(r.id, 'proyecto')}
+                      >
+                        <Package className="h-3 w-3 mr-1" />
+                        Confirmar entrega a proyecto
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs text-red-600 border-red-200 hover:bg-red-50"
+                        disabled={procesandoRecepcion === r.id}
+                        onClick={() => {
+                          setRechazarDialog({ open: true, recepcionId: r.id })
+                          setRechazarObservaciones('')
+                        }}
+                      >
+                        <X className="h-3 w-3 mr-1" />
+                        Rechazar
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        })()}
 
         {/* Dialog rechazar recepción */}
         <Dialog open={rechazarDialog.open} onOpenChange={(open) => { if (!open) setRechazarDialog({ open: false, recepcionId: null }) }}>
@@ -525,6 +571,58 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
 
         {/* Historial */}
         <PedidoEquipoHistorial pedidoId={pedidoId} className="w-full" />
+
+        {/* Timeline de Trazabilidad */}
+        {(() => {
+          const eventos = (pedido as any)?.eventosTrazabilidad || []
+          if (eventos.length === 0) return null
+          return (
+            <Collapsible defaultOpen>
+              <div className="bg-white rounded-lg border">
+                <CollapsibleTrigger asChild>
+                  <button className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50/50 transition-colors">
+                    <div className="flex items-center gap-2">
+                      <History className="h-4 w-4 text-blue-600" />
+                      <span className="text-sm font-medium">Timeline de Trazabilidad</span>
+                      <Badge variant="outline" className="text-[10px] h-5 ml-1">
+                        {eventos.length} eventos
+                      </Badge>
+                    </div>
+                    <ChevronDown className="h-4 w-4 text-gray-400" />
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="px-4 pb-4 border-t">
+                    <div className="pt-4 space-y-3">
+                      {eventos.map((evento: any, idx: number) => {
+                        const tipo = evento.tipo || ''
+                        const iconMap: Record<string, { icon: typeof ShoppingCart; color: string }> = {
+                          'oc_generada': { icon: ShoppingCart, color: 'text-blue-500' },
+                          'recepcion_en_almacen': { icon: Warehouse, color: 'text-green-500' },
+                          'entrega_a_proyecto': { icon: Package, color: 'text-purple-500' },
+                          'recepcion_confirmada': { icon: PackageCheck, color: 'text-green-600' },
+                        }
+                        const { icon: Icon, color } = iconMap[tipo] || { icon: Activity, color: 'text-gray-500' }
+
+                        return (
+                          <div key={evento.id || idx} className="flex items-start gap-3 text-xs">
+                            <Icon className={cn('h-3.5 w-3.5 flex-shrink-0 mt-0.5', color)} />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-gray-700">{evento.descripcion}</p>
+                              <p className="text-muted-foreground text-[10px]">
+                                {formatDate(evento.fechaEvento)} • {evento.user?.name || 'Sistema'}
+                              </p>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </CollapsibleContent>
+              </div>
+            </Collapsible>
+          )
+        })()}
       </div>
 
       {/* Modal de edición */}

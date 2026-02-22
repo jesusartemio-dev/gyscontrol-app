@@ -13,13 +13,19 @@ export async function POST(
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    if (!['admin', 'gerente', 'logistico', 'gestor'].includes(session.user.role)) {
-      return NextResponse.json({ error: 'Sin permisos para confirmar recepción' }, { status: 403 })
-    }
-
     const { id } = await params
     const body = await req.json()
+    const paso: 'almacen' | 'proyecto' = body.paso || 'almacen'
     const observaciones = body.observaciones || null
+
+    // Validar permisos por paso
+    const role = session.user.role
+    if (paso === 'almacen' && !['admin', 'gerente', 'logistico'].includes(role)) {
+      return NextResponse.json({ error: 'Sin permisos para confirmar llegada a almacén' }, { status: 403 })
+    }
+    if (paso === 'proyecto' && !['admin', 'gerente', 'gestor', 'coordinador'].includes(role)) {
+      return NextResponse.json({ error: 'Sin permisos para confirmar entrega a proyecto' }, { status: 403 })
+    }
 
     const recepcion = await prisma.recepcionPendiente.findUnique({
       where: { id },
@@ -35,7 +41,8 @@ export async function POST(
           include: {
             ordenCompra: { select: { numero: true } }
           }
-        }
+        },
+        confirmadoPor: { select: { name: true } },
       }
     })
 
@@ -43,9 +50,16 @@ export async function POST(
       return NextResponse.json({ error: 'Recepción no encontrada' }, { status: 404 })
     }
 
-    if (recepcion.estado !== 'pendiente') {
+    // Validar estado según paso
+    if (paso === 'almacen' && recepcion.estado !== 'pendiente') {
       return NextResponse.json(
-        { error: 'Esta recepción ya fue procesada' },
+        { error: `No se puede confirmar en almacén: estado actual es "${recepcion.estado}"` },
+        { status: 409 }
+      )
+    }
+    if (paso === 'proyecto' && recepcion.estado !== 'en_almacen') {
+      return NextResponse.json(
+        { error: `No se puede confirmar entrega a proyecto: estado actual es "${recepcion.estado}". Debe estar en almacén primero.` },
         { status: 409 }
       )
     }
@@ -53,16 +67,66 @@ export async function POST(
     const pedidoItem = recepcion.pedidoEquipoItem
     const pedido = pedidoItem.pedidoEquipo
     const proyectoId = pedido.proyectoId
+    const ocNumero = recepcion.ordenCompraItem.ordenCompra.numero
 
+    // ═══════════════════════════════════════
+    // PASO 1: Confirmar llegada a almacén
+    // ═══════════════════════════════════════
+    if (paso === 'almacen') {
+      const result = await prisma.$transaction(async (tx) => {
+        // 1. Actualizar RecepcionPendiente → en_almacen
+        await tx.recepcionPendiente.update({
+          where: { id },
+          data: {
+            estado: 'en_almacen',
+            confirmadoPorId: session.user.id,
+            fechaConfirmacion: new Date(),
+            observaciones,
+          }
+        })
+
+        // 2. Crear EventoTrazabilidad
+        await tx.eventoTrazabilidad.create({
+          data: {
+            id: `evt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            proyectoId,
+            pedidoEquipoId: pedido.id,
+            tipo: 'recepcion_en_almacen',
+            descripcion: `Recepción en almacén: ${recepcion.cantidadRecibida} x ${pedidoItem.codigo} desde OC ${ocNumero}`,
+            usuarioId: session.user.id,
+            metadata: {
+              recepcionPendienteId: id,
+              ordenCompraNumero: ocNumero,
+              cantidadRecibida: recepcion.cantidadRecibida,
+              pedidoCodigo: pedido.codigo,
+              itemCodigo: pedidoItem.codigo,
+            },
+            updatedAt: new Date(),
+          }
+        })
+
+        return {
+          recepcionId: id,
+          paso: 'almacen',
+          nuevoEstado: 'en_almacen',
+        }
+      })
+
+      return NextResponse.json(result)
+    }
+
+    // ═══════════════════════════════════════
+    // PASO 2: Confirmar entrega a proyecto
+    // ═══════════════════════════════════════
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Marcar RecepcionPendiente como confirmada
+      // 1. Marcar RecepcionPendiente como entregado_proyecto
       await tx.recepcionPendiente.update({
         where: { id },
         data: {
-          estado: 'confirmado',
-          confirmadoPorId: session.user.id,
-          fechaConfirmacion: new Date(),
-          observaciones,
+          estado: 'entregado_proyecto',
+          entregadoPorId: session.user.id,
+          fechaEntregaProyecto: new Date(),
+          observaciones: observaciones || recepcion.observaciones,
         }
       })
 
@@ -99,11 +163,11 @@ export async function POST(
           pedidoEquipoItemId: pedidoItem.id,
           listaEquipoItemId: pedidoItem.listaEquipoItemId || null,
           proyectoId,
-          fechaEntrega: recepcion.fechaRecepcion,
+          fechaEntrega: new Date(),
           estado: nuevoEstadoEntrega as any,
           cantidad: pedidoItem.cantidadPedida,
           cantidadEntregada: recepcion.cantidadRecibida,
-          observaciones: observaciones || `Recepción confirmada desde OC ${recepcion.ordenCompraItem.ordenCompra.numero}`,
+          observaciones: observaciones || `Entrega a proyecto desde OC ${ocNumero}`,
           usuarioId: session.user.id,
           updatedAt: new Date()
         }
@@ -115,17 +179,18 @@ export async function POST(
           id: `evt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           entregaItemId,
           proyectoId,
-          tipo: 'recepcion_confirmada',
-          descripcion: `Recepción confirmada: ${recepcion.cantidadRecibida} unidades desde OC ${recepcion.ordenCompraItem.ordenCompra.numero}`,
+          pedidoEquipoId: pedido.id,
+          tipo: 'entrega_a_proyecto',
+          descripcion: `Entrega a proyecto: ${recepcion.cantidadRecibida} x ${pedidoItem.codigo} desde almacén (OC ${ocNumero})`,
           estadoAnterior: pedidoItem.estadoEntrega as any,
           estadoNuevo: nuevoEstadoEntrega as any,
           usuarioId: session.user.id,
           metadata: {
             recepcionPendienteId: id,
-            ordenCompraNumero: recepcion.ordenCompraItem.ordenCompra.numero,
+            ordenCompraNumero: ocNumero,
             cantidadRecibida: recepcion.cantidadRecibida,
             pedidoCodigo: pedido.codigo,
-            proyectoNombre: pedido.proyecto.nombre,
+            itemCodigo: pedidoItem.codigo,
           },
           updatedAt: new Date()
         }
@@ -159,7 +224,6 @@ export async function POST(
         select: { estado: true, precioUnitario: true, cantidadAtendida: true }
       })
 
-      // Recalcular costoRealTotal
       const costoRealTotal = allPedidoItems.reduce((sum, item) =>
         sum + ((item.precioUnitario || 0) * (item.cantidadAtendida || 0)), 0)
 
@@ -186,6 +250,7 @@ export async function POST(
 
       return {
         recepcionId: id,
+        paso: 'proyecto',
         entregaItemId,
         pedidoItemId: pedidoItem.id,
         cantidadRecibida: recepcion.cantidadRecibida,

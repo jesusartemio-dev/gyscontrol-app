@@ -500,25 +500,28 @@ model EntregaItem {
 }
 
 model EventoTrazabilidad {
-  id             String             @id
-  entregaItemId  String?
-  proyectoId     String?
-  tipo           String
-  descripcion    String
-  estadoAnterior EstadoEntregaItem?
-  estadoNuevo    EstadoEntregaItem?
-  fechaEvento    DateTime           @default(now())
-  usuarioId      String
-  metadata       Json?
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime
-  entregaItem    EntregaItem?       @relation(fields: [entregaItemId], references: [id])
-  proyecto       Proyecto?          @relation(fields: [proyectoId], references: [id])
-  user           User               @relation(fields: [usuarioId], references: [id])
+  id              String             @id
+  entregaItemId   String?
+  proyectoId      String?
+  pedidoEquipoId  String?
+  tipo            String
+  descripcion     String
+  estadoAnterior  EstadoEntregaItem?
+  estadoNuevo     EstadoEntregaItem?
+  fechaEvento     DateTime           @default(now())
+  usuarioId       String
+  metadata        Json?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime
+  entregaItem     EntregaItem?       @relation(fields: [entregaItemId], references: [id])
+  proyecto        Proyecto?          @relation(fields: [proyectoId], references: [id])
+  pedidoEquipo    PedidoEquipo?      @relation(fields: [pedidoEquipoId], references: [id])
+  user            User               @relation(fields: [usuarioId], references: [id])
 
   @@index([entregaItemId])
   @@index([fechaEvento])
   @@index([proyectoId])
+  @@index([pedidoEquipoId])
   @@index([tipo, fechaEvento])
   @@map("evento_trazabilidad")
 }
@@ -633,6 +636,7 @@ model PedidoEquipo {
   user                 User               @relation(fields: [responsableId], references: [id])
   pedidoEquipoItem     PedidoEquipoItem[]
   ordenesCompra        OrdenCompra[]
+  eventosTrazabilidad  EventoTrazabilidad[]
 
   @@index([estado, prioridad, createdAt(sort: Desc)], map: "idx_pedido_estado_prioridad_fecha")
   @@index([proyectoId, estado, createdAt(sort: Desc)], map: "idx_pedido_proyecto_estado_fecha")
@@ -1352,6 +1356,7 @@ model User {
   equiposActualizadosPor                CatalogoEquipo[]             @relation("EquipoActualizadoPor")
   // Recepciones pendientes
   recepcionesConfirmadas                RecepcionPendiente[]         @relation("RecepcionConfirmador")
+  recepcionesEntregadas                 RecepcionPendiente[]         @relation("RecepcionEntregador")
 
   @@map("user")
 }
@@ -3205,21 +3210,24 @@ model OrdenCompraItem {
 }
 
 model RecepcionPendiente {
-  id                 String    @id @default(cuid())
-  pedidoEquipoItemId String
-  ordenCompraItemId  String
-  cantidadRecibida   Float
-  fechaRecepcion     DateTime  @default(now())
-  estado             String    @default("pendiente")
-  confirmadoPorId    String?
-  fechaConfirmacion  DateTime?
-  observaciones      String?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  id                    String    @id @default(cuid())
+  pedidoEquipoItemId    String
+  ordenCompraItemId     String
+  cantidadRecibida      Float
+  fechaRecepcion        DateTime  @default(now())
+  estado                String    @default("pendiente")
+  confirmadoPorId       String?
+  fechaConfirmacion     DateTime?
+  entregadoPorId        String?
+  fechaEntregaProyecto  DateTime?
+  observaciones         String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   pedidoEquipoItem PedidoEquipoItem @relation(fields: [pedidoEquipoItemId], references: [id], onDelete: Cascade)
   ordenCompraItem  OrdenCompraItem  @relation(fields: [ordenCompraItemId], references: [id], onDelete: Cascade)
   confirmadoPor    User?            @relation("RecepcionConfirmador", fields: [confirmadoPorId], references: [id])
+  entregadoPor     User?            @relation("RecepcionEntregador", fields: [entregadoPorId], references: [id])
 
   @@index([pedidoEquipoItemId])
   @@index([ordenCompraItemId])

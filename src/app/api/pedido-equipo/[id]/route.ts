@@ -59,7 +59,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
               },
             },
             recepcionesPendientes: {
-              where: { estado: 'pendiente' },
+              where: { estado: { in: ['pendiente', 'en_almacen'] } },
               include: {
                 ordenCompraItem: {
                   select: {
@@ -70,6 +70,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
                     ordenCompra: { select: { numero: true } },
                   },
                 },
+                confirmadoPor: { select: { name: true } },
               },
               orderBy: { fechaRecepcion: 'desc' as const },
             },
@@ -81,6 +82,12 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
             items: { select: { id: true } },
           },
           orderBy: { createdAt: 'desc' as const },
+        },
+        eventosTrazabilidad: {
+          include: {
+            user: { select: { name: true } },
+          },
+          orderBy: { fechaEvento: 'asc' as const },
         },
       },
     })
@@ -95,6 +102,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
       } : null,
       items: data.pedidoEquipoItem,
       ordenesCompra: data.ordenesCompra,
+      eventosTrazabilidad: data.eventosTrazabilidad,
     } : null
 
     return NextResponse.json(response)
