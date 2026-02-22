@@ -6,16 +6,25 @@
 
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { notFound } from 'next/navigation'
 import { getProyectoById } from '@/lib/services/proyecto'
 import { getPedidoEquipoById } from '@/lib/services/pedidoEquipo'
 import { useSession } from 'next-auth/react'
+import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Progress } from '@/components/ui/progress'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import {
   ArrowLeft,
@@ -27,6 +36,8 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
+  PackageCheck,
+  X,
   ChevronRight,
   FileText,
   Plus,
@@ -65,6 +76,9 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
   const [pedidoId, setPedidoId] = useState('')
   const [showEditModal, setShowEditModal] = useState(false)
   const [showItemDirectoModal, setShowItemDirectoModal] = useState(false)
+  const [rechazarDialog, setRechazarDialog] = useState<{ open: boolean; recepcionId: string | null }>({ open: false, recepcionId: null })
+  const [rechazarObservaciones, setRechazarObservaciones] = useState('')
+  const [procesandoRecepcion, setProcesandoRecepcion] = useState<string | null>(null)
 
   useEffect(() => {
     params.then((p) => {
@@ -95,6 +109,68 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
     }
     fetchData()
   }, [proyectoId, pedidoId])
+
+  // Recepciones pendientes (aplanar desde items)
+  const recepcionesPendientes = (pedido?.items || []).flatMap((item: any) =>
+    (item.recepcionesPendientes || []).map((r: any) => ({
+      ...r,
+      itemCodigo: item.codigo,
+      itemDescripcion: item.descripcion,
+    }))
+  )
+
+  const reloadPedido = useCallback(async () => {
+    const pedidoData = await getPedidoEquipoById(pedidoId)
+    if (pedidoData) setPedido(pedidoData)
+  }, [pedidoId])
+
+  const handleConfirmarRecepcion = useCallback(async (recepcionId: string) => {
+    setProcesandoRecepcion(recepcionId)
+    try {
+      const res = await fetch(`/api/recepcion-pendiente/${recepcionId}/confirmar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ observaciones: null }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Error al confirmar')
+      }
+      toast.success('Recepción confirmada — entrega registrada')
+      await reloadPedido()
+    } catch (err: any) {
+      toast.error(err.message || 'Error al confirmar recepción')
+    } finally {
+      setProcesandoRecepcion(null)
+    }
+  }, [reloadPedido])
+
+  const handleRechazarRecepcion = useCallback(async () => {
+    if (!rechazarDialog.recepcionId || !rechazarObservaciones.trim()) return
+    setProcesandoRecepcion(rechazarDialog.recepcionId)
+    try {
+      const res = await fetch(`/api/recepcion-pendiente/${rechazarDialog.recepcionId}/rechazar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ observaciones: rechazarObservaciones.trim() }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Error al rechazar')
+      }
+      toast.success('Recepción rechazada')
+      setRechazarDialog({ open: false, recepcionId: null })
+      setRechazarObservaciones('')
+      await reloadPedido()
+    } catch (err: any) {
+      toast.error(err.message || 'Error al rechazar recepción')
+    } finally {
+      setProcesandoRecepcion(null)
+    }
+  }, [rechazarDialog.recepcionId, rechazarObservaciones, reloadPedido])
+
+  const userRole = session?.user?.role || ''
+  const puedeConfirmarRecepcion = ['admin', 'gerente', 'logistico', 'gestor'].includes(userRole)
 
   if (loading) return <LoadingSkeleton />
   if (!proyecto || !pedido) notFound()
@@ -174,6 +250,91 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
             setPedido((prev) => (prev ? { ...prev, estado: nuevoEstado as any } : null))
           }}
         />
+
+        {/* Banner recepciones pendientes */}
+        {recepcionesPendientes.length > 0 && puedeConfirmarRecepcion && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <PackageCheck className="h-4 w-4 text-blue-600" />
+              <span className="text-sm font-semibold text-blue-800">
+                Recepciones pendientes de confirmar ({recepcionesPendientes.length})
+              </span>
+            </div>
+            <div className="space-y-2">
+              {recepcionesPendientes.map((r: any) => (
+                <div key={r.id} className="flex items-center justify-between bg-white rounded border px-3 py-2">
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm">
+                      <strong>{r.cantidadRecibida}</strong> x {r.itemDescripcion}
+                      <span className="text-muted-foreground"> ({r.itemCodigo})</span>
+                      {' '}desde{' '}
+                      <span className="font-medium">{r.ordenCompraItem?.ordenCompra?.numero || 'OC'}</span>
+                      {' '}el{' '}
+                      <span className="text-muted-foreground">{formatDate(r.fechaRecepcion)}</span>
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 ml-3 flex-shrink-0">
+                    <Button
+                      size="sm"
+                      variant="default"
+                      className="h-7 text-xs bg-green-600 hover:bg-green-700"
+                      disabled={procesandoRecepcion === r.id}
+                      onClick={() => handleConfirmarRecepcion(r.id)}
+                    >
+                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                      Confirmar
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs text-red-600 border-red-200 hover:bg-red-50"
+                      disabled={procesandoRecepcion === r.id}
+                      onClick={() => {
+                        setRechazarDialog({ open: true, recepcionId: r.id })
+                        setRechazarObservaciones('')
+                      }}
+                    >
+                      <X className="h-3 w-3 mr-1" />
+                      Rechazar
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Dialog rechazar recepción */}
+        <Dialog open={rechazarDialog.open} onOpenChange={(open) => { if (!open) setRechazarDialog({ open: false, recepcionId: null }) }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Rechazar recepción</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Indica el motivo del rechazo. Esta acción no actualizará las cantidades del pedido.
+              </p>
+              <Textarea
+                placeholder="Motivo del rechazo (obligatorio)..."
+                value={rechazarObservaciones}
+                onChange={(e) => setRechazarObservaciones(e.target.value)}
+                rows={3}
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setRechazarDialog({ open: false, recepcionId: null })}>
+                Cancelar
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={!rechazarObservaciones.trim() || procesandoRecepcion !== null}
+                onClick={handleRechazarRecepcion}
+              >
+                Rechazar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Stats cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
