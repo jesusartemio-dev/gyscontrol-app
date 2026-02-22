@@ -51,6 +51,13 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 
 // 🎯 Icons
@@ -152,6 +159,42 @@ export default function PedidoLogisticaDetailPage() {
   }>({ item: null, cantidadAtendida: 0, estado: 'pendiente', fechaEntregaReal: '', observacionesEntrega: '', motivoAtencionDirecta: '', costoRealUnitario: '', costoRealMoneda: 'USD' })
 
   const resetEditingItem = () => setEditingItem({ item: null, cantidadAtendida: 0, estado: 'pendiente', fechaEntregaReal: '', observacionesEntrega: '', motivoAtencionDirecta: '', costoRealUnitario: '', costoRealMoneda: 'USD' })
+
+  // 🏪 Estado para asignación de proveedor inline
+  const [proveedores, setProveedores] = useState<{ id: string; nombre: string }[]>([])
+  const [proveedoresCargados, setProveedoresCargados] = useState(false)
+  const [savingProveedor, setSavingProveedor] = useState<string | null>(null)
+
+  const cargarProveedores = async () => {
+    if (proveedoresCargados) return
+    try {
+      const res = await fetch('/api/proveedor')
+      const data = await res.json()
+      setProveedores(data)
+      setProveedoresCargados(true)
+    } catch {
+      toast.error('Error al cargar proveedores')
+    }
+  }
+
+  const handleAsignarProveedor = async (itemId: string, proveedorId: string, cantidadPedida: number) => {
+    const prov = proveedores.find(p => p.id === proveedorId)
+    if (!prov) return
+    setSavingProveedor(itemId)
+    try {
+      await updatePedidoEquipoItem(itemId, {
+        cantidadPedida,
+        proveedorId: prov.id,
+        proveedorNombre: prov.nombre,
+      })
+      toast.success(`Proveedor "${prov.nombre}" asignado`)
+      await cargarDatos()
+    } catch {
+      toast.error('Error al asignar proveedor')
+    } finally {
+      setSavingProveedor(null)
+    }
+  }
 
   // 🔁 Cargar datos iniciales
   useEffect(() => {
@@ -769,7 +812,9 @@ export default function PedidoLogisticaDetailPage() {
                             {sinProveedor.length} item{sinProveedor.length !== 1 ? 's' : ''} sin proveedor asignado
                           </p>
                           <p className="text-red-600 mt-0.5">
-                            Asigna proveedor desde la Lista de Equipo antes de generar OC.
+                            {(pedido as any).listaId
+                              ? 'Asigna proveedor desde la Lista de Equipo antes de generar OC.'
+                              : 'Asigna proveedor directamente en cada item o genera la OC y el sistema asignará el proveedor al confirmarla.'}
                           </p>
                           <p className="text-red-500 mt-1 font-mono text-[10px]">
                             {sinProveedor.map((i: any) => i.codigo).join(', ')}
@@ -1052,57 +1097,90 @@ export default function PedidoLogisticaDetailPage() {
                       <td className="px-3 py-2 text-gray-600 max-w-[180px] truncate" title={item.descripcion}>
                         {item.descripcion}
                       </td>
-                      <td className="px-3 py-2 text-gray-600 max-w-[140px]">
-                        <div className="truncate">{(item as any).proveedor?.nombre || (item as any).proveedorNombre || (item as any).listaEquipoItem?.proveedor?.nombre || '—'}</div>
-                        {(item as any).ordenCompraItems?.length > 0 && (
-                          <Link
-                            href={`/logistica/ordenes-compra/${(item as any).ordenCompraItems[0].ordenCompra?.id}`}
-                            className="inline-flex items-center gap-0.5 text-[9px] text-blue-600 hover:underline mt-0.5"
-                          >
-                            <ShoppingCart className="h-2.5 w-2.5" />
-                            {(item as any).ordenCompraItems[0].ordenCompra?.numero}
-                          </Link>
-                        )}
-                        {!((item as any).ordenCompraItems?.length > 0) && (() => {
+                      <td className="px-3 py-2 text-gray-600 max-w-[160px]">
+                        {(() => {
+                          const provNombre = (item as any).proveedor?.nombre || (item as any).proveedorNombre || (item as any).listaEquipoItem?.proveedor?.nombre
+                          const tieneProveedor = !!provNombre
+                          const tieneOC = (item as any).ordenCompraItems?.length > 0
                           const atendido = (item.cantidadAtendida || 0) > 0
                           const motivo = (item as any).motivoAtencionDirecta
-                          if (atendido && motivo === 'importacion_gerencia') {
-                            return (
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <span className="inline-flex items-center gap-0.5 text-[9px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full mt-0.5 font-medium">
-                                      Importación
-                                    </span>
-                                  </TooltipTrigger>
-                                  <TooltipContent><p className="text-xs">Compra directa por gerencia / importación</p></TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            )
-                          }
-                          if (atendido && motivo) {
-                            const motivoLabels: Record<string, string> = {
-                              'compra_directa': 'Compra directa en tienda / caja chica',
-                              'urgencia': 'Urgencia — sin tiempo para OC',
-                              'otro': 'Otro motivo',
-                            }
-                            return (
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <span className="inline-flex items-center gap-0.5 text-[9px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full mt-0.5 font-medium">
-                                      Directo
-                                    </span>
-                                  </TooltipTrigger>
-                                  <TooltipContent><p className="text-xs">{motivoLabels[motivo] || motivo}</p></TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            )
-                          }
-                          if ((item as any).proveedorId || (item as any).listaEquipoItem?.proveedorId) {
-                            return <span className="inline-flex items-center text-[9px] text-gray-400 mt-0.5">Sin OC</span>
-                          }
-                          return null
+
+                          return (
+                            <>
+                              {tieneProveedor ? (
+                                <div className="truncate">{provNombre}</div>
+                              ) : !tieneOC && !atendido ? (
+                                <Select
+                                  value=""
+                                  onValueChange={(provId) => handleAsignarProveedor(item.id, provId, item.cantidadPedida)}
+                                  onOpenChange={(open) => { if (open) cargarProveedores() }}
+                                  disabled={savingProveedor === item.id}
+                                >
+                                  <SelectTrigger className="h-6 text-[10px] w-full border-dashed border-gray-300 text-gray-400">
+                                    <SelectValue placeholder={savingProveedor === item.id ? 'Guardando...' : 'Asignar proveedor'} />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {proveedores.map(p => (
+                                      <SelectItem key={p.id} value={p.id} className="text-xs">{p.nombre}</SelectItem>
+                                    ))}
+                                    {proveedores.length === 0 && (
+                                      <div className="px-2 py-1.5 text-xs text-gray-400">Cargando...</div>
+                                    )}
+                                  </SelectContent>
+                                </Select>
+                              ) : (
+                                <div className="truncate text-gray-400">—</div>
+                              )}
+                              {tieneOC && (
+                                <Link
+                                  href={`/logistica/ordenes-compra/${(item as any).ordenCompraItems[0].ordenCompra?.id}`}
+                                  className="inline-flex items-center gap-0.5 text-[9px] text-blue-600 hover:underline mt-0.5"
+                                >
+                                  <ShoppingCart className="h-2.5 w-2.5" />
+                                  {(item as any).ordenCompraItems[0].ordenCompra?.numero}
+                                </Link>
+                              )}
+                              {!tieneOC && (() => {
+                                if (atendido && motivo === 'importacion_gerencia') {
+                                  return (
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <span className="inline-flex items-center gap-0.5 text-[9px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full mt-0.5 font-medium">
+                                            Importación
+                                          </span>
+                                        </TooltipTrigger>
+                                        <TooltipContent><p className="text-xs">Compra directa por gerencia / importación</p></TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  )
+                                }
+                                if (atendido && motivo) {
+                                  const motivoLabels: Record<string, string> = {
+                                    'compra_directa': 'Compra directa en tienda / caja chica',
+                                    'urgencia': 'Urgencia — sin tiempo para OC',
+                                    'otro': 'Otro motivo',
+                                  }
+                                  return (
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <span className="inline-flex items-center gap-0.5 text-[9px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full mt-0.5 font-medium">
+                                            Directo
+                                          </span>
+                                        </TooltipTrigger>
+                                        <TooltipContent><p className="text-xs">{motivoLabels[motivo] || motivo}</p></TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  )
+                                }
+                                if ((item as any).proveedorId || (item as any).listaEquipoItem?.proveedorId) {
+                                  return <span className="inline-flex items-center text-[9px] text-gray-400 mt-0.5">Sin OC</span>
+                                }
+                                return null
+                              })()}
+                            </>
+                          )
                         })()}
                       </td>
                       <td className="px-3 py-2 text-center text-gray-500">{item.unidad}</td>
@@ -1793,7 +1871,9 @@ export default function PedidoLogisticaDetailPage() {
                       <p className="text-xs font-medium text-gray-700">No hay items elegibles para generar OCs</p>
                       {sinProveedor > 0 && conOC === 0 && (
                         <p className="text-[11px] text-muted-foreground mt-2 max-w-xs mx-auto">
-                          Los items de este pedido no tienen proveedor asignado. Para generar OCs, primero seleccione un proveedor en la cotización de cada item desde la Lista de Equipo.
+                          {(pedido as any).listaId
+                            ? 'Los items de este pedido no tienen proveedor asignado. Para generar OCs, primero seleccione un proveedor en la cotización de cada item desde la Lista de Equipo.'
+                            : 'Los items de este pedido no tienen proveedor asignado. Asigne proveedor directamente en cada item desde la tabla de abajo.'}
                         </p>
                       )}
                       {conOC > 0 && sinProveedor === 0 && (
@@ -1812,7 +1892,9 @@ export default function PedidoLogisticaDetailPage() {
                       <div className="flex items-start gap-2 text-[10px] text-amber-700 bg-amber-50 rounded px-2.5 py-1.5">
                         <AlertTriangle className="h-3 w-3 flex-shrink-0 mt-0.5" />
                         <span>
-                          <strong>{sinProveedor} item{sinProveedor !== 1 ? 's' : ''} sin proveedor</strong> — para incluirlos, asigne proveedor desde la Lista de Equipo (seleccionar cotización)
+                          <strong>{sinProveedor} item{sinProveedor !== 1 ? 's' : ''} sin proveedor</strong> — {(pedido as any).listaId
+                            ? 'para incluirlos, asigne proveedor desde la Lista de Equipo (seleccionar cotización)'
+                            : 'asigne proveedor directamente en cada item desde la tabla del pedido'}
                         </span>
                       </div>
                     )}

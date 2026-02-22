@@ -141,6 +141,9 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
            comentarioLogisticaPorId: session.user.id,
            comentarioLogisticaAt: new Date(),
          } : {}),
+         // 🏪 Proveedor
+         ...(body.proveedorId !== undefined ? { proveedorId: body.proveedorId || null } : {}),
+         ...(body.proveedorNombre !== undefined ? { proveedorNombre: body.proveedorNombre || null } : {}),
          // 🚚 Campos de trazabilidad de entregas
          fechaEntregaEstimada: body.fechaEntregaEstimada ? new Date(body.fechaEntregaEstimada) : undefined,
          fechaEntregaReal: body.fechaEntregaReal ? new Date(body.fechaEntregaReal) : undefined,

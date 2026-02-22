@@ -740,6 +740,9 @@ export interface PedidoEquipoItemPayload {
   tipoItem?: string // "equipo" | "consumible" | "servicio"
   tiempoEntrega?: string
   tiempoEntregaDias?: number
+  // 🏪 Proveedor
+  proveedorId?: string
+  proveedorNombre?: string
   // 🚚 Campos de trazabilidad de entregas
   fechaEntregaEstimada?: string
   fechaEntregaReal?: string
