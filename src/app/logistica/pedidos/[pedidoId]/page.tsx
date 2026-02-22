@@ -52,6 +52,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { Checkbox } from '@/components/ui/checkbox'
 import { cn } from '@/lib/utils'
 
 // 🎯 Icons
@@ -131,6 +132,7 @@ export default function PedidoLogisticaDetailPage() {
   const [monedaOC, setMonedaOC] = useState('USD')
   const [condicionPagoOC, setCondicionPagoOC] = useState('contado')
   const [fechasEntregaOC, setFechasEntregaOC] = useState<Record<string, string>>({})
+  const [proveedoresSeleccionados, setProveedoresSeleccionados] = useState<Set<string>>(new Set())
 
   // 📦 Estado para edición de items
   const [editingItem, setEditingItem] = useState<{
@@ -302,11 +304,20 @@ export default function PedidoLogisticaDetailPage() {
     if (!pedido) return
     try {
       setGenerandoOC(true)
+      // Solo enviar items y fechas de proveedores seleccionados
+      const { grupos } = calcularGruposProveedor()
+      const gruposActivos = grupos.filter(g => proveedoresSeleccionados.has(g.id))
+      const itemIds = gruposActivos.flatMap(g => g.items.map((i: any) => i.id))
+      const fechasFiltradas: Record<string, string> = {}
+      for (const g of gruposActivos) {
+        if (fechasEntregaOC[g.id]) fechasFiltradas[g.id] = fechasEntregaOC[g.id]
+      }
       const resultado = await generarOCsDesdePedido({
         pedidoId: pedido.id,
+        itemIds,
         moneda: monedaOC,
         condicionPago: condicionPagoOC,
-        fechasEntregaPorProveedor: fechasEntregaOC,
+        fechasEntregaPorProveedor: fechasFiltradas,
       })
       toast.success(`Se generaron ${resultado.resumen.totalOCs} orden(es) de compra con ${resultado.resumen.totalItems} items`)
       setShowGenerarOC(false)
@@ -476,6 +487,7 @@ export default function PedidoLogisticaDetailPage() {
                       fechasIniciales[g.id] = fn
                     }
                     setFechasEntregaOC(fechasIniciales)
+                    setProveedoresSeleccionados(new Set(grupos.map(g => g.id)))
                     setShowGenerarOC(true)
                   }}
                   className="h-7 text-xs"
@@ -922,6 +934,7 @@ export default function PedidoLogisticaDetailPage() {
                       fechasIniciales[g.id] = fn
                     }
                     setFechasEntregaOC(fechasIniciales)
+                    setProveedoresSeleccionados(new Set(grupos.map(g => g.id)))
                     setShowGenerarOC(true)
                   }}
                   className="h-7 text-xs"
@@ -1144,15 +1157,17 @@ export default function PedidoLogisticaDetailPage() {
           </DialogHeader>
           {(() => {
             const { grupos, sinProveedor, conOC } = calcularGruposProveedor()
-            const totalItems = grupos.reduce((s, g) => s + g.items.length, 0)
-            const totalMonto = grupos.reduce((s, g) => s + g.monto, 0)
+            const gruposActivos = grupos.filter(g => proveedoresSeleccionados.has(g.id))
+            const totalItems = gruposActivos.reduce((s, g) => s + g.items.length, 0)
+            const totalMonto = gruposActivos.reduce((s, g) => s + g.monto, 0)
+            const cantidadOCs = gruposActivos.length
 
             return (
               <div className="space-y-4">
                 {/* Resumen */}
                 <div className="bg-blue-50 rounded-lg p-3 text-xs">
                   <p className="font-medium text-blue-800 mb-1">
-                    Se crearán {grupos.length} OC{grupos.length !== 1 ? 's' : ''} con {totalItems} items
+                    Se crearán {cantidadOCs} OC{cantidadOCs !== 1 ? 's' : ''} con {totalItems} items
                   </p>
                   <p className="text-blue-600">
                     Cada OC se genera por proveedor en estado borrador
@@ -1173,20 +1188,35 @@ export default function PedidoLogisticaDetailPage() {
                 {grupos.length > 0 ? (
                   <div className="space-y-2.5 max-h-[340px] overflow-y-auto">
                     {grupos.map(grupo => {
+                      const isChecked = proveedoresSeleccionados.has(grupo.id)
                       const fechaNecStr = pedido?.fechaNecesaria
                         ? new Date(pedido.fechaNecesaria).toISOString().split('T')[0]
                         : ''
                       const fechaProv = fechasEntregaOC[grupo.id] || ''
                       const superaFecha = fechaProv && fechaNecStr && fechaProv > fechaNecStr
-                      // Fecha sugerida basada en tiempoEntregaDias más largo del grupo
                       const fechaSugerida = grupo.maxTiempoEntregaDias > 0
                         ? new Date(Date.now() + grupo.maxTiempoEntregaDias * 86400000).toISOString().split('T')[0]
                         : null
 
                       return (
-                        <div key={grupo.id} className="bg-white border rounded-lg px-3 py-2.5 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2 min-w-0">
+                        <div key={grupo.id} className={cn(
+                          'border rounded-lg px-3 py-2.5 space-y-2 transition-opacity',
+                          isChecked ? 'bg-white' : 'bg-gray-50 opacity-60'
+                        )}>
+                          <div className="flex items-center gap-2.5">
+                            <Checkbox
+                              checked={isChecked}
+                              onCheckedChange={(checked) => {
+                                setProveedoresSeleccionados(prev => {
+                                  const next = new Set(prev)
+                                  if (checked) next.add(grupo.id)
+                                  else next.delete(grupo.id)
+                                  return next
+                                })
+                              }}
+                              className="h-4 w-4 flex-shrink-0"
+                            />
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
                               <Building2 className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
                               <div className="min-w-0">
                                 <p className="text-xs font-medium truncate">{grupo.nombre}</p>
@@ -1196,34 +1226,43 @@ export default function PedidoLogisticaDetailPage() {
                               </div>
                             </div>
                           </div>
-                          <div>
-                            <label className="text-[10px] font-medium text-muted-foreground mb-0.5 block">
-                              Fecha entrega estimada <span className="text-red-500">*</span>
-                            </label>
-                            <Input
-                              type="date"
-                              value={fechaProv}
-                              onChange={(e) => setFechasEntregaOC(prev => ({ ...prev, [grupo.id]: e.target.value }))}
-                              className="h-7 text-xs"
-                            />
-                            {!fechaProv && (
-                              <p className="text-[9px] text-red-500 mt-0.5">Requerido</p>
-                            )}
-                            {superaFecha && (
-                              <div className="flex items-center gap-1 text-[9px] text-amber-700 mt-0.5">
-                                <AlertTriangle className="h-2.5 w-2.5 flex-shrink-0" />
-                                <span>Supera la fecha necesaria del proyecto</span>
-                              </div>
-                            )}
-                            {fechaSugerida && (
-                              <p className="text-[9px] text-blue-600 mt-0.5">
-                                Sugerido por tiempo de entrega ({grupo.maxTiempoEntregaDias}d): {new Date(fechaSugerida).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                              </p>
-                            )}
-                          </div>
+                          {isChecked && (
+                            <div className="pl-6">
+                              <label className="text-[10px] font-medium text-muted-foreground mb-0.5 block">
+                                Fecha entrega estimada <span className="text-red-500">*</span>
+                              </label>
+                              <Input
+                                type="date"
+                                value={fechaProv}
+                                onChange={(e) => setFechasEntregaOC(prev => ({ ...prev, [grupo.id]: e.target.value }))}
+                                className="h-7 text-xs"
+                              />
+                              {!fechaProv && (
+                                <p className="text-[9px] text-red-500 mt-0.5">Requerido</p>
+                              )}
+                              {superaFecha && (
+                                <div className="flex items-center gap-1 text-[9px] text-amber-700 mt-0.5">
+                                  <AlertTriangle className="h-2.5 w-2.5 flex-shrink-0" />
+                                  <span>Supera la fecha necesaria del proyecto</span>
+                                </div>
+                              )}
+                              {fechaSugerida && (
+                                <p className="text-[9px] text-blue-600 mt-0.5">
+                                  Sugerido por tiempo de entrega ({grupo.maxTiempoEntregaDias}d): {new Date(fechaSugerida).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                                </p>
+                              )}
+                            </div>
+                          )}
                         </div>
                       )
                     })}
+
+                    {/* Info text */}
+                    {grupos.length > 1 && (
+                      <p className="text-[10px] text-muted-foreground italic px-1">
+                        Los proveedores no seleccionados podrán generar su OC más adelante desde este mismo pedido.
+                      </p>
+                    )}
                   </div>
                 ) : (
                   <div className="text-center py-6 space-y-3">
@@ -1313,11 +1352,11 @@ export default function PedidoLogisticaDetailPage() {
                   <Button
                     size="sm"
                     onClick={handleGenerarOCs}
-                    disabled={generandoOC || grupos.length === 0 || grupos.some(g => !fechasEntregaOC[g.id])}
+                    disabled={generandoOC || cantidadOCs === 0 || gruposActivos.some(g => !fechasEntregaOC[g.id])}
                     className="h-8 text-xs"
                   >
                     <ShoppingCart className="h-3 w-3 mr-1" />
-                    {generandoOC ? 'Generando...' : `Generar ${grupos.length} OC${grupos.length !== 1 ? 's' : ''}`}
+                    {generandoOC ? 'Generando...' : `Generar ${cantidadOCs} OC${cantidadOCs !== 1 ? 's' : ''}`}
                   </Button>
                 </div>
               </div>
