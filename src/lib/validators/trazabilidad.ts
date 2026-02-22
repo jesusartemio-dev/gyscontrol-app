@@ -21,10 +21,10 @@ import { EstadoEntregaItem } from '@/types/modelos';
  * Schema para validar datos de entrega de items
  */
 export const EntregaItemSchema = z.object({
-  pedidoEquipoItemId: z.string().uuid('ID de item inválido'),
+  pedidoEquipoItemId: z.string().min(1, 'ID de item requerido'),
   estadoEntrega: z.enum(['pendiente', 'en_proceso', 'parcial', 'entregado', 'retrasado', 'cancelado']),
   cantidadAtendida: z.number().positive('Cantidad debe ser positiva').optional(),
-  fechaEntregaReal: z.date().optional(),
+  fechaEntregaReal: z.coerce.date().optional(),
   observacionesEntrega: z.string().max(500, 'Observaciones muy largas').optional(),
   comentarioLogistica: z.string().max(500, 'Comentario muy largo').optional(),
   motivoAtencionDirecta: z.string().optional(),
