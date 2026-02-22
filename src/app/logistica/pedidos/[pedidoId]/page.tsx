@@ -25,6 +25,7 @@ import {
 } from '@/lib/services/pedidoEquipoItem'
 import { obtenerEventosTrazabilidad } from '@/lib/services/trazabilidad'
 import { generarOCsDesdePedido } from '@/lib/services/ordenCompra'
+import PedidoEstadoStepper from '@/components/logistica/PedidoEstadoStepper'
 
 // 🎨 UI Components
 import { Button } from '@/components/ui/button'
@@ -422,6 +423,11 @@ export default function PedidoLogisticaDetailPage() {
       </div>
 
       <div className="p-4 space-y-4">
+        {/* Stepper de estado */}
+        <div className="bg-white rounded-lg border px-4 py-3">
+          <PedidoEstadoStepper estado={pedido.estado} />
+        </div>
+
         {/* Stats cards compactas */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           <div className="bg-white rounded-lg border p-3">
@@ -647,23 +653,23 @@ export default function PedidoLogisticaDetailPage() {
         </div>
 
         {/* 🛒 Órdenes de Compra vinculadas */}
-        {(pedido as any).ordenesCompra && (pedido as any).ordenesCompra.length > 0 && (
-          <div className="bg-white rounded-lg border">
-            <div className="px-4 py-3 border-b bg-gray-50/50 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <ShoppingCart className="h-4 w-4 text-blue-600" />
-                <span className="text-sm font-medium">Órdenes de Compra</span>
-              </div>
-              {(() => {
-                const totalItemsPedido = pedido.items?.length || 0
-                const itemsConOC = pedido.items?.filter((i: any) => (i as any).ordenCompraItems?.length > 0).length || 0
-                return (
-                  <Badge variant="outline" className="text-[10px] h-5">
-                    {itemsConOC} de {totalItemsPedido} items con OC
-                  </Badge>
-                )
-              })()}
+        <div className="bg-white rounded-lg border">
+          <div className="px-4 py-3 border-b bg-gray-50/50 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ShoppingCart className="h-4 w-4 text-blue-600" />
+              <span className="text-sm font-medium">Órdenes de Compra</span>
             </div>
+            {(() => {
+              const totalItemsPedido = pedido.items?.length || 0
+              const itemsConOC = pedido.items?.filter((i: any) => (i as any).ordenCompraItems?.length > 0).length || 0
+              return (
+                <Badge variant="outline" className="text-[10px] h-5">
+                  {itemsConOC} de {totalItemsPedido} items con OC
+                </Badge>
+              )
+            })()}
+          </div>
+          {(pedido as any).ordenesCompra && (pedido as any).ordenesCompra.length > 0 ? (
             <table className="w-full text-xs">
               <thead className="bg-gray-50">
                 <tr className="border-b">
@@ -705,8 +711,30 @@ export default function PedidoLogisticaDetailPage() {
                 ))}
               </tbody>
             </table>
-          </div>
-        )}
+          ) : (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <ShoppingCart className="h-8 w-8 text-gray-300 mb-2" />
+              <p className="text-xs text-muted-foreground mb-3">No hay órdenes de compra generadas para este pedido.</p>
+              {puedeGenerarOC && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const fn = pedido?.fechaNecesaria
+                      ? new Date(pedido.fechaNecesaria).toISOString().split('T')[0]
+                      : ''
+                    setFechaEntregaOC(fn)
+                    setShowGenerarOC(true)
+                  }}
+                  className="h-7 text-xs"
+                >
+                  <ShoppingCart className="h-3 w-3 mr-1" />
+                  Generar OCs
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* 📈 Timeline de Trazabilidad - Colapsable */}
         {eventos.length > 0 && (
