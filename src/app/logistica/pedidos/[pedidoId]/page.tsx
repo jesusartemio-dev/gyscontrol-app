@@ -799,10 +799,37 @@ export default function PedidoLogisticaDetailPage() {
                           return <span className="text-[10px] text-gray-600">{texto}</span>
                         })()}
                       </td>
-                      <td className="px-3 py-2 text-center text-gray-500">
-                        {(item as any).fechaEntregaReal
-                          ? formatDate((item as any).fechaEntregaReal)
-                          : '—'}
+                      <td className="px-3 py-2 text-center">
+                        {(() => {
+                          const fEstimada = (item as any).fechaEntregaEstimada
+                          const fReal = (item as any).fechaEntregaReal
+                          const fechaNec = pedido?.fechaNecesaria
+
+                          if (fReal) {
+                            return <span className="text-[10px] text-gray-600">{formatDate(fReal)}</span>
+                          }
+                          if (fEstimada) {
+                            const superaFecha = fechaNec && new Date(fEstimada) > new Date(fechaNec)
+                            if (superaFecha) {
+                              return (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="text-[10px] font-medium text-red-600 cursor-help">
+                                        {formatDate(fEstimada)}
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p className="text-xs">Supera la fecha necesaria del proyecto ({formatDate(fechaNec)})</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              )
+                            }
+                            return <span className="text-[10px] text-gray-600">{formatDate(fEstimada)}</span>
+                          }
+                          return <span className="text-gray-400">—</span>
+                        })()}
                       </td>
                       <td className="px-3 py-2 text-right font-medium text-emerald-600">
                         {item.costoTotal ? formatCurrency(item.costoTotal) : '—'}

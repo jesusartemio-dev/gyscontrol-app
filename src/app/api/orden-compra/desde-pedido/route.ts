@@ -160,6 +160,15 @@ export async function POST(req: Request) {
           },
         })
 
+        // Propagar fechaEntregaEstimada a los PedidoEquipoItem vinculados
+        if (fechaProveedor) {
+          const pedidoItemIds = grupoItems.map(item => item.id)
+          await tx.pedidoEquipoItem.updateMany({
+            where: { id: { in: pedidoItemIds } },
+            data: { fechaEntregaEstimada: new Date(fechaProveedor) },
+          })
+        }
+
         ocs.push(oc)
       }
 
