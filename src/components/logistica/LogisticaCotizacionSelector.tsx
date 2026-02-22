@@ -8,6 +8,7 @@ import {
   Trophy,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   Loader2,
   X,
   Circle,
@@ -50,6 +51,24 @@ export default function LogisticaCotizacionSelector({ item, onUpdated }: Props) 
       tiempoMin: tiempos.length > 0 ? Math.min(...tiempos) : null,
     }
   }, [cotizaciones])
+
+  // OC vinculada: clasificar estado
+  const ocActiva = useMemo(() => {
+    const ESTADOS_BLOQUEANTES = ['aprobada', 'enviada', 'confirmada', 'parcial']
+    const ocItems = (item as any).ordenCompraItems || []
+    const activas = ocItems
+      .map((oci: any) => oci.ordenCompra)
+      .filter((oc: any) => oc && !['cancelada', 'completada'].includes(oc.estado))
+      .sort((a: any, b: any) => {
+        const aBlock = ESTADOS_BLOQUEANTES.includes(a.estado) ? 0 : 1
+        const bBlock = ESTADOS_BLOQUEANTES.includes(b.estado) ? 0 : 1
+        return aBlock - bBlock
+      })
+    return activas[0] || null
+  }, [item])
+
+  const ocBloqueada = ocActiva && ['aprobada', 'enviada', 'confirmada', 'parcial'].includes(ocActiva.estado)
+  const ocEditable = ocActiva && ocActiva.estado === 'borrador'
 
   // Auto-seleccionar si hay solo 1 cotización y no hay selección actual
   useEffect(() => {
@@ -141,6 +160,20 @@ export default function LogisticaCotizacionSelector({ item, onUpdated }: Props) 
           </p>
         </div>
       </div>
+
+      {/* Indicador OC vinculada */}
+      {ocBloqueada && (
+        <div className="flex items-center gap-1.5 mx-4 mt-2 px-2.5 py-1.5 bg-red-50 border border-red-200 rounded text-[10px] text-red-700">
+          <AlertCircle className="h-3 w-3 shrink-0" />
+          <span>OC activa <strong>{ocActiva.numero}</strong> ({ocActiva.estado}) — no se puede cambiar</span>
+        </div>
+      )}
+      {ocEditable && (
+        <div className="flex items-center gap-1.5 mx-4 mt-2 px-2.5 py-1.5 bg-amber-50 border border-amber-200 rounded text-[10px] text-amber-700">
+          <AlertTriangle className="h-3 w-3 shrink-0" />
+          <span>OC <strong>{ocActiva.numero}</strong> en borrador — se actualizará al cambiar proveedor</span>
+        </div>
+      )}
 
       {/* Lista de cotizaciones (scrollable) */}
       {cotizaciones.length === 0 ? (
@@ -263,7 +296,7 @@ export default function LogisticaCotizacionSelector({ item, onUpdated }: Props) 
                 variant="ghost"
                 size="sm"
                 onClick={handleDeseleccionar}
-                disabled={isConfirming}
+                disabled={isConfirming || !!ocBloqueada}
                 className="h-6 text-[10px] text-red-600 hover:text-red-700 hover:bg-red-50 px-2"
               >
                 {isConfirming ? (
@@ -282,7 +315,8 @@ export default function LogisticaCotizacionSelector({ item, onUpdated }: Props) 
               disabled={
                 !selectedId ||
                 isConfirming ||
-                selectedId === item.cotizacionSeleccionadaId
+                selectedId === item.cotizacionSeleccionadaId ||
+                !!ocBloqueada
               }
               className="h-6 text-[10px] px-3"
             >

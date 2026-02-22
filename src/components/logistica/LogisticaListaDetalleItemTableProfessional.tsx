@@ -105,7 +105,7 @@ export default function LogisticaListaDetalleItemTableProfessional({ items, onUp
       toast.warning(`${warningCount} OCs en borrador actualizadas con nuevos precios`, { duration: 8000 })
     }
     if (blockedCount > 0) {
-      toast.warning(`${blockedCount} items omitidos por tener OC activa`, { duration: 8000 })
+      toast.warning(`${blockedCount} items omitidos por tener OC activa (no se puede cambiar cotización mientras la OC esté vigente)`, { duration: 8000 })
     }
     if (errores > 0) {
       toast.error(`${errores} items no se pudieron actualizar`)
