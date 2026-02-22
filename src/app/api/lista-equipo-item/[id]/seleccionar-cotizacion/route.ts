@@ -58,10 +58,11 @@ export async function PATCH(
         await prisma.pedidoEquipoItem.update({
           where: { id: pedidoItem.id },
           data: {
-            precioUnitario: 0, // O null, dependiendo de la lógica de negocio
+            precioUnitario: 0,
             costoTotal: 0,
             tiempoEntrega: null,
             tiempoEntregaDias: null,
+            proveedorId: null,
           },
         })
   
@@ -176,6 +177,7 @@ export async function PATCH(
           costoTotal: nuevoCostoTotal,
           tiempoEntrega: tiempoEntrega,
           tiempoEntregaDias: tiempoEntregaDias,
+          proveedorId,
         },
       })
 
