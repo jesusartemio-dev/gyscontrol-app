@@ -253,7 +253,8 @@ export default function PedidoLogisticaDetailPage() {
     const elegibles: any[] = []
 
     for (const item of pedido.items) {
-      const provId = (item as any).proveedorId
+      // proveedorId directo o fallback desde listaEquipoItem
+      const provId = (item as any).proveedorId || (item as any).listaEquipoItem?.proveedorId
       const ocItems = (item as any).ordenCompraItems || []
 
       if (!provId) {
@@ -268,7 +269,7 @@ export default function PedidoLogisticaDetailPage() {
     // Agrupar elegibles por proveedor
     const mapaProveedores = new Map<string, { nombre: string; items: any[]; monto: number }>()
     for (const item of elegibles) {
-      const provId = (item as any).proveedorId
+      const provId = (item as any).proveedorId || (item as any).listaEquipoItem?.proveedorId
       const provNombre = (item as any).proveedor?.nombre || (item as any).proveedorNombre || (item as any).listaEquipoItem?.proveedor?.nombre || 'Sin nombre'
       if (!mapaProveedores.has(provId)) {
         mapaProveedores.set(provId, { nombre: provNombre, items: [], monto: 0 })
@@ -575,7 +576,7 @@ export default function PedidoLogisticaDetailPage() {
                             {(item as any).ordenCompraItems[0].ordenCompra?.numero}
                           </Link>
                         )}
-                        {(item as any).proveedorId && !((item as any).ordenCompraItems?.length > 0) && (
+                        {((item as any).proveedorId || (item as any).listaEquipoItem?.proveedorId) && !((item as any).ordenCompraItems?.length > 0) && (
                           <span className="inline-flex items-center text-[9px] text-gray-400 mt-0.5">Sin OC</span>
                         )}
                       </td>

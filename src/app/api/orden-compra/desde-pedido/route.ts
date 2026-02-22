@@ -78,9 +78,13 @@ export async function POST(req: Request) {
       items = items.filter(item => itemIds.includes(item.id))
     }
 
-    // Excluir items sin proveedor
-    const itemsSinProveedor = items.filter(item => !item.proveedorId)
-    items = items.filter(item => !!item.proveedorId)
+    // Helper: proveedorId directo o fallback desde listaEquipoItem
+    const getProveedorId = (item: typeof items[0]) =>
+      item.proveedorId || item.listaEquipoItem?.proveedorId || null
+
+    // Excluir items sin proveedor (ni directo ni desde lista)
+    const itemsSinProveedor = items.filter(item => !getProveedorId(item))
+    items = items.filter(item => !!getProveedorId(item))
 
     // Excluir items que ya tienen OC vinculada
     const itemsConOC = items.filter(item => item.ordenCompraItems.length > 0)
@@ -96,10 +100,10 @@ export async function POST(req: Request) {
       )
     }
 
-    // 3. Agrupar por proveedorId
+    // 3. Agrupar por proveedorId (directo o desde listaEquipoItem)
     const gruposPorProveedor = new Map<string, typeof items>()
     for (const item of items) {
-      const provId = item.proveedorId!
+      const provId = getProveedorId(item)!
       if (!gruposPorProveedor.has(provId)) {
         gruposPorProveedor.set(provId, [])
       }
