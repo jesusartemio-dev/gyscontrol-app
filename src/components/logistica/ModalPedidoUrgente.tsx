@@ -265,16 +265,16 @@ export default function ModalPedidoUrgente({ isOpen, onClose, onCreated }: Props
             </div>
 
             <div className="flex-1 overflow-auto border rounded-lg">
-              <table className="w-full text-xs">
+              <table className="w-full text-xs table-fixed">
                 <thead className="bg-gray-50 sticky top-0 z-10">
                   <tr className="border-b">
-                    <th className="px-2 py-1.5 text-left font-medium w-[110px]">Tipo</th>
-                    <th className="px-2 py-1.5 text-left font-medium w-[120px]">Codigo</th>
+                    <th className="px-2 py-1.5 text-left font-medium" style={{ width: 140 }}>Tipo</th>
+                    <th className="px-2 py-1.5 text-left font-medium" style={{ width: 140 }}>Codigo</th>
                     <th className="px-2 py-1.5 text-left font-medium">Descripcion</th>
-                    <th className="px-2 py-1.5 text-left font-medium w-[90px]">Unidad</th>
-                    <th className="px-2 py-1.5 text-center font-medium w-[65px]">Cant</th>
-                    <th className="px-2 py-1.5 text-center font-medium w-[90px]">Precio</th>
-                    <th className="px-2 py-1.5 w-[32px]"></th>
+                    <th className="px-2 py-1.5 text-left font-medium" style={{ width: 110 }}>Unidad</th>
+                    <th className="px-2 py-1.5 text-center font-medium" style={{ width: 70 }}>Cant</th>
+                    <th className="px-2 py-1.5 text-center font-medium" style={{ width: 80 }}>Precio</th>
+                    <th className="px-2 py-1.5" style={{ width: 40 }}></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -282,7 +282,7 @@ export default function ModalPedidoUrgente({ isOpen, onClose, onCreated }: Props
                     <tr key={item.tempId} className="hover:bg-gray-50/50">
                       <td className="px-1 py-1">
                         <Select value={item.tipoItem} onValueChange={(v) => updateItem(item.tempId, 'tipoItem', v)}>
-                          <SelectTrigger className="h-7 text-[10px] border-0 bg-transparent px-1">
+                          <SelectTrigger className="h-7 text-[10px] border-0 bg-transparent px-1 w-full">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -296,8 +296,8 @@ export default function ModalPedidoUrgente({ isOpen, onClose, onCreated }: Props
                         <Input
                           value={item.codigo}
                           onChange={(e) => updateItem(item.tempId, 'codigo', e.target.value)}
-                          placeholder="COD"
-                          className={`h-7 text-[10px] bg-transparent px-1 ${!item.codigo.trim() ? 'border border-red-300 rounded' : 'border-0'}`}
+                          placeholder="COD-001"
+                          className={`h-7 text-[10px] bg-transparent px-1 w-full ${!item.codigo.trim() ? 'border border-red-300 rounded' : 'border-0'}`}
                         />
                       </td>
                       <td className="px-1 py-1">
@@ -305,12 +305,12 @@ export default function ModalPedidoUrgente({ isOpen, onClose, onCreated }: Props
                           value={item.descripcion}
                           onChange={(e) => updateItem(item.tempId, 'descripcion', e.target.value)}
                           placeholder="Descripcion del item..."
-                          className={`h-7 text-[10px] bg-transparent px-1 ${!item.descripcion.trim() ? 'border border-red-300 rounded' : 'border-0'}`}
+                          className={`h-7 text-[10px] bg-transparent px-1 w-full ${!item.descripcion.trim() ? 'border border-red-300 rounded' : 'border-0'}`}
                         />
                       </td>
                       <td className="px-1 py-1">
                         <Select value={item.unidad} onValueChange={(v) => updateItem(item.tempId, 'unidad', v)}>
-                          <SelectTrigger className="h-7 text-[10px] border-0 bg-transparent px-1">
+                          <SelectTrigger className="h-7 text-[10px] border-0 bg-transparent px-1 w-full">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -326,7 +326,7 @@ export default function ModalPedidoUrgente({ isOpen, onClose, onCreated }: Props
                           min={0}
                           value={item.cantidad || ''}
                           onChange={(e) => updateItem(item.tempId, 'cantidad', parseFloat(e.target.value) || 0)}
-                          className={`h-7 text-[10px] bg-transparent px-1 text-center ${!item.cantidad || item.cantidad <= 0 ? 'border border-red-300 rounded' : 'border-0'}`}
+                          className={`h-7 text-[10px] bg-transparent px-1 text-center w-full ${!item.cantidad || item.cantidad <= 0 ? 'border border-red-300 rounded' : 'border-0'}`}
                         />
                       </td>
                       <td className="px-1 py-1">
@@ -337,7 +337,7 @@ export default function ModalPedidoUrgente({ isOpen, onClose, onCreated }: Props
                           value={item.precioEstimado}
                           onChange={(e) => updateItem(item.tempId, 'precioEstimado', e.target.value)}
                           placeholder="—"
-                          className="h-7 text-[10px] border-0 bg-transparent px-1 text-center"
+                          className="h-7 text-[10px] border-0 bg-transparent px-1 text-center w-full"
                         />
                       </td>
                       <td className="px-1 py-1">
