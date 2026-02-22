@@ -93,6 +93,9 @@ const getEstadoBadgeClass = (estado: string): string => {
     borrador: 'bg-gray-100 text-gray-600 border-gray-200',
     enviado: 'bg-blue-100 text-blue-700 border-blue-200',
     cancelado: 'bg-red-100 text-red-700 border-red-200',
+    aprobada: 'bg-green-100 text-green-700 border-green-200',
+    confirmada: 'bg-cyan-100 text-cyan-700 border-cyan-200',
+    recibida: 'bg-emerald-100 text-emerald-700 border-emerald-200',
   }
   return styles[estado] || styles.pendiente
 }
@@ -566,6 +569,9 @@ export default function PedidoLogisticaDetailPage() {
                             {(item as any).ordenCompraItems[0].ordenCompra?.numero}
                           </Link>
                         )}
+                        {(item as any).proveedorId && !((item as any).ordenCompraItems?.length > 0) && (
+                          <span className="inline-flex items-center text-[9px] text-gray-400 mt-0.5">Sin OC</span>
+                        )}
                       </td>
                       <td className="px-3 py-2 text-center text-gray-500">{item.unidad}</td>
                       <td className="px-3 py-2 text-center font-medium text-blue-600">
@@ -639,6 +645,68 @@ export default function PedidoLogisticaDetailPage() {
             </div>
           )}
         </div>
+
+        {/* 🛒 Órdenes de Compra vinculadas */}
+        {(pedido as any).ordenesCompra && (pedido as any).ordenesCompra.length > 0 && (
+          <div className="bg-white rounded-lg border">
+            <div className="px-4 py-3 border-b bg-gray-50/50 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ShoppingCart className="h-4 w-4 text-blue-600" />
+                <span className="text-sm font-medium">Órdenes de Compra</span>
+              </div>
+              {(() => {
+                const totalItemsPedido = pedido.items?.length || 0
+                const itemsConOC = pedido.items?.filter((i: any) => (i as any).ordenCompraItems?.length > 0).length || 0
+                return (
+                  <Badge variant="outline" className="text-[10px] h-5">
+                    {itemsConOC} de {totalItemsPedido} items con OC
+                  </Badge>
+                )
+              })()}
+            </div>
+            <table className="w-full text-xs">
+              <thead className="bg-gray-50">
+                <tr className="border-b">
+                  <th className="px-3 py-2 text-left font-medium text-gray-600">N° OC</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-600">Proveedor</th>
+                  <th className="px-3 py-2 text-center font-medium text-gray-600">Items</th>
+                  <th className="px-3 py-2 text-right font-medium text-gray-600">Subtotal</th>
+                  <th className="px-3 py-2 text-center font-medium text-gray-600">Estado</th>
+                  <th className="px-3 py-2 text-center font-medium text-gray-600">F. Entrega Est.</th>
+                  <th className="px-3 py-2 text-center font-medium text-gray-600">Acción</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {(pedido as any).ordenesCompra.map((oc: any) => (
+                  <tr key={oc.id} className="hover:bg-gray-50/50">
+                    <td className="px-3 py-2 font-mono font-medium">{oc.numero}</td>
+                    <td className="px-3 py-2 text-gray-600">{oc.proveedor?.nombre || '—'}</td>
+                    <td className="px-3 py-2 text-center">{oc.items?.length || 0}</td>
+                    <td className="px-3 py-2 text-right font-medium text-emerald-600">
+                      {formatCurrency(oc.subtotal || 0)}
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <Badge variant="outline" className={cn('text-[10px] px-1.5 py-0', getEstadoBadgeClass(oc.estado))}>
+                        {oc.estado}
+                      </Badge>
+                    </td>
+                    <td className="px-3 py-2 text-center text-gray-500">
+                      {oc.fechaEntregaEstimada ? formatDate(oc.fechaEntregaEstimada) : '—'}
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <Button variant="ghost" size="sm" asChild className="h-6 text-[10px] px-2">
+                        <Link href={`/logistica/ordenes-compra/${oc.id}`}>
+                          <ExternalLink className="h-3 w-3 mr-1" />
+                          Ver
+                        </Link>
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         {/* 📈 Timeline de Trazabilidad - Colapsable */}
         {eventos.length > 0 && (

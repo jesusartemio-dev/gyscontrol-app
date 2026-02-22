@@ -43,6 +43,23 @@ export async function GET(
                 pedidoEquipo: true
               }
             },
+            ordenCompraItems: {
+              include: {
+                ordenCompra: {
+                  select: {
+                    id: true,
+                    numero: true,
+                    estado: true,
+                    subtotal: true,
+                    total: true,
+                    moneda: true,
+                    fechaEntregaEstimada: true,
+                    proveedor: { select: { id: true, nombre: true } },
+                    pedidoEquipo: { select: { id: true, codigo: true } },
+                  },
+                },
+              },
+            },
             proyectoEquipoItem: {
               include: { proyectoEquipoCotizado: true },
             },
@@ -74,6 +91,7 @@ export async function GET(
           ...ped,
           pedido: ped.pedidoEquipo
         })),
+        ordenCompraItems: item.ordenCompraItems,
         proyectoEquipo: item.proyectoEquipoCotizado
       }))
     }

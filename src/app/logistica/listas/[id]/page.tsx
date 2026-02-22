@@ -14,7 +14,9 @@ import {
   X,
   ChevronRight,
   Loader2,
-  AlertTriangle
+  AlertTriangle,
+  ShoppingCart,
+  ExternalLink
 } from 'lucide-react'
 import { getLogisticaListaById } from '@/lib/services/logisticaLista'
 import { updateListaEstado } from '@/lib/services/listaEquipo'
@@ -166,6 +168,25 @@ export default function LogisticaListaDetallePage() {
   const itemsBajaCobertura = totalItems - itemsConCobertura
   const faltaCobertura = totalItems > 0 && itemsBajaCobertura > 0
 
+  // OC data aggregated from items
+  const ordenesCompraFromItems = (() => {
+    const map = new Map<string, any>()
+    for (const item of items) {
+      const ocItems = (item as any).ordenCompraItems || []
+      for (const ocItem of ocItems) {
+        const oc = ocItem.ordenCompra
+        if (oc && !map.has(oc.id)) {
+          map.set(oc.id, { ...oc, itemCount: 0 })
+        }
+        if (oc) {
+          map.get(oc.id)!.itemCount++
+        }
+      }
+    }
+    return Array.from(map.values())
+  })()
+  const itemsConOCCount = items.filter((i: any) => ((i as any).ordenCompraItems || []).length > 0).length
+
   return (
     <div className="min-h-screen bg-gray-50/50">
       {/* Header */}
@@ -294,6 +315,76 @@ export default function LogisticaListaDetallePage() {
               <Package className="h-10 w-10 text-gray-300 mb-3" />
               <p className="text-sm text-muted-foreground">No hay items en esta lista</p>
             </div>
+          </div>
+        )}
+
+        {/* Órdenes de Compra vinculadas */}
+        {ordenesCompraFromItems.length > 0 && (
+          <div className="bg-white rounded-lg border">
+            <div className="px-4 py-3 border-b bg-gray-50/50 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ShoppingCart className="h-4 w-4 text-blue-600" />
+                <span className="text-sm font-medium">Órdenes de Compra</span>
+              </div>
+              <Badge className="text-[10px] h-5 bg-gray-100 text-gray-700">
+                {itemsConOCCount} de {totalItems} items con OC
+              </Badge>
+            </div>
+            <table className="w-full text-xs">
+              <thead className="bg-gray-50">
+                <tr className="border-b">
+                  <th className="px-3 py-2 text-left font-medium text-gray-600">N° OC</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-600">Proveedor</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-600">Pedido origen</th>
+                  <th className="px-3 py-2 text-center font-medium text-gray-600">Items</th>
+                  <th className="px-3 py-2 text-right font-medium text-gray-600">Subtotal</th>
+                  <th className="px-3 py-2 text-center font-medium text-gray-600">Estado</th>
+                  <th className="px-3 py-2 text-center font-medium text-gray-600">F. Entrega Est.</th>
+                  <th className="px-3 py-2 text-center font-medium text-gray-600">Acción</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {ordenesCompraFromItems.map((oc: any) => (
+                  <tr key={oc.id} className="hover:bg-gray-50/50">
+                    <td className="px-3 py-2 font-mono font-medium">{oc.numero}</td>
+                    <td className="px-3 py-2 text-gray-600">{oc.proveedor?.nombre || '—'}</td>
+                    <td className="px-3 py-2">
+                      {oc.pedidoEquipo ? (
+                        <Link
+                          href={`/logistica/pedidos/${oc.pedidoEquipo.id}`}
+                          className="text-blue-600 hover:underline inline-flex items-center gap-0.5"
+                        >
+                          {oc.pedidoEquipo.codigo}
+                          <ExternalLink className="h-2.5 w-2.5" />
+                        </Link>
+                      ) : '—'}
+                    </td>
+                    <td className="px-3 py-2 text-center">{oc.itemCount}</td>
+                    <td className="px-3 py-2 text-right font-medium text-emerald-600">
+                      {new Intl.NumberFormat('es-PE', { style: 'currency', currency: oc.moneda || 'USD', minimumFractionDigits: 2 }).format(oc.subtotal || 0)}
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <Badge className={`text-[10px] px-1.5 py-0 ${getEstadoBadge(oc.estado)}`}>
+                        {oc.estado}
+                      </Badge>
+                    </td>
+                    <td className="px-3 py-2 text-center text-gray-500">
+                      {oc.fechaEntregaEstimada
+                        ? new Date(oc.fechaEntregaEstimada).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' })
+                        : '—'}
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <Button variant="ghost" size="sm" asChild className="h-6 text-[10px] px-2">
+                        <Link href={`/logistica/ordenes-compra/${oc.id}`}>
+                          <ExternalLink className="h-3 w-3 mr-1" />
+                          Ver
+                        </Link>
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

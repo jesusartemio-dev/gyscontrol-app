@@ -60,6 +60,13 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
             },
           },
         },
+        ordenesCompra: {
+          include: {
+            proveedor: { select: { id: true, nombre: true } },
+            items: { select: { id: true } },
+          },
+          orderBy: { createdAt: 'desc' as const },
+        },
       },
     })
 
@@ -71,7 +78,8 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
         ...data.listaEquipo,
         items: data.listaEquipo.listaEquipoItem
       } : null,
-      items: data.pedidoEquipoItem
+      items: data.pedidoEquipoItem,
+      ordenesCompra: data.ordenesCompra,
     } : null
 
     return NextResponse.json(response)
