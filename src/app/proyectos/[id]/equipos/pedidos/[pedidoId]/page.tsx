@@ -91,6 +91,7 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
   const [rechazarObservaciones, setRechazarObservaciones] = useState('')
   const [procesandoRecepcion, setProcesandoRecepcion] = useState<string | null>(null)
   const [rechazoDetalleModal, setRechazoDetalleModal] = useState<any>(null)
+  const [revertirRechazo, setRevertirRechazo] = useState<{ confirmando: boolean; motivo: string; procesando: boolean }>({ confirmando: false, motivo: '', procesando: false })
 
   useEffect(() => {
     params.then((p) => {
@@ -684,7 +685,7 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
       />
 
       {/* Modal detalle de rechazo */}
-      <Dialog open={!!rechazoDetalleModal} onOpenChange={(open) => { if (!open) setRechazoDetalleModal(null) }}>
+      <Dialog open={!!rechazoDetalleModal} onOpenChange={(open) => { if (!open) { setRechazoDetalleModal(null); setRevertirRechazo({ confirmando: false, motivo: '', procesando: false }) } }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="text-sm font-medium flex items-center gap-2 text-red-700">
@@ -726,10 +727,78 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
                   <li>Gestionar garantía / devolución</li>
                 </ul>
               </div>
+              {/* Revertir rechazo — solo admin/gerente */}
+              {['admin', 'gerente'].includes(session?.user?.role || '') && (
+                <>
+                  {!revertirRechazo.confirmando ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full h-8 text-xs text-amber-700 border-amber-300 hover:bg-amber-50"
+                      onClick={() => setRevertirRechazo({ confirmando: true, motivo: '', procesando: false })}
+                    >
+                      <RefreshCw className="h-3 w-3 mr-1" />
+                      Revertir rechazo
+                    </Button>
+                  ) : (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2">
+                      <p className="text-[11px] font-medium text-amber-800">
+                        ¿Revertir este rechazo? El item volverá a estado pendiente.
+                      </p>
+                      <Textarea
+                        placeholder="Motivo de reversión (opcional)..."
+                        value={revertirRechazo.motivo}
+                        onChange={(e) => setRevertirRechazo(prev => ({ ...prev, motivo: e.target.value }))}
+                        rows={2}
+                        className="text-xs"
+                      />
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-[10px]"
+                          disabled={revertirRechazo.procesando}
+                          onClick={() => setRevertirRechazo({ confirmando: false, motivo: '', procesando: false })}
+                        >
+                          Cancelar
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="h-7 text-[10px] bg-amber-600 hover:bg-amber-700"
+                          disabled={revertirRechazo.procesando}
+                          onClick={async () => {
+                            setRevertirRechazo(prev => ({ ...prev, procesando: true }))
+                            try {
+                              const res = await fetch(`/api/recepcion-pendiente/${rechazoDetalleModal.id}/revertir`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ observaciones: revertirRechazo.motivo }),
+                              })
+                              if (!res.ok) {
+                                const data = await res.json()
+                                throw new Error(data.error || 'Error al revertir')
+                              }
+                              toast.success('Rechazo revertido. Item vuelve a pendiente.')
+                              setRechazoDetalleModal(null)
+                              setRevertirRechazo({ confirmando: false, motivo: '', procesando: false })
+                              await reloadPedido()
+                            } catch (err: any) {
+                              toast.error(err.message || 'Error al revertir rechazo')
+                              setRevertirRechazo(prev => ({ ...prev, procesando: false }))
+                            }
+                          }}
+                        >
+                          Confirmar reversión
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setRechazoDetalleModal(null)}>
+            <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => { setRechazoDetalleModal(null); setRevertirRechazo({ confirmando: false, motivo: '', procesando: false }) }}>
               Cerrar
             </Button>
           </DialogFooter>
