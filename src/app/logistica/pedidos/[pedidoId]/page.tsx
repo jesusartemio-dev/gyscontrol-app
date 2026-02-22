@@ -80,7 +80,9 @@ import {
   Truck,
   FileText,
   Warehouse,
+  Wrench,
 } from 'lucide-react'
+import TipoItemBadge from '@/components/shared/TipoItemBadge'
 
 // 🔧 Utility functions
 const formatCurrency = (amount: number): string => {
@@ -218,9 +220,10 @@ export default function PedidoLogisticaDetailPage() {
     if (!editingItem.item) return
 
     const tieneOC = ((editingItem.item as any).ordenCompraItems?.length ?? 0) > 0
+    const esServicio = (editingItem.item as any).tipoItem === 'servicio'
 
-    // Validaciones para atención directa (sin OC)
-    if (!tieneOC && editingItem.cantidadAtendida > 0 && !editingItem.motivoAtencionDirecta) {
+    // Validaciones para atención directa (solo equipos/consumibles sin OC)
+    if (!esServicio && !tieneOC && editingItem.cantidadAtendida > 0 && !editingItem.motivoAtencionDirecta) {
       toast.error('Debe seleccionar un motivo de atención directa')
       return
     }
@@ -231,28 +234,40 @@ export default function PedidoLogisticaDetailPage() {
       }
     }
 
+    // Validación servicio: requiere fecha
+    if (esServicio && !editingItem.fechaEntregaReal) {
+      toast.error('Debe indicar la fecha de ejecución del servicio')
+      return
+    }
+
     try {
       setUpdating(true)
 
       let estadoEntrega: string = 'pendiente'
-      if (editingItem.cantidadAtendida === 0) {
-        estadoEntrega = 'pendiente'
-      } else if (editingItem.cantidadAtendida >= editingItem.item.cantidadPedida) {
+      let cantidadFinal = editingItem.cantidadAtendida
+
+      if (esServicio) {
+        // Servicios: confirmar ejecución completa directamente
+        cantidadFinal = editingItem.item.cantidadPedida
         estadoEntrega = 'entregado'
-      } else if (editingItem.cantidadAtendida > 0) {
+      } else if (cantidadFinal === 0) {
+        estadoEntrega = 'pendiente'
+      } else if (cantidadFinal >= editingItem.item.cantidadPedida) {
+        estadoEntrega = 'entregado'
+      } else if (cantidadFinal > 0) {
         estadoEntrega = 'parcial'
       }
 
       const payload: Record<string, any> = {
         pedidoEquipoItemId: editingItem.item.id,
         estadoEntrega,
-        cantidadAtendida: editingItem.cantidadAtendida,
-        fechaEntregaReal: editingItem.cantidadAtendida > 0 ? editingItem.fechaEntregaReal : undefined,
+        cantidadAtendida: cantidadFinal,
+        fechaEntregaReal: (cantidadFinal > 0 || esServicio) ? editingItem.fechaEntregaReal : undefined,
         observacionesEntrega: editingItem.observacionesEntrega || undefined,
       }
 
-      // Campos de atención directa (solo sin OC)
-      if (!tieneOC && editingItem.motivoAtencionDirecta) {
+      // Campos de atención directa (solo sin OC y no servicio)
+      if (!esServicio && !tieneOC && editingItem.motivoAtencionDirecta) {
         payload.motivoAtencionDirecta = editingItem.motivoAtencionDirecta
         if (editingItem.motivoAtencionDirecta === 'importacion_gerencia' && editingItem.costoRealUnitario) {
           payload.costoRealUnitario = parseFloat(editingItem.costoRealUnitario)
@@ -1029,7 +1044,10 @@ export default function PedidoLogisticaDetailPage() {
                   {pedido.items.map((item) => (
                     <tr key={item.id} className="hover:bg-gray-50/50">
                       <td className="px-3 py-2">
-                        <span className="font-mono font-medium">{item.codigo}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono font-medium">{item.codigo}</span>
+                          <TipoItemBadge tipoItem={(item as any).tipoItem} catalogoEquipoId={(item as any).catalogoEquipoId} />
+                        </div>
                       </td>
                       <td className="px-3 py-2 text-gray-600 max-w-[180px] truncate" title={item.descripcion}>
                         {item.descripcion}
@@ -1384,13 +1402,17 @@ export default function PedidoLogisticaDetailPage() {
             const ocNumero = tieneOC ? (editingItem.item as any).ordenCompraItems[0]?.ordenCompra?.numero : null
             const userRole = session?.user?.role || ''
             const puedeEditarCosto = ['admin', 'gerente', 'socio'].includes(userRole)
+            const esServicio = (editingItem.item as any).tipoItem === 'servicio'
 
             return (
               <div className="space-y-4">
                 {/* Item info card */}
                 <div className="bg-gray-50 rounded-lg p-3 space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="font-mono font-medium text-xs">{editingItem.item.codigo}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-mono font-medium text-xs">{editingItem.item.codigo}</span>
+                      <TipoItemBadge tipoItem={(editingItem.item as any).tipoItem} catalogoEquipoId={(editingItem.item as any).catalogoEquipoId} />
+                    </div>
                     <span className="text-[10px] text-muted-foreground bg-white px-1.5 py-0.5 rounded border">
                       {editingItem.item.unidad}
                     </span>
@@ -1412,172 +1434,234 @@ export default function PedidoLogisticaDetailPage() {
                   </div>
                 )}
 
-                {/* Motivo de atención directa (solo sin OC) */}
-                {!tieneOC && (
+                {esServicio ? (
                   <>
-                    <div>
-                      <label className="text-xs font-medium mb-1 block">Motivo de atención directa *</label>
-                      <select
-                        value={editingItem.motivoAtencionDirecta}
-                        onChange={(e) => setEditingItem(prev => ({ ...prev, motivoAtencionDirecta: e.target.value }))}
-                        className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      >
-                        <option value="">Seleccionar motivo...</option>
-                        <option value="compra_caja_chica">Compra directa en tienda / caja chica</option>
-                        <option value="urgencia_proyecto">Urgencia — sin tiempo para OC</option>
-                        <option value="importacion_gerencia">Compra directa por gerencia / importación</option>
-                        <option value="otro">Otro</option>
-                      </select>
+                    {/* Flujo servicio: confirmar ejecución */}
+                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 space-y-3">
+                      <div className="flex items-center gap-2 text-purple-700 text-xs font-medium">
+                        <Wrench className="h-3.5 w-3.5" />
+                        Confirmar ejecución del servicio
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium mb-1 block text-purple-700">Fecha de ejecución *</label>
+                        <Input
+                          type="date"
+                          value={editingItem.fechaEntregaReal}
+                          onChange={(e) => setEditingItem(prev => ({ ...prev, fechaEntregaReal: e.target.value }))}
+                          className="h-9 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium mb-1 block text-purple-700">Observaciones</label>
+                        <textarea
+                          value={editingItem.observacionesEntrega}
+                          onChange={(e) => setEditingItem(prev => ({ ...prev, observacionesEntrega: e.target.value }))}
+                          placeholder="Ej: Servicio completado, incluye materiales..."
+                          rows={2}
+                          className="w-full rounded-md border border-purple-200 bg-white px-3 py-2 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 resize-none"
+                        />
+                      </div>
                     </div>
 
-                    {/* Costo real para importación gerencia */}
-                    {editingItem.motivoAtencionDirecta === 'importacion_gerencia' && (
-                      <div className="space-y-2">
-                        <label className="text-xs font-medium block">Costo real de adquisición *</label>
-                        {puedeEditarCosto ? (
-                          <div className="flex items-center gap-2">
-                            <Input
-                              type="number"
-                              min={0}
-                              step="0.01"
-                              value={editingItem.costoRealUnitario}
-                              onChange={(e) => setEditingItem(prev => ({ ...prev, costoRealUnitario: e.target.value }))}
-                              placeholder="Costo unitario"
-                              className="h-9 text-sm flex-1"
-                            />
-                            <select
-                              value={editingItem.costoRealMoneda}
-                              onChange={(e) => setEditingItem(prev => ({ ...prev, costoRealMoneda: e.target.value }))}
-                              className="h-9 rounded-md border border-input bg-background px-2 text-xs w-20"
-                            >
-                              <option value="USD">USD</option>
-                              <option value="PEN">PEN</option>
-                            </select>
+                    {/* Estado resultante servicio */}
+                    <div className="rounded-lg px-3 py-2 flex items-center gap-2 text-xs font-medium border bg-green-50 text-green-700 border-green-200">
+                      <span className="w-2 h-2 rounded-full bg-green-500" />
+                      Al confirmar, el servicio pasará a estado: Entregado
+                    </div>
+
+                    {/* Actions servicio */}
+                    <div className="flex justify-end gap-2 pt-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={resetEditingItem}
+                        className="h-8 text-xs"
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={saveItemEdit}
+                        disabled={updating || !editingItem.fechaEntregaReal}
+                        className="h-8 text-xs bg-purple-600 hover:bg-purple-700"
+                      >
+                        <Wrench className="h-3 w-3 mr-1" />
+                        {updating ? 'Confirmando...' : 'Confirmar Ejecución'}
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Flujo equipo/consumible: atención directa + cantidad */}
+
+                    {/* Motivo de atención directa (solo sin OC) */}
+                    {!tieneOC && (
+                      <>
+                        <div>
+                          <label className="text-xs font-medium mb-1 block">Motivo de atención directa *</label>
+                          <select
+                            value={editingItem.motivoAtencionDirecta}
+                            onChange={(e) => setEditingItem(prev => ({ ...prev, motivoAtencionDirecta: e.target.value }))}
+                            className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            <option value="">Seleccionar motivo...</option>
+                            <option value="compra_caja_chica">Compra directa en tienda / caja chica</option>
+                            <option value="urgencia_proyecto">Urgencia — sin tiempo para OC</option>
+                            <option value="importacion_gerencia">Compra directa por gerencia / importación</option>
+                            <option value="otro">Otro</option>
+                          </select>
+                        </div>
+
+                        {/* Costo real para importación gerencia */}
+                        {editingItem.motivoAtencionDirecta === 'importacion_gerencia' && (
+                          <div className="space-y-2">
+                            <label className="text-xs font-medium block">Costo real de adquisición *</label>
+                            {puedeEditarCosto ? (
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  step="0.01"
+                                  value={editingItem.costoRealUnitario}
+                                  onChange={(e) => setEditingItem(prev => ({ ...prev, costoRealUnitario: e.target.value }))}
+                                  placeholder="Costo unitario"
+                                  className="h-9 text-sm flex-1"
+                                />
+                                <select
+                                  value={editingItem.costoRealMoneda}
+                                  onChange={(e) => setEditingItem(prev => ({ ...prev, costoRealMoneda: e.target.value }))}
+                                  className="h-9 rounded-md border border-input bg-background px-2 text-xs w-20"
+                                >
+                                  <option value="USD">USD</option>
+                                  <option value="PEN">PEN</option>
+                                </select>
+                              </div>
+                            ) : (
+                              <p className="text-xs text-muted-foreground italic bg-gray-50 rounded p-2">Solo Gerencia puede completar este campo.</p>
+                            )}
+                            <p className="text-[10px] text-red-600 bg-red-50 border border-red-200 rounded p-2">
+                              Este dato es visible para socios y directivos. Ingresar el costo total real (incluye flete, impuestos, aduanas). Se creará automáticamente una CxP pendiente de documentos.
+                            </p>
                           </div>
-                        ) : (
-                          <p className="text-xs text-muted-foreground italic bg-gray-50 rounded p-2">Solo Gerencia puede completar este campo.</p>
                         )}
-                        <p className="text-[10px] text-red-600 bg-red-50 border border-red-200 rounded p-2">
-                          Este dato es visible para socios y directivos. Ingresar el costo total real (incluye flete, impuestos, aduanas). Se creará automáticamente una CxP pendiente de documentos.
-                        </p>
+
+                        {/* Aviso informativo */}
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-2.5 text-[10px] text-blue-700 flex items-start gap-2">
+                          <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                          <span>Recuerda registrar el gasto en Finanzas → Requerimientos con categoría &quot;equipos&quot;.</span>
+                        </div>
+                      </>
+                    )}
+
+                    {/* Cantidad section */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-xs font-medium">Cantidad a entregar</label>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-6 text-[10px] px-2"
+                          onClick={() => setCantidadAtendida(cantPedida)}
+                          disabled={esCompleta}
+                        >
+                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                          Entrega completa
+                        </Button>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1">
+                          <Input
+                            type="number"
+                            min={0}
+                            max={cantPedida}
+                            value={cantAtendida}
+                            onChange={(e) => setCantidadAtendida(Number(e.target.value))}
+                            className="h-9 text-sm font-medium"
+                          />
+                        </div>
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                          / {cantPedida} {editingItem.item.unidad}
+                        </span>
+                      </div>
+
+                      {/* Progress bar */}
+                      <div className="mt-2">
+                        <Progress
+                          value={porcentaje}
+                          className={cn('h-2', esCompleta && '[&>div]:bg-green-500', esParcial && '[&>div]:bg-amber-500')}
+                        />
+                        <p className="text-[10px] text-muted-foreground mt-1 text-right">{porcentaje}%</p>
+                      </div>
+                    </div>
+
+                    {/* Fecha de entrega */}
+                    {cantAtendida > 0 && (
+                      <div>
+                        <label className="text-xs font-medium mb-1 block">Fecha de Entrega</label>
+                        <Input
+                          type="date"
+                          value={editingItem.fechaEntregaReal}
+                          onChange={(e) => setEditingItem(prev => ({ ...prev, fechaEntregaReal: e.target.value }))}
+                          className="h-9 text-xs"
+                        />
                       </div>
                     )}
 
-                    {/* Aviso informativo */}
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-2.5 text-[10px] text-blue-700 flex items-start gap-2">
-                      <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                      <span>Recuerda registrar el gasto en Finanzas → Requerimientos con categoría &quot;equipos&quot;.</span>
+                    {/* Observaciones */}
+                    <div>
+                      <label className="text-xs font-medium mb-1 block">Observaciones</label>
+                      <textarea
+                        value={editingItem.observacionesEntrega}
+                        onChange={(e) => setEditingItem(prev => ({ ...prev, observacionesEntrega: e.target.value }))}
+                        placeholder="Ej: Entrega parcial, pendiente 2 unidades para la siguiente semana..."
+                        rows={2}
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
+                      />
+                    </div>
+
+                    {/* Estado resultante */}
+                    <div className={cn(
+                      'rounded-lg px-3 py-2 flex items-center gap-2 text-xs font-medium border',
+                      cantAtendida === 0 && 'bg-gray-50 text-gray-600 border-gray-200',
+                      esParcial && 'bg-amber-50 text-amber-700 border-amber-200',
+                      esCompleta && 'bg-green-50 text-green-700 border-green-200',
+                    )}>
+                      <span className={cn(
+                        'w-2 h-2 rounded-full',
+                        cantAtendida === 0 && 'bg-gray-400',
+                        esParcial && 'bg-amber-500',
+                        esCompleta && 'bg-green-500',
+                      )} />
+                      Estado resultante: {cantAtendida === 0 ? 'Pendiente' : esCompleta ? 'Entregado' : 'Parcial'}
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex justify-end gap-2 pt-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={resetEditingItem}
+                        className="h-8 text-xs"
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={saveItemEdit}
+                        disabled={updating}
+                        className={cn(
+                          'h-8 text-xs',
+                          esCompleta && 'bg-green-600 hover:bg-green-700',
+                        )}
+                      >
+                        <Save className="h-3 w-3 mr-1" />
+                        {updating ? 'Guardando...' : esCompleta ? 'Confirmar Entrega' : 'Guardar'}
+                      </Button>
                     </div>
                   </>
                 )}
-
-                {/* Cantidad section */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-xs font-medium">Cantidad a entregar</label>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-6 text-[10px] px-2"
-                      onClick={() => setCantidadAtendida(cantPedida)}
-                      disabled={esCompleta}
-                    >
-                      <CheckCircle2 className="h-3 w-3 mr-1" />
-                      Entrega completa
-                    </Button>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1">
-                      <Input
-                        type="number"
-                        min={0}
-                        max={cantPedida}
-                        value={cantAtendida}
-                        onChange={(e) => setCantidadAtendida(Number(e.target.value))}
-                        className="h-9 text-sm font-medium"
-                      />
-                    </div>
-                    <span className="text-xs text-muted-foreground whitespace-nowrap">
-                      / {cantPedida} {editingItem.item.unidad}
-                    </span>
-                  </div>
-
-                  {/* Progress bar */}
-                  <div className="mt-2">
-                    <Progress
-                      value={porcentaje}
-                      className={cn('h-2', esCompleta && '[&>div]:bg-green-500', esParcial && '[&>div]:bg-amber-500')}
-                    />
-                    <p className="text-[10px] text-muted-foreground mt-1 text-right">{porcentaje}%</p>
-                  </div>
-                </div>
-
-                {/* Fecha de entrega */}
-                {cantAtendida > 0 && (
-                  <div>
-                    <label className="text-xs font-medium mb-1 block">Fecha de Entrega</label>
-                    <Input
-                      type="date"
-                      value={editingItem.fechaEntregaReal}
-                      onChange={(e) => setEditingItem(prev => ({ ...prev, fechaEntregaReal: e.target.value }))}
-                      className="h-9 text-xs"
-                    />
-                  </div>
-                )}
-
-                {/* Observaciones */}
-                <div>
-                  <label className="text-xs font-medium mb-1 block">Observaciones</label>
-                  <textarea
-                    value={editingItem.observacionesEntrega}
-                    onChange={(e) => setEditingItem(prev => ({ ...prev, observacionesEntrega: e.target.value }))}
-                    placeholder="Ej: Entrega parcial, pendiente 2 unidades para la siguiente semana..."
-                    rows={2}
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
-                  />
-                </div>
-
-                {/* Estado resultante */}
-                <div className={cn(
-                  'rounded-lg px-3 py-2 flex items-center gap-2 text-xs font-medium border',
-                  cantAtendida === 0 && 'bg-gray-50 text-gray-600 border-gray-200',
-                  esParcial && 'bg-amber-50 text-amber-700 border-amber-200',
-                  esCompleta && 'bg-green-50 text-green-700 border-green-200',
-                )}>
-                  <span className={cn(
-                    'w-2 h-2 rounded-full',
-                    cantAtendida === 0 && 'bg-gray-400',
-                    esParcial && 'bg-amber-500',
-                    esCompleta && 'bg-green-500',
-                  )} />
-                  Estado resultante: {cantAtendida === 0 ? 'Pendiente' : esCompleta ? 'Entregado' : 'Parcial'}
-                </div>
-
-                {/* Actions */}
-                <div className="flex justify-end gap-2 pt-1">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={resetEditingItem}
-                    className="h-8 text-xs"
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={saveItemEdit}
-                    disabled={updating}
-                    className={cn(
-                      'h-8 text-xs',
-                      esCompleta && 'bg-green-600 hover:bg-green-700',
-                    )}
-                  >
-                    <Save className="h-3 w-3 mr-1" />
-                    {updating ? 'Guardando...' : esCompleta ? 'Confirmar Entrega' : 'Guardar'}
-                  </Button>
-                </div>
               </div>
             )
           })()}

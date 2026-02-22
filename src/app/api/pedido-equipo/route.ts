@@ -91,6 +91,8 @@ export async function GET(request: Request) {
         proyectoId: true,
         responsableId: true,
         listaId: true,
+        esUrgente: true,
+        prioridad: true,
         createdAt: true,
         updatedAt: true,
         user: {
@@ -136,6 +138,7 @@ export async function GET(request: Request) {
              codigo: true,
              descripcion: true,
              unidad: true,
+             tipoItem: true,
              fechaEntregaEstimada: true,
              fechaEntregaReal: true,
              estadoEntrega: true,
@@ -281,7 +284,7 @@ export async function POST(request: Request) {
           listaId: body.listaId ?? null,
           codigo: codigoGenerado,
           numeroSecuencia: nuevoNumero,
-          estado: 'borrador',
+          estado: body.esUrgente ? 'enviado' : 'borrador',
           observacion: body.observacion ?? '',
           prioridad: body.prioridad || 'media',
           esUrgente: body.esUrgente || false,
@@ -342,6 +345,7 @@ export async function POST(request: Request) {
               estadoEntrega: 'pendiente',
               proveedorId: listaItem.proveedorId || null,
               proveedorNombre: listaItem.proveedor?.nombre || null,
+              tipoItem: (listaItem as any).tipoItem || 'equipo',
               updatedAt: now,
             },
           })
@@ -359,6 +363,22 @@ export async function POST(request: Request) {
         await tx.pedidoEquipo.update({
           where: { id: pedido.id },
           data: { presupuestoTotal, updatedAt: now },
+        })
+      }
+
+      // EventoTrazabilidad para pedidos urgentes
+      if (body.esUrgente) {
+        await tx.eventoTrazabilidad.create({
+          data: {
+            id: `evt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            proyectoId: body.proyectoId,
+            pedidoEquipoId: pedido.id,
+            tipo: 'pedido_urgente',
+            descripcion: `Pedido urgente creado. Motivo: ${body.observacion || 'No especificado'}. Sin lista técnica previa.`,
+            usuarioId: body.responsableId,
+            metadata: { esUrgente: true, itemCount: itemsCreados },
+            updatedAt: now,
+          },
         })
       }
 

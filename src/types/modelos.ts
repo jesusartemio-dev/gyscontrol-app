@@ -1343,6 +1343,7 @@ export interface ListaEquipoItem {
   codigo: string
   descripcion: string
   categoria: string // ✅ Campo agregado para consistencia con otras entidades
+  tipoItem?: string // "equipo" | "consumible" | "servicio"
   unidad: string
   marca: string // ✅ Campo agregado para exportación Excel
   cantidad: number
@@ -1516,6 +1517,7 @@ export interface PedidoEquipoItem {
   codigo: string
   descripcion: string
   unidad: string
+  tipoItem?: string // "equipo" | "consumible" | "servicio"
 
   tiempoEntrega?: string              // Ej: "stock", "7 días", etc.
   tiempoEntregaDias?: number         // Ej: 0, 7, 14

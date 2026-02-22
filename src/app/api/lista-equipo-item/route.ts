@@ -150,6 +150,7 @@ export async function POST(request: Request) {
         codigo: body.codigo,
         descripcion: body.descripcion,
         categoria: body.categoria || 'SIN-CATEGORIA',
+        tipoItem: body.tipoItem || 'equipo',
         unidad: body.unidad,
         marca: body.marca || 'SIN-MARCA',
         cantidad: body.cantidad ?? 0,

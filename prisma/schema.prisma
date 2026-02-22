@@ -569,6 +569,7 @@ model ListaEquipoItem {
   codigo                                String
   descripcion                           String
   categoria                             String                       @default("SIN-CATEGORIA")
+  tipoItem                              String                       @default("equipo")
   unidad                                String
   marca                                 String                       @default("SIN-MARCA")
   cantidad                              Float
@@ -664,6 +665,7 @@ model PedidoEquipoItem {
   codigo                      String
   descripcion                 String
   categoria                   String?
+  tipoItem                    String                @default("equipo")
   marca                       String?
   catalogoEquipoId            String?
   tiempoEntrega               String?
@@ -3199,6 +3201,7 @@ model OrdenCompraItem {
   listaEquipoItemId  String?
   codigo             String
   descripcion        String
+  tipoItem           String   @default("equipo")
   unidad             String
   cantidad           Float
   precioUnitario     Float

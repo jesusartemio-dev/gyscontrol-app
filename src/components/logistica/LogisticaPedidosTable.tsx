@@ -238,7 +238,12 @@ export default function LogisticaPedidosTable({ pedidos, loading = false, onDele
                 onClick={() => router.push(`/logistica/pedidos/${pedido.id}`)}
               >
                 <TableCell className="font-mono text-xs py-2">
-                  {pedido.codigo}
+                  <div className="flex items-center gap-1.5">
+                    {pedido.codigo}
+                    {(pedido as any).esUrgente && (
+                      <Badge variant="destructive" className="text-[9px] h-4 px-1 font-semibold">URGENTE</Badge>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell className="py-2">
                   <div className="flex items-center gap-1.5">

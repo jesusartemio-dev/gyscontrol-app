@@ -352,29 +352,64 @@ function OrdenCompraPDF({ oc }: Props) {
           </View>
         )}
 
-        {/* Items Table */}
-        <View style={styles.table}>
-          <View style={styles.tableHeader}>
-            <Text style={[styles.tableHeaderText, styles.colNum]}>N°</Text>
-            <Text style={[styles.tableHeaderText, styles.colCodigo]}>Código</Text>
-            <Text style={[styles.tableHeaderText, styles.colDesc]}>Descripción</Text>
-            <Text style={[styles.tableHeaderText, styles.colUnd]}>Und.</Text>
-            <Text style={[styles.tableHeaderText, styles.colCant]}>Cant.</Text>
-            <Text style={[styles.tableHeaderText, styles.colPrecio]}>P. Unit.</Text>
-            <Text style={[styles.tableHeaderText, styles.colTotal]}>Total</Text>
-          </View>
-          {oc.items?.map((item, i) => (
-            <View key={item.id} style={[styles.tableRow, i % 2 === 1 ? styles.tableRowAlt : {}]}>
-              <Text style={[styles.tableCell, styles.colNum]}>{i + 1}</Text>
-              <Text style={[styles.tableCell, styles.colCodigo]}>{item.codigo}</Text>
-              <Text style={[styles.tableCell, styles.colDesc]}>{item.descripcion}</Text>
-              <Text style={[styles.tableCell, styles.colUnd]}>{item.unidad}</Text>
-              <Text style={[styles.tableCellRight, styles.colCant]}>{item.cantidad}</Text>
-              <Text style={[styles.tableCellRight, styles.colPrecio]}>{formatCurrency(item.precioUnitario, oc.moneda)}</Text>
-              <Text style={[styles.tableCellRight, styles.colTotal]}>{formatCurrency(item.costoTotal, oc.moneda)}</Text>
-            </View>
-          ))}
-        </View>
+        {/* Items Table - Equipos y Materiales */}
+        {(() => {
+          const allItems = oc.items || []
+          const equiposYMateriales = allItems.filter((i: any) => (i.tipoItem || 'equipo') !== 'servicio')
+          const servicios = allItems.filter((i: any) => (i.tipoItem || 'equipo') === 'servicio')
+          return (
+            <>
+              {equiposYMateriales.length > 0 && (
+                <View style={styles.table}>
+                  {servicios.length > 0 && (
+                    <Text style={{ fontSize: 9, fontWeight: 700, marginBottom: 4, color: colors.primary }}>Equipos y Materiales</Text>
+                  )}
+                  <View style={styles.tableHeader}>
+                    <Text style={[styles.tableHeaderText, styles.colNum]}>N°</Text>
+                    <Text style={[styles.tableHeaderText, styles.colCodigo]}>Código</Text>
+                    <Text style={[styles.tableHeaderText, styles.colDesc]}>Descripción</Text>
+                    <Text style={[styles.tableHeaderText, styles.colUnd]}>Und.</Text>
+                    <Text style={[styles.tableHeaderText, styles.colCant]}>Cant.</Text>
+                    <Text style={[styles.tableHeaderText, styles.colPrecio]}>P. Unit.</Text>
+                    <Text style={[styles.tableHeaderText, styles.colTotal]}>Total</Text>
+                  </View>
+                  {equiposYMateriales.map((item, i) => (
+                    <View key={item.id} style={[styles.tableRow, i % 2 === 1 ? styles.tableRowAlt : {}]}>
+                      <Text style={[styles.tableCell, styles.colNum]}>{i + 1}</Text>
+                      <Text style={[styles.tableCell, styles.colCodigo]}>{item.codigo}</Text>
+                      <Text style={[styles.tableCell, styles.colDesc]}>{item.descripcion}</Text>
+                      <Text style={[styles.tableCell, styles.colUnd]}>{item.unidad}</Text>
+                      <Text style={[styles.tableCellRight, styles.colCant]}>{item.cantidad}</Text>
+                      <Text style={[styles.tableCellRight, styles.colPrecio]}>{formatCurrency(item.precioUnitario, oc.moneda)}</Text>
+                      <Text style={[styles.tableCellRight, styles.colTotal]}>{formatCurrency(item.costoTotal, oc.moneda)}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+              {servicios.length > 0 && (
+                <View style={styles.table}>
+                  <Text style={{ fontSize: 9, fontWeight: 700, marginBottom: 4, color: '#7c3aed' }}>Servicios</Text>
+                  <View style={styles.tableHeader}>
+                    <Text style={[styles.tableHeaderText, styles.colNum]}>N°</Text>
+                    <Text style={[styles.tableHeaderText, styles.colCodigo]}>Código</Text>
+                    <Text style={[styles.tableHeaderText, { width: '48%' }]}>Descripción</Text>
+                    <Text style={[styles.tableHeaderText, styles.colPrecio]}>P. Unit.</Text>
+                    <Text style={[styles.tableHeaderText, styles.colTotal]}>Total</Text>
+                  </View>
+                  {servicios.map((item, i) => (
+                    <View key={item.id} style={[styles.tableRow, i % 2 === 1 ? styles.tableRowAlt : {}]}>
+                      <Text style={[styles.tableCell, styles.colNum]}>{i + 1}</Text>
+                      <Text style={[styles.tableCell, styles.colCodigo]}>{item.codigo}</Text>
+                      <Text style={[styles.tableCell, { width: '48%' }]}>{item.descripcion}</Text>
+                      <Text style={[styles.tableCellRight, styles.colPrecio]}>{formatCurrency(item.precioUnitario, oc.moneda)}</Text>
+                      <Text style={[styles.tableCellRight, styles.colTotal]}>{formatCurrency(item.costoTotal, oc.moneda)}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </>
+          )
+        })()}
 
         {/* Totals */}
         <View style={styles.totalsContainer}>

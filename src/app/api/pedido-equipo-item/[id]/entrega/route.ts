@@ -65,6 +65,14 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const data = validationResult.data
     const pedido = itemExistente.pedidoEquipo
 
+    // Override for servicio items: always full delivery
+    const esServicio = (itemExistente as any).tipoItem === 'servicio'
+    if (esServicio) {
+      data.cantidadAtendida = itemExistente.cantidadPedida
+      data.estadoEntrega = 'entregado' as any
+      estadoDerivado = 'entregado'
+    }
+
     const itemActualizado = await prisma.$transaction(async (tx) => {
       // 1. Update PedidoEquipoItem
       const updatedItem = await tx.pedidoEquipoItem.update({
@@ -146,8 +154,10 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
           entregaItemId: entregaItemId,
           proyectoId: pedido.proyectoId,
           pedidoEquipoId: pedido.id,
-          tipo: data.motivoAtencionDirecta ? 'ENTREGA_DIRECTA' : 'ENTREGA',
-          descripcion: `Entrega registrada: ${data.cantidadAtendida} unidades - ${data.estadoEntrega}${data.motivoAtencionDirecta ? ` (${data.motivoAtencionDirecta})` : ''}`,
+          tipo: esServicio ? 'CONFIRMACION_SERVICIO' : (data.motivoAtencionDirecta ? 'ENTREGA_DIRECTA' : 'ENTREGA'),
+          descripcion: esServicio
+            ? `Servicio confirmado: ${itemExistente.descripcion}. Ejecutado el ${data.fechaEntregaReal ? data.fechaEntregaReal.toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}.`
+            : `Entrega registrada: ${data.cantidadAtendida} unidades - ${data.estadoEntrega}${data.motivoAtencionDirecta ? ` (${data.motivoAtencionDirecta})` : ''}`,
           estadoAnterior: itemExistente.estadoEntrega as any || null,
           estadoNuevo: data.estadoEntrega as any,
           usuarioId: userId,

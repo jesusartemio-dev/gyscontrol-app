@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Pencil, Trash2, CheckCircle2, X, Search, Package, Clock, AlertTriangle, CheckCircle, Grid3X3, List, RotateCcw, Recycle, Plus, ShoppingCart, FileText, Download, Tag } from 'lucide-react'
+import { Pencil, Trash2, CheckCircle2, X, Search, Package, Clock, AlertTriangle, CheckCircle, Grid3X3, List, RotateCcw, Recycle, Plus, ShoppingCart, FileText, Download, Tag, ChevronDown, Wrench } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ListaEquipoItem } from '@/types'
@@ -25,6 +25,14 @@ import ModalReemplazarReemplazoDesdeCatalogo from './ModalReemplazarReemplazoDes
 import ModalAgregarItemDesdeCatalogo from './ModalAgregarItemDesdeCatalogo'
 import ModalAgregarItemDesdeEquipo from './ModalAgregarItemDesdeEquipo'
 import ModalImportarExcelLista from './ModalImportarExcelLista'
+import ModalAgregarItemLibre from './ModalAgregarItemLibre'
+import TipoItemBadge from '@/components/shared/TipoItemBadge'
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '@/components/ui/dropdown-menu'
 import { calcularCostoItem, calcularCostoTotal, formatCurrency } from '@/lib/utils/costoCalculations'
 import { exportarListaEquipoAExcel } from '@/lib/utils/listaEquipoExcel'
 // import { DebugLogger, useRenderTracker } from '@/components/debug/DebugLogger'
@@ -123,6 +131,8 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
   const [showModalAgregarCatalogo, setShowModalAgregarCatalogo] = useState(false)
   const [showModalAgregarEquipo, setShowModalAgregarEquipo] = useState(false)
   const [showModalImportarExcel, setShowModalImportarExcel] = useState(false)
+  const [showModalItemLibre, setShowModalItemLibre] = useState(false)
+  const [tipoItemLibre, setTipoItemLibre] = useState<'consumible' | 'servicio'>('consumible')
   
 
   // 📊 Memoize pedido summaries to prevent infinite loops
@@ -397,15 +407,33 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
         {/* Add Items Buttons */}
         {editable && (
           <div className="flex items-center gap-1">
-            <Button
-              variant="default"
-              size="sm"
-              onClick={() => setShowModalAgregarCatalogo(true)}
-              className="h-7 px-2 text-xs bg-orange-600 hover:bg-orange-700"
-            >
-              <Plus className="h-3 w-3 mr-1" />
-              Catálogo
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="h-7 px-2 text-xs bg-orange-600 hover:bg-orange-700"
+                >
+                  <Plus className="h-3 w-3 mr-1" />
+                  Agregar item
+                  <ChevronDown className="h-3 w-3 ml-1" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem onClick={() => setShowModalAgregarCatalogo(true)}>
+                  <Package className="h-3.5 w-3.5 mr-2 text-blue-600" />
+                  Desde catalogo
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { setTipoItemLibre('consumible'); setShowModalItemLibre(true) }}>
+                  <Tag className="h-3.5 w-3.5 mr-2 text-orange-600" />
+                  Consumible / material libre
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { setTipoItemLibre('servicio'); setShowModalItemLibre(true) }}>
+                  <Wrench className="h-3.5 w-3.5 mr-2 text-purple-600" />
+                  Servicio / trabajo
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button
               variant="outline"
               size="sm"
@@ -578,8 +606,11 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                  >
                    <td className={`${cellPadding} ${columnWidths.codigoDescripcion} text-gray-700`}>
                        <div className="space-y-0.5">
-                         <div className="font-medium text-gray-900 text-xs" title={item.codigo}>
-                           {item.codigo}
+                         <div className="flex items-center gap-1.5">
+                           <div className="font-medium text-gray-900 text-xs" title={item.codigo}>
+                             {item.codigo}
+                           </div>
+                           <TipoItemBadge tipoItem={(item as any).tipoItem} catalogoEquipoId={item.catalogoEquipoId} />
                          </div>
                          <div className="text-[11px] text-gray-500 line-clamp-2 leading-tight" title={item.descripcion}>
                            {item.descripcion}
@@ -887,9 +918,12 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                     <CardHeader className="pb-2 p-3">
                       <div className="flex items-start justify-between gap-2">
                         <div className="space-y-0.5 min-w-0">
-                          <CardTitle className="text-sm font-semibold text-gray-900 truncate">
-                            {item.codigo}
-                          </CardTitle>
+                          <div className="flex items-center gap-1.5">
+                            <CardTitle className="text-sm font-semibold text-gray-900 truncate">
+                              {item.codigo}
+                            </CardTitle>
+                            <TipoItemBadge tipoItem={(item as any).tipoItem} catalogoEquipoId={item.catalogoEquipoId} />
+                          </div>
                           <p className="text-xs text-muted-foreground line-clamp-2">
                             {item.descripcion}
                           </p>
@@ -1156,6 +1190,14 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
           setShowModalImportarExcel(false)
           onCreated?.()
         }}
+      />
+
+      <ModalAgregarItemLibre
+        isOpen={showModalItemLibre}
+        tipoItem={tipoItemLibre}
+        listaId={listaId}
+        onClose={() => setShowModalItemLibre(false)}
+        onCreated={async () => { await onCreated?.() }}
       />
     </div>
   )

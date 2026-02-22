@@ -120,6 +120,7 @@ export async function POST(req: Request) {
         const ocItems = grupoItems.map(item => ({
           codigo: item.codigo,
           descripcion: item.descripcion,
+          tipoItem: (item as any).tipoItem || 'equipo',
           unidad: item.unidad,
           cantidad: item.cantidadPedida,
           precioUnitario: item.precioUnitario || 0,

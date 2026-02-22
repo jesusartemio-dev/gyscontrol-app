@@ -613,6 +613,7 @@ export interface ListaEquipoItemPayload {
   cantidadEntregada?: number
   estado?: EstadoListaItem
   origen?: OrigenListaItem
+  tipoItem?: string // "equipo" | "consumible" | "servicio"
 }
 
 export interface ListaEquipoItemCreatePayload extends ListaEquipoItemPayload {}
@@ -680,7 +681,7 @@ export interface CotizacionProveedorItemUpdatePayload
 export interface PedidoEquipoPayload {
   proyectoId: string
   responsableId: string
-  listaId: string
+  listaId?: string | null
   estado?: EstadoPedido
   observacion?: string
   fechaPedido?: string         // ✅ se mantiene por compatibilidad
@@ -736,6 +737,7 @@ export interface PedidoEquipoItemPayload {
   categoria?: string
   marca?: string
   catalogoEquipoId?: string
+  tipoItem?: string // "equipo" | "consumible" | "servicio"
   tiempoEntrega?: string
   tiempoEntregaDias?: number
   // 🚚 Campos de trazabilidad de entregas
