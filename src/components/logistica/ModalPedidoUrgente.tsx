@@ -192,7 +192,7 @@ export default function ModalPedidoUrgente({ isOpen, onClose, onCreated }: Props
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && !loading && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+      <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
         <DialogHeader>
           <div className="flex items-center gap-2">
             <Zap className="h-4 w-4 text-red-600" />
@@ -268,12 +268,12 @@ export default function ModalPedidoUrgente({ isOpen, onClose, onCreated }: Props
               <table className="w-full text-xs">
                 <thead className="bg-gray-50 sticky top-0 z-10">
                   <tr className="border-b">
-                    <th className="px-2 py-1.5 text-left font-medium w-[100px]">Tipo</th>
-                    <th className="px-2 py-1.5 text-left font-medium w-[90px]">Codigo</th>
+                    <th className="px-2 py-1.5 text-left font-medium w-[110px]">Tipo</th>
+                    <th className="px-2 py-1.5 text-left font-medium w-[120px]">Codigo</th>
                     <th className="px-2 py-1.5 text-left font-medium">Descripcion</th>
-                    <th className="px-2 py-1.5 text-left font-medium w-[80px]">Unidad</th>
-                    <th className="px-2 py-1.5 text-center font-medium w-[60px]">Cant</th>
-                    <th className="px-2 py-1.5 text-center font-medium w-[80px]">Precio</th>
+                    <th className="px-2 py-1.5 text-left font-medium w-[90px]">Unidad</th>
+                    <th className="px-2 py-1.5 text-center font-medium w-[65px]">Cant</th>
+                    <th className="px-2 py-1.5 text-center font-medium w-[90px]">Precio</th>
                     <th className="px-2 py-1.5 w-[32px]"></th>
                   </tr>
                 </thead>
