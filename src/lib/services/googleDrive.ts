@@ -33,16 +33,33 @@ export function getSharedDriveId(): string {
   return id
 }
 
+export function getAdminDriveId(): string {
+  const id = process.env.GOOGLE_ADMIN_DRIVE_ID
+  if (id) return id
+  // Fallback: usar Drive de Proyectos si no está configurado el de Admin
+  console.warn('[GoogleDrive] GOOGLE_ADMIN_DRIVE_ID no configurado, usando GOOGLE_SHARED_DRIVE_ID como fallback')
+  return getSharedDriveId()
+}
+
+/** IDs de drives permitidos para validación de seguridad */
+export function getAllowedDriveIds(): string[] {
+  const ids = [getSharedDriveId()]
+  const adminId = process.env.GOOGLE_ADMIN_DRIVE_ID
+  if (adminId && !ids.includes(adminId)) ids.push(adminId)
+  return ids
+}
+
 export async function listFiles(options: {
   folderId?: string
   query?: string
   pageSize?: number
   pageToken?: string
   orderBy?: string
+  driveId?: string
 }) {
   const drive = getDriveClient()
-  const sharedDriveId = getSharedDriveId()
-  const { folderId, query, pageSize = 50, pageToken, orderBy = 'folder,name' } = options
+  const { folderId, query, pageSize = 50, pageToken, orderBy = 'folder,name', driveId } = options
+  const sharedDriveId = driveId || getSharedDriveId()
 
   // Build query: files in folder, not trashed
   const qParts: string[] = ['trashed = false']

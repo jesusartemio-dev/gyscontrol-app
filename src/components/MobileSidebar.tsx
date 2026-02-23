@@ -137,9 +137,10 @@ export default function MobileSidebar() {
       title: 'Documentos',
       icon: HardDrive,
       color: 'text-indigo-400',
-      roles: ['admin', 'gerente', 'proyectos', 'coordinador', 'gestor', 'logistico', 'comercial'],
+      roles: ['admin', 'gerente', 'proyectos', 'coordinador', 'gestor', 'logistico', 'comercial', 'administracion'],
       links: [
         { href: '/documentos', label: 'GYS.PROYECTOS', icon: FolderOpen },
+        { href: '/documentos/administracion', label: 'GYS.ADMINISTRACION', icon: Building2 },
       ],
     },
     {

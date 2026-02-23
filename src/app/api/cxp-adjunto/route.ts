@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { uploadFile, createFolder, getSharedDriveId } from '@/lib/services/googleDrive'
+import { uploadFile, createFolder, getAdminDriveId } from '@/lib/services/googleDrive'
 
 const ROLES_ALLOWED = ['admin', 'gerente', 'administracion']
 
 async function getOrCreateCxPFolder(): Promise<string> {
-  const parentId = getSharedDriveId()
+  const parentId = getAdminDriveId()
   const folder = await createFolder({ parentId, folderName: 'CxP_Comprobantes' })
   return folder.id!
 }

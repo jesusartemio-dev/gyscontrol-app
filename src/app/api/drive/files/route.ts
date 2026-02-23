@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { listFiles, uploadFile, getSharedDriveId } from '@/lib/services/googleDrive'
+import { listFiles, uploadFile, getSharedDriveId, getAllowedDriveIds } from '@/lib/services/googleDrive'
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,16 +11,26 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const folderId = searchParams.get('folderId') || getSharedDriveId()
+    const driveId = searchParams.get('driveId') || undefined
+    const folderId = searchParams.get('folderId') || driveId || getSharedDriveId()
     const query = searchParams.get('query') || undefined
     const pageToken = searchParams.get('pageToken') || undefined
     const pageSize = parseInt(searchParams.get('pageSize') || '50', 10)
+
+    // Validar que el driveId es un drive permitido
+    if (driveId) {
+      const allowed = getAllowedDriveIds()
+      if (!allowed.includes(driveId)) {
+        return NextResponse.json({ message: 'Drive no permitido' }, { status: 403 })
+      }
+    }
 
     const result = await listFiles({
       folderId,
       query,
       pageSize,
       pageToken,
+      driveId,
     })
 
     return NextResponse.json(result)

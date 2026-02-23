@@ -186,9 +186,10 @@ export default function Sidebar() {
       title: 'Documentos',
       icon: HardDrive,
       color: 'text-indigo-400',
-      roles: ['admin', 'gerente', 'proyectos', 'coordinador', 'gestor', 'logistico', 'comercial'],
+      roles: ['admin', 'gerente', 'proyectos', 'coordinador', 'gestor', 'logistico', 'comercial', 'administracion'],
       links: [
         { href: '/documentos', label: 'GYS.PROYECTOS', icon: FolderOpen },
+        { href: '/documentos/administracion', label: 'GYS.ADMINISTRACION', icon: Building2 },
       ],
     },
     // 2.1. Mi Trabajo - Registro personal de horas y tareas (para todos)

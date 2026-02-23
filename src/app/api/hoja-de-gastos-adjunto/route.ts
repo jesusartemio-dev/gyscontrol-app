@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { uploadFile, createFolder, getSharedDriveId } from '@/lib/services/googleDrive'
+import { uploadFile, createFolder, getAdminDriveId } from '@/lib/services/googleDrive'
 
 async function getOrCreateDepositoFolder(hojaId: string): Promise<string> {
   const hoja = await prisma.hojaDeGastos.findUnique({
@@ -13,7 +13,7 @@ async function getOrCreateDepositoFolder(hojaId: string): Promise<string> {
     },
   })
 
-  const parentId = getSharedDriveId()
+  const parentId = getAdminDriveId()
   const folderName = hoja?.proyecto
     ? `Depositos_${hoja.proyecto.codigo}`
     : `Depositos_${hoja?.centroCosto?.nombre || hojaId}`

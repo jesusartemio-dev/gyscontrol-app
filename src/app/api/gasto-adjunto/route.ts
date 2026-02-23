@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { uploadFile, createFolder, getSharedDriveId } from '@/lib/services/googleDrive'
+import { uploadFile, createFolder, getAdminDriveId } from '@/lib/services/googleDrive'
 
 // Buscar o crear carpeta de comprobantes
 async function getOrCreateComprobantesFolder(hojaId: string): Promise<string> {
@@ -14,7 +14,7 @@ async function getOrCreateComprobantesFolder(hojaId: string): Promise<string> {
     },
   })
 
-  const parentId = getSharedDriveId()
+  const parentId = getAdminDriveId()
   const folderName = hoja?.proyecto
     ? `Comprobantes_${hoja.proyecto.codigo}`
     : `Comprobantes_${hoja?.centroCosto?.nombre || hojaId}`

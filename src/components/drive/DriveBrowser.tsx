@@ -25,13 +25,14 @@ import { toast } from 'sonner'
 
 interface DriveBrowserProps {
   sharedDriveId?: string
+  driveName?: string
 }
 
-export function DriveBrowser({ sharedDriveId }: DriveBrowserProps) {
+export function DriveBrowser({ sharedDriveId, driveName = 'GYS.PROYECTOS' }: DriveBrowserProps) {
   const rootId = sharedDriveId || ''
   const [currentFolderId, setCurrentFolderId] = useState<string>(rootId)
   const [breadcrumb, setBreadcrumb] = useState<BreadcrumbItem[]>([
-    { id: rootId, name: 'GYS.PROYECTOS' },
+    { id: rootId, name: driveName },
   ])
   const [files, setFiles] = useState<DriveItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -58,6 +59,7 @@ export function DriveBrowser({ sharedDriveId }: DriveBrowserProps) {
       if (folderId) params.set('folderId', folderId)
       if (query) params.set('query', query)
       if (pageToken) params.set('pageToken', pageToken)
+      if (rootId) params.set('driveId', rootId)
 
       const res = await fetch(`/api/drive/files?${params.toString()}`)
       if (!res.ok) throw new Error('Error al cargar archivos')
