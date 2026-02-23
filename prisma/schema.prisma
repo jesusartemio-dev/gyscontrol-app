@@ -1348,6 +1348,7 @@ model User {
   // Hojas de gastos
   hojasComoEmpleado                     HojaDeGastos[]               @relation("HojaEmpleado")
   hojasComoAprobador                    HojaDeGastos[]               @relation("HojaAprobador")
+  hojasEventos                          HojaDeGastosEvento[]         @relation("HojaEventoUsuario")
   // Órdenes de compra
   ordenesCompraSolicitante              OrdenCompra[]                @relation("OCsolicitante")
   ordenesCompraAprobador                OrdenCompra[]                @relation("OCaprobador")
@@ -3062,11 +3063,30 @@ model HojaDeGastos {
   aprobador   User?        @relation("HojaAprobador", fields: [aprobadorId], references: [id])
   lineas      GastoLinea[]
   adjuntos    HojaDeGastosAdjunto[]
+  eventos     HojaDeGastosEvento[]
 
   @@index([proyectoId, estado])
   @@index([centroCostoId, estado])
   @@index([empleadoId, estado])
   @@map("hoja_de_gastos")
+}
+
+model HojaDeGastosEvento {
+  id              String   @id @default(cuid())
+  hojaDeGastosId  String
+  tipo            String   // creado, enviado, aprobado, rechazado, depositado, rendido, validado, cerrado, adjunto_subido
+  descripcion     String
+  estadoAnterior  String?
+  estadoNuevo     String?
+  metadata        Json?
+  usuarioId       String?
+  creadoEn        DateTime @default(now())
+
+  hojaDeGastos HojaDeGastos @relation(fields: [hojaDeGastosId], references: [id], onDelete: Cascade)
+  usuario      User?        @relation("HojaEventoUsuario", fields: [usuarioId], references: [id])
+
+  @@index([hojaDeGastosId])
+  @@map("hoja_de_gastos_evento")
 }
 
 model HojaDeGastosAdjunto {

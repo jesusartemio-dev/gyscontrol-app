@@ -23,29 +23,44 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: 'Solo se puede cerrar desde estado validado' }, { status: 400 })
     }
 
-    const data = await prisma.hojaDeGastos.update({
-      where: { id },
-      data: {
-        estado: 'cerrado',
-        fechaCierre: new Date(),
-        updatedAt: new Date(),
-      },
-    })
-
-    // Recalcular totalRealGastos del proyecto si aplica
-    if (hoja.proyectoId) {
-      const agg = await prisma.hojaDeGastos.aggregate({
-        where: {
-          proyectoId: hoja.proyectoId,
-          estado: { in: ['validado', 'cerrado'] },
+    const data = await prisma.$transaction(async (tx) => {
+      const updated = await tx.hojaDeGastos.update({
+        where: { id },
+        data: {
+          estado: 'cerrado',
+          fechaCierre: new Date(),
+          updatedAt: new Date(),
         },
-        _sum: { montoGastado: true },
       })
-      await prisma.proyecto.update({
-        where: { id: hoja.proyectoId },
-        data: { totalRealGastos: agg._sum.montoGastado || 0 },
+
+      await tx.hojaDeGastosEvento.create({
+        data: {
+          hojaDeGastosId: id,
+          tipo: 'cerrado',
+          descripcion: `Cerrado por ${session.user.name}`,
+          estadoAnterior: 'validado',
+          estadoNuevo: 'cerrado',
+          usuarioId: session.user.id,
+        },
       })
-    }
+
+      // Recalcular totalRealGastos del proyecto si aplica
+      if (hoja.proyectoId) {
+        const agg = await tx.hojaDeGastos.aggregate({
+          where: {
+            proyectoId: hoja.proyectoId,
+            estado: { in: ['validado', 'cerrado'] },
+          },
+          _sum: { montoGastado: true },
+        })
+        await tx.proyecto.update({
+          where: { id: hoja.proyectoId },
+          data: { totalRealGastos: agg._sum.montoGastado || 0 },
+        })
+      }
+
+      return updated
+    })
 
     return NextResponse.json(data)
   } catch (error) {

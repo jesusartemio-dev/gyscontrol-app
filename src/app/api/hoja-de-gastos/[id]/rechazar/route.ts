@@ -33,15 +33,33 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
 
     const payload = await req.json()
+    const comentario = payload.comentario || 'Rechazado'
+    const estadoAnterior = hoja.estado
 
-    const data = await prisma.hojaDeGastos.update({
-      where: { id },
-      data: {
-        estado: 'rechazado',
-        rechazadoEn,
-        comentarioRechazo: payload.comentario || 'Rechazado',
-        updatedAt: new Date(),
-      },
+    const data = await prisma.$transaction(async (tx) => {
+      const updated = await tx.hojaDeGastos.update({
+        where: { id },
+        data: {
+          estado: 'rechazado',
+          rechazadoEn,
+          comentarioRechazo: comentario,
+          updatedAt: new Date(),
+        },
+      })
+
+      await tx.hojaDeGastosEvento.create({
+        data: {
+          hojaDeGastosId: id,
+          tipo: 'rechazado',
+          descripcion: `Rechazado en etapa ${rechazadoEn}: ${comentario}`,
+          estadoAnterior,
+          estadoNuevo: 'rechazado',
+          usuarioId: session.user.id,
+          metadata: { etapa: rechazadoEn, comentario },
+        },
+      })
+
+      return updated
     })
 
     return NextResponse.json(data)

@@ -34,16 +34,33 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // Recalcular montos
     const montoGastado = hoja.lineas.reduce((sum, l) => sum + l.monto, 0)
     const saldo = hoja.montoDepositado - montoGastado
+    const estadoAnterior = hoja.estado
 
-    const data = await prisma.hojaDeGastos.update({
-      where: { id },
-      data: {
-        estado: 'rendido',
-        montoGastado,
-        saldo,
-        fechaRendicion: new Date(),
-        updatedAt: new Date(),
-      },
+    const data = await prisma.$transaction(async (tx) => {
+      const updated = await tx.hojaDeGastos.update({
+        where: { id },
+        data: {
+          estado: 'rendido',
+          montoGastado,
+          saldo,
+          fechaRendicion: new Date(),
+          updatedAt: new Date(),
+        },
+      })
+
+      await tx.hojaDeGastosEvento.create({
+        data: {
+          hojaDeGastosId: id,
+          tipo: 'rendido',
+          descripcion: `Rendicion enviada. Monto gastado: S/ ${montoGastado.toFixed(2)} (${hoja.lineas.length} linea(s))`,
+          estadoAnterior,
+          estadoNuevo: 'rendido',
+          usuarioId: session.user.id,
+          metadata: { montoGastado, saldo, cantidadLineas: hoja.lineas.length },
+        },
+      })
+
+      return updated
     })
 
     return NextResponse.json(data)

@@ -32,6 +32,7 @@ import {
   MessageSquare,
   Upload,
   X,
+  History,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -48,6 +49,7 @@ import { getGastoLineas } from '@/lib/services/gastoLinea'
 import EstadoStepper from '@/components/finanzas/EstadoStepper'
 import ResumenFinanciero from '@/components/finanzas/ResumenFinanciero'
 import GastoLineaTable from '@/components/rendiciones/GastoLineaTable'
+import HojaEventosTimeline from '@/components/finanzas/HojaEventosTimeline'
 import { uploadHojaAdjunto, deleteHojaAdjunto } from '@/lib/services/hojaDeGastosAdjunto'
 import type { HojaDeGastos, GastoLinea, CategoriaGasto, HojaDeGastosAdjunto } from '@/types'
 
@@ -364,6 +366,21 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
           />
         </CardContent>
       </Card>
+
+      {/* Historial del Requerimiento */}
+      {(hoja as any).eventos && (
+        <Card>
+          <CardHeader className="py-3 px-4">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <History className="h-4 w-4 text-muted-foreground" />
+              Historial del Requerimiento
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-4">
+            <HojaEventosTimeline eventos={(hoja as any).eventos} />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Rechazar Dialog */}
       <Dialog open={showRechazo} onOpenChange={setShowRechazo}>

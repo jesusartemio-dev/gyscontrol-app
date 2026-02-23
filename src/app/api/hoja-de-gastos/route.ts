@@ -122,20 +122,34 @@ export async function POST(req: Request) {
 
     const numero = await generarNumero()
 
-    const data = await prisma.hojaDeGastos.create({
-      data: {
-        numero,
-        proyectoId: payload.proyectoId || null,
-        centroCostoId: payload.centroCostoId || null,
-        categoriaCosto: payload.categoriaCosto || 'gastos',
-        empleadoId: payload.empleadoId || session.user.id,
-        motivo: payload.motivo.trim(),
-        observaciones: payload.observaciones || null,
-        requiereAnticipo: payload.requiereAnticipo || false,
-        montoAnticipo: payload.requiereAnticipo ? (payload.montoAnticipo || 0) : 0,
-        updatedAt: new Date(),
-      },
-      include: includeRelations,
+    const data = await prisma.$transaction(async (tx) => {
+      const hoja = await tx.hojaDeGastos.create({
+        data: {
+          numero,
+          proyectoId: payload.proyectoId || null,
+          centroCostoId: payload.centroCostoId || null,
+          categoriaCosto: payload.categoriaCosto || 'gastos',
+          empleadoId: payload.empleadoId || session.user.id,
+          motivo: payload.motivo.trim(),
+          observaciones: payload.observaciones || null,
+          requiereAnticipo: payload.requiereAnticipo || false,
+          montoAnticipo: payload.requiereAnticipo ? (payload.montoAnticipo || 0) : 0,
+          updatedAt: new Date(),
+        },
+        include: includeRelations,
+      })
+
+      await tx.hojaDeGastosEvento.create({
+        data: {
+          hojaDeGastosId: hoja.id,
+          tipo: 'creado',
+          descripcion: `Requerimiento ${numero} creado`,
+          estadoNuevo: 'borrador',
+          usuarioId: session.user.id,
+        },
+      })
+
+      return hoja
     })
 
     return NextResponse.json(data)

@@ -23,14 +23,29 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: 'Solo se puede aprobar desde estado enviado' }, { status: 400 })
     }
 
-    const data = await prisma.hojaDeGastos.update({
-      where: { id },
-      data: {
-        estado: 'aprobado',
-        aprobadorId: session.user.id,
-        fechaAprobacion: new Date(),
-        updatedAt: new Date(),
-      },
+    const data = await prisma.$transaction(async (tx) => {
+      const updated = await tx.hojaDeGastos.update({
+        where: { id },
+        data: {
+          estado: 'aprobado',
+          aprobadorId: session.user.id,
+          fechaAprobacion: new Date(),
+          updatedAt: new Date(),
+        },
+      })
+
+      await tx.hojaDeGastosEvento.create({
+        data: {
+          hojaDeGastosId: id,
+          tipo: 'aprobado',
+          descripcion: `Aprobado por ${session.user.name}`,
+          estadoAnterior: 'enviado',
+          estadoNuevo: 'aprobado',
+          usuarioId: session.user.id,
+        },
+      })
+
+      return updated
     })
 
     return NextResponse.json(data)

@@ -37,29 +37,44 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       }
     }
 
-    const data = await prisma.hojaDeGastos.update({
-      where: { id },
-      data: {
-        estado: 'validado',
-        fechaValidacion: new Date(),
-        updatedAt: new Date(),
-      },
-    })
-
-    // Recalcular totalRealGastos del proyecto si aplica
-    if (hoja.proyectoId) {
-      const agg = await prisma.hojaDeGastos.aggregate({
-        where: {
-          proyectoId: hoja.proyectoId,
-          estado: { in: ['validado', 'cerrado'] },
+    const data = await prisma.$transaction(async (tx) => {
+      const updated = await tx.hojaDeGastos.update({
+        where: { id },
+        data: {
+          estado: 'validado',
+          fechaValidacion: new Date(),
+          updatedAt: new Date(),
         },
-        _sum: { montoGastado: true },
       })
-      await prisma.proyecto.update({
-        where: { id: hoja.proyectoId },
-        data: { totalRealGastos: agg._sum.montoGastado || 0 },
+
+      await tx.hojaDeGastosEvento.create({
+        data: {
+          hojaDeGastosId: id,
+          tipo: 'validado',
+          descripcion: `Validado por ${session.user.name}`,
+          estadoAnterior: 'rendido',
+          estadoNuevo: 'validado',
+          usuarioId: session.user.id,
+        },
       })
-    }
+
+      // Recalcular totalRealGastos del proyecto si aplica
+      if (hoja.proyectoId) {
+        const agg = await tx.hojaDeGastos.aggregate({
+          where: {
+            proyectoId: hoja.proyectoId,
+            estado: { in: ['validado', 'cerrado'] },
+          },
+          _sum: { montoGastado: true },
+        })
+        await tx.proyecto.update({
+          where: { id: hoja.proyectoId },
+          data: { totalRealGastos: agg._sum.montoGastado || 0 },
+        })
+      }
+
+      return updated
+    })
 
     return NextResponse.json(data)
   } catch (error) {

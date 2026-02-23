@@ -29,15 +29,31 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const payload = await req.json()
     const montoDepositado = payload.montoDepositado || hoja.montoAnticipo
 
-    const data = await prisma.hojaDeGastos.update({
-      where: { id },
-      data: {
-        estado: 'depositado',
-        montoDepositado,
-        saldo: montoDepositado - hoja.montoGastado,
-        fechaDeposito: new Date(),
-        updatedAt: new Date(),
-      },
+    const data = await prisma.$transaction(async (tx) => {
+      const updated = await tx.hojaDeGastos.update({
+        where: { id },
+        data: {
+          estado: 'depositado',
+          montoDepositado,
+          saldo: montoDepositado - hoja.montoGastado,
+          fechaDeposito: new Date(),
+          updatedAt: new Date(),
+        },
+      })
+
+      await tx.hojaDeGastosEvento.create({
+        data: {
+          hojaDeGastosId: id,
+          tipo: 'depositado',
+          descripcion: `Deposito registrado: S/ ${montoDepositado.toFixed(2)}`,
+          estadoAnterior: 'aprobado',
+          estadoNuevo: 'depositado',
+          usuarioId: session.user.id,
+          metadata: { monto: montoDepositado, montoAnticipo: hoja.montoAnticipo },
+        },
+      })
+
+      return updated
     })
 
     return NextResponse.json(data)

@@ -13,6 +13,10 @@ const includeRelations = {
     orderBy: { fecha: 'asc' as const },
   },
   adjuntos: { orderBy: { createdAt: 'asc' as const } },
+  eventos: {
+    include: { usuario: { select: { id: true, name: true } } },
+    orderBy: { creadoEn: 'asc' as const },
+  },
 }
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {

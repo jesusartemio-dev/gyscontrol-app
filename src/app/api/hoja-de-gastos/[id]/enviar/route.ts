@@ -19,15 +19,32 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: 'Solo se puede enviar desde borrador o rechazado' }, { status: 400 })
     }
 
-    const data = await prisma.hojaDeGastos.update({
-      where: { id },
-      data: {
-        estado: 'enviado',
-        fechaEnvio: new Date(),
-        comentarioRechazo: null,
-        rechazadoEn: null,
-        updatedAt: new Date(),
-      },
+    const estadoAnterior = hoja.estado
+
+    const data = await prisma.$transaction(async (tx) => {
+      const updated = await tx.hojaDeGastos.update({
+        where: { id },
+        data: {
+          estado: 'enviado',
+          fechaEnvio: new Date(),
+          comentarioRechazo: null,
+          rechazadoEn: null,
+          updatedAt: new Date(),
+        },
+      })
+
+      await tx.hojaDeGastosEvento.create({
+        data: {
+          hojaDeGastosId: id,
+          tipo: 'enviado',
+          descripcion: 'Enviado para aprobacion',
+          estadoAnterior,
+          estadoNuevo: 'enviado',
+          usuarioId: session.user.id,
+        },
+      })
+
+      return updated
     })
 
     return NextResponse.json(data)
