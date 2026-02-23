@@ -32,6 +32,12 @@ import {
 } from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils'
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import {
   ArrowLeft,
   Package,
   Calendar,
@@ -53,6 +59,7 @@ import {
   Activity,
   ShoppingCart,
   RefreshCw,
+  Wrench,
 } from 'lucide-react'
 import Link from 'next/link'
 import type { Proyecto, PedidoEquipo } from '@/types'
@@ -592,12 +599,35 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
                         {item.cantidadAtendida || 0}
                       </td>
                       <td className="px-3 py-2 text-center">
-                        <Badge
-                          variant="outline"
-                          className={cn('text-[10px] px-1.5 py-0', getEstadoBadge(item.estado))}
-                        >
-                          {item.estado}
-                        </Badge>
+                        {(item as any).tipoItem === 'servicio' && (item as any).estadoEntrega === 'entregado' ? (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge className="text-[10px] px-1.5 py-0 bg-purple-100 text-purple-700 hover:bg-purple-100 border-purple-200">
+                                  <Wrench className="h-2.5 w-2.5 mr-0.5" />
+                                  Ejecutado
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-xs">
+                                  Servicio ejecutado{(item as any).fechaEntregaReal ? ` el ${formatDate((item as any).fechaEntregaReal)}` : ''}
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        ) : (item as any).tipoItem === 'servicio' && (!item.estado || item.estado === 'pendiente') ? (
+                          <Badge className="text-[10px] px-1.5 py-0 bg-purple-50 text-purple-600 hover:bg-purple-50 border-purple-200">
+                            <Clock className="h-2.5 w-2.5 mr-0.5" />
+                            Pend. ejecución
+                          </Badge>
+                        ) : (
+                          <Badge
+                            variant="outline"
+                            className={cn('text-[10px] px-1.5 py-0', getEstadoBadge(item.estado))}
+                          >
+                            {item.estado}
+                          </Badge>
+                        )}
                       </td>
                       <td className="px-3 py-2 text-center">
                         {(() => {

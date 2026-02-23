@@ -333,9 +333,13 @@ export default function PedidoLogisticaDetailPage() {
       }
     }
 
-    // Validación servicio: requiere fecha
+    // Validación servicio: requiere fecha y costo
     if (esServicio && !editingItem.fechaEntregaReal) {
       toast.error('Debe indicar la fecha de ejecución del servicio')
+      return
+    }
+    if (esServicio && (!editingItem.precioUnitario || parseFloat(editingItem.precioUnitario) <= 0)) {
+      toast.error('Debe indicar el costo del servicio')
       return
     }
 
@@ -1667,6 +1671,36 @@ export default function PedidoLogisticaDetailPage() {
                         />
                       </div>
                       <div>
+                        <label className="text-xs font-medium mb-1 block text-purple-700">
+                          Costo del servicio {!editingItem.precioUnitario && !editingItem.item?.precioUnitario ? '*' : ''}
+                          {!editingItem.precioUnitario && !editingItem.item?.precioUnitario && (
+                            <span className="ml-1 text-[10px] text-amber-600 font-normal">(sin costo registrado)</span>
+                          )}
+                        </label>
+                        <div className={cn(
+                          'flex items-center gap-2 rounded-md border px-3 py-1.5',
+                          !editingItem.precioUnitario && !editingItem.item?.precioUnitario
+                            ? 'border-amber-300 bg-amber-50'
+                            : 'border-purple-200 bg-white'
+                        )}>
+                          <span className="text-xs text-muted-foreground">$</span>
+                          <Input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            value={editingItem.precioUnitario}
+                            onChange={(e) => setEditingItem(prev => ({ ...prev, precioUnitario: e.target.value }))}
+                            placeholder="0.00"
+                            className="h-7 text-sm font-medium border-0 p-0 focus-visible:ring-0 shadow-none"
+                          />
+                          <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                            × 1 global = <span className="font-medium text-emerald-600">
+                              ${(parseFloat(editingItem.precioUnitario) || 0).toFixed(2)}
+                            </span>
+                          </span>
+                        </div>
+                      </div>
+                      <div>
                         <label className="text-xs font-medium mb-1 block text-purple-700">Observaciones</label>
                         <textarea
                           value={editingItem.observacionesEntrega}
@@ -1697,7 +1731,7 @@ export default function PedidoLogisticaDetailPage() {
                       <Button
                         size="sm"
                         onClick={saveItemEdit}
-                        disabled={updating || !editingItem.fechaEntregaReal}
+                        disabled={updating || !editingItem.fechaEntregaReal || !editingItem.precioUnitario || parseFloat(editingItem.precioUnitario) <= 0}
                         className="h-8 text-xs bg-purple-600 hover:bg-purple-700"
                       >
                         <Wrench className="h-3 w-3 mr-1" />
