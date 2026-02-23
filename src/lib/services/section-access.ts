@@ -6,6 +6,11 @@
 import { prisma } from '@/lib/prisma'
 import { DEFAULT_ROLE_SECTIONS, SECTION_KEYS, type RoleKey, type SectionKey } from '@/lib/config/sections'
 
+// Mapa de renombramientos de secciones para migrar registros viejos en BD
+const SECTION_KEY_RENAMES: Record<string, SectionKey> = {
+  finanzas: 'gastos',
+}
+
 // Obtener secciones accesibles para un rol
 export async function getSectionAccessForRole(role: string): Promise<string[]> {
   try {
@@ -81,8 +86,43 @@ export function getSectionAccessFallback(role: RoleKey): string[] {
   return DEFAULT_ROLE_SECTIONS[role] || ['mi-trabajo']
 }
 
+// Migrar registros con sectionKey renombrado (ej. 'finanzas' → 'gastos')
+async function migrateRenamedSections(): Promise<void> {
+  for (const [oldKey, newKey] of Object.entries(SECTION_KEY_RENAMES)) {
+    const oldRecords = await (prisma as any).roleSectionAccess.findMany({
+      where: { sectionKey: oldKey },
+    })
+
+    for (const record of oldRecords) {
+      const newExists = await (prisma as any).roleSectionAccess.findUnique({
+        where: { role_sectionKey: { role: record.role, sectionKey: newKey } },
+      })
+
+      if (!newExists) {
+        // Crear registro con la nueva key preservando hasAccess
+        await (prisma as any).roleSectionAccess.create({
+          data: {
+            role: record.role,
+            sectionKey: newKey,
+            hasAccess: record.hasAccess,
+            updatedBy: record.updatedBy,
+          },
+        })
+      }
+
+      // Eliminar registro viejo
+      await (prisma as any).roleSectionAccess.delete({
+        where: { id: record.id },
+      })
+    }
+  }
+}
+
 // Inicializar todos los registros en BD desde los defaults
 export async function seedSectionAccess(): Promise<void> {
+  // Primero migrar secciones renombradas
+  await migrateRenamedSections()
+
   const allRoles = Object.keys(DEFAULT_ROLE_SECTIONS) as RoleKey[]
 
   for (const role of allRoles) {
