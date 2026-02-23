@@ -44,6 +44,7 @@ export interface SidebarLink {
   icon: any // Lucide icon component
   badge?: NotificationBadgeType
   submenu?: SidebarLink[] // ✅ Submenú opcional para enlaces anidados
+  roles?: RolUsuario[] // Filtro por rol a nivel de link individual
 }
 
 // ✅ Tipo para secciones del sidebar

@@ -36,9 +36,9 @@ import type { HojaDeGastos } from '@/types'
 type TabFilter = 'todas' | 'enviado' | 'aprobado' | 'rendido' | 'validado' | 'cerrado' | 'rechazado'
 
 const TABS: { key: TabFilter; label: string }[] = [
+  { key: 'aprobado', label: 'Por Depositar' },
   { key: 'todas', label: 'Todas' },
   { key: 'enviado', label: 'Por Aprobar' },
-  { key: 'aprobado', label: 'Aprobados' },
   { key: 'rendido', label: 'Rendidos' },
   { key: 'validado', label: 'Validados' },
   { key: 'cerrado', label: 'Cerrados' },
@@ -86,7 +86,7 @@ export default function GestionGastosPage() {
 function GestionGastosContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const initialTab = (searchParams.get('estado') as TabFilter) || 'todas'
+  const initialTab = (searchParams.get('estado') as TabFilter) || 'aprobado'
 
   const [hojas, setHojas] = useState<HojaDeGastos[]>([])
   const [loading, setLoading] = useState(true)
@@ -219,6 +219,9 @@ function GestionGastosContent() {
     // Exclude borradores from admin view
     if (tab === 'todas') {
       result = result.filter(h => h.estado !== 'borrador')
+    } else if (tab === 'aprobado') {
+      // "Por Depositar": solo aprobados que requieren anticipo
+      result = result.filter(h => h.estado === 'aprobado' && h.requiereAnticipo)
     } else {
       result = result.filter(h => h.estado === tab)
     }
@@ -326,7 +329,7 @@ function GestionGastosContent() {
     <div
       key={hoja.id}
       className="border-b last:border-b-0 px-4 py-3 hover:bg-muted/50 cursor-pointer"
-      onClick={() => router.push(`/finanzas/requerimientos/${hoja.id}`)}
+      onClick={() => router.push(`/gastos/mis-requerimientos/${hoja.id}`)}
     >
       <div className="flex items-start justify-between gap-2 mb-1.5">
         <div className="min-w-0 flex-1">
@@ -467,7 +470,7 @@ function GestionGastosContent() {
                       <TableRow
                         key={hoja.id}
                         className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => router.push(`/finanzas/requerimientos/${hoja.id}`)}
+                        onClick={() => router.push(`/gastos/mis-requerimientos/${hoja.id}`)}
                       >
                         <TableCell className="font-mono text-sm font-medium">{hoja.numero}</TableCell>
                         <TableCell className="text-sm max-w-[130px] truncate">

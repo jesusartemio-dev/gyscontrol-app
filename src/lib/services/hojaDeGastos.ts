@@ -7,12 +7,14 @@ export async function getHojasDeGastos(params?: {
   proyectoId?: string
   estado?: string
   empleadoId?: string
+  scope?: string
 }): Promise<HojaDeGastos[]> {
   const searchParams = new URLSearchParams()
   if (params?.centroCostoId) searchParams.set('centroCostoId', params.centroCostoId)
   if (params?.proyectoId) searchParams.set('proyectoId', params.proyectoId)
   if (params?.estado) searchParams.set('estado', params.estado)
   if (params?.empleadoId) searchParams.set('empleadoId', params.empleadoId)
+  if (params?.scope) searchParams.set('scope', params.scope)
   const query = searchParams.toString()
   const res = await fetch(`${BASE_URL}${query ? `?${query}` : ''}`)
   if (!res.ok) {

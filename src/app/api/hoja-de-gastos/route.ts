@@ -47,6 +47,7 @@ export async function GET(req: Request) {
     const proyectoId = searchParams.get('proyectoId')
     const estado = searchParams.get('estado')
     const empleadoId = searchParams.get('empleadoId')
+    const scope = searchParams.get('scope')
 
     const where: any = {}
     if (centroCostoId) where.centroCostoId = centroCostoId
@@ -54,17 +55,21 @@ export async function GET(req: Request) {
     if (estado) where.estado = estado
     if (empleadoId) where.empleadoId = empleadoId
 
-    // Filtrar por permisos
-    const role = session.user.role
-    if (!['admin', 'gerente', 'administracion'].includes(role)) {
-      where.OR = [
-        { empleadoId: session.user.id },
-        // Hojas de proyecto: visible si eres gestor/supervisor/lider
-        { proyecto: { gestorId: session.user.id } },
-        { proyecto: { supervisorId: session.user.id } },
-        { proyecto: { liderId: session.user.id } },
-        // Hojas de centro de costo: visible si eres el empleado (ya cubierto arriba)
-      ]
+    // scope=propios: solo hojas del usuario actual (ignora filtro de roles)
+    if (scope === 'propios') {
+      where.empleadoId = session.user.id
+    } else {
+      // Filtrar por permisos
+      const role = session.user.role
+      if (!['admin', 'gerente', 'administracion'].includes(role)) {
+        where.OR = [
+          { empleadoId: session.user.id },
+          // Hojas de proyecto: visible si eres gestor/supervisor/lider
+          { proyecto: { gestorId: session.user.id } },
+          { proyecto: { supervisorId: session.user.id } },
+          { proyecto: { liderId: session.user.id } },
+        ]
+      }
     }
 
     const data = await prisma.hojaDeGastos.findMany({

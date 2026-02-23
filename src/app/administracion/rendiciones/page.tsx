@@ -380,7 +380,7 @@ export default function RendicionesPage() {
                         variant="outline"
                         size="sm"
                         className="text-xs"
-                        onClick={() => router.push(`/finanzas/requerimientos/${hoja.id}`)}
+                        onClick={() => router.push(`/gastos/mis-requerimientos/${hoja.id}`)}
                       >
                         Ver detalle completo
                       </Button>

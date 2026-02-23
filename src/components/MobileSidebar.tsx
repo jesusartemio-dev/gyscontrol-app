@@ -56,6 +56,7 @@ import {
   ArrowDownCircle,
   ArrowUpCircle,
   Landmark,
+  CheckCircle2,
 } from 'lucide-react'
 import type { RolUsuario, SidebarSection, NotificationBadgeType } from '@/types/modelos'
 
@@ -171,6 +172,7 @@ export default function MobileSidebar() {
         { href: '/supervision/listas-equipo', label: 'Listas Equipo', icon: ClipboardList },
         { href: '/supervision/resumen', label: 'Resumen Proyectos', icon: BarChart3 },
         { href: '/supervision/analisis-edt', label: 'Análisis EDT', icon: Target },
+        { href: '/supervision/gastos', label: 'Aprobar Requerimientos', icon: CheckCircle2, roles: ['admin', 'gerente', 'gestor', 'coordinador'] as any },
       ]
     },
     {
@@ -203,13 +205,13 @@ export default function MobileSidebar() {
       ],
     },
     {
-      key: 'finanzas',
-      title: 'Mis Gastos',
+      key: 'gastos',
+      title: 'Gastos',
       icon: Receipt,
       color: 'text-amber-400',
       roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos', 'colaborador', 'logistico', 'administracion'],
       links: [
-        { href: '/finanzas/requerimientos', label: 'Mis Requerimientos', icon: CreditCard },
+        { href: '/gastos/mis-requerimientos', label: 'Mis Requerimientos', icon: CreditCard },
       ],
     },
     {
@@ -292,6 +294,9 @@ export default function MobileSidebar() {
       ...section,
       links: section.links.filter(link => {
         if (link.href === '/admin/actividad' && role !== 'admin') {
+          return false
+        }
+        if (link.roles && role && !(link.roles as string[]).includes(role)) {
           return false
         }
         return true

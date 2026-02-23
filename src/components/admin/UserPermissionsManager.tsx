@@ -232,13 +232,13 @@ const SIDEBAR_ACCESS_MAP: SidebarAccessSection[] = [
     ],
   },
   {
-    key: 'finanzas',
-    title: 'Mis Gastos',
+    key: 'gastos',
+    title: 'Gastos',
     icon: Receipt,
     color: 'text-amber-500',
     roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos', 'colaborador', 'logistico', 'administracion'],
     links: [
-      { label: 'Mis Requerimientos', href: '/finanzas/requerimientos' },
+      { label: 'Mis Requerimientos', href: '/gastos/mis-requerimientos' },
     ],
   },
   {

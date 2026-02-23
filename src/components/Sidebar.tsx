@@ -54,6 +54,7 @@ import {
   ArrowDownCircle,
   ArrowUpCircle,
   Landmark,
+  CheckCircle2,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -79,7 +80,7 @@ export default function Sidebar() {
     supervision: false,
     logistica: false,
     aprovisionamiento: false,
-    finanzas: false,
+    gastos: false,
     administracion: false,
     gestion: false,
   })
@@ -222,6 +223,7 @@ export default function Sidebar() {
         { href: '/supervision/listas-equipo', label: 'Listas Equipo', icon: ClipboardList },
         { href: '/supervision/resumen', label: 'Resumen Proyectos', icon: BarChart3 },
         { href: '/supervision/analisis-edt', label: 'Análisis EDT', icon: Target },
+        { href: '/supervision/gastos', label: 'Aprobar Requerimientos', icon: CheckCircle2, roles: ['admin', 'gerente', 'gestor', 'coordinador'] as any },
       ]
     },
     // 3. Logística - Gestión completa de la cadena logística
@@ -255,15 +257,15 @@ export default function Sidebar() {
         { href: '/finanzas/aprovisionamiento/timeline', label: 'Timeline', icon: Clock },
       ],
     },
-    // 4.1. Mis Gastos - Requerimientos de dinero
+    // 4.1. Gastos - Requerimientos de dinero
     {
-      key: 'finanzas',
-      title: 'Mis Gastos',
+      key: 'gastos',
+      title: 'Gastos',
       icon: Receipt,
       color: 'text-amber-400',
       roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos', 'colaborador', 'logistico', 'administracion'],
       links: [
-        { href: '/finanzas/requerimientos', label: 'Mis Requerimientos', icon: CreditCard },
+        { href: '/gastos/mis-requerimientos', label: 'Mis Requerimientos', icon: CreditCard },
       ],
     },
     // 4.2. Administración - Gestión financiera y administrativa
@@ -364,6 +366,10 @@ export default function Sidebar() {
       links: section.links.filter(link => {
         // Filtrar links específicos por rol
         if (link.href === '/admin/actividad' && role !== 'admin') {
+          return false
+        }
+        // Per-link role filtering
+        if (link.roles && role && !(link.roles as string[]).includes(role)) {
           return false
         }
         return true

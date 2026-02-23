@@ -443,7 +443,7 @@ export default function AdministracionDashboard() {
                   <div
                     key={hoja.id}
                     className="flex items-center gap-3 px-4 py-3 hover:bg-muted/50 cursor-pointer transition-colors"
-                    onClick={() => router.push(`/finanzas/requerimientos/${hoja.id}`)}
+                    onClick={() => router.push(`/gastos/mis-requerimientos/${hoja.id}`)}
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-0.5">
