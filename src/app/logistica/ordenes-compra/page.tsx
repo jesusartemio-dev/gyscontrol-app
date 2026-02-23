@@ -237,6 +237,7 @@ export default function OrdenesCompraPage() {
                   <TableHead>Asignado a</TableHead>
                   <TableHead>Categoría</TableHead>
                   <TableHead>Estado</TableHead>
+                  <TableHead>Factura</TableHead>
                   <TableHead>Items</TableHead>
                   <TableHead className="text-right">Total</TableHead>
                   <TableHead>Fecha</TableHead>
@@ -264,6 +265,14 @@ export default function OrdenesCompraPage() {
                       <Badge className={`text-xs ${estadoColor[oc.estado] || ''}`}>
                         {oc.estado}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {(() => {
+                        const cxp = (oc as any).cuentasPorPagar?.[0]
+                        if (!cxp) return <span className="text-[10px] text-gray-400">Sin factura</span>
+                        if (cxp.numeroFactura) return <Badge className="text-[10px] bg-green-100 text-green-700">{cxp.estado === 'pagada' ? 'Pagada' : 'Facturada'}</Badge>
+                        return <Badge className="text-[10px] bg-yellow-100 text-yellow-700">CxP sin factura</Badge>
+                      })()}
                     </TableCell>
                     <TableCell className="text-center text-sm">{oc.items?.length || 0}</TableCell>
                     <TableCell className="text-right font-mono text-sm">

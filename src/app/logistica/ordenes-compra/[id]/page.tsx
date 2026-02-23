@@ -397,7 +397,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
         </div>
       </div>
 
-      {/* Pedido origen */}
+      {/* Pedido origen + Estado de pago */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs px-1">
         {(oc as any).pedidoEquipo ? (
           <>
@@ -415,6 +415,26 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
         ) : (
           <span className="text-muted-foreground">OC manual — sin pedido vinculado</span>
         )}
+        {/* Estado de pago */}
+        {(() => {
+          const cxp = ((oc as any).cuentasPorPagar || [])[0]
+          if (!cxp) return <span className="text-muted-foreground border-l pl-4">Sin factura registrada</span>
+          return (
+            <Link
+              href="/administracion/cuentas-pagar"
+              className="border-l pl-4 flex items-center gap-1 hover:underline"
+            >
+              <CreditCard className="h-3 w-3 text-gray-400" />
+              <span>Factura: <strong>{cxp.numeroFactura || '—'}</strong></span>
+              <span className="text-muted-foreground">—</span>
+              {cxp.estado === 'pagada' ? (
+                <span className="text-green-600 font-medium flex items-center gap-0.5">Pagada <CheckCircle className="h-3 w-3" /></span>
+              ) : (
+                <span className="text-amber-600">Pendiente de pago</span>
+              )}
+            </Link>
+          )
+        })()}
       </div>
 
       {/* Delivery Info */}

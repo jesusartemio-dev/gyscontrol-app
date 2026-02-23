@@ -34,6 +34,16 @@ const includeRelations = {
   items: {
     orderBy: { createdAt: 'asc' as const },
   },
+  cuentasPorPagar: {
+    where: { estado: { not: 'anulada' as const } },
+    select: {
+      id: true,
+      numeroFactura: true,
+      estado: true,
+    },
+    take: 1,
+    orderBy: { createdAt: 'desc' as const },
+  },
 }
 
 export async function GET(req: Request) {
