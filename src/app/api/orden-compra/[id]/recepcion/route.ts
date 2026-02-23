@@ -54,11 +54,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       const cantidadEfectiva = Math.min(rec.cantidadRecibida, item.cantidad)
       if (cantidadEfectiva <= 0) continue
 
-      // Evitar duplicados: no crear si ya existe una pendiente para este OC item
+      // Evitar duplicados: no crear si ya existe una para este OC item en estado activo
       const existente = await prisma.recepcionPendiente.findFirst({
         where: {
           ordenCompraItemId: item.id,
-          estado: 'pendiente',
+          estado: { in: ['pendiente', 'en_almacen'] },
         }
       })
       if (existente) continue
