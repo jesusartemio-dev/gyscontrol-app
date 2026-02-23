@@ -330,77 +330,33 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
         )}
       </div>
 
-      {/* Info Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Proveedor */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-muted-foreground" />
-              Proveedor
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm space-y-1">
-            <div className="font-medium">{oc.proveedor?.nombre}</div>
-            {oc.proveedor?.ruc && <div className="text-muted-foreground">RUC: {oc.proveedor.ruc}</div>}
-            {oc.proveedor?.direccion && <div className="text-muted-foreground">{oc.proveedor.direccion}</div>}
-            {oc.proveedor?.contactoNombre && <div className="text-muted-foreground">Contacto: {oc.proveedor.contactoNombre}</div>}
-            {oc.proveedor?.contactoTelefono && <div className="text-muted-foreground">Tel: {oc.proveedor.contactoTelefono}</div>}
-            {oc.proveedor?.banco && (
-              <div className="text-muted-foreground">
-                Banco: {oc.proveedor.banco} | Cta: {oc.proveedor.numeroCuenta}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+      {/* Info compacta: Proveedor + Montos */}
+      <div className="bg-white border rounded-lg px-4 py-3">
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-x-6 gap-y-2">
+          {/* Proveedor — inline */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+            <div className="flex items-center gap-1.5">
+              <Building2 className="h-3.5 w-3.5 text-gray-400" />
+              <span className="font-medium">{oc.proveedor?.nombre}</span>
+            </div>
+            {oc.proveedor?.ruc && <span className="text-muted-foreground">RUC: {oc.proveedor.ruc}</span>}
+            {oc.proveedor?.contactoNombre && <span className="text-muted-foreground">Contacto: {oc.proveedor.contactoNombre}</span>}
+            {oc.proveedor?.contactoTelefono && <span className="text-muted-foreground">Tel: {oc.proveedor.contactoTelefono}</span>}
+            {oc.proveedor?.banco && <span className="text-muted-foreground">Banco: {oc.proveedor.banco} | Cta: {oc.proveedor.numeroCuenta}</span>}
+          </div>
 
-        {/* Montos & Condiciones */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <CreditCard className="h-4 w-4 text-muted-foreground" />
-              Montos y Condiciones
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm space-y-1">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Subtotal:</span>
-              <span className="font-mono">{formatCurrency(oc.subtotal, oc.moneda)}</span>
-            </div>
+          {/* Montos — compacto a la derecha */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs md:justify-end">
+            <span className="text-muted-foreground">Subtotal: <span className="font-mono text-foreground">{formatCurrency(oc.subtotal, oc.moneda)}</span></span>
             {oc.moneda !== 'USD' && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">IGV (18%):</span>
-                <span className="font-mono">{formatCurrency(oc.igv, oc.moneda)}</span>
-              </div>
+              <span className="text-muted-foreground">IGV: <span className="font-mono text-foreground">{formatCurrency(oc.igv, oc.moneda)}</span></span>
             )}
-            <div className="flex justify-between font-bold border-t pt-1">
-              <span>Total:</span>
-              <span className="font-mono">{formatCurrency(oc.total, oc.moneda)}</span>
-            </div>
-            <div className="border-t pt-1 mt-1 space-y-0.5">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Condición:</span>
-                <span>{displayCondicionPago(oc.condicionPago, oc.diasCredito)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Moneda:</span>
-                <span>{oc.moneda}</span>
-              </div>
-              {oc.centroCosto && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Centro de Costo:</span>
-                  <span>{oc.centroCosto.nombre}</span>
-                </div>
-              )}
-              {oc.proyecto && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Proyecto:</span>
-                  <span>{oc.proyecto.codigo} - {oc.proyecto.nombre}</span>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+            <span className="font-semibold">Total: <span className="font-mono">{formatCurrency(oc.total, oc.moneda)}</span></span>
+            <span className="text-muted-foreground border-l pl-4">{displayCondicionPago(oc.condicionPago, oc.diasCredito)} · {oc.moneda}</span>
+            {oc.centroCosto && <span className="text-muted-foreground">CC: {oc.centroCosto.nombre}</span>}
+            {oc.proyecto && <span className="text-muted-foreground">{oc.proyecto.codigo}</span>}
+          </div>
+        </div>
       </div>
 
       {/* Delivery Info */}
