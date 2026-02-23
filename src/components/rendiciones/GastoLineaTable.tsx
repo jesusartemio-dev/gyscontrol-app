@@ -51,6 +51,7 @@ interface GastoLineaTableProps {
   categorias: CategoriaGasto[]
   editable: boolean
   onChanged: () => void
+  showConformidad?: boolean
 }
 
 export default function GastoLineaTable({
@@ -59,6 +60,7 @@ export default function GastoLineaTable({
   categorias,
   editable,
   onChanged,
+  showConformidad = false,
 }: GastoLineaTableProps) {
   const [showForm, setShowForm] = useState(false)
   const [editLinea, setEditLinea] = useState<GastoLinea | null>(null)
@@ -457,6 +459,7 @@ export default function GastoLineaTable({
         categorias={categorias}
         editable={editable}
         onChanged={onChanged}
+        showConformidad={showConformidad}
       />
     </div>
   )

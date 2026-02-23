@@ -185,7 +185,9 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
   const canAprobar = hoja.estado === 'enviado' && ['admin', 'gerente', 'gestor', 'coordinador', 'administracion'].includes(role || '')
   const canDepositar = hoja.estado === 'aprobado' && hoja.requiereAnticipo && ['admin', 'gerente', 'administracion'].includes(role || '')
   const canRendir = (hoja.estado === 'aprobado' && !hoja.requiereAnticipo) || hoja.estado === 'depositado'
-  const canValidar = hoja.estado === 'rendido' && ['admin', 'gerente', 'administracion'].includes(role || '')
+  const canValidarLineas = hoja.estado === 'rendido' && ['admin', 'gerente', 'administracion'].includes(role || '')
+  const allLineasConforme = lineas.length > 0 && lineas.every(l => l.conformidad === 'conforme')
+  const canValidar = canValidarLineas && allLineasConforme
   const canCerrar = hoja.estado === 'validado' && ['admin', 'gerente', 'coordinador', 'administracion'].includes(role || '')
   const canRechazar = ['enviado', 'rendido', 'validado'].includes(hoja.estado) && ['admin', 'gerente', 'gestor', 'coordinador', 'administracion'].includes(role || '')
 
@@ -304,7 +306,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
       </Card>
 
       {/* Actions */}
-      {(canEnviar || canAprobar || canDepositar || canRendir || canValidar || canCerrar || canRechazar) && (
+      {(canEnviar || canAprobar || canDepositar || canRendir || canValidarLineas || canCerrar || canRechazar) && (
         <Card>
           <CardContent className="p-3 flex flex-wrap gap-2">
             {canEnviar && (
@@ -331,11 +333,18 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
                 Rendir gastos
               </Button>
             )}
-            {canValidar && (
-              <Button size="sm" onClick={handleValidar} disabled={actionLoading} className="bg-teal-600 hover:bg-teal-700">
-                <CheckCircle className="h-3.5 w-3.5 mr-1" />
-                Validar rendición
-              </Button>
+            {canValidarLineas && (
+              <div className="flex items-center gap-1.5">
+                <Button size="sm" onClick={handleValidar} disabled={actionLoading || !allLineasConforme} className="bg-teal-600 hover:bg-teal-700" title={!allLineasConforme ? 'Todas las líneas deben estar conformes para validar' : undefined}>
+                  <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                  Validar rendición
+                </Button>
+                {!allLineasConforme && (
+                  <span className="text-xs text-amber-600">
+                    {lineas.filter(l => l.conformidad !== 'conforme').length} línea{lineas.filter(l => l.conformidad !== 'conforme').length !== 1 ? 's' : ''} pendiente{lineas.filter(l => l.conformidad !== 'conforme').length !== 1 ? 's' : ''}
+                  </span>
+                )}
+              </div>
             )}
             {canCerrar && (
               <Button size="sm" onClick={handleCerrar} disabled={actionLoading} className="bg-green-700 hover:bg-green-800">
@@ -363,6 +372,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
             categorias={categorias}
             editable={isEditable}
             onChanged={loadData}
+            showConformidad={canValidarLineas}
           />
         </CardContent>
       </Card>
