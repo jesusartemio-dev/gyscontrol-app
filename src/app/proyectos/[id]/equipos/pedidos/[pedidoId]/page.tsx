@@ -60,6 +60,8 @@ import {
   ShoppingCart,
   RefreshCw,
   Wrench,
+  List,
+  ExternalLink,
 } from 'lucide-react'
 import Link from 'next/link'
 import type { Proyecto, PedidoEquipo } from '@/types'
@@ -492,7 +494,7 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
 
         {/* Info del pedido */}
         <div className="bg-white rounded-lg border p-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-xs">
             <div className="flex items-center gap-2">
               <User className="h-3.5 w-3.5 text-gray-400" />
               <div>
@@ -521,6 +523,21 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
                 <p className="font-medium">{pedido.fechaEntregaEstimada ? formatDate(pedido.fechaEntregaEstimada) : '—'}</p>
               </div>
             </div>
+            {(pedido as any).lista && (
+              <div className="flex items-center gap-2">
+                <List className="h-3.5 w-3.5 text-gray-400" />
+                <div>
+                  <span className="text-muted-foreground">Lista Origen</span>
+                  <Link
+                    href={`/proyectos/${proyectoId}/equipos/listas/${(pedido as any).lista.id}`}
+                    className="font-medium text-blue-600 hover:underline flex items-center gap-1"
+                  >
+                    {(pedido as any).lista.codigo || (pedido as any).lista.nombre}
+                    <ExternalLink className="h-2.5 w-2.5" />
+                  </Link>
+                </div>
+              </div>
+            )}
           </div>
 
           {pedido.observacion && (

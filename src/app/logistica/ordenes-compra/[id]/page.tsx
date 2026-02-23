@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { ArrowLeft, Loader2, CheckCircle, Send, Package, XCircle, FileDown, Building2, CreditCard, MapPin, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Loader2, CheckCircle, Send, Package, XCircle, FileDown, Building2, CreditCard, MapPin, AlertTriangle, ShoppingCart } from 'lucide-react'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -357,6 +357,26 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
             {oc.proyecto && <span className="text-muted-foreground">{oc.proyecto.codigo}</span>}
           </div>
         </div>
+      </div>
+
+      {/* Pedido origen */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs px-1">
+        {(oc as any).pedidoEquipo ? (
+          <>
+            <Link
+              href={`/logistica/pedidos/${(oc as any).pedidoEquipo.id}`}
+              className="flex items-center gap-1 text-blue-600 hover:underline font-medium"
+            >
+              <ShoppingCart className="h-3 w-3" />
+              Pedido: {(oc as any).pedidoEquipo.codigo}
+            </Link>
+            {oc.proyecto && (
+              <span className="text-muted-foreground">Proyecto: {oc.proyecto.codigo} — {oc.proyecto.nombre}</span>
+            )}
+          </>
+        ) : (
+          <span className="text-muted-foreground">OC manual — sin pedido vinculado</span>
+        )}
       </div>
 
       {/* Delivery Info */}
