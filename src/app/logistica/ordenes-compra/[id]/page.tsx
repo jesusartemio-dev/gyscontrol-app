@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { ArrowLeft, Loader2, CheckCircle, Send, Package, XCircle, FileDown, Building2, CreditCard, MapPin, AlertTriangle, ShoppingCart } from 'lucide-react'
+import { ArrowLeft, Loader2, CheckCircle, Send, Package, XCircle, FileDown, Building2, CreditCard, MapPin, AlertTriangle, ShoppingCart, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -66,6 +66,10 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
     observaciones: '',
   })
   const [savingFactura, setSavingFactura] = useState(false)
+  const [inlineEdit, setInlineEdit] = useState<{ itemId: string; field: 'precioUnitario' | 'cantidad'; value: string } | null>(null)
+  const [savingInline, setSavingInline] = useState(false)
+
+  const esBorrador = oc?.estado === 'borrador'
 
   useEffect(() => { loadData() }, [id])
 
@@ -80,6 +84,40 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
       setLoading(false)
     }
   }
+
+  const startInlineEdit = (itemId: string, field: 'precioUnitario' | 'cantidad', currentValue: number) => {
+    if (!esBorrador) return
+    setInlineEdit({ itemId, field, value: String(currentValue) })
+  }
+
+  const saveInlineEdit = async () => {
+    if (!inlineEdit || !oc) return
+    const numVal = parseFloat(inlineEdit.value)
+    if (isNaN(numVal) || (inlineEdit.field === 'cantidad' && numVal <= 0) || (inlineEdit.field === 'precioUnitario' && numVal < 0)) {
+      toast.error(inlineEdit.field === 'cantidad' ? 'Cantidad debe ser mayor a 0' : 'Precio no puede ser negativo')
+      return
+    }
+    setSavingInline(true)
+    try {
+      const res = await fetch(`/api/orden-compra-item/${inlineEdit.itemId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [inlineEdit.field]: numVal }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Error al guardar')
+      }
+      setInlineEdit(null)
+      await loadData()
+    } catch (err: any) {
+      toast.error(err.message || 'Error al actualizar')
+    } finally {
+      setSavingInline(false)
+    }
+  }
+
+  const cancelInlineEdit = () => setInlineEdit(null)
 
   const handleAction = async (action: string, fn: () => Promise<any>) => {
     try {
@@ -424,8 +462,54 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
                   <TableCell className="font-mono text-xs">{item.codigo}</TableCell>
                   <TableCell className="text-sm">{item.descripcion}</TableCell>
                   <TableCell className="text-xs">{item.unidad}</TableCell>
-                  <TableCell className="text-right font-mono text-sm">{item.cantidad}</TableCell>
-                  <TableCell className="text-right font-mono text-sm">{formatCurrency(item.precioUnitario, oc.moneda)}</TableCell>
+                  <TableCell className="text-right">
+                    {inlineEdit?.itemId === item.id && inlineEdit.field === 'cantidad' ? (
+                      <Input
+                        type="number"
+                        min={0.01}
+                        step="any"
+                        autoFocus
+                        value={inlineEdit.value}
+                        onChange={e => setInlineEdit(prev => prev ? { ...prev, value: e.target.value } : null)}
+                        onBlur={saveInlineEdit}
+                        onKeyDown={e => { if (e.key === 'Enter') saveInlineEdit(); if (e.key === 'Escape') cancelInlineEdit() }}
+                        disabled={savingInline}
+                        className="h-7 w-20 text-xs text-right font-mono ml-auto"
+                      />
+                    ) : (
+                      <span
+                        className={`font-mono text-sm ${esBorrador ? 'cursor-pointer hover:text-blue-600 group inline-flex items-center gap-1' : ''}`}
+                        onClick={() => startInlineEdit(item.id, 'cantidad', item.cantidad)}
+                      >
+                        {item.cantidad}
+                        {esBorrador && <Pencil className="h-2.5 w-2.5 text-gray-300 group-hover:text-blue-500" />}
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {inlineEdit?.itemId === item.id && inlineEdit.field === 'precioUnitario' ? (
+                      <Input
+                        type="number"
+                        min={0}
+                        step="any"
+                        autoFocus
+                        value={inlineEdit.value}
+                        onChange={e => setInlineEdit(prev => prev ? { ...prev, value: e.target.value } : null)}
+                        onBlur={saveInlineEdit}
+                        onKeyDown={e => { if (e.key === 'Enter') saveInlineEdit(); if (e.key === 'Escape') cancelInlineEdit() }}
+                        disabled={savingInline}
+                        className="h-7 w-24 text-xs text-right font-mono ml-auto"
+                      />
+                    ) : (
+                      <span
+                        className={`font-mono text-sm ${esBorrador ? 'cursor-pointer hover:text-blue-600 group inline-flex items-center gap-1' : ''}`}
+                        onClick={() => startInlineEdit(item.id, 'precioUnitario', item.precioUnitario)}
+                      >
+                        {formatCurrency(item.precioUnitario, oc.moneda)}
+                        {esBorrador && <Pencil className="h-2.5 w-2.5 text-gray-300 group-hover:text-blue-500" />}
+                      </span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-right font-mono text-sm">{formatCurrency(item.costoTotal, oc.moneda)}</TableCell>
                   {['confirmada', 'parcial', 'completada'].includes(oc.estado) && (
                     <TableCell className="text-right">
@@ -451,6 +535,12 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
             </TableBody>
           </Table>
         </CardContent>
+        {esBorrador && (
+          <div className="px-4 py-2 border-t text-[11px] text-muted-foreground flex items-center gap-1.5">
+            <Pencil className="h-3 w-3" />
+            Los precios y cantidades son editables mientras la OC esté en borrador. Al aprobar quedan fijos.
+          </div>
+        )}
       </Card>
 
       {/* Recepción Actions */}
