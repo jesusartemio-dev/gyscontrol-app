@@ -13,6 +13,10 @@ const includeRelations = {
     include: { cuentaBancaria: { select: { id: true, nombreBanco: true, numeroCuenta: true } } },
     orderBy: { fechaPago: 'desc' as const },
   },
+  adjuntos: {
+    include: { subidoPor: { select: { id: true, name: true } } },
+    orderBy: { createdAt: 'desc' as const },
+  },
 }
 
 export async function GET(req: Request) {

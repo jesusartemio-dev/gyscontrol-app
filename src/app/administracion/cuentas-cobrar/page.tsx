@@ -28,6 +28,8 @@ interface PagoCobro {
   medioPago: string
   numeroOperacion: string | null
   observaciones: string | null
+  esDetraccion?: boolean
+  numeroConstanciaBN?: string | null
   cuentaBancaria: CuentaBancaria | null
 }
 
@@ -69,6 +71,14 @@ interface CuentaPorCobrar {
   cliente?: Cliente
   valorizacion?: Valorizacion | null
   pagos?: PagoCobro[]
+  adjuntos?: Array<{
+    id: string
+    nombreArchivo: string
+    urlArchivo: string
+    tipoArchivo: string | null
+    createdAt: string
+    subidoPor?: { id: string; name: string | null }
+  }>
 }
 
 const ESTADOS_CXC = [
@@ -132,6 +142,7 @@ export default function CuentasCobrarPage() {
   const [detraccionCodigo, setDetraccionCodigo] = useState('')
   const [detraccionFechaPago, setDetraccionFechaPago] = useState('')
   const [cuentaBNId, setCuentaBNId] = useState('none')
+  const [numeroConstanciaBN, setNumeroConstanciaBN] = useState('')
 
   // Detail dialog
   const [showDetail, setShowDetail] = useState<CuentaPorCobrar | null>(null)
@@ -333,6 +344,7 @@ export default function CuentasCobrarPage() {
           detraccionCodigo: conDetraccion ? detraccionCodigo || undefined : undefined,
           detraccionFechaPago: conDetraccion ? detraccionFechaPago || undefined : undefined,
           cuentaBNId: conDetraccion && cuentaBNId !== 'none' ? cuentaBNId : undefined,
+          numeroConstanciaBN: conDetraccion && numeroConstanciaBN ? numeroConstanciaBN : undefined,
         }),
       })
       if (!res.ok) {
@@ -699,6 +711,10 @@ export default function CuentasCobrarPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div>
+                  <Label className="text-xs">N° Constancia depósito BN</Label>
+                  <Input placeholder="Ej: 00123456789" value={numeroConstanciaBN} onChange={e => setNumeroConstanciaBN(e.target.value)} />
+                </div>
                 {pagoMonto && detraccionPorcentaje && (
                   <div className="text-xs space-y-1 pt-2 border-t border-amber-300">
                     <div className="flex justify-between">
@@ -783,6 +799,7 @@ export default function CuentasCobrarPage() {
                               <div className="text-xs text-muted-foreground">{formatDate(p.fechaPago)} · {p.medioPago}</div>
                               {p.numeroOperacion && <div className="text-xs text-muted-foreground">Op: {p.numeroOperacion}</div>}
                               {p.cuentaBancaria && <div className="text-xs text-muted-foreground">{p.cuentaBancaria.nombreBanco}</div>}
+                              {p.esDetraccion && p.numeroConstanciaBN && <div className="text-xs text-amber-700 font-medium">N° Constancia BN: {p.numeroConstanciaBN}</div>}
                             </div>
                           </div>
                         </CardContent>
@@ -791,6 +808,72 @@ export default function CuentasCobrarPage() {
                   </div>
                 </div>
               )}
+
+              {/* Documentos de respaldo */}
+              <div>
+                <div className="font-medium mb-2">Documentos de Respaldo</div>
+                {showDetail.adjuntos && showDetail.adjuntos.length > 0 ? (
+                  <div className="space-y-1">
+                    {showDetail.adjuntos.map((adj) => (
+                      <div key={adj.id} className="flex items-center justify-between text-xs border rounded p-2">
+                        <a href={adj.urlArchivo} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline truncate max-w-[250px]">{adj.nombreArchivo}</a>
+                        <Badge variant="outline" className="text-[10px] shrink-0 ml-2">{adj.tipoArchivo || 'otro'}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Sin documentos adjuntos</p>
+                )}
+                {(showDetail.estado === 'pendiente' || showDetail.estado === 'parcial') && (
+                  <div className="mt-2 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <select
+                        id="adjuntoTipoCxC"
+                        defaultValue="factura"
+                        className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                      >
+                        <option value="factura">Factura emitida</option>
+                        <option value="voucher">Voucher de pago</option>
+                        <option value="valorizacion">Valorización</option>
+                        <option value="otro">Otro</option>
+                      </select>
+                      <label className="flex items-center gap-1.5 cursor-pointer text-xs text-blue-600 hover:text-blue-800">
+                        <Upload className="h-3.5 w-3.5" />
+                        Adjuntar
+                        <input
+                          type="file"
+                          accept=".pdf,.png,.jpg,.jpeg,.webp"
+                          className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0]
+                            if (!file || !showDetail) return
+                            const tipoSelect = document.getElementById('adjuntoTipoCxC') as HTMLSelectElement
+                            const tipoArchivo = tipoSelect?.value || 'otro'
+                            const fd = new FormData()
+                            fd.append('file', file)
+                            fd.append('cuentaPorCobrarId', showDetail.id)
+                            fd.append('tipoArchivo', tipoArchivo)
+                            try {
+                              const res = await fetch('/api/cxc-adjunto', { method: 'POST', credentials: 'include', body: fd })
+                              if (!res.ok) throw new Error('Error al subir')
+                              toast.success('Documento adjuntado')
+                              loadData()
+                              const updated = await res.json()
+                              setShowDetail(prev => prev ? {
+                                ...prev,
+                                adjuntos: [...(prev.adjuntos || []), updated],
+                              } : null)
+                            } catch {
+                              toast.error('Error al adjuntar documento')
+                            }
+                            e.target.value = ''
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
           <DialogFooter>

@@ -28,6 +28,8 @@ interface PagoPagar {
   medioPago: string
   numeroOperacion: string | null
   observaciones: string | null
+  esDetraccion?: boolean
+  numeroConstanciaBN?: string | null
   cuentaBancaria: CuentaBancaria | null
 }
 
@@ -166,6 +168,7 @@ export default function CuentasPagarPage() {
   const [detraccionCodigo, setDetraccionCodigo] = useState('')
   const [detraccionFechaPago, setDetraccionFechaPago] = useState('')
   const [cuentaBNId, setCuentaBNId] = useState('none')
+  const [numeroConstanciaBN, setNumeroConstanciaBN] = useState('')
 
   // Detail dialog
   const [showDetail, setShowDetail] = useState<CuentaPorPagar | null>(null)
@@ -398,6 +401,7 @@ export default function CuentasPagarPage() {
           detraccionCodigo: conDetraccion ? detraccionCodigo || undefined : undefined,
           detraccionFechaPago: conDetraccion ? detraccionFechaPago || undefined : undefined,
           cuentaBNId: conDetraccion && cuentaBNId !== 'none' ? cuentaBNId : undefined,
+          numeroConstanciaBN: conDetraccion && numeroConstanciaBN ? numeroConstanciaBN : undefined,
         }),
       })
       if (!res.ok) {
@@ -943,6 +947,10 @@ export default function CuentasPagarPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div>
+                  <Label className="text-xs">N° Constancia depósito BN</Label>
+                  <Input placeholder="Ej: 00123456789" value={numeroConstanciaBN} onChange={e => setNumeroConstanciaBN(e.target.value)} />
+                </div>
                 {pagoMonto && detraccionPorcentaje && (
                   <div className="text-xs space-y-1 pt-2 border-t border-amber-300">
                     <div className="flex justify-between">
@@ -1031,6 +1039,7 @@ export default function CuentasPagarPage() {
                               <div className="text-xs text-muted-foreground">{formatDate(p.fechaPago)} · {p.medioPago}</div>
                               {p.numeroOperacion && <div className="text-xs text-muted-foreground">Op: {p.numeroOperacion}</div>}
                               {p.cuentaBancaria && <div className="text-xs text-muted-foreground">{p.cuentaBancaria.nombreBanco}</div>}
+                              {p.esDetraccion && p.numeroConstanciaBN && <div className="text-xs text-amber-700 font-medium">N° Constancia BN: {p.numeroConstanciaBN}</div>}
                             </div>
                           </div>
                         </CardContent>

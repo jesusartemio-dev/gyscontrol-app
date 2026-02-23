@@ -1366,6 +1366,7 @@ model User {
   recepcionesEntregadas                 RecepcionPendiente[]         @relation("RecepcionEntregador")
   recepcionesRechazadas                 RecepcionPendiente[]         @relation("RecepcionRechazador")
   cxpAdjuntos                           CxPAdjunto[]                 @relation("CxPAdjuntoSubidoPor")
+  cxcAdjuntos                           CxCAdjunto[]                 @relation("CxCAdjuntoSubidoPor")
 
   @@map("user")
 }
@@ -3300,6 +3301,7 @@ model CuentaPorCobrar {
   cliente      Cliente       @relation(fields: [clienteId], references: [id])
   valorizacion Valorizacion? @relation(fields: [valorizacionId], references: [id])
   pagos        PagoCobro[]
+  adjuntos     CxCAdjunto[]
 
   @@index([proyectoId, estado])
   @@index([clienteId, estado])
@@ -3321,6 +3323,7 @@ model PagoCobro {
   detraccionCodigo      String?
   detraccionMonto       Float?
   detraccionFechaPago   DateTime?
+  numeroConstanciaBN    String?
   createdAt          DateTime @default(now())
   updatedAt          DateTime
 
@@ -3385,6 +3388,7 @@ model PagoPagar {
   detraccionCodigo      String?
   detraccionMonto       Float?
   detraccionFechaPago   DateTime?
+  numeroConstanciaBN    String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime
 
@@ -3412,6 +3416,24 @@ model CxPAdjunto {
 
   @@index([cuentaPorPagarId])
   @@map("cxp_adjunto")
+}
+
+model CxCAdjunto {
+  id                String         @id @default(cuid())
+  cuentaPorCobrarId String
+  nombreArchivo     String
+  urlArchivo        String
+  driveFileId       String?
+  tipoArchivo       String?        // "factura" | "voucher" | "valorizacion" | "otro"
+  tamano            Int?
+  subidoPorId       String
+  createdAt         DateTime       @default(now())
+
+  cuentaPorCobrar CuentaPorCobrar @relation(fields: [cuentaPorCobrarId], references: [id], onDelete: Cascade)
+  subidoPor       User            @relation("CxCAdjuntoSubidoPor", fields: [subidoPorId], references: [id])
+
+  @@index([cuentaPorCobrarId])
+  @@map("cxc_adjunto")
 }
 
 // ======================

@@ -18,7 +18,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const { id: cuentaPorPagarId } = await params
     const body = await req.json()
     const { monto, fechaPago, medioPago, numeroOperacion, cuentaBancariaId, observaciones,
-      conDetraccion, detraccionPorcentaje, detraccionCodigo, detraccionFechaPago, cuentaBNId } = body
+      conDetraccion, detraccionPorcentaje, detraccionCodigo, detraccionFechaPago, cuentaBNId, numeroConstanciaBN } = body
 
     if (!monto || !fechaPago) {
       return NextResponse.json({ error: 'monto y fechaPago son requeridos' }, { status: 400 })
@@ -54,6 +54,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             detraccionCodigo: detraccionCodigo || null,
             detraccionMonto,
             detraccionFechaPago: detraccionFechaPago ? new Date(detraccionFechaPago) : null,
+            numeroConstanciaBN: numeroConstanciaBN || null,
             updatedAt: new Date(),
           },
         }),
