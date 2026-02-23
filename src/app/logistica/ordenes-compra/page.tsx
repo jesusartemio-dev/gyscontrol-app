@@ -270,7 +270,12 @@ export default function OrdenesCompraPage() {
                       {(() => {
                         const cxp = (oc as any).cuentasPorPagar?.[0]
                         if (!cxp) return <span className="text-[10px] text-gray-400">Sin factura</span>
-                        if (cxp.numeroFactura) return <Badge className="text-[10px] bg-green-100 text-green-700">{cxp.estado === 'pagada' ? 'Pagada' : 'Facturada'}</Badge>
+                        if (cxp.numeroFactura) return (
+                          <div>
+                            <Badge className="text-[10px] bg-green-100 text-green-700">{cxp.estado === 'pagada' ? 'Pagada' : 'Facturada'}</Badge>
+                            <div className="text-[10px] font-mono text-muted-foreground mt-0.5 truncate max-w-[100px]">{cxp.numeroFactura}</div>
+                          </div>
+                        )
                         return <Badge className="text-[10px] bg-yellow-100 text-yellow-700">CxP sin factura</Badge>
                       })()}
                     </TableCell>

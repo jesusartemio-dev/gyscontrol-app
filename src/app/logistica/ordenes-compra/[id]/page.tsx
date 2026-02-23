@@ -7,13 +7,14 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { ArrowLeft, Loader2, CheckCircle, Send, Package, XCircle, FileDown, Building2, CreditCard, MapPin, AlertTriangle, ShoppingCart, Pencil } from 'lucide-react'
+import { ArrowLeft, Loader2, CheckCircle, Send, Package, XCircle, FileDown, Building2, CreditCard, MapPin, AlertTriangle, ShoppingCart, Pencil, Clock, Receipt } from 'lucide-react'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import Link from 'next/link'
+import { useSession } from 'next-auth/react'
 import { getOrdenCompraById, aprobarOC, enviarOC, confirmarOC, cancelarOC, deleteOrdenCompra, registrarRecepcionOC } from '@/lib/services/ordenCompra'
 import OCEstadoStepper from '@/components/logistica/OCEstadoStepper'
 import dynamic from 'next/dynamic'
@@ -47,6 +48,9 @@ const condicionLabel: Record<string, string> = {
 export default function OrdenCompraDetallePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
+  const { data: session } = useSession()
+  const userRole = session?.user?.role || ''
+  const puedeVerCxP = ['admin', 'gerente', 'socio', 'administracion'].includes(userRole)
   const [oc, setOC] = useState<OrdenCompra | null>(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
@@ -415,24 +419,39 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
         ) : (
           <span className="text-muted-foreground">OC manual — sin pedido vinculado</span>
         )}
-        {/* Estado de pago */}
+        {/* Estado de facturación */}
         {(() => {
           const cxp = ((oc as any).cuentasPorPagar || [])[0]
-          if (!cxp) return <span className="text-muted-foreground border-l pl-4">Sin factura registrada</span>
-          return (
-            <Link
-              href="/administracion/cuentas-pagar"
-              className="border-l pl-4 flex items-center gap-1 hover:underline"
-            >
-              <CreditCard className="h-3 w-3 text-gray-400" />
-              <span>Factura: <strong>{cxp.numeroFactura || '—'}</strong></span>
+          const content = !cxp ? (
+            <span className="flex items-center gap-1 text-muted-foreground">
+              <Receipt className="h-3 w-3" />
+              Sin factura registrada
+            </span>
+          ) : cxp.numeroFactura ? (
+            <span className="flex items-center gap-1">
+              <Receipt className="h-3 w-3 text-gray-400" />
+              <span>Factura: <strong>{cxp.numeroFactura}</strong></span>
               <span className="text-muted-foreground">—</span>
               {cxp.estado === 'pagada' ? (
                 <span className="text-green-600 font-medium flex items-center gap-0.5">Pagada <CheckCircle className="h-3 w-3" /></span>
               ) : (
                 <span className="text-amber-600">Pendiente de pago</span>
               )}
-            </Link>
+            </span>
+          ) : (
+            <span className="flex items-center gap-1 text-amber-600">
+              <Clock className="h-3 w-3" />
+              CxP creada — factura pendiente
+            </span>
+          )
+          return (
+            <span className="border-l pl-4 flex items-center gap-1">
+              {puedeVerCxP ? (
+                <Link href="/administracion/cuentas-pagar" className="flex items-center gap-1 hover:underline">
+                  {content}
+                </Link>
+              ) : content}
+            </span>
           )
         })()}
       </div>

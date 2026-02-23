@@ -592,6 +592,7 @@ export default function CuentasPagarPage() {
                 <TableHead>Factura</TableHead>
                 <TableHead>Proveedor</TableHead>
                 <TableHead>Proyecto</TableHead>
+                <TableHead>OC</TableHead>
                 <TableHead className="text-right">Monto</TableHead>
                 <TableHead className="text-right">Pagado</TableHead>
                 <TableHead className="text-right">Saldo</TableHead>
@@ -603,7 +604,7 @@ export default function CuentasPagarPage() {
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                     <DollarSign className="h-8 w-8 mx-auto mb-2 opacity-40" />
                     No hay cuentas por pagar
                   </TableCell>
@@ -619,6 +620,7 @@ export default function CuentasPagarPage() {
                         {item.proveedor?.ruc && <div className="text-xs text-muted-foreground">{item.proveedor.ruc}</div>}
                       </TableCell>
                       <TableCell className="text-sm font-mono">{item.proyecto?.codigo || '—'}</TableCell>
+                      <TableCell className="text-xs font-mono text-muted-foreground">{item.ordenCompra?.numero || <span className="text-gray-400">Manual</span>}</TableCell>
                       <TableCell className="text-right font-mono text-sm">
                         {formatCurrency(item.monto, item.moneda)}
                       </TableCell>
