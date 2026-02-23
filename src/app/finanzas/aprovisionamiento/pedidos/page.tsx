@@ -96,7 +96,7 @@ function PedidosEquipoContent() {
     const itemsEntregados = items.reduce((sum, p) => {
       return sum + (p.items?.filter(item => (item.cantidadAtendida || 0) >= item.cantidadPedida).length || 0)
     }, 0)
-    const progresoEntrega = totalItems > 0 ? Math.round((itemsEntregados / totalItems) * 100) : 0
+    const progresoEntrega = totalItems > 0 ? Math.min(100, Math.round((itemsEntregados / totalItems) * 100)) : 0
 
     const montoTotal = items.reduce((sum, p) => {
       return sum + (p.items?.reduce((s, i) => s + (i.costoTotal || (i.cantidadPedida * (i.precioUnitario || 0))), 0) || 0)
@@ -110,7 +110,7 @@ function PedidosEquipoContent() {
     return pedidosData.items.map(pedido => {
       const itemsEntregados = pedido.items?.filter(i => i.estado === 'entregado').length || 0
       const totalItems = pedido.items?.length || 0
-      const progreso = totalItems > 0 ? Math.round((itemsEntregados / totalItems) * 100) : 0
+      const progreso = totalItems > 0 ? Math.min(100, Math.round((itemsEntregados / totalItems) * 100)) : 0
 
       return {
         id: pedido.id,

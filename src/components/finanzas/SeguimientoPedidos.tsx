@@ -375,7 +375,7 @@ export default function SeguimientoPedidos({
       // 📊 Calcular progreso basado en items entregados
       const itemsEntregados = itemsPedido.filter(item => item.estado === 'entregado').length
       const itemsTotal = itemsPedido.length
-      const progreso = itemsTotal > 0 ? (itemsEntregados / itemsTotal) * 100 : 0
+      const progreso = itemsTotal > 0 ? Math.min(100, (itemsEntregados / itemsTotal) * 100) : 0
       
       // ⏰ Calcular días restantes y estado de tiempo
       const fechaEstimada = new Date(pedido.fechaEntregaEstimada || pedido.fechaNecesaria)

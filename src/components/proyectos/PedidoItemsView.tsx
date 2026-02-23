@@ -414,7 +414,7 @@ export function PedidoItemsView() {
                         const costo = item.costoTotal || (item.cantidadPedida * (item.precioUnitario || 0))
                         const proveedor = item.proveedorNombre || item.listaEquipoItem?.proveedor?.nombre || '-'
                         const progreso = item.cantidadAtendida && item.cantidadPedida
-                          ? Math.round((item.cantidadAtendida / item.cantidadPedida) * 100)
+                          ? Math.min(100, Math.round((item.cantidadAtendida / item.cantidadPedida) * 100))
                           : 0
                         return (
                           <TableRow key={item.id} className={cn(idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30')}>

@@ -34,73 +34,80 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: 'Debe indicar al menos un item' }, { status: 400 })
     }
 
-    // Update each item's cantidadRecibida
-    for (const rec of recepciones) {
-      const item = existing.items.find(i => i.id === rec.itemId)
-      if (!item) continue
-      const nueva = Math.min(rec.cantidadRecibida, item.cantidad)
-      await prisma.ordenCompraItem.update({
-        where: { id: rec.itemId },
-        data: { cantidadRecibida: nueva, updatedAt: new Date() },
+    // Wrap all mutations in a transaction to prevent race conditions (e.g., double-click creating duplicates)
+    const { data, recepcionesPendientesCreadas } = await prisma.$transaction(async (tx) => {
+      // Update each item's cantidadRecibida
+      for (const rec of recepciones) {
+        const item = existing.items.find(i => i.id === rec.itemId)
+        if (!item) continue
+        const nueva = Math.min(rec.cantidadRecibida, item.cantidad)
+        await tx.ordenCompraItem.update({
+          where: { id: rec.itemId },
+          data: { cantidadRecibida: nueva, updatedAt: new Date() },
+        })
+      }
+
+      // Crear RecepcionPendiente para items vinculados a pedidos
+      let creadas = 0
+      for (const rec of recepciones) {
+        const item = existing.items.find(i => i.id === rec.itemId)
+        if (!item || !item.pedidoEquipoItemId) continue
+
+        const cantidadEfectiva = Math.min(rec.cantidadRecibida, item.cantidad)
+        if (cantidadEfectiva <= 0) continue
+
+        // Evitar duplicados: no crear si ya existe una para este OC item en estado activo
+        const existente = await tx.recepcionPendiente.findFirst({
+          where: {
+            ordenCompraItemId: item.id,
+            estado: { in: ['pendiente', 'en_almacen'] },
+          }
+        })
+        if (existente) continue
+
+        await tx.recepcionPendiente.create({
+          data: {
+            pedidoEquipoItemId: item.pedidoEquipoItemId,
+            ordenCompraItemId: item.id,
+            cantidadRecibida: cantidadEfectiva,
+          }
+        })
+        creadas++
+      }
+
+      // Re-fetch items to compute state
+      const updatedItems = await tx.ordenCompraItem.findMany({
+        where: { ordenCompraId: id },
       })
-    }
 
-    // Crear RecepcionPendiente para items vinculados a pedidos
-    let recepcionesPendientesCreadas = 0
-    for (const rec of recepciones) {
-      const item = existing.items.find(i => i.id === rec.itemId)
-      if (!item || !item.pedidoEquipoItemId) continue
+      const todosCompletos = updatedItems.every(i => i.cantidadRecibida >= i.cantidad)
+      const algunoRecibido = updatedItems.some(i => i.cantidadRecibida > 0)
 
-      const cantidadEfectiva = Math.min(rec.cantidadRecibida, item.cantidad)
-      if (cantidadEfectiva <= 0) continue
+      let nuevoEstado = existing.estado
+      if (todosCompletos) {
+        nuevoEstado = 'completada'
+      } else if (algunoRecibido) {
+        nuevoEstado = 'parcial'
+      }
 
-      // Evitar duplicados: no crear si ya existe una para este OC item en estado activo
-      const existente = await prisma.recepcionPendiente.findFirst({
-        where: {
-          ordenCompraItemId: item.id,
-          estado: { in: ['pendiente', 'en_almacen'] },
-        }
+      const ocData = await tx.ordenCompra.update({
+        where: { id },
+        data: { estado: nuevoEstado, updatedAt: new Date() },
+        include: {
+          proveedor: true,
+          centroCosto: { select: { id: true, nombre: true, tipo: true } },
+          pedidoEquipo: { select: { id: true, codigo: true, estado: true } },
+          proyecto: { select: { id: true, codigo: true, nombre: true } },
+          solicitante: { select: { id: true, name: true, email: true } },
+          aprobador: { select: { id: true, name: true, email: true } },
+          items: { orderBy: { createdAt: 'asc' } },
+        },
       })
-      if (existente) continue
 
-      await prisma.recepcionPendiente.create({
-        data: {
-          pedidoEquipoItemId: item.pedidoEquipoItemId,
-          ordenCompraItemId: item.id,
-          cantidadRecibida: cantidadEfectiva,
-        }
-      })
-      recepcionesPendientesCreadas++
-    }
-
-    // Re-fetch items to compute state
-    const updatedItems = await prisma.ordenCompraItem.findMany({
-      where: { ordenCompraId: id },
+      return { data: ocData, nuevoEstado, recepcionesPendientesCreadas: creadas }
     })
 
-    const todosCompletos = updatedItems.every(i => i.cantidadRecibida >= i.cantidad)
-    const algunoRecibido = updatedItems.some(i => i.cantidadRecibida > 0)
-
-    let nuevoEstado = existing.estado
-    if (todosCompletos) {
-      nuevoEstado = 'completada'
-    } else if (algunoRecibido) {
-      nuevoEstado = 'parcial'
-    }
-
-    const data = await prisma.ordenCompra.update({
-      where: { id },
-      data: { estado: nuevoEstado, updatedAt: new Date() },
-      include: {
-        proveedor: true,
-        centroCosto: { select: { id: true, nombre: true, tipo: true } },
-        pedidoEquipo: { select: { id: true, codigo: true, estado: true } },
-        proyecto: { select: { id: true, codigo: true, nombre: true } },
-        solicitante: { select: { id: true, name: true, email: true } },
-        aprobador: { select: { id: true, name: true, email: true } },
-        items: { orderBy: { createdAt: 'asc' } },
-      },
-    })
+    const nuevoEstado = data.estado
 
     // Propagar precioReal al catálogo cuando OC se completa
     if (nuevoEstado === 'completada') {

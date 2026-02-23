@@ -94,7 +94,7 @@ export default function PedidoEquipoAccordion({
   const itemsCompletos = pedido.items?.filter(item => 
     (item.cantidadAtendida || 0) >= (item.cantidadPedida || 0)
   ).length || 0
-  const progreso = totalItems > 0 ? (itemsCompletos / totalItems) * 100 : 0
+  const progreso = totalItems > 0 ? Math.min(100, (itemsCompletos / totalItems) * 100) : 0
 
   const handleCreateItem = async (payload: PedidoEquipoItemPayload) => {
     try {

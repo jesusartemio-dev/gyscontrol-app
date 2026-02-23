@@ -307,10 +307,10 @@ export default function PedidoLogisticaDetailPage() {
     })
   }
 
-  // Clamp cantidadAtendida to valid range
+  // Allow values above cantidadPedida (excess delivery) but not below 0
   const setCantidadAtendida = (value: number) => {
     if (!editingItem.item) return
-    const clamped = Math.max(0, Math.min(value, editingItem.item.cantidadPedida))
+    const clamped = Math.max(0, value)
     setEditingItem(prev => ({ ...prev, cantidadAtendida: clamped }))
   }
 
@@ -422,7 +422,7 @@ export default function PedidoLogisticaDetailPage() {
     const itemsEntregados = pedido.items.reduce((sum, item) => {
       return sum + (item.estado === 'entregado' ? item.cantidadPedida : 0)
     }, 0)
-    const progreso = totalItems > 0 ? (itemsEntregados / totalItems) * 100 : 0
+    const progreso = totalItems > 0 ? Math.min(100, (itemsEntregados / totalItems) * 100) : 0
 
     return { progreso, itemsEntregados, totalItems }
   }
@@ -1287,8 +1287,11 @@ export default function PedidoLogisticaDetailPage() {
                       <td className="px-3 py-2 text-center font-medium text-blue-600">
                         {item.cantidadPedida}
                       </td>
-                      <td className="px-3 py-2 text-center font-medium text-green-600">
+                      <td className={cn('px-3 py-2 text-center font-medium', (item.cantidadAtendida || 0) > item.cantidadPedida ? 'text-amber-600' : 'text-green-600')}>
                         {item.cantidadAtendida || 0}
+                        {(item.cantidadAtendida || 0) > item.cantidadPedida && (
+                          <span className="text-[9px] text-amber-500 ml-0.5">(+{(item.cantidadAtendida || 0) - item.cantidadPedida})</span>
+                        )}
                       </td>
                       <td className="px-3 py-2 text-center">
                         <Badge
@@ -1613,7 +1616,8 @@ export default function PedidoLogisticaDetailPage() {
           {editingItem.item && (() => {
             const cantPedida = editingItem.item.cantidadPedida
             const cantAtendida = editingItem.cantidadAtendida
-            const porcentaje = cantPedida > 0 ? Math.round((cantAtendida / cantPedida) * 100) : 0
+            const porcentaje = cantPedida > 0 ? Math.min(100, Math.round((cantAtendida / cantPedida) * 100)) : 0
+            const esExceso = cantAtendida > cantPedida
             const esCompleta = cantAtendida >= cantPedida
             const esParcial = cantAtendida > 0 && cantAtendida < cantPedida
             const proveedor = (editingItem.item as any).proveedor?.nombre || (editingItem.item as any).proveedorNombre || (editingItem.item as any).listaEquipoItem?.proveedor?.nombre
@@ -1824,24 +1828,34 @@ export default function PedidoLogisticaDetailPage() {
                           <Input
                             type="number"
                             min={0}
-                            max={cantPedida}
                             value={cantAtendida}
                             onChange={(e) => setCantidadAtendida(Number(e.target.value))}
-                            className="h-9 text-sm font-medium"
+                            className={cn('h-9 text-sm font-medium', esExceso && 'border-amber-400 bg-amber-50')}
                           />
                         </div>
-                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                        <span className={cn('text-xs whitespace-nowrap', esExceso ? 'text-amber-600 font-medium' : 'text-muted-foreground')}>
                           / {cantPedida} {editingItem.item.unidad}
                         </span>
                       </div>
+
+                      {/* Excess delivery warning */}
+                      {esExceso && (
+                        <div className="mt-2 bg-amber-50 border border-amber-300 rounded-lg p-2.5 text-xs text-amber-700 flex items-start gap-2">
+                          <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                          <span>
+                            La cantidad ({cantAtendida}) supera lo pedido ({cantPedida}).
+                            Se registrará como entrega con exceso de <strong>{cantAtendida - cantPedida}</strong> {editingItem.item.unidad}.
+                          </span>
+                        </div>
+                      )}
 
                       {/* Progress bar */}
                       <div className="mt-2">
                         <Progress
                           value={porcentaje}
-                          className={cn('h-2', esCompleta && '[&>div]:bg-green-500', esParcial && '[&>div]:bg-amber-500')}
+                          className={cn('h-2', esExceso && '[&>div]:bg-amber-500', !esExceso && esCompleta && '[&>div]:bg-green-500', esParcial && '[&>div]:bg-amber-500')}
                         />
-                        <p className="text-[10px] text-muted-foreground mt-1 text-right">{porcentaje}%</p>
+                        <p className={cn('text-[10px] mt-1 text-right', esExceso ? 'text-amber-600 font-medium' : 'text-muted-foreground')}>{porcentaje}%</p>
                       </div>
                     </div>
 
@@ -1928,15 +1942,17 @@ export default function PedidoLogisticaDetailPage() {
                       'rounded-lg px-3 py-2 flex items-center gap-2 text-xs font-medium border',
                       cantAtendida === 0 && 'bg-gray-50 text-gray-600 border-gray-200',
                       esParcial && 'bg-amber-50 text-amber-700 border-amber-200',
-                      esCompleta && 'bg-green-50 text-green-700 border-green-200',
+                      esExceso && 'bg-amber-50 text-amber-700 border-amber-300',
+                      esCompleta && !esExceso && 'bg-green-50 text-green-700 border-green-200',
                     )}>
                       <span className={cn(
                         'w-2 h-2 rounded-full',
                         cantAtendida === 0 && 'bg-gray-400',
                         esParcial && 'bg-amber-500',
-                        esCompleta && 'bg-green-500',
+                        esExceso && 'bg-amber-500',
+                        esCompleta && !esExceso && 'bg-green-500',
                       )} />
-                      Estado resultante: {cantAtendida === 0 ? 'Pendiente' : esCompleta ? 'Entregado' : 'Parcial'}
+                      Estado resultante: {cantAtendida === 0 ? 'Pendiente' : esExceso ? `Entregado (exceso +${cantAtendida - cantPedida})` : esCompleta ? 'Entregado' : 'Parcial'}
                     </div>
 
                     {/* Actions */}
@@ -1955,11 +1971,12 @@ export default function PedidoLogisticaDetailPage() {
                         disabled={updating}
                         className={cn(
                           'h-8 text-xs',
-                          esCompleta && 'bg-green-600 hover:bg-green-700',
+                          esExceso && 'bg-amber-600 hover:bg-amber-700',
+                          esCompleta && !esExceso && 'bg-green-600 hover:bg-green-700',
                         )}
                       >
                         <Save className="h-3 w-3 mr-1" />
-                        {updating ? 'Guardando...' : esCompleta ? 'Confirmar Entrega' : 'Guardar'}
+                        {updating ? 'Guardando...' : esExceso ? 'Guardar con exceso' : esCompleta ? 'Confirmar Entrega' : 'Guardar'}
                       </Button>
                     </div>
                   </>

@@ -206,7 +206,7 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
     parciales: pedido.items?.filter((i) => i.estado === 'parcial').length || 0,
     pendientes: pedido.items?.filter((i) => i.estado === 'pendiente').length || 0,
     progress: pedido.items?.length
-      ? ((pedido.items.filter((i) => i.estado === 'entregado').length / pedido.items.length) * 100)
+      ? Math.min(100, (pedido.items.filter((i) => i.estado === 'entregado').length / pedido.items.length) * 100)
       : 0,
   }
 

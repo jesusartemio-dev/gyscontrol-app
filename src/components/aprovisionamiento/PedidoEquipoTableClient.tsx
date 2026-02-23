@@ -319,7 +319,7 @@ export default function PedidoEquipoTableClient({
       totalItems,
       totalRecibidos,
       totalPendientes,
-      progresoPromedio: totalItems > 0 ? (totalRecibidos / totalItems) * 100 : 0
+      progresoPromedio: totalItems > 0 ? Math.min(100, (totalRecibidos / totalItems) * 100) : 0
     }
   }, [data])
 

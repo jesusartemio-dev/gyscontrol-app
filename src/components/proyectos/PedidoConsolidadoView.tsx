@@ -356,7 +356,7 @@ export function PedidoConsolidadoView() {
                   </TableRow>
                   {catGroup.items.map((item, idx) => {
                     const progreso = item.cantidadPedidaTotal > 0
-                      ? Math.round((item.cantidadAtendidaTotal / item.cantidadPedidaTotal) * 100)
+                      ? Math.min(100, Math.round((item.cantidadAtendidaTotal / item.cantidadPedidaTotal) * 100))
                       : 0
                     return (
                       <TableRow key={item.groupKey} className={cn(idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30')}>

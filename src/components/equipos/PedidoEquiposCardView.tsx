@@ -142,7 +142,7 @@ const PedidoEquiposCardView = memo(function PedidoEquiposCardView({
             const totalItems = pedido.items?.length || 0;
             const montoTotal = pedido.items?.reduce((sum, item) => sum + (item.costoTotal || 0), 0) || 0;
             const itemsEntregados = pedido.items?.filter(item => item.estado === 'entregado').length || 0;
-            const progreso = totalItems > 0 ? Math.round((itemsEntregados / totalItems) * 100) : 0;
+            const progreso = totalItems > 0 ? Math.min(100, Math.round((itemsEntregados / totalItems) * 100)) : 0;
 
             return (
               <Card key={pedido.id} className="hover:shadow-lg transition-all duration-200 border-l-4 border-l-blue-500">

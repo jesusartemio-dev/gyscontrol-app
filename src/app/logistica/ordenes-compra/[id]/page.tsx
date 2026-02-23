@@ -435,13 +435,25 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
               {cxp.estado === 'pagada' ? (
                 <span className="text-green-600 font-medium flex items-center gap-0.5">Pagada <CheckCircle className="h-3 w-3" /></span>
               ) : (
-                <span className="text-amber-600">Pendiente de pago</span>
+                <span className="text-amber-600 flex items-center gap-1">
+                  Pendiente de pago
+                  {cxp.saldoPendiente != null && cxp.saldoPendiente > 0 && (
+                    <span className="text-[10px] bg-amber-100 px-1.5 py-0.5 rounded font-medium">
+                      Saldo: {formatCurrency(cxp.saldoPendiente, cxp.moneda)}
+                    </span>
+                  )}
+                </span>
               )}
             </span>
           ) : (
             <span className="flex items-center gap-1 text-amber-600">
               <Clock className="h-3 w-3" />
               CxP creada — factura pendiente
+              {cxp.saldoPendiente != null && cxp.saldoPendiente > 0 && (
+                <span className="text-[10px] bg-amber-100 px-1.5 py-0.5 rounded font-medium">
+                  Saldo: {formatCurrency(cxp.saldoPendiente, cxp.moneda)}
+                </span>
+              )}
             </span>
           )
           return (

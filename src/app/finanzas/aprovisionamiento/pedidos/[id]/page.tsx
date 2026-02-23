@@ -147,7 +147,7 @@ export default async function PedidoEquipoDetallePage({ params, searchParams }: 
     montoTotal: itemsData.items.reduce((sum: number, item: any) => sum + ((item.precioUnitario || 0) * (item.cantidadPedida || 0)), 0),
     montoRecibido: itemsData.items.reduce((sum: number, item: any) => sum + ((item.precioUnitario || 0) * (item.cantidadRecibida || 0)), 0),
     progresoEntrega: itemsData.total > 0 ?
-      Math.round((itemsData.items.filter((item: any) => (item.cantidadRecibida || 0) >= item.cantidadPedida).length / itemsData.total) * 100) : 0,
+      Math.min(100, Math.round((itemsData.items.filter((item: any) => (item.cantidadRecibida || 0) >= item.cantidadPedida).length / itemsData.total) * 100)) : 0,
     diasDesdeCreacion: (pedido.fechaPedido || pedido.createdAt) ?
       Math.floor((new Date().getTime() - new Date(pedido.fechaPedido || pedido.createdAt).getTime()) / (1000 * 60 * 60 * 24)) : 0,
     diasParaEntrega: pedido.fechaEntregaEstimada ?
@@ -291,7 +291,7 @@ export default async function PedidoEquipoDetallePage({ params, searchParams }: 
               ${stats.montoRecibido.toLocaleString('es-PE', { minimumFractionDigits: 2 })}
             </div>
             <p className="text-xs text-muted-foreground">
-              {stats.montoTotal > 0 ? Math.round((stats.montoRecibido / stats.montoTotal) * 100) : 0}% recibido
+              {stats.montoTotal > 0 ? Math.min(100, Math.round((stats.montoRecibido / stats.montoTotal) * 100)) : 0}% recibido
             </p>
           </CardContent>
         </Card>
@@ -518,7 +518,7 @@ export default async function PedidoEquipoDetallePage({ params, searchParams }: 
               {itemsData.items.length > 0 ? (
                 <div className="space-y-3">
                   {itemsData.items.slice(0, 5).map((item: any) => {
-                    const progreso = item.cantidadPedida > 0 ? Math.round(((item.cantidadRecibida || 0) / item.cantidadPedida) * 100) : 0
+                    const progreso = item.cantidadPedida > 0 ? Math.min(100, Math.round(((item.cantidadRecibida || 0) / item.cantidadPedida) * 100)) : 0
                     return (
                       <div key={item.id} className="flex items-center justify-between text-sm">
                         <div className="flex-1 min-w-0">
@@ -581,7 +581,7 @@ export default async function PedidoEquipoDetallePage({ params, searchParams }: 
                     <tbody>
                       {itemsData.items.map((item: any, index: number) => {
                         const progreso = item.cantidadPedida > 0 ?
-                          Math.round(((item.cantidadRecibida || 0) / item.cantidadPedida) * 100) : 0
+                          Math.min(100, Math.round(((item.cantidadRecibida || 0) / item.cantidadPedida) * 100)) : 0
                         
                         return (
                           <tr key={item.id} className="border-b hover:bg-muted/50">

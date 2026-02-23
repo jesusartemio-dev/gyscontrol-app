@@ -61,7 +61,7 @@ const calcularProgreso = (pedido: PedidoEquipo): number => {
   if (!pedido.items || pedido.items.length === 0) return 0
   const totalPedido = pedido.items.reduce((sum, item) => sum + (item.cantidadPedida || 0), 0)
   const totalAtendido = pedido.items.reduce((sum, item) => sum + (item.cantidadAtendida || 0), 0)
-  return totalPedido > 0 ? (totalAtendido / totalPedido) * 100 : 0
+  return totalPedido > 0 ? Math.min(100, (totalAtendido / totalPedido) * 100) : 0
 }
 
 export default function LogisticaPedidosTable({ pedidos, loading = false, onDelete, className }: LogisticaPedidosTableProps) {
