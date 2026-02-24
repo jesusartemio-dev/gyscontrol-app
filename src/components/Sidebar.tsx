@@ -217,6 +217,7 @@ export default function Sidebar() {
       links: [
         { href: '/supervision/timesheet', label: 'Timesheet', icon: ClipboardList },
         { href: '/supervision/jornada-campo', label: 'Jornada Campo', icon: MapPin },
+        { href: '/supervision/bloqueos-campo', label: 'Bloqueos Campo', icon: ShieldAlert },
         { href: '/supervision/tareas', label: 'Gestión de Tareas', icon: CheckSquare },
         { href: '/supervision/equipo', label: 'Vista de Equipo', icon: Users },
         { href: '/supervision/edts', label: 'Gestión de EDTs', icon: GitBranch },
