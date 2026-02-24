@@ -276,3 +276,58 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     return NextResponse.json({ error: 'Error del servidor' }, { status: 500 })
   }
 }
+
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string; valId: string }> }) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+    if (!ROLES_ALLOWED.includes(session.user.role)) {
+      return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
+    }
+
+    const { valId } = await params
+
+    const existing = await prisma.valorizacion.findUnique({
+      where: { id: valId },
+      include: { cuentasPorCobrar: { select: { id: true, estado: true, montoPagado: true } } },
+    })
+    if (!existing) {
+      return NextResponse.json({ error: 'Valorización no encontrada' }, { status: 404 })
+    }
+
+    // Solo se puede eliminar en borrador o anulada
+    if (!['borrador', 'anulada'].includes(existing.estado)) {
+      return NextResponse.json(
+        { error: `No se puede eliminar una valorización en estado "${existing.estado}". Solo se puede eliminar en borrador o anulada.` },
+        { status: 400 }
+      )
+    }
+
+    // Verificar si hay CxC con pagos asociados
+    const cxcConPagos = existing.cuentasPorCobrar.filter(c => c.montoPagado > 0)
+    if (cxcConPagos.length > 0) {
+      return NextResponse.json(
+        { error: 'No se puede eliminar: tiene cuentas por cobrar con pagos registrados.' },
+        { status: 400 }
+      )
+    }
+
+    // Desvincular CxC que no tienen pagos (nullificar FK)
+    if (existing.cuentasPorCobrar.length > 0) {
+      await prisma.cuentaPorCobrar.updateMany({
+        where: { valorizacionId: valId },
+        data: { valorizacionId: null },
+      })
+    }
+
+    // Eliminar valorización (partidas y adjuntos se eliminan por cascade)
+    await prisma.valorizacion.delete({ where: { id: valId } })
+
+    return NextResponse.json({ ok: true })
+  } catch (error) {
+    console.error('Error al eliminar valorización:', error)
+    return NextResponse.json({ error: 'Error del servidor' }, { status: 500 })
+  }
+}

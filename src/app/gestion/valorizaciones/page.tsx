@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, FileSpreadsheet, Loader2, Search, Eye, Send, CheckCircle, Edit, Ban, Upload, Download, AlertTriangle, RefreshCw } from 'lucide-react'
+import { Plus, FileSpreadsheet, Loader2, Search, Eye, Send, CheckCircle, Edit, Ban, Upload, Download, AlertTriangle, RefreshCw, Trash2 } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 import toast from 'react-hot-toast'
 import ValorizacionImportExcelModal from '@/components/gestion/ValorizacionImportExcelModal'
@@ -127,6 +127,10 @@ export default function ValorizacionesPage() {
   const [showObservarDialog, setShowObservarDialog] = useState(false)
   const [observarTarget, setObservarTarget] = useState<Valorizacion | null>(null)
   const [motivoObservacion, setMotivoObservacion] = useState('')
+
+  // Eliminar dialog
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<Valorizacion | null>(null)
 
   useEffect(() => { loadData() }, [])
 
@@ -316,6 +320,28 @@ export default function ValorizacionesPage() {
     }
   }
 
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/proyectos/${deleteTarget.proyectoId}/valorizaciones/${deleteTarget.id}`, {
+        method: 'DELETE',
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Error al eliminar')
+      }
+      toast.success('Valorización eliminada')
+      setShowDeleteDialog(false)
+      setDeleteTarget(null)
+      loadData()
+    } catch (e: any) {
+      toast.error(e.message || 'Error al eliminar')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -474,6 +500,11 @@ export default function ValorizacionesPage() {
                         {!['anulada', 'pagada', 'facturada', 'aprobada_cliente'].includes(item.estado) && (
                           <Button variant="ghost" size="icon" onClick={() => openEstadoTransition(item, 'anulada')} title="Anular">
                             <Ban className="h-3.5 w-3.5 text-red-500" />
+                          </Button>
+                        )}
+                        {['borrador', 'anulada'].includes(item.estado) && (
+                          <Button variant="ghost" size="icon" onClick={() => { setDeleteTarget(item); setShowDeleteDialog(true) }} title="Eliminar">
+                            <Trash2 className="h-3.5 w-3.5 text-red-500" />
                           </Button>
                         )}
                       </div>
@@ -652,6 +683,28 @@ export default function ValorizacionesPage() {
             <Button onClick={handleObservar} disabled={saving} className="bg-orange-600 hover:bg-orange-700">
               {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Marcar Observada
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog eliminar valorización */}
+      <Dialog open={showDeleteDialog} onOpenChange={open => { if (!open) { setShowDeleteDialog(false); setDeleteTarget(null) } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Eliminar Valorización</DialogTitle>
+            <DialogDescription>
+              {deleteTarget && `${deleteTarget.codigo} — ${deleteTarget.proyecto?.codigo}`}
+            </DialogDescription>
+          </DialogHeader>
+          <p className="text-sm text-red-600">
+            Esta acción eliminará permanentemente la valorización, sus partidas y adjuntos. Esta acción no se puede deshacer.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowDeleteDialog(false); setDeleteTarget(null) }}>Cancelar</Button>
+            <Button onClick={handleDelete} disabled={saving} variant="destructive">
+              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Eliminar
             </Button>
           </DialogFooter>
         </DialogContent>
