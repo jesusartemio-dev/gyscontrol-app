@@ -99,8 +99,19 @@ const formatDate = (date: string) =>
   new Date(date).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })
 
 const isVencida = (fecha: string, estado: string) => {
+  if (estado === 'vencida') return true
   if (estado === 'pagada' || estado === 'anulada') return false
   return new Date(fecha) < new Date()
+}
+
+const isPorVencer = (fecha: string, estado: string) => {
+  if (estado === 'pagada' || estado === 'anulada' || estado === 'vencida') return false
+  const hoy = new Date()
+  const venc = new Date(fecha)
+  if (venc < hoy) return false // ya venció
+  const en7Dias = new Date(hoy)
+  en7Dias.setDate(en7Dias.getDate() + 7)
+  return venc <= en7Dias
 }
 
 export default function CuentasCobrarPage() {
@@ -180,7 +191,8 @@ export default function CuentasCobrarPage() {
 
   const resumen = useMemo(() => {
     const pendientes = items.filter(i => i.estado === 'pendiente' || i.estado === 'parcial')
-    const vencidas = pendientes.filter(i => isVencida(i.fechaVencimiento, i.estado))
+    const vencidas = items.filter(i => isVencida(i.fechaVencimiento, i.estado))
+    const porVencer = items.filter(i => isPorVencer(i.fechaVencimiento, i.estado))
     const pagadas = items.filter(i => i.estado === 'pagada')
 
     const byMoneda = (arr: CuentaPorCobrar[], field: 'saldoPendiente' | 'monto') => {
@@ -194,6 +206,10 @@ export default function CuentasCobrarPage() {
       countPendiente: pendientes.length,
       vencido: byMoneda(vencidas, 'saldoPendiente'),
       countVencido: vencidas.length,
+      porVencer: byMoneda(porVencer, 'saldoPendiente'),
+      countPorVencer: porVencer.length,
+      porVencerItems: porVencer,
+      vencidaItems: vencidas,
       cobrado: byMoneda(pagadas, 'monto'),
     }
   }, [items])
@@ -443,6 +459,58 @@ export default function CuentasCobrarPage() {
         </Card>
       </div>
 
+      {/* Banners de alerta */}
+      {resumen.countVencido > 0 && (
+        <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 shrink-0" />
+          <div className="flex-1">
+            <div className="font-semibold text-red-800">
+              {resumen.countVencido} cuenta{resumen.countVencido > 1 ? 's' : ''} vencida{resumen.countVencido > 1 ? 's' : ''}
+            </div>
+            <div className="text-sm text-red-700 mt-0.5">
+              Saldo total: {renderMonedaTotals(resumen.vencido.pen, resumen.vencido.usd)}
+            </div>
+            <div className="text-xs text-red-600 mt-1 space-y-0.5">
+              {resumen.vencidaItems.slice(0, 5).map(c => (
+                <div key={c.id}>
+                  {c.numeroDocumento || 'S/N'} — {c.cliente?.nombre} — {c.proyecto?.codigo} — {formatCurrency(c.saldoPendiente, c.moneda)} — venció {formatDate(c.fechaVencimiento)}
+                </div>
+              ))}
+              {resumen.vencidaItems.length > 5 && (
+                <div className="italic">...y {resumen.vencidaItems.length - 5} más</div>
+              )}
+            </div>
+          </div>
+          <Button variant="outline" size="sm" className="shrink-0 border-red-300 text-red-700 hover:bg-red-100" onClick={() => setFilterEstado('vencida')}>
+            Ver vencidas
+          </Button>
+        </div>
+      )}
+
+      {resumen.countPorVencer > 0 && (
+        <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+          <Clock className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+          <div className="flex-1">
+            <div className="font-semibold text-amber-800">
+              {resumen.countPorVencer} cuenta{resumen.countPorVencer > 1 ? 's' : ''} por vencer en los próximos 7 días
+            </div>
+            <div className="text-sm text-amber-700 mt-0.5">
+              Saldo total: {renderMonedaTotals(resumen.porVencer.pen, resumen.porVencer.usd)}
+            </div>
+            <div className="text-xs text-amber-600 mt-1 space-y-0.5">
+              {resumen.porVencerItems.slice(0, 5).map(c => (
+                <div key={c.id}>
+                  {c.numeroDocumento || 'S/N'} — {c.cliente?.nombre} — {c.proyecto?.codigo} — {formatCurrency(c.saldoPendiente, c.moneda)} — vence {formatDate(c.fechaVencimiento)}
+                </div>
+              ))}
+              {resumen.porVencerItems.length > 5 && (
+                <div className="italic">...y {resumen.porVencerItems.length - 5} más</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Filtros */}
       <div className="flex gap-3 items-center flex-wrap">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
@@ -490,8 +558,9 @@ export default function CuentasCobrarPage() {
               ) : (
                 filtered.map(item => {
                   const vencida = isVencida(item.fechaVencimiento, item.estado)
+                  const porVencer = isPorVencer(item.fechaVencimiento, item.estado)
                   return (
-                    <TableRow key={item.id} className={`${item.estado === 'anulada' ? 'opacity-50' : ''} ${vencida ? 'bg-red-50/50' : ''}`}>
+                    <TableRow key={item.id} className={`${item.estado === 'anulada' ? 'opacity-50' : ''} ${vencida ? 'bg-red-50/50' : porVencer ? 'bg-amber-50/50' : ''}`}>
                       <TableCell className="font-mono text-sm">{item.numeroDocumento || '—'}</TableCell>
                       <TableCell className="text-sm font-medium">{item.cliente?.nombre || '—'}</TableCell>
                       <TableCell className="text-sm">
@@ -506,9 +575,10 @@ export default function CuentasCobrarPage() {
                       <TableCell className="text-right font-mono text-sm font-semibold">
                         {formatCurrency(item.saldoPendiente, item.moneda)}
                       </TableCell>
-                      <TableCell className={`text-sm ${vencida ? 'text-red-600 font-semibold' : ''}`}>
+                      <TableCell className={`text-sm ${vencida ? 'text-red-600 font-semibold' : porVencer ? 'text-amber-600 font-medium' : ''}`}>
                         {formatDate(item.fechaVencimiento)}
                         {vencida && <AlertTriangle className="inline h-3 w-3 ml-1" />}
+                        {porVencer && <Clock className="inline h-3 w-3 ml-1" />}
                       </TableCell>
                       <TableCell>
                         <Badge className={getEstadoColor(item.estado)}>

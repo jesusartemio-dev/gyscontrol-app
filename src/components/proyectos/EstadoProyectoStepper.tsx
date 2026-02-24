@@ -24,8 +24,17 @@ import {
   ChevronDown,
   FileEdit,
   FileCheck,
-  Lock
+  Lock,
+  Shield,
 } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 
 interface Props {
@@ -124,12 +133,60 @@ const specialStates = ['pausado', 'cancelado']
 
 export default function EstadoProyectoStepper({ proyecto, onUpdated, compact = false }: Props) {
   const [loadingEstado, setLoadingEstado] = useState<string | null>(null)
+  const [showCierreDialog, setShowCierreDialog] = useState(false)
+  const [fondoGarantiaInfo, setFondoGarantiaInfo] = useState<{
+    totalFondo: number
+    diasGarantia: number
+    fechaVencimiento: string
+    moneda: string
+  } | null>(null)
+  const [loadingFondo, setLoadingFondo] = useState(false)
   const currentEstado = proyecto.estado || 'creado'
   const currentConfig = estadosConfig[currentEstado as keyof typeof estadosConfig]
+
+  const fetchFondoGarantia = async () => {
+    setLoadingFondo(true)
+    try {
+      const res = await fetch(`/api/proyectos/${proyecto.id}/valorizaciones`)
+      if (res.ok) {
+        const data = await res.json()
+        const valorizaciones = Array.isArray(data) ? data : (data.data || [])
+        const totalFondo = valorizaciones
+          .filter((v: any) => v.estado !== 'anulada')
+          .reduce((sum: number, v: any) => sum + (v.fondoGarantiaMonto || 0), 0)
+
+        const diasGarantia = proyecto.diasGarantia ?? 365
+        const fechaVenc = new Date()
+        fechaVenc.setDate(fechaVenc.getDate() + diasGarantia)
+
+        setFondoGarantiaInfo({
+          totalFondo: Math.round(totalFondo * 100) / 100,
+          diasGarantia,
+          fechaVencimiento: fechaVenc.toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' }),
+          moneda: proyecto.moneda || 'PEN',
+        })
+      }
+    } catch {
+      setFondoGarantiaInfo(null)
+    } finally {
+      setLoadingFondo(false)
+    }
+  }
 
   const handleEstadoChange = async (nuevoEstado: string) => {
     if (nuevoEstado === currentEstado) return
 
+    // Interceptar cierre para mostrar confirmación
+    if (nuevoEstado === 'cerrado') {
+      setShowCierreDialog(true)
+      fetchFondoGarantia()
+      return
+    }
+
+    await executeEstadoChange(nuevoEstado)
+  }
+
+  const executeEstadoChange = async (nuevoEstado: string) => {
     try {
       setLoadingEstado(nuevoEstado)
       const response = await fetch(`/api/proyecto/${proyecto.id}`, {
@@ -149,6 +206,11 @@ export default function EstadoProyectoStepper({ proyecto, onUpdated, compact = f
     } finally {
       setLoadingEstado(null)
     }
+  }
+
+  const handleConfirmCierre = async () => {
+    setShowCierreDialog(false)
+    await executeEstadoChange('cerrado')
   }
 
   // Get the step index for the current estado
@@ -351,6 +413,77 @@ export default function EstadoProyectoStepper({ proyecto, onUpdated, compact = f
           </DropdownMenu>
         </>
       )}
+
+      {/* Dialog de confirmación de cierre */}
+      <Dialog open={showCierreDialog} onOpenChange={setShowCierreDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lock className="h-5 w-5 text-emerald-600" />
+              Confirmar cierre de proyecto
+            </DialogTitle>
+            <DialogDescription>
+              Esta acción cerrará el proyecto y generará automáticamente una cuenta por cobrar por el fondo de garantía acumulado.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+            {loadingFondo ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                <span className="ml-2 text-sm text-muted-foreground">Calculando fondo de garantía...</span>
+              </div>
+            ) : fondoGarantiaInfo ? (
+              <>
+                <div className="rounded-lg border bg-emerald-50 p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground flex items-center gap-1">
+                      <Shield className="h-4 w-4" />
+                      Fondo de garantía acumulado
+                    </span>
+                    <span className="font-semibold text-emerald-700">
+                      {fondoGarantiaInfo.moneda} {fondoGarantiaInfo.totalFondo.toLocaleString('es-PE', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Plazo de garantía</span>
+                    <span className="font-medium">{fondoGarantiaInfo.diasGarantia} días</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Vencimiento CxC</span>
+                    <span className="font-medium">{fondoGarantiaInfo.fechaVencimiento}</span>
+                  </div>
+                </div>
+                {fondoGarantiaInfo.totalFondo === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    No hay fondo de garantía acumulado. No se creará una CxC adicional.
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">No se pudo obtener información del fondo de garantía.</p>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowCierreDialog(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleConfirmCierre}
+              disabled={loadingEstado !== null || loadingFondo}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              {loadingEstado === 'cerrado' ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Lock className="h-4 w-4 mr-2" />
+              )}
+              Confirmar cierre
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -9,7 +9,8 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, FileSpreadsheet, Loader2, Search, Eye, Send, CheckCircle, Edit, Ban, Check, Upload, Download } from 'lucide-react'
+import { Plus, FileSpreadsheet, Loader2, Search, Eye, Send, CheckCircle, Edit, Ban, Check, Upload, Download, AlertTriangle, RefreshCw } from 'lucide-react'
+import { Textarea } from '@/components/ui/textarea'
 import toast from 'react-hot-toast'
 import ValorizacionImportExcelModal from '@/components/gestion/ValorizacionImportExcelModal'
 import { exportarValAExcel } from '@/lib/utils/valorizacionExcel'
@@ -51,6 +52,10 @@ interface Valorizacion {
   estado: string
   fechaEnvio: string | null
   fechaAprobacion: string | null
+  fechaObservacion: string | null
+  fechaCorreccion: string | null
+  motivoObservacion: string | null
+  ciclosAprobacion: number
   observaciones: string | null
   createdAt: string
   updatedAt: string
@@ -60,6 +65,8 @@ interface Valorizacion {
 const ESTADOS = [
   { value: 'borrador', label: 'Borrador', color: 'bg-gray-100 text-gray-700' },
   { value: 'enviada', label: 'Enviada', color: 'bg-blue-100 text-blue-700' },
+  { value: 'observada', label: 'Observada', color: 'bg-orange-100 text-orange-700' },
+  { value: 'corregida', label: 'Corregida', color: 'bg-violet-100 text-violet-700' },
   { value: 'aprobada_cliente', label: 'Aprobada', color: 'bg-emerald-100 text-emerald-700' },
   { value: 'facturada', label: 'Facturada', color: 'bg-purple-100 text-purple-700' },
   { value: 'pagada', label: 'Pagada', color: 'bg-green-100 text-green-800' },
@@ -112,6 +119,11 @@ export default function ValorizacionesPage() {
   // Estado transition dialog
   const [showEstadoDialog, setShowEstadoDialog] = useState(false)
   const [estadoTarget, setEstadoTarget] = useState<{ val: Valorizacion; estado: string } | null>(null)
+
+  // Observar dialog
+  const [showObservarDialog, setShowObservarDialog] = useState(false)
+  const [observarTarget, setObservarTarget] = useState<Valorizacion | null>(null)
+  const [motivoObservacion, setMotivoObservacion] = useState('')
 
   useEffect(() => { loadData() }, [])
 
@@ -256,13 +268,50 @@ export default function ValorizacionesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
-      if (!res.ok) throw new Error()
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Error al cambiar estado')
+      }
       toast.success(`Estado cambiado a ${getEstadoLabel(estadoTarget.estado)}`)
       setShowEstadoDialog(false)
       setEstadoTarget(null)
       loadData()
-    } catch {
-      toast.error('Error al cambiar estado')
+    } catch (e: any) {
+      toast.error(e.message || 'Error al cambiar estado')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const openObservar = (val: Valorizacion) => {
+    setObservarTarget(val)
+    setMotivoObservacion('')
+    setShowObservarDialog(true)
+  }
+
+  const handleObservar = async () => {
+    if (!observarTarget) return
+    if (!motivoObservacion.trim()) {
+      toast.error('Ingresa el motivo de la observación')
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/proyectos/${observarTarget.proyectoId}/valorizaciones/${observarTarget.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estado: 'observada', motivoObservacion: motivoObservacion.trim() }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Error')
+      }
+      toast.success('Valorización marcada como observada')
+      setShowObservarDialog(false)
+      setObservarTarget(null)
+      loadData()
+    } catch (e: any) {
+      toast.error(e.message || 'Error al observar')
     } finally {
       setSaving(false)
     }
@@ -420,9 +469,19 @@ export default function ValorizacionesPage() {
                             </Button>
                           </>
                         )}
-                        {item.estado === 'enviada' && (
-                          <Button variant="ghost" size="icon" onClick={() => openEstadoTransition(item, 'aprobada_cliente')} title="Aprobar">
-                            <CheckCircle className="h-4 w-4 text-emerald-600" />
+                        {(item.estado === 'enviada' || item.estado === 'corregida') && (
+                          <>
+                            <Button variant="ghost" size="icon" onClick={() => openObservar(item)} title="Marcar Observada">
+                              <AlertTriangle className="h-4 w-4 text-orange-500" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => openEstadoTransition(item, 'aprobada_cliente')} title="Aprobar">
+                              <CheckCircle className="h-4 w-4 text-emerald-600" />
+                            </Button>
+                          </>
+                        )}
+                        {item.estado === 'observada' && (
+                          <Button variant="ghost" size="icon" onClick={() => openEstadoTransition(item, 'corregida')} title="Enviar Corrección">
+                            <RefreshCw className="h-4 w-4 text-violet-600" />
                           </Button>
                         )}
                         {!['anulada', 'pagada', 'facturada', 'aprobada_cliente'].includes(item.estado) && (
@@ -606,6 +665,20 @@ export default function ValorizacionesPage() {
               {/* Banner de flujo de estados */}
               <ValorizacionFlowBanner estado={showDetail.estado} />
 
+              {/* Alerta de observación del cliente */}
+              {(['observada', 'corregida'].includes(showDetail.estado)) && showDetail.motivoObservacion && (
+                <div className="flex items-start gap-2 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                  <AlertTriangle className="h-4 w-4 text-orange-600 mt-0.5 shrink-0" />
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-orange-800">Observación del cliente</div>
+                    <p className="text-sm text-orange-700 mt-0.5">{showDetail.motivoObservacion}</p>
+                  </div>
+                  {showDetail.ciclosAprobacion > 1 && (
+                    <Badge className="bg-orange-100 text-orange-700 shrink-0">Ciclo #{showDetail.ciclosAprobacion}</Badge>
+                  )}
+                </div>
+              )}
+
               <div className="flex items-center gap-2">
                 <Badge variant="outline">{showDetail.moneda}</Badge>
                 {showDetail.tipoCambio && <span className="text-xs text-muted-foreground">TC: {showDetail.tipoCambio}</span>}
@@ -699,6 +772,39 @@ export default function ValorizacionesPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Dialog observar valorización */}
+      <Dialog open={showObservarDialog} onOpenChange={open => { if (!open) { setShowObservarDialog(false); setObservarTarget(null) } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Marcar como Observada</DialogTitle>
+            <DialogDescription>
+              {observarTarget && `${observarTarget.codigo} — ${observarTarget.proyecto?.codigo}`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-sm text-orange-800">
+              La valorización será devuelta para corrección. Ingresa el motivo de la observación del cliente.
+            </div>
+            <div>
+              <Label>Motivo de observación *</Label>
+              <Textarea
+                placeholder="Describe las observaciones del cliente..."
+                value={motivoObservacion}
+                onChange={e => setMotivoObservacion(e.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowObservarDialog(false); setObservarTarget(null) }}>Cancelar</Button>
+            <Button onClick={handleObservar} disabled={saving} className="bg-orange-600 hover:bg-orange-700">
+              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Marcar Observada
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <ValorizacionImportExcelModal
         isOpen={showImportDialog}
         onClose={() => setShowImportDialog(false)}
@@ -712,6 +818,8 @@ export default function ValorizacionesPage() {
 const FLOW_STEPS = [
   { value: 'borrador', label: 'Borrador' },
   { value: 'enviada', label: 'Enviada' },
+  { value: 'observada', label: 'Observada' },
+  { value: 'corregida', label: 'Corregida' },
   { value: 'aprobada_cliente', label: 'Aprobada Cliente' },
   { value: 'facturada', label: 'Facturada' },
   { value: 'pagada', label: 'Pagada' },

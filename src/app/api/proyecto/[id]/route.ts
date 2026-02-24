@@ -114,6 +114,61 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     const { id } = await context.params
     const data = await req.json()
 
+    // Detectar transición a "cerrado" para crear CxC de fondo de garantía
+    if (data.estado === 'cerrado') {
+      const proyectoActual = await prisma.proyecto.findUnique({
+        where: { id },
+        select: { estado: true, clienteId: true, codigo: true, diasGarantia: true, moneda: true, tipoCambio: true },
+      })
+
+      if (proyectoActual && proyectoActual.estado !== 'cerrado') {
+        // Idempotencia: verificar que no exista ya una CxC de fondo de garantía para este proyecto
+        const cxcExistente = await prisma.cuentaPorCobrar.findFirst({
+          where: {
+            proyectoId: id,
+            descripcion: { startsWith: 'Fondo de Garantía' },
+          },
+        })
+
+        if (!cxcExistente) {
+          // Sumar fondoGarantiaMonto de todas las valorizaciones no anuladas
+          const agg = await prisma.valorizacion.aggregate({
+            where: {
+              proyectoId: id,
+              estado: { not: 'anulada' },
+            },
+            _sum: { fondoGarantiaMonto: true },
+          })
+
+          const totalFondoGarantia = agg._sum.fondoGarantiaMonto || 0
+
+          if (totalFondoGarantia > 0) {
+            const diasGarantia = proyectoActual.diasGarantia ?? 365
+            const fechaVencimiento = new Date()
+            fechaVencimiento.setDate(fechaVencimiento.getDate() + diasGarantia)
+
+            await prisma.cuentaPorCobrar.create({
+              data: {
+                proyectoId: id,
+                clienteId: proyectoActual.clienteId,
+                descripcion: `Fondo de Garantía — ${proyectoActual.codigo}`,
+                monto: totalFondoGarantia,
+                saldoPendiente: totalFondoGarantia,
+                moneda: proyectoActual.moneda || 'PEN',
+                tipoCambio: proyectoActual.tipoCambio || undefined,
+                fechaEmision: new Date(),
+                fechaVencimiento,
+                condicionPago: `${diasGarantia} días post-cierre`,
+                diasCredito: diasGarantia,
+                observaciones: `Generado automáticamente al cerrar proyecto. Fondo acumulado de ${agg._sum.fondoGarantiaMonto?.toFixed(2)} en valorizaciones.`,
+                updatedAt: new Date(),
+              },
+            })
+          }
+        }
+      }
+    }
+
     const actualizado = await prisma.proyecto.update({
       where: { id },
       data,

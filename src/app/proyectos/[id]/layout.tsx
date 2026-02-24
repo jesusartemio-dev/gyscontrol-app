@@ -16,7 +16,8 @@ import {
   Pencil,
   Save,
   X,
-  Loader2
+  Loader2,
+  Shield,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getProyectoById } from '@/lib/services/proyecto'
@@ -87,6 +88,7 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
   const [editNombre, setEditNombre] = useState('')
   const [editDescripcion, setEditDescripcion] = useState('')
   const [editFechaInicio, setEditFechaInicio] = useState('')
+  const [editDiasGarantia, setEditDiasGarantia] = useState(365)
 
   const startEditingHeader = () => {
     if (!proyecto) return
@@ -96,6 +98,7 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
     setEditFechaInicio(proyecto.fechaInicio
       ? new Date(proyecto.fechaInicio).toISOString().split('T')[0]
       : '')
+    setEditDiasGarantia(proyecto.diasGarantia ?? 365)
     setEditingHeader(true)
   }
 
@@ -114,7 +117,8 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
           codigo: editCodigo,
           nombre: editNombre,
           descripcion: editDescripcion || null,
-          fechaInicio: editFechaInicio ? new Date(editFechaInicio).toISOString() : proyecto.fechaInicio
+          fechaInicio: editFechaInicio ? new Date(editFechaInicio).toISOString() : proyecto.fechaInicio,
+          diasGarantia: editDiasGarantia,
         })
       })
       if (!res.ok) {
@@ -122,7 +126,7 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
         throw new Error(err.error || 'Error al actualizar')
       }
       const updated = await res.json()
-      handleDataUpdate({ ...proyecto, codigo: updated.codigo, nombre: updated.nombre, descripcion: updated.descripcion, fechaInicio: updated.fechaInicio })
+      handleDataUpdate({ ...proyecto, codigo: updated.codigo, nombre: updated.nombre, descripcion: updated.descripcion, fechaInicio: updated.fechaInicio, diasGarantia: updated.diasGarantia })
       setEditingHeader(false)
       toast.success('Datos del proyecto actualizados')
     } catch (err: any) {
@@ -544,6 +548,26 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
                     <span className="flex items-center gap-1 text-muted-foreground">
                       <Calendar className="h-3.5 w-3.5" />
                       {formatDate(proyecto.fechaInicio)}
+                    </span>
+                  )}
+                  <span className="text-muted-foreground">|</span>
+                  {editingHeader ? (
+                    <span className="flex items-center gap-1">
+                      <Shield className="h-3.5 w-3.5 text-muted-foreground" />
+                      <Input
+                        type="number"
+                        value={editDiasGarantia}
+                        onChange={(e) => setEditDiasGarantia(Number(e.target.value))}
+                        className="h-7 w-20 text-sm"
+                        min={0}
+                        title="Días de garantía"
+                      />
+                      <span className="text-xs text-muted-foreground">días gtía</span>
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1 text-muted-foreground" title="Días de garantía post-cierre">
+                      <Shield className="h-3.5 w-3.5" />
+                      {proyecto.diasGarantia ?? 365}d
                     </span>
                   )}
                   <span className="text-muted-foreground">|</span>

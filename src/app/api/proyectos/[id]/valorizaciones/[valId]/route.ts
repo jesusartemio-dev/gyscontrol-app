@@ -99,6 +99,51 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       return NextResponse.json({ error: 'Valorización no encontrada' }, { status: 404 })
     }
 
+    // Validación de transiciones de estado
+    const TRANSICIONES: Record<string, string[]> = {
+      borrador:         ['enviada', 'anulada'],
+      enviada:          ['observada', 'aprobada_cliente', 'anulada'],
+      observada:        ['corregida', 'anulada'],
+      corregida:        ['observada', 'aprobada_cliente', 'anulada'],
+      aprobada_cliente: ['facturada', 'anulada'],
+      facturada:        ['pagada'],
+      pagada:           [],
+      anulada:          [],
+    }
+
+    if (body.estado && body.estado !== existing.estado) {
+      const permitidas = TRANSICIONES[existing.estado] || []
+      if (!permitidas.includes(body.estado)) {
+        return NextResponse.json(
+          { error: `Transición no permitida: ${existing.estado} → ${body.estado}` },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Campos automáticos según estado
+    let extraCampos: Record<string, any> = {}
+    if (body.estado && body.estado !== existing.estado) {
+      switch (body.estado) {
+        case 'enviada':
+          extraCampos = { fechaEnvio: new Date() }
+          break
+        case 'observada':
+          extraCampos = {
+            fechaObservacion: new Date(),
+            motivoObservacion: body.motivoObservacion ?? null,
+            ciclosAprobacion: { increment: 1 },
+          }
+          break
+        case 'corregida':
+          extraCampos = { fechaCorreccion: new Date() }
+          break
+        case 'aprobada_cliente':
+          extraCampos = { fechaAprobacion: new Date() }
+          break
+      }
+    }
+
     // Manejo de cambio de estado
     if (body.estado && body.estado !== existing.estado) {
       // Transición a "facturada": opcionalmente crear CuentaPorCobrar
@@ -161,8 +206,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         ...(body.moneda !== undefined && { moneda: body.moneda }),
         ...(body.tipoCambio !== undefined && { tipoCambio: body.tipoCambio }),
         ...(body.estado !== undefined && { estado: body.estado }),
-        ...(body.estado === 'enviada' && !existing.fechaEnvio && { fechaEnvio: new Date() }),
-        ...(body.estado === 'aprobada_cliente' && !existing.fechaAprobacion && { fechaAprobacion: new Date() }),
+        ...extraCampos,
         ...(body.observaciones !== undefined && { observaciones: body.observaciones }),
         presupuestoContractual,
         montoValorizacion,

@@ -899,6 +899,7 @@ model Proyecto {
   totalReal                Float                      @default(0)
   moneda                   String?                    @default("USD")
   tipoCambio               Float?
+  diasGarantia             Int                        @default(365)
   createdAt                DateTime                   @default(now())
   updatedAt                DateTime
   deletedAt                DateTime?
@@ -1481,6 +1482,10 @@ model Valorizacion {
   estado                      EstadoValorizacion  @default(borrador)
   fechaEnvio                  DateTime?
   fechaAprobacion             DateTime?
+  fechaObservacion            DateTime?
+  fechaCorreccion             DateTime?
+  motivoObservacion           String?
+  ciclosAprobacion            Int                 @default(0)
   observaciones               String?
   createdAt                   DateTime            @default(now())
   updatedAt                   DateTime
@@ -2970,6 +2975,8 @@ enum OrigenRecurso {
 enum EstadoValorizacion {
   borrador
   enviada
+  observada
+  corregida
   aprobada_cliente
   facturada
   pagada

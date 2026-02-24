@@ -57,6 +57,8 @@ interface Valorizacion {
 const ESTADOS = [
   { value: 'borrador', label: 'Borrador', color: 'bg-gray-100 text-gray-700' },
   { value: 'enviada', label: 'Enviada', color: 'bg-blue-100 text-blue-700' },
+  { value: 'observada', label: 'Observada', color: 'bg-orange-100 text-orange-700' },
+  { value: 'corregida', label: 'Corregida', color: 'bg-violet-100 text-violet-700' },
   { value: 'aprobada_cliente', label: 'Aprobada', color: 'bg-emerald-100 text-emerald-700' },
   { value: 'facturada', label: 'Facturada', color: 'bg-purple-100 text-purple-700' },
   { value: 'pagada', label: 'Pagada', color: 'bg-green-100 text-green-800' },
@@ -81,6 +83,8 @@ const formatPeriod = (start: string, end: string) =>
 const FLOW_STEPS = [
   { value: 'borrador', label: 'Borrador' },
   { value: 'enviada', label: 'Enviada' },
+  { value: 'observada', label: 'Observada' },
+  { value: 'corregida', label: 'Corregida' },
   { value: 'aprobada_cliente', label: 'Aprobada Cliente' },
   { value: 'facturada', label: 'Facturada' },
   { value: 'pagada', label: 'Pagada' },

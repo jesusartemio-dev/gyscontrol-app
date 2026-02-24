@@ -67,7 +67,7 @@ interface ValExportRow {
   observaciones: string | null
 }
 
-const ESTADOS_VALIDOS = ['borrador', 'enviada', 'aprobada_cliente', 'facturada', 'pagada', 'anulada']
+const ESTADOS_VALIDOS = ['borrador', 'enviada', 'observada', 'corregida', 'aprobada_cliente', 'facturada', 'pagada', 'anulada']
 const MONEDAS_VALIDAS = ['PEN', 'USD']
 
 // ============================================

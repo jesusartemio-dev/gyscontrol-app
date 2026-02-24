@@ -1088,6 +1088,7 @@ export interface Proyecto {
   totalReal: number
   moneda?: string | null
   tipoCambio?: number | null
+  diasGarantia?: number
   codigo: string
   estado: string
   fechaInicio: string
@@ -1537,7 +1538,7 @@ export interface PedidoEquipoItem {
 // 📊 Valorización de Proyectos
 // ============================
 
-export type EstadoValorizacion = 'borrador' | 'enviada' | 'aprobada_cliente' | 'facturada' | 'pagada' | 'anulada'
+export type EstadoValorizacion = 'borrador' | 'enviada' | 'observada' | 'corregida' | 'aprobada_cliente' | 'facturada' | 'pagada' | 'anulada'
 
 export interface Valorizacion {
   id: string
@@ -1570,6 +1571,10 @@ export interface Valorizacion {
   estado: EstadoValorizacion
   fechaEnvio?: string | null
   fechaAprobacion?: string | null
+  fechaObservacion?: string | null
+  fechaCorreccion?: string | null
+  motivoObservacion?: string | null
+  ciclosAprobacion: number
   observaciones?: string | null
   createdAt: string
   updatedAt: string
