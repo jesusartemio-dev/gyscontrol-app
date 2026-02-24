@@ -1293,6 +1293,8 @@ model User {
   password                  String?
   role                      Role                        @default(colaborador)
   image                     String?
+  lastLoginAt               DateTime?
+  lastActivityAt            DateTime?
   metaMensual               Float?
   metaTrimestral            Float?
   Account                   Account[]

@@ -99,6 +99,21 @@ export const authOptions: AuthOptions = {
       return session
     },
   },
+  events: {
+    async signIn({ user }) {
+      try {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            lastLoginAt: new Date(),
+            lastActivityAt: new Date(),
+          },
+        })
+      } catch (error) {
+        console.error('[Auth Event] Error updating lastLoginAt:', error)
+      }
+    },
+  },
   session: {
     strategy: 'jwt',
     maxAge: 30 * 24 * 60 * 60, // 30 days

@@ -312,6 +312,7 @@ export default function Sidebar() {
         { href: '/admin/usuarios', label: 'Usuarios', icon: Users },
         { href: '/admin/permisos', label: 'Permisos', icon: Shield },
         { href: '/admin/actividad', label: 'Actividad Sistema', icon: Activity },
+        { href: '/configuracion/actividad-usuarios', label: 'Actividad Usuarios', icon: Users },
         { href: '/configuracion/notificaciones', label: 'Notificaciones', icon: AlertCircle },
         // 🏢 Entidades maestras del negocio
         { href: '/comercial/clientes', label: 'Clientes', icon: Building2 },
