@@ -14,9 +14,11 @@ import {
   Home,
   ChevronRight,
   ChevronDown,
+  ChevronUp,
   X,
   Filter,
   Clock,
+  BarChart3,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -56,6 +58,10 @@ interface UsuarioActividad {
   lastActivityAt: string | null
   accionesUltimos30Dias: number
   estado: 'online_hoy' | 'activo_semana' | 'inactivo'
+  secciones: Array<{ seccion: string; count: number }>
+  desglose: Record<string, number>
+  horaPico: number | null
+  horasActividad: number[] | null
 }
 
 interface Resumen {
@@ -80,6 +86,38 @@ const ROL_LABELS: Record<string, string> = {
 }
 
 const ROLES = Object.keys(ROL_LABELS)
+
+const SECCION_LABELS: Record<string, string> = {
+  LISTA_EQUIPO: 'Listas',
+  PEDIDO_EQUIPO: 'Pedidos',
+  PROYECTO: 'Proyectos',
+  COTIZACION: 'Cotizaciones',
+  OPORTUNIDAD: 'CRM',
+  CATALOGO_EQUIPO: 'Catalogo',
+  PERMISO_ACCESO: 'Permisos',
+  LISTA_EQUIPO_ITEM: 'Items Lista',
+}
+
+const ACCION_LABELS: Record<string, string> = {
+  CREAR: 'Creados',
+  ACTUALIZAR: 'Editados',
+  ELIMINAR: 'Eliminados',
+  CAMBIAR_ESTADO: 'Cambios estado',
+}
+
+const ACCION_COLORS: Record<string, string> = {
+  CREAR: 'text-green-600',
+  ACTUALIZAR: 'text-blue-600',
+  ELIMINAR: 'text-red-500',
+  CAMBIAR_ESTADO: 'text-amber-600',
+}
+
+function formatHora(hora: number | null) {
+  if (hora === null) return '-'
+  const h = hora.toString().padStart(2, '0')
+  const hEnd = ((hora + 1) % 24).toString().padStart(2, '0')
+  return `${h}:00 - ${hEnd}:00`
+}
 
 function getEstadoBadge(estado: string) {
   switch (estado) {
@@ -155,6 +193,7 @@ export default function UserActivityDashboard() {
   const [fechaDesde, setFechaDesde] = useState('')
   const [fechaHasta, setFechaHasta] = useState('')
   const [filtrosAbiertos, setFiltrosAbiertos] = useState(false)
+  const [expandedUser, setExpandedUser] = useState<string | null>(null)
 
   const cargarDatos = useCallback(
     async (showLoading = true) => {
@@ -230,6 +269,11 @@ export default function UserActivityDashboard() {
       'Ultimo Login': formatFechaAbsoluta(u.lastLoginAt),
       'Ultima Actividad': formatFechaAbsoluta(u.lastActivityAt),
       'Acciones (30 dias)': u.accionesUltimos30Dias,
+      'Creados': u.desglose?.CREAR || 0,
+      'Editados': u.desglose?.ACTUALIZAR || 0,
+      'Eliminados': u.desglose?.ELIMINAR || 0,
+      'Secciones Top': u.secciones?.map(s => SECCION_LABELS[s.seccion] || s.seccion).join(', ') || '-',
+      'Hora Pico': formatHora(u.horaPico),
       Estado:
         u.estado === 'online_hoy'
           ? 'En linea hoy'
@@ -241,15 +285,10 @@ export default function UserActivityDashboard() {
     const wb = XLSX.utils.book_new()
     const ws = XLSX.utils.json_to_sheet(data)
 
-    // Ajustar anchos de columna
     ws['!cols'] = [
-      { wch: 25 },
-      { wch: 30 },
-      { wch: 15 },
-      { wch: 20 },
-      { wch: 20 },
-      { wch: 15 },
-      { wch: 20 },
+      { wch: 25 }, { wch: 30 }, { wch: 15 }, { wch: 20 }, { wch: 20 },
+      { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 25 },
+      { wch: 15 }, { wch: 20 },
     ]
 
     XLSX.utils.book_append_sheet(wb, ws, 'Actividad Usuarios')
@@ -510,6 +549,7 @@ export default function UserActivityDashboard() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-8"></TableHead>
                     <TableHead className="min-w-[200px]">Usuario</TableHead>
                     <TableHead>Rol</TableHead>
                     <TableHead>Ultimo Login</TableHead>
@@ -521,56 +561,173 @@ export default function UserActivityDashboard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {usuariosFiltrados.map(usuario => (
-                    <TableRow key={usuario.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                              {getInitials(usuario.name, usuario.email)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="min-w-0">
-                            <div className="font-medium text-sm truncate">
-                              {usuario.name || 'Sin nombre'}
-                            </div>
-                            <div className="text-xs text-muted-foreground truncate">
-                              {usuario.email}
-                            </div>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-xs">
-                          {ROL_LABELS[usuario.role] || usuario.role}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div
-                          className="text-sm flex items-center gap-1.5"
-                          title={formatFechaAbsoluta(usuario.lastLoginAt)}
+                  {usuariosFiltrados.map(usuario => {
+                    const isExpanded = expandedUser === usuario.id
+                    const hasDetail = usuario.accionesUltimos30Dias > 0
+                    return (
+                      <React.Fragment key={usuario.id}>
+                        <TableRow
+                          className={hasDetail ? 'cursor-pointer hover:bg-muted/50' : ''}
+                          onClick={() => hasDetail && setExpandedUser(isExpanded ? null : usuario.id)}
                         >
-                          <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                          {formatFecha(usuario.lastLoginAt)}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div
-                          className="text-sm flex items-center gap-1.5"
-                          title={formatFechaAbsoluta(usuario.lastActivityAt)}
-                        >
-                          <Activity className="h-3.5 w-3.5 text-muted-foreground" />
-                          {formatFecha(usuario.lastActivityAt)}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <span className="font-mono text-sm">
-                          {usuario.accionesUltimos30Dias}
-                        </span>
-                      </TableCell>
-                      <TableCell>{getEstadoBadge(usuario.estado)}</TableCell>
-                    </TableRow>
-                  ))}
+                          <TableCell className="w-8 px-2">
+                            {hasDetail && (
+                              isExpanded
+                                ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                                : <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <Avatar className="h-8 w-8">
+                                <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                                  {getInitials(usuario.name, usuario.email)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="min-w-0">
+                                <div className="font-medium text-sm truncate">
+                                  {usuario.name || 'Sin nombre'}
+                                </div>
+                                <div className="text-xs text-muted-foreground truncate">
+                                  {usuario.email}
+                                </div>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-xs">
+                              {ROL_LABELS[usuario.role] || usuario.role}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div
+                              className="text-sm flex items-center gap-1.5"
+                              title={formatFechaAbsoluta(usuario.lastLoginAt)}
+                            >
+                              <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                              {formatFecha(usuario.lastLoginAt)}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div
+                              className="text-sm flex items-center gap-1.5"
+                              title={formatFechaAbsoluta(usuario.lastActivityAt)}
+                            >
+                              <Activity className="h-3.5 w-3.5 text-muted-foreground" />
+                              {formatFecha(usuario.lastActivityAt)}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span className="font-mono text-sm">
+                              {usuario.accionesUltimos30Dias}
+                            </span>
+                          </TableCell>
+                          <TableCell>{getEstadoBadge(usuario.estado)}</TableCell>
+                        </TableRow>
+                        {/* Fila expandible con detalle */}
+                        {isExpanded && (
+                          <TableRow className="bg-muted/30 hover:bg-muted/30">
+                            <TableCell colSpan={7} className="p-0">
+                              <div className="px-6 py-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                                {/* Secciones más usadas */}
+                                <div>
+                                  <h4 className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1.5">
+                                    <BarChart3 className="h-3.5 w-3.5" />
+                                    Secciones mas usadas
+                                  </h4>
+                                  {usuario.secciones && usuario.secciones.length > 0 ? (
+                                    <div className="space-y-1.5">
+                                      {usuario.secciones.map((s, i) => (
+                                        <div key={i} className="flex items-center justify-between">
+                                          <span className="text-sm">
+                                            {SECCION_LABELS[s.seccion] || s.seccion}
+                                          </span>
+                                          <Badge variant="secondary" className="text-[10px] h-5">
+                                            {s.count}
+                                          </Badge>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <p className="text-xs text-muted-foreground">Sin datos</p>
+                                  )}
+                                </div>
+                                {/* Tipo de acciones */}
+                                <div>
+                                  <h4 className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1.5">
+                                    <Activity className="h-3.5 w-3.5" />
+                                    Tipo de acciones
+                                  </h4>
+                                  {usuario.desglose && Object.keys(usuario.desglose).length > 0 ? (
+                                    <div className="space-y-1.5">
+                                      {Object.entries(usuario.desglose).map(([accion, count]) => (
+                                        <div key={accion} className="flex items-center justify-between">
+                                          <span className={`text-sm ${ACCION_COLORS[accion] || ''}`}>
+                                            {ACCION_LABELS[accion] || accion}
+                                          </span>
+                                          <span className="font-mono text-sm">{count}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <p className="text-xs text-muted-foreground">Sin datos</p>
+                                  )}
+                                </div>
+                                {/* Horario de uso */}
+                                <div>
+                                  <h4 className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1.5">
+                                    <Clock className="h-3.5 w-3.5" />
+                                    Horario de uso
+                                  </h4>
+                                  {usuario.horaPico !== null ? (
+                                    <div>
+                                      <div className="text-sm mb-2">
+                                        Hora pico: <span className="font-semibold">{formatHora(usuario.horaPico)}</span>
+                                      </div>
+                                      {usuario.horasActividad && (
+                                        <div className="flex items-end gap-px h-10">
+                                          {usuario.horasActividad.slice(6, 22).map((count, i) => {
+                                            const hora = i + 6
+                                            const max = Math.max(...usuario.horasActividad!.slice(6, 22))
+                                            const height = max > 0 ? (count / max) * 100 : 0
+                                            return (
+                                              <div
+                                                key={hora}
+                                                className="flex-1 group relative"
+                                                title={`${hora}:00 - ${count} acciones`}
+                                              >
+                                                <div
+                                                  className={`w-full rounded-t-sm ${
+                                                    hora === usuario.horaPico
+                                                      ? 'bg-primary'
+                                                      : 'bg-primary/30'
+                                                  }`}
+                                                  style={{ height: `${Math.max(height, 2)}%` }}
+                                                />
+                                              </div>
+                                            )
+                                          })}
+                                        </div>
+                                      )}
+                                      {usuario.horasActividad && (
+                                        <div className="flex justify-between mt-0.5">
+                                          <span className="text-[9px] text-muted-foreground">6am</span>
+                                          <span className="text-[9px] text-muted-foreground">2pm</span>
+                                          <span className="text-[9px] text-muted-foreground">10pm</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <p className="text-xs text-muted-foreground">Sin datos</p>
+                                  )}
+                                </div>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </React.Fragment>
+                    )
+                  })}
                 </TableBody>
               </Table>
             </div>

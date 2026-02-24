@@ -63,6 +63,58 @@ export async function GET(request: NextRequest) {
       actionCounts.map(ac => [ac.usuarioId, ac._count.id])
     )
 
+    // Secciones más usadas por usuario (groupBy entidadTipo por usuario)
+    const sectionsByUser = await prisma.auditLog.groupBy({
+      by: ['usuarioId', 'entidadTipo'],
+      where: {
+        createdAt: { gte: thirtyDaysAgo },
+      },
+      _count: { id: true },
+      orderBy: { _count: { id: 'desc' } },
+    })
+
+    const seccionesMap = new Map<string, Array<{ seccion: string; count: number }>>()
+    for (const row of sectionsByUser) {
+      const arr = seccionesMap.get(row.usuarioId) || []
+      arr.push({ seccion: row.entidadTipo, count: row._count.id })
+      seccionesMap.set(row.usuarioId, arr)
+    }
+
+    // Tipo de acciones por usuario (CREAR, ACTUALIZAR, ELIMINAR, etc.)
+    const actionsByUser = await prisma.auditLog.groupBy({
+      by: ['usuarioId', 'accion'],
+      where: {
+        createdAt: { gte: thirtyDaysAgo },
+      },
+      _count: { id: true },
+    })
+
+    const accionesMap = new Map<string, Record<string, number>>()
+    for (const row of actionsByUser) {
+      const obj = accionesMap.get(row.usuarioId) || {}
+      obj[row.accion] = row._count.id
+      accionesMap.set(row.usuarioId, obj)
+    }
+
+    // Horarios de actividad por usuario (hora del día)
+    const horariosRaw = await prisma.auditLog.findMany({
+      where: {
+        createdAt: { gte: thirtyDaysAgo },
+      },
+      select: {
+        usuarioId: true,
+        createdAt: true,
+      },
+    })
+
+    const horariosMap = new Map<string, number[]>()
+    for (const row of horariosRaw) {
+      const horas = horariosMap.get(row.usuarioId) || Array(24).fill(0)
+      const hora = new Date(row.createdAt).getHours()
+      horas[hora]++
+      horariosMap.set(row.usuarioId, horas)
+    }
+
     // Clasificar estado de cada usuario
     const usuariosConActividad = users.map(user => {
       const lastActivity = user.lastActivityAt
@@ -78,10 +130,31 @@ export async function GET(request: NextRequest) {
         estado = 'inactivo'
       }
 
+      // Top 3 secciones más usadas
+      const secciones = (seccionesMap.get(user.id) || []).slice(0, 3)
+
+      // Desglose de acciones
+      const desglose = accionesMap.get(user.id) || {}
+
+      // Horario pico (hora con más actividad)
+      const horas = horariosMap.get(user.id) || []
+      let horaPico: number | null = null
+      let maxActividad = 0
+      for (let i = 0; i < horas.length; i++) {
+        if (horas[i] > maxActividad) {
+          maxActividad = horas[i]
+          horaPico = i
+        }
+      }
+
       return {
         ...user,
         accionesUltimos30Dias: countMap.get(user.id) || 0,
         estado,
+        secciones,
+        desglose,
+        horaPico,
+        horasActividad: horas.length > 0 ? horas : null,
       }
     })
 
