@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Loader2, Search, Eye, Receipt, DollarSign, FileSpreadsheet, Check, Ban } from 'lucide-react'
+import { Loader2, Search, Eye, Receipt, DollarSign, FileSpreadsheet, Check, Ban, Undo2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface Proyecto {
@@ -131,7 +131,7 @@ function FlowBanner({ estado }: { estado: string }) {
   )
 }
 
-type TabFilter = 'pendientes' | 'facturadas' | 'pagadas' | 'todas'
+type TabFilter = 'pendientes' | 'facturadas' | 'pagadas' | 'anuladas' | 'todas'
 
 export default function FacturacionPage() {
   const [items, setItems] = useState<Valorizacion[]>([])
@@ -151,9 +151,12 @@ export default function FacturacionPage() {
   const [factMetodoPago, setFactMetodoPago] = useState('')
   const [factBancoFinanciera, setFactBancoFinanciera] = useState('')
 
-  // Generic estado dialog (pagada, anulada)
+  // Generic estado dialog (pagada)
   const [showEstadoDialog, setShowEstadoDialog] = useState(false)
   const [estadoTarget, setEstadoTarget] = useState<{ val: Valorizacion; estado: string } | null>(null)
+
+  // Anular confirm dialog
+  const [confirmAnular, setConfirmAnular] = useState<Valorizacion | null>(null)
 
   useEffect(() => { loadData() }, [])
 
@@ -164,7 +167,7 @@ export default function FacturacionPage() {
       if (res.ok) {
         const data = await res.json()
         // Only show valorizaciones that are relevant to admin: aprobada_cliente, facturada, pagada
-        setItems(data.filter((v: Valorizacion) => ['aprobada_cliente', 'facturada', 'pagada'].includes(v.estado)))
+        setItems(data.filter((v: Valorizacion) => ['aprobada_cliente', 'facturada', 'pagada', 'anulada'].includes(v.estado)))
       }
     } catch {
       toast.error('Error al cargar datos')
@@ -178,6 +181,7 @@ export default function FacturacionPage() {
     if (tabFilter === 'pendientes') result = result.filter(i => i.estado === 'aprobada_cliente')
     else if (tabFilter === 'facturadas') result = result.filter(i => i.estado === 'facturada')
     else if (tabFilter === 'pagadas') result = result.filter(i => i.estado === 'pagada')
+    else if (tabFilter === 'anuladas') result = result.filter(i => i.estado === 'anulada')
     if (searchTerm) {
       const term = searchTerm.toLowerCase()
       result = result.filter(i =>
@@ -193,6 +197,7 @@ export default function FacturacionPage() {
     pendientes: items.filter(i => i.estado === 'aprobada_cliente').length,
     facturadas: items.filter(i => i.estado === 'facturada').length,
     pagadas: items.filter(i => i.estado === 'pagada').length,
+    anuladas: items.filter(i => i.estado === 'anulada').length,
     todas: items.length,
   }), [items])
 
@@ -268,6 +273,34 @@ export default function FacturacionPage() {
     }
   }
 
+  // Anular
+  const handleAnular = (val: Valorizacion) => {
+    setConfirmAnular(val)
+  }
+
+  const executeAnular = async () => {
+    if (!confirmAnular) return
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/proyectos/${confirmAnular.proyectoId}/valorizaciones/${confirmAnular.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estado: 'anulada' }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        throw new Error(data?.error || 'Error al anular')
+      }
+      toast.success('Valorización anulada correctamente')
+      setConfirmAnular(null)
+      loadData()
+    } catch (err: any) {
+      toast.error(err.message || 'Error al anular')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -331,6 +364,7 @@ export default function FacturacionPage() {
             { key: 'pendientes', label: 'Por Facturar' },
             { key: 'facturadas', label: 'Facturadas' },
             { key: 'pagadas', label: 'Pagadas' },
+            { key: 'anuladas', label: 'Anuladas' },
             { key: 'todas', label: 'Todas' },
           ] as { key: TabFilter; label: string }[]).map(tab => (
             <Button
@@ -401,6 +435,21 @@ export default function FacturacionPage() {
                         {item.estado === 'facturada' && (
                           <Button variant="ghost" size="icon" onClick={() => openEstadoTransition(item, 'pagada')} title="Marcar pagada">
                             <DollarSign className="h-4 w-4 text-green-600" />
+                          </Button>
+                        )}
+                        {item.estado === 'pagada' && (
+                          <Button variant="ghost" size="icon" onClick={() => openEstadoTransition(item, 'facturada')} title="Revertir pago">
+                            <Undo2 className="h-4 w-4 text-amber-600" />
+                          </Button>
+                        )}
+                        {item.estado === 'facturada' && (
+                          <Button variant="ghost" size="icon" onClick={() => openEstadoTransition(item, 'aprobada_cliente')} title="Revertir factura">
+                            <Undo2 className="h-4 w-4 text-amber-600" />
+                          </Button>
+                        )}
+                        {(item.estado === 'facturada' || item.estado === 'pagada') && (
+                          <Button variant="ghost" size="icon" onClick={() => handleAnular(item)} title="Anular">
+                            <Ban className="h-4 w-4 text-red-500" />
                           </Button>
                         )}
                       </div>
@@ -491,6 +540,24 @@ export default function FacturacionPage() {
                 Marcar Pagada
               </Button>
             )}
+            {showDetail?.estado === 'pagada' && (
+              <Button variant="outline" onClick={() => { setShowDetail(null); openEstadoTransition(showDetail!, 'facturada') }}>
+                <Undo2 className="h-4 w-4 mr-2" />
+                Revertir Pago
+              </Button>
+            )}
+            {showDetail?.estado === 'facturada' && (
+              <Button variant="outline" onClick={() => { setShowDetail(null); openEstadoTransition(showDetail!, 'aprobada_cliente') }}>
+                <Undo2 className="h-4 w-4 mr-2" />
+                Revertir Factura
+              </Button>
+            )}
+            {(showDetail?.estado === 'facturada' || showDetail?.estado === 'pagada') && (
+              <Button variant="destructive" onClick={() => { setShowDetail(null); handleAnular(showDetail!) }}>
+                <Ban className="h-4 w-4 mr-2" />
+                Anular
+              </Button>
+            )}
             <Button variant="outline" onClick={() => setShowDetail(null)}>Cerrar</Button>
           </DialogFooter>
         </DialogContent>
@@ -570,23 +637,130 @@ export default function FacturacionPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Generic estado change dialog (pagada) */}
+      {/* Generic estado change dialog */}
       <Dialog open={showEstadoDialog} onOpenChange={open => { if (!open) { setShowEstadoDialog(false); setEstadoTarget(null) } }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Cambiar Estado</DialogTitle>
+            <DialogTitle>
+              {estadoTarget && (
+                estadoTarget.estado === 'facturada' && estadoTarget.val.estado === 'pagada' ? 'Revertir Pago' :
+                estadoTarget.estado === 'aprobada_cliente' && estadoTarget.val.estado === 'facturada' ? 'Revertir Factura' :
+                'Cambiar Estado'
+              )}
+            </DialogTitle>
             <DialogDescription>
-              {estadoTarget && `${estadoTarget.val.codigo} → ${getEstadoLabel(estadoTarget.estado)}`}
+              {estadoTarget && `${estadoTarget.val.codigo} — ${getEstadoLabel(estadoTarget.val.estado)} → ${getEstadoLabel(estadoTarget.estado)}`}
             </DialogDescription>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            ¿Confirmar cambio de estado a <strong>{estadoTarget && getEstadoLabel(estadoTarget.estado)}</strong>?
-          </p>
+          {estadoTarget && (
+            <div className="space-y-3">
+              <Card>
+                <CardContent className="p-3 text-sm space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Código</span>
+                    <span className="font-mono font-medium">{estadoTarget.val.codigo}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Proyecto</span>
+                    <span>{estadoTarget.val.proyecto?.codigo}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Neto a Recibir</span>
+                    <span className="font-mono font-bold">{formatCurrency(estadoTarget.val.netoARecibir, estadoTarget.val.moneda)}</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Revertir factura warning */}
+              {estadoTarget.val.estado === 'facturada' && estadoTarget.estado === 'aprobada_cliente' && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm space-y-1">
+                  <p className="font-medium text-amber-700">Al revertir la facturación:</p>
+                  <ul className="list-disc pl-5 text-amber-600 space-y-0.5">
+                    <li>La valorización volverá a <strong>Aprobada Cliente</strong></li>
+                    <li>Las CxC asociadas serán <strong>anuladas</strong></li>
+                    <li>Podrá volver a facturarse después</li>
+                  </ul>
+                </div>
+              )}
+
+              {/* Revertir pago warning */}
+              {estadoTarget.val.estado === 'pagada' && estadoTarget.estado === 'facturada' && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm space-y-1">
+                  <p className="font-medium text-amber-700">Al revertir el pago:</p>
+                  <ul className="list-disc pl-5 text-amber-600 space-y-0.5">
+                    <li>La valorización volverá a <strong>Facturada</strong></li>
+                    <li>Las CxC asociadas no se modifican</li>
+                  </ul>
+                </div>
+              )}
+
+              {/* Marcar pagada info */}
+              {estadoTarget.estado === 'pagada' && (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-sm">
+                  <p className="text-emerald-700">La valorización se marcará como <strong>Pagada</strong>.</p>
+                </div>
+              )}
+            </div>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => { setShowEstadoDialog(false); setEstadoTarget(null) }}>Cancelar</Button>
             <Button onClick={handleEstadoChange} disabled={saving}>
               {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Confirmar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Anular confirm dialog */}
+      <Dialog open={!!confirmAnular} onOpenChange={open => { if (!open) setConfirmAnular(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Anular Valorización</DialogTitle>
+            <DialogDescription>
+              Esta acción cambiará el estado de la valorización a Anulada
+            </DialogDescription>
+          </DialogHeader>
+          {confirmAnular && (
+            <div className="space-y-3">
+              <Card>
+                <CardContent className="p-3 text-sm space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Código</span>
+                    <span className="font-mono font-medium">{confirmAnular.codigo}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Proyecto</span>
+                    <span>{confirmAnular.proyecto?.codigo}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Estado actual</span>
+                    <Badge className={getEstadoColor(confirmAnular.estado)}>{getEstadoLabel(confirmAnular.estado)}</Badge>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Neto a Recibir</span>
+                    <span className="font-mono font-bold">{formatCurrency(confirmAnular.netoARecibir, confirmAnular.moneda)}</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm space-y-1">
+                <p className="font-medium text-red-700">Al anular esta valorización:</p>
+                <ul className="list-disc pl-5 text-red-600 space-y-0.5">
+                  <li>La valorización pasará a estado <strong>Anulada</strong> de forma irreversible</li>
+                  <li>Se revertirá la amortización de adelanto asociada</li>
+                  {(confirmAnular.estado === 'facturada' || confirmAnular.estado === 'pagada') && (
+                    <li>Las Cuentas por Cobrar (CxC) asociadas también serán <strong>anuladas</strong></li>
+                  )}
+                </ul>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmAnular(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={executeAnular} disabled={saving}>
+              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Sí, Anular
             </Button>
           </DialogFooter>
         </DialogContent>

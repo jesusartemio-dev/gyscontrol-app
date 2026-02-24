@@ -103,12 +103,12 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     // Validación de transiciones de estado
     const TRANSICIONES: Record<string, string[]> = {
       borrador:         ['enviada', 'anulada'],
-      enviada:          ['observada', 'aprobada_cliente', 'anulada'],
-      observada:        ['corregida', 'anulada'],
-      corregida:        ['observada', 'aprobada_cliente', 'anulada'],
-      aprobada_cliente: ['facturada', 'anulada'],
-      facturada:        ['pagada'],
-      pagada:           [],
+      enviada:          ['observada', 'aprobada_cliente', 'borrador', 'anulada'],
+      observada:        ['corregida', 'enviada', 'anulada'],
+      corregida:        ['observada', 'aprobada_cliente', 'enviada', 'anulada'],
+      aprobada_cliente: ['facturada', 'enviada', 'anulada'],
+      facturada:        ['pagada', 'aprobada_cliente', 'anulada'],
+      pagada:           ['facturada', 'anulada'],
       anulada:          [],
     }
 
@@ -160,6 +160,33 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       // Revertir amortización al anular desde estado post-aprobación
       const estadosPostAprobacion = ['aprobada_cliente', 'facturada', 'pagada']
       if (body.estado === 'anulada' && estadosPostAprobacion.includes(existing.estado) && existing.adelantoMonto > 0) {
+        await prisma.proyecto.update({
+          where: { id: proyectoId },
+          data: {
+            adelantoAmortizado: { decrement: existing.adelantoMonto },
+          },
+        })
+      }
+
+      // Al anular desde facturada/pagada: anular CxC asociadas
+      const estadosConCxC = ['facturada', 'pagada']
+      if (body.estado === 'anulada' && estadosConCxC.includes(existing.estado)) {
+        await prisma.cuentaPorCobrar.updateMany({
+          where: { valorizacionId: valId, estado: { not: 'anulada' } },
+          data: { estado: 'anulada', updatedAt: new Date() },
+        })
+      }
+
+      // Revertir facturación (facturada → aprobada_cliente): anular CxC asociadas
+      if (existing.estado === 'facturada' && body.estado === 'aprobada_cliente') {
+        await prisma.cuentaPorCobrar.updateMany({
+          where: { valorizacionId: valId, estado: { not: 'anulada' } },
+          data: { estado: 'anulada', updatedAt: new Date() },
+        })
+      }
+
+      // Revertir aprobación (aprobada_cliente → enviada): revertir amortización adelanto
+      if (existing.estado === 'aprobada_cliente' && body.estado === 'enviada' && existing.adelantoMonto > 0) {
         await prisma.proyecto.update({
           where: { id: proyectoId },
           data: {
@@ -305,16 +332,16 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
       )
     }
 
-    // Verificar si hay CxC con pagos asociados
-    const cxcConPagos = existing.cuentasPorCobrar.filter(c => c.montoPagado > 0)
-    if (cxcConPagos.length > 0) {
+    // Verificar si hay CxC activas con pagos (no anuladas)
+    const cxcActivasConPagos = existing.cuentasPorCobrar.filter(c => c.montoPagado > 0 && c.estado !== 'anulada')
+    if (cxcActivasConPagos.length > 0) {
       return NextResponse.json(
-        { error: 'No se puede eliminar: tiene cuentas por cobrar con pagos registrados.' },
+        { error: 'No se puede eliminar: tiene cuentas por cobrar activas con pagos registrados. Anúlelas primero.' },
         { status: 400 }
       )
     }
 
-    // Desvincular CxC que no tienen pagos (nullificar FK)
+    // Desvincular CxC (nullificar FK)
     if (existing.cuentasPorCobrar.length > 0) {
       await prisma.cuentaPorCobrar.updateMany({
         where: { valorizacionId: valId },
