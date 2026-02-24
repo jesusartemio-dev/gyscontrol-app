@@ -161,6 +161,12 @@ export default function CuentasCobrarPage() {
   // Import dialog
   const [showImportDialog, setShowImportDialog] = useState(false)
 
+  // Confirm dialog
+  const [confirmDialog, setConfirmDialog] = useState<{
+    tipo: 'anular' | 'eliminar'
+    cuenta: CuentaPorCobrar
+  } | null>(null)
+
   useEffect(() => { loadData() }, [])
 
   const loadData = async () => {
@@ -294,8 +300,11 @@ export default function CuentasCobrarPage() {
   }
 
   // --- Anular ---
-  const handleAnular = async (cuenta: CuentaPorCobrar) => {
-    if (!confirm(`¿Anular la cuenta ${cuenta.numeroDocumento || cuenta.id.slice(0, 8)}?`)) return
+  const handleAnular = (cuenta: CuentaPorCobrar) => {
+    setConfirmDialog({ tipo: 'anular', cuenta })
+  }
+
+  const executeAnular = async (cuenta: CuentaPorCobrar) => {
     setSaving(true)
     try {
       const res = await fetch(`/api/administracion/cuentas-cobrar/${cuenta.id}`, {
@@ -318,8 +327,11 @@ export default function CuentasCobrarPage() {
   }
 
   // --- Eliminar ---
-  const handleEliminar = async (cuenta: CuentaPorCobrar) => {
-    if (!confirm(`¿Eliminar permanentemente la cuenta ${cuenta.numeroDocumento || cuenta.id.slice(0, 8)}? Esta acción no se puede deshacer.`)) return
+  const handleEliminar = (cuenta: CuentaPorCobrar) => {
+    setConfirmDialog({ tipo: 'eliminar', cuenta })
+  }
+
+  const executeEliminar = async (cuenta: CuentaPorCobrar) => {
     setSaving(true)
     try {
       const res = await fetch(`/api/administracion/cuentas-cobrar/${cuenta.id}`, {
@@ -337,6 +349,14 @@ export default function CuentasCobrarPage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleConfirmAction = async () => {
+    if (!confirmDialog) return
+    const { tipo, cuenta } = confirmDialog
+    setConfirmDialog(null)
+    if (tipo === 'anular') await executeAnular(cuenta)
+    else await executeEliminar(cuenta)
   }
 
   // --- Pago ---
@@ -998,6 +1018,71 @@ export default function CuentasCobrarPage() {
                 Registrar Cobro
               </Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog confirmación anular/eliminar */}
+      <Dialog open={!!confirmDialog} onOpenChange={open => { if (!open) setConfirmDialog(null) }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className={`h-5 w-5 ${confirmDialog?.tipo === 'eliminar' ? 'text-red-600' : 'text-amber-600'}`} />
+              {confirmDialog?.tipo === 'anular' ? 'Anular Cuenta por Cobrar' : 'Eliminar Cuenta por Cobrar'}
+            </DialogTitle>
+            <DialogDescription>
+              {confirmDialog?.cuenta.numeroDocumento || 'Sin documento'} — {confirmDialog?.cuenta.cliente?.nombre}
+            </DialogDescription>
+          </DialogHeader>
+          {confirmDialog && (
+            <div className="space-y-3 text-sm">
+              <Card>
+                <CardContent className="p-3 space-y-1">
+                  <div className="flex justify-between"><span>Documento</span><span className="font-mono">{confirmDialog.cuenta.numeroDocumento || '—'}</span></div>
+                  <div className="flex justify-between"><span>Monto</span><span className="font-mono font-bold">{formatCurrency(confirmDialog.cuenta.monto, confirmDialog.cuenta.moneda)}</span></div>
+                  {confirmDialog.cuenta.montoPagado > 0 && (
+                    <div className="flex justify-between text-green-600"><span>Pagado</span><span className="font-mono">{formatCurrency(confirmDialog.cuenta.montoPagado, confirmDialog.cuenta.moneda)}</span></div>
+                  )}
+                  <div className="flex justify-between"><span>Estado actual</span>
+                    <Badge className={getEstadoColor(confirmDialog.cuenta.estado)}>
+                      {ESTADOS_CXC.find(e => e.value === confirmDialog.cuenta.estado)?.label || confirmDialog.cuenta.estado}
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+              {confirmDialog.tipo === 'anular' ? (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 space-y-1">
+                  <p className="font-medium">La cuenta pasará a estado &quot;Anulada&quot;.</p>
+                  <p>No se podrán registrar más cobros. Los pagos existentes se mantendrán como historial.</p>
+                  {confirmDialog.cuenta.estado === 'pagada' && (
+                    <p className="font-semibold mt-2">Esta cuenta ya fue cobrada en su totalidad. Al anularla podrá eliminarla después si es necesario.</p>
+                  )}
+                </div>
+              ) : (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 space-y-1">
+                  <p className="font-medium">Se eliminará permanentemente esta cuenta por cobrar.</p>
+                  {confirmDialog.cuenta.montoPagado > 0 && (
+                    <p>Se eliminarán también los <strong>{confirmDialog.cuenta.pagos?.length || 0} pago(s)</strong> registrados y sus adjuntos asociados.</p>
+                  )}
+                  <p className="font-semibold">Esta acción no se puede deshacer.</p>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmDialog(null)}>Cancelar</Button>
+            <Button
+              variant={confirmDialog?.tipo === 'eliminar' ? 'destructive' : 'default'}
+              onClick={handleConfirmAction}
+              disabled={saving}
+            >
+              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {confirmDialog?.tipo === 'anular' ? (
+                <><Ban className="h-4 w-4 mr-1" /> Sí, anular</>
+              ) : (
+                <><Trash2 className="h-4 w-4 mr-1" /> Sí, eliminar</>
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
