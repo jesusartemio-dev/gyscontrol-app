@@ -211,7 +211,7 @@ export default function SupervisionGastosPage() {
                   <TableRow
                     key={hoja.id}
                     className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => router.push(`/gastos/mis-requerimientos/${hoja.id}`)}
+                    onClick={() => router.push(`/gastos/mis-requerimientos/${hoja.id}?from=supervision`)}
                   >
                     <TableCell className="font-mono text-sm font-medium">{hoja.numero}</TableCell>
                     <TableCell className="text-sm">{hoja.empleado?.name || '-'}</TableCell>

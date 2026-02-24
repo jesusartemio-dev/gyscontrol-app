@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, use } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -59,7 +59,14 @@ const formatDate = (date: string | null | undefined) =>
 export default function RequerimientoDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { data: session } = useSession()
+  const from = searchParams.get('from')
+  const backUrl =
+    from === 'supervision' ? '/supervision/gastos' :
+    from === 'administracion' ? '/administracion/gastos' :
+    from === 'rendiciones' ? '/administracion/rendiciones' :
+    '/gastos/mis-requerimientos'
   const [hoja, setHoja] = useState<HojaDeGastos | null>(null)
   const [lineas, setLineas] = useState<GastoLinea[]>([])
   const [categorias, setCategorias] = useState<CategoriaGasto[]>([])
@@ -195,7 +202,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
     <div className="container mx-auto p-4 sm:p-6 space-y-4 max-w-4xl">
       {/* Header */}
       <div className="flex items-center gap-2 flex-wrap">
-        <Button variant="ghost" size="sm" onClick={() => router.push('/gastos/mis-requerimientos')}>
+        <Button variant="ghost" size="sm" onClick={() => router.push(backUrl)}>
           <ArrowLeft className="h-4 w-4 mr-1" />
           Volver
         </Button>

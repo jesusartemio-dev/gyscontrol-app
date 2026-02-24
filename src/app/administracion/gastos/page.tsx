@@ -329,7 +329,7 @@ function GestionGastosContent() {
     <div
       key={hoja.id}
       className="border-b last:border-b-0 px-4 py-3 hover:bg-muted/50 cursor-pointer"
-      onClick={() => router.push(`/gastos/mis-requerimientos/${hoja.id}`)}
+      onClick={() => router.push(`/gastos/mis-requerimientos/${hoja.id}?from=administracion`)}
     >
       <div className="flex items-start justify-between gap-2 mb-1.5">
         <div className="min-w-0 flex-1">
@@ -470,7 +470,7 @@ function GestionGastosContent() {
                       <TableRow
                         key={hoja.id}
                         className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => router.push(`/gastos/mis-requerimientos/${hoja.id}`)}
+                        onClick={() => router.push(`/gastos/mis-requerimientos/${hoja.id}?from=administracion`)}
                       >
                         <TableCell className="font-mono text-sm font-medium">{hoja.numero}</TableCell>
                         <TableCell className="text-sm max-w-[130px] truncate">
