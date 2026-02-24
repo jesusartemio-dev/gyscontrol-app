@@ -62,14 +62,15 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
       return NextResponse.json({ error: 'Cuenta por cobrar no encontrada' }, { status: 404 })
     }
 
-    if (existing.montoPagado > 0 || existing.pagos.length > 0) {
+    // Si tiene pagos y NO está anulada, bloquear eliminación
+    if ((existing.montoPagado > 0 || existing.pagos.length > 0) && existing.estado !== 'anulada') {
       return NextResponse.json(
-        { error: 'No se puede eliminar: tiene pagos registrados. Anúlela en su lugar.' },
+        { error: 'No se puede eliminar: tiene pagos registrados. Anúlela primero.' },
         { status: 400 }
       )
     }
 
-    // Eliminar CxC (adjuntos se eliminan por cascade)
+    // Eliminar CxC (pagos y adjuntos se eliminan por cascade)
     await prisma.cuentaPorCobrar.delete({ where: { id } })
 
     return NextResponse.json({ ok: true })

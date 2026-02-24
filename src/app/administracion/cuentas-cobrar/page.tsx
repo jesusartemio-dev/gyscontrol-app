@@ -617,17 +617,17 @@ export default function CuentasCobrarPage() {
                             Ver
                           </Button>
                           {(item.estado === 'pendiente' || item.estado === 'parcial') && (
-                            <>
-                              <Button variant="outline" size="sm" onClick={() => openPago(item)}>
-                                <ArrowDownCircle className="h-3 w-3 mr-1" />
-                                Pago
-                              </Button>
-                              <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700" onClick={() => handleAnular(item)} title="Anular">
-                                <Ban className="h-3 w-3" />
-                              </Button>
-                            </>
+                            <Button variant="outline" size="sm" onClick={() => openPago(item)}>
+                              <ArrowDownCircle className="h-3 w-3 mr-1" />
+                              Pago
+                            </Button>
                           )}
-                          {item.montoPagado === 0 && item.estado !== 'pagada' && (
+                          {item.estado !== 'anulada' && (
+                            <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700" onClick={() => handleAnular(item)} title="Anular">
+                              <Ban className="h-3 w-3" />
+                            </Button>
+                          )}
+                          {(item.estado === 'anulada' || (item.montoPagado === 0 && item.estado !== 'pagada')) && (
                             <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700" onClick={() => handleEliminar(item)} title="Eliminar">
                               <Trash2 className="h-3 w-3" />
                             </Button>
@@ -978,13 +978,13 @@ export default function CuentasCobrarPage() {
             </div>
           )}
           <DialogFooter>
-            {showDetail && (showDetail.estado === 'pendiente' || showDetail.estado === 'parcial') && (
+            {showDetail && showDetail.estado !== 'anulada' && (
               <Button variant="destructive" size="sm" onClick={() => handleAnular(showDetail)} disabled={saving}>
                 <Ban className="h-4 w-4 mr-1" />
                 Anular
               </Button>
             )}
-            {showDetail && showDetail.montoPagado === 0 && showDetail.estado !== 'pagada' && (
+            {showDetail && (showDetail.estado === 'anulada' || (showDetail.montoPagado === 0 && showDetail.estado !== 'pagada')) && (
               <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => handleEliminar(showDetail)} disabled={saving}>
                 <Trash2 className="h-4 w-4 mr-1" />
                 Eliminar
