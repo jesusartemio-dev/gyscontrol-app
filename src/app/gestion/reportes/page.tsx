@@ -40,6 +40,14 @@ const reportes = [
     roles: ['admin', 'gerente', 'gestor'],
   },
   {
+    titulo: 'Curva S',
+    descripcion: 'Avance planificado vs real (EVM). Detecta desviaciones con SPI y Schedule Variance semanales.',
+    icono: TrendingUp,
+    href: '/gestion/reportes/curva-s',
+    color: 'bg-orange-100 text-orange-600',
+    roles: ['admin', 'gerente', 'gestor', 'coordinador'],
+  },
+  {
     titulo: 'KPIs de Gestión',
     descripcion: '12 indicadores clave organizados en 4 cuadrantes: Comercial, Proyectos, Logística y Financiero.',
     icono: PieChart,
