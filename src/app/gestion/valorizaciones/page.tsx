@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, FileSpreadsheet, Loader2, Search, Eye, Send, CheckCircle, Edit, Ban, Upload, Download, AlertTriangle, RefreshCw, Trash2, Clock } from 'lucide-react'
+import { Plus, FileSpreadsheet, Loader2, Search, Eye, Send, CheckCircle, Edit, Ban, Upload, Download, AlertTriangle, RefreshCw, Trash2, Clock, Undo2 } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 import toast from 'react-hot-toast'
 import ValorizacionImportExcelModal from '@/components/gestion/ValorizacionImportExcelModal'
@@ -501,7 +501,23 @@ export default function ValorizacionesPage() {
                             <RefreshCw className="h-4 w-4 text-violet-600" />
                           </Button>
                         )}
-                        {!['anulada', 'pagada', 'facturada', 'aprobada_cliente'].includes(item.estado) && (
+                        {/* Backward transitions */}
+                        {item.estado === 'aprobada_cliente' && (
+                          <Button variant="ghost" size="icon" onClick={() => openEstadoTransition(item, 'enviada')} title="Revertir aprobación">
+                            <Undo2 className="h-4 w-4 text-amber-600" />
+                          </Button>
+                        )}
+                        {(item.estado === 'enviada' || item.estado === 'corregida') && (
+                          <Button variant="ghost" size="icon" onClick={() => openEstadoTransition(item, 'borrador')} title="Revertir a borrador">
+                            <Undo2 className="h-4 w-4 text-amber-600" />
+                          </Button>
+                        )}
+                        {item.estado === 'observada' && (
+                          <Button variant="ghost" size="icon" onClick={() => openEstadoTransition(item, 'enviada')} title="Revertir a enviada">
+                            <Undo2 className="h-4 w-4 text-amber-600" />
+                          </Button>
+                        )}
+                        {item.estado !== 'anulada' && (
                           <Button variant="ghost" size="icon" onClick={() => openEstadoTransition(item, 'anulada')} title="Anular">
                             <Ban className="h-3.5 w-3.5 text-red-500" />
                           </Button>
@@ -628,22 +644,58 @@ export default function ValorizacionesPage() {
       <Dialog open={showEstadoDialog} onOpenChange={open => { if (!open) { setShowEstadoDialog(false); setEstadoTarget(null) } }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {estadoTarget?.estado === 'anulada' ? 'Anular Valorización' : 'Cambiar Estado'}
+            <DialogTitle className={estadoTarget?.estado === 'anulada' ? 'text-red-600' : ''}>
+              {estadoTarget?.estado === 'anulada' ? 'Anular Valorización' :
+               estadoTarget && ['borrador', 'enviada'].includes(estadoTarget.estado) &&
+               ['enviada', 'corregida', 'aprobada_cliente', 'observada'].includes(estadoTarget.val.estado)
+                 ? 'Revertir Estado' : 'Cambiar Estado'}
             </DialogTitle>
             <DialogDescription>
-              {estadoTarget && `${estadoTarget.val.codigo} → ${getEstadoLabel(estadoTarget.estado)}`}
+              {estadoTarget && `${estadoTarget.val.codigo} — ${getEstadoLabel(estadoTarget.val.estado)} → ${getEstadoLabel(estadoTarget.estado)}`}
             </DialogDescription>
           </DialogHeader>
-          {estadoTarget?.estado === 'anulada' && (
-            <p className="text-sm text-red-600">
-              Esta acción anulará la valorización. Las valorizaciones anuladas no se incluyen en el cálculo del acumulado.
-            </p>
-          )}
-          {estadoTarget?.estado !== 'anulada' && (
-            <p className="text-sm text-muted-foreground">
-              ¿Confirmar cambio de estado a <strong>{estadoTarget && getEstadoLabel(estadoTarget.estado)}</strong>?
-            </p>
+          {estadoTarget && (
+            <div className="space-y-3">
+              {estadoTarget.estado === 'anulada' && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm space-y-1">
+                  <p className="font-medium text-red-700">Al anular esta valorización:</p>
+                  <ul className="list-disc pl-5 text-red-600 space-y-0.5">
+                    <li>La valorización pasará a estado <strong>Anulada</strong> de forma irreversible</li>
+                    <li>No se incluirá en el cálculo del acumulado</li>
+                    {['aprobada_cliente', 'facturada', 'pagada'].includes(estadoTarget.val.estado) && (
+                      <li>Se revertirá la amortización de adelanto</li>
+                    )}
+                    {['facturada', 'pagada'].includes(estadoTarget.val.estado) && (
+                      <li>Las CxC asociadas serán <strong>anuladas</strong></li>
+                    )}
+                  </ul>
+                </div>
+              )}
+              {estadoTarget.val.estado === 'aprobada_cliente' && estadoTarget.estado === 'enviada' && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm space-y-1">
+                  <p className="font-medium text-amber-700">Al revertir la aprobación:</p>
+                  <ul className="list-disc pl-5 text-amber-600 space-y-0.5">
+                    <li>La valorización volverá a <strong>Enviada</strong></li>
+                    <li>Se revertirá la amortización de adelanto</li>
+                  </ul>
+                </div>
+              )}
+              {['enviada', 'corregida'].includes(estadoTarget.val.estado) && estadoTarget.estado === 'borrador' && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm">
+                  <p className="text-amber-700">La valorización volverá a <strong>Borrador</strong> y podrá ser editada o eliminada.</p>
+                </div>
+              )}
+              {estadoTarget.val.estado === 'observada' && estadoTarget.estado === 'enviada' && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm">
+                  <p className="text-amber-700">La valorización volverá a <strong>Enviada</strong>.</p>
+                </div>
+              )}
+              {!['anulada', 'borrador', 'enviada'].includes(estadoTarget.estado) && estadoTarget.estado !== 'anulada' && (
+                <p className="text-sm text-muted-foreground">
+                  ¿Confirmar cambio de estado a <strong>{getEstadoLabel(estadoTarget.estado)}</strong>?
+                </p>
+              )}
+            </div>
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => { setShowEstadoDialog(false); setEstadoTarget(null) }}>Cancelar</Button>
