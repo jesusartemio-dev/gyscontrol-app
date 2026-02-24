@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { calcularAdelantoValorizacion } from '@/lib/utils/adelantoUtils'
 
 const ROLES_ALLOWED = ['admin', 'gerente', 'gestor', 'coordinador', 'administracion']
 
@@ -68,21 +69,43 @@ async function recalcularMontoValorizacion(valorizacionId: string, tx: any) {
   })
   const acumuladoAnterior = agg._sum.montoValorizacion || 0
 
+  // Recalcular adelanto desde proyecto si tiene adelanto configurado
+  const proyecto = await tx.proyecto.findUnique({
+    where: { id: val.proyectoId },
+    select: { adelantoPorcentaje: true, adelantoMonto: true, adelantoAmortizado: true },
+  })
+
+  let adelantoPorcentaje = val.adelantoPorcentaje
+  let adelantoMontoOverride: number | undefined
+
+  if (proyecto && proyecto.adelantoMonto > 0) {
+    const adelantoCalc = calcularAdelantoValorizacion(proyecto, montoValorizacion)
+    if (adelantoCalc.tieneAdelanto) {
+      adelantoPorcentaje = adelantoCalc.adelantoPorcentaje
+      adelantoMontoOverride = adelantoCalc.adelantoMonto
+    }
+  }
+
   const calculados = calcularMontos({
     montoValorizacion,
     acumuladoAnterior,
     presupuestoContractual: val.presupuestoContractual,
     descuentoComercialPorcentaje: val.descuentoComercialPorcentaje,
-    adelantoPorcentaje: val.adelantoPorcentaje,
+    adelantoPorcentaje,
     igvPorcentaje: val.igvPorcentaje,
     fondoGarantiaPorcentaje: val.fondoGarantiaPorcentaje,
   })
+
+  if (adelantoMontoOverride !== undefined) {
+    calculados.adelantoMonto = adelantoMontoOverride
+  }
 
   return tx.valorizacion.update({
     where: { id: valorizacionId },
     data: {
       montoValorizacion,
       acumuladoAnterior,
+      adelantoPorcentaje,
       ...calculados,
       updatedAt: new Date(),
     },

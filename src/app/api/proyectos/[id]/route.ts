@@ -164,11 +164,17 @@ export async function GET(
       };
     }
 
+    // Calcular campo derivado de adelanto
+    const adelantoSaldoDisponible = Math.round(
+      ((proyectoConMetricas.adelantoMonto || 0) - (proyectoConMetricas.adelantoAmortizado || 0)) * 100
+    ) / 100
+
     // Mapear nombres de relaciones para compatibilidad frontend
     const proyectoFormateado = {
       ...proyectoConMetricas,
       listaEquipos: proyectoConMetricas.listaEquipo,
-      cronogramas: proyectoConMetricas.proyectoCronograma
+      cronogramas: proyectoConMetricas.proyectoCronograma,
+      adelantoSaldoDisponible,
     };
 
     logger.info(`📋 Proyecto obtenido: ${proyecto.nombre} (${proyectoId}) - Usuario: ${session.user.email}`);
@@ -210,7 +216,8 @@ export async function PUT(
         comercialId: true,
         gestorId: true,
         estado: true,
-        nombre: true
+        nombre: true,
+        totalCliente: true,
       }
     });
 
@@ -244,9 +251,15 @@ export async function PUT(
     }
 
     // 📝 Filtrar campos undefined y actualizar proyecto
-    const dataToUpdate = Object.fromEntries(
+    const dataToUpdate: Record<string, any> = Object.fromEntries(
       Object.entries(validatedData).filter(([_, value]) => value !== undefined)
     );
+
+    // Si se actualiza adelantoPorcentaje, recalcular adelantoMonto = totalCliente * (% / 100)
+    if (dataToUpdate.adelantoPorcentaje !== undefined) {
+      const totalCliente = proyectoExistente.totalCliente ?? 0
+      dataToUpdate.adelantoMonto = Math.round(totalCliente * (dataToUpdate.adelantoPorcentaje / 100) * 100) / 100
+    }
 
     const proyectoActualizado = await prisma.proyecto.update({
       where: { id: proyectoId },

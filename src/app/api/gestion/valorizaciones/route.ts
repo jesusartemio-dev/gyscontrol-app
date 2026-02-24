@@ -26,7 +26,7 @@ export async function GET(req: Request) {
     const valorizaciones = await prisma.valorizacion.findMany({
       where,
       include: {
-        proyecto: { select: { id: true, codigo: true, nombre: true, totalCliente: true, clienteId: true } },
+        proyecto: { select: { id: true, codigo: true, nombre: true, totalCliente: true, clienteId: true, adelantoPorcentaje: true, adelantoMonto: true, adelantoAmortizado: true } },
         adjuntos: true,
       },
       orderBy: [{ createdAt: 'desc' }],

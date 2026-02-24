@@ -372,16 +372,24 @@ export default function TablaPartidas({ valorizacionId, proyectoId, readOnly, ti
   const colCount = readOnly ? 6 : 7
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold">Partidas de Valorización</h3>
+    <div className="space-y-3">
+      {/* Header con título y acciones */}
+      <div className="flex items-center justify-between border-b pb-2">
         <div className="flex items-center gap-2">
+          <h3 className="text-sm font-semibold">Partidas de Valorización</h3>
+          {partidas.length > 0 && (
+            <Badge variant="secondary" className="text-xs font-normal">
+              {partidas.length} {partidas.length === 1 ? 'partida' : 'partidas'}
+            </Badge>
+          )}
           {guardando && (
             <span className="flex items-center gap-1 text-xs text-muted-foreground">
               <Loader2 className="h-3 w-3 animate-spin" />
               Guardando...
             </span>
           )}
+        </div>
+        <div className="flex items-center gap-2">
           {!readOnly && tieneCotizacion && (
             <Button
               variant="outline"
@@ -400,188 +408,197 @@ export default function TablaPartidas({ valorizacionId, proyectoId, readOnly, ti
           {!readOnly && (
             <Button variant="outline" size="sm" onClick={agregarPartida}>
               <Plus className="h-3.5 w-3.5 mr-1" />
-              Agregar partida
+              Agregar
             </Button>
           )}
         </div>
       </div>
 
       {partidas.length === 0 ? (
-        <div className="text-center py-6 text-muted-foreground border rounded-lg bg-muted/30">
-          <p className="text-sm">Sin partidas</p>
+        <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg bg-muted/20">
+          <p className="text-sm font-medium">Sin partidas registradas</p>
           {!readOnly && (
-            <p className="text-xs mt-1">
+            <p className="text-xs mt-1.5">
               {tieneCotizacion
                 ? 'Carga desde cotización o agrega partidas manualmente'
-                : 'Click "+ Agregar partida" para comenzar'}
+                : 'Haz click en "Agregar" para comenzar'}
             </p>
           )}
         </div>
       ) : (
         <div className="border rounded-lg overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/50">
-                <TableHead className="w-10 text-center">#</TableHead>
-                <TableHead className="min-w-[180px]">Descripción</TableHead>
-                <TableHead className="w-28 text-right">Contractual</TableHead>
-                <TableHead className="w-20 text-right">% Ant.</TableHead>
-                <TableHead className="w-36 text-right">% Esta Val.</TableHead>
-                <TableHead className="w-28 text-right">Monto</TableHead>
-                {!readOnly && <TableHead className="w-10" />}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {partidas.map((p, idx) => {
-                const acumTotal = p.porcentajeAcumuladoAnterior + p.porcentajeAvance
-                const overLimit = acumTotal > 100
-                const isLast = idx === partidas.length - 1 && !p.id
-                const prevOrigen = idx > 0 ? partidas[idx - 1].origen : null
-                const separatorLabel = showSeparators ? getSeparatorLabel(p.origen, prevOrigen) : null
-                const badge = ORIGEN_BADGES[p.origen]
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/60">
+                  <TableHead className="w-10 text-center text-xs">#</TableHead>
+                  <TableHead className="min-w-[220px] text-xs">Descripción</TableHead>
+                  <TableHead className="w-32 text-right text-xs">Contractual</TableHead>
+                  <TableHead className="w-20 text-center text-xs">% Ant.</TableHead>
+                  <TableHead className="w-40 text-right text-xs">% Esta Val.</TableHead>
+                  <TableHead className="w-32 text-right text-xs">Monto Avance</TableHead>
+                  {!readOnly && <TableHead className="w-10" />}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {partidas.map((p, idx) => {
+                  const acumTotal = p.porcentajeAcumuladoAnterior + p.porcentajeAvance
+                  const overLimit = acumTotal > 100
+                  const isLast = idx === partidas.length - 1 && !p.id
+                  const prevOrigen = idx > 0 ? partidas[idx - 1].origen : null
+                  const separatorLabel = showSeparators ? getSeparatorLabel(p.origen, prevOrigen) : null
+                  const badge = ORIGEN_BADGES[p.origen]
 
-                // Sugerencia de avance desde cronograma
-                const avanceCronograma = p.proyectoEdtId ? avancesEdt.get(p.proyectoEdtId) : undefined
-                const tieneSugerencia = avanceCronograma !== undefined
-                const sugerenciaIncremento = tieneSugerencia
-                  ? Math.round((avanceCronograma - p.porcentajeAcumuladoAnterior) * 100) / 100
-                  : 0
-                const alDia = tieneSugerencia && sugerenciaIncremento <= 0
-                const mostrarSugerenciaPositiva = tieneSugerencia && sugerenciaIncremento > 0
+                  // Sugerencia de avance desde cronograma
+                  const avanceCronograma = p.proyectoEdtId ? avancesEdt.get(p.proyectoEdtId) : undefined
+                  const tieneSugerencia = avanceCronograma !== undefined
+                  const sugerenciaIncremento = tieneSugerencia
+                    ? Math.round((avanceCronograma - p.porcentajeAcumuladoAnterior) * 100) / 100
+                    : 0
+                  const alDia = tieneSugerencia && sugerenciaIncremento <= 0
+                  const mostrarSugerenciaPositiva = tieneSugerencia && sugerenciaIncremento > 0
 
-                // Tooltip mejorado para % anterior
-                const tooltipAnterior = tieneSugerencia
-                  ? `Valorizado en períodos anteriores: ${p.porcentajeAcumuladoAnterior}%\nAvance en cronograma: ${avanceCronograma}%\nDisponible para valorizar: ${Math.max(sugerenciaIncremento, 0)}%`
-                  : 'Valorizado anteriormente'
+                  // Tooltip mejorado para % anterior
+                  const tooltipAnterior = tieneSugerencia
+                    ? `Valorizado en períodos anteriores: ${p.porcentajeAcumuladoAnterior}%\nAvance en cronograma: ${avanceCronograma}%\nDisponible para valorizar: ${Math.max(sugerenciaIncremento, 0)}%`
+                    : 'Valorizado anteriormente'
 
-                return (
-                  <React.Fragment key={p.id || `new-${idx}`}>
-                    {separatorLabel && (
-                      <TableRow className="bg-muted/30">
-                        <TableCell colSpan={colCount} className="py-1 text-center">
-                          <span className="text-[10px] font-semibold text-muted-foreground tracking-widest">
-                            ── {separatorLabel} ──
-                          </span>
+                  return (
+                    <React.Fragment key={p.id || `new-${idx}`}>
+                      {separatorLabel && (
+                        <TableRow className="bg-muted/40 hover:bg-muted/40">
+                          <TableCell colSpan={colCount} className="py-1.5 px-4">
+                            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                              {separatorLabel}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      <TableRow className={`${overLimit ? 'bg-yellow-50/80' : idx % 2 === 0 ? '' : 'bg-muted/20'} hover:bg-accent/50 transition-colors`}>
+                        <TableCell className="text-center text-xs text-muted-foreground font-mono py-2.5">
+                          {idx + 1}
                         </TableCell>
-                      </TableRow>
-                    )}
-                    <TableRow className={overLimit ? 'bg-yellow-50' : ''}>
-                      <TableCell className="text-center text-xs text-muted-foreground font-mono">
-                        {idx + 1}
-                      </TableCell>
-                      <TableCell className="p-1">
-                        <div className="flex items-center gap-1.5">
-                          {badge && (
-                            <Badge className={`${badge.className} text-[10px] px-1 py-0 leading-tight shrink-0`}>
-                              {badge.label}
-                            </Badge>
-                          )}
+                        <TableCell className="py-1.5 px-2">
+                          <div className="flex items-center gap-2">
+                            {badge && (
+                              <Badge className={`${badge.className} text-[10px] px-1.5 py-0 leading-tight shrink-0`}>
+                                {badge.label}
+                              </Badge>
+                            )}
+                            {readOnly ? (
+                              <span className="text-sm leading-tight">{p.descripcion}</span>
+                            ) : (
+                              <Input
+                                ref={isLast ? newRowRef : undefined}
+                                className="h-8 text-sm border-muted"
+                                placeholder="Descripción de la partida"
+                                value={p.descripcion}
+                                onChange={e => updatePartida(idx, 'descripcion', e.target.value)}
+                                onBlur={handleBlur}
+                              />
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-1.5 px-2">
                           {readOnly ? (
-                            <span className="text-sm px-1">{p.descripcion}</span>
+                            <span className="text-sm font-mono text-right block">{formatCurrency(p.montoContractual)}</span>
                           ) : (
                             <Input
-                              ref={isLast ? newRowRef : undefined}
-                              className="h-8 text-sm"
-                              placeholder="Descripción de la partida"
-                              value={p.descripcion}
-                              onChange={e => updatePartida(idx, 'descripcion', e.target.value)}
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              className="h-8 text-sm text-right font-mono border-muted"
+                              value={p.montoContractual || ''}
+                              onChange={e => updatePartida(idx, 'montoContractual', e.target.value)}
                               onBlur={handleBlur}
                             />
                           )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="p-1">
-                        {readOnly ? (
-                          <span className="text-sm font-mono text-right block px-2">{formatCurrency(p.montoContractual)}</span>
-                        ) : (
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            className="h-8 text-sm text-right font-mono"
-                            value={p.montoContractual || ''}
-                            onChange={e => updatePartida(idx, 'montoContractual', e.target.value)}
-                            onBlur={handleBlur}
-                          />
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right text-xs text-muted-foreground font-mono px-2" title={tooltipAnterior}>
-                        {p.porcentajeAcumuladoAnterior > 0 ? `${p.porcentajeAcumuladoAnterior.toFixed(1)}%` : '—'}
-                      </TableCell>
-                      <TableCell className="p-1">
-                        {readOnly ? (
-                          <span className="text-sm font-mono text-right block px-2">{p.porcentajeAvance.toFixed(1)}%</span>
-                        ) : (
-                          <div>
-                            <Input
-                              type="number"
-                              step="0.1"
-                              min="0"
-                              max="100"
-                              className={`h-8 text-sm text-right font-mono ${
-                                p.porcentajeAvance > 100 ? 'border-red-500 text-red-600' : ''
-                              }`}
-                              value={p.porcentajeAvance || ''}
-                              onChange={e => updatePartida(idx, 'porcentajeAvance', e.target.value)}
-                              onBlur={handleBlur}
-                            />
-                            {/* Badge sugerencia positiva */}
-                            {mostrarSugerenciaPositiva && (
-                              <div className="mt-1 flex items-center gap-1 rounded border border-blue-200 bg-blue-50 px-1.5 py-0.5">
-                                <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                                  Cron: {avanceCronograma}%
-                                </span>
-                                <button
-                                  type="button"
-                                  className="text-[10px] font-medium text-blue-600 hover:text-blue-800 hover:underline whitespace-nowrap"
-                                  onClick={() => aplicarSugerencia(idx, sugerenciaIncremento)}
-                                >
-                                  Usar {sugerenciaIncremento}%
-                                </button>
-                              </div>
-                            )}
-                            {/* Badge "al día" */}
-                            {alDia && (
-                              <div className="mt-1 flex items-center gap-1 rounded border border-green-200 bg-green-50 px-1.5 py-0.5">
-                                <span className="text-[10px] text-green-700 whitespace-nowrap">
-                                  Cron: {avanceCronograma}% ✓ Al día
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-sm px-3">
-                        <span className={p.montoAvance === 0 ? 'text-muted-foreground' : 'font-medium'}>
-                          {formatCurrency(p.montoAvance)}
-                        </span>
-                        {overLimit && (
-                          <div className="text-[10px] text-yellow-600 leading-tight mt-0.5">
-                            Supera 100% acum.
-                          </div>
-                        )}
-                      </TableCell>
-                      {!readOnly && (
-                        <TableCell className="p-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50"
-                            onClick={() => eliminarPartida(idx)}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
                         </TableCell>
-                      )}
-                    </TableRow>
-                  </React.Fragment>
-                )
-              })}
-            </TableBody>
-          </Table>
-          <div className="flex justify-between items-center px-4 py-2.5 bg-muted/50 border-t">
-            <span className="text-sm font-semibold">Total Valorización</span>
-            <span className="text-base font-bold font-mono">
+                        <TableCell className="text-center text-xs text-muted-foreground font-mono py-2.5 px-2" title={tooltipAnterior}>
+                          {p.porcentajeAcumuladoAnterior > 0 ? (
+                            <span className="inline-block bg-muted/60 rounded px-1.5 py-0.5">
+                              {p.porcentajeAcumuladoAnterior.toFixed(1)}%
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground/50">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="py-1.5 px-2">
+                          {readOnly ? (
+                            <span className="text-sm font-mono text-right block font-medium">{p.porcentajeAvance.toFixed(1)}%</span>
+                          ) : (
+                            <div>
+                              <Input
+                                type="number"
+                                step="0.1"
+                                min="0"
+                                max="100"
+                                className={`h-8 text-sm text-right font-mono border-muted ${
+                                  p.porcentajeAvance > 100 ? 'border-red-400 text-red-600 bg-red-50/50' : ''
+                                }`}
+                                value={p.porcentajeAvance || ''}
+                                onChange={e => updatePartida(idx, 'porcentajeAvance', e.target.value)}
+                                onBlur={handleBlur}
+                              />
+                              {/* Badge sugerencia positiva */}
+                              {mostrarSugerenciaPositiva && (
+                                <div className="mt-1 flex items-center gap-1 rounded border border-blue-200 bg-blue-50 px-1.5 py-0.5">
+                                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                                    Cron: {avanceCronograma}%
+                                  </span>
+                                  <button
+                                    type="button"
+                                    className="text-[10px] font-medium text-blue-600 hover:text-blue-800 hover:underline whitespace-nowrap"
+                                    onClick={() => aplicarSugerencia(idx, sugerenciaIncremento)}
+                                  >
+                                    Usar {sugerenciaIncremento}%
+                                  </button>
+                                </div>
+                              )}
+                              {/* Badge "al día" */}
+                              {alDia && (
+                                <div className="mt-1 flex items-center gap-1 rounded border border-green-200 bg-green-50 px-1.5 py-0.5">
+                                  <span className="text-[10px] text-green-700 whitespace-nowrap">
+                                    Cron: {avanceCronograma}% - Al día
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-sm py-2.5 px-3">
+                          <span className={p.montoAvance === 0 ? 'text-muted-foreground' : 'font-semibold'}>
+                            {formatCurrency(p.montoAvance)}
+                          </span>
+                          {overLimit && (
+                            <div className="text-[10px] text-yellow-600 leading-tight mt-0.5">
+                              Supera 100% acum.
+                            </div>
+                          )}
+                        </TableCell>
+                        {!readOnly && (
+                          <TableCell className="py-1.5 px-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:text-red-600 hover:bg-red-50"
+                              onClick={() => eliminarPartida(idx)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    </React.Fragment>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          </div>
+          {/* Total footer */}
+          <div className="flex justify-between items-center px-4 py-3 bg-primary/5 border-t-2 border-primary/20">
+            <span className="text-sm font-semibold text-foreground">Total Valorización</span>
+            <span className="text-lg font-bold font-mono text-primary">
               {formatCurrency(total)}
             </span>
           </div>

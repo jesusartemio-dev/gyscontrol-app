@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { calcularAdelantoValorizacion } from '@/lib/utils/adelantoUtils'
 
 const ROLES_ALLOWED = ['admin', 'gerente', 'gestor', 'coordinador', 'administracion']
 
@@ -60,7 +61,7 @@ async function calcularAcumuladoAnterior(proyectoId: string, excludeId?: string)
 }
 
 const includeRelations = {
-  proyecto: { select: { id: true, codigo: true, nombre: true, totalCliente: true, clienteId: true } },
+  proyecto: { select: { id: true, codigo: true, nombre: true, totalCliente: true, clienteId: true, adelantoPorcentaje: true, adelantoMonto: true, adelantoAmortizado: true } },
   adjuntos: true,
 }
 
@@ -107,7 +108,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // Verificar que el proyecto existe
     const proyecto = await prisma.proyecto.findUnique({
       where: { id: proyectoId },
-      select: { id: true, codigo: true, totalCliente: true, clienteId: true },
+      select: {
+        id: true, codigo: true, totalCliente: true, clienteId: true,
+        adelantoPorcentaje: true, adelantoMonto: true, adelantoAmortizado: true,
+      },
     })
     if (!proyecto) {
       return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 })
@@ -130,9 +134,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const montoValorizacion = body.montoValorizacion || 0
     const descuentoComercialPorcentaje = body.descuentoComercialPorcentaje ?? 0
-    const adelantoPorcentaje = body.adelantoPorcentaje ?? 0
     const igvPorcentaje = body.igvPorcentaje ?? 18
     const fondoGarantiaPorcentaje = body.fondoGarantiaPorcentaje ?? 0
+
+    // Auto-calcular adelanto desde proyecto si tiene adelanto configurado
+    const adelantoCalc = calcularAdelantoValorizacion(proyecto, montoValorizacion)
+    const adelantoPorcentaje = adelantoCalc.tieneAdelanto ? adelantoCalc.adelantoPorcentaje : (body.adelantoPorcentaje ?? 0)
 
     const calculados = calcularMontos({
       montoValorizacion,
@@ -143,6 +150,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       igvPorcentaje,
       fondoGarantiaPorcentaje,
     })
+
+    // Si el proyecto tiene adelanto, usar el monto calculado por el helper
+    if (adelantoCalc.tieneAdelanto) {
+      calculados.adelantoMonto = adelantoCalc.adelantoMonto
+    }
 
     const valorizacion = await prisma.valorizacion.create({
       data: {

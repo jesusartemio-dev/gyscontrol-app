@@ -15,6 +15,7 @@ import toast from 'react-hot-toast'
 import ValorizacionImportExcelModal from '@/components/gestion/ValorizacionImportExcelModal'
 import { exportarValAExcel } from '@/lib/utils/valorizacionExcel'
 import TablaPartidas from '@/components/valorizacion/TablaPartidas'
+import { calcularAdelantoValorizacion } from '@/lib/utils/adelantoUtils'
 
 interface Proyecto {
   id: string
@@ -24,6 +25,9 @@ interface Proyecto {
   moneda: string | null
   tipoCambio: number | null
   cotizacionId?: string | null
+  adelantoPorcentaje?: number
+  adelantoMonto?: number
+  adelantoAmortizado?: number
 }
 
 interface Valorizacion {
@@ -136,10 +140,32 @@ export default function ValorizacionesPage() {
         fetch('/api/gestion/valorizaciones'),
         fetch('/api/proyectos?fields=id,codigo,nombre'),
       ])
-      if (vRes.ok) setItems(await vRes.json())
+      let valorizaciones: Valorizacion[] = []
+      if (vRes.ok) {
+        valorizaciones = await vRes.json()
+        setItems(valorizaciones)
+      }
       if (pRes.ok) {
         const data = await pRes.json()
-        setProyectos(Array.isArray(data) ? data : data.proyectos || [])
+        const proyList: Proyecto[] = Array.isArray(data) ? data : data.proyectos || []
+        // Enriquecer proyectos con datos de adelanto desde las valorizaciones
+        const adelantoMap = new Map<string, { adelantoPorcentaje: number; adelantoMonto: number; adelantoAmortizado: number }>()
+        for (const v of valorizaciones) {
+          if (v.proyecto && !adelantoMap.has(v.proyecto.id)) {
+            const p = v.proyecto as any
+            if (p.adelantoPorcentaje !== undefined) {
+              adelantoMap.set(p.id, {
+                adelantoPorcentaje: p.adelantoPorcentaje ?? 0,
+                adelantoMonto: p.adelantoMonto ?? 0,
+                adelantoAmortizado: p.adelantoAmortizado ?? 0,
+              })
+            }
+          }
+        }
+        setProyectos(proyList.map(p => ({
+          ...p,
+          ...adelantoMap.get(p.id),
+        })))
       }
     } catch {
       toast.error('Error al cargar datos')
@@ -188,13 +214,14 @@ export default function ValorizacionesPage() {
     setFormPeriodoInicio(val.periodoInicio.split('T')[0])
     setFormPeriodoFin(val.periodoFin.split('T')[0])
     setFormDescuento(val.descuentoComercialPorcentaje.toString())
-    setFormAdelanto(val.adelantoPorcentaje.toString())
     setFormIgv(val.igvPorcentaje.toString())
     setFormFondoGarantia(val.fondoGarantiaPorcentaje.toString())
     setFormMoneda(val.moneda)
     setFormTipoCambio(val.tipoCambio?.toString() || '')
     setShowTipoCambio(!!val.tipoCambio)
     setFormObservaciones(val.observaciones || '')
+    // Setear adelanto: usar valor existente de la valorización
+    setFormAdelanto(val.adelantoPorcentaje.toString())
     setShowForm(true)
   }
 
@@ -341,13 +368,29 @@ export default function ValorizacionesPage() {
   const preview = useMemo(() => {
     const monto = parseFloat(formMontoValorizacion) || 0
     const desc = monto * (parseFloat(formDescuento) || 0) / 100
-    const adel = monto * (parseFloat(formAdelanto) || 0) / 100
+
+    // Usar adelanto del proyecto si disponible, sino el porcentaje manual
+    const proy = proyectos.find(p => p.id === (editingVal?.proyectoId || formProyectoId))
+    let adel = monto * (parseFloat(formAdelanto) || 0) / 100
+    if (proy && (proy.adelantoMonto ?? 0) > 0) {
+      const saldo = (proy.adelantoMonto ?? 0) - (proy.adelantoAmortizado ?? 0)
+      if (saldo > 0) {
+        const calc = calcularAdelantoValorizacion(
+          { adelantoPorcentaje: proy.adelantoPorcentaje ?? 0, adelantoMonto: proy.adelantoMonto ?? 0, adelantoAmortizado: proy.adelantoAmortizado ?? 0 },
+          monto
+        )
+        adel = calc.adelantoMonto
+      } else {
+        adel = 0
+      }
+    }
+
     const sub = monto - desc - adel
     const igv = sub * (parseFloat(formIgv) || 18) / 100
     const fg = sub * (parseFloat(formFondoGarantia) || 0) / 100
     const neto = sub + igv - fg
     return { descuento: desc, adelanto: adel, subtotal: sub, igv, fondoGarantia: fg, netoARecibir: neto }
-  }, [formMontoValorizacion, formDescuento, formAdelanto, formIgv, formFondoGarantia])
+  }, [formMontoValorizacion, formDescuento, formAdelanto, formIgv, formFondoGarantia, proyectos, editingVal, formProyectoId])
 
   if (loading) {
     return (
@@ -521,16 +564,16 @@ export default function ValorizacionesPage() {
 
       {/* Dialog crear/editar */}
       <Dialog open={showForm} onOpenChange={open => { if (!open) { setShowForm(false); resetForm() } }}>
-        <DialogContent className={editingVal ? 'max-w-3xl' : 'max-w-lg'}>
+        <DialogContent className={editingVal ? 'max-w-5xl' : 'max-w-lg'}>
           <DialogHeader>
             <DialogTitle>{editingVal ? `Editar ${editingVal.codigo}` : 'Nueva Valorización'}</DialogTitle>
             <DialogDescription>
               {editingVal
-                ? 'Agrega partidas para calcular el monto. Los campos financieros se recalculan automáticamente.'
+                ? `${editingVal.proyecto?.codigo} — ${editingVal.proyecto?.nombre}`
                 : 'Selecciona un proyecto y completa los datos. Luego podrás agregar las partidas.'}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 max-h-[70vh] overflow-y-auto">
+          <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
             {!editingVal && (
               <div>
                 <Label>Proyecto *</Label>
@@ -558,66 +601,183 @@ export default function ValorizacionesPage() {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Periodo Inicio *</Label>
-                <Input type="date" value={formPeriodoInicio} onChange={e => setFormPeriodoInicio(e.target.value)} />
-              </div>
-              <div>
-                <Label>Periodo Fin *</Label>
-                <Input type="date" value={formPeriodoFin} onChange={e => setFormPeriodoFin(e.target.value)} />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Moneda</Label>
-                <Select value={formMoneda} onValueChange={setFormMoneda}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="USD">Dólares (USD)</SelectItem>
-                    <SelectItem value="PEN">Soles (PEN)</SelectItem>
-                  </SelectContent>
-                </Select>
-                {!showTipoCambio ? (
-                  <button
-                    type="button"
-                    className="text-xs text-blue-600 hover:underline mt-1"
-                    onClick={() => setShowTipoCambio(true)}
-                  >
-                    ¿Registrar tipo de cambio?
-                  </button>
-                ) : (
-                  <div className="mt-2">
-                    <Label>Tipo de Cambio</Label>
-                    <Input type="number" step="0.001" placeholder="Ej: 3.75" value={formTipoCambio} onChange={e => setFormTipoCambio(e.target.value)} />
+            {/* Configuración financiera - layout compacto en edición */}
+            {editingVal ? (
+              <Card className="bg-muted/30 border-dashed">
+                <CardContent className="p-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Periodo</Label>
+                      <div className="grid grid-cols-2 gap-2 mt-1">
+                        <Input type="date" className="h-8 text-xs" value={formPeriodoInicio} onChange={e => setFormPeriodoInicio(e.target.value)} />
+                        <Input type="date" className="h-8 text-xs" value={formPeriodoFin} onChange={e => setFormPeriodoFin(e.target.value)} />
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Moneda</Label>
+                      <Select value={formMoneda} onValueChange={setFormMoneda}>
+                        <SelectTrigger className="h-8 text-xs mt-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="USD">USD</SelectItem>
+                          <SelectItem value="PEN">PEN</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {showTipoCambio && (
+                        <Input type="number" step="0.001" placeholder="TC" className="h-7 text-xs mt-1" value={formTipoCambio} onChange={e => setFormTipoCambio(e.target.value)} />
+                      )}
+                      {!showTipoCambio && (
+                        <button type="button" className="text-[10px] text-blue-600 hover:underline mt-0.5" onClick={() => setShowTipoCambio(true)}>
+                          + Tipo de cambio
+                        </button>
+                      )}
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Descuento %</Label>
+                      <Input type="number" step="0.01" className="h-8 text-xs mt-1" value={formDescuento} onChange={e => setFormDescuento(e.target.value)} />
+                      {(() => {
+                        const proy = proyectos.find(p => p.id === (editingVal?.proyectoId || formProyectoId))
+                        const proyAdelanto = proy && (proy.adelantoMonto ?? 0) > 0
+                          ? { adelantoPorcentaje: proy.adelantoPorcentaje ?? 0, adelantoMonto: proy.adelantoMonto ?? 0, adelantoAmortizado: proy.adelantoAmortizado ?? 0 }
+                          : null
+                        if (!proyAdelanto) {
+                          return (
+                            <div className="mt-2">
+                              <Label className="text-xs text-muted-foreground">Adelanto %</Label>
+                              <Input type="number" step="0.01" className="h-8 text-xs mt-1" value={formAdelanto} onChange={e => setFormAdelanto(e.target.value)} />
+                            </div>
+                          )
+                        }
+                        const saldoDisponible = proyAdelanto.adelantoMonto - proyAdelanto.adelantoAmortizado
+                        if (saldoDisponible <= 0) {
+                          return (
+                            <div className="mt-2">
+                              <Badge className="bg-emerald-100 text-emerald-700 text-[10px]">Adelanto amortizado 100%</Badge>
+                            </div>
+                          )
+                        }
+                        const monto = parseFloat(formMontoValorizacion) || 0
+                        const calc = calcularAdelantoValorizacion(proyAdelanto, monto)
+                        return (
+                          <div className="mt-2">
+                            <Label className="text-xs text-muted-foreground">Adelanto % <span className="text-[10px]">({proyAdelanto.adelantoPorcentaje}%)</span></Label>
+                            <Input type="number" step="0.01" className="h-8 text-xs mt-1" value={formAdelanto} onChange={e => setFormAdelanto(e.target.value)} />
+                            <p className="text-[10px] text-muted-foreground mt-0.5">
+                              Saldo: {formatCurrency(saldoDisponible, proy?.moneda || 'PEN')}
+                              {calc.adelantoMonto > 0 && ` | -${formatCurrency(calc.adelantoMonto, proy?.moneda || 'PEN')}`}
+                            </p>
+                          </div>
+                        )
+                      })()}
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">IGV %</Label>
+                      <Input type="number" step="0.01" className="h-8 text-xs mt-1" value={formIgv} onChange={e => setFormIgv(e.target.value)} />
+                      <div className="mt-2">
+                        <Label className="text-xs text-muted-foreground">Fondo Garantía %</Label>
+                        <Input type="number" step="0.01" className="h-8 text-xs mt-1" value={formFondoGarantia} onChange={e => setFormFondoGarantia(e.target.value)} />
+                      </div>
+                    </div>
                   </div>
-                )}
-              </div>
-              <div className="space-y-3">
-                <div>
-                  <Label>Descuento Comercial %</Label>
-                  <Input type="number" step="0.01" value={formDescuento} onChange={e => setFormDescuento(e.target.value)} />
+                  <div className="mt-3">
+                    <Input placeholder="Observaciones..." className="h-8 text-xs" value={formObservaciones} onChange={e => setFormObservaciones(e.target.value)} />
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Periodo Inicio *</Label>
+                    <Input type="date" value={formPeriodoInicio} onChange={e => setFormPeriodoInicio(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label>Periodo Fin *</Label>
+                    <Input type="date" value={formPeriodoFin} onChange={e => setFormPeriodoFin(e.target.value)} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Moneda</Label>
+                    <Select value={formMoneda} onValueChange={setFormMoneda}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="USD">Dólares (USD)</SelectItem>
+                        <SelectItem value="PEN">Soles (PEN)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {!showTipoCambio ? (
+                      <button
+                        type="button"
+                        className="text-xs text-blue-600 hover:underline mt-1"
+                        onClick={() => setShowTipoCambio(true)}
+                      >
+                        ¿Registrar tipo de cambio?
+                      </button>
+                    ) : (
+                      <div className="mt-2">
+                        <Label>Tipo de Cambio</Label>
+                        <Input type="number" step="0.001" placeholder="Ej: 3.75" value={formTipoCambio} onChange={e => setFormTipoCambio(e.target.value)} />
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-3">
+                    <div>
+                      <Label>Descuento Comercial %</Label>
+                      <Input type="number" step="0.01" value={formDescuento} onChange={e => setFormDescuento(e.target.value)} />
+                    </div>
+                    {(() => {
+                      const proy = proyectos.find(p => p.id === (editingVal?.proyectoId || formProyectoId))
+                      const proyAdelanto = proy && (proy.adelantoMonto ?? 0) > 0
+                        ? { adelantoPorcentaje: proy.adelantoPorcentaje ?? 0, adelantoMonto: proy.adelantoMonto ?? 0, adelantoAmortizado: proy.adelantoAmortizado ?? 0 }
+                        : null
+                      if (!proyAdelanto) {
+                        return (
+                          <div>
+                            <Label>Adelanto %</Label>
+                            <Input type="number" step="0.01" value={formAdelanto} onChange={e => setFormAdelanto(e.target.value)} />
+                          </div>
+                        )
+                      }
+                      const saldoDisponible = proyAdelanto.adelantoMonto - proyAdelanto.adelantoAmortizado
+                      if (saldoDisponible <= 0) {
+                        return (
+                          <div>
+                            <Label>Adelanto</Label>
+                            <Badge className="bg-emerald-100 text-emerald-700 mt-1">Adelanto amortizado al 100%</Badge>
+                          </div>
+                        )
+                      }
+                      const monto = parseFloat(formMontoValorizacion) || 0
+                      const calc = calcularAdelantoValorizacion(proyAdelanto, monto)
+                      return (
+                        <div>
+                          <Label>Adelanto % <span className="text-xs text-muted-foreground">(auto: {proyAdelanto.adelantoPorcentaje}%)</span></Label>
+                          <Input type="number" step="0.01" value={formAdelanto} onChange={e => setFormAdelanto(e.target.value)} />
+                          <div className="text-xs text-muted-foreground mt-1">
+                            Saldo disponible: {formatCurrency(saldoDisponible, proy?.moneda || 'PEN')}
+                            {calc.adelantoMonto > 0 && ` | Descuento: ${formatCurrency(calc.adelantoMonto, proy?.moneda || 'PEN')}`}
+                          </div>
+                        </div>
+                      )
+                    })()}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>IGV %</Label>
+                    <Input type="number" step="0.01" value={formIgv} onChange={e => setFormIgv(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label>Fondo de Garantía %</Label>
+                    <Input type="number" step="0.01" value={formFondoGarantia} onChange={e => setFormFondoGarantia(e.target.value)} />
+                  </div>
                 </div>
                 <div>
-                  <Label>Adelanto %</Label>
-                  <Input type="number" step="0.01" value={formAdelanto} onChange={e => setFormAdelanto(e.target.value)} />
+                  <Label>Observaciones</Label>
+                  <Input placeholder="Observaciones..." value={formObservaciones} onChange={e => setFormObservaciones(e.target.value)} />
                 </div>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>IGV %</Label>
-                <Input type="number" step="0.01" value={formIgv} onChange={e => setFormIgv(e.target.value)} />
-              </div>
-              <div>
-                <Label>Fondo de Garantía %</Label>
-                <Input type="number" step="0.01" value={formFondoGarantia} onChange={e => setFormFondoGarantia(e.target.value)} />
-              </div>
-            </div>
-            <div>
-              <Label>Observaciones</Label>
-              <Input placeholder="Observaciones..." value={formObservaciones} onChange={e => setFormObservaciones(e.target.value)} />
-            </div>
+              </>
+            )}
 
             {/* Tabla de partidas (solo cuando ya existe la valorización) */}
             {editingVal && (
@@ -632,42 +792,43 @@ export default function ValorizacionesPage() {
 
             {/* Preview cálculos */}
             {parseFloat(formMontoValorizacion) > 0 && (
-              <Card className="bg-muted/50">
-                <CardContent className="p-3 space-y-1 text-sm">
-                  <div className="font-medium mb-2">Resumen financiero</div>
-                  <div className="flex justify-between">
-                    <span>Monto Valorización</span>
-                    <span className="font-mono">{formatCurrency(parseFloat(formMontoValorizacion) || 0, formMoneda)}</span>
-                  </div>
-                  {preview.descuento > 0 && (
-                    <div className="flex justify-between text-red-600">
-                      <span>(-) Descuento Comercial</span>
-                      <span className="font-mono">-{formatCurrency(preview.descuento, formMoneda)}</span>
+              <Card className="bg-muted/30 border">
+                <CardContent className="p-3 text-sm">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Monto Val.</span>
+                      <span className="font-mono font-medium">{formatCurrency(parseFloat(formMontoValorizacion) || 0, formMoneda)}</span>
                     </div>
-                  )}
-                  {preview.adelanto > 0 && (
-                    <div className="flex justify-between text-red-600">
-                      <span>(-) Adelanto</span>
-                      <span className="font-mono">-{formatCurrency(preview.adelanto, formMoneda)}</span>
+                    {preview.descuento > 0 && (
+                      <div className="flex justify-between text-red-600">
+                        <span>(-) Desc.</span>
+                        <span className="font-mono">-{formatCurrency(preview.descuento, formMoneda)}</span>
+                      </div>
+                    )}
+                    {preview.adelanto > 0 && (
+                      <div className="flex justify-between text-red-600">
+                        <span>(-) Adelanto</span>
+                        <span className="font-mono">-{formatCurrency(preview.adelanto, formMoneda)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Subtotal</span>
+                      <span className="font-mono">{formatCurrency(preview.subtotal, formMoneda)}</span>
                     </div>
-                  )}
-                  <div className="flex justify-between border-t pt-1">
-                    <span>Subtotal</span>
-                    <span className="font-mono">{formatCurrency(preview.subtotal, formMoneda)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>(+) IGV</span>
-                    <span className="font-mono">+{formatCurrency(preview.igv, formMoneda)}</span>
-                  </div>
-                  {preview.fondoGarantia > 0 && (
-                    <div className="flex justify-between text-orange-600">
-                      <span>(-) Fondo Garantía</span>
-                      <span className="font-mono">-{formatCurrency(preview.fondoGarantia, formMoneda)}</span>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">(+) IGV</span>
+                      <span className="font-mono">+{formatCurrency(preview.igv, formMoneda)}</span>
                     </div>
-                  )}
-                  <div className="flex justify-between border-t pt-1 font-bold text-base">
-                    <span>Neto a Recibir</span>
-                    <span className="font-mono">{formatCurrency(preview.netoARecibir, formMoneda)}</span>
+                    {preview.fondoGarantia > 0 && (
+                      <div className="flex justify-between text-orange-600">
+                        <span>(-) F. Garantía</span>
+                        <span className="font-mono">-{formatCurrency(preview.fondoGarantia, formMoneda)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between font-bold col-span-2 md:col-span-1 border-t pt-1 md:border-t-0 md:pt-0">
+                      <span>Neto a Recibir</span>
+                      <span className="font-mono text-base">{formatCurrency(preview.netoARecibir, formMoneda)}</span>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -687,7 +848,7 @@ export default function ValorizacionesPage() {
 
       {/* Dialog detalle */}
       <Dialog open={!!showDetail} onOpenChange={open => { if (!open) setShowDetail(null) }}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-5xl">
           <DialogHeader>
             <DialogTitle>Valorización {showDetail?.codigo}</DialogTitle>
             <DialogDescription>

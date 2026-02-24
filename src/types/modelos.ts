@@ -1089,6 +1089,9 @@ export interface Proyecto {
   moneda?: string | null
   tipoCambio?: number | null
   diasGarantia?: number
+  adelantoPorcentaje?: number
+  adelantoMonto?: number
+  adelantoAmortizado?: number
   codigo: string
   estado: string
   fechaInicio: string

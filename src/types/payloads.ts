@@ -441,6 +441,8 @@ export interface ProyectoPayload {
   fechaInicio: string
   fechaFin?: string
   diasGarantia?: number
+  adelantoPorcentaje?: number
+  adelantoMonto?: number
 }
 
 export interface ProyectoUpdatePayload extends Partial<ProyectoPayload> {}

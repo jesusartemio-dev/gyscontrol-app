@@ -19,10 +19,19 @@ import {
   CheckSquare,
   CheckCircle,
   FileWarning,
+  Banknote,
+  Pencil,
+  Save,
+  X,
+  Loader2,
 } from 'lucide-react'
 
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import toast from 'react-hot-toast'
 
 import { useProyectoContext } from './ProyectoContext'
 
@@ -64,9 +73,66 @@ type ProyectoCondExcl = {
 
 export default function ProyectoHubPage() {
   const router = useRouter()
-  const { proyecto, cronogramaStats, costosReales } = useProyectoContext()
+  const { proyecto, cronogramaStats, costosReales, setProyecto } = useProyectoContext()
   const [condExcl, setCondExcl] = useState<ProyectoCondExcl | null>(null)
   const [showCondExcl, setShowCondExcl] = useState(false)
+
+  // Adelanto editing state
+  const [editingAdelanto, setEditingAdelanto] = useState(false)
+  const [savingAdelanto, setSavingAdelanto] = useState(false)
+  const [editAdelantoPct, setEditAdelantoPct] = useState('0')
+  const [editAdelantoMonto, setEditAdelantoMonto] = useState('0')
+
+  const startEditingAdelanto = () => {
+    if (!proyecto) return
+    setEditAdelantoPct((proyecto.adelantoPorcentaje ?? 0).toString())
+    setEditAdelantoMonto((proyecto.adelantoMonto ?? 0).toString())
+    setEditingAdelanto(true)
+  }
+
+  const handleAdelantoPctChange = (val: string) => {
+    setEditAdelantoPct(val)
+    const pct = parseFloat(val) || 0
+    const totalCliente = proyecto?.totalCliente || proyecto?.grandTotal || 0
+    setEditAdelantoMonto((Math.round(totalCliente * (pct / 100) * 100) / 100).toString())
+  }
+
+  const handleAdelantoMontoChange = (val: string) => {
+    setEditAdelantoMonto(val)
+    const monto = parseFloat(val) || 0
+    const totalCliente = proyecto?.totalCliente || proyecto?.grandTotal || 0
+    if (totalCliente > 0) {
+      setEditAdelantoPct((Math.round((monto / totalCliente) * 100 * 100) / 100).toString())
+    }
+  }
+
+  const saveAdelanto = async () => {
+    if (!proyecto) return
+    setSavingAdelanto(true)
+    try {
+      const res = await fetch(`/api/proyecto/${proyecto.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adelantoPorcentaje: parseFloat(editAdelantoPct) || 0,
+          adelantoMonto: parseFloat(editAdelantoMonto) || 0,
+        }),
+      })
+      if (!res.ok) throw new Error('Error al actualizar')
+      const updated = await res.json()
+      setProyecto({
+        ...proyecto,
+        adelantoPorcentaje: updated.adelantoPorcentaje,
+        adelantoMonto: updated.adelantoMonto,
+      })
+      setEditingAdelanto(false)
+      toast.success('Adelanto actualizado')
+    } catch {
+      toast.error('Error al guardar adelanto')
+    } finally {
+      setSavingAdelanto(false)
+    }
+  }
 
   useEffect(() => {
     if (!proyecto?.id) return
@@ -438,6 +504,134 @@ export default function ProyectoHubPage() {
           </motion.div>
         ))}
       </div>
+
+      {/* Adelanto del Cliente */}
+      {((proyecto.adelantoMonto ?? 0) > 0 || editingAdelanto) && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2, delay: 0.3 }}
+        >
+          <Card>
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Banknote className="h-4 w-4 text-emerald-600" />
+                  <span className="text-sm font-semibold">Adelanto del Cliente</span>
+                </div>
+                {!editingAdelanto ? (
+                  <Button variant="ghost" size="sm" className="h-7 px-2" onClick={startEditingAdelanto}>
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                ) : (
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="sm" className="h-7 px-2 text-green-700" onClick={saveAdelanto} disabled={savingAdelanto}>
+                      {savingAdelanto ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setEditingAdelanto(false)} disabled={savingAdelanto}>
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {editingAdelanto ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs">Porcentaje (%)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="100"
+                      value={editAdelantoPct}
+                      onChange={e => handleAdelantoPctChange(e.target.value)}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Monto</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={editAdelantoMonto}
+                      onChange={e => handleAdelantoMontoChange(e.target.value)}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-4 gap-3 text-sm">
+                    <div>
+                      <div className="text-xs text-muted-foreground">Porcentaje</div>
+                      <div className="font-semibold">{(proyecto.adelantoPorcentaje ?? 0).toFixed(2)}%</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Monto Total</div>
+                      <div className="font-semibold">{formatCurrency(proyecto.adelantoMonto ?? 0)}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Amortizado</div>
+                      <div className="font-semibold text-orange-600">{formatCurrency(proyecto.adelantoAmortizado ?? 0)}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Saldo</div>
+                      <div className="font-semibold text-emerald-600">
+                        {formatCurrency((proyecto.adelantoMonto ?? 0) - (proyecto.adelantoAmortizado ?? 0))}
+                      </div>
+                    </div>
+                  </div>
+                  {(proyecto.adelantoMonto ?? 0) > 0 && (
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Progreso de amortización</span>
+                        <span className="font-medium">
+                          {((proyecto.adelantoMonto ?? 0) > 0
+                            ? ((proyecto.adelantoAmortizado ?? 0) / (proyecto.adelantoMonto ?? 1) * 100).toFixed(1)
+                            : '0'
+                          )}%
+                        </span>
+                      </div>
+                      <div className="relative h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div
+                          className="absolute inset-y-0 left-0 rounded-full bg-emerald-500 transition-all"
+                          style={{
+                            width: `${Math.min(
+                              ((proyecto.adelantoAmortizado ?? 0) / Math.max(proyecto.adelantoMonto ?? 1, 1)) * 100,
+                              100
+                            )}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
+      {/* Botón para configurar adelanto si no está configurado */}
+      {!editingAdelanto && (proyecto.adelantoMonto ?? 0) === 0 && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.2, delay: 0.3 }}
+        >
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-xs text-muted-foreground hover:text-foreground"
+            onClick={startEditingAdelanto}
+          >
+            <Banknote className="h-3.5 w-3.5 mr-1" />
+            Configurar adelanto del cliente
+          </Button>
+        </motion.div>
+      )}
 
       {/* Condiciones y Exclusiones del Proyecto */}
       {(totalCond > 0 || totalExcl > 0) && (

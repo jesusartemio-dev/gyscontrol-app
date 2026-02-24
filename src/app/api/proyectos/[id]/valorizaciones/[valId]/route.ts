@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { calcularAdelantoValorizacion } from '@/lib/utils/adelantoUtils'
 
 const ROLES_ALLOWED = ['admin', 'gerente', 'gestor', 'coordinador', 'administracion']
 
@@ -53,7 +54,7 @@ async function calcularAcumuladoAnterior(proyectoId: string, excludeId: string):
 }
 
 const includeRelations = {
-  proyecto: { select: { id: true, codigo: true, nombre: true, totalCliente: true, clienteId: true } },
+  proyecto: { select: { id: true, codigo: true, nombre: true, totalCliente: true, clienteId: true, adelantoPorcentaje: true, adelantoMonto: true, adelantoAmortizado: true } },
   adjuntos: true,
   cuentasPorCobrar: true,
 }
@@ -146,6 +147,27 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
     // Manejo de cambio de estado
     if (body.estado && body.estado !== existing.estado) {
+      // Amortización de adelanto al aprobar
+      if (body.estado === 'aprobada_cliente' && existing.adelantoMonto > 0) {
+        await prisma.proyecto.update({
+          where: { id: proyectoId },
+          data: {
+            adelantoAmortizado: { increment: existing.adelantoMonto },
+          },
+        })
+      }
+
+      // Revertir amortización al anular desde estado post-aprobación
+      const estadosPostAprobacion = ['aprobada_cliente', 'facturada', 'pagada']
+      if (body.estado === 'anulada' && estadosPostAprobacion.includes(existing.estado) && existing.adelantoMonto > 0) {
+        await prisma.proyecto.update({
+          where: { id: proyectoId },
+          data: {
+            adelantoAmortizado: { decrement: existing.adelantoMonto },
+          },
+        })
+      }
+
       // Transición a "facturada": opcionalmente crear CuentaPorCobrar
       if (body.estado === 'facturada' && body.crearCuentaCobrar) {
         const proyecto = await prisma.proyecto.findUnique({
@@ -183,9 +205,31 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const montoValorizacion = body.montoValorizacion ?? existing.montoValorizacion
     const presupuestoContractual = body.presupuestoContractual ?? existing.presupuestoContractual
     const descuentoComercialPorcentaje = body.descuentoComercialPorcentaje ?? existing.descuentoComercialPorcentaje
-    const adelantoPorcentaje = body.adelantoPorcentaje ?? existing.adelantoPorcentaje
     const igvPorcentaje = body.igvPorcentaje ?? existing.igvPorcentaje
     const fondoGarantiaPorcentaje = body.fondoGarantiaPorcentaje ?? existing.fondoGarantiaPorcentaje
+
+    // Recalcular adelanto desde proyecto si está en borrador y el proyecto tiene adelanto
+    let adelantoPorcentaje = body.adelantoPorcentaje ?? existing.adelantoPorcentaje
+    let adelantoMontoOverride: number | undefined
+
+    const estadoFinal = body.estado ?? existing.estado
+    if (estadoFinal === 'borrador') {
+      const proyecto = await prisma.proyecto.findUnique({
+        where: { id: proyectoId },
+        select: { adelantoPorcentaje: true, adelantoMonto: true, adelantoAmortizado: true },
+      })
+      if (proyecto && proyecto.adelantoMonto > 0) {
+        const adelantoCalc = calcularAdelantoValorizacion(
+          proyecto,
+          montoValorizacion,
+          body.adelantoMontoManual
+        )
+        if (adelantoCalc.tieneAdelanto) {
+          adelantoPorcentaje = adelantoCalc.adelantoPorcentaje
+          adelantoMontoOverride = adelantoCalc.adelantoMonto
+        }
+      }
+    }
 
     const acumuladoAnterior = await calcularAcumuladoAnterior(proyectoId, valId)
     const calculados = calcularMontos({
@@ -197,6 +241,11 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       igvPorcentaje,
       fondoGarantiaPorcentaje,
     })
+
+    // Si se usó el helper, sobrescribir el adelantoMonto calculado
+    if (adelantoMontoOverride !== undefined) {
+      calculados.adelantoMonto = adelantoMontoOverride
+    }
 
     const valorizacion = await prisma.valorizacion.update({
       where: { id: valId },

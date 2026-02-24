@@ -900,6 +900,9 @@ model Proyecto {
   moneda                   String?                    @default("USD")
   tipoCambio               Float?
   diasGarantia             Int                        @default(365)
+  adelantoPorcentaje       Float                      @default(0)
+  adelantoMonto            Float                      @default(0)
+  adelantoAmortizado       Float                      @default(0)
   createdAt                DateTime                   @default(now())
   updatedAt                DateTime
   deletedAt                DateTime?
