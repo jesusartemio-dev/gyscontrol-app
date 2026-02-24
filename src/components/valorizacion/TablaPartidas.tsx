@@ -596,11 +596,22 @@ export default function TablaPartidas({ valorizacionId, proyectoId, readOnly, ti
             </Table>
           </div>
           {/* Total footer */}
-          <div className="flex justify-between items-center px-4 py-3 bg-primary/5 border-t-2 border-primary/20">
-            <span className="text-sm font-semibold text-foreground">Total Valorización</span>
-            <span className="text-lg font-bold font-mono text-primary">
-              {formatCurrency(total)}
-            </span>
+          <div className="flex items-center px-4 py-3 bg-primary/5 border-t-2 border-primary/20">
+            <span className="text-sm font-semibold text-foreground flex-1">Totales</span>
+            <div className="flex items-center gap-6">
+              <div className="text-right">
+                <span className="text-[11px] text-muted-foreground block leading-tight">Contractual</span>
+                <span className="text-sm font-bold font-mono">
+                  {formatCurrency(partidas.reduce((s, p) => s + p.montoContractual, 0))}
+                </span>
+              </div>
+              <div className="text-right">
+                <span className="text-[11px] text-muted-foreground block leading-tight">Valorización</span>
+                <span className="text-lg font-bold font-mono text-primary">
+                  {formatCurrency(total)}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       )}
