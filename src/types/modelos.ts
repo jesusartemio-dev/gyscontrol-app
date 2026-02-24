@@ -1595,6 +1595,41 @@ export interface ValorizacionAdjunto {
   createdAt: string
 }
 
+export type OrigenPartida = 'equipo' | 'servicio' | 'gasto' | 'libre'
+
+export interface PartidaValorizacion {
+  id: string
+  valorizacionId: string
+  numero: number
+  descripcion: string
+  origen: OrigenPartida
+  proyectoEquipoCotizadoId?: string | null
+  proyectoServicioCotizadoId?: string | null
+  proyectoGastoCotizadoId?: string | null
+  proyectoEdtId?: string | null
+  montoContractual: number
+  porcentajeAvance: number
+  montoAvance: number
+  porcentajeAcumuladoAnterior: number
+  montoAcumuladoAnterior: number
+  orden: number
+  createdAt: string
+  updatedAt: string
+}
+
+export type PartidaValorizacionInput = {
+  numero: number
+  descripcion: string
+  origen?: OrigenPartida
+  proyectoEquipoCotizadoId?: string | null
+  proyectoServicioCotizadoId?: string | null
+  proyectoGastoCotizadoId?: string | null
+  proyectoEdtId?: string | null
+  montoContractual: number
+  porcentajeAvance: number
+  orden?: number
+}
+
 // ============================
 // ⏱️ Registro de Horas Hombre
 // ============================

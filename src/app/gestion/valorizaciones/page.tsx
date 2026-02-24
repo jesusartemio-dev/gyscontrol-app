@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea'
 import toast from 'react-hot-toast'
 import ValorizacionImportExcelModal from '@/components/gestion/ValorizacionImportExcelModal'
 import { exportarValAExcel } from '@/lib/utils/valorizacionExcel'
+import TablaPartidas from '@/components/valorizacion/TablaPartidas'
 
 interface Proyecto {
   id: string
@@ -22,6 +23,7 @@ interface Proyecto {
   totalCliente: number | null
   moneda: string | null
   tipoCambio: number | null
+  cotizacionId?: string | null
 }
 
 interface Valorizacion {
@@ -197,13 +199,8 @@ export default function ValorizacionesPage() {
   }
 
   const handleSave = async () => {
-    if (!formMontoValorizacion || !formPeriodoInicio || !formPeriodoFin) {
-      toast.error('Monto y periodo son requeridos')
-      return
-    }
-    const monto = parseFloat(formMontoValorizacion)
-    if (monto <= 0) {
-      toast.error('El monto debe ser mayor a 0')
+    if (!formPeriodoInicio || !formPeriodoFin) {
+      toast.error('Periodo inicio y fin son requeridos')
       return
     }
     if (new Date(formPeriodoFin) <= new Date(formPeriodoInicio)) {
@@ -216,6 +213,7 @@ export default function ValorizacionesPage() {
     }
     setSaving(true)
     try {
+      const monto = parseFloat(formMontoValorizacion) || 0
       const payload = {
         montoValorizacion: monto,
         periodoInicio: formPeriodoInicio,
@@ -229,29 +227,51 @@ export default function ValorizacionesPage() {
         observaciones: formObservaciones || null,
       }
 
-      const url = editingVal
-        ? `/api/proyectos/${editingVal.proyectoId}/valorizaciones/${editingVal.id}`
-        : `/api/proyectos/${formProyectoId}/valorizaciones`
-
-      const res = await fetch(url, {
-        method: editingVal ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error || 'Error')
+      if (editingVal) {
+        // Modo edición: actualizar campos (porcentajes, periodo, etc.)
+        const res = await fetch(`/api/proyectos/${editingVal.proyectoId}/valorizaciones/${editingVal.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+        if (!res.ok) {
+          const err = await res.json()
+          throw new Error(err.error || 'Error')
+        }
+        toast.success('Valorización actualizada')
+        setShowForm(false)
+        resetForm()
+        loadData()
+      } else {
+        // Modo creación: crear registro base con monto=0, luego pasar a edición
+        const res = await fetch(`/api/proyectos/${formProyectoId}/valorizaciones`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...payload, montoValorizacion: 0 }),
+        })
+        if (!res.ok) {
+          const err = await res.json()
+          throw new Error(err.error || 'Error')
+        }
+        const creada: Valorizacion = await res.json()
+        toast.success('Valorización creada — ahora agrega las partidas')
+        // Transicionar a modo edición con la valorización recién creada
+        setEditingVal(creada)
+        setFormProyectoId(creada.proyectoId)
+        setFormMontoValorizacion('0')
+        loadData()
       }
-      toast.success(editingVal ? 'Valorización actualizada' : 'Valorización creada')
-      setShowForm(false)
-      resetForm()
-      loadData()
     } catch (e: any) {
       toast.error(e.message || 'Error al guardar')
     } finally {
       setSaving(false)
     }
   }
+
+  // Callback cuando TablaPartidas actualiza el monto
+  const handleMontoFromPartidas = useCallback((monto: number) => {
+    setFormMontoValorizacion(monto.toString())
+  }, [])
 
   const openEstadoTransition = (val: Valorizacion, nuevoEstado: string) => {
     setEstadoTarget({ val, estado: nuevoEstado })
@@ -501,14 +521,16 @@ export default function ValorizacionesPage() {
 
       {/* Dialog crear/editar */}
       <Dialog open={showForm} onOpenChange={open => { if (!open) { setShowForm(false); resetForm() } }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className={editingVal ? 'max-w-3xl' : 'max-w-lg'}>
           <DialogHeader>
             <DialogTitle>{editingVal ? `Editar ${editingVal.codigo}` : 'Nueva Valorización'}</DialogTitle>
             <DialogDescription>
-              {editingVal ? 'Modifica los datos de la valorización. Los montos se recalculan automáticamente.' : 'Selecciona un proyecto y completa los datos. Los montos se calculan automáticamente.'}
+              {editingVal
+                ? 'Agrega partidas para calcular el monto. Los campos financieros se recalculan automáticamente.'
+                : 'Selecciona un proyecto y completa los datos. Luego podrás agregar las partidas.'}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+          <div className="space-y-4 max-h-[70vh] overflow-y-auto">
             {!editingVal && (
               <div>
                 <Label>Proyecto *</Label>
@@ -535,10 +557,7 @@ export default function ValorizacionesPage() {
                 </Select>
               </div>
             )}
-            <div>
-              <Label>Monto Valorización *</Label>
-              <Input type="number" step="0.01" min="0.01" placeholder="0.00" value={formMontoValorizacion} onChange={e => setFormMontoValorizacion(e.target.value)} />
-            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Periodo Inicio *</Label>
@@ -549,38 +568,40 @@ export default function ValorizacionesPage() {
                 <Input type="date" value={formPeriodoFin} onChange={e => setFormPeriodoFin(e.target.value)} />
               </div>
             </div>
-            <div>
-              <Label>Moneda</Label>
-              <Select value={formMoneda} onValueChange={setFormMoneda}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="USD">Dólares (USD)</SelectItem>
-                  <SelectItem value="PEN">Soles (PEN)</SelectItem>
-                </SelectContent>
-              </Select>
-              {!showTipoCambio ? (
-                <button
-                  type="button"
-                  className="text-xs text-blue-600 hover:underline mt-1"
-                  onClick={() => setShowTipoCambio(true)}
-                >
-                  ¿Registrar tipo de cambio?
-                </button>
-              ) : (
-                <div className="mt-2">
-                  <Label>Tipo de Cambio</Label>
-                  <Input type="number" step="0.001" placeholder="Ej: 3.75" value={formTipoCambio} onChange={e => setFormTipoCambio(e.target.value)} />
-                </div>
-              )}
-            </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Descuento Comercial %</Label>
-                <Input type="number" step="0.01" value={formDescuento} onChange={e => setFormDescuento(e.target.value)} />
+                <Label>Moneda</Label>
+                <Select value={formMoneda} onValueChange={setFormMoneda}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="USD">Dólares (USD)</SelectItem>
+                    <SelectItem value="PEN">Soles (PEN)</SelectItem>
+                  </SelectContent>
+                </Select>
+                {!showTipoCambio ? (
+                  <button
+                    type="button"
+                    className="text-xs text-blue-600 hover:underline mt-1"
+                    onClick={() => setShowTipoCambio(true)}
+                  >
+                    ¿Registrar tipo de cambio?
+                  </button>
+                ) : (
+                  <div className="mt-2">
+                    <Label>Tipo de Cambio</Label>
+                    <Input type="number" step="0.001" placeholder="Ej: 3.75" value={formTipoCambio} onChange={e => setFormTipoCambio(e.target.value)} />
+                  </div>
+                )}
               </div>
-              <div>
-                <Label>Adelanto %</Label>
-                <Input type="number" step="0.01" value={formAdelanto} onChange={e => setFormAdelanto(e.target.value)} />
+              <div className="space-y-3">
+                <div>
+                  <Label>Descuento Comercial %</Label>
+                  <Input type="number" step="0.01" value={formDescuento} onChange={e => setFormDescuento(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Adelanto %</Label>
+                  <Input type="number" step="0.01" value={formAdelanto} onChange={e => setFormAdelanto(e.target.value)} />
+                </div>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -598,11 +619,22 @@ export default function ValorizacionesPage() {
               <Input placeholder="Observaciones..." value={formObservaciones} onChange={e => setFormObservaciones(e.target.value)} />
             </div>
 
+            {/* Tabla de partidas (solo cuando ya existe la valorización) */}
+            {editingVal && (
+              <TablaPartidas
+                valorizacionId={editingVal.id}
+                proyectoId={editingVal.proyectoId}
+                readOnly={editingVal.estado !== 'borrador'}
+                tieneCotizacion={!!proyectos.find(p => p.id === editingVal.proyectoId)?.cotizacionId}
+                onMontoChange={handleMontoFromPartidas}
+              />
+            )}
+
             {/* Preview cálculos */}
             {parseFloat(formMontoValorizacion) > 0 && (
               <Card className="bg-muted/50">
                 <CardContent className="p-3 space-y-1 text-sm">
-                  <div className="font-medium mb-2">Vista previa de cálculos</div>
+                  <div className="font-medium mb-2">Resumen financiero</div>
                   <div className="flex justify-between">
                     <span>Monto Valorización</span>
                     <span className="font-mono">{formatCurrency(parseFloat(formMontoValorizacion) || 0, formMoneda)}</span>
@@ -642,10 +674,12 @@ export default function ValorizacionesPage() {
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowForm(false); resetForm() }}>Cancelar</Button>
+            <Button variant="outline" onClick={() => { setShowForm(false); resetForm() }}>
+              {editingVal ? 'Cerrar' : 'Cancelar'}
+            </Button>
             <Button onClick={handleSave} disabled={saving}>
               {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {editingVal ? 'Guardar' : 'Crear'}
+              {editingVal ? 'Guardar cambios' : 'Crear y agregar partidas'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -653,7 +687,7 @@ export default function ValorizacionesPage() {
 
       {/* Dialog detalle */}
       <Dialog open={!!showDetail} onOpenChange={open => { if (!open) setShowDetail(null) }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>Valorización {showDetail?.codigo}</DialogTitle>
             <DialogDescription>
@@ -720,6 +754,15 @@ export default function ValorizacionesPage() {
                   <Row label="Neto a Recibir" value={formatCurrency(showDetail.netoARecibir, showDetail.moneda)} bold border />
                 </CardContent>
               </Card>
+
+              {/* Partidas (read-only) */}
+              <TablaPartidas
+                valorizacionId={showDetail.id}
+                proyectoId={showDetail.proyectoId}
+                readOnly={true}
+                tieneCotizacion={false}
+                onMontoChange={() => {}}
+              />
 
               {showDetail.observaciones && (
                 <div>

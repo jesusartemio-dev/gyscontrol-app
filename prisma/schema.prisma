@@ -1495,6 +1495,7 @@ model Valorizacion {
   proyecto  Proyecto              @relation(fields: [proyectoId], references: [id])
   adjuntos  ValorizacionAdjunto[]
   cuentasPorCobrar CuentaPorCobrar[]
+  partidas  PartidaValorizacion[]
 
   @@unique([proyectoId, numero])
   @@index([proyectoId, estado])
@@ -1516,6 +1517,40 @@ model ValorizacionAdjunto {
 
   @@index([valorizacionId])
   @@map("valorizacion_adjunto")
+}
+
+model PartidaValorizacion {
+  id             String        @id @default(cuid())
+  valorizacionId String
+  valorizacion   Valorizacion  @relation(fields: [valorizacionId], references: [id], onDelete: Cascade)
+
+  numero         Int
+  descripcion    String
+  origen         OrigenPartida @default(libre)
+
+  // Vínculos con cotización
+  proyectoEquipoCotizadoId    String?
+  proyectoServicioCotizadoId  String?
+  proyectoGastoCotizadoId     String?
+
+  // Vínculo con cronograma de ejecución
+  proyectoEdtId  String?
+
+  // Montos
+  montoContractual            Float   @default(0)
+  porcentajeAvance            Float   @default(0)
+  montoAvance                 Float   @default(0)
+
+  // Acumulado de valorizaciones anteriores (snapshot al crear)
+  porcentajeAcumuladoAnterior Float   @default(0)
+  montoAcumuladoAnterior      Float   @default(0)
+
+  orden          Int           @default(0)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([valorizacionId])
+  @@map("partida_valorizacion")
 }
 
 model VerificationToken {
@@ -2972,6 +3007,13 @@ enum TipoRecurso {
 enum OrigenRecurso {
   propio
   externo
+}
+
+enum OrigenPartida {
+  equipo
+  servicio
+  gasto
+  libre
 }
 
 enum EstadoValorizacion {
