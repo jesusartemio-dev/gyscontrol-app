@@ -39,6 +39,17 @@ export async function GET(
         },
         adjuntos: true,
         partidas: { orderBy: { orden: 'asc' } },
+        valorizacionHH: {
+          select: {
+            id: true,
+            clienteId: true,
+            totalHorasReportadas: true,
+            totalHorasEquivalentes: true,
+            subtotal: true,
+            descuentoPct: true,
+            descuentoMonto: true,
+          },
+        },
       },
     })
 

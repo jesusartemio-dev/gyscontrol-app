@@ -1634,6 +1634,82 @@ export type PartidaValorizacionInput = {
 }
 
 // ============================
+// 💰 Tarifas HH por Cliente
+// ============================
+
+export type TarifaClienteRecurso = {
+  id: string
+  clienteId: string
+  recursoId: string
+  recursoNombre?: string
+  recurso?: { id: string; nombre: string; tipo: string }
+  modalidad: 'oficina' | 'campo'
+  tarifaVenta: number
+  moneda: string
+  activo: boolean
+  createdAt?: string
+}
+
+export type ConfigDescuentoHH = {
+  id: string
+  clienteId: string
+  desdeHoras: number
+  descuentoPct: number  // fracción: 0.10 = 10%
+  orden: number
+  activo: boolean
+}
+
+export type TarifasClienteHH = {
+  tarifas: TarifaClienteRecurso[]
+  descuentos: ConfigDescuentoHH[]
+  resumenDescuentos: string
+}
+
+// ============================
+// 📋 Valorización por HH
+// ============================
+
+export type LineaHH = {
+  id: string
+  valorizacionHHId: string
+  registroHorasId: string
+  proyectoId: string
+  proyectoCodigo?: string
+  proyectoNombre?: string
+  recursoId: string
+  recursoNombre?: string
+  fecha: string
+  detalle?: string | null
+  modalidad: 'oficina' | 'campo'
+  horasReportadas: number
+  horasStd: number
+  horasOT125: number
+  horasOT135: number
+  horasOT200: number
+  horasEquivalente: number
+  tarifaHora: number
+  moneda: string
+  costoLinea: number
+  orden: number
+}
+
+export type ValorizacionHH = {
+  id: string
+  valorizacionId: string
+  clienteId: string
+  clienteNombre?: string
+  periodoInicio: string
+  periodoFin: string
+  proyectosIds: string[]
+  totalHorasReportadas: number
+  totalHorasEquivalentes: number
+  subtotal: number
+  descuentoPct: number
+  descuentoMonto: number
+  lineas?: LineaHH[]
+}
+
+// ============================
 // ⏱️ Registro de Horas Hombre
 // ============================
 

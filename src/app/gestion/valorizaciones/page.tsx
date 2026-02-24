@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, FileSpreadsheet, Loader2, Search, Eye, Send, CheckCircle, Edit, Ban, Upload, Download, AlertTriangle, RefreshCw, Trash2 } from 'lucide-react'
+import { Plus, FileSpreadsheet, Loader2, Search, Eye, Send, CheckCircle, Edit, Ban, Upload, Download, AlertTriangle, RefreshCw, Trash2, Clock } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 import toast from 'react-hot-toast'
 import ValorizacionImportExcelModal from '@/components/gestion/ValorizacionImportExcelModal'
@@ -373,6 +373,10 @@ export default function ValorizacionesPage() {
           >
             <Upload className="h-4 w-4 mr-1" />
             Importar
+          </Button>
+          <Button variant="outline" onClick={() => router.push('/gestion/valorizaciones-hh/nueva')}>
+            <Clock className="h-4 w-4 mr-2" />
+            Nueva Val. HH
           </Button>
           <Button onClick={openCreate}>
             <Plus className="h-4 w-4 mr-2" />

@@ -34,6 +34,7 @@ import { Progress } from '@/components/ui/progress'
 import { getClienteById } from '@/lib/services/cliente'
 import { getContactosByCliente, createContacto, type CrmContactoCliente, type CreateContactoData } from '@/lib/services/crm'
 import { ContactoForm, ContactoCard } from '@/components/crm'
+import TarifasHH from '@/components/clientes/TarifasHH'
 import type { Cliente } from '@/types'
 
 // Extended Cliente type with CRM fields
@@ -304,11 +305,12 @@ export default function CrmClienteDetailPage() {
 
         {/* Main Content */}
         <Tabs defaultValue="perfil" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="perfil">Perfil CRM</TabsTrigger>
             <TabsTrigger value="contactos">Contactos</TabsTrigger>
             <TabsTrigger value="historial">Historial</TabsTrigger>
             <TabsTrigger value="oportunidades">Oportunidades</TabsTrigger>
+            <TabsTrigger value="tarifas">Tarifas HH</TabsTrigger>
             <TabsTrigger value="analisis">Análisis</TabsTrigger>
           </TabsList>
 
@@ -622,6 +624,11 @@ export default function CrmClienteDetailPage() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Tarifas HH */}
+          <TabsContent value="tarifas" className="space-y-6">
+            <TarifasHH clienteId={clienteId} clienteNombre={cliente.nombre} />
           </TabsContent>
 
           {/* Análisis */}

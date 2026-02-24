@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ArrowLeft, Loader2, Save, Eye, Check } from 'lucide-react'
 import toast from 'react-hot-toast'
 import TablaPartidas from '@/components/valorizacion/TablaPartidas'
+import DetalleHH from '@/components/valorizacion/DetalleHH'
 import { calcularAdelantoValorizacion } from '@/lib/utils/adelantoUtils'
 
 interface Proyecto {
@@ -62,6 +63,15 @@ interface Valorizacion {
   createdAt: string
   updatedAt: string
   proyecto?: Proyecto
+  valorizacionHH?: {
+    id: string
+    clienteId: string
+    totalHorasReportadas: number
+    totalHorasEquivalentes: number
+    subtotal: number
+    descuentoPct: number
+    descuentoMonto: number
+  } | null
 }
 
 const ESTADOS = [
@@ -400,14 +410,22 @@ export default function ValorizacionEditPage() {
         </CardContent>
       </Card>
 
-      {/* Tabla de partidas - ANCHO COMPLETO */}
-      <TablaPartidas
-        valorizacionId={val.id}
-        proyectoId={val.proyectoId}
-        readOnly={readOnly}
-        tieneCotizacion={!!val.proyecto?.cotizacionId}
-        onMontoChange={handleMontoFromPartidas}
-      />
+      {/* HH detail OR partidas table */}
+      {val.valorizacionHH ? (
+        <DetalleHH
+          valorizacionHHId={val.valorizacionHH.id}
+          estado={val.estado}
+          moneda={val.moneda}
+        />
+      ) : (
+        <TablaPartidas
+          valorizacionId={val.id}
+          proyectoId={val.proyectoId}
+          readOnly={readOnly}
+          tieneCotizacion={!!val.proyecto?.cotizacionId}
+          onMontoChange={handleMontoFromPartidas}
+        />
+      )}
 
       {/* Resumen financiero */}
       {parseFloat(formMontoValorizacion) > 0 && (

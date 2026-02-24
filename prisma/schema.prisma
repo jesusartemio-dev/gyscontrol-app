@@ -137,18 +137,18 @@ model CategoriaExclusion {
 }
 
 model CatalogoGasto {
-  id            String         @id @default(cuid())
-  codigo        String         @unique
-  descripcion   String
-  categoriaId   String
-  cantidad      Float          @default(1)
-  precioInterno Float
-  margen        Float          @default(0.2)
-  precioVenta   Float
-  estado        String         @default("activo")
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  categoria          CategoriaGasto      @relation(fields: [categoriaId], references: [id])
+  id                  String                @id @default(cuid())
+  codigo              String                @unique
+  descripcion         String
+  categoriaId         String
+  cantidad            Float                 @default(1)
+  precioInterno       Float
+  margen              Float                 @default(0.2)
+  precioVenta         Float
+  estado              String                @default("activo")
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  categoria           CategoriaGasto        @relation(fields: [categoriaId], references: [id])
   cotizacionGastoItem CotizacionGastoItem[]
 
   @@map("catalogo_gasto")
@@ -182,8 +182,90 @@ model Cliente {
   crmHistorialProyecto     CrmHistorialProyecto[]
   crmOportunidad           CrmOportunidad[]
   cuentasPorCobrar         CuentaPorCobrar[]
+  tarifasRecursos          TarifaClienteRecurso[]
+  descuentosHH             ConfigDescuentoHH[]
+  valorizacionesHH         ValorizacionHH[]
 
   @@map("cliente")
+}
+
+model TarifaClienteRecurso {
+  id          String        @id @default(cuid())
+  clienteId   String
+  cliente     Cliente       @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  recursoId   String
+  recurso     Recurso       @relation(fields: [recursoId], references: [id])
+  modalidad   OrigenTrabajo // oficina | campo
+  tarifaVenta Float // precio que GYS cobra al cliente por HH
+  moneda      String        @default("USD")
+  activo      Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@unique([clienteId, recursoId, modalidad])
+  @@map("tarifa_cliente_recurso")
+}
+
+model ConfigDescuentoHH {
+  id           String   @id @default(cuid())
+  clienteId    String
+  cliente      Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  desdeHoras   Float // umbral en horas equivalentes: 100, 200, 300
+  descuentoPct Float // fracción: 0.10, 0.08, 0.05 (NO porcentaje)
+  orden        Int // para aplicarlos en orden ascendente
+  activo       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  @@map("config_descuento_hh")
+}
+
+model ValorizacionHH {
+  id                     String       @id @default(cuid())
+  valorizacionId         String       @unique
+  valorizacion           Valorizacion @relation(fields: [valorizacionId], references: [id], onDelete: Cascade)
+  clienteId              String
+  cliente                Cliente      @relation(fields: [clienteId], references: [id])
+  periodoInicio          DateTime
+  periodoFin             DateTime
+  proyectosIds           String // JSON array de proyectoId[]
+  totalHorasReportadas   Float        @default(0)
+  totalHorasEquivalentes Float        @default(0)
+  subtotal               Float        @default(0)
+  descuentoPct           Float        @default(0)
+  descuentoMonto         Float        @default(0)
+  lineas                 LineaHH[]
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+
+  @@map("valorizacion_hh")
+}
+
+model LineaHH {
+  id               String         @id @default(cuid())
+  valorizacionHHId String
+  valorizacionHH   ValorizacionHH @relation(fields: [valorizacionHHId], references: [id], onDelete: Cascade)
+  registroHorasId  String         @unique
+  registroHoras    RegistroHoras  @relation(fields: [registroHorasId], references: [id])
+  proyectoId       String
+  proyecto         Proyecto       @relation(fields: [proyectoId], references: [id])
+  recursoId        String
+  recurso          Recurso        @relation(fields: [recursoId], references: [id])
+  fecha            DateTime
+  detalle          String?
+  modalidad        OrigenTrabajo
+  horasReportadas  Float
+  horasStd         Float
+  horasOT125       Float          @default(0)
+  horasOT135       Float          @default(0)
+  horasOT200       Float          @default(0)
+  horasEquivalente Float
+  tarifaHora       Float
+  moneda           String         @default("USD")
+  costoLinea       Float
+  orden            Int            @default(0)
+  createdAt        DateTime       @default(now())
+
+  @@map("linea_hh")
 }
 
 model Cotizacion {
@@ -267,31 +349,31 @@ model Cotizacion {
 }
 
 model CotizacionTdrAnalisis {
-  id                   String     @id @default(cuid())
-  cotizacionId         String
-  cotizacion           Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+  id           String     @id @default(cuid())
+  cotizacionId String
+  cotizacion   Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
 
-  resumenTdr           String     @db.Text
-  requerimientos       Json?
-  equiposIdentificados Json?
+  resumenTdr             String @db.Text
+  requerimientos         Json?
+  equiposIdentificados   Json?
   serviciosIdentificados Json?
-  ambiguedades         Json?
-  consultasCliente     Json?
-  supuestos            Json?
-  exclusiones          Json?
+  ambiguedades           Json?
+  consultasCliente       Json?
+  supuestos              Json?
+  exclusiones            Json?
 
-  nombreArchivo        String?
-  paginasPdf           Int?
-  clienteDetectado     String?
-  proyectoDetectado    String?
-  ubicacionDetectada   String?
-  alcanceDetectado     String?    @db.Text
+  nombreArchivo      String?
+  paginasPdf         Int?
+  clienteDetectado   String?
+  proyectoDetectado  String?
+  ubicacionDetectada String?
+  alcanceDetectado   String? @db.Text
 
-  cronogramaEstimado   Json?
-  presupuestoEstimado  Json?
+  cronogramaEstimado  Json?
+  presupuestoEstimado Json?
 
-  createdAt            DateTime   @default(now())
-  updatedAt            DateTime   @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("cotizacion_tdr_analisis")
 }
@@ -500,23 +582,23 @@ model EntregaItem {
 }
 
 model EventoTrazabilidad {
-  id              String             @id
-  entregaItemId   String?
-  proyectoId      String?
-  pedidoEquipoId  String?
-  tipo            String
-  descripcion     String
-  estadoAnterior  EstadoEntregaItem?
-  estadoNuevo     EstadoEntregaItem?
-  fechaEvento     DateTime           @default(now())
-  usuarioId       String
-  metadata        Json?
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime
-  entregaItem     EntregaItem?       @relation(fields: [entregaItemId], references: [id])
-  proyecto        Proyecto?          @relation(fields: [proyectoId], references: [id])
-  pedidoEquipo    PedidoEquipo?      @relation(fields: [pedidoEquipoId], references: [id])
-  user            User               @relation(fields: [usuarioId], references: [id])
+  id             String             @id
+  entregaItemId  String?
+  proyectoId     String?
+  pedidoEquipoId String?
+  tipo           String
+  descripcion    String
+  estadoAnterior EstadoEntregaItem?
+  estadoNuevo    EstadoEntregaItem?
+  fechaEvento    DateTime           @default(now())
+  usuarioId      String
+  metadata       Json?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime
+  entregaItem    EntregaItem?       @relation(fields: [entregaItemId], references: [id])
+  proyecto       Proyecto?          @relation(fields: [proyectoId], references: [id])
+  pedidoEquipo   PedidoEquipo?      @relation(fields: [pedidoEquipoId], references: [id])
+  user           User               @relation(fields: [usuarioId], references: [id])
 
   @@index([entregaItemId])
   @@index([fechaEvento])
@@ -614,27 +696,27 @@ model ListaEquipoItem {
 }
 
 model PedidoEquipo {
-  id                   String             @id
+  id                   String               @id
   proyectoId           String
   responsableId        String
   listaId              String?
-  codigo               String             @unique
+  codigo               String               @unique
   numeroSecuencia      Int
-  estado               EstadoPedido       @default(borrador)
-  fechaPedido          DateTime           @default(now())
+  estado               EstadoPedido         @default(borrador)
+  fechaPedido          DateTime             @default(now())
   observacion          String?
   fechaEntregaEstimada DateTime?
   fechaEntregaReal     DateTime?
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
   fechaNecesaria       DateTime
-  costoRealTotal       Float              @default(0)
-  esUrgente            Boolean            @default(false)
-  presupuestoTotal     Float              @default(0)
-  prioridad            String?            @default("media")
-  listaEquipo          ListaEquipo?       @relation(fields: [listaId], references: [id])
-  proyecto             Proyecto           @relation(fields: [proyectoId], references: [id])
-  user                 User               @relation(fields: [responsableId], references: [id])
+  costoRealTotal       Float                @default(0)
+  esUrgente            Boolean              @default(false)
+  presupuestoTotal     Float                @default(0)
+  prioridad            String?              @default("media")
+  listaEquipo          ListaEquipo?         @relation(fields: [listaId], references: [id])
+  proyecto             Proyecto             @relation(fields: [proyectoId], references: [id])
+  user                 User                 @relation(fields: [responsableId], references: [id])
   pedidoEquipoItem     PedidoEquipoItem[]
   ordenesCompra        OrdenCompra[]
   eventosTrazabilidad  EventoTrazabilidad[]
@@ -648,24 +730,24 @@ model PedidoEquipo {
 }
 
 model PedidoEquipoItem {
-  id                          String            @id
+  id                          String               @id
   pedidoId                    String
   listaEquipoItemId           String?
   cantidadPedida              Float
   precioUnitario              Float?
   costoTotal                  Float?
-  estado                      EstadoPedidoItem  @default(pendiente)
+  estado                      EstadoPedidoItem     @default(pendiente)
   cantidadAtendida            Float?
   comentarioLogistica         String?
   comentarioLogisticaPorId    String?
   comentarioLogisticaAt       DateTime?
-  createdAt                   DateTime          @default(now())
-  updatedAt                   DateTime          @updatedAt
+  createdAt                   DateTime             @default(now())
+  updatedAt                   DateTime             @updatedAt
   listaId                     String?
   codigo                      String
   descripcion                 String
   categoria                   String?
-  tipoItem                    String                @default("equipo")
+  tipoItem                    String               @default("equipo")
   marca                       String?
   catalogoEquipoId            String?
   tiempoEntrega               String?
@@ -675,7 +757,7 @@ model PedidoEquipoItem {
   responsableId               String
   fechaEntregaEstimada        DateTime?
   fechaEntregaReal            DateTime?
-  estadoEntrega               EstadoEntregaItem @default(pendiente)
+  estadoEntrega               EstadoEntregaItem    @default(pendiente)
   observacionesEntrega        String?
   proveedorId                 String?
   proveedorNombre             String?
@@ -683,13 +765,13 @@ model PedidoEquipoItem {
   costoRealMoneda             String?
   motivoAtencionDirecta       String?
   entregaItem                 EntregaItem[]
-  listaEquipoItem             ListaEquipoItem?  @relation(fields: [listaEquipoItemId], references: [id])
-  listaEquipo                 ListaEquipo?      @relation(fields: [listaId], references: [id])
-  pedidoEquipo                PedidoEquipo      @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
-  proveedor                   Proveedor?        @relation(fields: [proveedorId], references: [id], onDelete: SetNull)
-  catalogoEquipo              CatalogoEquipo?   @relation(fields: [catalogoEquipoId], references: [id], onDelete: SetNull)
-  user                        User              @relation(fields: [responsableId], references: [id])
-  comentarioLogisticaPor      User?             @relation("PedidoEquipoItemComentarioLogistica", fields: [comentarioLogisticaPorId], references: [id])
+  listaEquipoItem             ListaEquipoItem?     @relation(fields: [listaEquipoItemId], references: [id])
+  listaEquipo                 ListaEquipo?         @relation(fields: [listaId], references: [id])
+  pedidoEquipo                PedidoEquipo         @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  proveedor                   Proveedor?           @relation(fields: [proveedorId], references: [id], onDelete: SetNull)
+  catalogoEquipo              CatalogoEquipo?      @relation(fields: [catalogoEquipoId], references: [id], onDelete: SetNull)
+  user                        User                 @relation(fields: [responsableId], references: [id])
+  comentarioLogisticaPor      User?                @relation("PedidoEquipoItemComentarioLogistica", fields: [comentarioLogisticaPorId], references: [id])
   ordenCompraItems            OrdenCompraItem[]
   recepcionesPendientes       RecepcionPendiente[]
   cuentasPorPagar             CuentaPorPagar[]
@@ -937,6 +1019,7 @@ model Proyecto {
   ordenesCompra            OrdenCompra[]
   cuentasPorCobrar         CuentaPorCobrar[]
   cuentasPorPagar          CuentaPorPagar[]
+  lineasHH                 LineaHH[]
 
   @@index([clienteId, estado, createdAt(sort: Desc)], map: "idx_proyecto_cliente_estado_fecha")
   @@index([comercialId, estado, fechaInicio], map: "idx_proyecto_comercial_estado_inicio")
@@ -1132,6 +1215,8 @@ model Recurso {
   plantillaServicioItemIndependiente PlantillaServicioItemIndependiente[]
   composiciones                      RecursoComposicion[]
   proyectoTareas                     ProyectoTarea[]
+  tarifasClientes                    TarifaClienteRecurso[]
+  lineasHH                           LineaHH[]
 
   @@map("recurso")
 }
@@ -1166,6 +1251,7 @@ model RegistroHoras {
   recurso                  Recurso                    @relation(fields: [recursoId], references: [id])
   user                     User                       @relation(fields: [usuarioId], references: [id])
   origenCampoMiembro       RegistroHorasCampoMiembro?
+  lineaHH                  LineaHH?
 
   @@index([edtId, fechaTrabajo])
   @@index([origen, fechaTrabajo])
@@ -1193,15 +1279,15 @@ model RegistroHorasCampo {
   motivoRechazo   String?
 
   // Campos para Jornada de Campo
-  objetivosDia        String?   // Objetivos planificados al inicio del día
-  personalPlanificado Json?     // [{userId, nombre}] - Personal planificado
-  avanceDia           String?   // Resumen de avance al cierre
-  bloqueos            Json?     // [{descripcion, impacto?, accion?}]
-  planSiguiente       String?   // Plan para el día siguiente
+  objetivosDia        String? // Objetivos planificados al inicio del día
+  personalPlanificado Json? // [{userId, nombre}] - Personal planificado
+  avanceDia           String? // Resumen de avance al cierre
+  bloqueos            Json? // [{descripcion, impacto?, accion?}]
+  planSiguiente       String? // Plan para el día siguiente
   fechaCierre         DateTime? // Cuando se cerró la jornada
 
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   proyecto    Proyecto                  @relation(fields: [proyectoId], references: [id])
   proyectoEdt ProyectoEdt?              @relation(fields: [proyectoEdtId], references: [id])
@@ -1218,14 +1304,14 @@ model RegistroHorasCampo {
 // Tarea dentro de un registro de campo
 // Puede ser una tarea del cronograma o una tarea extra (nombreTareaExtra)
 model RegistroHorasCampoTarea {
-  id                 String   @id @default(cuid())
-  registroCampoId    String
-  proyectoTareaId    String?
-  nombreTareaExtra   String?
-  descripcion        String?
-  porcentajeInicial  Int?
-  porcentajeFinal    Int?
-  createdAt          DateTime @default(now())
+  id                String   @id @default(cuid())
+  registroCampoId   String
+  proyectoTareaId   String?
+  nombreTareaExtra  String?
+  descripcion       String?
+  porcentajeInicial Int?
+  porcentajeFinal   Int?
+  createdAt         DateTime @default(now())
 
   registroCampo RegistroHorasCampo          @relation(fields: [registroCampoId], references: [id], onDelete: Cascade)
   proyectoTarea ProyectoTarea?              @relation(fields: [proyectoTareaId], references: [id])
@@ -1289,91 +1375,91 @@ model UnidadServicio {
 }
 
 model User {
-  id                        String                      @id @default(cuid())
-  name                      String?
-  email                     String                      @unique
-  emailVerified             DateTime?
-  password                  String?
-  role                      Role                        @default(colaborador)
-  image                     String?
-  lastLoginAt               DateTime?
-  lastActivityAt            DateTime?
-  metaMensual               Float?
-  metaTrimestral            Float?
-  Account                   Account[]
-  cotizacion                Cotizacion[]
-  entregaItem               EntregaItem[]
-  eventoTrazabilidad        EventoTrazabilidad[]
-  listaEquipo               ListaEquipo[]
-  listaEquipoItem           ListaEquipoItem[]
-  pedidoEquipo              PedidoEquipo[]
-  pedidoEquipoItem          PedidoEquipoItem[]
-  proyectosComoComercial    Proyecto[]                  @relation("ProyectoComercial")
-  proyectosComoGestor       Proyecto[]                  @relation("ProyectoGestor")
-  proyectosComoSupervisor   Proyecto[]                  @relation("ProyectoSupervisor")
-  proyectosComoLider        Proyecto[]                  @relation("ProyectoLider")
-  personalProyecto          PersonalProyecto[]
-  proyectoEquipoCotizado    ProyectoEquipoCotizado[]
-  proyectoServicioCotizado  ProyectoServicioCotizado[]
-  registroHoras             RegistroHoras[]
-  Session                   Session[]
-  asignacionesRecurso       AsignacionRecurso[]
-  auditLog                  AuditLog[]
-  cotizacionEdt             CotizacionEdt[]
-  cotizacionPlantillaImport CotizacionPlantillaImport[]
-  cotizacionTarea           CotizacionTarea[]
-  cotizacionVersion         CotizacionVersion[]
-  crmActividad              CrmActividad[]
-  crmMetricaComercial       CrmMetricaComercial[]
-  crmOportunidadComercial   CrmOportunidad[]            @relation("CrmOportunidadComercial")
-  crmOportunidadResponsable CrmOportunidad[]            @relation("CrmOportunidadResponsable")
-  metricaComercial          MetricaComercial[]
-  notificaciones            Notificacion[]
-  proyectoActividad         ProyectoActividad[]
-  proyectoEdt               ProyectoEdt[]
-  proyectoSubtarea          ProyectoSubtarea[]
-  tareasAsignadas           ProyectoTarea[]             @relation("TareaResponsable")
-  tareasCreadas             ProyectoTarea[]             @relation("TareaCreadaPor")
-  registrosProgreso         RegistroProgreso[]
-  subtareas                 Subtarea[]
-  tareas                    Tarea[]
-  userPermissions           UserPermission[]
-  empleado                  Empleado?
-  departamentosResponsable  Departamento[]              @relation("DepartamentoResponsable")
-  configuracionGeneral      ConfiguracionGeneral[]
+  id                              String                      @id @default(cuid())
+  name                            String?
+  email                           String                      @unique
+  emailVerified                   DateTime?
+  password                        String?
+  role                            Role                        @default(colaborador)
+  image                           String?
+  lastLoginAt                     DateTime?
+  lastActivityAt                  DateTime?
+  metaMensual                     Float?
+  metaTrimestral                  Float?
+  Account                         Account[]
+  cotizacion                      Cotizacion[]
+  entregaItem                     EntregaItem[]
+  eventoTrazabilidad              EventoTrazabilidad[]
+  listaEquipo                     ListaEquipo[]
+  listaEquipoItem                 ListaEquipoItem[]
+  pedidoEquipo                    PedidoEquipo[]
+  pedidoEquipoItem                PedidoEquipoItem[]
+  proyectosComoComercial          Proyecto[]                  @relation("ProyectoComercial")
+  proyectosComoGestor             Proyecto[]                  @relation("ProyectoGestor")
+  proyectosComoSupervisor         Proyecto[]                  @relation("ProyectoSupervisor")
+  proyectosComoLider              Proyecto[]                  @relation("ProyectoLider")
+  personalProyecto                PersonalProyecto[]
+  proyectoEquipoCotizado          ProyectoEquipoCotizado[]
+  proyectoServicioCotizado        ProyectoServicioCotizado[]
+  registroHoras                   RegistroHoras[]
+  Session                         Session[]
+  asignacionesRecurso             AsignacionRecurso[]
+  auditLog                        AuditLog[]
+  cotizacionEdt                   CotizacionEdt[]
+  cotizacionPlantillaImport       CotizacionPlantillaImport[]
+  cotizacionTarea                 CotizacionTarea[]
+  cotizacionVersion               CotizacionVersion[]
+  crmActividad                    CrmActividad[]
+  crmMetricaComercial             CrmMetricaComercial[]
+  crmOportunidadComercial         CrmOportunidad[]            @relation("CrmOportunidadComercial")
+  crmOportunidadResponsable       CrmOportunidad[]            @relation("CrmOportunidadResponsable")
+  metricaComercial                MetricaComercial[]
+  notificaciones                  Notificacion[]
+  proyectoActividad               ProyectoActividad[]
+  proyectoEdt                     ProyectoEdt[]
+  proyectoSubtarea                ProyectoSubtarea[]
+  tareasAsignadas                 ProyectoTarea[]             @relation("TareaResponsable")
+  tareasCreadas                   ProyectoTarea[]             @relation("TareaCreadaPor")
+  registrosProgreso               RegistroProgreso[]
+  subtareas                       Subtarea[]
+  tareas                          Tarea[]
+  userPermissions                 UserPermission[]
+  empleado                        Empleado?
+  departamentosResponsable        Departamento[]              @relation("DepartamentoResponsable")
+  configuracionGeneral            ConfiguracionGeneral[]
   // Registro de horas en campo
-  registrosCampoSupervisor  RegistroHorasCampo[]        @relation("RegistrosCampoSupervisor")
-  registrosCampoAprobador   RegistroHorasCampo[]        @relation("RegistrosCampoAprobador")
-  miembrosCuadrilla         RegistroHorasCampoMiembro[]
+  registrosCampoSupervisor        RegistroHorasCampo[]        @relation("RegistrosCampoSupervisor")
+  registrosCampoAprobador         RegistroHorasCampo[]        @relation("RegistrosCampoAprobador")
+  miembrosCuadrilla               RegistroHorasCampoMiembro[]
   // Trazabilidad
-  listaEquipoItemsVerificados           ListaEquipoItem[]            @relation("ListaEquipoItemVerificador")
-  pedidoEquipoItemsComentados           PedidoEquipoItem[]           @relation("PedidoEquipoItemComentarioLogistica")
+  listaEquipoItemsVerificados     ListaEquipoItem[]           @relation("ListaEquipoItemVerificador")
+  pedidoEquipoItemsComentados     PedidoEquipoItem[]          @relation("PedidoEquipoItemComentarioLogistica")
   // Descuentos cotización
-  cotizacionDescuentosSolicitados       Cotizacion[]                 @relation("CotizacionDescuentoSolicitante")
-  cotizacionDescuentosAprobados         Cotizacion[]                 @relation("CotizacionDescuentoAprobador")
+  cotizacionDescuentosSolicitados Cotizacion[]                @relation("CotizacionDescuentoSolicitante")
+  cotizacionDescuentosAprobados   Cotizacion[]                @relation("CotizacionDescuentoAprobador")
   // Hojas de gastos
-  hojasComoEmpleado                     HojaDeGastos[]               @relation("HojaEmpleado")
-  hojasComoAprobador                    HojaDeGastos[]               @relation("HojaAprobador")
-  hojasEventos                          HojaDeGastosEvento[]         @relation("HojaEventoUsuario")
+  hojasComoEmpleado               HojaDeGastos[]              @relation("HojaEmpleado")
+  hojasComoAprobador              HojaDeGastos[]              @relation("HojaAprobador")
+  hojasEventos                    HojaDeGastosEvento[]        @relation("HojaEventoUsuario")
   // Órdenes de compra
-  ordenesCompraSolicitante              OrdenCompra[]                @relation("OCsolicitante")
-  ordenesCompraAprobador                OrdenCompra[]                @relation("OCaprobador")
+  ordenesCompraSolicitante        OrdenCompra[]               @relation("OCsolicitante")
+  ordenesCompraAprobador          OrdenCompra[]               @relation("OCaprobador")
   // Timesheet aprobación
-  timesheetsEnviados                    TimesheetAprobacion[]        @relation("TimesheetUsuario")
-  timesheetsAprobados                   TimesheetAprobacion[]        @relation("TimesheetAprobador")
+  timesheetsEnviados              TimesheetAprobacion[]       @relation("TimesheetUsuario")
+  timesheetsAprobados             TimesheetAprobacion[]       @relation("TimesheetAprobador")
   // Agente IA conversaciones
-  agenteConversaciones                  AgenteConversacion[]
-  agenteConversacionMensajes            AgenteConversacionMensaje[]
-  agenteUsage                           AgenteUsage[]
+  agenteConversaciones            AgenteConversacion[]
+  agenteConversacionMensajes      AgenteConversacionMensaje[]
+  agenteUsage                     AgenteUsage[]
   // Catálogo equipos tracking
-  equiposCreadosPor                     CatalogoEquipo[]             @relation("EquipoCreadoPor")
-  equiposActualizadosPor                CatalogoEquipo[]             @relation("EquipoActualizadoPor")
+  equiposCreadosPor               CatalogoEquipo[]            @relation("EquipoCreadoPor")
+  equiposActualizadosPor          CatalogoEquipo[]            @relation("EquipoActualizadoPor")
   // Recepciones pendientes
-  recepcionesConfirmadas                RecepcionPendiente[]         @relation("RecepcionConfirmador")
-  recepcionesEntregadas                 RecepcionPendiente[]         @relation("RecepcionEntregador")
-  recepcionesRechazadas                 RecepcionPendiente[]         @relation("RecepcionRechazador")
-  cxpAdjuntos                           CxPAdjunto[]                 @relation("CxPAdjuntoSubidoPor")
-  cxcAdjuntos                           CxCAdjunto[]                 @relation("CxCAdjuntoSubidoPor")
+  recepcionesConfirmadas          RecepcionPendiente[]        @relation("RecepcionConfirmador")
+  recepcionesEntregadas           RecepcionPendiente[]        @relation("RecepcionEntregador")
+  recepcionesRechazadas           RecepcionPendiente[]        @relation("RecepcionRechazador")
+  cxpAdjuntos                     CxPAdjunto[]                @relation("CxPAdjuntoSubidoPor")
+  cxcAdjuntos                     CxCAdjunto[]                @relation("CxCAdjuntoSubidoPor")
 
   @@map("user")
 }
@@ -1443,7 +1529,7 @@ model RecursoComposicion {
   id             String   @id @default(cuid())
   recursoId      String
   empleadoId     String
-  cantidad       Int      @default(1)   // Número de personas de este perfil
+  cantidad       Int      @default(1) // Número de personas de este perfil
   horasAsignadas Float? // Horas asignadas (opcional, alternativa a %)
   rol            String? // Rol dentro del recurso (ej: "Líder", "Ayudante")
   activo         Boolean  @default(true)
@@ -1457,48 +1543,49 @@ model RecursoComposicion {
 }
 
 model Valorizacion {
-  id                          String              @id @default(cuid())
-  proyectoId                  String
-  numero                      Int                 // secuencial por proyecto: 1, 2, 3...
-  codigo                      String              @unique // "{codigoProyecto}-VAL-{numero}"
-  periodoInicio               DateTime
-  periodoFin                  DateTime
-  moneda                      String              @default("PEN")
-  tipoCambio                  Float?
+  id                           String             @id @default(cuid())
+  proyectoId                   String
+  numero                       Int // secuencial por proyecto: 1, 2, 3...
+  codigo                       String             @unique // "{codigoProyecto}-VAL-{numero}"
+  periodoInicio                DateTime
+  periodoFin                   DateTime
+  moneda                       String             @default("PEN")
+  tipoCambio                   Float?
   // Montos de avance
-  presupuestoContractual      Float               // monto total del contrato
-  acumuladoAnterior           Float               @default(0) // calculado: SUM valorizaciones anteriores
-  montoValorizacion           Float               // monto de esta valorización
-  acumuladoActual             Float               @default(0) // calculado: acumuladoAnterior + montoValorizacion
-  saldoPorValorizar           Float               @default(0) // calculado: presupuestoContractual - acumuladoActual
-  porcentajeAvance            Float               @default(0) // calculado: acumuladoActual / presupuestoContractual * 100
+  presupuestoContractual       Float // monto total del contrato
+  acumuladoAnterior            Float              @default(0) // calculado: SUM valorizaciones anteriores
+  montoValorizacion            Float // monto de esta valorización
+  acumuladoActual              Float              @default(0) // calculado: acumuladoAnterior + montoValorizacion
+  saldoPorValorizar            Float              @default(0) // calculado: presupuestoContractual - acumuladoActual
+  porcentajeAvance             Float              @default(0) // calculado: acumuladoActual / presupuestoContractual * 100
   // Montos financieros
   descuentoComercialPorcentaje Float              @default(0)
-  descuentoComercialMonto     Float               @default(0) // calculado
-  adelantoPorcentaje          Float               @default(0)
-  adelantoMonto               Float               @default(0) // calculado
-  subtotal                    Float               @default(0) // calculado: montoValorizacion - descuento - adelanto
-  igvPorcentaje               Float               @default(18)
-  igvMonto                    Float               @default(0) // calculado
-  fondoGarantiaPorcentaje     Float               @default(0)
-  fondoGarantiaMonto          Float               @default(0) // calculado
-  netoARecibir                Float               @default(0) // calculado: subtotal + IGV - fondoGarantia
+  descuentoComercialMonto      Float              @default(0) // calculado
+  adelantoPorcentaje           Float              @default(0)
+  adelantoMonto                Float              @default(0) // calculado
+  subtotal                     Float              @default(0) // calculado: montoValorizacion - descuento - adelanto
+  igvPorcentaje                Float              @default(18)
+  igvMonto                     Float              @default(0) // calculado
+  fondoGarantiaPorcentaje      Float              @default(0)
+  fondoGarantiaMonto           Float              @default(0) // calculado
+  netoARecibir                 Float              @default(0) // calculado: subtotal + IGV - fondoGarantia
   // Estado y fechas
-  estado                      EstadoValorizacion  @default(borrador)
-  fechaEnvio                  DateTime?
-  fechaAprobacion             DateTime?
-  fechaObservacion            DateTime?
-  fechaCorreccion             DateTime?
-  motivoObservacion           String?
-  ciclosAprobacion            Int                 @default(0)
-  observaciones               String?
-  createdAt                   DateTime            @default(now())
-  updatedAt                   DateTime
+  estado                       EstadoValorizacion @default(borrador)
+  fechaEnvio                   DateTime?
+  fechaAprobacion              DateTime?
+  fechaObservacion             DateTime?
+  fechaCorreccion              DateTime?
+  motivoObservacion            String?
+  ciclosAprobacion             Int                @default(0)
+  observaciones                String?
+  createdAt                    DateTime           @default(now())
+  updatedAt                    DateTime
 
-  proyecto  Proyecto              @relation(fields: [proyectoId], references: [id])
-  adjuntos  ValorizacionAdjunto[]
+  proyecto         Proyecto              @relation(fields: [proyectoId], references: [id])
+  adjuntos         ValorizacionAdjunto[]
   cuentasPorCobrar CuentaPorCobrar[]
-  partidas  PartidaValorizacion[]
+  partidas         PartidaValorizacion[]
+  valorizacionHH   ValorizacionHH?
 
   @@unique([proyectoId, numero])
   @@index([proyectoId, estado])
@@ -1507,14 +1594,14 @@ model Valorizacion {
 }
 
 model ValorizacionAdjunto {
-  id              String   @id @default(cuid())
-  valorizacionId  String
-  nombreArchivo   String
-  urlArchivo      String
-  driveFileId     String?
-  tipoArchivo     String?  // "excel", "pdf"
-  tamano          Int?
-  createdAt       DateTime @default(now())
+  id             String   @id @default(cuid())
+  valorizacionId String
+  nombreArchivo  String
+  urlArchivo     String
+  driveFileId    String?
+  tipoArchivo    String? // "excel", "pdf"
+  tamano         Int?
+  createdAt      DateTime @default(now())
 
   valorizacion Valorizacion @relation(fields: [valorizacionId], references: [id], onDelete: Cascade)
 
@@ -1523,34 +1610,34 @@ model ValorizacionAdjunto {
 }
 
 model PartidaValorizacion {
-  id             String        @id @default(cuid())
+  id             String       @id @default(cuid())
   valorizacionId String
-  valorizacion   Valorizacion  @relation(fields: [valorizacionId], references: [id], onDelete: Cascade)
+  valorizacion   Valorizacion @relation(fields: [valorizacionId], references: [id], onDelete: Cascade)
 
-  numero         Int
-  descripcion    String
-  origen         OrigenPartida @default(libre)
+  numero      Int
+  descripcion String
+  origen      OrigenPartida @default(libre)
 
   // Vínculos con cotización
-  proyectoEquipoCotizadoId    String?
-  proyectoServicioCotizadoId  String?
-  proyectoGastoCotizadoId     String?
+  proyectoEquipoCotizadoId   String?
+  proyectoServicioCotizadoId String?
+  proyectoGastoCotizadoId    String?
 
   // Vínculo con cronograma de ejecución
-  proyectoEdtId  String?
+  proyectoEdtId String?
 
   // Montos
-  montoContractual            Float   @default(0)
-  porcentajeAvance            Float   @default(0)
-  montoAvance                 Float   @default(0)
+  montoContractual Float @default(0)
+  porcentajeAvance Float @default(0)
+  montoAvance      Float @default(0)
 
   // Acumulado de valorizaciones anteriores (snapshot al crear)
-  porcentajeAcumuladoAnterior Float   @default(0)
-  montoAcumuladoAnterior      Float   @default(0)
+  porcentajeAcumuladoAnterior Float @default(0)
+  montoAcumuladoAnterior      Float @default(0)
 
-  orden          Int           @default(0)
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  orden     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([valorizacionId])
   @@map("partida_valorizacion")
@@ -2749,16 +2836,16 @@ model UserPermission {
 
 // Configuración general del sistema (singleton - solo un registro)
 model ConfiguracionGeneral {
-  id             String   @id @default("default")
-  tipoCambio     Decimal  @default(3.75) @db.Decimal(10, 4) // PEN a USD
-  horasSemanales Int      @default(48) // Horas laborales por semana
-  diasLaborables Int      @default(5) // Días laborables por semana (L-V)
-  semanasxMes    Int      @default(4) // Semanas por mes para cálculo
-  horasMensuales Int      @default(192) // Calculado: horasSemanales * semanasxMes
-  agenteLimiteMensualUsd Float @default(25) // Limite mensual de gasto del agente IA (USD)
-  updatedAt      DateTime @updatedAt
-  updatedBy      String?
-  user           User?    @relation(fields: [updatedBy], references: [id])
+  id                     String   @id @default("default")
+  tipoCambio             Decimal  @default(3.75) @db.Decimal(10, 4) // PEN a USD
+  horasSemanales         Int      @default(48) // Horas laborales por semana
+  diasLaborables         Int      @default(5) // Días laborables por semana (L-V)
+  semanasxMes            Int      @default(4) // Semanas por mes para cálculo
+  horasMensuales         Int      @default(192) // Calculado: horasSemanales * semanasxMes
+  agenteLimiteMensualUsd Float    @default(25) // Limite mensual de gasto del agente IA (USD)
+  updatedAt              DateTime @updatedAt
+  updatedBy              String?
+  user                   User?    @relation(fields: [updatedBy], references: [id])
 
   @@map("configuracion_general")
 }
@@ -2766,8 +2853,8 @@ model ConfiguracionGeneral {
 // Configuración de columnas y permisos del catálogo de equipos por vista
 model ConfiguracionCatalogoColumnas {
   id        String   @id // 'admin' | 'comercial' | 'logistica' | 'proyectos'
-  columnas  Json     // Array de column keys visibles
-  permisos  Json     // { canCreate, canEdit, canDelete, canImport, canExport }
+  columnas  Json // Array de column keys visibles
+  permisos  Json // { canCreate, canEdit, canDelete, canImport, canExport }
   updatedAt DateTime @updatedAt
 
   @@map("configuracion_catalogo_columnas")
@@ -2921,8 +3008,8 @@ enum OrigenTrabajo {
 }
 
 enum EstadoRegistroCampo {
-  iniciado   // Jornada comenzada pero no cerrada
-  pendiente  // Jornada cerrada, esperando aprobación
+  iniciado // Jornada comenzada pero no cerrada
+  pendiente // Jornada cerrada, esperando aprobación
   aprobado
   rechazado
 }
@@ -3068,7 +3155,7 @@ model RoleSectionAccess {
 model CentroCosto {
   id          String   @id @default(cuid())
   nombre      String
-  tipo        String   // "departamento" | "administrativo"
+  tipo        String // "departamento" | "administrativo"
   descripcion String?
   activo      Boolean  @default(true)
   createdAt   DateTime @default(now())
@@ -3085,8 +3172,8 @@ model CentroCosto {
 // Exactamente UNO debe estar presente: proyecto (para gastos de proyecto)
 // o centroCosto (para gastos administrativos/departamento). Validación en API.
 model HojaDeGastos {
-  id                String    @id @default(cuid())
-  numero            String    @unique
+  id                String         @id @default(cuid())
+  numero            String         @unique
   proyectoId        String?
   centroCostoId     String?
   categoriaCosto    CategoriaCosto @default(gastos)
@@ -3094,27 +3181,27 @@ model HojaDeGastos {
   aprobadorId       String?
   motivo            String
   observaciones     String?
-  requiereAnticipo  Boolean   @default(false)
-  estado            String    @default("borrador")
+  requiereAnticipo  Boolean        @default(false)
+  estado            String         @default("borrador")
   rechazadoEn       String?
   comentarioRechazo String?
-  montoAnticipo     Float     @default(0)
-  montoDepositado   Float     @default(0)
-  montoGastado      Float     @default(0)
-  saldo             Float     @default(0)
+  montoAnticipo     Float          @default(0)
+  montoDepositado   Float          @default(0)
+  montoGastado      Float          @default(0)
+  saldo             Float          @default(0)
   fechaEnvio        DateTime?
   fechaAprobacion   DateTime?
   fechaDeposito     DateTime?
   fechaRendicion    DateTime?
   fechaValidacion   DateTime?
   fechaCierre       DateTime?
-  createdAt         DateTime  @default(now())
+  createdAt         DateTime       @default(now())
   updatedAt         DateTime
 
-  proyecto    Proyecto?    @relation(fields: [proyectoId], references: [id])
-  centroCosto CentroCosto? @relation(fields: [centroCostoId], references: [id])
-  empleado    User         @relation("HojaEmpleado", fields: [empleadoId], references: [id])
-  aprobador   User?        @relation("HojaAprobador", fields: [aprobadorId], references: [id])
+  proyecto    Proyecto?             @relation(fields: [proyectoId], references: [id])
+  centroCosto CentroCosto?          @relation(fields: [centroCostoId], references: [id])
+  empleado    User                  @relation("HojaEmpleado", fields: [empleadoId], references: [id])
+  aprobador   User?                 @relation("HojaAprobador", fields: [aprobadorId], references: [id])
   lineas      GastoLinea[]
   adjuntos    HojaDeGastosAdjunto[]
   eventos     HojaDeGastosEvento[]
@@ -3126,15 +3213,15 @@ model HojaDeGastos {
 }
 
 model HojaDeGastosEvento {
-  id              String   @id @default(cuid())
-  hojaDeGastosId  String
-  tipo            String   // creado, enviado, aprobado, rechazado, depositado, rendido, validado, cerrado, adjunto_subido
-  descripcion     String
-  estadoAnterior  String?
-  estadoNuevo     String?
-  metadata        Json?
-  usuarioId       String?
-  creadoEn        DateTime @default(now())
+  id             String   @id @default(cuid())
+  hojaDeGastosId String
+  tipo           String // creado, enviado, aprobado, rechazado, depositado, rendido, validado, cerrado, adjunto_subido
+  descripcion    String
+  estadoAnterior String?
+  estadoNuevo    String?
+  metadata       Json?
+  usuarioId      String?
+  creadoEn       DateTime @default(now())
 
   hojaDeGastos HojaDeGastos @relation(fields: [hojaDeGastosId], references: [id], onDelete: Cascade)
   usuario      User?        @relation("HojaEventoUsuario", fields: [usuarioId], references: [id])
@@ -3144,15 +3231,15 @@ model HojaDeGastosEvento {
 }
 
 model HojaDeGastosAdjunto {
-  id              String   @id @default(cuid())
-  hojaDeGastosId  String
-  nombreArchivo   String
-  urlArchivo      String
-  driveFileId     String?
-  tipoArchivo     String?
-  tamano          Int?
-  tipo            String   @default("constancia_deposito")
-  createdAt       DateTime @default(now())
+  id             String   @id @default(cuid())
+  hojaDeGastosId String
+  nombreArchivo  String
+  urlArchivo     String
+  driveFileId    String?
+  tipoArchivo    String?
+  tamano         Int?
+  tipo           String   @default("constancia_deposito")
+  createdAt      DateTime @default(now())
 
   hojaDeGastos HojaDeGastos @relation(fields: [hojaDeGastosId], references: [id], onDelete: Cascade)
 
@@ -3161,23 +3248,23 @@ model HojaDeGastosAdjunto {
 }
 
 model GastoLinea {
-  id                String          @id @default(cuid())
-  hojaDeGastosId    String
-  categoriaGastoId  String?
-  descripcion       String
-  fecha             DateTime
-  monto             Float
-  moneda            String          @default("PEN")
-  tipoComprobante   String?
-  numeroComprobante String?
-  proveedorNombre   String?
-  proveedorRuc      String?
-  observaciones     String?
+  id                    String    @id @default(cuid())
+  hojaDeGastosId        String
+  categoriaGastoId      String?
+  descripcion           String
+  fecha                 DateTime
+  monto                 Float
+  moneda                String    @default("PEN")
+  tipoComprobante       String?
+  numeroComprobante     String?
+  proveedorNombre       String?
+  proveedorRuc          String?
+  observaciones         String?
   sunatVerificado       Boolean?
   conformidad           String?
   comentarioConformidad String?
   conformadoEn          DateTime?
-  createdAt             DateTime        @default(now())
+  createdAt             DateTime  @default(now())
   updatedAt             DateTime
 
   hojaDeGastos   HojaDeGastos    @relation(fields: [hojaDeGastosId], references: [id], onDelete: Cascade)
@@ -3254,10 +3341,10 @@ model OrdenCompra {
   createdAt            DateTime          @default(now())
   updatedAt            DateTime
 
-  proveedor    Proveedor        @relation(fields: [proveedorId], references: [id])
-  centroCosto  CentroCosto?     @relation(fields: [centroCostoId], references: [id])
-  pedidoEquipo PedidoEquipo?    @relation(fields: [pedidoEquipoId], references: [id])
-  proyecto     Proyecto?        @relation(fields: [proyectoId], references: [id])
+  proveedor       Proveedor         @relation(fields: [proveedorId], references: [id])
+  centroCosto     CentroCosto?      @relation(fields: [centroCostoId], references: [id])
+  pedidoEquipo    PedidoEquipo?     @relation(fields: [pedidoEquipoId], references: [id])
+  proyecto        Proyecto?         @relation(fields: [proyectoId], references: [id])
   solicitante     User              @relation("OCsolicitante", fields: [solicitanteId], references: [id])
   aprobador       User?             @relation("OCaprobador", fields: [aprobadorId], references: [id])
   items           OrdenCompraItem[]
@@ -3296,22 +3383,22 @@ model OrdenCompraItem {
 }
 
 model RecepcionPendiente {
-  id                    String    @id @default(cuid())
-  pedidoEquipoItemId    String
-  ordenCompraItemId     String
-  cantidadRecibida      Float
-  fechaRecepcion        DateTime  @default(now())
-  estado                String    @default("pendiente")
-  confirmadoPorId       String?
-  fechaConfirmacion     DateTime?
-  entregadoPorId        String?
-  fechaEntregaProyecto  DateTime?
-  rechazadoPorId        String?
-  fechaRechazo          DateTime?
-  motivoRechazo         String?
-  observaciones         String?
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  id                   String    @id @default(cuid())
+  pedidoEquipoItemId   String
+  ordenCompraItemId    String
+  cantidadRecibida     Float
+  fechaRecepcion       DateTime  @default(now())
+  estado               String    @default("pendiente")
+  confirmadoPorId      String?
+  fechaConfirmacion    DateTime?
+  entregadoPorId       String?
+  fechaEntregaProyecto DateTime?
+  rechazadoPorId       String?
+  fechaRechazo         DateTime?
+  motivoRechazo        String?
+  observaciones        String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   pedidoEquipoItem PedidoEquipoItem @relation(fields: [pedidoEquipoItemId], references: [id], onDelete: Cascade)
   ordenCompraItem  OrdenCompraItem  @relation(fields: [ordenCompraItemId], references: [id], onDelete: Cascade)
@@ -3330,16 +3417,16 @@ model RecepcionPendiente {
 // ======================
 
 model CuentaBancaria {
-  id            String   @id @default(cuid())
-  nombreBanco   String
-  numeroCuenta  String
-  cci           String?
-  tipo          String   @default("corriente") // corriente, ahorro
-  moneda        String   @default("PEN")       // PEN, USD
-  activa        Boolean  @default(true)
-  descripcion   String?                        // alias: "BCP Soles Operaciones"
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime
+  id           String   @id @default(cuid())
+  nombreBanco  String
+  numeroCuenta String
+  cci          String?
+  tipo         String   @default("corriente") // corriente, ahorro
+  moneda       String   @default("PEN") // PEN, USD
+  activa       Boolean  @default(true)
+  descripcion  String? // alias: "BCP Soles Operaciones"
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime
 
   pagosCobro PagoCobro[]
   pagosPagar PagoPagar[]
@@ -3349,27 +3436,27 @@ model CuentaBancaria {
 }
 
 model CuentaPorCobrar {
-  id                String             @id @default(cuid())
-  proyectoId        String
-  clienteId         String
-  valorizacionId    String?
-  numeroDocumento   String?            // número de factura emitida
-  descripcion       String?
-  monto             Float
-  moneda            String             @default("PEN")
-  tipoCambio        Float?
-  montoPagado       Float              @default(0) // calculado: SUM(pagosCobro.monto)
-  saldoPendiente    Float              @default(0) // calculado: monto - montoPagado
-  fechaEmision      DateTime
-  fechaVencimiento  DateTime
-  condicionPago     String?
-  diasCredito       Int?
-  metodoPago        String?
-  bancoFinanciera   String?
-  estado            EstadoCuentaCobrar @default(pendiente)
-  observaciones     String?
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime
+  id               String             @id @default(cuid())
+  proyectoId       String
+  clienteId        String
+  valorizacionId   String?
+  numeroDocumento  String? // número de factura emitida
+  descripcion      String?
+  monto            Float
+  moneda           String             @default("PEN")
+  tipoCambio       Float?
+  montoPagado      Float              @default(0) // calculado: SUM(pagosCobro.monto)
+  saldoPendiente   Float              @default(0) // calculado: monto - montoPagado
+  fechaEmision     DateTime
+  fechaVencimiento DateTime
+  condicionPago    String?
+  diasCredito      Int?
+  metodoPago       String?
+  bancoFinanciera  String?
+  estado           EstadoCuentaCobrar @default(pendiente)
+  observaciones    String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime
 
   proyecto     Proyecto      @relation(fields: [proyectoId], references: [id])
   cliente      Cliente       @relation(fields: [clienteId], references: [id])
@@ -3384,22 +3471,22 @@ model CuentaPorCobrar {
 }
 
 model PagoCobro {
-  id                 String   @id @default(cuid())
-  cuentaPorCobrarId  String
-  cuentaBancariaId   String?
-  monto              Float
-  fechaPago          DateTime
-  medioPago          String   @default("transferencia") // transferencia, cheque, efectivo, detraccion
-  numeroOperacion    String?
-  observaciones      String?
-  esDetraccion          Boolean   @default(false)
-  detraccionPorcentaje  Float?
-  detraccionCodigo      String?
-  detraccionMonto       Float?
-  detraccionFechaPago   DateTime?
-  numeroConstanciaBN    String?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime
+  id                   String    @id @default(cuid())
+  cuentaPorCobrarId    String
+  cuentaBancariaId     String?
+  monto                Float
+  fechaPago            DateTime
+  medioPago            String    @default("transferencia") // transferencia, cheque, efectivo, detraccion
+  numeroOperacion      String?
+  observaciones        String?
+  esDetraccion         Boolean   @default(false)
+  detraccionPorcentaje Float?
+  detraccionCodigo     String?
+  detraccionMonto      Float?
+  detraccionFechaPago  DateTime?
+  numeroConstanciaBN   String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime
 
   cuentaPorCobrar CuentaPorCobrar @relation(fields: [cuentaPorCobrarId], references: [id], onDelete: Cascade)
   cuentaBancaria  CuentaBancaria? @relation(fields: [cuentaBancariaId], references: [id])
@@ -3410,28 +3497,28 @@ model PagoCobro {
 }
 
 model CuentaPorPagar {
-  id                String             @id @default(cuid())
-  proveedorId       String
-  proyectoId        String?
-  ordenCompraId     String?
-  pedidoEquipoId    String?
+  id                 String            @id @default(cuid())
+  proveedorId        String
+  proyectoId         String?
+  ordenCompraId      String?
+  pedidoEquipoId     String?
   pedidoEquipoItemId String?
-  tipoOrigen        String?            // "oc" | "atencion_directa" | "importacion_gerencia"
-  numeroFactura     String?            // número de factura del proveedor
-  descripcion       String?
-  monto             Float
-  moneda            String             @default("PEN")
-  tipoCambio        Float?
-  montoPagado       Float              @default(0) // calculado: SUM(pagosPagar.monto)
-  saldoPendiente    Float              @default(0) // calculado: monto - montoPagado
-  fechaRecepcion    DateTime
-  fechaVencimiento  DateTime
-  condicionPago     String             @default("contado") // contado, credito
-  diasCredito       Int?
-  estado            EstadoCuentaPagar  @default(pendiente)
-  observaciones     String?
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime
+  tipoOrigen         String? // "oc" | "atencion_directa" | "importacion_gerencia"
+  numeroFactura      String? // número de factura del proveedor
+  descripcion        String?
+  monto              Float
+  moneda             String            @default("PEN")
+  tipoCambio         Float?
+  montoPagado        Float             @default(0) // calculado: SUM(pagosPagar.monto)
+  saldoPendiente     Float             @default(0) // calculado: monto - montoPagado
+  fechaRecepcion     DateTime
+  fechaVencimiento   DateTime
+  condicionPago      String            @default("contado") // contado, credito
+  diasCredito        Int?
+  estado             EstadoCuentaPagar @default(pendiente)
+  observaciones      String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime
 
   proveedor        Proveedor         @relation(fields: [proveedorId], references: [id])
   proyecto         Proyecto?         @relation(fields: [proyectoId], references: [id])
@@ -3449,22 +3536,22 @@ model CuentaPorPagar {
 }
 
 model PagoPagar {
-  id                String   @id @default(cuid())
-  cuentaPorPagarId  String
-  cuentaBancariaId  String?
-  monto             Float
-  fechaPago         DateTime
-  medioPago         String   @default("transferencia") // transferencia, cheque, efectivo
-  numeroOperacion   String?
-  observaciones     String?
-  esDetraccion          Boolean   @default(false)
-  detraccionPorcentaje  Float?
-  detraccionCodigo      String?
-  detraccionMonto       Float?
-  detraccionFechaPago   DateTime?
-  numeroConstanciaBN    String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime
+  id                   String    @id @default(cuid())
+  cuentaPorPagarId     String
+  cuentaBancariaId     String?
+  monto                Float
+  fechaPago            DateTime
+  medioPago            String    @default("transferencia") // transferencia, cheque, efectivo
+  numeroOperacion      String?
+  observaciones        String?
+  esDetraccion         Boolean   @default(false)
+  detraccionPorcentaje Float?
+  detraccionCodigo     String?
+  detraccionMonto      Float?
+  detraccionFechaPago  DateTime?
+  numeroConstanciaBN   String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime
 
   cuentaPorPagar CuentaPorPagar  @relation(fields: [cuentaPorPagarId], references: [id], onDelete: Cascade)
   cuentaBancaria CuentaBancaria? @relation(fields: [cuentaBancariaId], references: [id])
@@ -3475,15 +3562,15 @@ model PagoPagar {
 }
 
 model CxPAdjunto {
-  id               String         @id @default(cuid())
+  id               String   @id @default(cuid())
   cuentaPorPagarId String
   nombreArchivo    String
   urlArchivo       String
   driveFileId      String?
-  tipoArchivo      String?        // "factura" | "transferencia" | "dua" | "otro"
+  tipoArchivo      String? // "factura" | "transferencia" | "dua" | "otro"
   tamano           Int?
   subidoPorId      String
-  createdAt        DateTime       @default(now())
+  createdAt        DateTime @default(now())
 
   cuentaPorPagar CuentaPorPagar @relation(fields: [cuentaPorPagarId], references: [id], onDelete: Cascade)
   subidoPor      User           @relation("CxPAdjuntoSubidoPor", fields: [subidoPorId], references: [id])
@@ -3493,15 +3580,15 @@ model CxPAdjunto {
 }
 
 model CxCAdjunto {
-  id                String         @id @default(cuid())
+  id                String   @id @default(cuid())
   cuentaPorCobrarId String
   nombreArchivo     String
   urlArchivo        String
   driveFileId       String?
-  tipoArchivo       String?        // "factura" | "voucher" | "valorizacion" | "otro"
+  tipoArchivo       String? // "factura" | "voucher" | "valorizacion" | "otro"
   tamano            Int?
   subidoPorId       String
-  createdAt         DateTime       @default(now())
+  createdAt         DateTime @default(now())
 
   cuentaPorCobrar CuentaPorCobrar @relation(fields: [cuentaPorCobrarId], references: [id], onDelete: Cascade)
   subidoPor       User            @relation("CxCAdjuntoSubidoPor", fields: [subidoPorId], references: [id])
@@ -3524,7 +3611,7 @@ enum EstadoTimesheet {
 model TimesheetAprobacion {
   id              String          @id @default(cuid())
   usuarioId       String
-  semana          String          // "2026-W07" ISO week
+  semana          String // "2026-W07" ISO week
   estado          EstadoTimesheet @default(borrador)
   totalHoras      Float           @default(0)
   aprobadoPorId   String?
@@ -3546,17 +3633,17 @@ model TimesheetAprobacion {
 // 🤖 Agente IA - Conversaciones
 // =============================================
 model AgenteConversacion {
-  id             String                      @id @default(cuid())
-  userId         String
-  titulo         String?
-  archivada      Boolean                     @default(false)
-  cotizacionId   String?
-  createdAt      DateTime                    @default(now())
-  updatedAt      DateTime                    @updatedAt
+  id           String   @id @default(cuid())
+  userId       String
+  titulo       String?
+  archivada    Boolean  @default(false)
+  cotizacionId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  user         User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  cotizacion   Cotizacion?                 @relation(fields: [cotizacionId], references: [id])
-  mensajes     AgenteConversacionMensaje[]
+  user       User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cotizacion Cotizacion?                 @relation(fields: [cotizacionId], references: [id])
+  mensajes   AgenteConversacionMensaje[]
 
   @@index([userId, archivada])
   @@index([userId, cotizacionId])
@@ -3568,10 +3655,10 @@ model AgenteConversacionMensaje {
   id             String   @id @default(cuid())
   conversacionId String
   userId         String?
-  role           String   // 'user' | 'assistant'
+  role           String // 'user' | 'assistant'
   content        String   @db.Text
-  attachments    Json?    // [{name, type, mimeType}] - sin base64
-  toolCalls      Json?    // ToolCallInfo[]
+  attachments    Json? // [{name, type, mimeType}] - sin base64
+  toolCalls      Json? // ToolCallInfo[]
   createdAt      DateTime @default(now())
 
   conversacion AgenteConversacion @relation(fields: [conversacionId], references: [id], onDelete: Cascade)
@@ -3586,11 +3673,11 @@ model AgenteUsage {
   id             String   @id @default(cuid())
   userId         String
   conversacionId String?
-  tipo           String   // 'chat', 'chat-simple', 'pdf-preprocessing', 'excel-extraction', 'pdf-extraction', 'ocr'
-  modelo         String   // model ID used
+  tipo           String // 'chat', 'chat-simple', 'pdf-preprocessing', 'excel-extraction', 'pdf-extraction', 'ocr'
+  modelo         String // model ID used
   tokensInput    Int
   tokensOutput   Int
-  costoEstimado  Float    // USD
+  costoEstimado  Float // USD
   duracionMs     Int?
   metadata       Json?
   createdAt      DateTime @default(now())
