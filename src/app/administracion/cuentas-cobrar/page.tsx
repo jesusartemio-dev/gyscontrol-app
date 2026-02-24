@@ -10,7 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Loader2, Search, ArrowDownCircle, AlertTriangle, DollarSign, Clock, CheckCircle, Plus, Ban, Download, Upload } from 'lucide-react'
+import { Loader2, Search, ArrowDownCircle, AlertTriangle, DollarSign, Clock, CheckCircle, Plus, Ban, Download, Upload, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import CxCImportExcelModal from '@/components/administracion/CxCImportExcelModal'
 import { exportarCxCAExcel } from '@/lib/utils/cuentasCobrarExcel'
@@ -317,6 +317,28 @@ export default function CuentasCobrarPage() {
     }
   }
 
+  // --- Eliminar ---
+  const handleEliminar = async (cuenta: CuentaPorCobrar) => {
+    if (!confirm(`¿Eliminar permanentemente la cuenta ${cuenta.numeroDocumento || cuenta.id.slice(0, 8)}? Esta acción no se puede deshacer.`)) return
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/administracion/cuentas-cobrar/${cuenta.id}`, {
+        method: 'DELETE',
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Error al eliminar')
+      }
+      toast.success('Cuenta eliminada')
+      setShowDetail(null)
+      loadData()
+    } catch (e: any) {
+      toast.error(e.message || 'Error al eliminar')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   // --- Pago ---
   const openPago = (cuenta: CuentaPorCobrar) => {
     setPagoCuenta(cuenta)
@@ -539,6 +561,7 @@ export default function CuentasCobrarPage() {
                 <TableHead>Documento</TableHead>
                 <TableHead>Cliente</TableHead>
                 <TableHead>Proyecto</TableHead>
+                <TableHead>Valorización</TableHead>
                 <TableHead className="text-right">Monto</TableHead>
                 <TableHead className="text-right">Pagado</TableHead>
                 <TableHead className="text-right">Saldo</TableHead>
@@ -550,7 +573,7 @@ export default function CuentasCobrarPage() {
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                     <DollarSign className="h-8 w-8 mx-auto mb-2 opacity-40" />
                     No hay cuentas por cobrar
                   </TableCell>
@@ -565,6 +588,9 @@ export default function CuentasCobrarPage() {
                       <TableCell className="text-sm font-medium">{item.cliente?.nombre || '—'}</TableCell>
                       <TableCell className="text-sm">
                         <div className="font-mono">{item.proyecto?.codigo}</div>
+                      </TableCell>
+                      <TableCell className="text-sm font-mono text-muted-foreground">
+                        {item.valorizacion?.codigo || '—'}
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm">
                         {formatCurrency(item.monto, item.moneda)}
@@ -596,10 +622,15 @@ export default function CuentasCobrarPage() {
                                 <ArrowDownCircle className="h-3 w-3 mr-1" />
                                 Pago
                               </Button>
-                              <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700" onClick={() => handleAnular(item)}>
+                              <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700" onClick={() => handleAnular(item)} title="Anular">
                                 <Ban className="h-3 w-3" />
                               </Button>
                             </>
+                          )}
+                          {item.montoPagado === 0 && item.estado !== 'pagada' && (
+                            <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700" onClick={() => handleEliminar(item)} title="Eliminar">
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
                           )}
                         </div>
                       </TableCell>
@@ -951,6 +982,12 @@ export default function CuentasCobrarPage() {
               <Button variant="destructive" size="sm" onClick={() => handleAnular(showDetail)} disabled={saving}>
                 <Ban className="h-4 w-4 mr-1" />
                 Anular
+              </Button>
+            )}
+            {showDetail && showDetail.montoPagado === 0 && showDetail.estado !== 'pagada' && (
+              <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => handleEliminar(showDetail)} disabled={saving}>
+                <Trash2 className="h-4 w-4 mr-1" />
+                Eliminar
               </Button>
             )}
             <div className="flex-1" />
