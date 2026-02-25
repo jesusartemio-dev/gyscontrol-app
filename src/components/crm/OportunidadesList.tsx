@@ -774,7 +774,11 @@ export default function OportunidadesList({ onView, onEdit, onDelete, onCreate, 
                     <td className="px-3 py-3">
                       {oportunidad.cotizacion ? (
                         <div className="flex items-center gap-1.5 whitespace-nowrap">
-                          <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 px-1.5 shrink-0">
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 px-1.5 shrink-0 cursor-pointer hover:bg-blue-100"
+                            onClick={(e) => { e.stopPropagation(); router.push(`/comercial/cotizaciones/${oportunidad.cotizacion!.id}`) }}
+                          >
                             <FileText className="h-3 w-3 mr-1" />
                             {oportunidad.cotizacion.codigo}
                           </Badge>
