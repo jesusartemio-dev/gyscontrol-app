@@ -39,7 +39,8 @@ import {
   GitCompare,
   Lock,
   Unlock,
-  Table2
+  Table2,
+  Wrench
 } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import { useToast } from '@/hooks/use-toast'
@@ -59,6 +60,7 @@ import { exportCronogramaToExcel } from '@/lib/utils/msProjectExcelExport'
 import ImportExcelCronogramaModal from './ImportExcelCronogramaModal'
 import { CronogramaVarianza } from './CronogramaVarianza'
 import { CronogramaTableView } from './CronogramaTableView'
+import { AsignarRecursoPorEdt } from './AsignarRecursoPorEdt'
 import type { ProyectoCronograma } from '@/types/modelos'
 
 interface CronogramaStats {
@@ -89,6 +91,7 @@ export function ProyectoCronogramaTab({
   const [showDeleteCronogramaModal, setShowDeleteCronogramaModal] = useState(false)
   const [showGenerarCronogramaModal, setShowGenerarCronogramaModal] = useState(false)
   const [showImportExcelModal, setShowImportExcelModal] = useState(false)
+  const [showAsignarRecursoModal, setShowAsignarRecursoModal] = useState(false)
 
   // Estado de datos
   const [selectedCronograma, setSelectedCronograma] = useState<ProyectoCronograma | undefined>(cronograma)
@@ -902,6 +905,14 @@ export function ProyectoCronogramaTab({
                 </>
               )}
 
+              <DropdownMenuItem onSelect={() => {
+                setDropdownOpen(false)
+                setTimeout(() => setShowAsignarRecursoModal(true), 100)
+              }} disabled={!hasCronograma}>
+                <Wrench className="h-4 w-4 mr-2" />
+                Asignar Recursos por EDT
+              </DropdownMenuItem>
+
               <DropdownMenuItem asChild>
                 <ProyectoDependencyManager
                   proyectoId={proyectoId}
@@ -1083,6 +1094,14 @@ export function ProyectoCronogramaTab({
         onOpenChange={setShowImportExcelModal}
         proyectoId={proyectoId}
         onImportSuccess={handleRefresh}
+      />
+
+      {/* Modal de asignar recurso por EDT */}
+      <AsignarRecursoPorEdt
+        open={showAsignarRecursoModal}
+        onOpenChange={setShowAsignarRecursoModal}
+        cronogramaId={selectedCronograma?.id || ''}
+        onSuccess={handleRefresh}
       />
 
       {/* Tabs de Vistas */}
