@@ -289,22 +289,22 @@ export default function ResumenTotalesProyecto({ proyecto, costosReales }: Props
           >
             {/* Totales intermedios */}
             <div className="grid grid-cols-2 gap-2 text-sm">
-              <div className="flex items-center justify-between p-2 bg-blue-50 rounded-lg border border-blue-200">
-                <div className="flex items-center gap-1">
-                  <Target className="h-3 w-3 text-blue-600" />
-                  <span className="text-xs font-medium text-blue-700">Presupuesto</span>
+              <div className="p-2 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="flex items-center gap-1 mb-0.5">
+                  <Target className="h-3 w-3 text-blue-600 flex-shrink-0" />
+                  <span className="text-[10px] font-medium text-blue-700">Presupuesto</span>
                 </div>
-                <span className="text-xs font-semibold text-blue-800">
+                <span className="text-xs font-semibold text-blue-800 block truncate" title={formatCurrency(totalInterno)}>
                   {formatCurrency(totalInterno)}
                 </span>
               </div>
 
-              <div className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-1">
-                  <DollarSign className="h-3 w-3 text-gray-600" />
-                  <span className="text-xs font-medium text-gray-700">Cliente</span>
+              <div className="p-2 bg-gray-50 rounded-lg">
+                <div className="flex items-center gap-1 mb-0.5">
+                  <DollarSign className="h-3 w-3 text-gray-600 flex-shrink-0" />
+                  <span className="text-[10px] font-medium text-gray-700">Cliente</span>
                 </div>
-                <span className="text-xs font-semibold text-gray-800">
+                <span className="text-xs font-semibold text-gray-800 block truncate" title={formatCurrency(totalCliente)}>
                   {formatCurrency(totalCliente)}
                 </span>
               </div>
