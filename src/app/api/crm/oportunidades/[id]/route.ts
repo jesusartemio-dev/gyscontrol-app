@@ -440,7 +440,9 @@ export async function DELETE(
         id: true,
         nombre: true,
         comercialId: true,
-        responsableId: true
+        responsableId: true,
+        cotizacionId: true,
+        proyectoId: true
       }
     })
 
@@ -448,6 +450,20 @@ export async function DELETE(
       return NextResponse.json(
         { error: 'Oportunidad no encontrada' },
         { status: 404 }
+      )
+    }
+
+    // ✅ No permitir eliminar si tiene cotización o proyecto vinculado
+    if (oportunidad.cotizacionId) {
+      return NextResponse.json(
+        { error: 'No se puede eliminar una oportunidad que tiene una cotización vinculada' },
+        { status: 400 }
+      )
+    }
+    if (oportunidad.proyectoId) {
+      return NextResponse.json(
+        { error: 'No se puede eliminar una oportunidad que tiene un proyecto vinculado' },
+        { status: 400 }
       )
     }
 

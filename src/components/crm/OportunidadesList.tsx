@@ -825,7 +825,7 @@ export default function OportunidadesList({ onView, onEdit, onDelete, onCreate, 
                             <Edit3 className="h-4 w-4" />
                           </Button>
                         )}
-                        {onDelete && (
+                        {onDelete && !oportunidad.cotizacionId && !oportunidad.proyectoId && (
                           <Button variant="ghost" size="sm" onClick={() => handleDelete(oportunidad)} className="h-7 w-7 p-0 text-red-600">
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -1082,7 +1082,7 @@ export default function OportunidadesList({ onView, onEdit, onDelete, onCreate, 
                         </Button>
                       )}
 
-                      {onDelete && (
+                      {onDelete && !oportunidad.cotizacionId && !oportunidad.proyectoId && (
                         <Button
                           variant="outline"
                           size="sm"
