@@ -375,7 +375,7 @@ export default function CotizacionEquipoItemImportExcelModal({
                 precioVenta,
                 categoriaId: categoria.id,
                 unidadId: unidad.id,
-                estado: 'ACTIVO'
+                estado: 'pendiente'
               }
 
               const catalogCreateRes = await fetch('/api/catalogo-equipo', {

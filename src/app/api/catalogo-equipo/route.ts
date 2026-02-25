@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
 
     const data = await req.json()
 
-    const requiredFields = ['codigo', 'descripcion', 'marca', 'precioLista', 'factorCosto', 'factorVenta', 'precioInterno', 'precioVenta', 'categoriaId', 'unidadId', 'estado']
+    const requiredFields = ['codigo', 'descripcion', 'marca', 'precioLista', 'factorCosto', 'factorVenta', 'precioInterno', 'precioVenta', 'categoriaId', 'unidadId']
     for (const field of requiredFields) {
       if (!(field in data)) {
         return NextResponse.json({ error: `Falta el campo obligatorio: ${field}` }, { status: 400 })
@@ -137,7 +137,7 @@ export async function POST(req: NextRequest) {
         precioReal: data.precioReal ?? null,
         categoriaId: data.categoriaId,
         unidadId: data.unidadId,
-        estado: data.estado,
+        estado: data.estado || 'pendiente',
         createdById: userId ?? null,
         updatedById: userId ?? null,
         updatedAt: new Date(),
