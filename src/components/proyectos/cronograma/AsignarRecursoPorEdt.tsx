@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -46,26 +46,31 @@ export function AsignarRecursoPorEdt({
   const [saving, setSaving] = useState<string | null>(null) // edtId currently saving
   const { toast } = useToast()
 
-  const loadData = useCallback(async () => {
-    if (!cronogramaId) return
-    try {
-      setLoading(true)
-      const res = await fetch(`/api/proyectos/cronograma/asignar-recurso?cronogramaId=${cronogramaId}`)
-      if (!res.ok) throw new Error('Error al cargar datos')
-      const data = await res.json()
-      setEdts(data.edts || [])
-      setRecursos(data.recursos || [])
-    } catch (error) {
-      console.error('Error cargando EDTs:', error)
-      toast({ title: 'Error', description: 'No se pudieron cargar las EDTs', variant: 'destructive' })
-    } finally {
-      setLoading(false)
-    }
-  }, [cronogramaId, toast])
-
   useEffect(() => {
-    if (open) loadData()
-  }, [open, loadData])
+    if (!open || !cronogramaId) return
+    let cancelled = false
+    setLoading(true)
+    fetch(`/api/proyectos/cronograma/asignar-recurso?cronogramaId=${cronogramaId}`)
+      .then(res => {
+        if (!res.ok) throw new Error('Error al cargar datos')
+        return res.json()
+      })
+      .then(data => {
+        if (cancelled) return
+        setEdts(data.edts || [])
+        setRecursos(data.recursos || [])
+      })
+      .catch(error => {
+        if (cancelled) return
+        console.error('Error cargando EDTs:', error)
+        toast({ title: 'Error', description: 'No se pudieron cargar las EDTs', variant: 'destructive' })
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, cronogramaId])
 
   const handleAsignar = async (edtId: string, recursoId: string) => {
     const finalRecursoId = recursoId === '__none__' ? null : recursoId
