@@ -82,6 +82,13 @@ export async function GET(
                 nombre: true
               }
             },
+            // 👤 Auditoría de selección de cotización
+            seleccionadoPor: {
+              select: {
+                id: true,
+                name: true
+              }
+            },
             // 💰 Simplified cotizaciones
             cotizacionProveedorItems: {
               select: {

@@ -11,6 +11,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { propagarPrecioLogisticaCatalogo } from '@/lib/services/catalogoPrecioSync'
 import { checkOCVinculada, clasificarOC, actualizarOCBorrador } from '@/lib/utils/ocValidation'
+import { crearEvento } from '@/lib/utils/trazabilidad'
 
 export async function PATCH(
   req: Request,
@@ -20,7 +21,17 @@ export async function PATCH(
     const { id } = await params
     const { cotizacionProveedorItemId } = await req.json()
     const session = await getServerSession(authOptions)
-    const userId = (session?.user as any)?.id as string | undefined
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+    const userId = (session.user as any)?.id as string
+    const userRole = (session.user as any)?.role as string
+
+    // Validar roles permitidos para seleccionar cotización
+    const rolesPermitidos = ['admin', 'gerente', 'logistico', 'gestor', 'coordinador']
+    if (!rolesPermitidos.includes(userRole)) {
+      return NextResponse.json({ error: 'Sin permiso para seleccionar cotización' }, { status: 403 })
+    }
 
     // Paso 0: Verificar OCs vinculadas ANTES de hacer cualquier cambio
     const pedidoItemsVinculados = await prisma.pedidoEquipoItem.findMany({
@@ -52,6 +63,10 @@ export async function PATCH(
     // Verificar si es una deselección (cotizacionProveedorItemId es null)
     if (cotizacionProveedorItemId === null) {
       // Paso 2: actualizar el ListaEquipoItem limpiando la selección
+      const itemAntes = await prisma.listaEquipoItem.findUnique({
+        where: { id },
+        select: { listaId: true, descripcion: true, precioElegido: true, proveedor: { select: { nombre: true } } },
+      })
       const updatedItem = await prisma.listaEquipoItem.update({
         where: { id },
         data: {
@@ -61,8 +76,25 @@ export async function PATCH(
           tiempoEntrega: null,
           tiempoEntregaDias: null,
           proveedorId: null,
+          seleccionadoPorId: null,
+          fechaSeleccion: null,
         },
       })
+
+      // Auditoría: evento de deselección
+      crearEvento(prisma, {
+        tipo: 'cotizacion_deseleccionada',
+        descripcion: `Cotización deseleccionada para "${itemAntes?.descripcion || id}"${itemAntes?.proveedor?.nombre ? ` (era ${itemAntes.proveedor.nombre})` : ''}`,
+        usuarioId: userId,
+        listaEquipoId: itemAntes?.listaId || null,
+        metadata: {
+          itemId: id,
+          itemDescripcion: itemAntes?.descripcion,
+          precioAnterior: itemAntes?.precioElegido ?? null,
+          proveedorAnterior: itemAntes?.proveedor?.nombre ?? null,
+          area: 'seleccion_cotizacion',
+        },
+      }).catch(() => {})
 
       // Paso 3: limpiar precios en pedidos existentes
       const pedidosAfectados = await prisma.pedidoEquipoItem.findMany({
@@ -137,7 +169,7 @@ export async function PATCH(
       where: { id: cotizacionProveedorItemId },
       include: {
         cotizacionProveedor: {
-          select: { proveedorId: true }
+          select: { proveedorId: true, proveedor: { select: { nombre: true } } }
         }
       }
     })
@@ -165,8 +197,15 @@ export async function PATCH(
     const tiempoEntrega = cotizacionItem.tiempoEntrega || 'Stock'
     const tiempoEntregaDias = cotizacionItem.tiempoEntregaDias ?? 0
 
-    // Paso 5: actualizar el ListaEquipoItem con la información final
+    // Paso 5: obtener precio anterior para auditoría
+    const itemAntes = await prisma.listaEquipoItem.findUnique({
+      where: { id },
+      select: { listaId: true, descripcion: true, precioElegido: true },
+    })
+
+    // Paso 6: actualizar el ListaEquipoItem con la información final + auditoría
     const proveedorId = cotizacionItem.cotizacionProveedor?.proveedorId ?? null
+    const proveedorNombre = cotizacionItem.cotizacionProveedor?.proveedor?.nombre ?? null
     const updatedItem = await prisma.listaEquipoItem.update({
       where: { id },
       data: {
@@ -176,10 +215,29 @@ export async function PATCH(
         tiempoEntrega,
         tiempoEntregaDias,
         proveedorId,
+        seleccionadoPorId: userId,
+        fechaSeleccion: new Date(),
       },
     })
 
-    // Paso 6: actualizar pedidos existentes que referencian este ítem
+    // Auditoría: evento de selección
+    crearEvento(prisma, {
+      tipo: 'cotizacion_seleccionada',
+      descripcion: `Cotización ${proveedorNombre || 'proveedor'} seleccionada para "${itemAntes?.descripcion || id}" — $${precioUnitario.toFixed(2)}`,
+      usuarioId: userId,
+      listaEquipoId: itemAntes?.listaId || null,
+      metadata: {
+        itemId: id,
+        itemDescripcion: itemAntes?.descripcion,
+        cotizacionId: cotizacionProveedorItemId,
+        proveedorNombre,
+        precioUnitario,
+        precioAnterior: itemAntes?.precioElegido ?? null,
+        area: 'seleccion_cotizacion',
+      },
+    }).catch(() => {})
+
+    // Paso 7: actualizar pedidos existentes que referencian este ítem
     const pedidosAfectados = await prisma.pedidoEquipoItem.findMany({
       where: { listaEquipoItemId: id },
       include: {

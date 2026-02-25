@@ -7,6 +7,7 @@
 'use client'
 
 import { useState, useMemo, useCallback } from 'react'
+import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -14,7 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Pencil, Trash2, CheckCircle2, X, Search, Package, Clock, AlertTriangle, CheckCircle, Grid3X3, List, RotateCcw, Recycle, Plus, ShoppingCart, FileText, Download, Tag, ChevronDown, Wrench } from 'lucide-react'
+import { Pencil, Trash2, CheckCircle2, X, Search, Package, Clock, AlertTriangle, CheckCircle, Grid3X3, List, RotateCcw, Recycle, Plus, ShoppingCart, FileText, Download, Tag, ChevronDown, Wrench, Trophy } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ListaEquipoItem } from '@/types'
@@ -53,6 +54,8 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { CotizacionCodigoSimple } from './CotizacionSelector'
+import CotizacionSelectorModal from './CotizacionSelectorModal'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { 
   calcularResumenPedidos, 
   getBadgeVariantPorEstado, 
@@ -116,6 +119,10 @@ const getOrigenVariant = (origen: string): "default" | "secondary" | "outline" =
 
 export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, listaNombre, items, editable = true, onCreated, onItemUpdated, onItemsUpdated, onDeleted, onRefresh }: Props) {
   const router = useRouter()
+  const { data: session } = useSession()
+  const rol = (session?.user as any)?.role || ''
+  const puedeSeleccionarCotizacion = ['admin', 'gerente', 'gestor', 'coordinador'].includes(rol)
+  const [selectorItem, setSelectorItem] = useState<ListaEquipoItem | null>(null)
   const [editCantidadItemId, setEditCantidadItemId] = useState<string | null>(null)
   const [editCantidadValues, setEditCantidadValues] = useState<Record<string, string>>({})
   const [editComentarioItemId, setEditComentarioItemId] = useState<string | null>(null)
@@ -664,25 +671,43 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                       )}
                    </td>
                    <td className={`${cellPadding} ${columnWidths.cotizacion}`}>
-                      <div className="flex items-start justify-center gap-1">
-                        {(() => {
-                          const n = item.cotizaciones?.length || 0
-                          const color = n === 0 ? 'bg-red-500' : n < 3 ? 'bg-amber-500' : 'bg-green-500'
-                          const label = `${n}/3 cotizaciones`
-                          return (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className={`inline-block w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${color}`} />
-                              </TooltipTrigger>
-                              <TooltipContent side="left" className="text-xs">{label}</TooltipContent>
-                            </Tooltip>
-                          )
-                        })()}
-                        <CotizacionCodigoSimple
-                          cotizaciones={item.cotizaciones || []}
-                          cotizacionSeleccionadaId={item.cotizacionSeleccionadaId || undefined}
-                          interactive={false}
-                        />
+                      <div className="flex flex-col items-center gap-0.5">
+                        <div className="flex items-start justify-center gap-1">
+                          {(() => {
+                            const n = item.cotizaciones?.length || 0
+                            const color = n === 0 ? 'bg-red-500' : n < 3 ? 'bg-amber-500' : 'bg-green-500'
+                            const label = `${n}/3 cotizaciones`
+                            return (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className={`inline-block w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${color}`} />
+                                </TooltipTrigger>
+                                <TooltipContent side="left" className="text-xs">{label}</TooltipContent>
+                              </Tooltip>
+                            )
+                          })()}
+                          <CotizacionCodigoSimple
+                            cotizaciones={item.cotizaciones || []}
+                            cotizacionSeleccionadaId={item.cotizacionSeleccionadaId || undefined}
+                            interactive={false}
+                          />
+                        </div>
+                        {puedeSeleccionarCotizacion && (item.cotizaciones?.length || 0) > 0 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setSelectorItem(item)}
+                            className="h-5 text-[10px] px-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                          >
+                            <Trophy className="h-3 w-3 mr-0.5" />
+                            {item.cotizacionSeleccionadaId ? 'Cambiar' : 'Elegir'}
+                          </Button>
+                        )}
+                        {(item as any).seleccionadoPor?.name && (
+                          <span className="text-[9px] text-muted-foreground text-center leading-tight">
+                            por {(item as any).seleccionadoPor.name}
+                          </span>
+                        )}
                       </div>
                    </td>
                    <td className={`${cellPadding} ${columnWidths.costo} text-right font-medium text-gray-900`}>
@@ -1010,6 +1035,24 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                           interactive={false}
                         />
                       </div>
+                      {puedeSeleccionarCotizacion && (item.cotizaciones?.length || 0) > 0 && (
+                        <div className="flex items-center justify-end">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setSelectorItem(item)}
+                            className="h-5 text-[10px] px-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                          >
+                            <Trophy className="h-3 w-3 mr-0.5" />
+                            {item.cotizacionSeleccionadaId ? 'Cambiar cotización' : 'Elegir cotización'}
+                          </Button>
+                        </div>
+                      )}
+                      {(item as any).seleccionadoPor?.name && (
+                        <div className="text-[9px] text-muted-foreground text-right">
+                          Elegido por {(item as any).seleccionadoPor.name}
+                        </div>
+                      )}
 
                       {(item.tiempoEntrega || item.tiempoEntregaDias) && (
                         <div className="flex items-center justify-between text-xs">
@@ -1199,6 +1242,21 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
         onClose={() => setShowModalItemLibre(false)}
         onCreated={async () => { await onCreated?.() }}
       />
+
+      {/* Modal de selección de cotización ganadora */}
+      <Dialog open={!!selectorItem} onOpenChange={(open) => { if (!open) setSelectorItem(null) }}>
+        <DialogContent className="max-w-md p-0 overflow-hidden">
+          {selectorItem && (
+            <CotizacionSelectorModal
+              item={selectorItem}
+              onUpdated={() => {
+                setSelectorItem(null)
+                onRefresh?.() || onCreated?.()
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

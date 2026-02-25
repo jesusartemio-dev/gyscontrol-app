@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { propagarPrecioLogisticaCatalogo } from '@/lib/services/catalogoPrecioSync'
 import { checkOCVinculada, clasificarOC, actualizarOCBorrador } from '@/lib/utils/ocValidation'
+import { crearEvento } from '@/lib/utils/trazabilidad'
 
 export async function POST(
   request: NextRequest,
@@ -12,6 +13,12 @@ export async function POST(
   const session = await getServerSession(authOptions)
   if (!session?.user) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  }
+
+  const userRole = (session.user as any)?.role as string
+  const rolesPermitidos = ['admin', 'gerente', 'logistico', 'gestor', 'coordinador']
+  if (!rolesPermitidos.includes(userRole)) {
+    return NextResponse.json({ error: 'Sin permiso para seleccionar cotización' }, { status: 403 })
   }
 
   try {
@@ -35,7 +42,10 @@ export async function POST(
       },
       include: {
         cotizacionProveedor: {
-          select: { proveedorId: true }
+          select: { proveedorId: true, proveedor: { select: { nombre: true } } }
+        },
+        listaEquipoItem: {
+          select: { descripcion: true, listaId: true, precioElegido: true }
         }
       }
     })
@@ -122,6 +132,8 @@ export async function POST(
               tiempoEntregaDias: winnerQuotation.tiempoEntregaDias,
               costoElegido: winnerQuotation.costoTotal,
               proveedorId,
+              seleccionadoPorId: userId || null,
+              fechaSeleccion: new Date(),
             }
           })
 
@@ -209,6 +221,29 @@ export async function POST(
           metadata: { origen: 'select-winners-bulk', listaEquipoItemId: itemId },
         }).catch(err => console.error('Error propagating precioLogistica:', err))
       }
+    }
+
+    // Auditoría: crear eventos de trazabilidad por cada item seleccionado
+    for (const [itemId, quotationId] of elegibles) {
+      const winner = validQuotations.find(q => q.id === quotationId)
+      const provNombre = winner?.cotizacionProveedor?.proveedor?.nombre ?? null
+      const desc = winner?.listaEquipoItem?.descripcion ?? itemId
+      crearEvento(prisma, {
+        tipo: 'cotizacion_seleccionada',
+        descripcion: `Cotización ${provNombre || 'proveedor'} seleccionada para "${desc}" — $${(winner?.precioUnitario ?? 0).toFixed(2)} (bulk)`,
+        usuarioId: userId || 'system',
+        listaEquipoId: id,
+        metadata: {
+          itemId,
+          itemDescripcion: desc,
+          cotizacionId: quotationId,
+          proveedorNombre: provNombre,
+          precioUnitario: winner?.precioUnitario ?? 0,
+          precioAnterior: winner?.listaEquipoItem?.precioElegido ?? null,
+          area: 'seleccion_cotizacion',
+          modo: 'bulk',
+        },
+      }).catch(() => {})
     }
 
     return NextResponse.json({

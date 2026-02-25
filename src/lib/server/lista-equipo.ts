@@ -50,6 +50,13 @@ export async function getListaEquipoDetail(proyectoId: string, listaId: string) 
                 nombre: true
               }
             },
+            // 👤 Auditoría de selección de cotización
+            seleccionadoPor: {
+              select: {
+                id: true,
+                name: true
+              }
+            },
             // 💰 Simplified cotizaciones
             cotizacionProveedorItems: {
               include: {

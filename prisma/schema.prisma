@@ -692,6 +692,9 @@ model ListaEquipoItem {
   ordenCompraItems                      OrdenCompraItem[]
   listaEquipoItemSeleccionados          ProyectoEquipoCotizadoItem[] @relation("proyectoEquipoCotizadoItemListaEquipoSeleccionado")
   catalogoEquipo                        CatalogoEquipo?              @relation(fields: [catalogoEquipoId], references: [id])
+  seleccionadoPorId                     String?
+  fechaSeleccion                        DateTime?
+  seleccionadoPor                       User?                        @relation("ListaEquipoItemSeleccionador", fields: [seleccionadoPorId], references: [id])
 
   @@index([listaId, estado, createdAt(sort: Desc)], map: "idx_lista_item_lista_estado_fecha")
   @@index([proveedorId, estado, precioElegido], map: "idx_lista_item_proveedor_estado_precio")
@@ -1517,6 +1520,8 @@ model User {
   recepcionesRechazadas           RecepcionPendiente[]        @relation("RecepcionRechazador")
   cxpAdjuntos                     CxPAdjunto[]                @relation("CxPAdjuntoSubidoPor")
   cxcAdjuntos                     CxCAdjunto[]                @relation("CxCAdjuntoSubidoPor")
+  // Selección cotización ganadora
+  seleccionesRealizadas           ListaEquipoItem[]           @relation("ListaEquipoItemSeleccionador")
 
   @@map("user")
 }
