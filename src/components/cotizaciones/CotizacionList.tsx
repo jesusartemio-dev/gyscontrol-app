@@ -214,16 +214,6 @@ export default function CotizacionList({
     onYearFilterChange?.(new Date().getFullYear().toString())
   }
 
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <CotizacionSkeleton key={i} />
-        ))}
-      </div>
-    )
-  }
-
   return (
     <TooltipProvider>
     <div className="space-y-4">
@@ -328,8 +318,14 @@ export default function CotizacionList({
         )}
       </AnimatePresence>
 
-      {/* Empty state when no results */}
-      {cotizaciones.length === 0 ? (
+      {/* Loading skeleton - solo en el área de contenido */}
+      {loading ? (
+        <div className="space-y-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <CotizacionSkeleton key={i} />
+          ))}
+        </div>
+      ) : cotizaciones.length === 0 ? (
         <EmptyState />
       ) : viewMode === 'table' ? (
         <div className="bg-white border rounded-lg overflow-x-auto">
