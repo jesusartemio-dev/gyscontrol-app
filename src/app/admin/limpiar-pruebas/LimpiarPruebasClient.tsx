@@ -44,6 +44,7 @@ export default function LimpiarPruebasClient() {
         case 'ordenCompra': return `/api/orden-compra/${id}`
         case 'valorizacion': return `/api/proyectos/${proyectoId}/valorizaciones/${id}`
         case 'cuentaPorCobrar': return `/api/administracion/cuentas-cobrar/${id}`
+        case 'cuentaPorPagar': return `/api/administracion/cuentas-pagar/${id}`
         default: return `/api/${deleteEntity?.entity}/${id}`
       }
     },
@@ -159,7 +160,14 @@ export default function LimpiarPruebasClient() {
                         <span>{cxp.numeroFactura || cxp.id.slice(0, 8)}</span>
                         <span className="text-muted-foreground">S/ {cxp.monto.toFixed(2)}</span>
                       </div>
-                      <span className="text-muted-foreground">Solo anulacion</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                        onClick={() => handleDelete('cuentaPorPagar', cxp.id, 'CxP')}
+                      >
+                        <Trash2 className="h-3 w-3 text-red-500" />
+                      </Button>
                     </div>
                   ))}
                 </CardContent>

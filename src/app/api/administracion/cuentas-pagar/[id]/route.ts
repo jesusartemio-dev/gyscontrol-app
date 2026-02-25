@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { canDelete } from '@/lib/utils/deleteValidation'
 
 const ROLES_ALLOWED = ['admin', 'gerente', 'administracion']
 
@@ -47,6 +48,37 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     return NextResponse.json({ error: 'Operación no soportada' }, { status: 400 })
   } catch (error) {
     console.error('Error al actualizar CxP:', error)
+    return NextResponse.json({ error: 'Error del servidor' }, { status: 500 })
+  }
+}
+
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+    if (!ROLES_ALLOWED.includes(session.user.role)) {
+      return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
+    }
+
+    const { id } = await params
+
+    // 🛡️ Validar dependientes antes de eliminar
+    const deleteCheck = await canDelete('cuentaPorPagar', id)
+    if (!deleteCheck.allowed) {
+      return NextResponse.json(
+        { error: deleteCheck.message, blockers: deleteCheck.blockers },
+        { status: 409 }
+      )
+    }
+
+    // Eliminar CxP (pagos y adjuntos se eliminan por cascade)
+    await prisma.cuentaPorPagar.delete({ where: { id } })
+
+    return NextResponse.json({ ok: true })
+  } catch (error) {
+    console.error('Error al eliminar CxP:', error)
     return NextResponse.json({ error: 'Error del servidor' }, { status: 500 })
   }
 }

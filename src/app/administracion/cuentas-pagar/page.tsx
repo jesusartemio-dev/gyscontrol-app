@@ -10,7 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Loader2, Search, ArrowUpCircle, AlertTriangle, DollarSign, Clock, CheckCircle, Plus, Ban, Package, ChevronRight, FileSpreadsheet, Upload, Download } from 'lucide-react'
+import { Loader2, Search, ArrowUpCircle, AlertTriangle, DollarSign, Clock, CheckCircle, Plus, Ban, Package, ChevronRight, FileSpreadsheet, Upload, Download, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import CxPImportExcelModal from '@/components/administracion/CxPImportExcelModal'
 import { exportarCxPAExcel } from '@/lib/utils/cuentasPagarExcel'
@@ -172,6 +172,12 @@ export default function CuentasPagarPage() {
 
   // Detail dialog
   const [showDetail, setShowDetail] = useState<CuentaPorPagar | null>(null)
+
+  // Confirm dialog (anular/eliminar)
+  const [confirmDialog, setConfirmDialog] = useState<{
+    tipo: 'anular' | 'eliminar'
+    cuenta: CuentaPorPagar
+  } | null>(null)
 
   // Import dialog
   const [showImportDialog, setShowImportDialog] = useState(false)
@@ -335,8 +341,11 @@ export default function CuentasPagarPage() {
   }
 
   // --- Anular ---
-  const handleAnular = async (cuenta: CuentaPorPagar) => {
-    if (!confirm(`¿Anular la cuenta ${cuenta.numeroFactura || cuenta.id.slice(0, 8)}?`)) return
+  const handleAnular = (cuenta: CuentaPorPagar) => {
+    setConfirmDialog({ tipo: 'anular', cuenta })
+  }
+
+  const executeAnular = async (cuenta: CuentaPorPagar) => {
     setSaving(true)
     try {
       const res = await fetch(`/api/administracion/cuentas-pagar/${cuenta.id}`, {
@@ -356,6 +365,39 @@ export default function CuentasPagarPage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  // --- Eliminar ---
+  const handleEliminar = (cuenta: CuentaPorPagar) => {
+    setConfirmDialog({ tipo: 'eliminar', cuenta })
+  }
+
+  const executeEliminar = async (cuenta: CuentaPorPagar) => {
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/administracion/cuentas-pagar/${cuenta.id}`, {
+        method: 'DELETE',
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Error al eliminar')
+      }
+      toast.success('Cuenta eliminada')
+      setShowDetail(null)
+      loadData()
+    } catch (e: any) {
+      toast.error(e.message || 'Error al eliminar')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleConfirmAction = async () => {
+    if (!confirmDialog) return
+    const { tipo, cuenta } = confirmDialog
+    setConfirmDialog(null)
+    if (tipo === 'anular') await executeAnular(cuenta)
+    else await executeEliminar(cuenta)
   }
 
   // --- Pago ---
@@ -1124,10 +1166,16 @@ export default function CuentasPagarPage() {
             </div>
           )}
           <DialogFooter>
-            {showDetail && (showDetail.estado === 'pendiente' || showDetail.estado === 'parcial') && (
+            {showDetail && showDetail.estado !== 'anulada' && (
               <Button variant="destructive" size="sm" onClick={() => handleAnular(showDetail)} disabled={saving}>
                 <Ban className="h-4 w-4 mr-1" />
                 Anular
+              </Button>
+            )}
+            {showDetail && (showDetail.estado === 'anulada' || (showDetail.montoPagado === 0 && showDetail.estado !== 'pagada')) && (
+              <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => handleEliminar(showDetail)} disabled={saving}>
+                <Trash2 className="h-4 w-4 mr-1" />
+                Eliminar
               </Button>
             )}
             <div className="flex-1" />
@@ -1138,6 +1186,71 @@ export default function CuentasPagarPage() {
                 Registrar Pago
               </Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog confirmación anular/eliminar */}
+      <Dialog open={!!confirmDialog} onOpenChange={open => { if (!open) setConfirmDialog(null) }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className={`h-5 w-5 ${confirmDialog?.tipo === 'eliminar' ? 'text-red-600' : 'text-amber-600'}`} />
+              {confirmDialog?.tipo === 'anular' ? 'Anular Cuenta por Pagar' : 'Eliminar Cuenta por Pagar'}
+            </DialogTitle>
+            <DialogDescription>
+              {confirmDialog?.cuenta.numeroFactura || 'Sin factura'} — {confirmDialog?.cuenta.proveedor?.nombre}
+            </DialogDescription>
+          </DialogHeader>
+          {confirmDialog && (
+            <div className="space-y-3 text-sm">
+              <Card>
+                <CardContent className="p-3 space-y-1">
+                  <div className="flex justify-between"><span>Factura</span><span className="font-mono">{confirmDialog.cuenta.numeroFactura || '—'}</span></div>
+                  <div className="flex justify-between"><span>Monto</span><span className="font-mono font-bold">{formatCurrency(confirmDialog.cuenta.monto, confirmDialog.cuenta.moneda)}</span></div>
+                  {confirmDialog.cuenta.montoPagado > 0 && (
+                    <div className="flex justify-between text-green-600"><span>Pagado</span><span className="font-mono">{formatCurrency(confirmDialog.cuenta.montoPagado, confirmDialog.cuenta.moneda)}</span></div>
+                  )}
+                  <div className="flex justify-between"><span>Estado actual</span>
+                    <Badge className={getEstadoColor(confirmDialog.cuenta.estado)}>
+                      {ESTADOS_CXP.find(e => e.value === confirmDialog.cuenta.estado)?.label || confirmDialog.cuenta.estado}
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+              {confirmDialog.tipo === 'anular' ? (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 space-y-1">
+                  <p className="font-medium">La cuenta pasará a estado &quot;Anulada&quot;.</p>
+                  <p>No se podrán registrar más pagos. Los pagos existentes se mantendrán como historial.</p>
+                  {confirmDialog.cuenta.estado === 'pagada' && (
+                    <p className="font-semibold mt-2">Esta cuenta ya fue pagada en su totalidad. Al anularla podrá eliminarla después si es necesario.</p>
+                  )}
+                </div>
+              ) : (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 space-y-1">
+                  <p className="font-medium">Se eliminará permanentemente esta cuenta por pagar.</p>
+                  {confirmDialog.cuenta.montoPagado > 0 && (
+                    <p>Se eliminarán también los <strong>{confirmDialog.cuenta.pagos?.length || 0} pago(s)</strong> registrados y sus adjuntos asociados.</p>
+                  )}
+                  <p className="font-semibold">Esta acción no se puede deshacer.</p>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmDialog(null)}>Cancelar</Button>
+            <Button
+              variant={confirmDialog?.tipo === 'eliminar' ? 'destructive' : 'default'}
+              onClick={handleConfirmAction}
+              disabled={saving}
+            >
+              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {confirmDialog?.tipo === 'anular' ? (
+                <><Ban className="h-4 w-4 mr-1" /> Sí, anular</>
+              ) : (
+                <><Trash2 className="h-4 w-4 mr-1" /> Sí, eliminar</>
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

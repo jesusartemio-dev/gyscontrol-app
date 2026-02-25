@@ -11,6 +11,7 @@ const VALID_ENTITIES: DeletableEntity[] = [
   'ordenCompra',
   'valorizacion',
   'cuentaPorCobrar',
+  'cuentaPorPagar',
 ]
 
 export async function GET(request: NextRequest) {

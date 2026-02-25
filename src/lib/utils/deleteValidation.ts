@@ -14,6 +14,7 @@ export type DeletableEntity =
   | 'ordenCompra'
   | 'valorizacion'
   | 'cuentaPorCobrar'
+  | 'cuentaPorPagar'
 
 export interface DeleteBlocker {
   entity: string
@@ -35,6 +36,7 @@ const ENTITY_LABELS: Record<DeletableEntity, string> = {
   ordenCompra: 'Orden de Compra',
   valorizacion: 'Valorización',
   cuentaPorCobrar: 'Cuenta por Cobrar',
+  cuentaPorPagar: 'Cuenta por Pagar',
 }
 
 // ─── Dispatcher ─────────────────────────────────────────────
@@ -51,6 +53,7 @@ export async function canDelete(
     ordenCompra: checkOrdenCompra,
     valorizacion: checkValorizacion,
     cuentaPorCobrar: checkCuentaPorCobrar,
+    cuentaPorPagar: checkCuentaPorPagar,
   }
 
   const checker = checkers[entity]
@@ -354,6 +357,35 @@ async function checkCuentaPorCobrar(id: string): Promise<DeleteBlocker[]> {
       entity: 'PagoCobro',
       count: cxc._count.pagos,
       message: `Tiene ${cxc._count.pagos} pago(s) registrado(s) — anule la CxC en lugar de eliminarla`,
+    })
+  }
+
+  return blockers
+}
+
+async function checkCuentaPorPagar(id: string): Promise<DeleteBlocker[]> {
+  const blockers: DeleteBlocker[] = []
+
+  const cxp = await prisma.cuentaPorPagar.findUnique({
+    where: { id },
+    select: {
+      estado: true,
+      montoPagado: true,
+      _count: {
+        select: {
+          pagos: true,
+        },
+      },
+    },
+  })
+
+  if (!cxp) return blockers
+
+  if ((cxp.montoPagado > 0 || cxp._count.pagos > 0) && cxp.estado !== 'anulada') {
+    blockers.push({
+      entity: 'PagoPagar',
+      count: cxp._count.pagos,
+      message: `Tiene ${cxp._count.pagos} pago(s) registrado(s) — anule la CxP en lugar de eliminarla`,
     })
   }
 
