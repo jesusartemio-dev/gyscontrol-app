@@ -17,6 +17,7 @@ import { authOptions } from '@/lib/auth'
 import { validarTransicion, getFechasPorTransicion, type EstadoListaEquipo } from '@/lib/utils/flujoListaEquipo'
 import { sincronizarRealesProyecto } from '@/lib/utils/syncReales'
 import { registrarActualizacion } from '@/lib/services/audit'
+import { canDelete } from '@/lib/utils/deleteValidation'
 
 // ✅ Obtener ListaEquipo por ID (GET)
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
@@ -199,6 +200,21 @@ export async function DELETE(req: Request, context: { params: Promise<{ id: stri
   const { id } = await context.params;
 
   try {
+    // 🔐 Verificar sesión
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    // 🛡️ Validar dependientes antes de eliminar
+    const deleteCheck = await canDelete('listaEquipo', id)
+    if (!deleteCheck.allowed) {
+      return NextResponse.json(
+        { error: deleteCheck.message, blockers: deleteCheck.blockers },
+        { status: 409 }
+      )
+    }
+
     await prisma.$transaction([
       // 0. Desmarcar todas las cotizaciones seleccionadas relacionadas
       prisma.cotizacionProveedorItem.updateMany({

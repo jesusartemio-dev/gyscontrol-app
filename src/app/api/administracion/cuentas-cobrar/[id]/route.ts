@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { canDelete } from '@/lib/utils/deleteValidation'
 
 const ROLES_ALLOWED = ['admin', 'gerente', 'administracion']
 
@@ -54,19 +55,12 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
 
     const { id } = await params
 
-    const existing = await prisma.cuentaPorCobrar.findUnique({
-      where: { id },
-      include: { pagos: { select: { id: true } } },
-    })
-    if (!existing) {
-      return NextResponse.json({ error: 'Cuenta por cobrar no encontrada' }, { status: 404 })
-    }
-
-    // Si tiene pagos y NO está anulada, bloquear eliminación
-    if ((existing.montoPagado > 0 || existing.pagos.length > 0) && existing.estado !== 'anulada') {
+    // 🛡️ Validar dependientes antes de eliminar
+    const deleteCheck = await canDelete('cuentaPorCobrar', id)
+    if (!deleteCheck.allowed) {
       return NextResponse.json(
-        { error: 'No se puede eliminar: tiene pagos registrados. Anúlela primero.' },
-        { status: 400 }
+        { error: deleteCheck.message, blockers: deleteCheck.blockers },
+        { status: 409 }
       )
     }
 

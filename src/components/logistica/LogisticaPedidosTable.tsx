@@ -19,16 +19,8 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
+import { useDeleteWithValidation } from '@/hooks/useDeleteWithValidation'
+import { DeleteWithValidationDialog } from '@/components/DeleteWithValidationDialog'
 import type { PedidoEquipo } from '@/types'
 
 type EstadoPedidoEquipo = 'borrador' | 'enviado' | 'atendido' | 'parcial' | 'entregado' | 'cancelado'
@@ -69,7 +61,10 @@ export default function LogisticaPedidosTable({ pedidos, loading = false, onDele
   const [sortField, setSortField] = useState<SortField>('fechaPedido')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
   const [currentPage, setCurrentPage] = useState(1)
-  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const deleteValidation = useDeleteWithValidation({
+    entity: 'pedidoEquipo',
+    onConfirmDelete: onDelete ? async (id) => { onDelete(id) } : undefined,
+  })
 
   // Sorting logic
   const sortedPedidos = useMemo(() => {
@@ -148,12 +143,6 @@ export default function LogisticaPedidosTable({ pedidos, loading = false, onDele
       : <ChevronDown className="h-3 w-3" />
   }
 
-  const handleDeleteConfirm = () => {
-    if (deleteId && onDelete) {
-      onDelete(deleteId)
-      setDeleteId(null)
-    }
-  }
 
   if (loading) {
     return (
@@ -298,7 +287,7 @@ export default function LogisticaPedidosTable({ pedidos, loading = false, onDele
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => setDeleteId(pedido.id)}
+                        onClick={() => deleteValidation.requestDelete(pedido.id)}
                         className="h-7 w-7 p-0"
                       >
                         <Trash2 className="h-3.5 w-3.5 text-red-500" />
@@ -344,23 +333,19 @@ export default function LogisticaPedidosTable({ pedidos, loading = false, onDele
         </div>
       )}
 
-      {/* Delete confirmation dialog */}
-      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
-        <AlertDialogContent className="max-w-sm">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-base">Eliminar pedido</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm">
-              Esta acción no se puede deshacer. El pedido y todos sus items serán eliminados permanentemente.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="h-8 text-xs">Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteConfirm} className="h-8 text-xs bg-red-600 hover:bg-red-700">
-              Eliminar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Delete confirmation dialog with validation */}
+      <DeleteWithValidationDialog
+        open={deleteValidation.dialogOpen}
+        onOpenChange={(open) => !open && deleteValidation.cancelDelete()}
+        checking={deleteValidation.checking}
+        deleting={deleteValidation.deleting}
+        allowed={deleteValidation.canDeleteResult?.allowed ?? null}
+        blockers={deleteValidation.canDeleteResult?.blockers ?? []}
+        message={deleteValidation.canDeleteResult?.message ?? ''}
+        onConfirm={deleteValidation.confirmDelete}
+        onCancel={deleteValidation.cancelDelete}
+        entityLabel="pedido"
+      />
     </div>
   )
 }

@@ -19,6 +19,9 @@ import {
 } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
+import { toast } from 'sonner'
+import { useDeleteWithValidation } from '@/hooks/useDeleteWithValidation'
+import { DeleteWithValidationDialog } from '@/components/DeleteWithValidationDialog'
 import type { ListaEquipo, EstadoListaEquipo, Proyecto } from '@/types'
 import {
   calcularStatsCotizacionLista,
@@ -34,6 +37,7 @@ interface LogisticaListasTableProps {
   proyectos?: Proyecto[]
   loading?: boolean
   onRefresh?: () => void
+  onDelete?: (id: string) => void
   className?: string
 }
 
@@ -51,11 +55,20 @@ const ESTADOS_CONFIG: Record<EstadoListaEquipo, { label: string; variant: 'defau
 
 const ITEMS_PER_PAGE = 15
 
-export default function LogisticaListasTable({ listas, loading = false, className }: LogisticaListasTableProps) {
+export default function LogisticaListasTable({ listas, loading = false, onDelete, className }: LogisticaListasTableProps) {
   const router = useRouter()
   const [sortField, setSortField] = useState<SortField>('createdAt')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
   const [currentPage, setCurrentPage] = useState(1)
+  const deleteValidation = useDeleteWithValidation({
+    entity: 'listaEquipo',
+    deleteEndpoint: (id) => `/api/lista-equipo/${id}`,
+    onSuccess: () => {
+      toast.success('Lista eliminada correctamente')
+      onDelete?.('')
+    },
+    onError: (msg) => toast.error(msg),
+  })
 
   // Sorting logic
   const sortedListas = useMemo(() => {
@@ -285,6 +298,7 @@ export default function LogisticaListasTable({ listas, loading = false, classNam
                     <Button
                       variant="ghost"
                       size="sm"
+                      onClick={() => deleteValidation.requestDelete(lista.id)}
                       className="h-7 w-7 p-0"
                     >
                       <Trash2 className="h-3.5 w-3.5 text-red-500" />
@@ -328,6 +342,20 @@ export default function LogisticaListasTable({ listas, loading = false, classNam
           </div>
         </div>
       )}
+
+      {/* Delete confirmation dialog with validation */}
+      <DeleteWithValidationDialog
+        open={deleteValidation.dialogOpen}
+        onOpenChange={(open) => !open && deleteValidation.cancelDelete()}
+        checking={deleteValidation.checking}
+        deleting={deleteValidation.deleting}
+        allowed={deleteValidation.canDeleteResult?.allowed ?? null}
+        blockers={deleteValidation.canDeleteResult?.blockers ?? []}
+        message={deleteValidation.canDeleteResult?.message ?? ''}
+        onConfirm={deleteValidation.confirmDelete}
+        onCancel={deleteValidation.cancelDelete}
+        entityLabel="lista de equipos"
+      />
     </div>
   )
 }

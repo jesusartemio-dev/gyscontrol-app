@@ -30,6 +30,8 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { toast } from 'sonner'
+import { useDeleteWithValidation } from '@/hooks/useDeleteWithValidation'
+import { DeleteWithValidationDialog } from '@/components/DeleteWithValidationDialog'
 import type { CotizacionProveedor } from '@/types'
 
 type SortField = 'codigo' | 'proveedor' | 'proyecto' | 'estado' | 'createdAt' | 'itemsCount'
@@ -65,7 +67,10 @@ export default function LogisticaCotizacionesTable({ cotizaciones, loading = fal
   const [sortField, setSortField] = useState<SortField>('createdAt')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
   const [currentPage, setCurrentPage] = useState(1)
-  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const deleteValidation = useDeleteWithValidation({
+    entity: 'cotizacionProveedor',
+    onConfirmDelete: onDelete ? async (id) => { onDelete(id) } : undefined,
+  })
   const [advancingId, setAdvancingId] = useState<string | null>(null)
   const [confirmAdvance, setConfirmAdvance] = useState<{
     cotId: string; estado: string; codigo: string; proveedor: string; siguiente: string; label: string
@@ -144,12 +149,6 @@ export default function LogisticaCotizacionesTable({ cotizaciones, loading = fal
       : <ChevronDown className="h-3 w-3" />
   }
 
-  const handleDeleteConfirm = () => {
-    if (deleteId && onDelete) {
-      onDelete(deleteId)
-      setDeleteId(null)
-    }
-  }
 
   const handleRequestAdvance = (e: React.MouseEvent, cot: CotizacionProveedor) => {
     e.stopPropagation()
@@ -410,7 +409,7 @@ export default function LogisticaCotizacionesTable({ cotizaciones, loading = fal
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => setDeleteId(cot.id)}
+                        onClick={() => deleteValidation.requestDelete(cot.id)}
                         className="h-7 w-7 p-0"
                       >
                         <Trash2 className="h-3.5 w-3.5 text-red-500" />
@@ -482,23 +481,19 @@ export default function LogisticaCotizacionesTable({ cotizaciones, loading = fal
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Delete confirmation dialog */}
-      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
-        <AlertDialogContent className="max-w-sm">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-base">Eliminar cotización</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm">
-              Esta acción no se puede deshacer. La cotización y todos sus items serán eliminados permanentemente.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="h-8 text-xs">Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteConfirm} className="h-8 text-xs bg-red-600 hover:bg-red-700">
-              Eliminar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Delete confirmation dialog with validation */}
+      <DeleteWithValidationDialog
+        open={deleteValidation.dialogOpen}
+        onOpenChange={(open) => !open && deleteValidation.cancelDelete()}
+        checking={deleteValidation.checking}
+        deleting={deleteValidation.deleting}
+        allowed={deleteValidation.canDeleteResult?.allowed ?? null}
+        blockers={deleteValidation.canDeleteResult?.blockers ?? []}
+        message={deleteValidation.canDeleteResult?.message ?? ''}
+        onConfirm={deleteValidation.confirmDelete}
+        onCancel={deleteValidation.cancelDelete}
+        entityLabel="cotizacion"
+      />
     </div>
   )
 }

@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import type { CotizacionProveedorUpdatePayload } from '@/types'
+import { canDelete } from '@/lib/utils/deleteValidation'
 
 export async function GET(
   req: Request,
@@ -118,6 +119,15 @@ export async function DELETE(
 
   try {
     const { id } = await context.params
+
+    // 🛡️ Validar dependientes antes de eliminar
+    const deleteCheck = await canDelete('cotizacionProveedor', id)
+    if (!deleteCheck.allowed) {
+      return NextResponse.json(
+        { ok: false, error: deleteCheck.message, blockers: deleteCheck.blockers },
+        { status: 409 }
+      )
+    }
 
     await prisma.$transaction(async (tx) => {
       const items = await tx.cotizacionProveedorItem.findMany({

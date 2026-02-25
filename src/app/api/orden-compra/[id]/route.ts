@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { canDelete } from '@/lib/utils/deleteValidation'
 
 const includeRelations = {
   proveedor: true,
@@ -129,14 +130,21 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     }
 
     const { id } = await params
-    const existing = await prisma.ordenCompra.findUnique({ where: { id } })
+
+    // 🛡️ Validar dependientes antes de eliminar
+    const deleteCheck = await canDelete('ordenCompra', id)
+    if (!deleteCheck.allowed) {
+      return NextResponse.json(
+        { error: deleteCheck.message, blockers: deleteCheck.blockers },
+        { status: 409 }
+      )
+    }
+
+    // Verificar permisos: solo el creador o admin puede eliminar
+    const existing = await prisma.ordenCompra.findUnique({ where: { id }, select: { solicitanteId: true } })
     if (!existing) {
       return NextResponse.json({ error: 'Orden de compra no encontrada' }, { status: 404 })
     }
-    if (existing.estado !== 'borrador') {
-      return NextResponse.json({ error: 'Solo se puede eliminar en estado borrador' }, { status: 400 })
-    }
-
     const role = session.user.role
     if (existing.solicitanteId !== session.user.id && role !== 'admin') {
       return NextResponse.json({ error: 'Solo el creador o admin puede eliminar' }, { status: 403 })

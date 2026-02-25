@@ -1,6 +1,9 @@
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import type { CotizacionProveedorUpdatePayload } from '@/types'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { canDelete } from '@/lib/utils/deleteValidation'
 
 // GET → Obtener cotización por ID
 export async function GET(
@@ -74,7 +77,22 @@ export async function DELETE(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
+    // 🔐 Verificar sesión
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
     const { id } = await context.params
+
+    // 🛡️ Validar dependientes antes de eliminar
+    const deleteCheck = await canDelete('cotizacionProveedor', id)
+    if (!deleteCheck.allowed) {
+      return NextResponse.json(
+        { error: deleteCheck.message, blockers: deleteCheck.blockers },
+        { status: 409 }
+      )
+    }
 
     await prisma.$transaction(async (tx) => {
       // Buscar items que se van a eliminar

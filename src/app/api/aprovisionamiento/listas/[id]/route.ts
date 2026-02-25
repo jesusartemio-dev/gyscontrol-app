@@ -8,6 +8,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import logger from '@/lib/logger'
 import { z } from 'zod'
+import { canDelete } from '@/lib/utils/deleteValidation'
 
 // 🔁 Schema para actualización de lista
 const ActualizarListaSchema = z.object({
@@ -340,36 +341,12 @@ export async function DELETE(
       )
     }
 
-    // 📡 Verificar que la lista existe y está en borrador
-    const lista = await prisma.listaEquipo.findUnique({
-      where: { id },
-      select: { 
-        id: true, 
-        estado: true, 
-        codigo: true,
-        pedidoEquipo: { select: { id: true } }
-      }
-    })
-
-    if (!lista) {
+    // 🛡️ Validar dependientes antes de eliminar
+    const deleteCheck = await canDelete('listaEquipo', id)
+    if (!deleteCheck.allowed) {
       return NextResponse.json(
-        { error: 'Lista no encontrada' },
-        { status: 404 }
-      )
-    }
-
-    // 📡 Solo permitir eliminar si está en borrador y no tiene pedidos
-    if (lista.estado !== 'borrador') {
-      return NextResponse.json(
-        { error: 'Solo se pueden eliminar listas en estado borrador' },
-        { status: 403 }
-      )
-    }
-
-    if (lista.pedidoEquipo.length > 0) {
-      return NextResponse.json(
-        { error: 'No se puede eliminar una lista que tiene pedidos asociados' },
-        { status: 403 }
+        { error: deleteCheck.message, blockers: deleteCheck.blockers },
+        { status: 409 }
       )
     }
 
@@ -380,8 +357,7 @@ export async function DELETE(
 
     logger.info('Lista eliminada', {
       userId: session.user.id,
-      listaId: id,
-      codigo: lista.codigo
+      listaId: id
     })
 
     return NextResponse.json({

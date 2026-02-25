@@ -15,6 +15,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { randomUUID } from 'crypto'
 import { validarTransicionPedido, getFechasPorTransicionPedido, type EstadoPedidoEquipo } from '@/lib/utils/flujoPedidoEquipo'
+import { canDelete } from '@/lib/utils/deleteValidation'
 
 // ✅ Obtener pedido por ID
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
@@ -256,6 +257,21 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
 export async function DELETE(_: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
+
+    // 🔐 Verificar sesión
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    // 🛡️ Validar dependientes antes de eliminar
+    const deleteCheck = await canDelete('pedidoEquipo', id)
+    if (!deleteCheck.allowed) {
+      return NextResponse.json(
+        { error: deleteCheck.message, blockers: deleteCheck.blockers },
+        { status: 409 }
+      )
+    }
 
     // ✅ Obtener todos los ítems asociados al pedido
     const items = await prisma.pedidoEquipoItem.findMany({

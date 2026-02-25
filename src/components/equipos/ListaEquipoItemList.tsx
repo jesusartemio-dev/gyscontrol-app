@@ -19,7 +19,7 @@ import { Pencil, Trash2, CheckCircle2, X, Search, Package, Clock, AlertTriangle,
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ListaEquipoItem } from '@/types'
-import { updateListaEquipoItem, deleteListaEquipoItem } from '@/lib/services/listaEquipoItem'
+import { updateListaEquipoItem } from '@/lib/services/listaEquipoItem'
 import { toast } from 'sonner'
 import ModalReemplazarItemDesdeCatalogo from './ModalReemplazarItemDesdeCatalogo'
 import ModalReemplazarReemplazoDesdeCatalogo from './ModalReemplazarReemplazoDesdeCatalogo'
@@ -40,17 +40,8 @@ import { exportarListaEquipoAExcel } from '@/lib/utils/listaEquipoExcel'
 // import MotionRefDebugger from '@/components/debug/MotionRefDebugger'
 // import RenderLoopDetector, { useRenderLoopDetection } from '@/components/debug/RenderLoopDetector'
 // Debug imports removed to fix runtime errors
-import {
-  AlertDialog,
-  AlertDialogTrigger,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogFooter,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogCancel,
-  AlertDialogAction,
-} from '@/components/ui/alert-dialog'
+import { useDeleteWithValidation } from '@/hooks/useDeleteWithValidation'
+import { DeleteWithValidationDialog } from '@/components/DeleteWithValidationDialog'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { CotizacionCodigoSimple } from './CotizacionSelector'
@@ -129,7 +120,16 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
   const [editComentarioValues, setEditComentarioValues] = useState<Record<string, string>>({})
   const [itemReemplazoOriginal, setItemReemplazoOriginal] = useState<ListaEquipoItem | null>(null)
   const [itemReemplazoReemplazo, setItemReemplazoReemplazo] = useState<ListaEquipoItem | null>(null)
-  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+  const deleteValidation = useDeleteWithValidation({
+    entity: 'listaEquipoItem',
+    deleteEndpoint: (id) => `/api/lista-equipo-item/${id}`,
+    onSuccess: () => {
+      toast.success('Item eliminado')
+      onItemsUpdated?.()
+      onDeleted?.()
+    },
+    onError: (msg) => toast.error(msg),
+  })
   const [searchTerm, setSearchTerm] = useState('')
   const [categoriaFiltro, setCategoriaFiltro] = useState('__ALL__')
   const [isLoading, setIsLoading] = useState(false)
@@ -280,22 +280,6 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
       onCreated?.()
     } catch {
       toast.error('Error al actualizar verificado')
-    }
-  }
-
-  const confirmDelete = async () => {
-    if (!deleteTarget) return
-    try {
-      const ok = await deleteListaEquipoItem(deleteTarget)
-      if (ok) {
-        toast.success('🗑️ Ítem eliminado')
-        onItemsUpdated?.()
-        onDeleted?.()
-      }
-    } catch {
-      toast.error('❌ No se pudo eliminar el ítem')
-    } finally {
-      setDeleteTarget(null)
     }
   }
 
@@ -895,7 +879,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                               size="sm"
                               variant="ghost"
                               disabled={!editable}
-                              onClick={() => setDeleteTarget(item.id)}
+                              onClick={() => deleteValidation.requestDelete(item.id)}
                               className="h-7 w-7 p-0 text-gray-400 hover:text-red-500 hover:bg-red-50"
                             >
                               <Trash2 className="h-3 w-3" />
@@ -1146,7 +1130,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                           size="sm"
                           variant="ghost"
                           disabled={!editable}
-                          onClick={() => setDeleteTarget(item.id)}
+                          onClick={() => deleteValidation.requestDelete(item.id)}
                           className="h-6 w-6 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
                         >
                           <Trash2 className="h-3 w-3" />
@@ -1162,20 +1146,18 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
         renderListView()
       )}
 
-      <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar ítem?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta acción no se puede deshacer. El ítem será eliminado permanentemente.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete}>Eliminar</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteWithValidationDialog
+        open={deleteValidation.dialogOpen}
+        onOpenChange={(open) => !open && deleteValidation.cancelDelete()}
+        checking={deleteValidation.checking}
+        deleting={deleteValidation.deleting}
+        allowed={deleteValidation.canDeleteResult?.allowed ?? null}
+        blockers={deleteValidation.canDeleteResult?.blockers ?? []}
+        message={deleteValidation.canDeleteResult?.message ?? ''}
+        onConfirm={deleteValidation.confirmDelete}
+        onCancel={deleteValidation.cancelDelete}
+        entityLabel="item"
+      />
 
       {itemReemplazoOriginal && (
         <ModalReemplazarItemDesdeCatalogo

@@ -10,6 +10,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import logger from '@/lib/logger'
 import { registrarActualizacion } from '@/lib/services/audit'
+import { canDelete } from '@/lib/utils/deleteValidation'
 
 // ✅ GET - Obtener lista de equipos por ID
 export async function GET(
@@ -204,35 +205,12 @@ export async function DELETE(
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    // 🔍 Verificar que la lista existe
-    const listaExistente = await prisma.listaEquipo.findUnique({
-      where: { id },
-      include: {
-        listaEquipoItem: true,
-        pedidoEquipo: true
-      }
-    })
-
-    if (!listaExistente) {
+    // 🛡️ Validar dependientes antes de eliminar
+    const deleteCheck = await canDelete('listaEquipo', id)
+    if (!deleteCheck.allowed) {
       return NextResponse.json(
-        { error: 'Lista de equipos no encontrada' },
-        { status: 404 }
-      )
-    }
-
-    // 🚫 Verificar que no tenga pedidos asociados
-    if (listaExistente.pedidoEquipo && listaExistente.pedidoEquipo.length > 0) {
-      return NextResponse.json(
-        { error: 'No se puede eliminar la lista porque tiene pedidos asociados' },
-        { status: 400 }
-      )
-    }
-
-    // 🚫 Verificar que esté en estado borrador
-    if (listaExistente.estado !== 'borrador') {
-      return NextResponse.json(
-        { error: 'Solo se pueden eliminar listas en estado borrador' },
-        { status: 400 }
+        { error: deleteCheck.message, blockers: deleteCheck.blockers },
+        { status: 409 }
       )
     }
 
@@ -243,8 +221,7 @@ export async function DELETE(
 
     logger.info(`Lista de equipos eliminada: ${id}`, {
       userId: session.user.id,
-      listaId: id,
-      itemsCount: listaExistente.listaEquipoItem?.length || 0
+      listaId: id
     })
 
     return NextResponse.json(

@@ -9,6 +9,7 @@ import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import type { ListaEquipoItemUpdatePayload } from '@/types/payloads'
+import { canDelete } from '@/lib/utils/deleteValidation'
 
 // ✅ Obtener ítem por ID
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
@@ -217,7 +218,22 @@ export async function PATCH(
 // ✅ Eliminar ítem y revertir estado del ProyectoEquipoItem si aplica
 export async function DELETE(_: Request, context: { params: Promise<{ id: string }> }) {
   try {
+    // 🔐 Verificar sesión
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
     const { id } = await context.params
+
+    // 🛡️ Validar dependientes antes de eliminar
+    const deleteCheck = await canDelete('listaEquipoItem', id)
+    if (!deleteCheck.allowed) {
+      return NextResponse.json(
+        { error: deleteCheck.message, blockers: deleteCheck.blockers },
+        { status: 409 }
+      )
+    }
 
     const item = await prisma.listaEquipoItem.findUnique({
       where: { id },

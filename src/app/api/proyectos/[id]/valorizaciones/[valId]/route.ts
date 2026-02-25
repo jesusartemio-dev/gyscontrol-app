@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { calcularAdelantoValorizacion } from '@/lib/utils/adelantoUtils'
+import { canDelete } from '@/lib/utils/deleteValidation'
 
 const ROLES_ALLOWED = ['admin', 'gerente', 'gestor', 'coordinador', 'administracion']
 
@@ -316,38 +317,20 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
 
     const { valId } = await params
 
-    const existing = await prisma.valorizacion.findUnique({
-      where: { id: valId },
-      include: { cuentasPorCobrar: { select: { id: true, estado: true, montoPagado: true } } },
+    // 🛡️ Validar dependientes antes de eliminar
+    const deleteCheck = await canDelete('valorizacion', valId)
+    if (!deleteCheck.allowed) {
+      return NextResponse.json(
+        { error: deleteCheck.message, blockers: deleteCheck.blockers },
+        { status: 409 }
+      )
+    }
+
+    // Desvincular CxC (nullificar FK) antes de eliminar
+    await prisma.cuentaPorCobrar.updateMany({
+      where: { valorizacionId: valId },
+      data: { valorizacionId: null },
     })
-    if (!existing) {
-      return NextResponse.json({ error: 'Valorización no encontrada' }, { status: 404 })
-    }
-
-    // Solo se puede eliminar en borrador o anulada
-    if (!['borrador', 'anulada'].includes(existing.estado)) {
-      return NextResponse.json(
-        { error: `No se puede eliminar una valorización en estado "${existing.estado}". Solo se puede eliminar en borrador o anulada.` },
-        { status: 400 }
-      )
-    }
-
-    // Verificar si hay CxC activas con pagos (no anuladas)
-    const cxcActivasConPagos = existing.cuentasPorCobrar.filter(c => c.montoPagado > 0 && c.estado !== 'anulada')
-    if (cxcActivasConPagos.length > 0) {
-      return NextResponse.json(
-        { error: 'No se puede eliminar: tiene cuentas por cobrar activas con pagos registrados. Anúlelas primero.' },
-        { status: 400 }
-      )
-    }
-
-    // Desvincular CxC (nullificar FK)
-    if (existing.cuentasPorCobrar.length > 0) {
-      await prisma.cuentaPorCobrar.updateMany({
-        where: { valorizacionId: valId },
-        data: { valorizacionId: null },
-      })
-    }
 
     // Eliminar valorización (partidas y adjuntos se eliminan por cascade)
     await prisma.valorizacion.delete({ where: { id: valId } })
