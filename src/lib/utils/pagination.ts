@@ -122,25 +122,28 @@ export function buildSearchFilter(
   searchFields: string[]
 ): Record<string, any> | undefined {
   if (!search.trim()) return undefined;
-  
+
   const searchTerm = search.trim();
-  
+
+  // Convierte "cliente.nombre" → { cliente: { nombre: { contains, mode } } }
+  const buildNestedFilter = (field: string) => {
+    const parts = field.split('.');
+    if (parts.length === 1) {
+      return { [field]: { contains: searchTerm, mode: 'insensitive' } };
+    }
+    let result: any = { contains: searchTerm, mode: 'insensitive' };
+    for (let i = parts.length - 1; i >= 0; i--) {
+      result = { [parts[i]]: result };
+    }
+    return result;
+  };
+
   if (searchFields.length === 1) {
-    return {
-      [searchFields[0]]: {
-        contains: searchTerm,
-        mode: 'insensitive'
-      }
-    };
+    return buildNestedFilter(searchFields[0]);
   }
-  
+
   return {
-    OR: searchFields.map(field => ({
-      [field]: {
-        contains: searchTerm,
-        mode: 'insensitive'
-      }
-    }))
+    OR: searchFields.map(field => buildNestedFilter(field))
   };
 }
 
