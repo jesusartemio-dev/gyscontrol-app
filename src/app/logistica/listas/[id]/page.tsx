@@ -37,6 +37,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import LogisticaListaDetalleItemTableProfessional from '@/components/logistica/LogisticaListaDetalleItemTableProfessional'
 import ModalCrearCotizacionDesdeLista from '@/components/logistica/ModalCrearCotizacionDesdeLista'
+import ListaTimeline from '@/components/logistica/ListaTimeline'
 import type { ListaEquipo } from '@/types'
 
 export default function LogisticaListaDetallePage() {
@@ -317,6 +318,17 @@ export default function LogisticaListaDetallePage() {
             </div>
           </div>
         )}
+
+        {/* Timeline de trazabilidad */}
+        <div className="bg-white rounded-lg border">
+          <div className="px-4 py-3 border-b bg-gray-50/50 flex items-center gap-2">
+            <FileText className="h-4 w-4 text-blue-600" />
+            <span className="text-sm font-medium">Timeline</span>
+          </div>
+          <div className="p-4">
+            <ListaTimeline listaId={id} />
+          </div>
+        </div>
 
         {/* Órdenes de Compra vinculadas */}
         {ordenesCompraFromItems.length > 0 && (

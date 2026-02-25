@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { crearNotificacion } from '@/lib/utils/notificaciones'
 
 async function generarNumeroOC(): Promise<string> {
   const now = new Date()
@@ -46,7 +47,7 @@ export async function POST(req: Request) {
     const pedido = await prisma.pedidoEquipo.findUnique({
       where: { id: pedidoId },
       include: {
-        proyecto: { select: { id: true, codigo: true, nombre: true } },
+        proyecto: { select: { id: true, codigo: true, nombre: true, gestorId: true } },
         pedidoEquipoItem: {
           include: {
             ordenCompraItems: { select: { id: true } },
@@ -197,6 +198,22 @@ export async function POST(req: Request) {
 
       return ocs
     })
+
+    // Notificar al gestor del proyecto (fire-and-forget)
+    if (pedido.proyecto?.gestorId) {
+      const ocsResumen = ordenesCreadas.map((oc: any) => oc.numero).join(', ')
+      crearNotificacion(prisma, {
+        usuarioId: pedido.proyecto.gestorId,
+        titulo: `OC generada para ${pedido.codigo}`,
+        mensaje: `Se generaron ${ordenesCreadas.length} OC(s) (${ocsResumen}) con ${items.length} items`,
+        tipo: 'success',
+        prioridad: 'media',
+        entidadTipo: 'PedidoEquipo',
+        entidadId: pedido.id,
+        accionUrl: `/logistica/pedidos/${pedido.id}`,
+        accionTexto: 'Ver pedido',
+      })
+    }
 
     return NextResponse.json({
       ordenesCreadas,

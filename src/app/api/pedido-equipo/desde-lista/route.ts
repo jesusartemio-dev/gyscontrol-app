@@ -12,12 +12,14 @@ import { prisma } from '@/lib/prisma'
 import logger from '@/lib/logger'
 import { PedidoEquipoPayload } from '@/types'
 import { randomUUID } from 'crypto'
+import { notificarPorRol } from '@/lib/utils/notificaciones'
+import { crearEvento } from '@/lib/utils/trazabilidad'
 
-// ✅ POST - Crear pedido desde lista contextual
+// POST - Crear pedido desde lista contextual
 export async function POST(request: NextRequest) {
   try {
     const payload: PedidoEquipoPayload = await request.json()
-    logger.info('📡 Creando pedido desde lista contextual:', payload)
+    logger.info('Creando pedido desde lista contextual:', payload)
 
     // 🔍 Validar datos requeridos
     if (!payload.proyectoId || !payload.responsableId || !payload.listaId) {
@@ -228,8 +230,37 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    logger.info(`✅ Pedido creado desde lista: ${resultado.pedido.id} con ${resultado.items.length} items`)
-    
+    logger.info(`Pedido creado desde lista: ${resultado.pedido.id} con ${resultado.items.length} items`)
+
+    // Notificar a logísticos (fire-and-forget)
+    notificarPorRol(prisma, ['logistico', 'admin'], {
+      titulo: `Nuevo pedido creado: ${codigoGenerado}`,
+      mensaje: `Pedido con ${resultado.items.length} items desde proyecto ${proyecto.codigo}${payload.esUrgente ? ' (URGENTE)' : ''}`,
+      tipo: payload.esUrgente ? 'warning' : 'info',
+      prioridad: payload.esUrgente ? 'alta' : 'media',
+      entidadTipo: 'PedidoEquipo',
+      entidadId: resultado.pedido.id,
+      accionUrl: `/logistica/pedidos/${resultado.pedido.id}`,
+      accionTexto: 'Ver pedido',
+    })
+
+    // Evento de trazabilidad (fire-and-forget)
+    crearEvento(prisma, {
+      listaEquipoId: payload.listaId,
+      proyectoId: payload.proyectoId,
+      pedidoEquipoId: resultado.pedido.id,
+      tipo: 'pedido_creado',
+      descripcion: `Pedido ${codigoGenerado} creado con ${resultado.items.length} items desde lista`,
+      usuarioId: payload.responsableId,
+      metadata: {
+        pedidoCodigo: codigoGenerado,
+        proyectoCodigo: proyecto.codigo,
+        totalItems: resultado.items.length,
+        costoTotal,
+        esUrgente: payload.esUrgente || false,
+      },
+    })
+
     // Budget validation warning - calculate lista budget from items
     let _advertenciaPresupuesto: string | null = null
     const listaPresupuesto = lista.listaEquipoItem.reduce((sum, item) => {

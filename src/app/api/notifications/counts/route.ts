@@ -23,41 +23,31 @@ export async function GET() {
     const [
       cotizacionesPendientes,
       proyectosActivos,
-      pedidosPendientes
+      pedidosPendientes,
+      listasPorCotizar
     ] = await Promise.all([
-      // Cotizaciones que requieren atención (borrador o enviada)
       prisma.cotizacion.count({
-        where: {
-          estado: {
-            in: ['borrador', 'enviada']
-          }
-        }
+        where: { estado: { in: ['borrador', 'enviada'] } }
       }),
-
-      // Proyectos activos (excluyendo cerrado, pausado, cancelado)
       prisma.proyecto.count({
         where: {
-          estado: {
-            in: ['creado', 'en_planificacion', 'listas_pendientes', 'listas_aprobadas', 'pedidos_creados', 'en_ejecucion', 'en_cierre']
-          },
+          estado: { in: ['creado', 'en_planificacion', 'listas_pendientes', 'listas_aprobadas', 'pedidos_creados', 'en_ejecucion', 'en_cierre'] },
           deletedAt: null
         }
       }),
-
-      // Pedidos que requieren gestión (borrador o enviado)
       prisma.pedidoEquipo.count({
-        where: {
-          estado: {
-            in: ['borrador', 'enviado']
-          }
-        }
+        where: { estado: { in: ['borrador', 'enviado'] } }
+      }),
+      prisma.listaEquipo.count({
+        where: { estado: { in: ['por_revisar', 'por_cotizar'] } }
       })
     ])
 
     return NextResponse.json({
       'cotizaciones-pendientes': cotizacionesPendientes,
       'proyectos-activos': proyectosActivos,
-      'pedidos-pendientes': pedidosPendientes
+      'pedidos-pendientes': pedidosPendientes,
+      'listas-por-cotizar': listasPorCotizar
     })
 
   } catch (error) {

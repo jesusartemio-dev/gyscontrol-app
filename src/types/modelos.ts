@@ -35,6 +35,8 @@ export type NotificationBadgeType =
   | 'cotizaciones-pendientes'
   | 'proyectos-activos'
   | 'pedidos-pendientes'
+  | 'listas-por-cotizar'
+  | 'notificaciones-no-leidas'
   
 
 // ✅ Tipo para enlaces del sidebar con notificaciones

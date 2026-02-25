@@ -34,6 +34,8 @@ const DEFAULT_COUNTS: NotificationCounts = {
   'cotizaciones-pendientes': 0,
   'proyectos-activos': 0,
   'pedidos-pendientes': 0,
+  'listas-por-cotizar': 0,
+  'notificaciones-no-leidas': 0,
 }
 
 const DEFAULT_PREFERENCES: UserPreferences = {
@@ -122,20 +124,25 @@ export function useNotifications(): UseNotificationsReturn {
       setLoading(true)
       setError(null)
 
-      // Llamar a la API de notificaciones
-      const response = await fetch('/api/notifications/counts')
+      // Llamar ambas APIs en paralelo
+      const [response, conteoRes] = await Promise.all([
+        fetch('/api/notifications/counts'),
+        fetch('/api/notificaciones/conteo'),
+      ])
 
       if (!response.ok) {
         throw new Error('Error al obtener notificaciones')
       }
 
       const data = await response.json()
+      const conteoData = conteoRes.ok ? await conteoRes.json() : { noLeidas: 0 }
 
-      // Actualizar contadores con datos reales de la API
       const newCounts: NotificationCounts = {
         'cotizaciones-pendientes': data['cotizaciones-pendientes'] || 0,
         'proyectos-activos': data['proyectos-activos'] || 0,
         'pedidos-pendientes': data['pedidos-pendientes'] || 0,
+        'listas-por-cotizar': data['listas-por-cotizar'] || 0,
+        'notificaciones-no-leidas': conteoData.noLeidas || 0,
       }
 
       setCounts(newCounts)

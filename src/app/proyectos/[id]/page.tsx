@@ -401,9 +401,9 @@ export default function ProyectoHubPage() {
                     {card.title}
                   </span>
                   {card.badge && (
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5">
+                    <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">
                       {card.badge}
-                    </Badge>
+                    </span>
                   )}
                   {card.total !== undefined && card.total > 0 && (
                     <span className="text-xs font-semibold text-gray-600">

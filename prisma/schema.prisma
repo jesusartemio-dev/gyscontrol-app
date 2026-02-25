@@ -586,6 +586,7 @@ model EventoTrazabilidad {
   entregaItemId  String?
   proyectoId     String?
   pedidoEquipoId String?
+  listaEquipoId  String?
   tipo           String
   descripcion    String
   estadoAnterior EstadoEntregaItem?
@@ -598,12 +599,14 @@ model EventoTrazabilidad {
   entregaItem    EntregaItem?       @relation(fields: [entregaItemId], references: [id])
   proyecto       Proyecto?          @relation(fields: [proyectoId], references: [id])
   pedidoEquipo   PedidoEquipo?      @relation(fields: [pedidoEquipoId], references: [id])
+  listaEquipo    ListaEquipo?       @relation(fields: [listaEquipoId], references: [id])
   user           User               @relation(fields: [usuarioId], references: [id])
 
   @@index([entregaItemId])
   @@index([fechaEvento])
   @@index([proyectoId])
   @@index([pedidoEquipoId])
+  @@index([listaEquipoId])
   @@index([tipo, fechaEvento])
   @@map("evento_trazabilidad")
 }
@@ -633,6 +636,7 @@ model ListaEquipo {
   pedidoEquipo               PedidoEquipo[]
   pedidoEquipoItem           PedidoEquipoItem[]
   proyectoEquipoCotizadoItem ProyectoEquipoCotizadoItem[]
+  eventosTrazabilidad        EventoTrazabilidad[]
 
   @@index([estado, fechaNecesaria, createdAt(sort: Desc)], map: "idx_lista_estado_necesaria_fecha")
   @@index([proyectoId, estado, createdAt(sort: Desc)], map: "idx_lista_proyecto_estado_fecha")

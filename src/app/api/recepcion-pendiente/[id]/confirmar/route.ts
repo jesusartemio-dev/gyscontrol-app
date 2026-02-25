@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { crearNotificacion } from '@/lib/utils/notificaciones'
 
 export async function POST(
   req: Request,
@@ -33,7 +34,7 @@ export async function POST(
         pedidoEquipoItem: {
           include: {
             pedidoEquipo: {
-              select: { id: true, codigo: true, proyectoId: true, proyecto: { select: { nombre: true } } }
+              select: { id: true, codigo: true, proyectoId: true, proyecto: { select: { nombre: true, gestorId: true } } }
             }
           }
         },
@@ -111,6 +112,21 @@ export async function POST(
           nuevoEstado: 'en_almacen',
         }
       })
+
+      // Notificar al gestor: material llegó a almacén
+      if (pedido.proyecto?.gestorId) {
+        crearNotificacion(prisma, {
+          usuarioId: pedido.proyecto.gestorId,
+          titulo: 'Material recibido en almacén',
+          mensaje: `${recepcion.cantidadRecibida} x ${pedidoItem.codigo} (OC ${ocNumero}) para ${pedido.proyecto?.nombre || pedido.codigo}`,
+          tipo: 'info',
+          prioridad: 'media',
+          entidadTipo: 'PedidoEquipo',
+          entidadId: pedido.id,
+          accionUrl: '/logistica/recepciones',
+          accionTexto: 'Ver recepciones',
+        })
+      }
 
       return NextResponse.json(result)
     }
@@ -259,6 +275,21 @@ export async function POST(
         nuevoEstadoPedido,
       }
     })
+
+    // Notificar al gestor: material entregado a proyecto
+    if (pedido.proyecto?.gestorId) {
+      crearNotificacion(prisma, {
+        usuarioId: pedido.proyecto.gestorId,
+        titulo: 'Material entregado a proyecto',
+        mensaje: `${recepcion.cantidadRecibida} x ${pedidoItem.codigo} (OC ${ocNumero}) entregado a ${pedido.proyecto?.nombre || pedido.codigo}`,
+        tipo: 'success',
+        prioridad: 'media',
+        entidadTipo: 'PedidoEquipo',
+        entidadId: pedido.id,
+        accionUrl: `/proyectos/${proyectoId}`,
+        accionTexto: 'Ver proyecto',
+      })
+    }
 
     return NextResponse.json(result)
   } catch (error) {

@@ -60,6 +60,7 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Button } from '@/components/ui/button'
 import LogoutButton from './LogoutButton'
+import NotificacionesBell from './NotificacionesBell'
 import { useNotifications } from '@/lib/hooks/useNotifications'
 import type { RolUsuario, SidebarSection, NotificationBadgeType } from '@/types/modelos'
 
@@ -235,7 +236,7 @@ export default function Sidebar() {
       color: 'text-orange-400',
       roles: ['admin', 'gerente', 'logistico'],
       links: [
-        { href: '/logistica/listas', label: 'Listas Técnicas', icon: FileText },
+        { href: '/logistica/listas', label: 'Listas Técnicas', icon: FileText, badge: 'listas-por-cotizar' as NotificationBadgeType },
         { href: '/logistica/pedidos', label: 'Gestión de Pedidos', icon: Package, badge: 'pedidos-pendientes' as NotificationBadgeType },
         { href: '/logistica/ordenes-compra', label: 'Órdenes de Compra', icon: FileText },
         { href: '/logistica/proveedores', label: 'Proveedores', icon: Building2 },
@@ -820,16 +821,16 @@ export default function Sidebar() {
       >
         {session?.user && (
           <div className="space-y-3">
-            {!collapsed && (
-              <div className="flex items-center justify-between text-xs text-gray-400">
-                <span>Sistema activo</span>
-                <div className="flex items-center gap-1">
+            <div className="flex items-center justify-between">
+              {!collapsed && (
+                <div className="flex items-center gap-1 text-xs text-gray-400">
                   <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
                   <span>Online</span>
                 </div>
-              </div>
-            )}
-            
+              )}
+              <NotificacionesBell collapsed={collapsed} />
+            </div>
+
             <LogoutButton 
               showIcon={!collapsed}
               className={clsx(
