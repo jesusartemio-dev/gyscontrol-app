@@ -300,6 +300,8 @@ export default function Sidebar() {
         { href: '/gestion/reportes/rentabilidad', label: 'Rentabilidad', icon: TrendingUp },
         { href: '/gestion/reportes/pedidos', label: 'Pedidos', icon: Package },
         { href: '/gestion/reportes/curva-s', label: 'Curva S', icon: TrendingUp },
+        { href: '/gestion/reportes/aging-cxc', label: 'Aging CxC', icon: Clock },
+        { href: '/gestion/reportes/margen-real', label: 'Margen Real', icon: BarChart3 },
       ],
     },
     // 6. Configuración - Administración del sistema y catálogos (solo admin y gerente)

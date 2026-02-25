@@ -13,6 +13,7 @@ import {
   PieChart,
   TrendingUp,
   ArrowRight,
+  Clock,
 } from 'lucide-react'
 
 export const metadata: Metadata = {
@@ -48,6 +49,22 @@ const reportes = [
     roles: ['admin', 'gerente', 'gestor', 'coordinador'],
   },
   {
+    titulo: 'Aging de CxC',
+    descripcion: 'Tabla de antigüedad de cuentas por cobrar. Saldos pendientes agrupados por cliente y tramos de vencimiento: vigente, 1-30, 31-60, 61-90 y +90 días.',
+    icono: Clock,
+    href: '/gestion/reportes/aging-cxc',
+    color: 'bg-red-100 text-red-600',
+    roles: ['admin', 'gerente', 'administracion'],
+  },
+  {
+    titulo: 'Margen Real',
+    descripcion: 'Dashboard de rentabilidad real por proyecto. Cruza ingresos valorizados vs costos reales (equipos, servicios HH y gastos operativos).',
+    icono: BarChart3,
+    href: '/gestion/reportes/margen-real',
+    color: 'bg-emerald-100 text-emerald-600',
+    roles: ['admin', 'gerente'],
+  },
+  {
     titulo: 'KPIs de Gestión',
     descripcion: '12 indicadores clave organizados en 4 cuadrantes: Comercial, Proyectos, Logística y Financiero.',
     icono: PieChart,
@@ -62,7 +79,7 @@ export default async function ReportesPage() {
   if (!session) notFound()
 
   const userRole = (session.user?.role as string) || ''
-  const allowedRoles = ['admin', 'gerente', 'gestor', 'comercial', 'proyectos', 'logistica', 'logistico', 'coordinador']
+  const allowedRoles = ['admin', 'gerente', 'gestor', 'comercial', 'proyectos', 'logistica', 'logistico', 'coordinador', 'administracion']
   if (!allowedRoles.includes(userRole)) notFound()
 
   const reportesVisibles = reportes.filter(r => r.roles.includes(userRole))
