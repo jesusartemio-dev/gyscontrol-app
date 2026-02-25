@@ -1,16 +1,41 @@
 import type { Cotizacion } from '@/types'
+import type { PaginationMeta } from '@/types/payloads'
 import { buildApiUrl } from '@/lib/utils'
 
-// Obtener todas las cotizaciones
-export async function getCotizaciones(): Promise<Cotizacion[]> {
+// Parámetros para consulta paginada de cotizaciones
+export interface CotizacionesParams {
+  page?: number
+  limit?: number
+  search?: string
+  estado?: string
+  anio?: string
+}
+
+// Resultado paginado de cotizaciones
+export interface CotizacionesPaginatedResult {
+  data: Cotizacion[]
+  pagination: PaginationMeta
+}
+
+// Obtener cotizaciones con paginación server-side
+export async function getCotizacionesPaginated(
+  params: CotizacionesParams = {}
+): Promise<CotizacionesPaginatedResult> {
   try {
-    const res = await fetch(buildApiUrl('/api/cotizacion'), {
+    const query = new URLSearchParams()
+    if (params.page) query.set('page', params.page.toString())
+    if (params.limit) query.set('limit', params.limit.toString())
+    if (params.search) query.set('search', params.search)
+    if (params.estado && params.estado !== 'all') query.set('estado', params.estado)
+    if (params.anio && params.anio !== 'todos') query.set('anio', params.anio)
+
+    const url = `${buildApiUrl('/api/cotizacion')}?${query.toString()}`
+    const res = await fetch(url, {
       cache: 'no-store',
-      credentials: 'include' // ✅ Incluir cookies de sesión
+      credentials: 'include'
     })
 
     if (res.status === 401) {
-      // Redirigir al login si no está autorizado
       if (typeof window !== 'undefined') {
         window.location.href = '/login'
       }
@@ -19,7 +44,42 @@ export async function getCotizaciones(): Promise<Cotizacion[]> {
 
     if (!res.ok) throw new Error('Error al obtener cotizaciones')
     const result = await res.json()
-    // ✅ La API devuelve un objeto paginado, extraemos solo los datos
+
+    // Mapear campos de paginación: API usa hasNext/hasPrev → PaginationMeta usa hasNextPage/hasPrevPage
+    const apiPagination = result.pagination || {}
+    const pagination: PaginationMeta = {
+      page: apiPagination.page || 1,
+      limit: apiPagination.limit || 20,
+      total: apiPagination.total || 0,
+      totalPages: apiPagination.totalPages || 1,
+      hasNextPage: apiPagination.hasNext ?? false,
+      hasPrevPage: apiPagination.hasPrev ?? false,
+    }
+
+    return { data: result.data || [], pagination }
+  } catch (error) {
+    console.error('❌ getCotizacionesPaginated error:', error)
+    throw error
+  }
+}
+
+// Obtener todas las cotizaciones (legacy, sin paginación explícita)
+export async function getCotizaciones(): Promise<Cotizacion[]> {
+  try {
+    const res = await fetch(buildApiUrl('/api/cotizacion'), {
+      cache: 'no-store',
+      credentials: 'include'
+    })
+
+    if (res.status === 401) {
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login'
+      }
+      throw new Error('No autorizado')
+    }
+
+    if (!res.ok) throw new Error('Error al obtener cotizaciones')
+    const result = await res.json()
     return result.data || result
   } catch (error) {
     console.error('❌ getCotizaciones error:', error)

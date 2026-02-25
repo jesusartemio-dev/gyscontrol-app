@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Eye,
@@ -31,40 +31,51 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DeleteAlertDialog } from '@/components/ui/DeleteAlertDialog'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useToast } from '@/hooks/use-toast'
+import { DataPagination } from '@/components/ui/data-pagination'
 import CotizacionEditModal from './CotizacionEditModal'
 import type { Cotizacion } from '@/types'
+import type { PaginationMeta } from '@/types/payloads'
 
 interface Props {
   cotizaciones: Cotizacion[]
   onDelete: (id: string) => void
   onUpdated: (actualizado: Cotizacion) => void
   loading?: boolean
+  // Filtros server-side (controlados por el padre)
+  search?: string
+  onSearchChange?: (value: string) => void
+  statusFilter?: string
+  onStatusFilterChange?: (value: string) => void
+  yearFilter?: string
+  onYearFilterChange?: (value: string) => void
+  // Paginación server-side
+  paginationMeta?: PaginationMeta
+  onPageChange?: (page: number) => void
+  onLimitChange?: (limit: number) => void
 }
 
-// ✅ Utility function for status badge variants
+// Status badge variants
 const getStatusVariant = (estado: string): "default" | "secondary" | "destructive" | "outline" => {
   switch (estado?.toLowerCase()) {
     case 'aprobado':
-    case 'activo': 
+    case 'activo':
       return 'default'
     case 'completado':
-    case 'finalizado': 
+    case 'finalizado':
       return 'secondary'
     case 'pausado':
-    case 'pendiente': 
+    case 'pendiente':
       return 'outline'
     case 'cancelado':
-    case 'rechazado': 
+    case 'rechazado':
       return 'destructive'
-    default: 
+    default:
       return 'outline'
   }
 }
 
-// ✅ Currency formatter - converts USD to display currency using tipoCambio
 import { formatDisplayCurrency } from '@/lib/utils/currency'
 
-// ✅ Date formatter
 const formatDate = (dateString: string): string => {
   return new Date(dateString).toLocaleDateString('es-ES', {
     year: 'numeric',
@@ -73,7 +84,6 @@ const formatDate = (dateString: string): string => {
   })
 }
 
-// 🔁 Skeleton loader component
 const CotizacionSkeleton = () => (
   <Card className="mb-4">
     <CardHeader className="pb-3">
@@ -100,7 +110,6 @@ const CotizacionSkeleton = () => (
   </Card>
 )
 
-// 🎨 Empty state component
 const EmptyState = () => (
   <motion.div
     initial={{ opacity: 0, y: 20 }}
@@ -111,38 +120,49 @@ const EmptyState = () => (
       <FileText className="h-12 w-12 text-muted-foreground" />
     </div>
     <h3 className="text-lg font-semibold text-foreground mb-2">
-      No hay cotizaciones disponibles
+      No se encontraron cotizaciones
     </h3>
     <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
-      Comienza creando tu primera cotización para gestionar tus proyectos comerciales.
+      Intenta ajustar los filtros de búsqueda.
     </p>
-    <Button asChild>
-      <Link href="/comercial/cotizaciones/nueva">
-        <Package className="h-4 w-4 mr-2" />
-        Crear Primera Cotización
-      </Link>
-    </Button>
   </motion.div>
 )
 
 type ViewMode = 'table' | 'cards'
 
-export default function CotizacionList({ cotizaciones, onDelete, onUpdated, loading = false }: Props) {
+// Estados disponibles para filtro
+const ESTADOS_OPTIONS = ['borrador', 'enviada', 'aprobada', 'rechazada', 'cancelada']
+
+// Años disponibles para filtro
+const currentYear = new Date().getFullYear()
+const YEAR_OPTIONS = Array.from({ length: 5 }, (_, i) => (currentYear - i).toString())
+
+export default function CotizacionList({
+  cotizaciones,
+  onDelete,
+  onUpdated,
+  loading = false,
+  search = '',
+  onSearchChange,
+  statusFilter = 'all',
+  onStatusFilterChange,
+  yearFilter = new Date().getFullYear().toString(),
+  onYearFilterChange,
+  paginationMeta,
+  onPageChange,
+  onLimitChange,
+}: Props) {
   const [error, setError] = useState<string | null>(null)
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('table')
-  const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [yearFilter, setYearFilter] = useState<string>(new Date().getFullYear().toString())
   const [editingCotizacion, setEditingCotizacion] = useState<Cotizacion | null>(null)
   const { toast } = useToast()
 
-  // 📡 Handle edit with improved UX feedback
   const handleEdit = async (id: string, field: string, value: string) => {
     if (!value.trim()) return
     setError(null)
     setLoadingId(id)
-    
+
     try {
       const actualizado = await updateCotizacion(id, { [field]: value })
       onUpdated(actualizado)
@@ -164,7 +184,6 @@ export default function CotizacionList({ cotizaciones, onDelete, onUpdated, load
     }
   }
 
-  // 📡 Handle delete with improved UX feedback
   const handleDelete = async (id: string) => {
     setError(null)
     setLoadingId(id)
@@ -189,50 +208,12 @@ export default function CotizacionList({ cotizaciones, onDelete, onUpdated, load
     }
   }
 
-  // Get unique statuses for filter
-  const statuses = useMemo(() => {
-    const uniqueStatuses = [...new Set(cotizaciones.map(c => c.estado).filter(Boolean))]
-    return uniqueStatuses.sort()
-  }, [cotizaciones])
-
-  // Get available years from cotizaciones
-  const availableYears = useMemo(() => {
-    const years = cotizaciones
-      .map(c => {
-        const dateStr = c.fecha || c.createdAt
-        return dateStr ? new Date(dateStr).getFullYear() : null
-      })
-      .filter((y): y is number => y !== null)
-    return [...new Set(years)].sort((a, b) => b - a)
-  }, [cotizaciones])
-
-  // Filter cotizaciones based on search and filters
-  const filteredCotizaciones = useMemo(() => {
-    return cotizaciones.filter(cotizacion => {
-      const matchesSearch =
-        cotizacion.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        cotizacion.codigo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        cotizacion.cliente?.nombre?.toLowerCase().includes(searchTerm.toLowerCase())
-
-      const matchesStatus = statusFilter === 'all' || cotizacion.estado === statusFilter
-
-      const matchesYear = yearFilter === 'todos' || (() => {
-        const dateStr = cotizacion.fecha || cotizacion.createdAt
-        if (!dateStr) return true
-        return new Date(dateStr).getFullYear().toString() === yearFilter
-      })()
-
-      return matchesSearch && matchesStatus && matchesYear
-    })
-  }, [cotizaciones, searchTerm, statusFilter, yearFilter])
-
   const clearFilters = () => {
-    setSearchTerm('')
-    setStatusFilter('all')
-    setYearFilter(new Date().getFullYear().toString())
+    onSearchChange?.('')
+    onStatusFilterChange?.('all')
+    onYearFilterChange?.(new Date().getFullYear().toString())
   }
 
-  // 🔁 Loading state
   if (loading) {
     return (
       <div className="space-y-4">
@@ -241,11 +222,6 @@ export default function CotizacionList({ cotizaciones, onDelete, onUpdated, load
         ))}
       </div>
     )
-  }
-
-  // 🎨 Empty state
-  if (!cotizaciones || cotizaciones.length === 0) {
-    return <EmptyState />
   }
 
   return (
@@ -261,8 +237,8 @@ export default function CotizacionList({ cotizaciones, onDelete, onUpdated, load
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
                   placeholder="Buscar por nombre, código o cliente..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  value={search}
+                  onChange={(e) => onSearchChange?.(e.target.value)}
                   className="pl-10"
                 />
               </div>
@@ -270,26 +246,26 @@ export default function CotizacionList({ cotizaciones, onDelete, onUpdated, load
 
             {/* Filters */}
             <div className="flex flex-wrap gap-2">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Select value={statusFilter} onValueChange={(v) => onStatusFilterChange?.(v)}>
                 <SelectTrigger className="w-40">
                   <SelectValue placeholder="Estado" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos los estados</SelectItem>
-                  {statuses.map(status => (
+                  {ESTADOS_OPTIONS.map(status => (
                     <SelectItem key={status} value={status}>{status}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
 
-              <Select value={yearFilter} onValueChange={setYearFilter}>
+              <Select value={yearFilter} onValueChange={(v) => onYearFilterChange?.(v)}>
                 <SelectTrigger className="w-28">
-                  <SelectValue placeholder="Ano" />
+                  <SelectValue placeholder="Año" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos</SelectItem>
-                  {availableYears.map(year => (
-                    <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                  {YEAR_OPTIONS.map(year => (
+                    <SelectItem key={year} value={year}>{year}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -325,12 +301,18 @@ export default function CotizacionList({ cotizaciones, onDelete, onUpdated, load
 
           {/* Results count */}
           <div className="mt-4 text-sm text-muted-foreground">
-            Mostrando {filteredCotizaciones.length} de {cotizaciones.length} cotizaciones
+            {paginationMeta ? (
+              <>
+                Mostrando {((paginationMeta.page - 1) * paginationMeta.limit) + 1}-{Math.min(paginationMeta.page * paginationMeta.limit, paginationMeta.total)} de {paginationMeta.total} cotizaciones
+              </>
+            ) : (
+              <>Mostrando {cotizaciones.length} cotizaciones</>
+            )}
           </div>
         </CardContent>
       </Card>
 
-      {/* 🚨 Error Alert */}
+      {/* Error Alert */}
       <AnimatePresence>
         {error && (
           <motion.div
@@ -346,8 +328,10 @@ export default function CotizacionList({ cotizaciones, onDelete, onUpdated, load
         )}
       </AnimatePresence>
 
-      {/* Content based on view mode */}
-      {viewMode === 'table' ? (
+      {/* Empty state when no results */}
+      {cotizaciones.length === 0 ? (
+        <EmptyState />
+      ) : viewMode === 'table' ? (
         <div className="bg-white border rounded-lg overflow-x-auto">
           <table className="w-full table-fixed min-w-[950px]">
             <thead className="bg-gray-50 border-b">
@@ -365,7 +349,7 @@ export default function CotizacionList({ cotizaciones, onDelete, onUpdated, load
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredCotizaciones.map((cotizacion) => {
+              {cotizaciones.map((cotizacion) => {
                 const margen = cotizacion.totalCliente - cotizacion.totalInterno
                 const margenPct = cotizacion.totalCliente > 0
                   ? ((margen / cotizacion.totalCliente) * 100).toFixed(1)
@@ -508,7 +492,7 @@ export default function CotizacionList({ cotizaciones, onDelete, onUpdated, load
           </table>
         </div>
       ) : (
-        /* Cards View - Original implementation */
+        /* Cards View */
         <motion.div
           className="grid gap-4"
           initial={{ opacity: 0 }}
@@ -516,7 +500,7 @@ export default function CotizacionList({ cotizaciones, onDelete, onUpdated, load
           transition={{ duration: 0.3 }}
         >
           <AnimatePresence>
-            {filteredCotizaciones.map((cotizacion, index) => (
+            {cotizaciones.map((cotizacion, index) => (
               <motion.div
                 key={cotizacion.id}
                 initial={{ opacity: 0, y: 20 }}
@@ -555,7 +539,6 @@ export default function CotizacionList({ cotizaciones, onDelete, onUpdated, load
                             cotizacion.nombre
                           )}
                         </CardTitle>
-                        {/* 🏷️ Quote Code */}
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <FileText className="h-4 w-4" />
                           <span className="font-mono text-xs bg-muted px-2 py-1 rounded">
@@ -590,7 +573,6 @@ export default function CotizacionList({ cotizaciones, onDelete, onUpdated, load
                   </CardHeader>
 
                   <CardContent>
-                    {/* 💰 Financial Summary */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -635,7 +617,6 @@ export default function CotizacionList({ cotizaciones, onDelete, onUpdated, load
                       </div>
                     </div>
 
-                    {/* 🎯 Action Buttons */}
                     <div className="flex justify-end gap-2">
                       <Button
                         variant="outline"
@@ -663,6 +644,23 @@ export default function CotizacionList({ cotizaciones, onDelete, onUpdated, load
             ))}
           </AnimatePresence>
         </motion.div>
+      )}
+
+      {/* Paginación server-side */}
+      {paginationMeta && onPageChange && (
+        <DataPagination
+          pagination={paginationMeta}
+          onPageChange={onPageChange}
+          onLimitChange={onLimitChange}
+          limitOptions={[20, 50, 100]}
+          showLimitSelector={true}
+          showItemsInfo={true}
+          showPageJump={true}
+          showQuickNavigation={true}
+          size="sm"
+          itemsLabel="cotizaciones"
+          className="rounded-lg border"
+        />
       )}
 
       {/* Modal de edición */}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import {
   FileText,
   Plus,
@@ -17,10 +17,12 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import CotizacionModal from '@/components/cotizaciones/CotizacionModal'
 import CotizacionList from '@/components/cotizaciones/CotizacionList'
-import { getCotizaciones } from '@/lib/services/cotizacion'
+import { getCotizacionesPaginated } from '@/lib/services/cotizacion'
 import type { Cotizacion } from '@/types'
+import type { PaginationMeta } from '@/types/payloads'
 import { penToUSD } from '@/lib/costos'
 import { ExcelImportWizard } from '@/components/agente/ExcelImportWizard'
+import { usePagination } from '@/components/ui/data-pagination'
 
 const formatCurrencyKPI = (amount: number): string => {
   if (amount >= 1000000) {
@@ -38,46 +40,86 @@ export default function CotizacionesPage() {
   const [error, setError] = useState<string | null>(null)
   const [importOpen, setImportOpen] = useState(false)
 
+  // Filtros
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [yearFilter, setYearFilter] = useState(new Date().getFullYear().toString())
+
+  // Paginación
+  const { page, limit, handlePageChange, handleLimitChange, reset: resetPagination } = usePagination(1, 20)
+  const [paginationMeta, setPaginationMeta] = useState<PaginationMeta>({
+    page: 1, limit: 20, total: 0, totalPages: 1, hasNextPage: false, hasPrevPage: false
+  })
+
+  // Debounce para búsqueda
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+
   useEffect(() => {
-    getCotizaciones()
-      .then((data) => setCotizaciones(data))
-      .catch(() => setError('Error al cargar cotizaciones.'))
-      .finally(() => setLoading(false))
-  }, [])
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current)
+    searchTimeoutRef.current = setTimeout(() => {
+      setDebouncedSearch(search)
+      resetPagination()
+    }, 400)
+    return () => {
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current)
+    }
+  }, [search, resetPagination])
 
-  const handleCreated = (nueva: Cotizacion) => {
-    setCotizaciones(prev => [...prev, nueva])
+  // Fetch cotizaciones con paginación
+  const fetchCotizaciones = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const result = await getCotizacionesPaginated({
+        page,
+        limit,
+        search: debouncedSearch || undefined,
+        estado: statusFilter !== 'all' ? statusFilter : undefined,
+        anio: yearFilter !== 'todos' ? yearFilter : undefined,
+      })
+      setCotizaciones(result.data)
+      setPaginationMeta(result.pagination)
+    } catch {
+      setError('Error al cargar cotizaciones.')
+    } finally {
+      setLoading(false)
+    }
+  }, [page, limit, debouncedSearch, statusFilter, yearFilter])
+
+  useEffect(() => {
+    fetchCotizaciones()
+  }, [fetchCotizaciones])
+
+  // Reset page on filter change
+  const handleStatusFilterChange = (value: string) => {
+    setStatusFilter(value)
+    resetPagination()
   }
 
-  const handleDelete = (id: string) => {
-    setCotizaciones(prev => prev.filter(c => c.id !== id))
+  const handleYearFilterChange = (value: string) => {
+    setYearFilter(value)
+    resetPagination()
   }
 
-  const handleUpdated = (actualizada: Cotizacion) => {
-    setCotizaciones(prev =>
-      prev.map(c => c.id === actualizada.id ? actualizada : c)
-    )
+  const handleCreated = () => {
+    fetchCotizaciones()
   }
 
-  // Calculate statistics
-  const totalCotizaciones = cotizaciones.length
-  const aprobadas = cotizaciones.filter(c => c.estado?.toLowerCase() === 'aprobada').length
-  const enviadas = cotizaciones.filter(c => c.estado?.toLowerCase() === 'enviada').length
-  const borradores = cotizaciones.filter(c => c.estado?.toLowerCase() === 'borrador').length
-  // KPI total: consolidate all cotizaciones to USD
+  const handleDelete = () => {
+    fetchCotizaciones()
+  }
+
+  const handleUpdated = () => {
+    fetchCotizaciones()
+  }
+
+  // KPI: monto total de la página visible
   const montoTotal = cotizaciones.reduce((sum, c) => {
     const monto = c.totalCliente || 0
     if (c.moneda === 'PEN' && c.tipoCambio) return sum + penToUSD(monto, c.tipoCambio)
     return sum + monto
   }, 0)
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-      </div>
-    )
-  }
 
   return (
     <div className="p-4 space-y-4">
@@ -87,27 +129,14 @@ export default function CotizacionesPage() {
           <FileText className="h-6 w-6 text-blue-600" />
           <h1 className="text-xl font-bold">Cotizaciones</h1>
           <Badge variant="secondary" className="text-xs">
-            {totalCotizaciones}
+            {paginationMeta.total}
           </Badge>
         </div>
 
         <div className="flex items-center gap-2">
           {/* Inline Stats */}
           <div className="hidden md:flex items-center gap-3 mr-4 text-xs">
-            <div className="flex items-center gap-1 text-green-600" title="Aprobadas">
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              <span className="font-medium">{aprobadas}</span>
-            </div>
-            <div className="flex items-center gap-1 text-blue-600" title="Enviadas">
-              <Send className="h-3.5 w-3.5" />
-              <span className="font-medium">{enviadas}</span>
-            </div>
-            <div className="flex items-center gap-1 text-gray-500" title="Borradores">
-              <Clock className="h-3.5 w-3.5" />
-              <span className="font-medium">{borradores}</span>
-            </div>
-            <div className="w-px h-4 bg-gray-200" />
-            <div className="flex items-center gap-1 text-emerald-600" title="Monto Total">
+            <div className="flex items-center gap-1 text-emerald-600" title="Monto Total (página)">
               <DollarSign className="h-3.5 w-3.5" />
               <span className="font-semibold">{formatCurrencyKPI(montoTotal)}</span>
             </div>
@@ -134,22 +163,14 @@ export default function CotizacionesPage() {
       </div>
 
       {/* Mobile Stats */}
-      <div className="md:hidden grid grid-cols-4 gap-2">
-        <div className="bg-green-50 rounded-lg p-2 text-center">
-          <div className="text-lg font-bold text-green-600">{aprobadas}</div>
-          <div className="text-[10px] text-green-700">Aprobadas</div>
-        </div>
-        <div className="bg-blue-50 rounded-lg p-2 text-center">
-          <div className="text-lg font-bold text-blue-600">{enviadas}</div>
-          <div className="text-[10px] text-blue-700">Enviadas</div>
-        </div>
+      <div className="md:hidden grid grid-cols-2 gap-2">
         <div className="bg-gray-50 rounded-lg p-2 text-center">
-          <div className="text-lg font-bold text-gray-600">{borradores}</div>
-          <div className="text-[10px] text-gray-700">Borradores</div>
+          <div className="text-lg font-bold text-gray-600">{paginationMeta.total}</div>
+          <div className="text-[10px] text-gray-700">Total</div>
         </div>
         <div className="bg-emerald-50 rounded-lg p-2 text-center">
           <div className="text-lg font-bold text-emerald-600">{formatCurrencyKPI(montoTotal)}</div>
-          <div className="text-[10px] text-emerald-700">Total</div>
+          <div className="text-[10px] text-emerald-700">Monto</div>
         </div>
       </div>
 
@@ -160,12 +181,12 @@ export default function CotizacionesPage() {
             <FileText className="h-12 w-12 text-red-500 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-red-600 mb-2">Error al cargar</h3>
             <p className="text-muted-foreground mb-4">{error}</p>
-            <Button onClick={() => window.location.reload()} variant="outline">
+            <Button onClick={fetchCotizaciones} variant="outline">
               Reintentar
             </Button>
           </CardContent>
         </Card>
-      ) : cotizaciones.length === 0 ? (
+      ) : !loading && cotizaciones.length === 0 && !debouncedSearch && statusFilter === 'all' && yearFilter === 'todos' ? (
         <Card>
           <CardContent className="py-12 text-center">
             <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -191,6 +212,18 @@ export default function CotizacionesPage() {
           cotizaciones={cotizaciones}
           onDelete={handleDelete}
           onUpdated={handleUpdated}
+          loading={loading}
+          // Filtros server-side
+          search={search}
+          onSearchChange={setSearch}
+          statusFilter={statusFilter}
+          onStatusFilterChange={handleStatusFilterChange}
+          yearFilter={yearFilter}
+          onYearFilterChange={handleYearFilterChange}
+          // Paginación
+          paginationMeta={paginationMeta}
+          onPageChange={handlePageChange}
+          onLimitChange={handleLimitChange}
         />
       )}
 
