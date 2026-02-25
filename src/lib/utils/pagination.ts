@@ -197,13 +197,13 @@ export const PAGINATION_CONFIGS = {
     defaultLimit: 20,
     maxLimit: 100,
     defaultSortBy: 'createdAt',
-    searchFields: ['codigo', 'cliente.nombre', 'comercial.nombre']
+    searchFields: ['codigo', 'cliente.nombre', 'user.name']
   },
   pedidos: {
     defaultLimit: 25,
     maxLimit: 100,
     defaultSortBy: 'fechaPedido',
-    searchFields: ['codigo', 'proveedor.nombre', 'lista.codigo']
+    searchFields: ['codigo', 'proyecto.nombre', 'user.name']
   },
   timeline: {
     defaultLimit: 30,
