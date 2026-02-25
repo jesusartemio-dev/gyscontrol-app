@@ -17,6 +17,7 @@ import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { getOrdenCompraById, aprobarOC, enviarOC, confirmarOC, cancelarOC, deleteOrdenCompra, registrarRecepcionOC } from '@/lib/services/ordenCompra'
 import OCEstadoStepper from '@/components/logistica/OCEstadoStepper'
+import { RollbackButton } from '@/components/RollbackButton'
 import dynamic from 'next/dynamic'
 import type { OrdenCompra } from '@/types'
 
@@ -331,6 +332,14 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
               {actionLoading === 'enviada' ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Send className="h-4 w-4 mr-1" />}
               Enviar al Proveedor
             </Button>
+            <RollbackButton
+              entityType="ordenCompra"
+              entityId={oc.id}
+              currentEstado={oc.estado}
+              targetEstado="borrador"
+              targetLabel="Volver a Borrador"
+              onSuccess={setOC}
+            />
             <Button
               size="sm"
               variant="outline"
@@ -342,15 +351,25 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
           </>
         )}
         {oc.estado === 'enviada' && (
-          <Button
-            size="sm"
-            onClick={() => handleAction('confirmada', () => confirmarOC(oc.id))}
-            disabled={!!actionLoading}
-            className="bg-purple-600 hover:bg-purple-700"
-          >
-            {actionLoading === 'confirmada' ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Package className="h-4 w-4 mr-1" />}
-            Confirmar OC
-          </Button>
+          <>
+            <Button
+              size="sm"
+              onClick={() => handleAction('confirmada', () => confirmarOC(oc.id))}
+              disabled={!!actionLoading}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              {actionLoading === 'confirmada' ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Package className="h-4 w-4 mr-1" />}
+              Confirmar OC
+            </Button>
+            <RollbackButton
+              entityType="ordenCompra"
+              entityId={oc.id}
+              currentEstado={oc.estado}
+              targetEstado="aprobada"
+              targetLabel="Volver a Aprobada"
+              onSuccess={setOC}
+            />
+          </>
         )}
         {['confirmada', 'parcial'].includes(oc.estado) && !editingRecepcion && (
           <Button

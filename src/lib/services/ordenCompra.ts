@@ -88,6 +88,8 @@ export const cancelarOC = (id: string, motivo?: string) =>
   postAction(id, 'cancelar', { motivo })
 export const registrarRecepcionOC = (id: string, items: { itemId: string; cantidadRecibida: number }[]) =>
   postAction(id, 'recepcion', { items })
+export const retrocederOC = (id: string, targetEstado: string, motivo?: string) =>
+  postAction(id, 'retroceder', { targetEstado, motivo })
 
 export async function generarOCsDesdePedido(payload: {
   pedidoId: string

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Clock, Loader2, Package, FileText, Truck, CheckCircle, Send, ShoppingCart, Trophy, XCircle } from 'lucide-react'
+import { Clock, Loader2, Package, FileText, Truck, CheckCircle, Send, ShoppingCart, Trophy, XCircle, RotateCcw } from 'lucide-react'
 import clsx from 'clsx'
 
 interface EventoTimeline {
@@ -21,6 +21,9 @@ const TIPO_CONFIG: Record<string, { icon: any; color: string; label: string }> =
   entrega_a_proyecto: { icon: CheckCircle, color: 'text-emerald-500 bg-emerald-100', label: 'Entregado' },
   cotizacion_seleccionada: { icon: Trophy, color: 'text-amber-600 bg-amber-100', label: 'Cotización Seleccionada' },
   cotizacion_deseleccionada: { icon: XCircle, color: 'text-gray-500 bg-gray-100', label: 'Cotización Deseleccionada' },
+  oc_retrocedida: { icon: RotateCcw, color: 'text-orange-500 bg-orange-100', label: 'OC Retrocedida' },
+  lista_retrocedida: { icon: RotateCcw, color: 'text-orange-500 bg-orange-100', label: 'Lista Retrocedida' },
+  pedido_retrocedido: { icon: RotateCcw, color: 'text-orange-500 bg-orange-100', label: 'Pedido Retrocedido' },
 }
 
 function formatFecha(fecha: string): string {

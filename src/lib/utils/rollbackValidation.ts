@@ -1,0 +1,228 @@
+import { prisma } from '@/lib/prisma'
+
+// ═══════════════════════════════════════════════════════════════
+// Helper centralizado: canRollback()
+// Solo lectura — nunca escribe. Verifica si una entidad puede
+// retroceder a un estado anterior de forma segura.
+// ═══════════════════════════════════════════════════════════════
+
+export type RollbackEntity = 'ordenCompra' | 'listaEquipo' | 'pedidoEquipo'
+
+export interface RollbackBlocker {
+  entity: string
+  count: number
+  message: string
+}
+
+export interface RollbackResult {
+  allowed: boolean
+  blockers: RollbackBlocker[]
+  message: string
+  fieldsToClean: string[]
+}
+
+// Transiciones válidas: [estadoActual] → [targetEstado]
+const VALID_ROLLBACKS: Record<RollbackEntity, Record<string, string[]>> = {
+  ordenCompra: {
+    enviada: ['aprobada'],
+    aprobada: ['borrador'],
+  },
+  listaEquipo: {
+    por_aprobar: ['por_validar'],
+    por_validar: ['por_cotizar'],
+  },
+  pedidoEquipo: {
+    enviado: ['borrador'],
+  },
+}
+
+// ─── Dispatcher ─────────────────────────────────────────────
+
+export async function canRollback(
+  entity: RollbackEntity,
+  id: string,
+  targetEstado: string
+): Promise<RollbackResult> {
+  const checkers: Record<RollbackEntity, (id: string, target: string) => Promise<RollbackResult>> = {
+    ordenCompra: checkOrdenCompraRollback,
+    listaEquipo: checkListaEquipoRollback,
+    pedidoEquipo: checkPedidoEquipoRollback,
+  }
+
+  const checker = checkers[entity]
+  if (!checker) {
+    return {
+      allowed: false,
+      blockers: [],
+      message: `Entidad "${entity}" no soporta retroceso de estado.`,
+      fieldsToClean: [],
+    }
+  }
+
+  return checker(id, targetEstado)
+}
+
+// ─── Validar transición ─────────────────────────────────────
+
+export function isValidRollback(
+  entity: RollbackEntity,
+  currentEstado: string,
+  targetEstado: string
+): boolean {
+  const targets = VALID_ROLLBACKS[entity]?.[currentEstado]
+  return targets?.includes(targetEstado) ?? false
+}
+
+// ─── Checkers individuales ──────────────────────────────────
+
+async function checkOrdenCompraRollback(id: string, targetEstado: string): Promise<RollbackResult> {
+  const oc = await prisma.ordenCompra.findUnique({
+    where: { id },
+    select: { estado: true, numero: true },
+  })
+
+  if (!oc) {
+    return { allowed: false, blockers: [], message: 'Orden de compra no encontrada.', fieldsToClean: [] }
+  }
+
+  if (!isValidRollback('ordenCompra', oc.estado, targetEstado)) {
+    return {
+      allowed: false,
+      blockers: [],
+      message: `No se puede retroceder de "${oc.estado}" a "${targetEstado}".`,
+      fieldsToClean: [],
+    }
+  }
+
+  const blockers: RollbackBlocker[] = []
+
+  if (oc.estado === 'aprobada' && targetEstado === 'borrador') {
+    // Verificar recepciones activas
+    const recepcionCount = await prisma.recepcionPendiente.count({
+      where: {
+        ordenCompraItem: { ordenCompraId: id },
+        estado: { not: 'rechazado' },
+      },
+    })
+    if (recepcionCount > 0) {
+      blockers.push({
+        entity: 'RecepcionPendiente',
+        count: recepcionCount,
+        message: `Tiene ${recepcionCount} recepción(es) pendiente(s) o en almacén`,
+      })
+    }
+  }
+
+  // enviada → aprobada: siempre permitido (sin bloqueantes)
+
+  const allowed = blockers.length === 0
+  const fieldsToClean = targetEstado === 'borrador'
+    ? ['fechaAprobacion', 'aprobadorId']
+    : ['fechaEnvio'] // aprobada
+
+  const message = allowed
+    ? targetEstado === 'borrador'
+      ? 'La OC volverá a Borrador. Podrás editar precios y cantidades.'
+      : 'La OC volverá a Aprobada. Se limpiará la fecha de envío.'
+    : `No se puede retroceder:\n${blockers.map(b => `· ${b.message}`).join('\n')}`
+
+  return { allowed, blockers, message, fieldsToClean }
+}
+
+async function checkListaEquipoRollback(id: string, targetEstado: string): Promise<RollbackResult> {
+  const lista = await prisma.listaEquipo.findUnique({
+    where: { id },
+    select: { estado: true, codigo: true },
+  })
+
+  if (!lista) {
+    return { allowed: false, blockers: [], message: 'Lista no encontrada.', fieldsToClean: [] }
+  }
+
+  if (!isValidRollback('listaEquipo', lista.estado, targetEstado)) {
+    return {
+      allowed: false,
+      blockers: [],
+      message: `No se puede retroceder de "${lista.estado}" a "${targetEstado}".`,
+      fieldsToClean: [],
+    }
+  }
+
+  const blockers: RollbackBlocker[] = []
+
+  if (lista.estado === 'por_validar' && targetEstado === 'por_cotizar') {
+    // Verificar si hay items con cotización seleccionada
+    const seleccionados = await prisma.listaEquipoItem.count({
+      where: {
+        listaId: id,
+        cotizacionSeleccionadaId: { not: null },
+      },
+    })
+    if (seleccionados > 0) {
+      blockers.push({
+        entity: 'ListaEquipoItem',
+        count: seleccionados,
+        message: `${seleccionados} ítem(s) tienen cotización ganadora seleccionada — quita la selección primero`,
+      })
+    }
+  }
+
+  // por_aprobar → por_validar: siempre permitido
+
+  const allowed = blockers.length === 0
+  const fieldsToClean = targetEstado === 'por_cotizar'
+    ? ['fechaFinCotizacion']
+    : ['fechaValidacion'] // por_validar
+
+  const message = allowed
+    ? `La lista volverá a "${targetEstado.replace(/_/g, ' ')}".`
+    : `No se puede retroceder:\n${blockers.map(b => `· ${b.message}`).join('\n')}`
+
+  return { allowed, blockers, message, fieldsToClean }
+}
+
+async function checkPedidoEquipoRollback(id: string, targetEstado: string): Promise<RollbackResult> {
+  const pedido = await prisma.pedidoEquipo.findUnique({
+    where: { id },
+    select: { estado: true, codigo: true },
+  })
+
+  if (!pedido) {
+    return { allowed: false, blockers: [], message: 'Pedido no encontrado.', fieldsToClean: [] }
+  }
+
+  if (!isValidRollback('pedidoEquipo', pedido.estado, targetEstado)) {
+    return {
+      allowed: false,
+      blockers: [],
+      message: `No se puede retroceder de "${pedido.estado}" a "${targetEstado}".`,
+      fieldsToClean: [],
+    }
+  }
+
+  const blockers: RollbackBlocker[] = []
+
+  // enviado → borrador: bloquear si tiene OCs activas
+  const ocCount = await prisma.ordenCompra.count({
+    where: {
+      pedidoEquipoId: id,
+      estado: { not: 'cancelada' },
+    },
+  })
+  if (ocCount > 0) {
+    blockers.push({
+      entity: 'OrdenCompra',
+      count: ocCount,
+      message: `Tiene ${ocCount} orden(es) de compra activa(s) — cancélalas primero`,
+    })
+  }
+
+  const allowed = blockers.length === 0
+  const fieldsToClean: string[] = []
+
+  const message = allowed
+    ? 'El pedido volverá a Borrador. Podrás editarlo nuevamente.'
+    : `No se puede retroceder:\n${blockers.map(b => `· ${b.message}`).join('\n')}`
+
+  return { allowed, blockers, message, fieldsToClean }
+}

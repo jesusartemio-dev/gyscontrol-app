@@ -26,6 +26,8 @@ import {
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
+import { RollbackButton } from '@/components/RollbackButton'
+import type { EstadoListaEquipo as EstadoListaType } from '@/lib/utils/flujoListaEquipo'
 
 import { useState } from 'react'
 
@@ -250,6 +252,28 @@ export default function ListaEstadoFlujoBanner({ estado, listaId, totalItems = 0
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+        )}
+
+        {/* Rollback Button */}
+        {listaId && estado === 'por_aprobar' && (
+          <RollbackButton
+            entityType="listaEquipo"
+            entityId={listaId}
+            currentEstado={estado}
+            targetEstado="por_validar"
+            targetLabel="Volver a Por Validar"
+            onSuccess={() => onUpdated?.('por_validar' as EstadoListaEquipo)}
+          />
+        )}
+        {listaId && estado === 'por_validar' && (
+          <RollbackButton
+            entityType="listaEquipo"
+            entityId={listaId}
+            currentEstado={estado}
+            targetEstado="por_cotizar"
+            targetLabel="Volver a Por Cotizar"
+            onSuccess={() => onUpdated?.('por_cotizar' as EstadoListaEquipo)}
+          />
         )}
 
         {/* Reset Button */}

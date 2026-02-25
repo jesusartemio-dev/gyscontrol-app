@@ -32,6 +32,7 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { flujoEstadosPedido, estadosPedidoList, estadoPedidoLabels, validarTransicionPedido, type EstadoPedidoEquipo } from '@/lib/utils/flujoPedidoEquipo'
 import { useSession } from 'next-auth/react'
+import { RollbackButton } from '@/components/RollbackButton'
 
 interface PedidoEstadoFlujoBannerProps {
   estado: string
@@ -153,6 +154,18 @@ const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
               )
             })}
           </div>
+
+          {/* Rollback: enviado → borrador */}
+          {estado === 'enviado' && (
+            <RollbackButton
+              entityType="pedidoEquipo"
+              entityId={pedidoId}
+              currentEstado={estado}
+              targetEstado="borrador"
+              targetLabel="Volver a Borrador"
+              onSuccess={() => onUpdated?.('borrador')}
+            />
+          )}
 
           {/* Botón cancelar */}
           {puedeCancelar && estado !== 'cancelado' && (
