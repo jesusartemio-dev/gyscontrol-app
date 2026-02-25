@@ -443,6 +443,16 @@ export interface ProyectoPayload {
   diasGarantia?: number
   adelantoPorcentaje?: number
   adelantoMonto?: number
+  // Contrato
+  numeroContrato?: string
+  fechaFirmaContrato?: string
+  fechaInicioContrato?: string
+  fechaFinContrato?: string
+  fondoGarantiaPct?: number
+  descuentoComercialPct?: number
+  igvPct?: number
+  condicionPago?: string
+  diasCredito?: number
 }
 
 export interface ProyectoUpdatePayload extends Partial<ProyectoPayload> {}

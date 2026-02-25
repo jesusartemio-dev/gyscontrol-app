@@ -111,6 +111,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       select: {
         id: true, codigo: true, totalCliente: true, clienteId: true,
         adelantoPorcentaje: true, adelantoMonto: true, adelantoAmortizado: true,
+        fondoGarantiaPct: true, descuentoComercialPct: true, igvPct: true,
       },
     })
     if (!proyecto) {
@@ -133,9 +134,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const acumuladoAnterior = await calcularAcumuladoAnterior(proyectoId)
 
     const montoValorizacion = body.montoValorizacion || 0
-    const descuentoComercialPorcentaje = body.descuentoComercialPorcentaje ?? 0
-    const igvPorcentaje = body.igvPorcentaje ?? 18
-    const fondoGarantiaPorcentaje = body.fondoGarantiaPorcentaje ?? 0
+    const descuentoComercialPorcentaje = body.descuentoComercialPorcentaje ?? proyecto.descuentoComercialPct ?? 0
+    const igvPorcentaje = body.igvPorcentaje ?? proyecto.igvPct ?? 18
+    const fondoGarantiaPorcentaje = body.fondoGarantiaPorcentaje ?? proyecto.fondoGarantiaPct ?? 0
 
     // Auto-calcular adelanto desde proyecto si tiene adelanto configurado
     const adelantoCalc = calcularAdelantoValorizacion(proyecto, montoValorizacion)

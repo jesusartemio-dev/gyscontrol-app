@@ -1092,6 +1092,16 @@ export interface Proyecto {
   adelantoPorcentaje?: number
   adelantoMonto?: number
   adelantoAmortizado?: number
+  // Contrato
+  numeroContrato?: string | null
+  fechaFirmaContrato?: string | null
+  fechaInicioContrato?: string | null
+  fechaFinContrato?: string | null
+  fondoGarantiaPct?: number
+  descuentoComercialPct?: number
+  igvPct?: number
+  condicionPago?: string | null
+  diasCredito?: number | null
   codigo: string
   estado: string
   fechaInicio: string

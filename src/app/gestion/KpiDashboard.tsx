@@ -114,6 +114,7 @@ export function KpiDashboard({ userRole }: KpiDashboardProps) {
   const [data, setData] = useState<KpiData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [cartasAlerta, setCartasAlerta] = useState<{ porVencer: number; vencidas: number }>({ porVencer: 0, vencidas: 0 })
 
   const loadData = async () => {
     try {
@@ -131,6 +132,19 @@ export function KpiDashboard({ userRole }: KpiDashboardProps) {
   }
 
   useEffect(() => { loadData() }, [])
+
+  // Load cartas fianza alerts for admin/gerente
+  useEffect(() => {
+    if (!['admin', 'gerente', 'gestor'].includes(userRole)) return
+    fetch('/api/cartas-fianza')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.resumen) {
+          setCartasAlerta({ porVencer: data.resumen.porVencer, vencidas: data.resumen.vencidas })
+        }
+      })
+      .catch(() => {})
+  }, [userRole])
 
   if (loading && !data) {
     return (
@@ -193,6 +207,32 @@ export function KpiDashboard({ userRole }: KpiDashboardProps) {
             </Button>
           </div>
         </div>
+
+        {/* Cartas Fianza Alert Banner */}
+        {(cartasAlerta.porVencer > 0 || cartasAlerta.vencidas > 0) && (
+          <Link href="/gestion/cartas-fianza">
+            <Card className="border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 hover:shadow-md transition-shadow cursor-pointer">
+              <CardContent className="px-4 py-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <ShieldCheck className="h-5 w-5 text-amber-600" />
+                    <div className="text-sm">
+                      <span className="font-semibold">Cartas de Fianza: </span>
+                      {cartasAlerta.vencidas > 0 && (
+                        <span className="text-red-600 font-medium">{cartasAlerta.vencidas} vencida{cartasAlerta.vencidas > 1 ? 's' : ''}</span>
+                      )}
+                      {cartasAlerta.vencidas > 0 && cartasAlerta.porVencer > 0 && ' · '}
+                      {cartasAlerta.porVencer > 0 && (
+                        <span className="text-amber-600 font-medium">{cartasAlerta.porVencer} por vencer</span>
+                      )}
+                    </div>
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-amber-600" />
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+        )}
 
         {/* 4 Quadrants Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

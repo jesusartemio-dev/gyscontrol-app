@@ -34,6 +34,7 @@ import { Label } from '@/components/ui/label'
 import toast from 'react-hot-toast'
 
 import { useProyectoContext } from './ProyectoContext'
+import SeccionContrato from '@/components/proyectos/SeccionContrato'
 
 // Utility function
 const formatCurrency = (amount: number): string => {
@@ -632,6 +633,12 @@ export default function ProyectoHubPage() {
           </Button>
         </motion.div>
       )}
+
+      {/* Contrato y Cartas Fianza */}
+      <SeccionContrato
+        proyecto={proyecto}
+        onUpdateProyecto={(updated: Partial<typeof proyecto>) => setProyecto({ ...proyecto, ...updated })}
+      />
 
       {/* Condiciones y Exclusiones del Proyecto */}
       {(totalCond > 0 || totalExcl > 0) && (

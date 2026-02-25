@@ -985,6 +985,16 @@ model Proyecto {
   adelantoPorcentaje       Float                      @default(0)
   adelantoMonto            Float                      @default(0)
   adelantoAmortizado       Float                      @default(0)
+  // Contrato
+  numeroContrato           String?
+  fechaFirmaContrato       DateTime?
+  fechaInicioContrato      DateTime?
+  fechaFinContrato         DateTime?
+  fondoGarantiaPct         Float                      @default(0)
+  descuentoComercialPct    Float                      @default(0)
+  igvPct                   Float                      @default(18)
+  condicionPago            String?
+  diasCredito              Int?
   createdAt                DateTime                   @default(now())
   updatedAt                DateTime
   deletedAt                DateTime?
@@ -1020,6 +1030,7 @@ model Proyecto {
   cuentasPorCobrar         CuentaPorCobrar[]
   cuentasPorPagar          CuentaPorPagar[]
   lineasHH                 LineaHH[]
+  cartasFianza             CartaFianza[]
 
   @@index([clienteId, estado, createdAt(sort: Desc)], map: "idx_proyecto_cliente_estado_fecha")
   @@index([comercialId, estado, fechaInicio], map: "idx_proyecto_comercial_estado_inicio")
@@ -1060,6 +1071,48 @@ enum RolPersonalProyecto {
   tecnico
   coordinador
   asistente
+}
+
+model CartaFianza {
+  id                String             @id @default(cuid())
+  proyectoId        String
+  tipo              TipoCartaFianza
+  estado            EstadoCartaFianza  @default(vigente)
+  entidadFinanciera String
+  numeroCarta       String?
+  moneda            String             @default("USD")
+  monto             Float
+  fechaEmision      DateTime
+  fechaVencimiento  DateTime
+  notas             String?
+  cartaRenovadaId   String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime
+
+  proyecto       Proyecto              @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  cartaRenovada  CartaFianza?          @relation("CartaRenovacion", fields: [cartaRenovadaId], references: [id])
+  renovaciones   CartaFianza[]         @relation("CartaRenovacion")
+  adjuntos       CartaFianzaAdjunto[]
+
+  @@index([proyectoId, estado])
+  @@index([fechaVencimiento, estado])
+  @@map("carta_fianza")
+}
+
+model CartaFianzaAdjunto {
+  id             String   @id @default(cuid())
+  cartaFianzaId  String
+  nombreArchivo  String
+  urlArchivo     String
+  driveFileId    String?
+  tipoArchivo    String?
+  tamano         Int?
+  createdAt      DateTime @default(now())
+
+  cartaFianza CartaFianza @relation(fields: [cartaFianzaId], references: [id], onDelete: Cascade)
+
+  @@index([cartaFianzaId])
+  @@map("carta_fianza_adjunto")
 }
 
 model ProyectoEquipoCotizado {
@@ -3132,6 +3185,22 @@ enum EstadoCuentaPagar {
   pagada
   vencida
   anulada
+}
+
+enum TipoCartaFianza {
+  fiel_cumplimiento
+  adelanto
+  garantia
+  beneficios_sociales
+}
+
+enum EstadoCartaFianza {
+  vigente
+  por_vencer
+  vencida
+  ejecutada
+  devuelta
+  renovada
 }
 
 model RoleSectionAccess {
