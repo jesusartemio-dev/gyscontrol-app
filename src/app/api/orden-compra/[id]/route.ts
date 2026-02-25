@@ -140,14 +140,15 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
       )
     }
 
-    // Verificar permisos: solo el creador o admin puede eliminar
+    // Verificar permisos: creador, admin, gerente o logistico
     const existing = await prisma.ordenCompra.findUnique({ where: { id }, select: { solicitanteId: true } })
     if (!existing) {
       return NextResponse.json({ error: 'Orden de compra no encontrada' }, { status: 404 })
     }
     const role = session.user.role
-    if (existing.solicitanteId !== session.user.id && role !== 'admin') {
-      return NextResponse.json({ error: 'Solo el creador o admin puede eliminar' }, { status: 403 })
+    const rolesPermitidos = ['admin', 'gerente', 'logistico']
+    if (existing.solicitanteId !== session.user.id && !rolesPermitidos.includes(role)) {
+      return NextResponse.json({ error: 'Sin permisos para eliminar esta orden' }, { status: 403 })
     }
 
     await prisma.ordenCompra.delete({ where: { id } })
