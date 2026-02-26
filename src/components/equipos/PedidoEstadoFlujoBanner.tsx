@@ -155,7 +155,7 @@ const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
             })}
           </div>
 
-          {/* Rollback: enviado → borrador */}
+          {/* Rollback buttons por estado */}
           {estado === 'enviado' && (
             <RollbackButton
               entityType="pedidoEquipo"
@@ -164,6 +164,36 @@ const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
               targetEstado="borrador"
               targetLabel="Volver a Borrador"
               onSuccess={() => onUpdated?.('borrador')}
+            />
+          )}
+          {estado === 'atendido' && ['admin', 'gerente', 'logistico'].includes(userRole) && (
+            <RollbackButton
+              entityType="pedidoEquipo"
+              entityId={pedidoId}
+              currentEstado={estado}
+              targetEstado="enviado"
+              targetLabel="Volver a Enviado"
+              onSuccess={() => onUpdated?.('enviado')}
+            />
+          )}
+          {estado === 'parcial' && ['admin', 'gerente', 'logistico'].includes(userRole) && (
+            <RollbackButton
+              entityType="pedidoEquipo"
+              entityId={pedidoId}
+              currentEstado={estado}
+              targetEstado="atendido"
+              targetLabel="Volver a Atendido"
+              onSuccess={() => onUpdated?.('atendido')}
+            />
+          )}
+          {estado === 'entregado' && ['admin', 'gerente'].includes(userRole) && (
+            <RollbackButton
+              entityType="pedidoEquipo"
+              entityId={pedidoId}
+              currentEstado={estado}
+              targetEstado="parcial"
+              targetLabel="Volver a Parcial"
+              onSuccess={() => onUpdated?.('parcial')}
             />
           )}
 

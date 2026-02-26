@@ -69,6 +69,16 @@ export async function POST(
       )
     }
 
+    // entregado → parcial: solo admin/gerente (estado casi-terminal)
+    if (pedido.estado === 'entregado' && targetEstado === 'parcial') {
+      if (!['admin', 'gerente'].includes(session.user.role)) {
+        return NextResponse.json(
+          { error: 'Solo admin o gerente pueden retroceder desde Entregado' },
+          { status: 403 }
+        )
+      }
+    }
+
     const check = await canRollback('pedidoEquipo', id, targetEstado)
     if (!check.allowed) {
       return NextResponse.json(
@@ -77,10 +87,17 @@ export async function POST(
       )
     }
 
+    // Campos a limpiar según target
+    const cleanFields: Record<string, null> = {}
+    if (targetEstado === 'parcial') {
+      cleanFields.fechaEntregaReal = null
+    }
+
     const updated = await prisma.pedidoEquipo.update({
       where: { id },
       data: {
         estado: targetEstado as any,
+        ...cleanFields,
         updatedAt: new Date(),
       },
     })

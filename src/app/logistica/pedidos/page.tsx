@@ -8,6 +8,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
 import { RefreshCw, Truck, Package, Search, Filter, X, CheckCircle, AlertTriangle, Clock, Building2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -36,6 +37,9 @@ const ESTADOS_PEDIDO = [
 
 export default function LogisticaPedidosPage() {
   const router = useRouter()
+  const { data: session } = useSession()
+  const userRole = session?.user?.role || ''
+  const puedeEliminar = userRole !== 'logistico'
   const [pedidos, setPedidos] = useState<PedidoEquipo[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -260,7 +264,7 @@ export default function LogisticaPedidosPage() {
           <LogisticaPedidosTable
             pedidos={pedidosFiltrados}
             onRefresh={fetchData}
-            onDelete={handleDelete}
+            onDelete={puedeEliminar ? handleDelete : undefined}
           />
         </div>
       </div>

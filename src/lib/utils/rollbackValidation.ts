@@ -35,6 +35,9 @@ const VALID_ROLLBACKS: Record<RollbackEntity, Record<string, string[]>> = {
   },
   pedidoEquipo: {
     enviado: ['borrador'],
+    atendido: ['enviado'],
+    parcial: ['atendido'],
+    entregado: ['parcial'],
   },
   recepcionPendiente: {
     en_almacen: ['pendiente'],
@@ -237,26 +240,69 @@ async function checkPedidoEquipoRollback(id: string, targetEstado: string): Prom
 
   const blockers: RollbackBlocker[] = []
 
-  // enviado → borrador: bloquear si tiene OCs activas
-  const ocCount = await prisma.ordenCompra.count({
-    where: {
-      pedidoEquipoId: id,
-      estado: { not: 'cancelada' },
-    },
-  })
-  if (ocCount > 0) {
-    blockers.push({
-      entity: 'OrdenCompra',
-      count: ocCount,
-      message: `Tiene ${ocCount} orden(es) de compra activa(s) — cancélalas primero`,
+  // enviado → borrador / atendido → enviado: bloquear si tiene OCs activas
+  if (['borrador', 'enviado'].includes(targetEstado)) {
+    const ocCount = await prisma.ordenCompra.count({
+      where: {
+        pedidoEquipoId: id,
+        estado: { not: 'cancelada' },
+      },
     })
+    if (ocCount > 0) {
+      blockers.push({
+        entity: 'OrdenCompra',
+        count: ocCount,
+        message: `Tiene ${ocCount} orden(es) de compra activa(s) — cancélalas primero`,
+      })
+    }
+  }
+
+  // parcial → atendido: bloquear si tiene recepciones que ya avanzaron
+  if (targetEstado === 'atendido') {
+    const recepcionCount = await prisma.recepcionPendiente.count({
+      where: {
+        pedidoEquipoItem: { pedidoId: id },
+        estado: { in: ['en_almacen', 'entregado_proyecto'] },
+      },
+    })
+    if (recepcionCount > 0) {
+      blockers.push({
+        entity: 'RecepcionPendiente',
+        count: recepcionCount,
+        message: `Tiene ${recepcionCount} recepción(es) en almacén o entregada(s) — retrocédelas primero`,
+      })
+    }
+  }
+
+  // entregado → parcial: bloquear si tiene entregas cerradas
+  if (targetEstado === 'parcial') {
+    const entregaCount = await prisma.entregaItem.count({
+      where: {
+        pedidoEquipoItem: { pedidoId: id },
+        estado: 'entregado',
+      },
+    })
+    if (entregaCount > 0) {
+      blockers.push({
+        entity: 'EntregaItem',
+        count: entregaCount,
+        message: `Tiene ${entregaCount} entrega(s) cerrada(s) al proyecto — retrocédelas primero`,
+      })
+    }
   }
 
   const allowed = blockers.length === 0
-  const fieldsToClean: string[] = []
+  const fieldsToClean: string[] = targetEstado === 'parcial' ? ['fechaEntregaReal'] : []
+
+  const targetLabels: Record<string, string> = {
+    borrador: 'Borrador',
+    enviado: 'Enviado',
+    atendido: 'Atendido',
+    parcial: 'Parcial',
+  }
 
   const message = allowed
-    ? 'El pedido volverá a Borrador. Podrás editarlo nuevamente.'
+    ? `El pedido volverá a ${targetLabels[targetEstado] || targetEstado}.`
     : `No se puede retroceder:\n${blockers.map(b => `· ${b.message}`).join('\n')}`
 
   return { allowed, blockers, message, fieldsToClean }

@@ -264,6 +264,15 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
+    // 🔐 Verificar rol — logístico no puede eliminar pedidos
+    const rolesPermitidos = ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos']
+    if (!rolesPermitidos.includes(session.user.role)) {
+      return NextResponse.json(
+        { error: 'Logística no puede eliminar pedidos. Solo el área de Proyectos puede eliminar pedidos.' },
+        { status: 403 }
+      )
+    }
+
     // 🛡️ Validar dependientes antes de eliminar
     const deleteCheck = await canDelete('pedidoEquipo', id)
     if (!deleteCheck.allowed) {
