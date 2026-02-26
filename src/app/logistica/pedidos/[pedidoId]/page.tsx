@@ -23,7 +23,7 @@ import {
   updatePedidoEquipoItem
 } from '@/lib/services/pedidoEquipoItem'
 import { generarOCsDesdePedido } from '@/lib/services/ordenCompra'
-import PedidoEstadoStepper from '@/components/logistica/PedidoEstadoStepper'
+import PedidoEstadoFlujoBanner from '@/components/equipos/PedidoEstadoFlujoBanner'
 
 // 🎨 UI Components
 import { Button } from '@/components/ui/button'
@@ -687,10 +687,13 @@ export default function PedidoLogisticaDetailPage() {
       </div>
 
       <div className="p-4 space-y-4">
-        {/* Stepper de estado */}
-        <div className="bg-white rounded-lg border px-4 py-3">
-          <PedidoEstadoStepper estado={pedido.estado} />
-        </div>
+        {/* Flujo de estado + rollback */}
+        <PedidoEstadoFlujoBanner
+          estado={pedido.estado}
+          pedidoId={pedido.id}
+          contexto="logistica"
+          onUpdated={() => cargarDatos()}
+        />
 
         {/* Banner recepciones — estado "pendiente" (llegaron, falta confirmar almacén) */}
         {(() => {
