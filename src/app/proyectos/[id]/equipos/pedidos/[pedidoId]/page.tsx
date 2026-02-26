@@ -270,6 +270,7 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
           pedidoId={pedidoId}
           pedidoNombre={pedido.codigo}
           usuarioId={session?.user?.id}
+          contexto="proyectos"
           onUpdated={(nuevoEstado) => {
             setPedido((prev) => (prev ? { ...prev, estado: nuevoEstado as any } : null))
           }}

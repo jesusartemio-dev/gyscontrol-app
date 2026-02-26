@@ -39,6 +39,7 @@ interface PedidoEstadoFlujoBannerProps {
   pedidoId: string
   pedidoNombre?: string
   usuarioId?: string
+  contexto?: 'proyectos' | 'logistica'
   onUpdated?: (nuevoEstado: string) => void
 }
 
@@ -63,6 +64,7 @@ const puedeAvanzarA = (estadoActual: string, estadoSiguiente: string, rol: strin
 const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
   estado,
   pedidoId,
+  contexto = 'logistica',
   onUpdated,
 }) => {
   const { data: session } = useSession()
@@ -166,7 +168,7 @@ const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
               onSuccess={() => onUpdated?.('borrador')}
             />
           )}
-          {estado === 'atendido' && ['admin', 'gerente', 'logistico'].includes(userRole) && (
+          {contexto === 'logistica' && estado === 'atendido' && ['admin', 'gerente', 'logistico'].includes(userRole) && (
             <RollbackButton
               entityType="pedidoEquipo"
               entityId={pedidoId}
@@ -176,7 +178,7 @@ const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
               onSuccess={() => onUpdated?.('enviado')}
             />
           )}
-          {estado === 'parcial' && ['admin', 'gerente', 'logistico'].includes(userRole) && (
+          {contexto === 'logistica' && estado === 'parcial' && ['admin', 'gerente', 'logistico'].includes(userRole) && (
             <RollbackButton
               entityType="pedidoEquipo"
               entityId={pedidoId}
@@ -186,7 +188,7 @@ const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
               onSuccess={() => onUpdated?.('atendido')}
             />
           )}
-          {estado === 'entregado' && ['admin', 'gerente'].includes(userRole) && (
+          {contexto === 'logistica' && estado === 'entregado' && ['admin', 'gerente'].includes(userRole) && (
             <RollbackButton
               entityType="pedidoEquipo"
               entityId={pedidoId}
