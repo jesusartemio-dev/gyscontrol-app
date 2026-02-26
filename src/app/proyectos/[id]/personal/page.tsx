@@ -43,7 +43,8 @@ import {
   Check,
   ArrowUpDown,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  Info
 } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
@@ -95,6 +96,12 @@ const rolesFijosConfig: Record<string, { icon: any; className: string; label: st
   gestor: { icon: UserCog, className: 'bg-blue-100 text-blue-700', label: 'Gestor' },
   supervisor: { icon: HardHat, className: 'bg-orange-100 text-orange-700', label: 'Supervisor' },
   lider: { icon: Settings, className: 'bg-purple-100 text-purple-700', label: 'Líder Técnico' }
+}
+
+const roleDescriptions: Record<string, string> = {
+  gestor: 'El gestor administra el proyecto, coordina recursos y supervisa el avance general.',
+  supervisor: 'El supervisor verifica la calidad del trabajo y valida los entregables del proyecto.',
+  lider: 'El líder técnico dirige la ejecución técnica y toma decisiones de ingeniería.'
 }
 
 // Skeleton minimalista
@@ -647,17 +654,50 @@ export default function PersonalPage({ params: _params }: PageProps) {
 
       {/* Modal para editar Rol Fijo */}
       <Dialog open={!!editingRolFijo} onOpenChange={(open) => !open && setEditingRolFijo(null)}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              {editingRolFijo && rolesFijosConfig[editingRolFijo] && (() => {
+                const config = rolesFijosConfig[editingRolFijo]
+                const Icon = config.icon
+                return (
+                  <span className={`inline-flex items-center justify-center h-7 w-7 rounded-lg ${config.className}`}>
+                    <Icon className="h-4 w-4" />
+                  </span>
+                )
+              })()}
               {editingRolFijo && rolesFijosConfig[editingRolFijo]
                 ? `Asignar ${rolesFijosConfig[editingRolFijo].label}`
                 : 'Asignar Rol'}
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 pt-4">
+          <div className="space-y-4 pt-2">
+            {/* Descripción del rol */}
+            {editingRolFijo && roleDescriptions[editingRolFijo] && (
+              <div className="flex gap-2 rounded-lg bg-muted/50 p-3">
+                <Info className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {roleDescriptions[editingRolFijo]}
+                </p>
+              </div>
+            )}
+
+            {/* Responsable actual */}
+            {editingRolFijo && rolesFijos[editingRolFijo as keyof typeof rolesFijos] && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                <p className="text-xs font-medium text-blue-600 mb-1">Responsable actual</p>
+                <p className="text-sm font-semibold text-blue-900">
+                  {rolesFijos[editingRolFijo as keyof typeof rolesFijos]!.name}
+                </p>
+                <p className="text-xs text-blue-600">
+                  {rolesFijos[editingRolFijo as keyof typeof rolesFijos]!.email}
+                </p>
+              </div>
+            )}
+
+            {/* Select de usuario */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Usuario</label>
+              <label className="text-sm font-medium">Nuevo responsable</label>
               <Select value={selectedRolFijoUserId || '__none__'} onValueChange={setSelectedRolFijoUserId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar usuario..." />
@@ -668,14 +708,17 @@ export default function PersonalPage({ params: _params }: PageProps) {
                   </SelectItem>
                   {usuarios.map((user) => (
                     <SelectItem key={user.id} value={user.id}>
-                      {user.name} ({user.role})
+                      <div className="flex flex-col">
+                        <span>{user.name}</span>
+                        <span className="text-xs text-muted-foreground">{user.email}</span>
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
-            <div className="flex justify-end gap-2 pt-4">
+            <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setEditingRolFijo(null)}>
                 Cancelar
               </Button>
@@ -685,7 +728,13 @@ export default function PersonalPage({ params: _params }: PageProps) {
                 ) : (
                   <Check className="h-4 w-4 mr-2" />
                 )}
-                Guardar
+                {(() => {
+                  const currentUser = editingRolFijo ? rolesFijos[editingRolFijo as keyof typeof rolesFijos] : null
+                  const isRemoving = selectedRolFijoUserId === '__none__' || !selectedRolFijoUserId
+                  if (isRemoving && currentUser) return 'Remover'
+                  if (currentUser) return 'Cambiar'
+                  return 'Asignar'
+                })()}
               </Button>
             </div>
           </div>
