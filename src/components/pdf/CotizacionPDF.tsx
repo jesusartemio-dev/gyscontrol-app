@@ -202,15 +202,16 @@ const s = StyleSheet.create({
 
   /* ─── Proposal Title ─── */
   proposalTitle: {
-    fontSize: 20,
-    fontWeight: 700,
-    color: C.black,
-    marginBottom: 2,
+    fontSize: 24,
+    fontFamily: 'Helvetica-Bold',
+    color: C.gray900,
+    marginBottom: 6,
   },
   proposalSubtitle: {
-    fontSize: 10,
+    fontSize: 9,
     color: C.gray500,
-    marginBottom: 18,
+    lineHeight: 1.4,
+    marginBottom: 16,
   },
 
   /* ─── Client Table ─── */
