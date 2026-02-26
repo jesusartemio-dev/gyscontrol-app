@@ -7,520 +7,38 @@ import {
   View,
   StyleSheet,
   PDFDownloadLink,
-  Image
 } from '@react-pdf/renderer'
 import type { Cotizacion } from '@/types'
-
-// Use built-in Helvetica font for better compatibility
-// Font.register({
-//   family: 'Helvetica',
-//   fonts: [
-//     { src: 'Helvetica', fontWeight: 300 },
-//     { src: 'Helvetica', fontWeight: 400 },
-//     { src: 'Helvetica', fontWeight: 500 },
-//     { src: 'Helvetica', fontWeight: 600 },
-//     { src: 'Helvetica', fontWeight: 700 }
-//   ]
-// })
 
 interface Props {
   cotizacion: Cotizacion
 }
 
-// Modern Gray Scale Sophistication - Single color palette
+// ── Brand Palette ────────────────────────────────────────────────
 const colors = {
-  primary: '#374151',      // Gray-700 - Main professional gray
-  secondary: '#6b7280',    // Gray-500 - Secondary text
-  accent: '#9ca3af',       // Gray-400 - Subtle accents
-  success: '#10b981',      // Keep for status indicators
-  warning: '#f59e0b',      // Keep for status indicators
-  danger: '#ef4444',       // Keep for status indicators
-  dark: '#111827',         // Gray-900 - Dark text
-  light: '#f9fafb',        // Gray-50 - Light backgrounds
-  white: '#ffffff',
-  black: '#000000',
-  border: '#e5e7eb',       // Gray-200 - Modern borders
-  borderLight: '#f3f4f6',  // Gray-100 - Very light borders
-  shadow: '#d1d5db'        // Gray-300 - Subtle shadows
+  navy:      '#1A1F2E',
+  green:     '#2D6A4F',
+  green2:    '#40916C',
+  greenPale: '#D8F3DC',
+  gold:      '#B5881A',
+  goldPale:  '#FFF8E1',
+  white:     '#FFFFFF',
+  black:     '#000000',
+  gray900:   '#111827',
+  gray700:   '#374151',
+  gray600:   '#4B5563',
+  gray500:   '#6B7280',
+  gray400:   '#9CA3AF',
+  gray300:   '#D1D5DB',
+  gray200:   '#E5E7EB',
+  gray100:   '#F3F4F6',
+  gray50:    '#F9FAFB',
+  red500:    '#EF4444',
+  red100:    '#FEE2E2',
+  blue50:    '#EFF6FF',
 }
 
-const styles = StyleSheet.create({
-  // Document and page styles - Modern Gray Scale
-  page: {
-    padding: 45,
-    fontSize: 10.5,
-    fontWeight: 400,
-    lineHeight: 1.5,
-    color: colors.dark,
-    backgroundColor: colors.white
-  },
-  
-  // Modern header with clean lines and subtle gradients
-  headerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-    position: 'relative'
-  },
-  headerAccent: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 3,
-    backgroundColor: colors.primary,
-    opacity: 0.8
-  },
-  logoSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 35
-  },
-  logo: {
-    width: 80,
-    height: 40,
-    marginRight: 20
-  },
-  companyName: {
-    fontSize: 16,
-    fontWeight: 700,
-    color: colors.primary,
-    marginBottom: 4,
-    letterSpacing: -0.3
-  },
-  companyTagline: {
-    fontSize: 9,
-    fontWeight: 400,
-    color: colors.secondary,
-    marginBottom: 6,
-    letterSpacing: 0.1
-  },
-  companyDetails: {
-    fontSize: 7.5,
-    color: colors.secondary,
-    lineHeight: 1.4,
-    fontWeight: 400
-  },
-  
-  // Compact header for interior pages
-  compactHeaderContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-    paddingBottom: 10,
-    borderBottom: `2px solid ${colors.primary}`,
-    position: 'relative'
-  },
-  compactCompanyName: {
-    fontSize: 14,
-    fontWeight: 600,
-    color: colors.primary,
-    textAlign: 'center',
-    letterSpacing: 0.2
-  },
-  compactTagline: {
-    fontSize: 8,
-    fontWeight: 400,
-    color: colors.secondary,
-    textAlign: 'center',
-    marginTop: 3,
-    letterSpacing: 0.1
-  },
-  
-  // Modern quote header section
-  quoteHeaderContainer: {
-    backgroundColor: colors.light,
-    padding: 22,
-    marginBottom: 28,
-    border: `1px solid ${colors.borderLight}`,
-    position: 'relative'
-  },
-  quoteHeaderAccent: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 4,
-    backgroundColor: colors.primary
-  },
-  quoteTitle: {
-    fontSize: 18,
-    fontWeight: 600,
-    textAlign: 'center',
-    marginBottom: 18,
-    color: colors.primary,
-    letterSpacing: 0.5
-  },
-  quoteMetadata: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 8
-  },
-  quoteNumber: {
-    fontSize: 14,
-    fontWeight: 600,
-    color: colors.dark,
-    letterSpacing: 0.2
-  },
-  quoteDate: {
-    fontSize: 10,
-    color: colors.secondary,
-    fontWeight: 400,
-    letterSpacing: 0.1
-  },
-  
-  // Modern client information table
-  clientSection: {
-    marginBottom: 32
-  },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: 600,
-    color: colors.primary,
-    marginBottom: 16,
-    letterSpacing: 0.3
-  },
-  clientTable: {
-    border: `1px solid ${colors.border}`,
-    overflow: 'hidden'
-  },
-  clientRow: {
-    flexDirection: 'row',
-    borderBottom: `1px solid ${colors.borderLight}`,
-    minHeight: 38,
-    alignItems: 'center'
-  },
-  clientRowLast: {
-    borderBottom: 'none'
-  },
-  clientLabel: {
-    width: 125,
-    fontSize: 9,
-    fontWeight: 600,
-    paddingLeft: 16,
-    paddingRight: 16,
-    backgroundColor: colors.light,
-    borderRight: `1px solid ${colors.borderLight}`,
-    color: colors.primary,
-    letterSpacing: 0.2
-  },
-  clientValue: {
-    flex: 1,
-    fontSize: 9,
-    paddingLeft: 16,
-    paddingRight: 16,
-    color: colors.dark,
-    fontWeight: 400,
-    lineHeight: 1.4
-  },
-  
-  // Modern summary section with gray scale sophistication
-  summaryContainer: {
-    marginBottom: 32
-  },
-  summaryHeader: {
-    backgroundColor: colors.primary,
-    padding: 14,
-    marginBottom: 0,
-    position: 'relative'
-  },
-  summaryHeaderAccent: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 2,
-    backgroundColor: colors.accent,
-    opacity: 0.3
-  },
-  summaryTitle: {
-    fontSize: 13,
-    fontWeight: 600,
-    color: colors.white,
-    textAlign: 'center',
-    letterSpacing: 0.3
-  },
-  summaryTable: {
-    border: `1px solid ${colors.border}`,
-    borderTop: 'none'
-  },
-  summaryTableHeader: {
-    flexDirection: 'row',
-    backgroundColor: colors.light,
-    borderBottom: `1px solid ${colors.border}`
-  },
-  summaryHeaderCell: {
-    padding: 13,
-    fontSize: 9.5,
-    fontWeight: 600,
-    textAlign: 'center',
-    borderRight: `1px solid ${colors.borderLight}`,
-    color: colors.primary,
-    letterSpacing: 0.2
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    borderBottom: `1px solid ${colors.borderLight}`,
-    minHeight: 42,
-    alignItems: 'center'
-  },
-  summaryRowAlt: {
-    backgroundColor: colors.white
-  },
-  summaryCell: {
-    padding: 13,
-    fontSize: 9,
-    borderRight: `1px solid ${colors.borderLight}`,
-    textAlign: 'center',
-    color: colors.dark
-  },
-  summaryDescCell: {
-    flex: 3,
-    textAlign: 'left',
-    fontWeight: 500,
-    paddingLeft: 16
-  },
-  summaryQtyCell: {
-    flex: 1,
-    fontWeight: 500
-  },
-  summaryPriceCell: {
-    flex: 2,
-    textAlign: 'right',
-    fontWeight: 600,
-    color: colors.primary,
-    paddingRight: 16
-  },
-  
-  // Professional totals section
-  totalsContainer: {
-    marginTop: 20,
-    alignItems: 'flex-end'
-  },
-  totalRow: {
-    flexDirection: 'row',
-    width: 250,
-    justifyContent: 'space-between',
-    paddingVertical: 6,
-    paddingHorizontal: 15,
-    marginBottom: 2,
-    borderBottom: `1px solid ${colors.border}`
-  },
-  totalLabel: {
-    fontSize: 11,
-    fontWeight: 500,
-    color: colors.secondary
-  },
-  totalValue: {
-    fontSize: 11,
-    fontWeight: 600,
-    color: colors.dark
-  },
-  grandTotalRow: {
-    flexDirection: 'row',
-    width: 250,
-    justifyContent: 'space-between',
-    backgroundColor: colors.primary,
-    padding: 15,
-    marginTop: 10
-  },
-  grandTotalLabel: {
-    fontSize: 14,
-    fontWeight: 700,
-    color: colors.white,
-    textTransform: 'uppercase'
-  },
-  grandTotalValue: {
-    fontSize: 14,
-    fontWeight: 700,
-    color: colors.white
-  },
-  
-  // Enhanced scope and details sections
-  contentSection: {
-    marginTop: 30,
-    marginBottom: 25
-  },
-  contentHeader: {
-    backgroundColor: colors.secondary,
-    padding: 12,
-    marginBottom: 0
-  },
-  contentTitle: {
-    fontSize: 13,
-    fontWeight: 600,
-    color: colors.white,
-    textAlign: 'center',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5
-  },
-  contentBody: {
-    padding: 20,
-    border: `1px solid ${colors.border}`,
-    borderTop: 'none',
-    backgroundColor: colors.white
-  },
-  contentText: {
-    fontSize: 10,
-    lineHeight: 1.6,
-    marginBottom: 12,
-    color: colors.dark,
-    textAlign: 'justify'
-  },
-  contentList: {
-    marginLeft: 20,
-    marginBottom: 15
-  },
-  contentListItem: {
-    fontSize: 10,
-    marginBottom: 6,
-    color: colors.dark,
-    lineHeight: 1.5
-  },
-  
-  // Professional detail tables
-  detailSection: {
-    marginTop: 25,
-    pageBreakInside: 'avoid'
-  },
-  detailHeader: {
-    backgroundColor: colors.accent,
-    padding: 12
-  },
-  detailTitle: {
-    fontSize: 13,
-    fontWeight: 600,
-    color: colors.white,
-    textAlign: 'center',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5
-  },
-  detailTable: {
-    border: `1px solid ${colors.border}`,
-    borderTop: 'none'
-  },
-  detailTableHeader: {
-    flexDirection: 'row',
-    backgroundColor: colors.dark,
-    color: colors.white
-  },
-  detailHeaderCell: {
-    padding: 10,
-    fontSize: 10,
-    fontWeight: 600,
-    textAlign: 'center',
-    borderRight: `1px solid ${colors.border}`,
-    textTransform: 'uppercase'
-  },
-  detailRow: {
-    flexDirection: 'row',
-    borderBottom: `1px solid ${colors.border}`,
-    minHeight: 35,
-    alignItems: 'center'
-  },
-  detailRowAlt: {
-    backgroundColor: '#fafbfc'
-  },
-  detailCell: {
-    padding: 8,
-    fontSize: 9,
-    borderRight: `1px solid ${colors.border}`,
-    textAlign: 'left',
-    color: colors.dark
-  },
-  detailItemCell: {
-    flex: 1,
-    textAlign: 'center',
-    fontWeight: 500
-  },
-  detailDescCell: {
-    flex: 4,
-    fontWeight: 400
-  },
-  detailUnitCell: {
-    flex: 1,
-    textAlign: 'center',
-    fontWeight: 500
-  },
-  detailQtyCell: {
-    flex: 1,
-    textAlign: 'center',
-    fontWeight: 600,
-    color: colors.primary
-  },
-  
-  // Modern asymmetric footer
-  footer: {
-    position: 'absolute',
-    bottom: 32,
-    left: 45,
-    right: 45,
-    paddingTop: 18,
-    borderTop: `1px solid ${colors.border}`,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end'
-  },
-  footerAccent: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 2,
-    backgroundColor: colors.primary,
-    opacity: 0.4
-  },
-  footerLeft: {
-    flex: 1,
-    paddingTop: 8
-  },
-  footerCenter: {
-    flex: 1,
-    textAlign: 'center',
-    paddingTop: 8
-  },
-  footerRight: {
-    flex: 1,
-    textAlign: 'right',
-    paddingTop: 8
-  },
-  footerText: {
-    fontSize: 7.5,
-    color: colors.secondary,
-    fontWeight: 400,
-    lineHeight: 1.3
-  },
-  footerBold: {
-    fontWeight: 600,
-    color: colors.primary
-  },
-  
-  // Page numbering
-  pageNumber: {
-    position: 'absolute',
-    bottom: 15,
-    right: 40,
-    fontSize: 8,
-    color: colors.secondary
-  },
-  
-  // Watermark for confidentiality
-  watermark: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: 'translate(-50%, -50%) rotate(-45deg)',
-    fontSize: 60,
-    color: '#f0f0f0',
-    fontWeight: 100,
-    zIndex: -1
-  }
-})
-
-// Enhanced utility functions
+// ── Utility functions ────────────────────────────────────────────
 const safeText = (value: any): string => {
   if (value === null || value === undefined) return ''
   return String(value).trim()
@@ -528,50 +46,621 @@ const safeText = (value: any): string => {
 
 const formatCurrency = (amount: number, currency: string = 'USD'): string => {
   if (isNaN(amount)) return currency === 'PEN' ? 'S/0.00' : '$0.00'
-
   if (currency === 'PEN') {
     return `S/${new Intl.NumberFormat('es-PE', {
       minimumFractionDigits: 2,
-      maximumFractionDigits: 2
+      maximumFractionDigits: 2,
     }).format(amount)}`
   }
-
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
     minimumFractionDigits: 2,
-    maximumFractionDigits: 2
+    maximumFractionDigits: 2,
   }).format(amount)
 }
 
 const formatDate = (date: Date | string): string => {
-  const dateObj = typeof date === 'string' ? new Date(date) : date
-  return dateObj.toLocaleDateString('es-PE', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric'
+  const d = typeof date === 'string' ? new Date(date) : date
+  return d.toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' })
+}
+
+const formatNumber = (num: number): string =>
+  new Intl.NumberFormat('en-US').format(num)
+
+const parseFormaPago = (fp: string): { percent: string; label: string }[] => {
+  return fp.split(',').map(part => {
+    const trimmed = part.trim()
+    const match = trimmed.match(/^(\d+%)\s+(.+)$/i)
+    if (match) return { percent: match[1], label: match[2].charAt(0).toUpperCase() + match[2].slice(1) }
+    return { percent: '', label: trimmed }
   })
 }
 
-const formatNumber = (num: number): string => {
-  return new Intl.NumberFormat('en-US').format(num)
-}
+const getInitials = (name: string): string =>
+  name.split(' ').filter(Boolean).map(w => w[0]).join('').toUpperCase().slice(0, 2)
 
+// ── Styles ───────────────────────────────────────────────────────
+const s = StyleSheet.create({
+  /* ─── Page ─── */
+  page: {
+    paddingTop: 58,
+    paddingBottom: 36,
+    paddingHorizontal: 40,
+    fontSize: 9,
+    lineHeight: 1.5,
+    color: colors.gray900,
+    backgroundColor: colors.white,
+  },
+
+  /* ─── Header (absolute, all pages) ─── */
+  header: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 48,
+    backgroundColor: colors.navy,
+    flexDirection: 'row',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  headerInner: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 40,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  logoBox: {
+    width: 36,
+    height: 24,
+    backgroundColor: colors.green,
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoText: {
+    color: colors.white,
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: 1,
+  },
+  headerCompany: {
+    color: colors.white,
+    fontSize: 9.5,
+    fontWeight: 600,
+    marginLeft: 8,
+  },
+  headerCode: {
+    color: colors.gray400,
+    fontSize: 8,
+    marginLeft: 8,
+  },
+  headerGreenAccent: {
+    position: 'absolute',
+    right: -15,
+    top: -12,
+    width: 130,
+    height: 72,
+    backgroundColor: colors.green,
+    transform: 'rotate(-8deg)',
+  },
+  headerDate: {
+    color: colors.white,
+    fontSize: 8,
+    fontWeight: 600,
+    zIndex: 2,
+    textAlign: 'right',
+  },
+
+  /* ─── Footer (absolute, all pages) ─── */
+  footer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 26,
+    backgroundColor: colors.navy,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 40,
+  },
+  footerText: {
+    color: colors.gray400,
+    fontSize: 7,
+  },
+  footerPageNum: {
+    color: colors.green2,
+    fontSize: 7.5,
+    fontWeight: 600,
+  },
+
+  /* ─── Urgency Band (Page 1) ─── */
+  urgencyBand: {
+    backgroundColor: colors.goldPale,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.gold,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    marginBottom: 18,
+  },
+  urgencyText: {
+    color: colors.gold,
+    fontSize: 8.5,
+    fontWeight: 600,
+  },
+  igvBadge: {
+    backgroundColor: colors.gold,
+    borderRadius: 3,
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+  },
+  igvBadgeText: {
+    color: colors.white,
+    fontSize: 7,
+    fontWeight: 700,
+  },
+
+  /* ─── Proposal Title ─── */
+  proposalTitle: {
+    fontSize: 20,
+    fontWeight: 700,
+    color: colors.navy,
+    marginBottom: 2,
+  },
+  proposalSubtitle: {
+    fontSize: 10,
+    color: colors.gray500,
+    marginBottom: 18,
+  },
+
+  /* ─── Client Table ─── */
+  clientTable: {
+    borderWidth: 1,
+    borderColor: colors.gray200,
+    borderRadius: 4,
+    marginBottom: 14,
+  },
+  clientRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray100,
+    minHeight: 22,
+  },
+  clientRowLast: {
+    borderBottomWidth: 0,
+  },
+  clientLabel: {
+    width: 110,
+    backgroundColor: colors.gray50,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    fontSize: 8,
+    fontWeight: 600,
+    color: colors.gray600,
+    textTransform: 'uppercase' as any,
+  },
+  clientValue: {
+    flex: 1,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    fontSize: 8.5,
+    color: colors.gray900,
+  },
+
+  /* ─── Hero Block (Page 1 bottom) ─── */
+  heroBlock: {
+    backgroundColor: colors.green,
+    borderRadius: 6,
+    flexDirection: 'row',
+    padding: 20,
+    marginTop: 10,
+  },
+  heroLeft: {
+    flex: 1,
+    paddingRight: 15,
+  },
+  heroRight: {
+    width: 160,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
+  heroProjectName: {
+    color: colors.white,
+    fontSize: 12,
+    fontWeight: 700,
+    marginBottom: 10,
+  },
+  heroBullet: {
+    color: colors.greenPale,
+    fontSize: 8,
+    marginBottom: 3,
+    lineHeight: 1.4,
+  },
+  heroTotalLabel: {
+    color: colors.greenPale,
+    fontSize: 8,
+    marginBottom: 2,
+  },
+  heroTotalAmount: {
+    color: colors.white,
+    fontSize: 22,
+    fontWeight: 700,
+  },
+  heroDiscount: {
+    color: colors.goldPale,
+    fontSize: 8,
+    fontWeight: 600,
+    marginTop: 4,
+  },
+
+  /* ─── Section Header (reusable) ─── */
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    marginTop: 14,
+  },
+  sectionGreenBar: {
+    width: 4,
+    height: 18,
+    backgroundColor: colors.green,
+    borderRadius: 2,
+    marginRight: 8,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: 700,
+    color: colors.navy,
+  },
+
+  /* ─── Summary Table (Page 2) ─── */
+  summaryHeaderRow: {
+    flexDirection: 'row',
+    backgroundColor: colors.navy,
+    borderRadius: 4,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    marginBottom: 2,
+  },
+  summaryHeaderCell: {
+    color: colors.white,
+    fontSize: 8,
+    fontWeight: 700,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray100,
+  },
+  summaryRowAlt: {
+    backgroundColor: colors.gray50,
+  },
+  summaryCell: {
+    fontSize: 9,
+    color: colors.gray900,
+  },
+  summaryCellBold: {
+    fontSize: 9,
+    color: colors.gray900,
+    fontWeight: 600,
+  },
+  summarySubtotalRow: {
+    flexDirection: 'row',
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    borderTopWidth: 2,
+    borderTopColor: colors.gray300,
+    marginTop: 2,
+  },
+  summaryDiscountRow: {
+    flexDirection: 'row',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: colors.goldPale,
+  },
+  summaryIgvRow: {
+    flexDirection: 'row',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  summaryGrandTotalRow: {
+    flexDirection: 'row',
+    paddingVertical: 9,
+    paddingHorizontal: 10,
+    backgroundColor: colors.navy,
+    borderRadius: 4,
+    marginTop: 2,
+  },
+
+  /* ─── Scope Section (Page 2) ─── */
+  scopeBullet: {
+    fontSize: 8.5,
+    color: colors.gray700,
+    marginBottom: 4,
+    paddingLeft: 8,
+    lineHeight: 1.5,
+  },
+
+  /* ─── Detail Tables (Pages 3-5) ─── */
+  detailHeaderRow: {
+    flexDirection: 'row',
+    backgroundColor: colors.navy,
+    borderRadius: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    marginBottom: 2,
+  },
+  detailHeaderCell: {
+    color: colors.white,
+    fontSize: 7.5,
+    fontWeight: 700,
+  },
+  detailGroupRow: {
+    flexDirection: 'row',
+    backgroundColor: colors.greenPale,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.green2,
+    alignItems: 'center',
+  },
+  detailGroupName: {
+    fontSize: 9,
+    fontWeight: 700,
+    color: colors.green,
+  },
+  detailGroupTotal: {
+    fontSize: 9,
+    fontWeight: 700,
+    color: colors.green,
+    textAlign: 'right',
+  },
+  detailRow: {
+    flexDirection: 'row',
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    borderBottomWidth: 0.5,
+    borderBottomColor: colors.gray100,
+    alignItems: 'center',
+  },
+  detailRowAlt: {
+    backgroundColor: colors.gray50,
+  },
+  detailRowAltBlue: {
+    backgroundColor: colors.blue50,
+  },
+  detailCell: {
+    fontSize: 8,
+    color: colors.gray900,
+  },
+  detailCellBold: {
+    fontSize: 8,
+    color: colors.gray700,
+    fontWeight: 600,
+  },
+  detailCellRight: {
+    fontSize: 8,
+    color: colors.gray900,
+    textAlign: 'right',
+  },
+
+  /* ─── Section Total Box ─── */
+  sectionTotalBox: {
+    alignSelf: 'flex-end',
+    flexDirection: 'row',
+    backgroundColor: colors.navy,
+    borderRadius: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginTop: 12,
+    width: 220,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  sectionTotalLabel: {
+    color: colors.gray400,
+    fontSize: 9,
+    fontWeight: 600,
+  },
+  sectionTotalAmount: {
+    color: colors.white,
+    fontSize: 12,
+    fontWeight: 700,
+  },
+
+  /* ─── Payment Blocks (Page 6) ─── */
+  paymentBlocksRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 18,
+    marginTop: 6,
+  },
+  paymentBlock: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.gray200,
+    borderRadius: 6,
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+  },
+  paymentPercent: {
+    fontSize: 20,
+    fontWeight: 700,
+    color: colors.navy,
+    marginBottom: 4,
+  },
+  paymentLabel: {
+    fontSize: 8,
+    color: colors.gray600,
+    textAlign: 'center',
+  },
+
+  /* ─── Info Cards (Page 6) ─── */
+  infoCardsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 18,
+    marginTop: 6,
+  },
+  infoCard: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.gray200,
+    borderTopWidth: 3,
+    borderTopColor: colors.green,
+    borderRadius: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+  },
+  infoCardTitle: {
+    fontSize: 8,
+    fontWeight: 700,
+    color: colors.green,
+    marginBottom: 5,
+    textTransform: 'uppercase' as any,
+  },
+  infoCardValue: {
+    fontSize: 8.5,
+    color: colors.gray900,
+    lineHeight: 1.6,
+  },
+
+  /* ─── Conditions List (Page 6) ─── */
+  conditionItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 5,
+    paddingLeft: 4,
+  },
+  conditionBullet: {
+    color: colors.green2,
+    fontSize: 9,
+    fontWeight: 700,
+    width: 14,
+  },
+  conditionText: {
+    flex: 1,
+    fontSize: 8.5,
+    color: colors.gray700,
+  },
+  conditionBadge: {
+    backgroundColor: colors.greenPale,
+    borderRadius: 3,
+    paddingVertical: 1,
+    paddingHorizontal: 5,
+    marginLeft: 6,
+  },
+  conditionBadgeText: {
+    fontSize: 6.5,
+    color: colors.green,
+    fontWeight: 600,
+  },
+
+  /* ─── CTA Block (Page 6 bottom) ─── */
+  ctaBlock: {
+    backgroundColor: colors.navy,
+    borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    marginTop: 'auto' as any,
+  },
+  ctaCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.green,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  ctaInitials: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: 700,
+  },
+  ctaMessage: {
+    color: colors.white,
+    fontSize: 10,
+    fontWeight: 600,
+    marginBottom: 3,
+  },
+  ctaContact: {
+    color: colors.gray400,
+    fontSize: 8,
+    lineHeight: 1.5,
+  },
+
+  /* ─── Exclusions (Page 7) ─── */
+  exclusionItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 5,
+    paddingLeft: 4,
+  },
+  exclusionBullet: {
+    color: colors.red500,
+    fontSize: 9,
+    fontWeight: 700,
+    width: 14,
+  },
+  exclusionText: {
+    flex: 1,
+    fontSize: 8.5,
+    color: colors.gray700,
+  },
+
+  /* ─── Cronograma (Page 8) ─── */
+  cronogramaEdt: {
+    marginBottom: 14,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.green,
+    paddingLeft: 10,
+  },
+  cronogramaEdtTitle: {
+    fontSize: 10,
+    fontWeight: 700,
+    color: colors.navy,
+    marginBottom: 4,
+  },
+  cronogramaDetail: {
+    fontSize: 8.5,
+    color: colors.gray600,
+    marginBottom: 2,
+  },
+  cronogramaTarea: {
+    fontSize: 8,
+    color: colors.gray500,
+    marginLeft: 10,
+    marginBottom: 2,
+  },
+})
+
+// ── Main Component ───────────────────────────────────────────────
 const CotizacionPDF = ({ cotizacion }: Props) => {
-  // Early return if cotizacion is not properly loaded
-  if (!cotizacion || !cotizacion.id) {
-    return null
-  }
+  if (!cotizacion || !cotizacion.id) return null
 
-  const currentDate = new Date()
+  // ── Data extraction ──
+  const now = new Date()
+  const validezDias = cotizacion.validezOferta || 15
+  const validUntilDate = cotizacion.fechaValidezHasta
+    ? new Date(cotizacion.fechaValidezHasta)
+    : new Date(now.getTime() + validezDias * 24 * 60 * 60 * 1000)
 
-  // Use dynamic validez or default to 15 days
-  const validezDias = (cotizacion as any).validezOferta || 15
-  const validUntilDate = (cotizacion as any).fechaValidezHasta
-    ? new Date((cotizacion as any).fechaValidezHasta)
-    : new Date(currentDate.getTime() + validezDias * 24 * 60 * 60 * 1000)
-
-  // Safe data access with defaults
   const equipos = Array.isArray(cotizacion.equipos) ? cotizacion.equipos : []
   const servicios = Array.isArray(cotizacion.servicios) ? cotizacion.servicios : []
   const gastos = Array.isArray(cotizacion.gastos) ? cotizacion.gastos : []
@@ -579,32 +668,76 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
   const condiciones = Array.isArray(cotizacion.condiciones) ? cotizacion.condiciones : []
   const cronograma = Array.isArray(cotizacion.cronograma) ? cotizacion.cronograma : []
 
-  // Dynamic currency
-  const moneda = (cotizacion as any).moneda || 'USD'
+  const moneda = cotizacion.moneda || 'USD'
   const monedaLabel = moneda === 'PEN' ? 'Soles (PEN)' : 'Dólares Americanos (USD)'
+  const incluyeIGV = cotizacion.incluyeIGV ?? false
 
-  // Calculate totals with safe access (all prices are without IGV for client)
-  const equiposTotal = equipos.reduce((sum, equipo) => sum + (equipo.subtotalCliente || 0), 0)
-  const serviciosTotal = servicios.reduce((sum, servicio) => sum + (servicio.subtotalCliente || 0), 0)
-  const gastosTotal = gastos.reduce((sum, gasto) => sum + (gasto.subtotalCliente || 0), 0)
-  const total = equiposTotal + serviciosTotal + gastosTotal
+  const comercial = cotizacion.comercial || (cotizacion as any).user
+  const comercialName = (comercial as any)?.name || (comercial as any)?.nombre || 'Departamento Comercial'
+  const formaPago = cotizacion.formaPago || '30% adelanto, 40% contra entrega, 30% contra conformidad'
+  const referencia = cotizacion.referencia || safeText(cotizacion.nombre)
+  const revision = (cotizacion as any).revision || 'R01'
 
-  // Determine which sections have content
+  // ── Totals (client-facing only) ──
+  const equiposTotal = equipos.reduce((sum, eq) => sum + (eq.subtotalCliente || 0), 0)
+  const serviciosTotal = servicios.reduce((sum, sv) => sum + (sv.subtotalCliente || 0), 0)
+  const gastosTotal = gastos.reduce((sum, gs) => sum + (gs.subtotalCliente || 0), 0)
+  const subtotal = equiposTotal + serviciosTotal + gastosTotal
+  const descuento = cotizacion.descuento || 0
+  const descuentoPct = (cotizacion as any).descuentoPorcentaje || 0
+  const grandTotal = cotizacion.grandTotal > 0 ? cotizacion.grandTotal : (subtotal - descuento)
+
+  // ── Counts ──
+  const totalEquiposItems = equipos.reduce((sum, eq) => sum + (eq.items?.length || 0), 0)
+  const totalServiciosItems = servicios.reduce((sum, sv) => sum + (sv.items?.length || 0), 0)
+  const totalGastosItems = gastos.reduce((sum, gs) => sum + (gs.items?.length || 0), 0)
+
   const hasEquipos = equipos.length > 0
   const hasServicios = servicios.length > 0
   const hasGastos = gastos.length > 0
   const hasExclusionesCondiciones = exclusiones.length > 0 || condiciones.length > 0
   const hasCronograma = cronograma.length > 0
 
-  // Get comercial info for contact
-  const comercial = (cotizacion as any).user || (cotizacion as any).comercial
+  const codeAndRevision = `${safeText(cotizacion.codigo)} ${revision}`
 
-  // Dynamic forma de pago
-  const formaPago = (cotizacion as any).formaPago || '30% adelanto, 40% contra entrega, 30% contra conformidad'
+  // ── Reusable header / footer ──
+  const renderHeader = () => (
+    <View style={s.header} fixed>
+      {/* Green diagonal accent on right */}
+      <View style={s.headerGreenAccent} />
+      <View style={s.headerInner}>
+        <View style={s.headerLeft}>
+          <View style={s.logoBox}>
+            <Text style={s.logoText}>GYS</Text>
+          </View>
+          <View>
+            <Text style={s.headerCompany}>GYS CONTROL INDUSTRIAL SAC</Text>
+            <Text style={s.headerCode}>{codeAndRevision}</Text>
+          </View>
+        </View>
+        <Text style={s.headerDate}>{formatDate(now)}</Text>
+      </View>
+    </View>
+  )
 
-  // Dynamic referencia
-  const referencia = (cotizacion as any).referencia || safeText(cotizacion.nombre)
+  const renderFooter = () => (
+    <View style={s.footer} fixed>
+      <Text style={s.footerText}>Documento Confidencial — GYS Control Industrial SAC</Text>
+      <Text
+        style={s.footerPageNum}
+        render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
+      />
+    </View>
+  )
 
+  const renderSectionHeader = (title: string) => (
+    <View style={s.sectionHeader}>
+      <View style={s.sectionGreenBar} />
+      <Text style={s.sectionTitle}>{title}</Text>
+    </View>
+  )
+
+  // ── Render ──
   return (
     <Document
       title={`Cotización ${safeText(cotizacion.nombre)} - ${safeText(cotizacion.cliente?.nombre)}`}
@@ -614,861 +747,639 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
       creator="GYS Control Industrial - Sistema de Gestión"
       producer="GYS Control Industrial SAC"
     >
-      {/* PÁGINA 1: PORTADA Y INFORMACIÓN GENERAL */}
-      <Page size="A4" style={styles.page}>
-        {/* Modern Header */}
-        <View style={styles.headerContainer}>
-          <Image style={styles.logo} src="/logo.png" />
-          <View style={{ alignItems: 'center' }}>
-            <Text style={[styles.companyName, { textAlign: 'center', marginBottom: 4 }]}>GYS CONTROL SAC</Text>
-            <Text style={[styles.companyTagline, { textAlign: 'center' }]}>Soluciones Integrales en Automatización Industrial</Text>
-          </View>
-          <View style={{ width: 80 }} />
-        </View>
+      {/* ═══════════════════════════════════════════════════════════
+          PAGE 1 — PORTADA
+          ═══════════════════════════════════════════════════════════ */}
+      <Page size="A4" style={s.page}>
+        {renderHeader()}
 
-        {/* Contact Details */}
-        <View style={{ alignItems: 'center', marginBottom: 10, marginTop: 5 }}>
-          <Text style={[styles.companyDetails, { textAlign: 'center' }]}>
-            Lima: Calle Los Geranios 486 - Tel: +51 1 478 7587 - Email: info@gyscontrol.com{"\n"}
-            Arequipa: Coop. Juan El Bueno E-26 - Tel: +51 54 277 584 - Web: www.gyscontrol.com
+        {/* Urgency Band */}
+        <View style={s.urgencyBand}>
+          <Text style={s.urgencyText}>
+            Validez de oferta: {validezDias} días — Hasta {formatDate(validUntilDate)}
           </Text>
-        </View>
-
-        {/* Modern Quote Header */}
-        <View style={styles.quoteHeaderContainer}>
-          <View style={styles.quoteHeaderAccent} />
-          <Text style={styles.quoteTitle}>Propuesta Económica</Text>
-          <View style={styles.quoteMetadata}>
-            <Text style={styles.quoteNumber}>N° {safeText(cotizacion.codigo)}</Text>
-            <Text style={styles.quoteDate}>{formatDate(currentDate)}</Text>
-          </View>
-        </View>
-
-        {/* Client Information */}
-        <View style={styles.clientSection}>
-          <Text style={styles.sectionTitle}>Información del Cliente</Text>
-          <View style={styles.clientTable}>
-            <View style={styles.clientRow}>
-              <Text style={styles.clientLabel}>Cliente</Text>
-              <Text style={styles.clientValue}>{safeText(cotizacion.cliente?.nombre).toUpperCase()}</Text>
-            </View>
-            <View style={styles.clientRow}>
-              <Text style={styles.clientLabel}>RUC</Text>
-              <Text style={styles.clientValue}>{safeText(cotizacion.cliente?.ruc)}</Text>
-            </View>
-            <View style={styles.clientRow}>
-              <Text style={styles.clientLabel}>Dirección</Text>
-              <Text style={styles.clientValue}>{safeText(cotizacion.cliente?.direccion)}</Text>
-            </View>
-            <View style={styles.clientRow}>
-              <Text style={styles.clientLabel}>Contacto</Text>
-              <Text style={styles.clientValue}>{safeText(cotizacion.cliente?.correo)}</Text>
-            </View>
-            <View style={styles.clientRow}>
-              <Text style={styles.clientLabel}>Referencia</Text>
-              <Text style={styles.clientValue}>{referencia}</Text>
-            </View>
-            <View style={styles.clientRow}>
-              <Text style={styles.clientLabel}>Moneda</Text>
-              <Text style={styles.clientValue}>{monedaLabel}</Text>
-            </View>
-            <View style={styles.clientRow}>
-              <Text style={styles.clientLabel}>Forma de Pago</Text>
-              <Text style={styles.clientValue}>{formaPago}</Text>
-            </View>
-            <View style={styles.clientRow}>
-              <Text style={styles.clientLabel}>Tiempo Entrega</Text>
-              <Text style={styles.clientValue}>{(cotizacion as any).tiempoEntrega || 'Según cronograma del proyecto'}</Text>
-            </View>
-            <View style={styles.clientRow}>
-              <Text style={styles.clientLabel}>Validez Oferta</Text>
-              <Text style={styles.clientValue}>{validezDias} días calendario - Hasta {formatDate(validUntilDate)}</Text>
-            </View>
-            <View style={[styles.clientRow, styles.clientRowLast]}>
-              <Text style={styles.clientLabel}>Moneda</Text>
-              <Text style={styles.clientValue}>{monedaLabel}</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Introduction */}
-        <View style={styles.contentSection}>
-          <View style={styles.contentHeader}>
-            <Text style={styles.contentTitle}>Introducción</Text>
-          </View>
-          <View style={styles.contentBody}>
-            <Text style={styles.contentText}>
-              En atención a su amable solicitud, GYS CONTROL INDUSTRIAL SAC tiene el agrado de presentar 
-              nuestra propuesta técnico-económica para el proyecto de automatización industrial solicitado.
-            </Text>
-            <Text style={styles.contentText}>
-              Nuestra propuesta ha sido desarrollada considerando los más altos estándares de calidad, 
-              cumplimiento normativo y las mejores prácticas de la industria, garantizando una solución 
-              integral y confiable para sus necesidades.
+          <View style={s.igvBadge}>
+            <Text style={s.igvBadgeText}>
+              {incluyeIGV ? 'IGV INCLUIDO' : 'SIN IGV'}
             </Text>
           </View>
         </View>
 
-        {/* Modern Footer */}
-        <View style={styles.footer}>
-          <View style={styles.footerAccent} />
-          <View style={styles.footerLeft}>
-            <Text style={styles.footerText}>
-              <Text style={styles.footerBold}>GYS Control Industrial SAC</Text>{"\n"}
-              RUC: 20545610672
-            </Text>
+        {/* Title */}
+        <Text style={s.proposalTitle}>Propuesta Económica</Text>
+        <Text style={s.proposalSubtitle}>
+          {safeText(cotizacion.nombre)} — {safeText(cotizacion.cliente?.nombre)}
+        </Text>
+
+        {/* Client Info Table */}
+        <View style={s.clientTable}>
+          <View style={s.clientRow}>
+            <Text style={s.clientLabel}>Cliente</Text>
+            <Text style={s.clientValue}>{safeText(cotizacion.cliente?.nombre).toUpperCase()}</Text>
           </View>
-          <View style={styles.footerCenter}>
-            <Text style={[styles.footerText, { textAlign: 'center' }]}>
-              Documento Confidencial - Uso Exclusivo del Cliente
-            </Text>
+          <View style={s.clientRow}>
+            <Text style={s.clientLabel}>RUC</Text>
+            <Text style={s.clientValue}>{safeText(cotizacion.cliente?.ruc)}</Text>
           </View>
-          <View style={styles.footerRight}>
-            <Text
-              style={[styles.footerText, { textAlign: 'right' }]}
-              render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`}
-            />
+          <View style={s.clientRow}>
+            <Text style={s.clientLabel}>Dirección</Text>
+            <Text style={s.clientValue}>{safeText(cotizacion.cliente?.direccion)}</Text>
+          </View>
+          <View style={s.clientRow}>
+            <Text style={s.clientLabel}>Contacto</Text>
+            <Text style={s.clientValue}>{safeText(cotizacion.cliente?.correo)}</Text>
+          </View>
+          <View style={s.clientRow}>
+            <Text style={s.clientLabel}>Referencia</Text>
+            <Text style={s.clientValue}>{referencia}</Text>
+          </View>
+          <View style={s.clientRow}>
+            <Text style={s.clientLabel}>Moneda</Text>
+            <Text style={s.clientValue}>{monedaLabel}</Text>
+          </View>
+          <View style={s.clientRow}>
+            <Text style={s.clientLabel}>Forma de Pago</Text>
+            <Text style={s.clientValue}>{formaPago}</Text>
+          </View>
+          <View style={s.clientRow}>
+            <Text style={s.clientLabel}>Tiempo Entrega</Text>
+            <Text style={s.clientValue}>{(cotizacion as any).tiempoEntrega || 'Según cronograma del proyecto'}</Text>
+          </View>
+          <View style={[s.clientRow, s.clientRowLast]}>
+            <Text style={s.clientLabel}>Validez Oferta</Text>
+            <Text style={s.clientValue}>{validezDias} días calendario — Hasta {formatDate(validUntilDate)}</Text>
           </View>
         </View>
+
+        {/* Spacer pushes hero to bottom */}
+        <View style={{ flex: 1 }} />
+
+        {/* Hero Block */}
+        <View style={s.heroBlock}>
+          <View style={s.heroLeft}>
+            <Text style={s.heroProjectName}>{safeText(cotizacion.nombre)}</Text>
+            {hasEquipos && (
+              <Text style={s.heroBullet}>
+                • Suministro de {totalEquiposItems} equipo{totalEquiposItems !== 1 ? 's' : ''} en {equipos.length} grupo{equipos.length !== 1 ? 's' : ''}: {equipos.map(e => safeText(e.nombre)).join(', ')}
+              </Text>
+            )}
+            {hasServicios && (
+              <Text style={s.heroBullet}>
+                • Servicios de ingeniería: {servicios.map(sv => safeText(sv.nombre)).join(', ')}
+              </Text>
+            )}
+            {hasGastos && (
+              <Text style={s.heroBullet}>
+                • Gastos adicionales: {gastos.map(gs => safeText(gs.nombre)).join(', ')}
+              </Text>
+            )}
+          </View>
+          <View style={s.heroRight}>
+            <Text style={s.heroTotalLabel}>Total Propuesta ({moneda})</Text>
+            <Text style={s.heroTotalAmount}>{formatCurrency(grandTotal, moneda)}</Text>
+            {descuentoPct > 0 && (
+              <Text style={s.heroDiscount}>Descuento aplicado: {descuentoPct}%</Text>
+            )}
+          </View>
+        </View>
+
+        {renderFooter()}
       </Page>
 
-      {/* PÁGINA 2: RESUMEN EJECUTIVO */}
-      <Page size="A4" style={styles.page}>
-        {/* Compact Header for Interior Pages */}
-        <View style={styles.compactHeaderContainer}>
-          <View>
-            <Text style={styles.compactCompanyName}>GYS CONTROL INDUSTRIAL SAC</Text>
-            <Text style={styles.compactTagline}>Soluciones Integrales en Automatización Industrial</Text>
+      {/* ═══════════════════════════════════════════════════════════
+          PAGE 2 — RESUMEN EJECUTIVO
+          ═══════════════════════════════════════════════════════════ */}
+      <Page size="A4" style={s.page}>
+        {renderHeader()}
+
+        {renderSectionHeader('Resumen Ejecutivo')}
+
+        {/* Summary Table */}
+        <View>
+          {/* Header */}
+          <View style={s.summaryHeaderRow}>
+            <Text style={[s.summaryHeaderCell, { flex: 2.5 }]}>Categoría</Text>
+            <Text style={[s.summaryHeaderCell, { flex: 1, textAlign: 'center' }]}>Grupos</Text>
+            <Text style={[s.summaryHeaderCell, { flex: 1, textAlign: 'center' }]}>Ítems</Text>
+            <Text style={[s.summaryHeaderCell, { flex: 1.5, textAlign: 'right' }]}>Valor Total</Text>
+          </View>
+
+          {/* Equipos Row */}
+          {hasEquipos && (
+            <View style={s.summaryRow}>
+              <Text style={[s.summaryCellBold, { flex: 2.5 }]}>Equipos</Text>
+              <Text style={[s.summaryCell, { flex: 1, textAlign: 'center' }]}>{equipos.length}</Text>
+              <Text style={[s.summaryCell, { flex: 1, textAlign: 'center' }]}>{totalEquiposItems}</Text>
+              <Text style={[s.summaryCellBold, { flex: 1.5, textAlign: 'right' }]}>{formatCurrency(equiposTotal, moneda)}</Text>
+            </View>
+          )}
+
+          {/* Servicios Row */}
+          {hasServicios && (
+            <View style={[s.summaryRow, hasEquipos ? s.summaryRowAlt : {}]}>
+              <Text style={[s.summaryCellBold, { flex: 2.5 }]}>Servicios</Text>
+              <Text style={[s.summaryCell, { flex: 1, textAlign: 'center' }]}>{servicios.length}</Text>
+              <Text style={[s.summaryCell, { flex: 1, textAlign: 'center' }]}>{totalServiciosItems}</Text>
+              <Text style={[s.summaryCellBold, { flex: 1.5, textAlign: 'right' }]}>{formatCurrency(serviciosTotal, moneda)}</Text>
+            </View>
+          )}
+
+          {/* Gastos Row */}
+          {hasGastos && (
+            <View style={[s.summaryRow, (hasEquipos && hasServicios) || (!hasEquipos && !hasServicios) ? {} : s.summaryRowAlt]}>
+              <Text style={[s.summaryCellBold, { flex: 2.5 }]}>Gastos Adicionales</Text>
+              <Text style={[s.summaryCell, { flex: 1, textAlign: 'center' }]}>{gastos.length}</Text>
+              <Text style={[s.summaryCell, { flex: 1, textAlign: 'center' }]}>{totalGastosItems}</Text>
+              <Text style={[s.summaryCellBold, { flex: 1.5, textAlign: 'right' }]}>{formatCurrency(gastosTotal, moneda)}</Text>
+            </View>
+          )}
+
+          {/* Subtotal */}
+          <View style={s.summarySubtotalRow}>
+            <Text style={[s.summaryCellBold, { flex: 4.5 }]}>Subtotal</Text>
+            <Text style={[s.summaryCellBold, { flex: 1.5, textAlign: 'right' }]}>{formatCurrency(subtotal, moneda)}</Text>
+          </View>
+
+          {/* Discount (conditional) */}
+          {descuentoPct > 0 && (
+            <View style={s.summaryDiscountRow}>
+              <Text style={[{ flex: 4.5, fontSize: 9, fontWeight: 600, color: colors.gold }]}>
+                Descuento ({descuentoPct}%)
+              </Text>
+              <Text style={[{ flex: 1.5, textAlign: 'right', fontSize: 9, fontWeight: 600, color: colors.gold }]}>
+                -{formatCurrency(descuento, moneda)}
+              </Text>
+            </View>
+          )}
+
+          {/* IGV Info */}
+          <View style={s.summaryIgvRow}>
+            <Text style={[{ flex: 4.5, fontSize: 8.5, color: colors.gray500 }]}>IGV</Text>
+            <Text style={[{ flex: 1.5, textAlign: 'right', fontSize: 8.5, color: colors.gray500 }]}>
+              {incluyeIGV ? 'Incluido en precios' : 'No incluido'}
+            </Text>
+          </View>
+
+          {/* Grand Total */}
+          <View style={s.summaryGrandTotalRow}>
+            <Text style={[{ flex: 4.5, fontSize: 11, fontWeight: 700, color: colors.white }]}>TOTAL</Text>
+            <Text style={[{ flex: 1.5, textAlign: 'right', fontSize: 11, fontWeight: 700, color: colors.white }]}>
+              {formatCurrency(grandTotal, moneda)}
+            </Text>
           </View>
         </View>
 
-        {/* Modern Summary Table */}
-        <View style={styles.summaryContainer}>
-          <View style={styles.summaryHeader}>
-            <View style={styles.summaryHeaderAccent} />
-            <Text style={styles.summaryTitle}>Resumen Ejecutivo</Text>
+        {/* Alcance del Proyecto (Dynamic) */}
+        {renderSectionHeader('Alcance del Proyecto')}
+
+        <View style={{ marginBottom: 10 }}>
+          <Text style={[s.scopeBullet, { fontWeight: 600, marginBottom: 8 }]}>
+            El presente proyecto contempla la implementación integral de soluciones de
+            automatización industrial, incluyendo:
+          </Text>
+          {hasEquipos && (
+            <Text style={s.scopeBullet}>
+              • Suministro de {totalEquiposItems} equipo{totalEquiposItems !== 1 ? 's' : ''} en {equipos.length} grupo{equipos.length !== 1 ? 's' : ''}: {equipos.map(e => safeText(e.nombre)).join(', ')}
+            </Text>
+          )}
+          {hasServicios && (
+            <Text style={s.scopeBullet}>
+              • Servicios de ingeniería: {servicios.map(sv => safeText(sv.nombre)).join(', ')}
+            </Text>
+          )}
+          {hasGastos && (
+            <Text style={s.scopeBullet}>
+              • Gastos adicionales: {gastos.map(gs => safeText(gs.nombre)).join(', ')}
+            </Text>
+          )}
+          {exclusiones.length > 0 && (
+            <Text style={s.scopeBullet}>
+              • {exclusiones.length} exclusión{exclusiones.length !== 1 ? 'es' : ''} detallada{exclusiones.length !== 1 ? 's' : ''} en sección aparte
+            </Text>
+          )}
+          {condiciones.length > 0 && (
+            <Text style={s.scopeBullet}>
+              • {condiciones.length} condición{condiciones.length !== 1 ? 'es' : ''} y consideracion{condiciones.length !== 1 ? 'es' : ''} especificada{condiciones.length !== 1 ? 's' : ''}
+            </Text>
+          )}
+        </View>
+
+        {renderFooter()}
+      </Page>
+
+      {/* ═══════════════════════════════════════════════════════════
+          PAGE 3 — DETALLE DE EQUIPOS
+          ═══════════════════════════════════════════════════════════ */}
+      {hasEquipos && (
+        <Page size="A4" style={s.page}>
+          {renderHeader()}
+
+          {renderSectionHeader('Detalle Técnico — Equipos')}
+
+          {/* Table Header */}
+          <View style={s.detailHeaderRow}>
+            <Text style={[s.detailHeaderCell, { flex: 0.4 }]}>#</Text>
+            <Text style={[s.detailHeaderCell, { flex: 1.2 }]}>Modelo / Marca</Text>
+            <Text style={[s.detailHeaderCell, { flex: 2.2 }]}>Descripción</Text>
+            <Text style={[s.detailHeaderCell, { flex: 0.5, textAlign: 'center' }]}>Und.</Text>
+            <Text style={[s.detailHeaderCell, { flex: 0.5, textAlign: 'center' }]}>Cant.</Text>
+            <Text style={[s.detailHeaderCell, { flex: 1, textAlign: 'right' }]}>P. Unit.</Text>
+            <Text style={[s.detailHeaderCell, { flex: 1, textAlign: 'right' }]}>Subtotal</Text>
           </View>
-          <View style={styles.summaryTable}>
-            {/* Table Header */}
-            <View style={styles.summaryTableHeader}>
-              <Text style={[styles.summaryHeaderCell, { flex: 1 }]}>Item</Text>
-              <Text style={[styles.summaryHeaderCell, styles.summaryDescCell]}>Descripción</Text>
-              <Text style={[styles.summaryHeaderCell, styles.summaryQtyCell]}>Cant.</Text>
-              <Text style={[styles.summaryHeaderCell, styles.summaryPriceCell]}>Valor Total</Text>
-            </View>
-            
-            {/* Equipment Rows */}
-            {cotizacion.equipos?.map((equipo, index) => (
-              <View key={`equipo-${equipo.id || index}`} style={[styles.summaryRow, ...(index % 2 === 1 ? [styles.summaryRowAlt] : [])]}>
-                <Text style={[styles.summaryCell, { flex: 1 }]}>{index + 1}</Text>
-                <Text style={[styles.summaryCell, styles.summaryDescCell]}>
-                  {safeText(equipo.nombre).toUpperCase()}
+
+          {/* Equipment Groups */}
+          {equipos.map((equipo, eqIdx) => (
+            <View key={`eq-${equipo.id || eqIdx}`} wrap={false}>
+              {/* Group Header */}
+              <View style={s.detailGroupRow}>
+                <Text style={[s.detailGroupName, { flex: 1 }]}>
+                  {eqIdx + 1}. {safeText(equipo.nombre).toUpperCase()}
                 </Text>
-                <Text style={[styles.summaryCell, styles.summaryQtyCell]}>1</Text>
-                <Text style={[styles.summaryCell, styles.summaryPriceCell]}>
+                <Text style={s.detailGroupTotal}>
                   {formatCurrency(equipo.subtotalCliente || 0, moneda)}
                 </Text>
               </View>
-            ))}
-            
-            {/* Services Rows */}
-            {cotizacion.servicios?.map((servicio, index) => {
-              const equiposLength = cotizacion.equipos?.length || 0
-              const rowIndex = equiposLength + index
-              return (
-                <View key={`servicio-${servicio.id || index}`} style={[styles.summaryRow, ...(rowIndex % 2 === 1 ? [styles.summaryRowAlt] : [])]}>
-                  <Text style={[styles.summaryCell, { flex: 1 }]}>{rowIndex + 1}</Text>
-                  <Text style={[styles.summaryCell, styles.summaryDescCell]}>
-                    {safeText(servicio.edt?.nombre || servicio.nombre).toUpperCase()}
+
+              {/* Items */}
+              {equipo.items?.map((item, itemIdx) => (
+                <View
+                  key={`eq-item-${item.id || itemIdx}`}
+                  style={[s.detailRow, itemIdx % 2 === 1 ? s.detailRowAlt : {}]}
+                >
+                  <Text style={[s.detailCell, { flex: 0.4 }]}>
+                    {eqIdx + 1}.{itemIdx + 1}
                   </Text>
-                  <Text style={[styles.summaryCell, styles.summaryQtyCell]}>1</Text>
-                  <Text style={[styles.summaryCell, styles.summaryPriceCell]}>
+                  <Text style={[s.detailCellBold, { flex: 1.2 }]}>
+                    {safeText(item.codigo)}{'\n'}
+                    <Text style={{ fontWeight: 400, color: colors.gray500, fontSize: 7 }}>
+                      {safeText(item.marca)}
+                    </Text>
+                  </Text>
+                  <Text style={[s.detailCell, { flex: 2.2 }]}>
+                    {safeText(item.descripcion)}
+                  </Text>
+                  <Text style={[s.detailCell, { flex: 0.5, textAlign: 'center' }]}>
+                    {safeText(item.unidad)}
+                  </Text>
+                  <Text style={[s.detailCell, { flex: 0.5, textAlign: 'center' }]}>
+                    {formatNumber(item.cantidad || 0)}
+                  </Text>
+                  <Text style={[s.detailCellRight, { flex: 1 }]}>
+                    {formatCurrency(item.precioCliente || 0, moneda)}
+                  </Text>
+                  <Text style={[s.detailCellRight, { flex: 1 }]}>
+                    {formatCurrency(item.costoCliente || 0, moneda)}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ))}
+
+          {/* Section Total Box */}
+          <View style={s.sectionTotalBox}>
+            <Text style={s.sectionTotalLabel}>Total Equipos</Text>
+            <Text style={s.sectionTotalAmount}>{formatCurrency(equiposTotal, moneda)}</Text>
+          </View>
+
+          {renderFooter()}
+        </Page>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════
+          PAGE 4 — DETALLE DE SERVICIOS
+          ═══════════════════════════════════════════════════════════ */}
+      {hasServicios && (
+        <Page size="A4" style={s.page}>
+          {renderHeader()}
+
+          {renderSectionHeader('Detalle Técnico — Servicios')}
+
+          {/* Table Header */}
+          <View style={s.detailHeaderRow}>
+            <Text style={[s.detailHeaderCell, { flex: 0.4 }]}>#</Text>
+            <Text style={[s.detailHeaderCell, { flex: 2.5 }]}>Actividad</Text>
+            <Text style={[s.detailHeaderCell, { flex: 1.5 }]}>Recurso</Text>
+            <Text style={[s.detailHeaderCell, { flex: 0.8, textAlign: 'center' }]}>Horas</Text>
+            <Text style={[s.detailHeaderCell, { flex: 1.2, textAlign: 'right' }]}>Valor</Text>
+          </View>
+
+          {/* Service Groups */}
+          {servicios.map((servicio, svIdx) => {
+            const groupHours = (servicio.items || []).reduce((sum: number, item: any) => sum + (item.horaTotal || 0), 0)
+            return (
+              <View key={`sv-${servicio.id || svIdx}`} wrap={false}>
+                {/* Group Header */}
+                <View style={s.detailGroupRow}>
+                  <Text style={[s.detailGroupName, { flex: 1 }]}>
+                    {svIdx + 1}. {safeText(servicio.nombre).toUpperCase()}
+                    <Text style={{ fontWeight: 400, fontSize: 7.5, color: colors.green2 }}>
+                      {'  '}({formatNumber(groupHours)} hrs)
+                    </Text>
+                  </Text>
+                  <Text style={s.detailGroupTotal}>
                     {formatCurrency(servicio.subtotalCliente || 0, moneda)}
                   </Text>
                 </View>
-              )
-            })}
-            
-            {/* Expenses Rows */}
-            {cotizacion.gastos?.map((gasto, index) => {
-              const prevLength = (cotizacion.equipos?.length || 0) + (cotizacion.servicios?.length || 0)
-              const rowIndex = prevLength + index
-              return (
-                <View key={`gasto-${gasto.id || index}`} style={[styles.summaryRow, ...(rowIndex % 2 === 1 ? [styles.summaryRowAlt] : [])]}>
-                  <Text style={[styles.summaryCell, { flex: 1 }]}>{rowIndex + 1}</Text>
-                  <Text style={[styles.summaryCell, styles.summaryDescCell]}>
-                    {safeText(gasto.nombre).toUpperCase()}
-                  </Text>
-                  <Text style={[styles.summaryCell, styles.summaryQtyCell]}>1</Text>
-                  <Text style={[styles.summaryCell, styles.summaryPriceCell]}>
-                    {formatCurrency(gasto.subtotalCliente || 0, moneda)}
-                  </Text>
-                </View>
-              )
-            })}
-          </View>
-        </View>
 
-        {/* Professional Totals */}
-        <View style={styles.totalsContainer}>
-          <View style={styles.grandTotalRow}>
-            <Text style={styles.grandTotalLabel}>Total:</Text>
-            <Text style={styles.grandTotalValue}>{formatCurrency(total, moneda)}</Text>
-          </View>
-        </View>
-
-        {/* Scope of Work */}
-        <View style={styles.contentSection}>
-          <View style={styles.contentHeader}>
-            <Text style={styles.contentTitle}>Alcance del Proyecto</Text>
-          </View>
-          <View style={styles.contentBody}>
-            <Text style={styles.contentText}>
-              El presente proyecto contempla la implementación integral de soluciones de automatización 
-              industrial, incluyendo:
-            </Text>
-            <View style={styles.contentList}>
-              <Text style={styles.contentListItem}>• Suministro e instalación de equipos especializados</Text>
-              <Text style={styles.contentListItem}>• Servicios de ingeniería y consultoría técnica</Text>
-              <Text style={styles.contentListItem}>• Programación y configuración de sistemas</Text>
-              <Text style={styles.contentListItem}>• Pruebas, puesta en marcha y comisionado</Text>
-              <Text style={styles.contentListItem}>• Capacitación del personal operativo</Text>
-              <Text style={styles.contentListItem}>• Documentación técnica completa</Text>
-              <Text style={styles.contentListItem}>• Soporte técnico y garantía</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Footer */}
-        <View style={styles.footer}>
-          <View style={styles.footerLeft}>
-            <Text style={styles.footerText}>
-              <Text style={styles.footerBold}>GYS Control Industrial SAC</Text>{"\n"}
-              RUC: 20545610672
-            </Text>
-          </View>
-          <View style={styles.footerCenter}>
-            <Text style={[styles.footerText, { textAlign: 'center' }]}>
-              Documento Confidencial - Uso Exclusivo del Cliente
-            </Text>
-          </View>
-          <View style={styles.footerRight}>
-            <Text
-              style={[styles.footerText, { textAlign: 'right' }]}
-              render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`}
-            />
-          </View>
-        </View>
-      </Page>
-
-      {/* PÁGINA 3: DETALLE DE EQUIPOS */}
-      {cotizacion.equipos && cotizacion.equipos.length > 0 && (
-        <Page size="A4" style={styles.page}>
-          {/* Compact Header for Interior Pages */}
-          <View style={styles.compactHeaderContainer}>
-            <View>
-              <Text style={styles.compactCompanyName}>GYS CONTROL INDUSTRIAL SAC</Text>
-              <Text style={styles.compactTagline}>Soluciones Integrales en Automatización Industrial</Text>
-            </View>
-          </View>
-
-          {/* Equipment Details */}
-          <View style={styles.detailSection}>
-            <View style={styles.detailHeader}>
-              <Text style={styles.detailTitle}>Detalle Técnico - Equipos</Text>
-            </View>
-            <View style={styles.detailTable}>
-              {/* Table Header */}
-              <View style={styles.detailTableHeader}>
-                <Text style={[styles.detailHeaderCell, styles.detailItemCell]}>Item</Text>
-                <Text style={[styles.detailHeaderCell, styles.detailDescCell]}>Descripción Técnica</Text>
-                <Text style={[styles.detailHeaderCell, styles.detailUnitCell]}>Unidad</Text>
-                <Text style={[styles.detailHeaderCell, styles.detailQtyCell]}>Cantidad</Text>
-              </View>
-              
-              {/* Equipment Rows */}
-              {cotizacion.equipos.map((equipo, equipoIndex) => (
-                <View key={`detail-equipo-${equipo.id}-${equipoIndex}`}>
-                  {/* Equipment Category Header */}
-                  <View style={[styles.detailRow, { backgroundColor: colors.accent, minHeight: 40 }]}>
-                    <Text style={[styles.detailCell, { flex: 1, color: colors.white, fontWeight: 600, fontSize: 11 }]}>
-                      {equipoIndex + 1}
+                {/* Items */}
+                {servicio.items?.map((item: any, itemIdx: number) => (
+                  <View
+                    key={`sv-item-${item.id || itemIdx}`}
+                    style={[s.detailRow, itemIdx % 2 === 1 ? s.detailRowAltBlue : {}]}
+                  >
+                    <Text style={[s.detailCell, { flex: 0.4 }]}>
+                      {svIdx + 1}.{itemIdx + 1}
                     </Text>
-                    <Text style={[styles.detailCell, { flex: 4, color: colors.white, fontWeight: 600, fontSize: 11 }]}>
-                      {safeText(equipo.nombre).toUpperCase()}
+                    <Text style={[s.detailCell, { flex: 2.5 }]}>
+                      {safeText(item.nombre || item.descripcion)}
                     </Text>
-                    <Text style={[styles.detailCell, { flex: 1, color: colors.white, textAlign: 'center' }]}>-</Text>
-                    <Text style={[styles.detailCell, { flex: 1, color: colors.white, textAlign: 'center' }]}>-</Text>
+                    <Text style={[s.detailCellBold, { flex: 1.5, color: colors.gray500 }]}>
+                      {safeText(item.recursoNombre)}
+                    </Text>
+                    <Text style={[s.detailCell, { flex: 0.8, textAlign: 'center' }]}>
+                      {formatNumber(item.horaTotal || 0)}
+                    </Text>
+                    <Text style={[s.detailCellRight, { flex: 1.2 }]}>
+                      {formatCurrency(item.costoCliente || 0, moneda)}
+                    </Text>
                   </View>
+                ))}
+              </View>
+            )
+          })}
 
-                  {/* Equipment Items */}
-                  {equipo.items?.map((item, itemIndex) => (
-                    <View key={`detail-equipo-item-${equipo.id}-${item.id}-${itemIndex}`} style={[styles.detailRow, ...(itemIndex % 2 === 1 ? [styles.detailRowAlt] : [])]}>
-                      <Text style={[styles.detailCell, styles.detailItemCell]}>
-                        {equipoIndex + 1}.{itemIndex + 1}
-                      </Text>
-                      <Text style={[styles.detailCell, styles.detailDescCell]}>
-                        <Text style={{ fontWeight: 600 }}>{safeText(item.codigo)}</Text>{"\n"}
-                        {safeText(item.descripcion)}
-                        {item.descripcion && item.descripcion.length > 50 && (
-                          <Text style={{ fontSize: 8, color: colors.secondary }}>
-                            {"\n"}Detalles adicionales disponibles
-                          </Text>
-                        )}
-                      </Text>
-                      <Text style={[styles.detailCell, styles.detailUnitCell]}>
-                        {safeText(item.unidad)}
-                      </Text>
-                      <Text style={[styles.detailCell, styles.detailQtyCell]}>
-                        {formatNumber(item.cantidad || 0)}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              ))}
-            </View>
+          {/* Section Total Box */}
+          <View style={s.sectionTotalBox}>
+            <Text style={s.sectionTotalLabel}>Total Servicios</Text>
+            <Text style={s.sectionTotalAmount}>{formatCurrency(serviciosTotal, moneda)}</Text>
           </View>
 
-          {/* Technical Notes */}
-          <View style={styles.contentSection}>
-            <View style={styles.contentHeader}>
-              <Text style={styles.contentTitle}>Notas Técnicas</Text>
-            </View>
-            <View style={styles.contentBody}>
-              <Text style={styles.contentText}>
-                • Todos los equipos cumplen con estándares internacionales de calidad y seguridad
-              </Text>
-              <Text style={styles.contentText}>
-                • Se incluye documentación técnica completa en español e inglés
-              </Text>
-              <Text style={styles.contentText}>
-                • Garantía de fábrica según especificaciones del fabricante
-              </Text>
-              <Text style={styles.contentText}>
-                • Soporte técnico especializado durante la implementación
-              </Text>
-            </View>
-          </View>
-
-          {/* Footer */}
-          <View style={styles.footer}>
-            <View style={styles.footerLeft}>
-              <Text style={styles.footerText}>
-                <Text style={styles.footerBold}>GYS Control Industrial SAC</Text>{"\n"}
-                RUC: 20545610672
-              </Text>
-            </View>
-            <View style={styles.footerCenter}>
-              <Text style={[styles.footerText, { textAlign: 'center' }]}>
-                Documento Confidencial - Uso Exclusivo del Cliente
-              </Text>
-            </View>
-            <View style={styles.footerRight}>
-              <Text
-                style={[styles.footerText, { textAlign: 'right' }]}
-                render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`}
-              />
-            </View>
-          </View>
+          {renderFooter()}
         </Page>
       )}
 
-      {/* PÁGINA: DETALLE DE SERVICIOS */}
-      {hasServicios && (
-        <Page size="A4" style={styles.page}>
-          {/* Compact Header */}
-          <View style={styles.compactHeaderContainer}>
-            <View>
-              <Text style={styles.compactCompanyName}>GYS CONTROL INDUSTRIAL SAC</Text>
-              <Text style={styles.compactTagline}>Soluciones Integrales en Automatización Industrial</Text>
-            </View>
-          </View>
-
-          {/* Services Details */}
-          <View style={styles.detailSection}>
-            <View style={styles.detailHeader}>
-              <Text style={styles.detailTitle}>Detalle Técnico - Servicios</Text>
-            </View>
-            <View style={styles.detailTable}>
-              {/* Table Header */}
-              <View style={styles.detailTableHeader}>
-                <Text style={[styles.detailHeaderCell, styles.detailItemCell]}>Item</Text>
-                <Text style={[styles.detailHeaderCell, styles.detailDescCell]}>Descripción del Servicio</Text>
-                <Text style={[styles.detailHeaderCell, styles.detailUnitCell]}>Horas</Text>
-                <Text style={[styles.detailHeaderCell, styles.detailQtyCell]}>Valor</Text>
-              </View>
-
-              {/* Services Rows */}
-              {servicios.map((servicio, servicioIndex) => (
-                <View key={`detail-servicio-${servicio.id}-${servicioIndex}`}>
-                  {/* Service Category Header */}
-                  <View style={[styles.detailRow, { backgroundColor: colors.accent, minHeight: 40 }]}>
-                    <Text style={[styles.detailCell, { flex: 1, color: colors.white, fontWeight: 600, fontSize: 11 }]}>
-                      {servicioIndex + 1}
-                    </Text>
-                    <Text style={[styles.detailCell, { flex: 4, color: colors.white, fontWeight: 600, fontSize: 11 }]}>
-                      {safeText(servicio.edt?.nombre || servicio.nombre).toUpperCase()}
-                    </Text>
-                    <Text style={[styles.detailCell, { flex: 1, color: colors.white, textAlign: 'center' }]}>
-                      {(servicio as any).horas || '-'}
-                    </Text>
-                    <Text style={[styles.detailCell, { flex: 1, color: colors.white, textAlign: 'right', paddingRight: 10 }]}>
-                      {formatCurrency(servicio.subtotalCliente || 0, moneda)}
-                    </Text>
-                  </View>
-
-                  {/* Service Items/Tasks */}
-                  {servicio.items?.map((item: any, itemIndex: number) => (
-                    <View key={`detail-servicio-item-${servicio.id}-${item.id}-${itemIndex}`} style={[styles.detailRow, ...(itemIndex % 2 === 1 ? [styles.detailRowAlt] : [])]}>
-                      <Text style={[styles.detailCell, styles.detailItemCell]}>
-                        {servicioIndex + 1}.{itemIndex + 1}
-                      </Text>
-                      <Text style={[styles.detailCell, styles.detailDescCell]}>
-                        {safeText(item.descripcion || item.nombre)}
-                      </Text>
-                      <Text style={[styles.detailCell, styles.detailUnitCell]}>
-                        {item.horas || item.cantidad || '-'}
-                      </Text>
-                      <Text style={[styles.detailCell, styles.detailQtyCell]}>
-                        {item.precioCliente ? formatCurrency(item.precioCliente, moneda) : '-'}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              ))}
-            </View>
-          </View>
-
-          {/* Services Notes */}
-          <View style={styles.contentSection}>
-            <View style={styles.contentHeader}>
-              <Text style={styles.contentTitle}>Notas de Servicios</Text>
-            </View>
-            <View style={styles.contentBody}>
-              <Text style={styles.contentText}>
-                • Los servicios incluyen mano de obra calificada y herramientas especializadas
-              </Text>
-              <Text style={styles.contentText}>
-                • Las horas indicadas son estimadas y pueden variar según condiciones de sitio
-              </Text>
-              <Text style={styles.contentText}>
-                • Incluye supervisión técnica durante la ejecución de los trabajos
-              </Text>
-              <Text style={styles.contentText}>
-                • Capacitación al personal operativo del cliente
-              </Text>
-            </View>
-          </View>
-
-          {/* Footer */}
-          <View style={styles.footer}>
-            <View style={styles.footerLeft}>
-              <Text style={styles.footerText}>
-                <Text style={styles.footerBold}>GYS Control Industrial SAC</Text>{"\n"}
-                RUC: 20545610672
-              </Text>
-            </View>
-            <View style={styles.footerCenter}>
-              <Text style={[styles.footerText, { textAlign: 'center' }]}>
-                Documento Confidencial - Uso Exclusivo del Cliente
-              </Text>
-            </View>
-            <View style={styles.footerRight}>
-              <Text
-                style={[styles.footerText, { textAlign: 'right' }]}
-                render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`}
-              />
-            </View>
-          </View>
-        </Page>
-      )}
-
-      {/* PÁGINA: DETALLE DE GASTOS */}
+      {/* ═══════════════════════════════════════════════════════════
+          PAGE 5 — DETALLE DE GASTOS
+          ═══════════════════════════════════════════════════════════ */}
       {hasGastos && (
-        <Page size="A4" style={styles.page}>
-          {/* Compact Header */}
-          <View style={styles.compactHeaderContainer}>
-            <View>
-              <Text style={styles.compactCompanyName}>GYS CONTROL INDUSTRIAL SAC</Text>
-              <Text style={styles.compactTagline}>Soluciones Integrales en Automatización Industrial</Text>
-            </View>
+        <Page size="A4" style={s.page}>
+          {renderHeader()}
+
+          {renderSectionHeader('Detalle de Gastos Adicionales')}
+
+          {/* Table Header */}
+          <View style={s.detailHeaderRow}>
+            <Text style={[s.detailHeaderCell, { flex: 0.4 }]}>#</Text>
+            <Text style={[s.detailHeaderCell, { flex: 3 }]}>Descripción</Text>
+            <Text style={[s.detailHeaderCell, { flex: 0.6, textAlign: 'center' }]}>Cant.</Text>
+            <Text style={[s.detailHeaderCell, { flex: 1, textAlign: 'right' }]}>P. Unit.</Text>
+            <Text style={[s.detailHeaderCell, { flex: 1, textAlign: 'right' }]}>Total</Text>
           </View>
 
-          {/* Expenses Details */}
-          <View style={styles.detailSection}>
-            <View style={styles.detailHeader}>
-              <Text style={styles.detailTitle}>Detalle de Gastos Adicionales</Text>
-            </View>
-            <View style={styles.detailTable}>
-              {/* Table Header */}
-              <View style={styles.detailTableHeader}>
-                <Text style={[styles.detailHeaderCell, styles.detailItemCell]}>Item</Text>
-                <Text style={[styles.detailHeaderCell, styles.detailDescCell]}>Descripción del Gasto</Text>
-                <Text style={[styles.detailHeaderCell, styles.detailUnitCell]}>Cant.</Text>
-                <Text style={[styles.detailHeaderCell, styles.detailQtyCell]}>Valor</Text>
+          {/* Gasto Groups */}
+          {gastos.map((gasto, gsIdx) => (
+            <View key={`gs-${gasto.id || gsIdx}`} wrap={false}>
+              {/* Group Header */}
+              <View style={s.detailGroupRow}>
+                <Text style={[s.detailGroupName, { flex: 1 }]}>
+                  {gsIdx + 1}. {safeText(gasto.nombre).toUpperCase()}
+                </Text>
+                <Text style={s.detailGroupTotal}>
+                  {formatCurrency(gasto.subtotalCliente || 0, moneda)}
+                </Text>
               </View>
 
-              {/* Gastos Rows */}
-              {gastos.map((gasto, gastoIndex) => (
-                <View key={`detail-gasto-${gasto.id}-${gastoIndex}`}>
-                  {/* Gasto Category Header */}
-                  <View style={[styles.detailRow, { backgroundColor: colors.accent, minHeight: 40 }]}>
-                    <Text style={[styles.detailCell, { flex: 1, color: colors.white, fontWeight: 600, fontSize: 11 }]}>
-                      {gastoIndex + 1}
-                    </Text>
-                    <Text style={[styles.detailCell, { flex: 4, color: colors.white, fontWeight: 600, fontSize: 11 }]}>
-                      {safeText(gasto.nombre).toUpperCase()}
-                    </Text>
-                    <Text style={[styles.detailCell, { flex: 1, color: colors.white, textAlign: 'center' }]}>
-                      {(gasto as any).cantidad || 1}
-                    </Text>
-                    <Text style={[styles.detailCell, { flex: 1, color: colors.white, textAlign: 'right', paddingRight: 10 }]}>
-                      {formatCurrency(gasto.subtotalCliente || 0, moneda)}
-                    </Text>
-                  </View>
-
-                  {/* Gasto Items if any */}
-                  {gasto.items?.map((item: any, itemIndex: number) => (
-                    <View key={`detail-gasto-item-${gasto.id}-${item.id}-${itemIndex}`} style={[styles.detailRow, ...(itemIndex % 2 === 1 ? [styles.detailRowAlt] : [])]}>
-                      <Text style={[styles.detailCell, styles.detailItemCell]}>
-                        {gastoIndex + 1}.{itemIndex + 1}
-                      </Text>
-                      <Text style={[styles.detailCell, styles.detailDescCell]}>
-                        {safeText(item.descripcion || item.nombre)}
-                      </Text>
-                      <Text style={[styles.detailCell, styles.detailUnitCell]}>
-                        {item.cantidad || 1}
-                      </Text>
-                      <Text style={[styles.detailCell, styles.detailQtyCell]}>
-                        {item.precioCliente ? formatCurrency(item.precioCliente, moneda) : '-'}
-                      </Text>
-                    </View>
-                  ))}
+              {/* Items */}
+              {gasto.items?.map((item: any, itemIdx: number) => (
+                <View
+                  key={`gs-item-${item.id || itemIdx}`}
+                  style={[s.detailRow, itemIdx % 2 === 1 ? s.detailRowAlt : {}]}
+                >
+                  <Text style={[s.detailCell, { flex: 0.4 }]}>
+                    {gsIdx + 1}.{itemIdx + 1}
+                  </Text>
+                  <Text style={[s.detailCell, { flex: 3 }]}>
+                    {safeText(item.nombre || item.descripcion)}
+                  </Text>
+                  <Text style={[s.detailCell, { flex: 0.6, textAlign: 'center' }]}>
+                    {formatNumber(item.cantidad || 0)}
+                  </Text>
+                  <Text style={[s.detailCellRight, { flex: 1 }]}>
+                    {formatCurrency(item.precioUnitario || 0, moneda)}
+                  </Text>
+                  <Text style={[s.detailCellRight, { flex: 1 }]}>
+                    {formatCurrency(item.costoCliente || 0, moneda)}
+                  </Text>
                 </View>
               ))}
             </View>
+          ))}
+
+          {/* Section Total Box */}
+          <View style={s.sectionTotalBox}>
+            <Text style={s.sectionTotalLabel}>Total Gastos</Text>
+            <Text style={s.sectionTotalAmount}>{formatCurrency(gastosTotal, moneda)}</Text>
           </View>
 
-          {/* Expenses Notes */}
-          <View style={styles.contentSection}>
-            <View style={styles.contentHeader}>
-              <Text style={styles.contentTitle}>Notas sobre Gastos</Text>
-            </View>
-            <View style={styles.contentBody}>
-              <Text style={styles.contentText}>
-                • Los gastos de viáticos incluyen transporte, alimentación y hospedaje del personal técnico
-              </Text>
-              <Text style={styles.contentText}>
-                • Los fletes se calculan según distancia y volumen de equipos a transportar
-              </Text>
-              <Text style={styles.contentText}>
-                • Los valores están sujetos a cambio según condiciones del proyecto
-              </Text>
-            </View>
-          </View>
-
-          {/* Footer */}
-          <View style={styles.footer}>
-            <View style={styles.footerLeft}>
-              <Text style={styles.footerText}>
-                <Text style={styles.footerBold}>GYS Control Industrial SAC</Text>{"\n"}
-                RUC: 20545610672
-              </Text>
-            </View>
-            <View style={styles.footerCenter}>
-              <Text style={[styles.footerText, { textAlign: 'center' }]}>
-                Documento Confidencial - Uso Exclusivo del Cliente
-              </Text>
-            </View>
-            <View style={styles.footerRight}>
-              <Text
-                style={[styles.footerText, { textAlign: 'right' }]}
-                render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`}
-              />
-            </View>
-          </View>
+          {renderFooter()}
         </Page>
       )}
 
-      {/* PÁGINA: TÉRMINOS Y CONDICIONES */}
-      <Page size="A4" style={styles.page}>
-        {/* Compact Header for Interior Pages */}
-        <View style={styles.compactHeaderContainer}>
-          <View>
-            <Text style={styles.compactCompanyName}>GYS CONTROL INDUSTRIAL SAC</Text>
-            <Text style={styles.compactTagline}>Soluciones Integrales en Automatización Industrial</Text>
-          </View>
+      {/* ═══════════════════════════════════════════════════════════
+          PAGE 6 — TÉRMINOS Y CONDICIONES
+          ═══════════════════════════════════════════════════════════ */}
+      <Page size="A4" style={s.page}>
+        {renderHeader()}
+
+        {renderSectionHeader('Términos y Condiciones Comerciales')}
+
+        {/* Payment Blocks */}
+        <Text style={{ fontSize: 8.5, fontWeight: 600, color: colors.gray700, marginBottom: 6, marginTop: 4 }}>
+          Condiciones de Pago
+        </Text>
+        <View style={s.paymentBlocksRow}>
+          {parseFormaPago(formaPago).map((block, idx) => (
+            <View key={`pay-${idx}`} style={s.paymentBlock}>
+              <Text style={s.paymentPercent}>{block.percent || '-'}</Text>
+              <Text style={s.paymentLabel}>{block.label}</Text>
+            </View>
+          ))}
         </View>
 
-        {/* Terms and Conditions */}
-        <View style={styles.contentSection}>
-          <View style={styles.contentHeader}>
-            <Text style={styles.contentTitle}>Términos y Condiciones Comerciales</Text>
-          </View>
-          <View style={styles.contentBody}>
-            <Text style={[styles.contentText, { fontWeight: 600, marginBottom: 15 }]}>1. CONDICIONES DE PAGO</Text>
-            <Text style={styles.contentText}>
-              • 30% de adelanto contra orden de compra{"\n"}
-              • 40% contra entrega de equipos en almacén del cliente{"\n"}
-              • 30% contra conformidad de servicios y puesta en marcha
-            </Text>
-            
-            <Text style={[styles.contentText, { fontWeight: 600, marginBottom: 15, marginTop: 20 }]}>2. TIEMPO DE ENTREGA</Text>
-            <Text style={styles.contentText}>
-              • Equipos: 8-12 semanas desde la orden de compra{"\n"}
-              • Servicios: Según cronograma acordado{"\n"}
-              • Los tiempos pueden variar según disponibilidad del fabricante
-            </Text>
-            
-            <Text style={[styles.contentText, { fontWeight: 600, marginBottom: 15, marginTop: 20 }]}>3. GARANTÍAS</Text>
-            <Text style={styles.contentText}>
-              • Equipos: 12 meses contra defectos de fabricación{"\n"}
-              • Servicios: 6 meses contra defectos de mano de obra{"\n"}
-              • Soporte técnico telefónico sin costo durante el período de garantía
-            </Text>
-            
-            <Text style={[styles.contentText, { fontWeight: 600, marginBottom: 15, marginTop: 20 }]}>4. EXCLUSIONES</Text>
-            <Text style={styles.contentText}>
-              • Obras civiles y adecuaciones de infraestructura{"\n"}
-              • Permisos municipales y licencias{"\n"}
-              • Seguros de transporte y almacenaje{"\n"}
-              • Gastos de alimentación y hospedaje del personal técnico
+        {/* Info Cards */}
+        <View style={s.infoCardsRow}>
+          {/* Tiempo de Entrega */}
+          <View style={s.infoCard}>
+            <Text style={s.infoCardTitle}>Tiempo de Entrega</Text>
+            <Text style={s.infoCardValue}>
+              {cotizacion.fechaInicio && cotizacion.fechaFin
+                ? `Inicio: ${formatDate(cotizacion.fechaInicio)}\nFin: ${formatDate(cotizacion.fechaFin)}`
+                : 'Según cronograma del proyecto'
+              }
             </Text>
           </View>
-        </View>
 
-        {/* Contact Information */}
-        <View style={styles.contentSection}>
-          <View style={styles.contentHeader}>
-            <Text style={styles.contentTitle}>Información de Contacto</Text>
+          {/* Garantías */}
+          <View style={s.infoCard}>
+            <Text style={s.infoCardTitle}>Garantías</Text>
+            <Text style={s.infoCardValue}>
+              Equipos: 12 meses{'\n'}
+              Servicios: 6 meses{'\n'}
+              Soporte técnico incluido
+            </Text>
           </View>
-          <View style={styles.contentBody}>
-            <Text style={styles.contentText}>
-              <Text style={{ fontWeight: 600 }}>{comercial?.name || 'Departamento Comercial'}</Text>{"\n"}
-              {comercial?.cargo || 'Ejecutivo Comercial'}{"\n"}
-              {comercial?.telefono && `Cel: ${comercial.telefono}\n`}
-              {comercial?.email && `Email: ${comercial.email}\n`}
-              Calle Los Geranios 486, Urb. San Eugenio Lince, Lima
+
+          {/* Validez */}
+          <View style={s.infoCard}>
+            <Text style={s.infoCardTitle}>Validez de Oferta</Text>
+            <Text style={s.infoCardValue}>
+              {validezDias} días calendario{'\n'}
+              Hasta: {formatDate(validUntilDate)}{'\n'}
+              Moneda: {monedaLabel}
             </Text>
           </View>
         </View>
 
-        {/* Acceptance */}
-        <View style={styles.contentSection}>
-          <View style={styles.contentHeader}>
-            <Text style={styles.contentTitle}>Aceptación de Propuesta</Text>
-          </View>
-          <View style={styles.contentBody}>
-            <Text style={styles.contentText}>
-              Agradecemos la oportunidad de presentar nuestra propuesta y esperamos contar con su 
-              preferencia. Para proceder con la ejecución del proyecto, solicitamos la confirmación 
-              por escrito de la aceptación de esta propuesta.
+        {/* Dynamic Conditions */}
+        {condiciones.length > 0 && (
+          <View style={{ marginTop: 4 }}>
+            <Text style={{ fontSize: 8.5, fontWeight: 600, color: colors.gray700, marginBottom: 8 }}>
+              Condiciones y Consideraciones
             </Text>
-            <Text style={[styles.contentText, { marginTop: 30, textAlign: 'center', fontWeight: 600 }]}>
-              ¡Gracias por confiar en GYS Control Industrial SAC!
+            {condiciones.map((cond, idx) => (
+              <View key={`cond-${cond.id || idx}`} style={s.conditionItem}>
+                <Text style={s.conditionBullet}>→</Text>
+                <Text style={s.conditionText}>{safeText(cond.descripcion)}</Text>
+                {cond.tipo && (
+                  <View style={s.conditionBadge}>
+                    <Text style={s.conditionBadgeText}>{cond.tipo}</Text>
+                  </View>
+                )}
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* CTA Block */}
+        <View style={s.ctaBlock}>
+          <View style={s.ctaCircle}>
+            <Text style={s.ctaInitials}>{getInitials(comercialName)}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.ctaMessage}>
+              Quedamos a su disposición para cualquier consulta.
+            </Text>
+            <Text style={s.ctaContact}>
+              {comercialName}
+              {(comercial as any)?.cargo ? ` — ${(comercial as any).cargo}` : ''}
+              {'\n'}
+              {(comercial as any)?.email ? `${(comercial as any).email}` : 'info@gyscontrol.com'}
+              {(comercial as any)?.telefono ? ` | ${(comercial as any).telefono}` : ''}
+              {'\n'}
+              Lima: +51 1 478 7587 | Arequipa: +51 54 277 584 | www.gyscontrol.com
             </Text>
           </View>
         </View>
 
-        {/* Footer */}
-        <View style={styles.footer}>
-          <View style={styles.footerLeft}>
-            <Text style={styles.footerText}>
-              <Text style={styles.footerBold}>GYS Control Industrial SAC</Text>{"\n"}
-              RUC: 20545610672
-            </Text>
-          </View>
-          <View style={styles.footerCenter}>
-            <Text style={[styles.footerText, { textAlign: 'center' }]}>
-              Documento Confidencial - Uso Exclusivo del Cliente
-            </Text>
-          </View>
-          <View style={styles.footerRight}>
-            <Text
-              style={[styles.footerText, { textAlign: 'right' }]}
-              render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`}
-            />
-          </View>
-        </View>
+        {renderFooter()}
       </Page>
 
-      {/* PÁGINA: EXCLUSIONES Y CONDICIONES */}
+      {/* ═══════════════════════════════════════════════════════════
+          PAGE 7 — EXCLUSIONES Y CONDICIONES
+          ═══════════════════════════════════════════════════════════ */}
       {hasExclusionesCondiciones && (
-      <Page size="A4" style={styles.page}>
-        {/* Compact Header for Interior Pages */}
-        <View style={styles.compactHeaderContainer}>
-          <View>
-            <Text style={styles.compactCompanyName}>GYS CONTROL INDUSTRIAL SAC</Text>
-            <Text style={styles.compactTagline}>Soluciones Integrales en Automatización Industrial</Text>
-          </View>
-        </View>
+        <Page size="A4" style={s.page}>
+          {renderHeader()}
 
-        {/* Exclusiones */}
-        <View style={styles.contentSection}>
-          <View style={styles.contentHeader}>
-            <Text style={styles.contentTitle}>Exclusiones de la Propuesta</Text>
-          </View>
-          <View style={styles.contentBody}>
-            {cotizacion.exclusiones && cotizacion.exclusiones.length > 0 ? (
-              <View style={styles.contentList}>
-                {cotizacion.exclusiones.map((exclusion, index) => (
-                  <Text key={`exclusion-${exclusion.id}-${index}`} style={styles.contentListItem}>
-                    • {exclusion.descripcion}
-                  </Text>
+          {/* Exclusions */}
+          {exclusiones.length > 0 && (
+            <View>
+              {renderSectionHeader('Exclusiones de la Propuesta')}
+              <View style={{ marginBottom: 18 }}>
+                {exclusiones.map((exc, idx) => (
+                  <View key={`exc-${exc.id || idx}`} style={s.exclusionItem}>
+                    <Text style={s.exclusionBullet}>✕</Text>
+                    <Text style={s.exclusionText}>{safeText(exc.descripcion)}</Text>
+                  </View>
                 ))}
               </View>
-            ) : (
-              <Text style={styles.contentText}>
-                No se han definido exclusiones específicas para esta propuesta.
-              </Text>
-            )}
-          </View>
-        </View>
+            </View>
+          )}
 
-        {/* Condiciones */}
-        <View style={styles.contentSection}>
-          <View style={styles.contentHeader}>
-            <Text style={styles.contentTitle}>Condiciones y Consideraciones</Text>
-          </View>
-          <View style={styles.contentBody}>
-            {cotizacion.condiciones && cotizacion.condiciones.length > 0 ? (
-              <View style={styles.contentList}>
-                {cotizacion.condiciones.map((condicion, index) => (
-                  <Text key={`condicion-${condicion.id}-${index}`} style={styles.contentListItem}>
-                    • {condicion.descripcion}
-                    {condicion.tipo && (
-                      <Text style={{ fontWeight: 600 }}> ({condicion.tipo})</Text>
+          {/* Conditions (if not already shown on page 6, show here as well) */}
+          {condiciones.length > 0 && (
+            <View>
+              {renderSectionHeader('Condiciones y Consideraciones')}
+              <View>
+                {condiciones.map((cond, idx) => (
+                  <View key={`cond-exc-${cond.id || idx}`} style={s.conditionItem}>
+                    <Text style={s.conditionBullet}>→</Text>
+                    <Text style={s.conditionText}>{safeText(cond.descripcion)}</Text>
+                    {cond.tipo && (
+                      <View style={s.conditionBadge}>
+                        <Text style={s.conditionBadgeText}>{cond.tipo}</Text>
+                      </View>
                     )}
-                  </Text>
+                  </View>
                 ))}
               </View>
-            ) : (
-              <Text style={styles.contentText}>
-                No se han definido condiciones específicas adicionales para esta propuesta.
-              </Text>
-            )}
-          </View>
-        </View>
+            </View>
+          )}
 
-        {/* Footer */}
-        <View style={styles.footer}>
-          <View style={styles.footerLeft}>
-            <Text style={styles.footerText}>
-              <Text style={styles.footerBold}>GYS Control Industrial SAC</Text>{"\n"}
-              RUC: 20545610672
-            </Text>
-          </View>
-          <View style={styles.footerCenter}>
-            <Text style={[styles.footerText, { textAlign: 'center' }]}>
-              Documento Confidencial - Uso Exclusivo del Cliente
-            </Text>
-          </View>
-          <View style={styles.footerRight}>
-            <Text
-              style={[styles.footerText, { textAlign: 'right' }]}
-              render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`}
-            />
-          </View>
-        </View>
-      </Page>
+          {renderFooter()}
+        </Page>
       )}
 
-      {/* PÁGINA: CRONOGRAMA COMERCIAL */}
+      {/* ═══════════════════════════════════════════════════════════
+          PAGE 8 — CRONOGRAMA
+          ═══════════════════════════════════════════════════════════ */}
       {hasCronograma && (
-      <Page size="A4" style={styles.page}>
-        {/* Compact Header for Interior Pages */}
-        <View style={styles.compactHeaderContainer}>
-          <View>
-            <Text style={styles.compactCompanyName}>GYS CONTROL INDUSTRIAL SAC</Text>
-            <Text style={styles.compactTagline}>Soluciones Integrales en Automatización Industrial</Text>
-          </View>
-        </View>
+        <Page size="A4" style={s.page}>
+          {renderHeader()}
 
-        {/* Cronograma Comercial */}
-        <View style={styles.contentSection}>
-          <View style={styles.contentHeader}>
-            <Text style={styles.contentTitle}>Cronograma de Ejecución</Text>
-          </View>
-          <View style={styles.contentBody}>
-            {cotizacion.cronograma && cotizacion.cronograma.length > 0 ? (
-              <View>
-                <Text style={styles.contentText}>
-                  A continuación se detalla el cronograma estimado de ejecución del proyecto:
-                </Text>
-                <View style={{ marginTop: 15 }}>
-                  {cotizacion.cronograma.map((edt, index) => (
-                    <View key={`cronograma-edt-${edt.id}-${index}`} style={{ marginBottom: 15 }}>
-                      <Text style={[styles.contentText, { fontWeight: 600, marginBottom: 8 }]}>
-                        {edt.edt?.nombre || 'Sin categoría'} - {edt.zona || 'Sin zona'}
-                      </Text>
-                      <Text style={styles.contentText}>
-                        • Fecha Inicio: {edt.fechaInicioCom ? formatDate(edt.fechaInicioCom) : 'No definida'}
-                      </Text>
-                      <Text style={styles.contentText}>
-                        • Fecha Fin: {edt.fechaFinCom ? formatDate(edt.fechaFinCom) : 'No definida'}
-                      </Text>
-                      <Text style={styles.contentText}>
-                        • Horas Estimadas: {edt.horasCom || 0} horas
-                      </Text>
-                      {edt.descripcion && (
-                        <Text style={styles.contentText}>
-                          • Descripción: {edt.descripcion}
-                        </Text>
-                      )}
-                      {edt.tareas && edt.tareas.length > 0 && (
-                        <View style={{ marginLeft: 20, marginTop: 8 }}>
-                          <Text style={[styles.contentText, { fontWeight: 500 }]}>
-                            Tareas programadas:
-                          </Text>
-                          {edt.tareas.map((tarea, tareaIndex) => (
-                            <Text key={`cronograma-tarea-${edt.id}-${tarea.id}-${tareaIndex}`} style={[styles.contentText, { marginLeft: 10 }]}>
-                              - {tarea.nombre}: {tarea.fechaInicioCom ? formatDate(tarea.fechaInicioCom) : 'No definida'} - {tarea.fechaFinCom ? formatDate(tarea.fechaFinCom) : 'No definida'}
-                            </Text>
-                          ))}
-                        </View>
-                      )}
-                    </View>
+          {renderSectionHeader('Cronograma de Ejecución')}
+
+          <Text style={{ fontSize: 8.5, color: colors.gray600, marginBottom: 14 }}>
+            A continuación se detalla el cronograma estimado de ejecución del proyecto:
+          </Text>
+
+          {cronograma.map((edt, idx) => (
+            <View key={`cron-${edt.id || idx}`} style={s.cronogramaEdt}>
+              <Text style={s.cronogramaEdtTitle}>
+                {safeText(edt.edt?.nombre || 'Sin categoría')}
+                {edt.zona ? ` — ${safeText(edt.zona)}` : ''}
+              </Text>
+              <Text style={s.cronogramaDetail}>
+                Inicio: {edt.fechaInicioCom ? formatDate(edt.fechaInicioCom) : 'No definida'}
+                {'   '}|{'   '}
+                Fin: {edt.fechaFinCom ? formatDate(edt.fechaFinCom) : 'No definida'}
+                {'   '}|{'   '}
+                Horas estimadas: {edt.horasCom || 0}
+              </Text>
+              {edt.descripcion && (
+                <Text style={s.cronogramaDetail}>{safeText(edt.descripcion)}</Text>
+              )}
+              {edt.tareas && edt.tareas.length > 0 && (
+                <View style={{ marginTop: 4 }}>
+                  {edt.tareas.map((tarea, tIdx) => (
+                    <Text key={`tarea-${edt.id}-${tarea.id || tIdx}`} style={s.cronogramaTarea}>
+                      — {safeText(tarea.nombre)}: {tarea.fechaInicioCom ? formatDate(tarea.fechaInicioCom) : '?'} → {tarea.fechaFinCom ? formatDate(tarea.fechaFinCom) : '?'}
+                    </Text>
                   ))}
                 </View>
-              </View>
-            ) : (
-              <Text style={styles.contentText}>
-                No se ha definido un cronograma específico para esta propuesta.
-                Los tiempos de entrega se detallan en las secciones correspondientes.
-              </Text>
-            )}
-          </View>
-        </View>
+              )}
+            </View>
+          ))}
 
-        {/* Footer */}
-        <View style={styles.footer}>
-          <View style={styles.footerLeft}>
-            <Text style={styles.footerText}>
-              <Text style={styles.footerBold}>GYS Control Industrial SAC</Text>{"\n"}
-              RUC: 20545610672
-            </Text>
-          </View>
-          <View style={styles.footerCenter}>
-            <Text style={[styles.footerText, { textAlign: 'center' }]}>
-              Documento Confidencial - Uso Exclusivo del Cliente
-            </Text>
-          </View>
-          <View style={styles.footerRight}>
-            <Text
-              style={[styles.footerText, { textAlign: 'right' }]}
-              render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`}
-            />
-          </View>
-        </View>
-      </Page>
+          {renderFooter()}
+        </Page>
       )}
     </Document>
   )
 }
 
+// ── Download Button ──────────────────────────────────────────────
 export const DescargarPDFButton = ({ cotizacion }: Props) => {
-  // Generate a stable key based on cotizacion content to force remount when data changes
-  // This prevents @react-pdf reconciler errors when trying to update an existing PDF
   const pdfKey = `pdf-${cotizacion.id}-${cotizacion.equipos?.length || 0}-${cotizacion.servicios?.length || 0}-${cotizacion.gastos?.length || 0}-${cotizacion.grandTotal || 0}`
 
   const fileName = `Cotizacion_${safeText(cotizacion.nombre)}_${safeText(cotizacion.cliente?.nombre)}.pdf`
@@ -1482,7 +1393,7 @@ export const DescargarPDFButton = ({ cotizacion }: Props) => {
       fileName={fileName}
       className="inline-flex items-center px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition-colors duration-200 shadow-sm hover:shadow-md h-8 min-w-[120px] justify-center flex-shrink-0"
     >
-      {({ blob, url, loading, error }) => {
+      {({ loading, error }: { loading: boolean; error: Error | null; blob: Blob | null; url: string | null }) => {
         if (loading) {
           return (
             <>
@@ -1495,7 +1406,7 @@ export const DescargarPDFButton = ({ cotizacion }: Props) => {
             </>
           )
         }
-        
+
         if (error) {
           return (
             <>
@@ -1507,7 +1418,7 @@ export const DescargarPDFButton = ({ cotizacion }: Props) => {
             </>
           )
         }
-        
+
         return (
           <>
             <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
