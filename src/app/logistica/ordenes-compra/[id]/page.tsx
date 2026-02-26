@@ -321,16 +321,6 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
             </Button>
           </>
         )}
-        {oc.estado !== 'borrador' && userRole === 'admin' && !['completada', 'cancelada'].includes(oc.estado) && (
-          <Button
-            size="sm"
-            variant="destructive"
-            onClick={() => setShowDelete(true)}
-            disabled={!!actionLoading}
-          >
-            Eliminar (Admin)
-          </Button>
-        )}
         {oc.estado === 'aprobada' && (
           <>
             <Button
@@ -382,19 +372,31 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
           </>
         )}
         {['confirmada', 'parcial'].includes(oc.estado) && !editingRecepcion && (
-          <Button
-            size="sm"
-            onClick={() => {
-              const initial: Record<string, number> = {}
-              oc.items?.forEach(item => { initial[item.id] = item.cantidadRecibida })
-              setRecepcion(initial)
-              setEditingRecepcion(true)
-            }}
-            className="bg-teal-600 hover:bg-teal-700"
-          >
-            <Package className="h-4 w-4 mr-1" />
-            Registrar Recepción
-          </Button>
+          <>
+            <Button
+              size="sm"
+              onClick={() => {
+                const initial: Record<string, number> = {}
+                oc.items?.forEach(item => { initial[item.id] = item.cantidadRecibida })
+                setRecepcion(initial)
+                setEditingRecepcion(true)
+              }}
+              className="bg-teal-600 hover:bg-teal-700"
+            >
+              <Package className="h-4 w-4 mr-1" />
+              Registrar Recepción
+            </Button>
+            {['admin', 'gerente'].includes(userRole) && (
+              <RollbackButton
+                entityType="ordenCompra"
+                entityId={oc.id}
+                currentEstado={oc.estado}
+                targetEstado="enviada"
+                targetLabel="Volver a Enviada"
+                onSuccess={setOC}
+              />
+            )}
+          </>
         )}
         {['enviada', 'confirmada', 'parcial', 'completada'].includes(oc.estado) && (
           <DescargarOCPDFButton oc={oc} />
@@ -864,13 +866,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
           <AlertDialogHeader>
             <AlertDialogTitle>Eliminar Orden de Compra</AlertDialogTitle>
             <AlertDialogDescription>
-              {oc.estado !== 'borrador' ? (
-                <span className="text-red-600 font-medium">
-                  ⚠ La OC {oc.numero} está en estado {oc.estado}. Se eliminarán también sus recepciones asociadas. Esta acción no se puede deshacer.
-                </span>
-              ) : (
-                <>¿Eliminar la OC {oc.numero}? Esta acción no se puede deshacer.</>
-              )}
+              ¿Eliminar la OC {oc.numero}? Esta acción no se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -45,11 +45,9 @@ const ENTITY_LABELS: Record<DeletableEntity, string> = {
 
 export async function canDelete(
   entity: DeletableEntity,
-  id: string,
-  options?: { role?: string }
+  id: string
 ): Promise<CanDeleteResult> {
-  const role = options?.role || ''
-  const checkers: Record<DeletableEntity, (id: string, role: string) => Promise<DeleteBlocker[]>> = {
+  const checkers: Record<DeletableEntity, (id: string) => Promise<DeleteBlocker[]>> = {
     listaEquipo: checkListaEquipo,
     listaEquipoItem: checkListaEquipoItem,
     cotizacionProveedor: checkCotizacionProveedor,
@@ -70,7 +68,7 @@ export async function canDelete(
     }
   }
 
-  const blockers = await checker(id, role)
+  const blockers = await checker(id)
   const allowed = blockers.length === 0
   const label = ENTITY_LABELS[entity]
 
@@ -83,7 +81,7 @@ export async function canDelete(
 
 // ─── Checkers individuales ──────────────────────────────────
 
-async function checkListaEquipo(id: string, _role: string): Promise<DeleteBlocker[]> {
+async function checkListaEquipo(id: string): Promise<DeleteBlocker[]> {
   const blockers: DeleteBlocker[] = []
 
   const lista = await prisma.listaEquipo.findUnique({
@@ -134,7 +132,7 @@ async function checkListaEquipo(id: string, _role: string): Promise<DeleteBlocke
   return blockers
 }
 
-async function checkListaEquipoItem(id: string, _role: string): Promise<DeleteBlocker[]> {
+async function checkListaEquipoItem(id: string): Promise<DeleteBlocker[]> {
   const blockers: DeleteBlocker[] = []
 
   const item = await prisma.listaEquipoItem.findUnique({
@@ -171,7 +169,7 @@ async function checkListaEquipoItem(id: string, _role: string): Promise<DeleteBl
   return blockers
 }
 
-async function checkCotizacionProveedor(id: string, _role: string): Promise<DeleteBlocker[]> {
+async function checkCotizacionProveedor(id: string): Promise<DeleteBlocker[]> {
   const blockers: DeleteBlocker[] = []
 
   // Items seleccionados que ya están en pedidos
@@ -196,7 +194,7 @@ async function checkCotizacionProveedor(id: string, _role: string): Promise<Dele
   return blockers
 }
 
-async function checkPedidoEquipo(id: string, _role: string): Promise<DeleteBlocker[]> {
+async function checkPedidoEquipo(id: string): Promise<DeleteBlocker[]> {
   const blockers: DeleteBlocker[] = []
 
   const pedido = await prisma.pedidoEquipo.findUnique({
@@ -247,9 +245,8 @@ async function checkPedidoEquipo(id: string, _role: string): Promise<DeleteBlock
   return blockers
 }
 
-async function checkOrdenCompra(id: string, role: string): Promise<DeleteBlocker[]> {
+async function checkOrdenCompra(id: string): Promise<DeleteBlocker[]> {
   const blockers: DeleteBlocker[] = []
-  const isAdmin = role === 'admin'
 
   const oc = await prisma.ordenCompra.findUnique({
     where: { id },
@@ -261,20 +258,7 @@ async function checkOrdenCompra(id: string, role: string): Promise<DeleteBlocker
 
   if (!oc) return blockers
 
-  // Estados terminales: nunca se pueden eliminar
-  const estadosTerminales = ['completada', 'cancelada']
-  if (estadosTerminales.includes(oc.estado)) {
-    blockers.push({
-      entity: 'OrdenCompra',
-      count: 1,
-      message: `La OC está en estado terminal "${oc.estado}" y no se puede eliminar`,
-    })
-    return blockers
-  }
-
-  // Admin puede eliminar OCs en aprobada/enviada/confirmada/parcial
-  // Usuarios normales solo pueden eliminar en borrador
-  if (!isAdmin && oc.estado !== 'borrador') {
+  if (oc.estado !== 'borrador') {
     blockers.push({
       entity: 'OrdenCompra',
       count: 1,
@@ -282,7 +266,6 @@ async function checkOrdenCompra(id: string, role: string): Promise<DeleteBlocker
     })
   }
 
-  // CxP activas siempre bloquean
   const cxpCount = await prisma.cuentaPorPagar.count({
     where: {
       ordenCompraId: id,
@@ -297,42 +280,24 @@ async function checkOrdenCompra(id: string, role: string): Promise<DeleteBlocker
     })
   }
 
-  // Para admin: recepciones entregadas al proyecto bloquean (no se pueden perder EntregaItems)
-  // Para usuarios normales: cualquier recepción activa bloquea
-  if (isAdmin) {
-    const entregadasCount = await prisma.recepcionPendiente.count({
-      where: {
-        ordenCompraItem: { ordenCompraId: id },
-        estado: 'entregado_proyecto',
-      },
+  const recepcionCount = await prisma.recepcionPendiente.count({
+    where: {
+      ordenCompraItem: { ordenCompraId: id },
+      estado: { not: 'rechazado' },
+    },
+  })
+  if (recepcionCount > 0) {
+    blockers.push({
+      entity: 'RecepcionPendiente',
+      count: recepcionCount,
+      message: `Tiene ${recepcionCount} recepcion(es) pendiente(s) o confirmada(s)`,
     })
-    if (entregadasCount > 0) {
-      blockers.push({
-        entity: 'RecepcionPendiente',
-        count: entregadasCount,
-        message: `Tiene ${entregadasCount} recepcion(es) ya entregadas al proyecto. Retrocede primero las entregas.`,
-      })
-    }
-  } else {
-    const recepcionCount = await prisma.recepcionPendiente.count({
-      where: {
-        ordenCompraItem: { ordenCompraId: id },
-        estado: { not: 'rechazado' },
-      },
-    })
-    if (recepcionCount > 0) {
-      blockers.push({
-        entity: 'RecepcionPendiente',
-        count: recepcionCount,
-        message: `Tiene ${recepcionCount} recepcion(es) pendiente(s) o confirmada(s)`,
-      })
-    }
   }
 
   return blockers
 }
 
-async function checkValorizacion(id: string, _role: string): Promise<DeleteBlocker[]> {
+async function checkValorizacion(id: string): Promise<DeleteBlocker[]> {
   const blockers: DeleteBlocker[] = []
 
   const valorizacion = await prisma.valorizacion.findUnique({
@@ -372,7 +337,7 @@ async function checkValorizacion(id: string, _role: string): Promise<DeleteBlock
   return blockers
 }
 
-async function checkCuentaPorCobrar(id: string, _role: string): Promise<DeleteBlocker[]> {
+async function checkCuentaPorCobrar(id: string): Promise<DeleteBlocker[]> {
   const blockers: DeleteBlocker[] = []
 
   const cxc = await prisma.cuentaPorCobrar.findUnique({
@@ -401,7 +366,7 @@ async function checkCuentaPorCobrar(id: string, _role: string): Promise<DeleteBl
   return blockers
 }
 
-async function checkRecepcionPendiente(id: string, _role: string): Promise<DeleteBlocker[]> {
+async function checkRecepcionPendiente(id: string): Promise<DeleteBlocker[]> {
   const blockers: DeleteBlocker[] = []
 
   const recepcion = await prisma.recepcionPendiente.findUnique({
@@ -422,7 +387,7 @@ async function checkRecepcionPendiente(id: string, _role: string): Promise<Delet
   return blockers
 }
 
-async function checkCuentaPorPagar(id: string, _role: string): Promise<DeleteBlocker[]> {
+async function checkCuentaPorPagar(id: string): Promise<DeleteBlocker[]> {
   const blockers: DeleteBlocker[] = []
 
   const cxp = await prisma.cuentaPorPagar.findUnique({

@@ -86,6 +86,8 @@ export async function POST(
       cleanFields.aprobadorId = null
     } else if (targetEstado === 'aprobada') {
       cleanFields.fechaEnvio = null
+    } else if (targetEstado === 'enviada') {
+      cleanFields.fechaConfirmacion = null
     }
 
     const updated = await prisma.ordenCompra.update({

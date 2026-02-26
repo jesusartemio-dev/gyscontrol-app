@@ -24,6 +24,8 @@ export interface RollbackResult {
 // Transiciones válidas: [estadoActual] → [targetEstado]
 const VALID_ROLLBACKS: Record<RollbackEntity, Record<string, string[]>> = {
   ordenCompra: {
+    confirmada: ['enviada'],
+    parcial: ['enviada'],
     enviada: ['aprobada'],
     aprobada: ['borrador'],
   },
@@ -118,18 +120,46 @@ async function checkOrdenCompraRollback(id: string, targetEstado: string): Promi
     }
   }
 
+  if (['confirmada', 'parcial'].includes(oc.estado) && targetEstado === 'enviada') {
+    // Bloquear si hay recepciones activas (no rechazadas)
+    const recepcionCount = await prisma.recepcionPendiente.count({
+      where: {
+        ordenCompraItem: { ordenCompraId: id },
+        estado: { not: 'rechazado' },
+      },
+    })
+    if (recepcionCount > 0) {
+      blockers.push({
+        entity: 'RecepcionPendiente',
+        count: recepcionCount,
+        message: `Tiene ${recepcionCount} recepción(es) activa(s) — elimínalas primero`,
+      })
+    }
+  }
+
   // enviada → aprobada: siempre permitido (sin bloqueantes)
 
   const allowed = blockers.length === 0
-  const fieldsToClean = targetEstado === 'borrador'
-    ? ['fechaAprobacion', 'aprobadorId']
-    : ['fechaEnvio'] // aprobada
 
-  const message = allowed
-    ? targetEstado === 'borrador'
+  let fieldsToClean: string[]
+  let message: string
+
+  if (targetEstado === 'borrador') {
+    fieldsToClean = ['fechaAprobacion', 'aprobadorId']
+    message = allowed
       ? 'La OC volverá a Borrador. Podrás editar precios y cantidades.'
-      : 'La OC volverá a Aprobada. Se limpiará la fecha de envío.'
-    : `No se puede retroceder:\n${blockers.map(b => `· ${b.message}`).join('\n')}`
+      : `No se puede retroceder:\n${blockers.map(b => `· ${b.message}`).join('\n')}`
+  } else if (targetEstado === 'enviada') {
+    fieldsToClean = ['fechaConfirmacion']
+    message = allowed
+      ? 'La OC volverá a Enviada. Se limpiará la fecha de confirmación.'
+      : `No se puede retroceder:\n${blockers.map(b => `· ${b.message}`).join('\n')}`
+  } else {
+    fieldsToClean = ['fechaEnvio']
+    message = allowed
+      ? 'La OC volverá a Aprobada. Se limpiará la fecha de envío.'
+      : `No se puede retroceder:\n${blockers.map(b => `· ${b.message}`).join('\n')}`
+  }
 
   return { allowed, blockers, message, fieldsToClean }
 }

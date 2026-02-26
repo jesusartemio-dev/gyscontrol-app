@@ -11,7 +11,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Plus, Search, X, Loader2, FileText, ChevronRight, Edit, Trash2, Upload, Download } from 'lucide-react'
 import { toast } from 'sonner'
-import { useSession } from 'next-auth/react'
 import { getOrdenesCompra, deleteOrdenCompra } from '@/lib/services/ordenCompra'
 import OCImportExcelModal from '@/components/logistica/OCImportExcelModal'
 import { exportarOCAExcel } from '@/lib/utils/ordenCompraExcel'
@@ -69,8 +68,6 @@ function getAsignadoA(oc: OrdenCompra): string {
 
 export default function OrdenesCompraPage() {
   const router = useRouter()
-  const { data: session } = useSession()
-  const isAdmin = session?.user?.role === 'admin'
   const [ordenes, setOrdenes] = useState<OrdenCompra[]>([])
   const [loading, setLoading] = useState(true)
   const [filterEstado, setFilterEstado] = useState('all')
@@ -292,22 +289,22 @@ export default function OrdenesCompraPage() {
                     <TableCell>
                       <div className="flex items-center gap-1">
                         {oc.estado === 'borrador' && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); router.push(`/logistica/ordenes-compra/${oc.id}`) }}
-                            className="p-1 rounded hover:bg-muted"
-                            title="Editar"
-                          >
-                            <Edit className="h-3.5 w-3.5 text-muted-foreground" />
-                          </button>
-                        )}
-                        {(oc.estado === 'borrador' || (isAdmin && !['completada', 'cancelada'].includes(oc.estado))) && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setDeleteTarget(oc) }}
-                            className="p-1 rounded hover:bg-red-50"
-                            title="Eliminar"
-                          >
-                            <Trash2 className="h-3.5 w-3.5 text-red-500" />
-                          </button>
+                          <>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); router.push(`/logistica/ordenes-compra/${oc.id}`) }}
+                              className="p-1 rounded hover:bg-muted"
+                              title="Editar"
+                            >
+                              <Edit className="h-3.5 w-3.5 text-muted-foreground" />
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setDeleteTarget(oc) }}
+                              className="p-1 rounded hover:bg-red-50"
+                              title="Eliminar"
+                            >
+                              <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                            </button>
+                          </>
                         )}
                         <ChevronRight className="h-4 w-4 text-muted-foreground" />
                       </div>
@@ -326,13 +323,7 @@ export default function OrdenesCompraPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Eliminar Orden de Compra</AlertDialogTitle>
             <AlertDialogDescription>
-              {deleteTarget?.estado !== 'borrador' ? (
-                <span className="text-red-600 font-medium">
-                  ⚠ La OC &quot;{deleteTarget?.numero}&quot; está en estado {deleteTarget?.estado}. Se eliminarán también sus recepciones asociadas. Esta acción no se puede deshacer.
-                </span>
-              ) : (
-                <>¿Eliminar la OC &quot;{deleteTarget?.numero}&quot;? Esta acción no se puede deshacer.</>
-              )}
+              ¿Eliminar la OC &quot;{deleteTarget?.numero}&quot;? Esta acción no se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -40,8 +40,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const role = session.user.role || ''
-    const result = await canDelete(entity, id, { role })
+    const result = await canDelete(entity, id)
     return NextResponse.json(result)
   } catch (error) {
     console.error('Error en pre-check de eliminación:', error)
