@@ -90,11 +90,20 @@ export async function GET(req: NextRequest) {
         }
       })
 
+      // Count total cotizaciones across all items
+      const totalCotizaciones = items.reduce((sum: number, item: any) => {
+        return sum + (item.cotizacionProveedorItems?.length || 0)
+      }, 0)
+
       return {
         ...lista,
         responsable: lista.user,
         items: itemsWithCantidadPedida,
-        montoEstimado
+        montoEstimado,
+        _count: {
+          ...(lista as any)._count,
+          cotizacionProveedorItem: totalCotizaciones
+        }
       }
     })
 
