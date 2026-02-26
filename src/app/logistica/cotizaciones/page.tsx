@@ -64,6 +64,7 @@ export default function CotizacionesPage() {
   // Filters
   const [search, setSearch] = useState('')
   const [estado, setEstado] = useState<string>('all')
+  const [proyectoId, setProyectoId] = useState<string>('all')
 
   const fetchData = async () => {
     try {
@@ -100,6 +101,7 @@ export default function CotizacionesPage() {
       if (!match) return false
     }
     if (estado !== 'all' && cot.estado !== estado) return false
+    if (proyectoId !== 'all' && cot.proyectoId !== proyectoId) return false
     return true
   })
 
@@ -111,11 +113,12 @@ export default function CotizacionesPage() {
     seleccionados: cotizaciones.filter(c => c.estado === 'seleccionado').length,
   }
 
-  const hasFilters = search || estado !== 'all'
+  const hasFilters = search || estado !== 'all' || proyectoId !== 'all'
 
   const clearFilters = () => {
     setSearch('')
     setEstado('all')
+    setProyectoId('all')
   }
 
   const handleDelete = async (id: string) => {
@@ -249,6 +252,21 @@ export default function CotizacionesPage() {
                 {ESTADOS_COTIZACION.map((e) => (
                   <SelectItem key={e.value} value={e.value} className="text-xs">
                     {e.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={proyectoId} onValueChange={setProyectoId}>
+              <SelectTrigger className="h-8 w-[180px] text-xs">
+                <Package className="h-3 w-3 mr-1.5 text-gray-400" />
+                <SelectValue placeholder="Proyecto" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" className="text-xs">Todos los proyectos</SelectItem>
+                {proyectos.map((p) => (
+                  <SelectItem key={p.id} value={p.id} className="text-xs">
+                    {p.codigo ? `${p.codigo} — ${p.nombre}` : p.nombre}
                   </SelectItem>
                 ))}
               </SelectContent>
