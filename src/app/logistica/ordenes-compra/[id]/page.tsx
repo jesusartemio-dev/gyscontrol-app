@@ -321,6 +321,16 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
             </Button>
           </>
         )}
+        {oc.estado !== 'borrador' && userRole === 'admin' && !['completada', 'cancelada'].includes(oc.estado) && (
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={() => setShowDelete(true)}
+            disabled={!!actionLoading}
+          >
+            Eliminar (Admin)
+          </Button>
+        )}
         {oc.estado === 'aprobada' && (
           <>
             <Button
@@ -854,7 +864,13 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
           <AlertDialogHeader>
             <AlertDialogTitle>Eliminar Orden de Compra</AlertDialogTitle>
             <AlertDialogDescription>
-              ¿Eliminar la OC {oc.numero}? Esta acción no se puede deshacer.
+              {oc.estado !== 'borrador' ? (
+                <span className="text-red-600 font-medium">
+                  ⚠ La OC {oc.numero} está en estado {oc.estado}. Se eliminarán también sus recepciones asociadas. Esta acción no se puede deshacer.
+                </span>
+              ) : (
+                <>¿Eliminar la OC {oc.numero}? Esta acción no se puede deshacer.</>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

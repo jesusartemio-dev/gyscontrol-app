@@ -12,6 +12,7 @@ const VALID_ENTITIES: DeletableEntity[] = [
   'valorizacion',
   'cuentaPorCobrar',
   'cuentaPorPagar',
+  'recepcionPendiente',
 ]
 
 export async function GET(request: NextRequest) {
@@ -39,7 +40,8 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const result = await canDelete(entity, id)
+    const role = session.user.role || ''
+    const result = await canDelete(entity, id, { role })
     return NextResponse.json(result)
   } catch (error) {
     console.error('Error en pre-check de eliminación:', error)

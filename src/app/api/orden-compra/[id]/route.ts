@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { canDelete } from '@/lib/utils/deleteValidation'
+import { crearEvento } from '@/lib/utils/trazabilidad'
 
 const includeRelations = {
   proveedor: true,
@@ -130,9 +131,10 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     }
 
     const { id } = await params
+    const role = session.user.role
 
-    // 🛡️ Validar dependientes antes de eliminar
-    const deleteCheck = await canDelete('ordenCompra', id)
+    // 🛡️ Validar dependientes antes de eliminar (role-aware)
+    const deleteCheck = await canDelete('ordenCompra', id, { role })
     if (!deleteCheck.allowed) {
       return NextResponse.json(
         { error: deleteCheck.message, blockers: deleteCheck.blockers },
@@ -141,16 +143,68 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     }
 
     // Verificar permisos: creador, admin, gerente o logistico
-    const existing = await prisma.ordenCompra.findUnique({ where: { id }, select: { solicitanteId: true } })
+    const existing = await prisma.ordenCompra.findUnique({
+      where: { id },
+      select: { solicitanteId: true, estado: true, numero: true, proyectoId: true },
+    })
     if (!existing) {
       return NextResponse.json({ error: 'Orden de compra no encontrada' }, { status: 404 })
     }
-    const role = session.user.role
     const rolesPermitidos = ['admin', 'gerente', 'logistico']
     if (existing.solicitanteId !== session.user.id && !rolesPermitidos.includes(role)) {
       return NextResponse.json({ error: 'Sin permisos para eliminar esta orden' }, { status: 403 })
     }
 
+    // OCs no-borrador requieren admin y limpieza transaccional
+    if (existing.estado !== 'borrador') {
+      if (role !== 'admin') {
+        return NextResponse.json({ error: 'Solo admin puede eliminar OCs fuera de borrador' }, { status: 403 })
+      }
+
+      await prisma.$transaction(async (tx) => {
+        // 1. Obtener OCI ids de esta OC
+        const ociIds = (await tx.ordenCompraItem.findMany({
+          where: { ordenCompraId: id },
+          select: { id: true },
+        })).map(i => i.id)
+
+        if (ociIds.length > 0) {
+          // 2. Revertir cantidadRecibida en los OCI (para recalcular estado OC no aplica — se va a eliminar)
+          // Pero sí necesitamos limpiar recepciones no-entregadas que serán cascadeadas
+          // Las EntregaItems vinculadas se setearán a null por onDelete: SetNull en el schema
+
+          // 3. Eliminar recepciones pendientes (no entregadas — las entregadas ya fueron bloqueadas por canDelete)
+          await tx.recepcionPendiente.deleteMany({
+            where: {
+              ordenCompraItemId: { in: ociIds },
+            },
+          })
+        }
+
+        // 4. Eliminar OCI (cascade from OC delete lo haría, pero lo hacemos explícito para claridad)
+        await tx.ordenCompraItem.deleteMany({ where: { ordenCompraId: id } })
+
+        // 5. Eliminar la OC
+        await tx.ordenCompra.delete({ where: { id } })
+      })
+
+      // Auditoría fire-and-forget
+      crearEvento(prisma, {
+        tipo: 'oc_eliminada',
+        descripcion: `OC ${existing.numero} eliminada por admin (estado: ${existing.estado})`,
+        usuarioId: session.user.id,
+        proyectoId: existing.proyectoId,
+        metadata: {
+          ordenCompraId: id,
+          ordenCompraNumero: existing.numero,
+          estadoAlEliminar: existing.estado,
+        },
+      }).catch(() => {})
+
+      return NextResponse.json({ success: true })
+    }
+
+    // Borrador: eliminación simple (cascade se encarga de los OCI)
     await prisma.ordenCompra.delete({ where: { id } })
     return NextResponse.json({ success: true })
   } catch (error) {
