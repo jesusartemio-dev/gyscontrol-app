@@ -212,7 +212,10 @@ async function checkPedidoEquipo(id: string): Promise<DeleteBlocker[]> {
 
   if (!pedido) return blockers
 
-  if (pedido.estado !== 'borrador' && pedido.estado !== 'cancelado') {
+  const esBorradorOCancelado = pedido.estado === 'borrador' || pedido.estado === 'cancelado'
+
+  // Estado activo → no se puede eliminar
+  if (!esBorradorOCancelado) {
     blockers.push({
       entity: 'PedidoEquipo',
       count: 1,
@@ -220,7 +223,8 @@ async function checkPedidoEquipo(id: string): Promise<DeleteBlocker[]> {
     })
   }
 
-  if (pedido._count.ordenesCompra > 0) {
+  // OCs bloquean solo en estado activo (en borrador/cancelado se eliminan en cascada)
+  if (!esBorradorOCancelado && pedido._count.ordenesCompra > 0) {
     blockers.push({
       entity: 'OrdenCompra',
       count: pedido._count.ordenesCompra,
@@ -228,9 +232,13 @@ async function checkPedidoEquipo(id: string): Promise<DeleteBlocker[]> {
     })
   }
 
+  // CxP activas bloquean SIEMPRE — no se eliminan datos financieros en cascada
   const cxpCount = await prisma.cuentaPorPagar.count({
     where: {
-      pedidoEquipoId: id,
+      OR: [
+        { pedidoEquipoId: id },
+        { ordenCompra: { pedidoEquipoId: id } },
+      ],
       estado: { not: 'anulada' },
     },
   })
@@ -238,7 +246,7 @@ async function checkPedidoEquipo(id: string): Promise<DeleteBlocker[]> {
     blockers.push({
       entity: 'CuentaPorPagar',
       count: cxpCount,
-      message: `Tiene ${cxpCount} cuenta(s) por pagar activa(s)`,
+      message: `Tiene ${cxpCount} cuenta(s) por pagar activa(s). Anúlelas antes de eliminar.`,
     })
   }
 

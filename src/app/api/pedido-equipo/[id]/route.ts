@@ -258,13 +258,11 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
   try {
     const { id } = await context.params
 
-    // 🔐 Verificar sesión
     const session = await getServerSession(authOptions)
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    // 🔐 Verificar rol — logístico no puede eliminar pedidos
     const rolesPermitidos = ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos']
     if (!rolesPermitidos.includes(session.user.role)) {
       return NextResponse.json(
@@ -273,7 +271,6 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
       )
     }
 
-    // 🛡️ Validar dependientes antes de eliminar
     const deleteCheck = await canDelete('pedidoEquipo', id)
     if (!deleteCheck.allowed) {
       return NextResponse.json(
@@ -282,36 +279,79 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
       )
     }
 
-    // ✅ Obtener todos los ítems asociados al pedido
-    const items = await prisma.pedidoEquipoItem.findMany({
-      where: { pedidoId: id },
+    // Cargar pedido con items y OCs para limpieza
+    const pedido = await prisma.pedidoEquipo.findUnique({
+      where: { id },
+      select: {
+        codigo: true,
+        estado: true,
+        proyectoId: true,
+        pedidoEquipoItem: {
+          select: { id: true, listaEquipoItemId: true, cantidadPedida: true },
+        },
+        ordenesCompra: {
+          select: { id: true },
+        },
+      },
     })
 
-    // ✅ Restar cantidades acumuladas en ListaEquipoItem
-    // Agrupar por listaEquipoItemId para recalcular después
+    if (!pedido) {
+      return NextResponse.json({ error: 'Pedido no encontrado' }, { status: 404 })
+    }
+
+    const itemIds = pedido.pedidoEquipoItem.map(i => i.id)
+    const ocIds = pedido.ordenesCompra.map(oc => oc.id)
     const listaItemIds = new Set<string>()
-    for (const item of items) {
-      if (item.listaEquipoItemId) {
-        listaItemIds.add(item.listaEquipoItemId)
-        if (item.cantidadPedida > 0) {
-          await prisma.listaEquipoItem.update({
+    for (const item of pedido.pedidoEquipoItem) {
+      if (item.listaEquipoItemId) listaItemIds.add(item.listaEquipoItemId)
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Eliminar EntregaItems vinculados a ítems del pedido (no tiene cascade)
+      if (itemIds.length > 0) {
+        await tx.entregaItem.deleteMany({
+          where: { pedidoEquipoItemId: { in: itemIds } },
+        })
+      }
+
+      // 2. Desligar CxP (anuladas — las activas ya están bloqueadas por canDelete)
+      const cxpOrConditions: object[] = [{ pedidoEquipoId: id }]
+      if (ocIds.length > 0) cxpOrConditions.push({ ordenCompraId: { in: ocIds } })
+      if (itemIds.length > 0) cxpOrConditions.push({ pedidoEquipoItemId: { in: itemIds } })
+
+      await tx.cuentaPorPagar.updateMany({
+        where: { OR: cxpOrConditions },
+        data: { pedidoEquipoId: null, pedidoEquipoItemId: null, ordenCompraId: null },
+      })
+
+      // 3. Desligar EventoTrazabilidad (preservar registros, limpiar FK)
+      await tx.eventoTrazabilidad.updateMany({
+        where: { pedidoEquipoId: id },
+        data: { pedidoEquipoId: null },
+      })
+
+      // 4. Eliminar OCs (cascade: OCI → RecepcionPendiente)
+      if (ocIds.length > 0) {
+        await tx.ordenCompra.deleteMany({
+          where: { id: { in: ocIds } },
+        })
+      }
+
+      // 5. Decrementar cantidadPedida en ListaEquipoItems
+      for (const item of pedido.pedidoEquipoItem) {
+        if (item.listaEquipoItemId && item.cantidadPedida > 0) {
+          await tx.listaEquipoItem.update({
             where: { id: item.listaEquipoItemId },
-            data: {
-              cantidadPedida: {
-                decrement: item.cantidadPedida,
-              },
-            },
+            data: { cantidadPedida: { decrement: item.cantidadPedida } },
           })
         }
       }
-    }
 
-    // ✅ Eliminar el pedido (asume que los ítems tienen delete cascade)
-    await prisma.pedidoEquipo.delete({
-      where: { id },
+      // 6. Eliminar PedidoEquipo (cascade: PedidoEquipoItem)
+      await tx.pedidoEquipo.delete({ where: { id } })
     })
 
-    // 🔄 Recalcular cantidadEntregada en ListaEquipoItems afectados
+    // Recalcular cantidadEntregada en ListaEquipoItems afectados
     for (const listaItemId of listaItemIds) {
       try {
         const resultado = await prisma.pedidoEquipoItem.aggregate({
@@ -323,13 +363,13 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
           data: { cantidadEntregada: resultado._sum.cantidadAtendida || 0 },
         })
       } catch (syncError) {
-        console.warn('⚠️ Error al sincronizar cantidadEntregada tras eliminar pedido:', syncError)
+        console.warn('Error al sincronizar cantidadEntregada tras eliminar pedido:', syncError)
       }
     }
 
     return NextResponse.json({ status: 'OK' })
   } catch (error) {
-    console.error('❌ Error al eliminar pedido:', error)
+    console.error('Error al eliminar pedido:', error)
     return NextResponse.json(
       { error: 'Error al eliminar pedido: ' + String(error) },
       { status: 500 }
