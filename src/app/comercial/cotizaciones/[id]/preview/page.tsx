@@ -109,7 +109,7 @@ export default function CotizacionPreviewPage() {
       serviciosTotal,
       gastosTotal,
       subtotal,
-      total: subtotal * 1.18
+      total: subtotal
     }
   }, [cotizacion])
 
@@ -282,7 +282,7 @@ export default function CotizacionPreviewPage() {
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-gray-500" />
                 <div>
-                  <p className="text-xs text-muted-foreground">Total + IGV</p>
+                  <p className="text-xs text-muted-foreground">Total</p>
                   <p className="text-lg font-bold text-gray-900">{formatCurrency(stats.total)}</p>
                 </div>
               </div>

@@ -583,17 +583,11 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
   const moneda = (cotizacion as any).moneda || 'USD'
   const monedaLabel = moneda === 'PEN' ? 'Soles (PEN)' : 'Dólares Americanos (USD)'
 
-  // Dynamic IGV handling
-  const incluyeIGV = (cotizacion as any).incluyeIGV ?? false
-  const igvRate = 0.18
-
-  // Calculate totals with safe access
+  // Calculate totals with safe access (all prices are without IGV for client)
   const equiposTotal = equipos.reduce((sum, equipo) => sum + (equipo.subtotalCliente || 0), 0)
   const serviciosTotal = servicios.reduce((sum, servicio) => sum + (servicio.subtotalCliente || 0), 0)
   const gastosTotal = gastos.reduce((sum, gasto) => sum + (gasto.subtotalCliente || 0), 0)
-  const subtotal = equiposTotal + serviciosTotal + gastosTotal
-  const igv = incluyeIGV ? 0 : subtotal * igvRate
-  const total = subtotal + igv
+  const total = equiposTotal + serviciosTotal + gastosTotal
 
   // Determine which sections have content
   const hasEquipos = equipos.length > 0
@@ -691,8 +685,8 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
               <Text style={styles.clientValue}>{validezDias} días calendario - Hasta {formatDate(validUntilDate)}</Text>
             </View>
             <View style={[styles.clientRow, styles.clientRowLast]}>
-              <Text style={styles.clientLabel}>IGV</Text>
-              <Text style={styles.clientValue}>{incluyeIGV ? 'Incluido en los precios' : 'No incluido en los precios mostrados'}</Text>
+              <Text style={styles.clientLabel}>Moneda</Text>
+              <Text style={styles.clientValue}>{monedaLabel}</Text>
             </View>
           </View>
         </View>
@@ -817,18 +811,8 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
 
         {/* Professional Totals */}
         <View style={styles.totalsContainer}>
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Subtotal:</Text>
-            <Text style={styles.totalValue}>{formatCurrency(subtotal, moneda)}</Text>
-          </View>
-          {!incluyeIGV && (
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>IGV (18%):</Text>
-              <Text style={styles.totalValue}>{formatCurrency(igv, moneda)}</Text>
-            </View>
-          )}
           <View style={styles.grandTotalRow}>
-            <Text style={styles.grandTotalLabel}>{incluyeIGV ? 'Total (inc. IGV):' : 'Total General:'}</Text>
+            <Text style={styles.grandTotalLabel}>Total:</Text>
             <Text style={styles.grandTotalValue}>{formatCurrency(total, moneda)}</Text>
           </View>
         </View>
