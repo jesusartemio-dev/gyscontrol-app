@@ -102,7 +102,8 @@ export async function GET(request: NextRequest) {
           },
           _count: {
             select: {
-              listaEquipoItem: true
+              listaEquipoItem: true,
+              cotizacionProveedorItem: true
             }
           }
         },

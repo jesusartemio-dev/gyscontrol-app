@@ -31,7 +31,8 @@ import {
   Building2,
   User,
   FileSpreadsheet,
-  ClipboardList
+  ClipboardList,
+  ShoppingCart
 } from 'lucide-react'
 import Link from 'next/link'
 import { format } from 'date-fns'
@@ -173,6 +174,7 @@ export function ListasEquipoView() {
         'Creado por': lista.user?.name || lista.user?.email || '-',
         'Estado': estadoLabels[lista.estado] || lista.estado,
         'Items': lista._count?.listaEquipoItem || 0,
+        'Cotizaciones': (lista._count as any)?.cotizacionProveedorItem || 0,
         'Fecha Creación': format(new Date(lista.createdAt), 'dd/MM/yyyy'),
         'Fecha Necesaria': lista.fechaNecesaria ? format(new Date(lista.fechaNecesaria), 'dd/MM/yyyy') : '-',
       }))
@@ -189,6 +191,7 @@ export function ListasEquipoView() {
         { wch: 20 },
         { wch: 12 },
         { wch: 8 },
+        { wch: 12 },
         { wch: 12 },
         { wch: 14 },
       ]
@@ -377,6 +380,7 @@ export function ListasEquipoView() {
                 <TableHead className="font-semibold text-gray-700">Lista</TableHead>
                 <TableHead className="font-semibold text-gray-700 hidden md:table-cell">Proyecto</TableHead>
                 <TableHead className="font-semibold text-gray-700 text-center w-20">Items</TableHead>
+                <TableHead className="font-semibold text-gray-700 text-center w-20 hidden sm:table-cell">Cotiz.</TableHead>
                 <TableHead className="font-semibold text-gray-700 hidden lg:table-cell">Creado por</TableHead>
                 <TableHead className="font-semibold text-gray-700 text-center hidden sm:table-cell">Fecha</TableHead>
                 <TableHead className="font-semibold text-gray-700 text-center">Estado</TableHead>
@@ -423,6 +427,18 @@ export function ListasEquipoView() {
                       <Package className="h-3.5 w-3.5 text-gray-400" />
                       <span className="font-medium">{lista._count?.listaEquipoItem || 0}</span>
                     </div>
+                  </TableCell>
+
+                  {/* Cotizaciones Count */}
+                  <TableCell className="text-center hidden sm:table-cell">
+                    {(lista._count as any)?.cotizacionProveedorItem > 0 ? (
+                      <div className="flex items-center justify-center gap-1">
+                        <ShoppingCart className="h-3.5 w-3.5 text-green-500" />
+                        <span className="text-sm font-medium text-green-700">{(lista._count as any).cotizacionProveedorItem}</span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
                   </TableCell>
 
                   {/* Creado por */}
@@ -526,6 +542,12 @@ export function ListasEquipoView() {
                 <div className="flex items-center justify-between pt-2 border-t">
                   <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
                     <span>{lista._count?.listaEquipoItem || 0} items</span>
+                    {(lista._count as any)?.cotizacionProveedorItem > 0 && (
+                      <span className="flex items-center gap-0.5 text-green-600">
+                        <ShoppingCart className="h-3 w-3" />
+                        {(lista._count as any).cotizacionProveedorItem} cotiz.
+                      </span>
+                    )}
                     <span>
                       {format(new Date(lista.createdAt), 'dd/MM/yy')}
                     </span>
