@@ -117,7 +117,7 @@ export default function RecepcionesPage() {
 
   // Action dialog state
   const [actionDialog, setActionDialog] = useState<{
-    type: 'confirmar_almacen' | 'confirmar_proyecto' | 'rechazar' | 'retroceder' | 'revertir'
+    type: 'confirmar_almacen' | 'confirmar_proyecto' | 'rechazar' | 'retroceder' | 'retroceder_entrega' | 'revertir'
     recepcion: Recepcion
   } | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
@@ -199,7 +199,11 @@ export default function RecepcionesPage() {
           break
         case 'retroceder':
           url = `/api/recepcion-pendiente/${recepcion.id}/retroceder`
-          body = { observaciones: actionMotivo.trim() || undefined }
+          body = { targetEstado: 'pendiente', observaciones: actionMotivo.trim() || undefined }
+          break
+        case 'retroceder_entrega':
+          url = `/api/recepcion-pendiente/${recepcion.id}/retroceder`
+          body = { targetEstado: 'en_almacen', observaciones: actionMotivo.trim() || undefined }
           break
         case 'revertir':
           url = `/api/recepcion-pendiente/${recepcion.id}/revertir`
@@ -222,7 +226,8 @@ export default function RecepcionesPage() {
         type === 'confirmar_almacen' ? 'Recepción confirmada en almacén' :
         type === 'confirmar_proyecto' ? 'Entrega a proyecto confirmada' :
         type === 'rechazar' ? 'Recepción rechazada' :
-        type === 'retroceder' ? 'Retroceso completado' :
+        type === 'retroceder' ? 'Retroceso a pendiente completado' :
+        type === 'retroceder_entrega' ? 'Entrega a proyecto revertida' :
         'Rechazo revertido'
       )
       setActionDialog(null)
@@ -423,11 +428,24 @@ export default function RecepcionesPage() {
                             </Button>
                           )}
 
-                          {/* Entregado: info */}
+                          {/* Entregado: retroceder (admin/gerente) + info */}
                           {r.estado === 'entregado_proyecto' && (
-                            <span className="text-[10px] text-muted-foreground">
-                              {r.entregadoPor?.name ? `por ${r.entregadoPor.name}` : ''}
-                            </span>
+                            <>
+                              {['admin', 'gerente'].includes(role) && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 px-2 text-xs text-orange-600 border-orange-200 hover:bg-orange-50"
+                                  onClick={() => setActionDialog({ type: 'retroceder_entrega', recepcion: r })}
+                                >
+                                  <RotateCcw className="h-3 w-3 mr-1" />
+                                  Retroceder
+                                </Button>
+                              )}
+                              <span className="text-[10px] text-muted-foreground">
+                                {r.entregadoPor?.name ? `por ${r.entregadoPor.name}` : ''}
+                              </span>
+                            </>
                           )}
                         </div>
                       </TableCell>
@@ -463,6 +481,7 @@ export default function RecepcionesPage() {
               {actionDialog?.type === 'confirmar_proyecto' && 'Confirmar entrega a proyecto'}
               {actionDialog?.type === 'rechazar' && 'Rechazar recepción'}
               {actionDialog?.type === 'retroceder' && 'Retroceder a pendiente'}
+              {actionDialog?.type === 'retroceder_entrega' && 'Retroceder a almacén'}
               {actionDialog?.type === 'revertir' && 'Revertir rechazo'}
             </AlertDialogTitle>
             <AlertDialogDescription>
@@ -475,7 +494,7 @@ export default function RecepcionesPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
 
-          {(actionDialog?.type === 'rechazar' || actionDialog?.type === 'retroceder' || actionDialog?.type === 'revertir') && (
+          {(actionDialog?.type === 'rechazar' || actionDialog?.type === 'retroceder' || actionDialog?.type === 'retroceder_entrega' || actionDialog?.type === 'revertir') && (
             <div className="space-y-2">
               <label className="text-sm font-medium">
                 {actionDialog.type === 'rechazar' ? 'Motivo del rechazo *' : 'Observaciones (opcional)'}
@@ -497,7 +516,7 @@ export default function RecepcionesPage() {
               disabled={actionLoading || (actionDialog?.type === 'rechazar' && actionMotivo.trim().length < 5)}
               className={cn(
                 actionDialog?.type === 'rechazar' ? 'bg-red-600 hover:bg-red-700' :
-                actionDialog?.type === 'retroceder' ? 'bg-orange-600 hover:bg-orange-700' :
+                (actionDialog?.type === 'retroceder' || actionDialog?.type === 'retroceder_entrega') ? 'bg-orange-600 hover:bg-orange-700' :
                 'bg-blue-600 hover:bg-blue-700'
               )}
             >
@@ -508,6 +527,7 @@ export default function RecepcionesPage() {
                 actionDialog?.type === 'confirmar_proyecto' ? 'Confirmar entrega' :
                 actionDialog?.type === 'rechazar' ? 'Rechazar' :
                 actionDialog?.type === 'retroceder' ? 'Retroceder' :
+                actionDialog?.type === 'retroceder_entrega' ? 'Retroceder a almacén' :
                 'Revertir'
               )}
             </AlertDialogAction>

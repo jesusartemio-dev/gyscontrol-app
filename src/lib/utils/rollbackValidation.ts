@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma'
 // retroceder a un estado anterior de forma segura.
 // ═══════════════════════════════════════════════════════════════
 
-export type RollbackEntity = 'ordenCompra' | 'listaEquipo' | 'pedidoEquipo'
+export type RollbackEntity = 'ordenCompra' | 'listaEquipo' | 'pedidoEquipo' | 'recepcionPendiente'
 
 export interface RollbackBlocker {
   entity: string
@@ -34,6 +34,10 @@ const VALID_ROLLBACKS: Record<RollbackEntity, Record<string, string[]>> = {
   pedidoEquipo: {
     enviado: ['borrador'],
   },
+  recepcionPendiente: {
+    en_almacen: ['pendiente'],
+    entregado_proyecto: ['en_almacen'],
+  },
 }
 
 // ─── Dispatcher ─────────────────────────────────────────────
@@ -47,6 +51,7 @@ export async function canRollback(
     ordenCompra: checkOrdenCompraRollback,
     listaEquipo: checkListaEquipoRollback,
     pedidoEquipo: checkPedidoEquipoRollback,
+    recepcionPendiente: checkRecepcionPendienteRollback,
   }
 
   const checker = checkers[entity]
@@ -222,6 +227,58 @@ async function checkPedidoEquipoRollback(id: string, targetEstado: string): Prom
 
   const message = allowed
     ? 'El pedido volverá a Borrador. Podrás editarlo nuevamente.'
+    : `No se puede retroceder:\n${blockers.map(b => `· ${b.message}`).join('\n')}`
+
+  return { allowed, blockers, message, fieldsToClean }
+}
+
+async function checkRecepcionPendienteRollback(id: string, targetEstado: string): Promise<RollbackResult> {
+  const recepcion = await prisma.recepcionPendiente.findUnique({
+    where: { id },
+    select: { estado: true },
+  })
+
+  if (!recepcion) {
+    return { allowed: false, blockers: [], message: 'Recepción no encontrada.', fieldsToClean: [] }
+  }
+
+  if (!isValidRollback('recepcionPendiente', recepcion.estado, targetEstado)) {
+    return {
+      allowed: false,
+      blockers: [],
+      message: `No se puede retroceder de "${recepcion.estado}" a "${targetEstado}".`,
+      fieldsToClean: [],
+    }
+  }
+
+  const blockers: RollbackBlocker[] = []
+
+  if (recepcion.estado === 'en_almacen' && targetEstado === 'pendiente') {
+    // Bloquear si ya tiene entregas al proyecto
+    const entregaCount = await prisma.entregaItem.count({
+      where: { recepcionPendienteId: id },
+    })
+    if (entregaCount > 0) {
+      blockers.push({
+        entity: 'EntregaItem',
+        count: entregaCount,
+        message: `Tiene ${entregaCount} entrega(s) al proyecto — retrocede la entrega primero`,
+      })
+    }
+  }
+
+  // entregado_proyecto → en_almacen: siempre permitido
+  // (las EntregaItem se eliminan como parte del retroceso)
+
+  const allowed = blockers.length === 0
+  const fieldsToClean = targetEstado === 'pendiente'
+    ? ['confirmadoPorId', 'fechaConfirmacion']
+    : ['entregadoPorId', 'fechaEntregaProyecto']
+
+  const message = allowed
+    ? targetEstado === 'pendiente'
+      ? 'La recepción volverá a Pendiente. Se limpiará la confirmación de almacén.'
+      : 'La recepción volverá a Almacén. Se eliminarán las entregas al proyecto y se recalcularán cantidades.'
     : `No se puede retroceder:\n${blockers.map(b => `· ${b.message}`).join('\n')}`
 
   return { allowed, blockers, message, fieldsToClean }
