@@ -942,7 +942,7 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
 
           {/* Equipment Groups */}
           {equipos.map((equipo, eqIdx) => (
-            <View key={`eq-${equipo.id || eqIdx}`} wrap={false}>
+            <View key={`eq-${equipo.id || eqIdx}`}>
               {/* Group Header */}
               <View style={s.detailGroupRow}>
                 <Text style={[s.detailGroupName, { flex: 1 }]}>
@@ -957,6 +957,7 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
               {equipo.items?.map((item, itemIdx) => (
                 <View
                   key={`eq-item-${item.id || itemIdx}`}
+                  wrap={false}
                   style={[s.detailRow, itemIdx % 2 === 1 ? s.detailRowAlt : {}]}
                 >
                   <Text style={[s.detailCell, { flex: 0.4 }]}>
@@ -1013,7 +1014,7 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
           {servicios.map((servicio, svIdx) => {
             const groupHours = (servicio.items || []).reduce((sum: number, item: any) => sum + (item.horaTotal || 0), 0)
             return (
-              <View key={`sv-${servicio.id || svIdx}`} wrap={false}>
+              <View key={`sv-${servicio.id || svIdx}`}>
                 {/* Group Header */}
                 <View style={s.detailGroupRow}>
                   <Text style={[s.detailGroupName, { flex: 1 }]}>
@@ -1031,6 +1032,7 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
                 {servicio.items?.map((item: any, itemIdx: number) => (
                   <View
                     key={`sv-item-${item.id || itemIdx}`}
+                    wrap={false}
                     style={[s.detailRow, itemIdx % 2 === 1 ? s.detailRowAltBlue : {}]}
                   >
                     <Text style={[s.detailCell, { flex: 0.4 }]}>
@@ -1080,7 +1082,7 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
 
           {/* Gasto Groups */}
           {gastos.map((gasto, gsIdx) => (
-            <View key={`gs-${gasto.id || gsIdx}`} wrap={false}>
+            <View key={`gs-${gasto.id || gsIdx}`}>
               {/* Group Header */}
               <View style={s.detailGroupRow}>
                 <Text style={[s.detailGroupName, { flex: 1 }]}>
@@ -1095,6 +1097,7 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
               {gasto.items?.map((item: any, itemIdx: number) => (
                 <View
                   key={`gs-item-${item.id || itemIdx}`}
+                  wrap={false}
                   style={[s.detailRow, itemIdx % 2 === 1 ? s.detailRowAlt : {}]}
                 >
                   <Text style={[s.detailCell, { flex: 0.4 }]}>
