@@ -7,7 +7,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { notFound } from 'next/navigation'
+import { notFound, useRouter } from 'next/navigation'
 import { getProyectoById } from '@/lib/services/proyecto'
 import { getPedidoEquipoById } from '@/lib/services/pedidoEquipo'
 import { useSession } from 'next-auth/react'
@@ -42,6 +42,7 @@ import {
   Package,
   Calendar,
   Edit,
+  Trash2,
   Truck,
   User,
   Clock,
@@ -70,6 +71,8 @@ import PedidoEstadoFlujoBanner from '@/components/equipos/PedidoEstadoFlujoBanne
 import TipoItemBadge from '@/components/shared/TipoItemBadge'
 import PedidoEquipoEditModal from '@/components/equipos/PedidoEquipoEditModal'
 import { PedidoItemDirectoModal } from '@/components/equipos/PedidoItemDirectoModal'
+import { useDeleteWithValidation } from '@/hooks/useDeleteWithValidation'
+import { DeleteWithValidationDialog } from '@/components/DeleteWithValidationDialog'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
 interface PageProps {
@@ -91,6 +94,7 @@ function LoadingSkeleton() {
 
 export default function ProjectPedidoDetailPage({ params }: PageProps) {
   const { data: session } = useSession()
+  const router = useRouter()
   const [proyecto, setProyecto] = useState<Proyecto | null>(null)
   const [pedido, setPedido] = useState<PedidoEquipo | null>(null)
   const [loading, setLoading] = useState(true)
@@ -103,6 +107,16 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
   const [procesandoRecepcion, setProcesandoRecepcion] = useState<string | null>(null)
   const [rechazoDetalleModal, setRechazoDetalleModal] = useState<any>(null)
   const [revertirRechazo, setRevertirRechazo] = useState<{ confirmando: boolean; motivo: string; procesando: boolean }>({ confirmando: false, motivo: '', procesando: false })
+
+  const deleteValidation = useDeleteWithValidation({
+    entity: 'pedidoEquipo',
+    deleteEndpoint: (id) => `/api/pedido-equipo/${id}`,
+    onSuccess: () => {
+      toast.success('Pedido eliminado')
+      router.push(`/proyectos/${proyectoId}/equipos/pedidos`)
+    },
+    onError: (error) => toast.error(error),
+  })
 
   useEffect(() => {
     params.then((p) => {
@@ -255,10 +269,23 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
               </div>
             </div>
 
-            <Button variant="outline" size="sm" onClick={() => setShowEditModal(true)} className="h-7 text-xs">
-              <Edit className="h-3 w-3 mr-1" />
-              Editar
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setShowEditModal(true)} className="h-7 text-xs">
+                <Edit className="h-3 w-3 mr-1" />
+                Editar
+              </Button>
+              {(pedido.estado === 'borrador' || pedido.estado === 'cancelado') && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => deleteValidation.requestDelete(pedidoId)}
+                  className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                >
+                  <Trash2 className="h-3 w-3 mr-1" />
+                  Eliminar
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -911,6 +938,20 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog de confirmación de eliminación */}
+      <DeleteWithValidationDialog
+        open={deleteValidation.dialogOpen}
+        onOpenChange={(open) => !open && deleteValidation.cancelDelete()}
+        checking={deleteValidation.checking}
+        deleting={deleteValidation.deleting}
+        allowed={deleteValidation.canDeleteResult?.allowed ?? null}
+        blockers={deleteValidation.canDeleteResult?.blockers ?? []}
+        message={deleteValidation.canDeleteResult?.message ?? ''}
+        onConfirm={deleteValidation.confirmDelete}
+        onCancel={deleteValidation.cancelDelete}
+        entityLabel="pedido"
+      />
     </div>
   )
 }
