@@ -51,7 +51,9 @@ import {
   ArrowUp,
   ArrowDown,
   ShoppingCart,
-  Zap
+  Zap,
+  Send,
+  X,
 } from 'lucide-react'
 import Link from 'next/link'
 import PedidoEquipoModalCrear from '@/components/equipos/PedidoEquipoModalCrear'
@@ -173,14 +175,15 @@ const PedidosTable = memo(function PedidosTable({
 
   const getEstadoBadge = (estado: string) => {
     const estados: Record<string, { icon: any; className: string; label: string }> = {
-      pendiente: { icon: Clock, className: 'bg-yellow-100 text-yellow-700', label: 'Pendiente' },
-      en_proceso: { icon: Truck, className: 'bg-blue-100 text-blue-700', label: 'En Proceso' },
-      parcial: { icon: AlertCircle, className: 'bg-orange-100 text-orange-700', label: 'Parcial' },
-      completado: { icon: CheckCircle2, className: 'bg-green-100 text-green-700', label: 'Completado' },
-      cancelado: { icon: AlertCircle, className: 'bg-red-100 text-red-700', label: 'Cancelado' }
+      borrador:  { icon: Clock, className: 'bg-gray-100 text-gray-700', label: 'Borrador' },
+      enviado:   { icon: Send, className: 'bg-blue-100 text-blue-700', label: 'Enviado' },
+      atendido:  { icon: CheckCircle2, className: 'bg-amber-100 text-amber-700', label: 'Atendido' },
+      parcial:   { icon: Package, className: 'bg-orange-100 text-orange-700', label: 'Parcial' },
+      entregado: { icon: Truck, className: 'bg-green-100 text-green-700', label: 'Entregado' },
+      cancelado: { icon: X, className: 'bg-red-100 text-red-700', label: 'Cancelado' },
     }
 
-    const config = estados[estado?.toLowerCase()] || estados.pendiente
+    const config = estados[estado?.toLowerCase()] || { icon: AlertCircle, className: 'bg-gray-100 text-gray-600', label: estado }
     const Icon = config.icon
 
     return (
@@ -220,10 +223,11 @@ const PedidosTable = memo(function PedidosTable({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="pendiente">Pendiente</SelectItem>
-            <SelectItem value="en_proceso">En Proceso</SelectItem>
+            <SelectItem value="borrador">Borrador</SelectItem>
+            <SelectItem value="enviado">Enviado</SelectItem>
+            <SelectItem value="atendido">Atendido</SelectItem>
             <SelectItem value="parcial">Parcial</SelectItem>
-            <SelectItem value="completado">Completado</SelectItem>
+            <SelectItem value="entregado">Entregado</SelectItem>
             <SelectItem value="cancelado">Cancelado</SelectItem>
           </SelectContent>
         </Select>
@@ -343,7 +347,7 @@ const PedidosTable = memo(function PedidosTable({
                       {formatDate((pedido as any).createdAt)}
                     </TableCell>
                     <TableCell className="py-2">
-                      {getEstadoBadge(pedido.estado || 'pendiente')}
+                      {getEstadoBadge(pedido.estado || 'borrador')}
                     </TableCell>
                     <TableCell className="py-2" onClick={(e) => e.stopPropagation()}>
                       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -472,7 +476,7 @@ export default function PedidosProyectoPage() {
 
   // Stats calculados
   const totalPedidos = pedidos.length
-  const pedidosCompletados = pedidos.filter(p => p.estado?.toLowerCase() === 'completado').length
+  const pedidosCompletados = pedidos.filter(p => p.estado === 'entregado').length
   const totalItems = pedidos.reduce((total, p) => total + (p.items?.length || 0), 0)
   const montoTotal = pedidos.reduce((total, p) => {
     return total + (p.items?.reduce((sum, item) => sum + (item.costoTotal || 0), 0) || 0)
