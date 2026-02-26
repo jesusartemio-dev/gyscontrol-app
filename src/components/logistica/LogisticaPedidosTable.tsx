@@ -283,7 +283,7 @@ export default function LogisticaPedidosTable({ pedidos, loading = false, onDele
                     >
                       <Eye className="h-3.5 w-3.5 text-blue-600" />
                     </Button>
-                    {onDelete && (
+                    {onDelete && (pedido.estado === 'borrador' || pedido.estado === 'cancelado') && (
                       <Button
                         variant="ghost"
                         size="sm"

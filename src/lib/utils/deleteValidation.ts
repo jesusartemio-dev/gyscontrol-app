@@ -212,11 +212,11 @@ async function checkPedidoEquipo(id: string): Promise<DeleteBlocker[]> {
 
   if (!pedido) return blockers
 
-  if (pedido.estado !== 'borrador') {
+  if (pedido.estado !== 'borrador' && pedido.estado !== 'cancelado') {
     blockers.push({
       entity: 'PedidoEquipo',
       count: 1,
-      message: `El pedido no está en estado borrador (estado actual: ${pedido.estado})`,
+      message: `Solo se puede eliminar un pedido en estado borrador o cancelado. Retrocede el estado primero o cancela el pedido antes de eliminar.`,
     })
   }
 

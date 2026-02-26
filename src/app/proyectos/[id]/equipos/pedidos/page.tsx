@@ -346,7 +346,7 @@ const PedidosTable = memo(function PedidosTable({
                         >
                           <Eye className="h-3.5 w-3.5" />
                         </Button>
-                        {pedido.estado === 'borrador' && (
+                        {(pedido.estado === 'borrador' || pedido.estado === 'cancelado') && (
                           <Button
                             variant="ghost"
                             size="sm"
