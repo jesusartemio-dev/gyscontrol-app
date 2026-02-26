@@ -274,19 +274,21 @@ async function checkPedidoEquipoRollback(id: string, targetEstado: string): Prom
     }
   }
 
-  // entregado → parcial: bloquear si tiene entregas cerradas
+  // entregado → parcial: bloquear si tiene entregas activas (con recepción vinculada)
+  // EntregaItems huérfanos (recepcionPendienteId = null) no bloquean — se limpian al retroceder
   if (targetEstado === 'parcial') {
     const entregaCount = await prisma.entregaItem.count({
       where: {
         pedidoEquipoItem: { pedidoId: id },
         estado: 'entregado',
+        recepcionPendienteId: { not: null },
       },
     })
     if (entregaCount > 0) {
       blockers.push({
         entity: 'EntregaItem',
         count: entregaCount,
-        message: `Tiene ${entregaCount} entrega(s) cerrada(s) al proyecto — retrocédelas primero`,
+        message: `Tiene ${entregaCount} entrega(s) activa(s) vinculada(s) a recepciones — retrocédelas primero`,
       })
     }
   }

@@ -93,13 +93,26 @@ export async function POST(
       cleanFields.fechaEntregaReal = null
     }
 
-    const updated = await prisma.pedidoEquipo.update({
-      where: { id },
-      data: {
-        estado: targetEstado as any,
-        ...cleanFields,
-        updatedAt: new Date(),
-      },
+    const updated = await prisma.$transaction(async (tx) => {
+      // Limpiar EntregaItems huérfanos (recepcionPendienteId = null) al retroceder entregado → parcial
+      if (targetEstado === 'parcial') {
+        await tx.entregaItem.deleteMany({
+          where: {
+            pedidoEquipoItem: { pedidoId: id },
+            recepcionPendienteId: null,
+            estado: 'entregado',
+          },
+        })
+      }
+
+      return tx.pedidoEquipo.update({
+        where: { id },
+        data: {
+          estado: targetEstado as any,
+          ...cleanFields,
+          updatedAt: new Date(),
+        },
+      })
     })
 
     // Registrar evento
