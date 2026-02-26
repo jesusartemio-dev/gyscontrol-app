@@ -22,7 +22,6 @@ import {
   getPedidoEquipos,
   createPedidoEquipo,
   updatePedidoEquipo,
-  deletePedidoEquipo,
 } from '@/lib/services/pedidoEquipo'
 import {
   createPedidoEquipoItem,
@@ -57,6 +56,8 @@ import {
 import Link from 'next/link'
 import PedidoEquipoModalCrear from '@/components/equipos/PedidoEquipoModalCrear'
 import ModalPedidoUrgente from '@/components/logistica/ModalPedidoUrgente'
+import { useDeleteWithValidation } from '@/hooks/useDeleteWithValidation'
+import { DeleteWithValidationDialog } from '@/components/DeleteWithValidationDialog'
 
 // Skeleton minimalista
 function LoadingSkeleton() {
@@ -89,19 +90,27 @@ function LoadingSkeleton() {
 const PedidosTable = memo(function PedidosTable({
   pedidos,
   proyectoId,
-  onDelete,
   onRefresh,
   loading
 }: {
   pedidos: PedidoEquipo[]
   proyectoId: string
-  onDelete: (id: string) => void
   onRefresh: () => void
   loading: boolean
 }) {
   const router = useRouter()
   const [search, setSearch] = useState('')
   const [filterEstado, setFilterEstado] = useState('all')
+
+  const deleteValidation = useDeleteWithValidation({
+    entity: 'pedidoEquipo',
+    deleteEndpoint: (id) => `/api/pedido-equipo/${id}`,
+    onSuccess: () => {
+      toast.success('Pedido eliminado')
+      onRefresh()
+    },
+    onError: (error) => toast.error(error),
+  })
   const [sortField, setSortField] = useState<string>('createdAt')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
@@ -351,7 +360,7 @@ const PedidosTable = memo(function PedidosTable({
                             variant="ghost"
                             size="sm"
                             className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                            onClick={() => onDelete(pedido.id)}
+                            onClick={() => deleteValidation.requestDelete(pedido.id)}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
@@ -365,6 +374,19 @@ const PedidosTable = memo(function PedidosTable({
           </TableBody>
         </Table>
       </div>
+
+      <DeleteWithValidationDialog
+        open={deleteValidation.dialogOpen}
+        onOpenChange={(open) => !open && deleteValidation.cancelDelete()}
+        checking={deleteValidation.checking}
+        deleting={deleteValidation.deleting}
+        allowed={deleteValidation.canDeleteResult?.allowed ?? null}
+        blockers={deleteValidation.canDeleteResult?.blockers ?? []}
+        message={deleteValidation.canDeleteResult?.message ?? ''}
+        onConfirm={deleteValidation.confirmDelete}
+        onCancel={deleteValidation.cancelDelete}
+        entityLabel="pedido"
+      />
     </div>
   )
 })
@@ -433,16 +455,6 @@ export default function PedidosProyectoPage() {
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('¿Eliminar este pedido?')) return
-    const ok = await deletePedidoEquipo(id)
-    if (ok) {
-      toast.success('Pedido eliminado')
-      cargarPedidos()
-    } else {
-      toast.error('Error al eliminar pedido')
-    }
-  }
 
   if (loading && !proyecto) return <LoadingSkeleton />
 
@@ -519,7 +531,6 @@ export default function PedidosProyectoPage() {
       <PedidosTable
         pedidos={pedidos}
         proyectoId={proyectoId}
-        onDelete={handleDelete}
         onRefresh={cargarDatos}
         loading={loading}
       />
