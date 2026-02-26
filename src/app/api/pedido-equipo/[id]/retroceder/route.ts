@@ -5,7 +5,13 @@ import { authOptions } from '@/lib/auth'
 import { canRollback, isValidRollback } from '@/lib/utils/rollbackValidation'
 import { crearEvento } from '@/lib/utils/trazabilidad'
 
-const ROLES_ALLOWED = ['admin', 'gerente', 'logistico', 'proyectos']
+// Roles permitidos por targetEstado — admin/gerente son superusuarios en todos
+const ROLES_POR_TARGET: Record<string, string[]> = {
+  borrador: ['admin', 'gerente', 'proyectos'],         // Proyectos retrocede su propio envío
+  enviado:  ['admin', 'gerente', 'logistico'],          // Solo Logística
+  atendido: ['admin', 'gerente', 'logistico'],          // Solo Logística
+  parcial:  ['admin', 'gerente'],                       // Solo admin/gerente (estado casi-terminal)
+}
 
 // GET: pre-check sin ejecutar
 export async function GET(
@@ -42,16 +48,18 @@ export async function POST(
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
-    if (!ROLES_ALLOWED.includes(session.user.role)) {
-      return NextResponse.json({ error: 'Sin permisos para retroceder' }, { status: 403 })
-    }
-
     const { id } = await params
     const body = await req.json()
     const { targetEstado, motivo } = body as { targetEstado: string; motivo?: string }
 
     if (!targetEstado) {
       return NextResponse.json({ error: 'targetEstado es requerido' }, { status: 400 })
+    }
+
+    // Verificar roles por targetEstado
+    const rolesPermitidos = ROLES_POR_TARGET[targetEstado]
+    if (!rolesPermitidos || !rolesPermitidos.includes(session.user.role)) {
+      return NextResponse.json({ error: 'Sin permisos para retroceder a este estado' }, { status: 403 })
     }
 
     const pedido = await prisma.pedidoEquipo.findUnique({
@@ -67,16 +75,6 @@ export async function POST(
         { error: `No se puede retroceder de "${pedido.estado}" a "${targetEstado}"` },
         { status: 400 }
       )
-    }
-
-    // entregado → parcial: solo admin/gerente (estado casi-terminal)
-    if (pedido.estado === 'entregado' && targetEstado === 'parcial') {
-      if (!['admin', 'gerente'].includes(session.user.role)) {
-        return NextResponse.json(
-          { error: 'Solo admin o gerente pueden retroceder desde Entregado' },
-          { status: 403 }
-        )
-      }
     }
 
     const check = await canRollback('pedidoEquipo', id, targetEstado)

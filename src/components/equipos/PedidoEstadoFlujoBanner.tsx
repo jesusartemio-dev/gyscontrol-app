@@ -61,6 +61,12 @@ const puedeAvanzarA = (estadoActual: string, estadoSiguiente: string, rol: strin
   return resultado.valido
 }
 
+// Transiciones de avanzar permitidas por contexto (admin/gerente ven todo)
+const AVANZAR_POR_CONTEXTO: Record<string, string[]> = {
+  proyectos: ['enviado'],          // borrador → enviado
+  logistica: ['atendido', 'parcial', 'entregado'], // enviado→atendido, atendido→parcial, parcial→entregado
+}
+
 const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
   estado,
   pedidoId,
@@ -121,7 +127,9 @@ const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
               const isCompleted = est.orden < estadoActual.orden
               const isCurrent = est.key === estado
               const isNext = est.orden === estadoActual.orden + 1
-              const canAdvance = isNext && puedeAvanzarA(estado, est.key, userRole)
+              const isSuperUser = ['admin', 'gerente'].includes(userRole)
+              const contextoPermiteAvanzar = isSuperUser || (AVANZAR_POR_CONTEXTO[contexto] || []).includes(est.key)
+              const canAdvance = isNext && contextoPermiteAvanzar && puedeAvanzarA(estado, est.key, userRole)
               const Icon = est.icon
 
               return (
@@ -158,7 +166,7 @@ const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
           </div>
 
           {/* Rollback buttons por estado */}
-          {estado === 'enviado' && (
+          {estado === 'enviado' && ['admin', 'gerente', 'proyectos'].includes(userRole) && (
             <RollbackButton
               entityType="pedidoEquipo"
               entityId={pedidoId}
