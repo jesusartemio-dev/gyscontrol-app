@@ -151,7 +151,6 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
           cantidadEntregada: data.cantidadAtendida || 0,
           observaciones: data.observacionesEntrega || null,
           usuarioId: userId,
-          updatedAt: new Date()
         }
       })
 

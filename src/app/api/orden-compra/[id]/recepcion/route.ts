@@ -104,6 +104,36 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         },
       })
 
+      // Registrar evento de trazabilidad
+      if (creadas > 0) {
+        const itemsResumen = recepciones
+          .filter(r => r.cantidadRecibida > 0)
+          .map(r => {
+            const item = existing.items.find(i => i.id === r.itemId)
+            return item ? `${Math.min(r.cantidadRecibida, item.cantidad)} x ${item.codigo}` : null
+          })
+          .filter(Boolean)
+          .join(', ')
+
+        await tx.eventoTrazabilidad.create({
+          data: {
+            id: `evt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            proyectoId: existing.proyectoId || null,
+            pedidoEquipoId: existing.pedidoEquipoId || null,
+            tipo: 'recepcion_registrada',
+            descripcion: `Recepción registrada en OC ${existing.numero}: ${itemsResumen}`,
+            usuarioId: session.user.id,
+            metadata: {
+              ordenCompraId: id,
+              ordenCompraNumero: existing.numero,
+              recepcionesCreadas: creadas,
+              nuevoEstadoOC: nuevoEstado,
+            },
+            updatedAt: new Date(),
+          }
+        })
+      }
+
       return { data: ocData, nuevoEstado, recepcionesPendientesCreadas: creadas }
     })
 

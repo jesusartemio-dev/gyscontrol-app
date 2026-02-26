@@ -35,6 +35,7 @@ const DEFAULT_COUNTS: NotificationCounts = {
   'proyectos-activos': 0,
   'pedidos-pendientes': 0,
   'listas-por-cotizar': 0,
+  'recepciones-pendientes': 0,
   'notificaciones-no-leidas': 0,
 }
 
@@ -142,6 +143,7 @@ export function useNotifications(): UseNotificationsReturn {
         'proyectos-activos': data['proyectos-activos'] || 0,
         'pedidos-pendientes': data['pedidos-pendientes'] || 0,
         'listas-por-cotizar': data['listas-por-cotizar'] || 0,
+        'recepciones-pendientes': data['recepciones-pendientes'] || 0,
         'notificaciones-no-leidas': conteoData.noLeidas || 0,
       }
 

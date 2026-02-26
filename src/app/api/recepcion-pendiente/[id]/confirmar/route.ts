@@ -178,6 +178,7 @@ export async function POST(
           id: entregaItemId,
           pedidoEquipoItemId: pedidoItem.id,
           listaEquipoItemId: pedidoItem.listaEquipoItemId || null,
+          recepcionPendienteId: id,
           proyectoId,
           fechaEntrega: new Date(),
           estado: nuevoEstadoEntrega as any,
@@ -185,7 +186,6 @@ export async function POST(
           cantidadEntregada: recepcion.cantidadRecibida,
           observaciones: observaciones || `Entrega a proyecto desde OC ${ocNumero}`,
           usuarioId: session.user.id,
-          updatedAt: new Date()
         }
       })
 

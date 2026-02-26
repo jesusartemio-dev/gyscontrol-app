@@ -24,7 +24,8 @@ export async function GET() {
       cotizacionesPendientes,
       proyectosActivos,
       pedidosPendientes,
-      listasPorCotizar
+      listasPorCotizar,
+      recepcionesPendientes
     ] = await Promise.all([
       prisma.cotizacion.count({
         where: { estado: { in: ['borrador', 'enviada'] } }
@@ -40,6 +41,9 @@ export async function GET() {
       }),
       prisma.listaEquipo.count({
         where: { estado: { in: ['por_revisar', 'por_cotizar'] } }
+      }),
+      prisma.recepcionPendiente.count({
+        where: { estado: { in: ['pendiente', 'en_almacen'] } }
       })
     ])
 
@@ -47,7 +51,8 @@ export async function GET() {
       'cotizaciones-pendientes': cotizacionesPendientes,
       'proyectos-activos': proyectosActivos,
       'pedidos-pendientes': pedidosPendientes,
-      'listas-por-cotizar': listasPorCotizar
+      'listas-por-cotizar': listasPorCotizar,
+      'recepciones-pendientes': recepcionesPendientes
     })
 
   } catch (error) {

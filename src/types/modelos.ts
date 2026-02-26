@@ -36,6 +36,7 @@ export type NotificationBadgeType =
   | 'proyectos-activos'
   | 'pedidos-pendientes'
   | 'listas-por-cotizar'
+  | 'recepciones-pendientes'
   | 'notificaciones-no-leidas'
   
 

@@ -9,16 +9,16 @@ export async function POST(
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
     if (!['admin', 'gerente'].includes(session.user.role)) {
-      return NextResponse.json({ error: 'Solo admin o gerente pueden revertir rechazos' }, { status: 403 })
+      return NextResponse.json({ error: 'Solo admin o gerente pueden retroceder confirmaciones' }, { status: 403 })
     }
 
     const { id } = await params
-    const body = await req.json()
+    const body = await req.json().catch(() => ({}))
     const observaciones = body.observaciones || ''
 
     const recepcion = await prisma.recepcionPendiente.findUnique({
@@ -35,7 +35,8 @@ export async function POST(
           include: {
             ordenCompra: { select: { id: true, numero: true } }
           }
-        }
+        },
+        entregasItem: { select: { id: true } },
       }
     })
 
@@ -43,9 +44,17 @@ export async function POST(
       return NextResponse.json({ error: 'Recepción no encontrada' }, { status: 404 })
     }
 
-    if (recepcion.estado !== 'rechazado') {
+    if (recepcion.estado !== 'en_almacen') {
       return NextResponse.json(
-        { error: `Solo se pueden revertir recepciones rechazadas. Estado actual: "${recepcion.estado}"` },
+        { error: 'Solo se puede retroceder desde estado "en almacén"' },
+        { status: 409 }
+      )
+    }
+
+    // Bloquear si ya fue entregado al proyecto
+    if (recepcion.entregasItem.length > 0) {
+      return NextResponse.json(
+        { error: 'No se puede retroceder: ya fue entregado al proyecto' },
         { status: 409 }
       )
     }
@@ -55,60 +64,32 @@ export async function POST(
     const ocNumero = recepcion.ordenCompraItem.ordenCompra.numero
 
     await prisma.$transaction(async (tx) => {
-      // 1. Revertir estado a pendiente, limpiar campos de rechazo
+      // 1. Retroceder a pendiente, limpiar campos de confirmación
       await tx.recepcionPendiente.update({
         where: { id },
         data: {
           estado: 'pendiente',
-          rechazadoPorId: null,
-          fechaRechazo: null,
-          motivoRechazo: null,
-          observaciones: observaciones.trim() || `Rechazo revertido por ${session.user.name || session.user.email}`,
+          confirmadoPorId: null,
+          fechaConfirmacion: null,
+          observaciones: observaciones.trim() || `Confirmación de almacén revertida por ${session.user.name || session.user.email}`,
         }
       })
 
-      // 2. Re-incrementar cantidadRecibida en OCI (rechazar lo decrementó)
-      await tx.ordenCompraItem.update({
-        where: { id: recepcion.ordenCompraItemId },
-        data: {
-          cantidadRecibida: { increment: recepcion.cantidadRecibida },
-          updatedAt: new Date(),
-        }
-      })
-
-      // 3. Recalcular estado de la OC
-      const ocId = recepcion.ordenCompraItem.ordenCompraId
-      const allItems = await tx.ordenCompraItem.findMany({
-        where: { ordenCompraId: ocId },
-      })
-      const todosCompletos = allItems.every(i => i.cantidadRecibida >= i.cantidad)
-      const algunoRecibido = allItems.some(i => i.cantidadRecibida > 0)
-
-      let nuevoEstadoOC = 'confirmada'
-      if (todosCompletos) nuevoEstadoOC = 'completada'
-      else if (algunoRecibido) nuevoEstadoOC = 'parcial'
-
-      await tx.ordenCompra.update({
-        where: { id: ocId },
-        data: { estado: nuevoEstadoOC as any, updatedAt: new Date() },
-      })
-
-      // 4. Crear EventoTrazabilidad
+      // 2. Crear EventoTrazabilidad
       await tx.eventoTrazabilidad.create({
         data: {
           id: `evt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           proyectoId: pedido.proyectoId,
           pedidoEquipoId: pedido.id,
-          tipo: 'rechazo_revertido',
-          descripcion: `Rechazo revertido: ${recepcion.cantidadRecibida} x ${pedidoItem.codigo} de OC ${ocNumero} vuelve a pendiente.${observaciones.trim() ? ` Motivo: ${observaciones.trim()}` : ''}`,
+          tipo: 'recepcion_retrocedida',
+          descripcion: `Confirmación de almacén revertida: ${recepcion.cantidadRecibida} x ${pedidoItem.codigo} de OC ${ocNumero} vuelve a pendiente.${observaciones.trim() ? ` Motivo: ${observaciones.trim()}` : ''}`,
           usuarioId: session.user.id,
           metadata: {
             recepcionPendienteId: id,
             ordenCompraNumero: ocNumero,
             cantidadRecibida: recepcion.cantidadRecibida,
-            pedidoCodigo: pedido.codigo,
-            itemCodigo: pedidoItem.codigo,
-            motivoRechazoOriginal: recepcion.motivoRechazo,
+            estadoAnterior: 'en_almacen',
+            estadoNuevo: 'pendiente',
           },
           updatedAt: new Date(),
         }
@@ -118,12 +99,12 @@ export async function POST(
     return NextResponse.json({
       recepcionId: id,
       estado: 'pendiente',
-      mensaje: 'Rechazo revertido correctamente'
+      mensaje: 'Confirmación de almacén revertida correctamente'
     })
   } catch (error) {
-    console.error('Error al revertir rechazo:', error)
+    console.error('Error al retroceder recepción:', error)
     return NextResponse.json(
-      { error: 'Error al revertir rechazo: ' + String(error) },
+      { error: 'Error al retroceder recepción: ' + String(error) },
       { status: 500 }
     )
   }

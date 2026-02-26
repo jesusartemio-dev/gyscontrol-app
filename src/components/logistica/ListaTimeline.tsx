@@ -24,6 +24,10 @@ const TIPO_CONFIG: Record<string, { icon: any; color: string; label: string }> =
   oc_retrocedida: { icon: RotateCcw, color: 'text-orange-500 bg-orange-100', label: 'OC Retrocedida' },
   lista_retrocedida: { icon: RotateCcw, color: 'text-orange-500 bg-orange-100', label: 'Lista Retrocedida' },
   pedido_retrocedido: { icon: RotateCcw, color: 'text-orange-500 bg-orange-100', label: 'Pedido Retrocedido' },
+  recepcion_registrada: { icon: Package, color: 'text-blue-500 bg-blue-100', label: 'Recepción Registrada' },
+  recepcion_retrocedida: { icon: RotateCcw, color: 'text-orange-500 bg-orange-100', label: 'Recepción Retrocedida' },
+  rechazo_recepcion: { icon: XCircle, color: 'text-red-500 bg-red-100', label: 'Recepción Rechazada' },
+  rechazo_revertido: { icon: RotateCcw, color: 'text-amber-500 bg-amber-100', label: 'Rechazo Revertido' },
 }
 
 function formatFecha(fecha: string): string {

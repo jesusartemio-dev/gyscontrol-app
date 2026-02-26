@@ -556,27 +556,30 @@ model CotizacionServicioItem {
 }
 
 model EntregaItem {
-  id                 String               @id
-  pedidoEquipoItemId String
-  listaEquipoItemId  String?
-  proyectoId         String
-  fechaEntrega       DateTime
-  estado             EstadoEntregaItem    @default(pendiente)
-  cantidad           Float
-  cantidadEntregada  Float?               @default(0)
-  observaciones      String?
-  fechaRegistro      DateTime             @default(now())
-  usuarioId          String?
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime
-  listaEquipoItem    ListaEquipoItem?     @relation(fields: [listaEquipoItemId], references: [id])
-  pedidoEquipoItem   PedidoEquipoItem     @relation(fields: [pedidoEquipoItemId], references: [id])
-  proyecto           Proyecto             @relation(fields: [proyectoId], references: [id])
-  user               User?                @relation(fields: [usuarioId], references: [id])
-  eventoTrazabilidad EventoTrazabilidad[]
+  id                    String               @id @default(cuid())
+  pedidoEquipoItemId    String
+  listaEquipoItemId     String?
+  recepcionPendienteId  String?
+  proyectoId            String
+  fechaEntrega          DateTime
+  estado                EstadoEntregaItem    @default(pendiente)
+  cantidad              Float
+  cantidadEntregada     Float?               @default(0)
+  observaciones         String?
+  fechaRegistro         DateTime             @default(now())
+  usuarioId             String?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  listaEquipoItem       ListaEquipoItem?     @relation(fields: [listaEquipoItemId], references: [id])
+  pedidoEquipoItem      PedidoEquipoItem     @relation(fields: [pedidoEquipoItemId], references: [id])
+  recepcion             RecepcionPendiente?  @relation(fields: [recepcionPendienteId], references: [id], onDelete: SetNull)
+  proyecto              Proyecto             @relation(fields: [proyectoId], references: [id])
+  user                  User?                @relation(fields: [usuarioId], references: [id])
+  eventoTrazabilidad    EventoTrazabilidad[]
 
   @@index([fechaEntrega])
   @@index([pedidoEquipoItemId])
+  @@index([recepcionPendienteId])
   @@index([proyectoId, estado])
   @@map("entrega_item")
 }
@@ -2973,6 +2976,13 @@ enum EstadoEntregaItem {
   cancelado
 }
 
+enum EstadoRecepcion {
+  pendiente
+  en_almacen
+  entregado_proyecto
+  rechazado
+}
+
 enum EstadoEquipo {
   pendiente
   revisado_tecnico
@@ -3461,12 +3471,12 @@ model OrdenCompraItem {
 }
 
 model RecepcionPendiente {
-  id                   String    @id @default(cuid())
+  id                   String           @id @default(cuid())
   pedidoEquipoItemId   String
   ordenCompraItemId    String
   cantidadRecibida     Float
-  fechaRecepcion       DateTime  @default(now())
-  estado               String    @default("pendiente")
+  fechaRecepcion       DateTime         @default(now())
+  estado               EstadoRecepcion  @default(pendiente)
   confirmadoPorId      String?
   fechaConfirmacion    DateTime?
   entregadoPorId       String?
@@ -3475,14 +3485,15 @@ model RecepcionPendiente {
   fechaRechazo         DateTime?
   motivoRechazo        String?
   observaciones        String?
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
 
   pedidoEquipoItem PedidoEquipoItem @relation(fields: [pedidoEquipoItemId], references: [id], onDelete: Cascade)
   ordenCompraItem  OrdenCompraItem  @relation(fields: [ordenCompraItemId], references: [id], onDelete: Cascade)
   confirmadoPor    User?            @relation("RecepcionConfirmador", fields: [confirmadoPorId], references: [id])
   entregadoPor     User?            @relation("RecepcionEntregador", fields: [entregadoPorId], references: [id])
   rechazadoPor     User?            @relation("RecepcionRechazador", fields: [rechazadoPorId], references: [id])
+  entregasItem     EntregaItem[]
 
   @@index([pedidoEquipoItemId])
   @@index([ordenCompraItemId])

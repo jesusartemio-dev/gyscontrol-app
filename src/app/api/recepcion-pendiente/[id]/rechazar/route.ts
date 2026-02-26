@@ -40,7 +40,7 @@ export async function POST(
         },
         ordenCompraItem: {
           include: {
-            ordenCompra: { select: { numero: true } }
+            ordenCompra: { select: { id: true, numero: true } }
           }
         }
       }
@@ -75,7 +75,33 @@ export async function POST(
         }
       })
 
-      // 2. Crear EventoTrazabilidad
+      // 2. Decrementar cantidadRecibida en OrdenCompraItem
+      await tx.ordenCompraItem.update({
+        where: { id: recepcion.ordenCompraItemId },
+        data: {
+          cantidadRecibida: { decrement: recepcion.cantidadRecibida },
+          updatedAt: new Date(),
+        }
+      })
+
+      // 3. Recalcular estado de la OrdenCompra (post-decrement)
+      const ocId = recepcion.ordenCompraItem.ordenCompraId
+      const allItems = await tx.ordenCompraItem.findMany({
+        where: { ordenCompraId: ocId },
+      })
+      const todosCompletos = allItems.every(i => i.cantidadRecibida >= i.cantidad)
+      const algunoRecibido = allItems.some(i => i.cantidadRecibida > 0)
+
+      let nuevoEstadoOC = 'confirmada'
+      if (todosCompletos) nuevoEstadoOC = 'completada'
+      else if (algunoRecibido) nuevoEstadoOC = 'parcial'
+
+      await tx.ordenCompra.update({
+        where: { id: ocId },
+        data: { estado: nuevoEstadoOC as any, updatedAt: new Date() },
+      })
+
+      // 4. Crear EventoTrazabilidad
       await tx.eventoTrazabilidad.create({
         data: {
           id: `evt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,

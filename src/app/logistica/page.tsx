@@ -11,7 +11,8 @@ import {
   CheckCircle,
   AlertTriangle,
   ArrowRight,
-  Loader2
+  Loader2,
+  ClipboardCheck
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -24,6 +25,7 @@ interface DashboardStats {
   listas: { total: number; porCotizar: number; porValidar: number; porAprobar: number }
   cotizaciones: { total: number; pendientes: number; cotizados: number; seleccionados: number }
   pedidos: { total: number; enProgreso: number; entregados: number; retrasados: number }
+  recepciones: { pendientes: number; enAlmacen: number }
   proveedores: { total: number }
 }
 
@@ -34,11 +36,12 @@ export default function LogisticaPage() {
   useEffect(() => {
     async function fetchStats() {
       try {
-        const [listasRes, cotData, pedData, provData] = await Promise.all([
+        const [listasRes, cotData, pedData, provData, recepcionesRes] = await Promise.all([
           fetch(buildApiUrl('/api/lista-equipo')),
           getCotizacionesProveedor(),
           getAllPedidoEquipos(),
           getProveedores(),
+          fetch(buildApiUrl('/api/logistica/recepciones?limit=1')),
         ])
 
         const listas = await listasRes.json()
@@ -46,6 +49,8 @@ export default function LogisticaPage() {
         const cotizaciones = cotData || []
         const pedidos = pedData || []
         const proveedores = provData || []
+        const recepcionesData = await recepcionesRes.json()
+        const recepcionesCounts = recepcionesData.counts || {}
 
         setStats({
           listas: {
@@ -68,6 +73,10 @@ export default function LogisticaPage() {
               if (!p.fechaNecesaria) return false
               return new Date(p.fechaNecesaria) < new Date() && p.estado !== 'entregado' && p.estado !== 'cancelado'
             }).length,
+          },
+          recepciones: {
+            pendientes: recepcionesCounts['pendiente'] || 0,
+            enAlmacen: recepcionesCounts['en_almacen'] || 0,
           },
           proveedores: { total: proveedores.length },
         })
@@ -131,6 +140,19 @@ export default function LogisticaPage() {
       stat: stats?.pedidos.total || 0,
     },
     {
+      title: 'Recepciones',
+      description: 'Control de recepciones y entregas',
+      href: '/logistica/recepciones',
+      icon: ClipboardCheck,
+      color: 'bg-orange-100 text-orange-600',
+      borderColor: 'border-l-orange-400',
+      badges: stats ? [
+        stats.recepciones.pendientes > 0 && { label: `${stats.recepciones.pendientes} pendientes`, color: 'bg-amber-100 text-amber-700' },
+        stats.recepciones.enAlmacen > 0 && { label: `${stats.recepciones.enAlmacen} en almacén`, color: 'bg-blue-100 text-blue-700' },
+      ].filter(Boolean) : [],
+      stat: (stats?.recepciones.pendientes || 0) + (stats?.recepciones.enAlmacen || 0),
+    },
+    {
       title: 'Proveedores',
       description: 'Directorio de proveedores',
       href: '/logistica/proveedores',
@@ -160,7 +182,7 @@ export default function LogisticaPage() {
 
       <div className="p-4 space-y-4">
         {/* KPIs principales */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           <Card className="border-l-4 border-l-amber-400">
             <CardContent className="p-3">
               <div className="flex items-center gap-2">
@@ -179,6 +201,17 @@ export default function LogisticaPage() {
                 <div>
                   <div className="text-lg font-bold text-blue-600">{stats?.cotizaciones.pendientes || 0}</div>
                   <div className="text-[11px] text-muted-foreground">Cotizaciones pendientes</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-l-4 border-l-orange-400">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-2">
+                <ClipboardCheck className="h-4 w-4 text-orange-500" />
+                <div>
+                  <div className="text-lg font-bold text-orange-600">{stats?.recepciones.pendientes || 0}</div>
+                  <div className="text-[11px] text-muted-foreground">Recepciones pendientes</div>
                 </div>
               </div>
             </CardContent>
