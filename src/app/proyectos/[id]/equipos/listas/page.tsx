@@ -261,7 +261,7 @@ const ListasTable = memo(function ListasTable({
                 </button>
               </TableHead>
               <TableHead className="w-[110px] text-xs font-medium">Estado</TableHead>
-              <TableHead className="w-[80px]"></TableHead>
+              <TableHead className="w-[80px] text-xs font-medium">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -316,7 +316,7 @@ const ListasTable = memo(function ListasTable({
                     {getEstadoBadge(lista.estado)}
                   </TableCell>
                   <TableCell className="py-2" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex gap-1">
                       <Button
                         variant="ghost"
                         size="sm"
