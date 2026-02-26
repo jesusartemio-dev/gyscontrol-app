@@ -205,13 +205,13 @@ const s = StyleSheet.create({
     fontSize: 24,
     fontFamily: 'Helvetica-Bold',
     color: C.gray900,
-    marginBottom: 6,
+    marginBottom: 14,
   },
   proposalSubtitle: {
-    fontSize: 9,
+    fontSize: 8,
     color: C.gray500,
     lineHeight: 1.4,
-    marginBottom: 16,
+    marginBottom: 18,
   },
 
   /* ─── Client Table ─── */
