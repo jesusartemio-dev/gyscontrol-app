@@ -338,7 +338,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
               currentEstado={oc.estado}
               targetEstado="borrador"
               targetLabel="Volver a Borrador"
-              onSuccess={setOC}
+              onSuccess={() => loadData()}
             />
             <Button
               size="sm"
@@ -367,7 +367,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
               currentEstado={oc.estado}
               targetEstado="aprobada"
               targetLabel="Volver a Aprobada"
-              onSuccess={setOC}
+              onSuccess={() => loadData()}
             />
           </>
         )}
@@ -393,7 +393,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
                 currentEstado={oc.estado}
                 targetEstado="enviada"
                 targetLabel="Volver a Enviada"
-                onSuccess={setOC}
+                onSuccess={() => loadData()}
               />
             )}
           </>
