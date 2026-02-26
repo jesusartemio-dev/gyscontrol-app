@@ -38,7 +38,8 @@ import {
   Trash2,
   ArrowUpDown,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  ShoppingCart
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -249,6 +250,7 @@ const ListasTable = memo(function ListasTable({
                   Items<SortIcon field="totalItems" />
                 </button>
               </TableHead>
+              <TableHead className="w-[70px] text-center text-xs font-medium">Cotiz.</TableHead>
               <TableHead className="w-[100px] text-right text-xs font-medium">Total</TableHead>
               <TableHead className="w-[90px]">
                 <button
@@ -265,7 +267,7 @@ const ListasTable = memo(function ListasTable({
           <TableBody>
             {sortedListas.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground text-sm">
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground text-sm">
                   {search || filterEstado !== 'all' ? 'No se encontraron listas' : 'Sin listas de equipos'}
                 </TableCell>
               </TableRow>
@@ -291,6 +293,18 @@ const ListasTable = memo(function ListasTable({
                   </TableCell>
                   <TableCell className="text-right font-mono text-sm py-2">
                     {lista.totalItems || lista.items?.length || 0}
+                  </TableCell>
+                  <TableCell className="text-center py-2">
+                    {(lista._count?.cotizacionProveedorItem || lista.cotizacionCount || 0) > 0 ? (
+                      <div className="flex items-center justify-center gap-1">
+                        <ShoppingCart className="h-3.5 w-3.5 text-green-500" />
+                        <span className="text-xs font-medium text-green-700">
+                          {lista._count?.cotizacionProveedorItem || lista.cotizacionCount || 0}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-right font-mono text-xs text-muted-foreground py-2">
                     ${(lista.totalPresupuesto || 0).toLocaleString('es-PE', { minimumFractionDigits: 2 })}
