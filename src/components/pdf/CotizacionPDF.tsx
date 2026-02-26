@@ -133,7 +133,7 @@ const s = StyleSheet.create({
     fontSize: 6,
     fontFamily: 'Helvetica-Bold',
     textTransform: 'uppercase' as any,
-    letterSpacing: 0.8,
+    letterSpacing: 0.5,
   },
   headerRightCode: {
     color: C.black,
@@ -245,23 +245,6 @@ const s = StyleSheet.create({
     paddingHorizontal: 10,
     fontSize: 8.5,
     color: C.gray900,
-  },
-
-  /* ─── Hero Block (Page 1 bottom) ─── */
-  heroBlock: {
-    backgroundColor: C.black,
-    borderRadius: 5,
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    marginTop: 12,
-  },
-  heroLeft: {
-    flex: 1,
-  },
-  heroRight: {
-    alignItems: 'flex-end',
-    marginLeft: 20,
   },
 
   /* ─── Section Bar (reusable) ─── */
@@ -541,7 +524,7 @@ const s = StyleSheet.create({
 
   /* ─── CTA Block (bottom) ─── */
   ctaBlock: {
-    backgroundColor: C.black,
+    backgroundColor: C.charcoal,
     borderRadius: 5,
     flexDirection: 'row',
     alignItems: 'center',
@@ -790,25 +773,25 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
         <View style={{ flex: 1 }} />
 
         {/* Hero Block */}
-        <View style={s.heroBlock}>
-          <View style={s.heroLeft}>
-            <Text style={{ color: C.green, fontSize: 7, textTransform: 'uppercase' as any, letterSpacing: 1.5, marginBottom: 4 }}>
-              Propuesta Económica — Valor Total
+        <View style={{ backgroundColor: C.charcoal, borderRadius: 5, padding: 16, flexDirection: 'row', alignItems: 'center', marginTop: 12 }}>
+          <View style={{ flex: 1, paddingRight: 16 }}>
+            <Text style={{ color: C.green, fontSize: 7, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase' as any, marginBottom: 6 }}>
+              Valor Total de la Propuesta
             </Text>
-            <Text style={{ color: C.white, fontSize: 10, fontFamily: 'Helvetica-Bold', marginBottom: 6 }}>
+            <Text style={{ color: C.white, fontSize: 11, fontFamily: 'Helvetica-Bold', marginBottom: 8 }}>
               {safeText(cotizacion.nombre)}
             </Text>
             {alcanceItems.map((item, i) => (
-              <Text key={i} style={{ color: C.gray400, fontSize: 7, lineHeight: 1.5 }}>
+              <Text key={i} style={{ color: C.gray400, fontSize: 7.5, lineHeight: 1.5 }}>
                 · {item}
               </Text>
             ))}
           </View>
-          <View style={s.heroRight}>
-            <Text style={{ color: C.gray400, fontSize: 6, textTransform: 'uppercase' as any, letterSpacing: 1, marginBottom: 3 }}>
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={{ color: C.gray400, fontSize: 6.5, textTransform: 'uppercase' as any, letterSpacing: 0.5, marginBottom: 4 }}>
               Total {moneda}
             </Text>
-            <Text style={{ color: C.green, fontSize: 28, fontFamily: 'Helvetica-Bold', lineHeight: 1 }}>
+            <Text style={{ color: C.green, fontSize: 26, fontFamily: 'Helvetica-Bold', lineHeight: 1 }}>
               {formatCurrency(grandTotal, moneda)}
             </Text>
             {hasDiscount && (
