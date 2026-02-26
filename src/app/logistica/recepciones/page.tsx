@@ -22,6 +22,7 @@ import {
   RotateCcw,
   Truck,
   Clock,
+  Trash2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -117,7 +118,7 @@ export default function RecepcionesPage() {
 
   // Action dialog state
   const [actionDialog, setActionDialog] = useState<{
-    type: 'confirmar_almacen' | 'confirmar_proyecto' | 'rechazar' | 'retroceder' | 'retroceder_entrega' | 'revertir'
+    type: 'confirmar_almacen' | 'confirmar_proyecto' | 'rechazar' | 'retroceder' | 'retroceder_entrega' | 'revertir' | 'eliminar'
     recepcion: Recepcion
   } | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
@@ -209,12 +210,15 @@ export default function RecepcionesPage() {
           url = `/api/recepcion-pendiente/${recepcion.id}/revertir`
           body = { observaciones: actionMotivo.trim() || undefined }
           break
+        case 'eliminar':
+          url = `/api/recepcion-pendiente/${recepcion.id}`
+          break
       }
 
       const res = await fetch(url, {
-        method: 'POST',
+        method: type === 'eliminar' ? 'DELETE' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        ...(type !== 'eliminar' ? { body: JSON.stringify(body) } : {}),
       })
 
       if (!res.ok) {
@@ -228,6 +232,7 @@ export default function RecepcionesPage() {
         type === 'rechazar' ? 'Recepción rechazada' :
         type === 'retroceder' ? 'Retroceso a pendiente completado' :
         type === 'retroceder_entrega' ? 'Entrega a proyecto revertida' :
+        type === 'eliminar' ? 'Recepción eliminada' :
         'Rechazo revertido'
       )
       setActionDialog(null)
@@ -352,7 +357,7 @@ export default function RecepcionesPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
-                          {/* Pendiente: confirmar almacén, rechazar */}
+                          {/* Pendiente: confirmar almacén, rechazar, eliminar */}
                           {r.estado === 'pendiente' && ['admin', 'gerente', 'logistico'].includes(role) && (
                             <>
                               <Button
@@ -374,6 +379,17 @@ export default function RecepcionesPage() {
                                 Rechazar
                               </Button>
                             </>
+                          )}
+                          {r.estado === 'pendiente' && role === 'admin' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 px-2 text-xs text-red-600 border-red-200 hover:bg-red-50"
+                              onClick={() => setActionDialog({ type: 'eliminar', recepcion: r })}
+                            >
+                              <Trash2 className="h-3 w-3 mr-1" />
+                              Eliminar
+                            </Button>
                           )}
 
                           {/* En almacén: confirmar proyecto, retroceder, rechazar */}
@@ -412,10 +428,21 @@ export default function RecepcionesPage() {
                                   Rechazar
                                 </Button>
                               )}
+                              {role === 'admin' && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 px-2 text-xs text-red-600 border-red-200 hover:bg-red-50"
+                                  onClick={() => setActionDialog({ type: 'eliminar', recepcion: r })}
+                                >
+                                  <Trash2 className="h-3 w-3 mr-1" />
+                                  Eliminar
+                                </Button>
+                              )}
                             </>
                           )}
 
-                          {/* Rechazado: revertir */}
+                          {/* Rechazado: revertir, eliminar */}
                           {r.estado === 'rechazado' && ['admin', 'gerente'].includes(role) && (
                             <Button
                               size="sm"
@@ -425,6 +452,17 @@ export default function RecepcionesPage() {
                             >
                               <RotateCcw className="h-3 w-3 mr-1" />
                               Revertir
+                            </Button>
+                          )}
+                          {r.estado === 'rechazado' && role === 'admin' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 px-2 text-xs text-red-600 border-red-200 hover:bg-red-50"
+                              onClick={() => setActionDialog({ type: 'eliminar', recepcion: r })}
+                            >
+                              <Trash2 className="h-3 w-3 mr-1" />
+                              Eliminar
                             </Button>
                           )}
 
@@ -483,14 +521,22 @@ export default function RecepcionesPage() {
               {actionDialog?.type === 'retroceder' && 'Retroceder a pendiente'}
               {actionDialog?.type === 'retroceder_entrega' && 'Retroceder a almacén'}
               {actionDialog?.type === 'revertir' && 'Revertir rechazo'}
+              {actionDialog?.type === 'eliminar' && 'Eliminar recepción'}
             </AlertDialogTitle>
-            <AlertDialogDescription>
-              {actionDialog?.recepcion && (
-                <>
-                  {actionDialog.recepcion.cantidadRecibida} x {actionDialog.recepcion.ordenCompraItem.codigo}
-                  {' '}de OC {actionDialog.recepcion.ordenCompraItem.ordenCompra.numero}
-                </>
-              )}
+            <AlertDialogDescription asChild>
+              <div>
+                {actionDialog?.recepcion && (
+                  <span>
+                    {actionDialog.recepcion.cantidadRecibida} x {actionDialog.recepcion.ordenCompraItem.codigo}
+                    {' '}de OC {actionDialog.recepcion.ordenCompraItem.ordenCompra.numero}
+                  </span>
+                )}
+                {actionDialog?.type === 'eliminar' && (
+                  <span className="block mt-2 text-red-600 font-medium">
+                    Se decrementará la cantidad recibida en la OC. Esta acción no se puede deshacer.
+                  </span>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
 
@@ -515,7 +561,7 @@ export default function RecepcionesPage() {
               onClick={(e) => { e.preventDefault(); executeAction() }}
               disabled={actionLoading || (actionDialog?.type === 'rechazar' && actionMotivo.trim().length < 5)}
               className={cn(
-                actionDialog?.type === 'rechazar' ? 'bg-red-600 hover:bg-red-700' :
+                (actionDialog?.type === 'rechazar' || actionDialog?.type === 'eliminar') ? 'bg-red-600 hover:bg-red-700' :
                 (actionDialog?.type === 'retroceder' || actionDialog?.type === 'retroceder_entrega') ? 'bg-orange-600 hover:bg-orange-700' :
                 'bg-blue-600 hover:bg-blue-700'
               )}
@@ -528,6 +574,7 @@ export default function RecepcionesPage() {
                 actionDialog?.type === 'rechazar' ? 'Rechazar' :
                 actionDialog?.type === 'retroceder' ? 'Retroceder' :
                 actionDialog?.type === 'retroceder_entrega' ? 'Retroceder a almacén' :
+                actionDialog?.type === 'eliminar' ? 'Eliminar' :
                 'Revertir'
               )}
             </AlertDialogAction>

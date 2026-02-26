@@ -15,6 +15,7 @@ export type DeletableEntity =
   | 'valorizacion'
   | 'cuentaPorCobrar'
   | 'cuentaPorPagar'
+  | 'recepcionPendiente'
 
 export interface DeleteBlocker {
   entity: string
@@ -37,6 +38,7 @@ const ENTITY_LABELS: Record<DeletableEntity, string> = {
   valorizacion: 'Valorización',
   cuentaPorCobrar: 'Cuenta por Cobrar',
   cuentaPorPagar: 'Cuenta por Pagar',
+  recepcionPendiente: 'Recepción Pendiente',
 }
 
 // ─── Dispatcher ─────────────────────────────────────────────
@@ -54,6 +56,7 @@ export async function canDelete(
     valorizacion: checkValorizacion,
     cuentaPorCobrar: checkCuentaPorCobrar,
     cuentaPorPagar: checkCuentaPorPagar,
+    recepcionPendiente: checkRecepcionPendiente,
   }
 
   const checker = checkers[entity]
@@ -357,6 +360,27 @@ async function checkCuentaPorCobrar(id: string): Promise<DeleteBlocker[]> {
       entity: 'PagoCobro',
       count: cxc._count.pagos,
       message: `Tiene ${cxc._count.pagos} pago(s) registrado(s) — anule la CxC en lugar de eliminarla`,
+    })
+  }
+
+  return blockers
+}
+
+async function checkRecepcionPendiente(id: string): Promise<DeleteBlocker[]> {
+  const blockers: DeleteBlocker[] = []
+
+  const recepcion = await prisma.recepcionPendiente.findUnique({
+    where: { id },
+    select: { estado: true },
+  })
+
+  if (!recepcion) return blockers
+
+  if (recepcion.estado === 'entregado_proyecto') {
+    blockers.push({
+      entity: 'RecepcionPendiente',
+      count: 1,
+      message: 'Esta recepción ya fue entregada al proyecto. Retrocede primero la entrega, luego elimina.',
     })
   }
 
