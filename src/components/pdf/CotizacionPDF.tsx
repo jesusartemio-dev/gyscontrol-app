@@ -1005,53 +1005,43 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
           {/* Table Header */}
           <View style={s.detailHeaderRow}>
             <Text style={[s.detailHeaderCell, { flex: 0.4 }]}>#</Text>
-            <Text style={[s.detailHeaderCell, { flex: 3 }]}>Actividad / Descripción</Text>
-            <Text style={[s.detailHeaderCell, { flex: 1.8 }]}>Recurso</Text>
-            <Text style={[s.detailHeaderCell, { flex: 0.8, textAlign: 'center' }]}>Horas</Text>
+            <Text style={[s.detailHeaderCell, { flex: 1 }]}>Actividad / Descripción</Text>
+            <Text style={[s.detailHeaderCell, { width: 140 }]}>Recurso</Text>
           </View>
 
           {/* Service Groups */}
-          {servicios.map((servicio, svIdx) => {
-            const groupHours = (servicio.items || []).reduce((sum: number, item: any) => sum + (item.horaTotal || 0), 0)
-            return (
-              <View key={`sv-${servicio.id || svIdx}`}>
-                {/* Group Header */}
-                <View style={s.detailGroupRow}>
-                  <Text style={[s.detailGroupName, { flex: 1 }]}>
-                    {svIdx + 1}.  {safeText(servicio.nombre).toUpperCase()}
-                    <Text style={{ fontWeight: 400, fontSize: 7.5, color: C.greenDark }}>
-                      {'  '}({formatNumber(groupHours)} hrs)
-                    </Text>
+          {servicios.map((servicio, svIdx) => (
+            <View key={`sv-${servicio.id || svIdx}`}>
+              {/* Group Header */}
+              <View style={s.detailGroupRow}>
+                <Text style={[s.detailGroupName, { flex: 1 }]}>
+                  {svIdx + 1}.  {safeText(servicio.nombre).toUpperCase()}
+                </Text>
+                <Text style={s.detailGroupTotal}>
+                  {formatCurrency(servicio.subtotalCliente || 0, moneda)}
+                </Text>
+              </View>
+
+              {/* Items */}
+              {servicio.items?.map((item: any, itemIdx: number) => (
+                <View
+                  key={`sv-item-${item.id || itemIdx}`}
+                  wrap={false}
+                  style={[s.detailRow, itemIdx % 2 === 1 ? s.detailRowAltBlue : {}]}
+                >
+                  <Text style={[s.detailCell, { flex: 0.4 }]}>
+                    {svIdx + 1}.{itemIdx + 1}
                   </Text>
-                  <Text style={s.detailGroupTotal}>
-                    {formatCurrency(servicio.subtotalCliente || 0, moneda)}
+                  <Text style={[s.detailCell, { flex: 1 }]}>
+                    {safeText(item.nombre || item.descripcion)}
+                  </Text>
+                  <Text style={{ width: 140, fontSize: 7.5, color: C.gray500 }}>
+                    {safeText(item.recursoNombre)}
                   </Text>
                 </View>
-
-                {/* Items */}
-                {servicio.items?.map((item: any, itemIdx: number) => (
-                  <View
-                    key={`sv-item-${item.id || itemIdx}`}
-                    wrap={false}
-                    style={[s.detailRow, itemIdx % 2 === 1 ? s.detailRowAltBlue : {}]}
-                  >
-                    <Text style={[s.detailCell, { flex: 0.4 }]}>
-                      {svIdx + 1}.{itemIdx + 1}
-                    </Text>
-                    <Text style={[s.detailCell, { flex: 3 }]}>
-                      {safeText(item.nombre || item.descripcion)}
-                    </Text>
-                    <Text style={[s.detailCellBold, { flex: 1.8, color: C.gray500 }]}>
-                      {safeText(item.recursoNombre)}
-                    </Text>
-                    <Text style={[s.detailCell, { flex: 0.8, textAlign: 'center' }]}>
-                      {formatNumber(item.horaTotal || 0)}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            )
-          })}
+              ))}
+            </View>
+          ))}
 
           {/* Section Total Box */}
           <View style={s.sectionTotalBox}>
