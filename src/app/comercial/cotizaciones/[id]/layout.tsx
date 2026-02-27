@@ -17,6 +17,8 @@ import {
   MessageSquare,
   BarChart3,
   FileSpreadsheet,
+  Loader2,
+  Download,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getCotizacionById } from '@/lib/services/cotizacion'
@@ -25,6 +27,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 import CrearProyectoDesdeCotizacionModal from '@/components/proyectos/CrearProyectoDesdeCotizacionModal'
 import CrearOportunidadDesdeCotizacion from '@/components/crm/CrearOportunidadDesdeCotizacion'
@@ -61,6 +64,8 @@ export default function CotizacionLayout({ children }: CotizacionLayoutProps) {
   const { data: session } = useSession()
   const [sidebarTab, setSidebarTab] = useState<'resumen' | 'chat'>('resumen')
   const [mobileChatOpen, setMobileChatOpen] = useState(false)
+  const [showExcelModal, setShowExcelModal] = useState(false)
+  const [excelExporting, setExcelExporting] = useState<'simple' | 'editable' | null>(null)
   const [chatHasActivity, setChatHasActivity] = useState(false)
 
   // Determinar si estamos en el hub o en una sub-página
@@ -283,37 +288,11 @@ export default function CotizacionLayout({ children }: CotizacionLayoutProps) {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-8 text-green-700 border-green-300 hover:bg-green-50"
-                    onClick={async () => {
-                      try {
-                        await exportarCotizacionAExcel(cotizacion)
-                        toast.success('Excel exportado')
-                      } catch {
-                        toast.error('Error al exportar Excel')
-                      }
-                    }}
+                    className="h-8"
+                    onClick={() => setShowExcelModal(true)}
                   >
                     <FileSpreadsheet className="h-4 w-4 mr-1" />
                     <span className="hidden sm:inline">Excel</span>
-                  </Button>
-                )}
-                {cotizacion && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 text-amber-700 border-amber-300 hover:bg-amber-50"
-                    title="Exportar Excel con fórmulas editables"
-                    onClick={async () => {
-                      try {
-                        await exportarCotizacionAExcelEditable(cotizacion)
-                        toast.success('Excel editable exportado')
-                      } catch {
-                        toast.error('Error al exportar Excel editable')
-                      }
-                    }}
-                  >
-                    <FileSpreadsheet className="h-4 w-4 mr-1" />
-                    <span className="hidden sm:inline">Excel Editable</span>
                   </Button>
                 )}
                 {cotizacion.oportunidadCrm ? (
@@ -520,6 +499,80 @@ export default function CotizacionLayout({ children }: CotizacionLayoutProps) {
               </div>
             )}
           </div>
+
+          {/* Modal de exportación Excel */}
+          <Dialog open={showExcelModal} onOpenChange={setShowExcelModal}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <FileSpreadsheet className="h-5 w-5 text-green-600" />
+                  Exportar a Excel
+                </DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-3 py-2">
+                <button
+                  className="flex items-start gap-3 p-3 rounded-lg border hover:bg-gray-50 transition-colors text-left"
+                  disabled={excelExporting !== null}
+                  onClick={async () => {
+                    try {
+                      setExcelExporting('simple')
+                      await exportarCotizacionAExcel(cotizacion)
+                      toast.success('Excel exportado')
+                      setShowExcelModal(false)
+                    } catch {
+                      toast.error('Error al exportar Excel')
+                    } finally {
+                      setExcelExporting(null)
+                    }
+                  }}
+                >
+                  <div className="shrink-0 mt-0.5 h-9 w-9 rounded-md bg-green-100 flex items-center justify-center">
+                    {excelExporting === 'simple' ? (
+                      <Loader2 className="h-4 w-4 text-green-600 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4 text-green-600" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">Excel Estándar</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Formato de solo lectura con todos los datos de la cotización. Ideal para compartir con el cliente.
+                    </p>
+                  </div>
+                </button>
+                <button
+                  className="flex items-start gap-3 p-3 rounded-lg border hover:bg-gray-50 transition-colors text-left"
+                  disabled={excelExporting !== null}
+                  onClick={async () => {
+                    try {
+                      setExcelExporting('editable')
+                      await exportarCotizacionAExcelEditable(cotizacion)
+                      toast.success('Excel editable exportado')
+                      setShowExcelModal(false)
+                    } catch {
+                      toast.error('Error al exportar Excel editable')
+                    } finally {
+                      setExcelExporting(null)
+                    }
+                  }}
+                >
+                  <div className="shrink-0 mt-0.5 h-9 w-9 rounded-md bg-amber-100 flex items-center justify-center">
+                    {excelExporting === 'editable' ? (
+                      <Loader2 className="h-4 w-4 text-amber-600 animate-spin" />
+                    ) : (
+                      <FileSpreadsheet className="h-4 w-4 text-amber-600" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">Excel Editable</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Incluye fórmulas y celdas editables para modificar cantidades, precios y márgenes internamente.
+                    </p>
+                  </div>
+                </button>
+              </div>
+            </DialogContent>
+          </Dialog>
 
           {/* Modal para crear oportunidad desde cotización */}
           <CrearOportunidadDesdeCotizacion
