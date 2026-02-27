@@ -265,11 +265,12 @@ export async function DELETE(req: Request, context: { params: Promise<{ id: stri
       prisma.proyectoEquipoCotizadoItem.updateMany({
         where: {
           listaId: id,
-          estado: 'en_lista',
+          estado: { in: ['en_lista', 'reemplazado'] },
         },
         data: {
           estado: 'pendiente',
           listaId: null,
+          listaEquipoSeleccionadoId: null,
         },
       }),
 
