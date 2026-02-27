@@ -17,7 +17,14 @@ export async function GET() {
       orderBy: { nombre: 'asc' },
       include: {
         catalogoServicio: true,
-        faseDefault: true
+        faseDefault: true,
+        _count: {
+          select: {
+            cotizacionEdt: true,
+            proyectoEdt: true,
+            catalogoServicio: true,
+          }
+        }
       },
     })
 

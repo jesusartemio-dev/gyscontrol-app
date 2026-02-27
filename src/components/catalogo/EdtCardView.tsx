@@ -11,7 +11,7 @@
 'use client'
 
 import { useState } from 'react'
-import { FolderOpen, Edit, Trash2, Save, X, Loader2, Package } from 'lucide-react'
+import { FolderOpen, Edit, Trash2, Save, X, Loader2, Package, ShieldAlert } from 'lucide-react'
 import { Edt } from '@/types'
 import { updateEdt, deleteEdt } from '@/lib/services/edt'
 import { Button } from '@/components/ui/button'
@@ -81,7 +81,13 @@ export default function EdtCardView({ data, onUpdate, onDelete, loading = false,
   const eliminar = async (id: string) => {
     setEliminando(id)
     try {
-      await deleteEdt(id)
+      const res = await fetch(`/api/edt/${id}`, { method: 'DELETE' })
+      if (res.status === 409) {
+        const data = await res.json()
+        toast.error(data.error || 'EDT en uso, no se puede eliminar')
+        return
+      }
+      if (!res.ok) throw new Error('Error al eliminar')
       toast.success('EDT eliminado exitosamente')
       onDelete?.(id)
     } catch (err) {
@@ -90,6 +96,11 @@ export default function EdtCardView({ data, onUpdate, onDelete, loading = false,
     } finally {
       setEliminando(null)
     }
+  }
+
+  const getUsoTotal = (edt: Edt) => {
+    if (!edt._count) return 0
+    return edt._count.cotizacionEdt + edt._count.proyectoEdt
   }
 
   if (loading) {
@@ -204,13 +215,16 @@ export default function EdtCardView({ data, onUpdate, onDelete, loading = false,
                   </Button>
                   <Button
                     size="sm"
-                    variant="destructive"
+                    variant={getUsoTotal(edt) > 0 ? "outline" : "destructive"}
                     onClick={() => eliminar(edt.id)}
-                    disabled={editando !== null || eliminando === edt.id}
+                    disabled={editando !== null || eliminando === edt.id || getUsoTotal(edt) > 0}
                     className="h-7 px-2"
+                    title={getUsoTotal(edt) > 0 ? 'EDT en uso, no se puede eliminar' : 'Eliminar'}
                   >
                     {eliminando === edt.id ? (
                       <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : getUsoTotal(edt) > 0 ? (
+                      <ShieldAlert className="h-3 w-3 text-muted-foreground" />
                     ) : (
                       <Trash2 className="h-3 w-3" />
                     )}
@@ -234,10 +248,17 @@ export default function EdtCardView({ data, onUpdate, onDelete, loading = false,
                   {edt.descripcion || 'Sin descripción'}
                 </p>
                 <div className="flex items-center justify-between">
-                  <Badge variant="secondary" className="text-xs">
-                    <Package className="h-3 w-3 mr-1" />
-                    {edt.servicios?.length || 0}
-                  </Badge>
+                  <div className="flex gap-1.5">
+                    <Badge variant="secondary" className="text-xs">
+                      <Package className="h-3 w-3 mr-1" />
+                      {edt.servicios?.length || 0}
+                    </Badge>
+                    {getUsoTotal(edt) > 0 && (
+                      <Badge variant="outline" className="text-xs text-green-600 border-green-200">
+                        En uso: {getUsoTotal(edt)}
+                      </Badge>
+                    )}
+                  </div>
                   <span className="text-xs text-gray-500">
                     {new Date(edt.createdAt).toLocaleDateString()}
                   </span>

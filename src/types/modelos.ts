@@ -419,6 +419,12 @@ export interface Edt {
   // 🆕 RELACIÓN: Fase por defecto para esta categoría
   faseDefaultId?: string
   faseDefault?: FaseDefault
+
+  _count?: {
+    cotizacionEdt: number
+    proyectoEdt: number
+    catalogoServicio: number
+  }
 }
 
 

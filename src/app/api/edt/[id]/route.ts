@@ -50,14 +50,39 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
 }
 
 // 🗑️ DELETE
-// ✅ Forma correcta
 export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params
   try {
-    const existente = await prisma.edt.findUnique({ where: { id } })
+    const existente = await prisma.edt.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: {
+            cotizacionEdt: true,
+            proyectoEdt: true,
+            catalogoServicio: true,
+          }
+        }
+      }
+    })
+
     if (!existente) {
-      console.warn('⚠️ EDT ya fue eliminado o no existe:', id)
       return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
+    }
+
+    // Validar que no esté en uso
+    const { cotizacionEdt, proyectoEdt, catalogoServicio } = existente._count
+    const totalUso = cotizacionEdt + proyectoEdt + catalogoServicio
+
+    if (totalUso > 0) {
+      const detalles: string[] = []
+      if (cotizacionEdt > 0) detalles.push(`${cotizacionEdt} cotización(es)`)
+      if (proyectoEdt > 0) detalles.push(`${proyectoEdt} proyecto(s)`)
+      if (catalogoServicio > 0) detalles.push(`${catalogoServicio} servicio(s)`)
+
+      return NextResponse.json({
+        error: `No se puede eliminar. EDT en uso en: ${detalles.join(', ')}`
+      }, { status: 409 })
     }
 
     const data = await prisma.edt.delete({ where: { id } })

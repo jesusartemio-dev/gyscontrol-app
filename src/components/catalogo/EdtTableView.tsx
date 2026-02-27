@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Pencil, Trash2, Check, X, Loader2 } from 'lucide-react'
+import { Pencil, Trash2, Check, X, Loader2, ShieldAlert } from 'lucide-react'
 import { Edt, FaseDefault } from '@/types'
 import { updateEdt, deleteEdt } from '@/lib/services/edt'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import {
   AlertDialog,
@@ -111,7 +112,15 @@ export default function EdtTableView({ data, onUpdate, onDelete, loading = false
     if (!edtAEliminar) return
     setEliminando(true)
     try {
-      await deleteEdt(edtAEliminar.id)
+      const res = await fetch(`/api/edt/${edtAEliminar.id}`, { method: 'DELETE' })
+      if (res.status === 409) {
+        const data = await res.json()
+        toast.error(data.error || 'EDT en uso, no se puede eliminar')
+        setDeleteDialogOpen(false)
+        setEdtAEliminar(null)
+        return
+      }
+      if (!res.ok) throw new Error('Error al eliminar')
       toast.success('EDT eliminado')
       onDelete?.(edtAEliminar.id)
       setDeleteDialogOpen(false)
@@ -122,6 +131,19 @@ export default function EdtTableView({ data, onUpdate, onDelete, loading = false
     } finally {
       setEliminando(false)
     }
+  }
+
+  const getUsoTotal = (edt: Edt) => {
+    if (!edt._count) return 0
+    return edt._count.cotizacionEdt + edt._count.proyectoEdt
+  }
+
+  const getUsoTooltip = (edt: Edt) => {
+    if (!edt._count) return ''
+    const parts: string[] = []
+    if (edt._count.cotizacionEdt > 0) parts.push(`${edt._count.cotizacionEdt} cotización(es)`)
+    if (edt._count.proyectoEdt > 0) parts.push(`${edt._count.proyectoEdt} proyecto(s)`)
+    return parts.join(', ')
   }
 
   const handleKeyDown = (e: React.KeyboardEvent, id: string) => {
@@ -151,6 +173,9 @@ export default function EdtTableView({ data, onUpdate, onDelete, loading = false
               </th>
               <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Fase por Defecto
+              </th>
+              <th className="text-center py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider w-20">
+                Uso
               </th>
               <th className="w-24 py-2 px-3"></th>
             </tr>
@@ -209,6 +234,24 @@ export default function EdtTableView({ data, onUpdate, onDelete, loading = false
                       {edt.faseDefault?.nombre || '—'}
                     </span>
                   )}
+                </td>
+                <td className="py-2 px-3 text-center">
+                  {(() => {
+                    const uso = getUsoTotal(edt)
+                    if (uso > 0) {
+                      return (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Badge variant="secondary" className="text-xs">
+                              {uso}
+                            </Badge>
+                          </TooltipTrigger>
+                          <TooltipContent>{getUsoTooltip(edt)}</TooltipContent>
+                        </Tooltip>
+                      )
+                    }
+                    return <span className="text-xs text-muted-foreground">—</span>
+                  })()}
                 </td>
                 <td className="py-2 px-3">
                   <div className="flex justify-end gap-1">
@@ -269,12 +312,21 @@ export default function EdtTableView({ data, onUpdate, onDelete, loading = false
                               variant="ghost"
                               className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
                               onClick={() => handleConfirmarEliminar(edt)}
-                              disabled={editando !== null}
+                              disabled={editando !== null || getUsoTotal(edt) > 0}
                             >
-                              <Trash2 className="h-3.5 w-3.5" />
+                              {getUsoTotal(edt) > 0 ? (
+                                <ShieldAlert className="h-3.5 w-3.5 text-muted-foreground" />
+                              ) : (
+                                <Trash2 className="h-3.5 w-3.5" />
+                              )}
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent>Eliminar</TooltipContent>
+                          <TooltipContent>
+                            {getUsoTotal(edt) > 0
+                              ? `No se puede eliminar: en uso en ${getUsoTooltip(edt)}`
+                              : 'Eliminar'
+                            }
+                          </TooltipContent>
                         </Tooltip>
                       </div>
                     )}
