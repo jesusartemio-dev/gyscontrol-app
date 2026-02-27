@@ -94,6 +94,9 @@ export async function PUT(
     console.log('🔍 [API TREE UPDATE] Actualizando:', { nodeType, realId, validatedData })
     console.log('🔍 [API TREE UPDATE] Orden value:', validatedData.orden)
 
+    // ✅ Obtener fechas actuales antes de actualizar (para detectar cambios reales)
+    const currentDates = await fetchCurrentNodeDates(nodeType, realId)
+
     // ✅ Actualizar según el tipo de nodo
     let updateData: any = {}
 
@@ -176,15 +179,20 @@ export async function PUT(
 
     console.log('✅ [API TREE UPDATE] Nodo actualizado exitosamente:', { nodeType, realId })
 
-    // ✅ GYS-GEN-12: Recalcular fechas y horas de padres después de la actualización
-    console.log('🔄 [API TREE UPDATE] Iniciando recálculo de padres para', { nodeType, nodeId, proyectoId: id })
-    console.log('🔄 [API TREE UPDATE] Llamando a recalcularPadresPostOperacion con parámetros:', { proyectoId: id, nodeType, nodeId })
-    try {
-      await recalcularPadresPostOperacion(id, nodeType, nodeId)
-      console.log('✅ [API TREE UPDATE] Recálculo de padres completado exitosamente')
-    } catch (error) {
-      logger.error('❌ [API TREE UPDATE] Error en recálculo de padres:', error)
-      logger.error('❌ [API TREE UPDATE] Stack trace:', error instanceof Error ? error.stack : 'No stack trace available')
+    // ✅ GYS-GEN-12: Solo recalcular padres si fechas/horas realmente cambiaron
+    const datesChanged = didDatesChange(nodeType, updateData, currentDates)
+    console.log('🔄 [API TREE UPDATE] ¿Fechas cambiaron?', datesChanged)
+
+    if (datesChanged) {
+      console.log('🔄 [API TREE UPDATE] Iniciando recálculo de padres para', { nodeType, nodeId, proyectoId: id })
+      try {
+        await recalcularPadresPostOperacion(id, nodeType, nodeId)
+        console.log('✅ [API TREE UPDATE] Recálculo de padres completado exitosamente')
+      } catch (error) {
+        logger.error('❌ [API TREE UPDATE] Error en recálculo de padres:', error)
+      }
+    } else {
+      console.log('⏭️ [API TREE UPDATE] Sin cambios en fechas/horas, omitiendo recálculo de padres')
     }
 
     return NextResponse.json({
@@ -552,4 +560,63 @@ async function recalcularFasePadre(faseId: string): Promise<void> {
       // Las fases no tienen campo horasPlan en el esquema actual
     }
   })
+}
+
+// ✅ Obtener fechas actuales del nodo antes de actualizar
+async function fetchCurrentNodeDates(nodeType: string, id: string) {
+  switch (nodeType) {
+    case 'tarea': {
+      const t = await prisma.proyectoTarea.findUnique({ where: { id }, select: { fechaInicio: true, fechaFin: true, horasEstimadas: true } })
+      return { fechaInicio: t?.fechaInicio, fechaFin: t?.fechaFin, horas: t?.horasEstimadas ? Number(t.horasEstimadas) : null }
+    }
+    case 'actividad': {
+      const a = await prisma.proyectoActividad.findUnique({ where: { id }, select: { fechaInicioPlan: true, fechaFinPlan: true, horasPlan: true } })
+      return { fechaInicio: a?.fechaInicioPlan, fechaFin: a?.fechaFinPlan, horas: a?.horasPlan ? Number(a.horasPlan) : null }
+    }
+    case 'edt': {
+      const e = await prisma.proyectoEdt.findUnique({ where: { id }, select: { fechaInicioPlan: true, fechaFinPlan: true, horasPlan: true } })
+      return { fechaInicio: e?.fechaInicioPlan, fechaFin: e?.fechaFinPlan, horas: e?.horasPlan ? Number(e.horasPlan) : null }
+    }
+    case 'fase': {
+      const f = await prisma.proyectoFase.findUnique({ where: { id }, select: { fechaInicioPlan: true, fechaFinPlan: true } })
+      return { fechaInicio: f?.fechaInicioPlan, fechaFin: f?.fechaFinPlan, horas: null }
+    }
+    default:
+      return { fechaInicio: null, fechaFin: null, horas: null }
+  }
+}
+
+// ✅ Detectar si fechas/horas realmente cambiaron
+function didDatesChange(
+  nodeType: string,
+  updateData: any,
+  currentDates: { fechaInicio?: Date | null, fechaFin?: Date | null, horas?: number | null }
+): boolean {
+  let newInicio: Date | undefined
+  let newFin: Date | undefined
+  let newHoras: number | undefined
+
+  switch (nodeType) {
+    case 'tarea':
+      newInicio = updateData.fechaInicio
+      newFin = updateData.fechaFin
+      newHoras = updateData.horasEstimadas
+      break
+    case 'actividad':
+    case 'edt':
+      newInicio = updateData.fechaInicioPlan
+      newFin = updateData.fechaFinPlan
+      newHoras = updateData.horasPlan
+      break
+    case 'fase':
+      newInicio = updateData.fechaInicioPlan
+      newFin = updateData.fechaFinPlan
+      break
+  }
+
+  if (newInicio !== undefined && currentDates.fechaInicio?.getTime() !== newInicio.getTime()) return true
+  if (newFin !== undefined && currentDates.fechaFin?.getTime() !== newFin.getTime()) return true
+  if (newHoras !== undefined && currentDates.horas !== newHoras) return true
+
+  return false
 }

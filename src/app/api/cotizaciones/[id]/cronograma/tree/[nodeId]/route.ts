@@ -74,13 +74,8 @@ export async function PUT(
       return NextResponse.json({ error: 'Formato de nodeId inválido' }, { status: 400 })
     }
 
-    // ✅ GYS-GEN-12: Obtener calendario laboral para recálculos
-    const calendarioLaboral = await obtenerCalendarioLaboral('empresa', 'default')
-    if (!calendarioLaboral) {
-      return NextResponse.json({
-        error: 'No hay calendario laboral configurado para actualizar fechas'
-      }, { status: 400 })
-    }
+    // Obtener fechas actuales antes de actualizar (para detectar cambios reales)
+    const currentDates = await fetchCurrentCotizacionNodeDates(nodeType, realId)
 
     // Actualizar según el tipo de nodo
     let updatedNode
@@ -181,8 +176,15 @@ export async function PUT(
         return NextResponse.json({ error: 'Tipo de nodo no soportado' }, { status: 400 })
     }
 
-    // ✅ GYS-GEN-12: Recalcular fechas de padres e hijos después de la actualización
-    await recalcularFechasPostActualizacion(id, nodeType, realId, calendarioLaboral)
+    // ✅ GYS-GEN-12: Solo recalcular si fechas/horas realmente cambiaron
+    const datesChanged = didCotizacionDatesChange(nodeType, validatedData, currentDates)
+
+    if (datesChanged) {
+      const calendarioLaboral = await obtenerCalendarioLaboral('empresa', 'default')
+      if (calendarioLaboral) {
+        await recalcularFechasPostActualizacion(id, nodeType, realId, calendarioLaboral)
+      }
+    }
 
     return NextResponse.json({
       success: true,
@@ -438,4 +440,71 @@ async function recalcularFechasPostActualizacion(
     }
   }
   // Para tareas, no hay hijos que recalcular
+}
+
+// ✅ Obtener fechas actuales del nodo de cotización antes de actualizar
+async function fetchCurrentCotizacionNodeDates(nodeType: string, id: string) {
+  switch (nodeType) {
+    case 'fase': {
+      const f = await prisma.cotizacionFase.findUnique({ where: { id }, select: { fechaInicioPlan: true, fechaFinPlan: true } })
+      return { fechaInicio: f?.fechaInicioPlan, fechaFin: f?.fechaFinPlan, horas: null }
+    }
+    case 'edt': {
+      const e = await prisma.cotizacionEdt.findUnique({ where: { id }, select: { fechaInicioComercial: true, fechaFinComercial: true, horasEstimadas: true } })
+      return { fechaInicio: e?.fechaInicioComercial, fechaFin: e?.fechaFinComercial, horas: e?.horasEstimadas ? Number(e.horasEstimadas) : null }
+    }
+    case 'actividad': {
+      const a = await prisma.cotizacionActividad.findUnique({ where: { id }, select: { fechaInicioComercial: true, fechaFinComercial: true, horasEstimadas: true } })
+      return { fechaInicio: a?.fechaInicioComercial, fechaFin: a?.fechaFinComercial, horas: a?.horasEstimadas ? Number(a.horasEstimadas) : null }
+    }
+    case 'tarea': {
+      const t = await prisma.cotizacionTarea.findUnique({ where: { id }, select: { fechaInicio: true, fechaFin: true, horasEstimadas: true } })
+      return { fechaInicio: t?.fechaInicio, fechaFin: t?.fechaFin, horas: t?.horasEstimadas ? Number(t.horasEstimadas) : null }
+    }
+    default:
+      return { fechaInicio: null, fechaFin: null, horas: null }
+  }
+}
+
+// ✅ Detectar si fechas/horas realmente cambiaron en nodo de cotización
+function didCotizacionDatesChange(
+  nodeType: string,
+  validatedData: any,
+  currentDates: { fechaInicio?: Date | null, fechaFin?: Date | null, horas?: number | null }
+): boolean {
+  let newInicio: Date | undefined
+  let newFin: Date | undefined
+  let newHoras: number | undefined
+
+  switch (nodeType) {
+    case 'fase':
+      if (validatedData.fechaInicioPlan?.trim()) newInicio = new Date(validatedData.fechaInicioPlan)
+      else if (validatedData.fechaInicioComercial?.trim()) newInicio = new Date(validatedData.fechaInicioComercial)
+      if (validatedData.fechaFinPlan?.trim()) newFin = new Date(validatedData.fechaFinPlan)
+      else if (validatedData.fechaFinComercial?.trim()) newFin = new Date(validatedData.fechaFinComercial)
+      break
+    case 'edt':
+    case 'actividad':
+      if (validatedData.fechaInicioComercial?.trim()) newInicio = new Date(validatedData.fechaInicioComercial)
+      if (validatedData.fechaFinComercial?.trim()) newFin = new Date(validatedData.fechaFinComercial)
+      if (validatedData.horasEstimadas !== undefined) {
+        newHoras = typeof validatedData.horasEstimadas === 'string'
+          ? parseFloat(validatedData.horasEstimadas) : validatedData.horasEstimadas
+      }
+      break
+    case 'tarea':
+      if (validatedData.fechaInicioComercial?.trim()) newInicio = new Date(validatedData.fechaInicioComercial)
+      if (validatedData.fechaFinComercial?.trim()) newFin = new Date(validatedData.fechaFinComercial)
+      if (validatedData.horasEstimadas !== undefined) {
+        newHoras = typeof validatedData.horasEstimadas === 'string'
+          ? parseFloat(validatedData.horasEstimadas) : validatedData.horasEstimadas
+      }
+      break
+  }
+
+  if (newInicio !== undefined && currentDates.fechaInicio?.getTime() !== newInicio.getTime()) return true
+  if (newFin !== undefined && currentDates.fechaFin?.getTime() !== newFin.getTime()) return true
+  if (newHoras !== undefined && !isNaN(newHoras) && currentDates.horas !== newHoras) return true
+
+  return false
 }
