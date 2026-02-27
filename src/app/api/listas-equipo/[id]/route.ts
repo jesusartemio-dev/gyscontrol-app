@@ -214,10 +214,22 @@ export async function DELETE(
       )
     }
 
-    // 🗑️ Eliminar lista (los items se eliminan automáticamente por CASCADE)
-    await prisma.listaEquipo.delete({
-      where: { id }
-    })
+    // 🗑️ Resetear estado de items cotizados vinculados y eliminar lista
+    await prisma.$transaction([
+      prisma.proyectoEquipoCotizadoItem.updateMany({
+        where: {
+          listaId: id,
+          estado: 'en_lista',
+        },
+        data: {
+          estado: 'pendiente',
+          listaId: null,
+        },
+      }),
+      prisma.listaEquipo.delete({
+        where: { id }
+      }),
+    ])
 
     logger.info(`Lista de equipos eliminada: ${id}`, {
       userId: session.user.id,

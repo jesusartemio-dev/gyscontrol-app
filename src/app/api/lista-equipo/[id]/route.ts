@@ -261,7 +261,19 @@ export async function DELETE(req: Request, context: { params: Promise<{ id: stri
         },
       }),
 
-      // 3. Eliminar la lista (esto eliminará los items por cascade)
+      // 3. Resetear estado de items cotizados vinculados a esta lista
+      prisma.proyectoEquipoCotizadoItem.updateMany({
+        where: {
+          listaId: id,
+          estado: 'en_lista',
+        },
+        data: {
+          estado: 'pendiente',
+          listaId: null,
+        },
+      }),
+
+      // 4. Eliminar la lista (esto eliminará los items por cascade)
       prisma.listaEquipo.delete({
         where: { id },
       }),
