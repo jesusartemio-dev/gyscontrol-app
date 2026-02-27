@@ -8,7 +8,7 @@ import {
   Building,
   User,
   Target,
-  Eye,
+  FileText,
   AlertCircle,
   ArrowLeft,
   PanelRightClose,
@@ -31,7 +31,8 @@ import CrearOportunidadDesdeCotizacion from '@/components/crm/CrearOportunidadDe
 import CrmIntegrationNotification from '@/components/crm/CrmIntegrationNotification'
 import ResumenTotalesCotizacion from '@/components/cotizaciones/ResumenTotalesCotizacion'
 import EstadoCotizacionStepper from '@/components/cotizaciones/EstadoCotizacionStepper'
-import { DescargarPDFButton } from '@/components/pdf/CotizacionPDF'
+
+
 import { ChatPanelContent } from '@/components/agente/ChatPanelContent'
 import { ChatPanel } from '@/components/agente/ChatPanel'
 
@@ -268,18 +269,15 @@ export default function CotizacionLayout({ children }: CotizacionLayoutProps) {
                   <span className="hidden sm:inline">Asistente</span>
                 </Button>
                 {puedeRenderizarPDF && (
-                  <>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => router.push(`/comercial/cotizaciones/${id}/preview`)}
-                      className="h-8"
-                    >
-                      <Eye className="h-4 w-4 mr-1" />
-                      <span className="hidden sm:inline">Vista Previa</span>
-                    </Button>
-                    <DescargarPDFButton cotizacion={cotizacion} />
-                  </>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => router.push(`/comercial/cotizaciones/${id}/preview`)}
+                    className="h-8 bg-green-600 text-white hover:bg-green-700 border-green-600"
+                  >
+                    <FileText className="h-4 w-4 mr-1" />
+                    <span className="hidden sm:inline">PDF</span>
+                  </Button>
                 )}
                 {cotizacion && (
                   <Button
