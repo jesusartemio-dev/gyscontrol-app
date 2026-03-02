@@ -27,6 +27,9 @@ interface Proyecto {
   adelantoPorcentaje?: number
   adelantoMonto?: number
   adelantoAmortizado?: number
+  descuentoComercialPct?: number
+  igvPct?: number
+  fondoGarantiaPct?: number
 }
 
 interface Valorizacion {
@@ -561,6 +564,9 @@ export default function ValorizacionesPage() {
                     setFormTipoCambio('')
                     setShowTipoCambio(false)
                   }
+                  setFormDescuento((proy.descuentoComercialPct ?? 0).toString())
+                  setFormIgv((proy.igvPct ?? 18).toString())
+                  setFormFondoGarantia((proy.fondoGarantiaPct ?? 0).toString())
                 }
               }}>
                 <SelectTrigger><SelectValue placeholder="Selecciona un proyecto" /></SelectTrigger>
