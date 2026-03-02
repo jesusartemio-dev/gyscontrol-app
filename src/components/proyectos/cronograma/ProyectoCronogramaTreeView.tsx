@@ -11,6 +11,7 @@ import { TreeNodeForm } from '../../cronograma/TreeNodeForm'
 import { ImportModal } from '../../cronograma/ImportModal'
 import { ImportEdtModal } from '../../cronograma/ImportEdtModal'
 import { ImportTareasModal } from '../../cronograma/ImportTareasModal'
+import { AsignarResponsable } from './AsignarResponsable'
 import { CronogramaTreeViewProps, TreeNode as TreeNodeType, NodeType } from '../../cronograma/types'
 import { useProyectoCronogramaTree } from './hooks/useProyectoCronogramaTree'
 import '../../cronograma/CronogramaTreeView.css'
@@ -57,6 +58,27 @@ export function ProyectoCronogramaTreeView({
   const [showImportItemsModal, setShowImportItemsModal] = useState(false)
   const [importItemsData, setImportItemsData] = useState<any[]>([])
   const [currentImportNode, setCurrentImportNode] = useState<{ id: string; type: string } | null>(null)
+
+  // Columna inteligente según tipo de cronograma
+  const assignmentColumn: 'recurso' | 'responsable' | undefined = (() => {
+    if (!selectedCronograma) return undefined
+    if (selectedCronograma.tipo === 'ejecucion') return 'responsable'
+    return 'recurso'
+  })()
+
+  // Estado para modal de asignar responsable
+  const [responsableModal, setResponsableModal] = useState<{
+    open: boolean
+    tipo: 'edt' | 'tarea'
+    elementoId: string
+    elementoNombre: string
+    responsableActual?: { id: string; name: string; email: string; role: string } | null
+  }>({
+    open: false,
+    tipo: 'edt',
+    elementoId: '',
+    elementoNombre: ''
+  })
 
   // Estados para importación de tareas
   const [showImportTareasModal, setShowImportTareasModal] = useState(false)
@@ -234,6 +256,31 @@ export function ProyectoCronogramaTreeView({
     }
   }
 
+  const handleAssignResponsable = (nodeId: string) => {
+    const node = state.nodes.get(nodeId)
+    if (!node) return
+
+    const realId = nodeId.replace(/^(edt|tarea)-/, '')
+    const tipo = node.type as 'edt' | 'tarea'
+
+    const responsableActual = node.data.responsableId
+      ? {
+          id: node.data.responsableId,
+          name: node.data.responsableNombre || node.data.responsable?.name || '',
+          email: node.data.responsable?.email || '',
+          role: node.data.responsable?.role || ''
+        }
+      : null
+
+    setResponsableModal({
+      open: true,
+      tipo,
+      elementoId: realId,
+      elementoNombre: node.nombre,
+      responsableActual
+    })
+  }
+
   const handleExecuteImport = async (selectedIds: string[]) => {
     if (!currentImportNode) return
 
@@ -346,7 +393,12 @@ export function ProyectoCronogramaTreeView({
               onSelect={() => actions.selectNode(nodeId)}
               isSelected={isSelected}
               readOnly={isReadOnly}
-              showRecurso
+              assignmentColumn={assignmentColumn}
+              onAssignResponsable={
+                !isReadOnly && assignmentColumn === 'responsable' && (node.type === 'edt' || node.type === 'tarea')
+                  ? () => handleAssignResponsable(nodeId)
+                  : undefined
+              }
             />
             
           </div>
@@ -541,7 +593,7 @@ export function ProyectoCronogramaTreeView({
             </div>
           ) : (
             <>
-              <TreeHeader showRecurso />
+              <TreeHeader assignmentColumn={assignmentColumn} />
               <div className="p-2">
                 {renderTree(state.rootNodes)}
               </div>
@@ -634,6 +686,21 @@ export function ProyectoCronogramaTreeView({
             onRefresh?.()
           }}
           loading={importing}
+        />
+
+        {/* Modal de asignación de responsable */}
+        <AsignarResponsable
+          open={responsableModal.open}
+          onOpenChange={(open) => setResponsableModal(prev => ({ ...prev, open }))}
+          tipo={responsableModal.tipo}
+          elementoId={responsableModal.elementoId}
+          elementoNombre={responsableModal.elementoNombre}
+          responsableActual={responsableModal.responsableActual}
+          onAsignacionExitosa={async () => {
+            setResponsableModal(prev => ({ ...prev, open: false }))
+            await actions.loadTree([...state.expandedNodes])
+            onRefresh?.()
+          }}
         />
 
       </CardContent>

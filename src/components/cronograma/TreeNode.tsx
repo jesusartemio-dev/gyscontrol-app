@@ -6,7 +6,7 @@
 // ===================================================
 
 import React from 'react'
-import { ChevronRight, ChevronDown, Plus, Edit, Trash2, Settings2, Download, Users } from 'lucide-react'
+import { ChevronRight, ChevronDown, Plus, Edit, Trash2, Settings2, Download, Users, UserCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -25,7 +25,8 @@ interface TreeNodeProps {
   isSelected: boolean
   readOnly?: boolean
   executionMode?: boolean
-  showRecurso?: boolean
+  assignmentColumn?: 'recurso' | 'responsable'
+  onAssignResponsable?: () => void
 }
 
 const NODE_CONFIG: Record<string, { icon: string; color: string; canAdd: NodeType[]; label: string }> = {
@@ -72,7 +73,8 @@ export function TreeNode({
   isSelected,
   readOnly = false,
   executionMode = false,
-  showRecurso = false
+  assignmentColumn,
+  onAssignResponsable
 }: TreeNodeProps) {
   const config = NODE_CONFIG[node.type]
   const hasChildren = node.metadata.hasChildren
@@ -183,7 +185,7 @@ export function TreeNode({
       className={`tree-node group ${isSelected ? 'bg-blue-50 border-blue-200' : 'hover:bg-gray-50'} py-0.5 cursor-pointer transition-colors`}
       onClick={onSelect}
     >
-      <div className={`grid items-center gap-1 ${showRecurso ? 'grid-cols-[1fr_80px_65px_120px_75px_100px_28px]' : 'grid-cols-[1fr_80px_65px_120px_75px_28px]'}`}>
+      <div className={`grid items-center gap-1 ${assignmentColumn ? 'grid-cols-[1fr_80px_65px_120px_75px_100px_28px]' : 'grid-cols-[1fr_80px_65px_120px_75px_28px]'}`}>
         {/* Columna 1: Nombre con indentación */}
         <div className="flex items-center gap-1 min-w-0" style={{ paddingLeft: `${node.level * 16 + 8}px` }}>
           {/* Toggle button */}
@@ -257,8 +259,8 @@ export function TreeNode({
           {totalHours > 0 ? `${totalHours}h` : ''}
         </div>
 
-        {/* Columna 6: Recurso (solo si showRecurso) */}
-        {showRecurso && (
+        {/* Columna 6: Recurso o Responsable según assignmentColumn */}
+        {assignmentColumn === 'recurso' && (
           <div className="text-center text-[11px] truncate">
             {node.type === 'tarea' ? (
               node.data.recursoNombre ? (
@@ -282,6 +284,33 @@ export function TreeNode({
                 }`}>
                   <Users className="h-2.5 w-2.5" />
                   {(node.metadata as any).recursosAsignados}/{(node.metadata as any).recursosTotales}
+                </span>
+              ) : null
+            )}
+          </div>
+        )}
+        {assignmentColumn === 'responsable' && (
+          <div className="text-center text-[11px] truncate">
+            {(node.type === 'tarea' || node.type === 'edt' || node.type === 'actividad') && node.data.responsableNombre ? (
+              <span className="text-blue-700 bg-blue-50 border border-blue-200 rounded px-1 py-0 text-[10px] truncate inline-block max-w-full">
+                {node.data.responsableNombre}
+              </span>
+            ) : node.type === 'tarea' ? (
+              <span className="text-red-400 text-[10px]">Sin asignar</span>
+            ) : (
+              (node.metadata as any).responsablesTotales > 0 ? (
+                <span className={`inline-flex items-center gap-0.5 border rounded px-1 py-0 text-[10px] font-medium ${
+                  (() => {
+                    const assigned = (node.metadata as any).responsablesAsignados || 0
+                    const total = (node.metadata as any).responsablesTotales || 0
+                    const ratio = total > 0 ? assigned / total : 0
+                    if (ratio >= 1) return 'bg-blue-50 text-blue-700 border-blue-200'
+                    if (ratio > 0) return 'bg-amber-50 text-amber-700 border-amber-200'
+                    return 'bg-red-50 text-red-600 border-red-200'
+                  })()
+                }`}>
+                  <Users className="h-2.5 w-2.5" />
+                  {(node.metadata as any).responsablesAsignados}/{(node.metadata as any).responsablesTotales}
                 </span>
               ) : null
             )}
@@ -325,9 +354,26 @@ export function TreeNode({
                 </DropdownMenuItem>
               )}
 
-              {/* Separator if there are create/import options and edit/delete options */}
+              {/* Separator if there are create/import options and more options below */}
               {!readOnly && (config.canAdd.length > 0 || node.type === 'proyecto' || node.type === 'fase' || node.type === 'actividad') && (
                 <div className="h-px bg-gray-200 my-1" />
+              )}
+
+              {/* Assign Responsable option - only for edt/tarea in execution mode */}
+              {!readOnly && assignmentColumn === 'responsable' && (node.type === 'edt' || node.type === 'tarea') && (
+                <>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setDropdownOpen(false)
+                      onAssignResponsable?.()
+                    }}
+                    className="text-blue-600"
+                  >
+                    <UserCheck className="h-4 w-4 mr-2" />
+                    Asignar Responsable
+                  </DropdownMenuItem>
+                  <div className="h-px bg-gray-200 my-1" />
+                </>
               )}
 
               {/* Edit option - only if not read-only and not proyecto */}

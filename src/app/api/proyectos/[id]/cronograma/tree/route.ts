@@ -78,8 +78,14 @@ export async function GET(
         include: {
           proyectoEdt: {
             include: {
+              user: {
+                select: { id: true, name: true, email: true }
+              },
               proyectoActividad: {
                 include: {
+                  user: {
+                    select: { id: true, name: true, email: true }
+                  },
                   proyectoTarea: {
                     include: {
                       user: {
@@ -123,8 +129,14 @@ export async function GET(
           include: {
             proyectoEdt: {
               include: {
+                user: {
+                  select: { id: true, name: true, email: true }
+                },
                 proyectoActividad: {
                   include: {
+                    user: {
+                      select: { id: true, name: true, email: true }
+                    },
                     proyectoTarea: {
                       include: {
                         user: {
@@ -153,8 +165,14 @@ export async function GET(
           include: {
             proyectoEdt: {
               include: {
+                user: {
+                  select: { id: true, name: true, email: true }
+                },
                 proyectoActividad: {
                   include: {
+                    user: {
+                      select: { id: true, name: true, email: true }
+                    },
                     proyectoTarea: {
                       include: {
                         user: {
@@ -233,7 +251,9 @@ export async function GET(
               estado: edt.estado,
               progreso: edt.porcentajeAvance,
               orden: edt.orden,
-              horasEstimadas: edt.horasPlan
+              horasEstimadas: edt.horasPlan,
+              responsableId: edt.responsableId,
+              responsableNombre: edt.user?.name || null
             },
             metadata: {
               hasChildren: edtActividades.length > 0,
@@ -263,7 +283,9 @@ export async function GET(
                   horasEstimadas: actividad.horasPlan,
                   horasReales: actividad.horasReales,
                   prioridad: actividad.prioridad,
-                  orden: actividad.orden
+                  orden: actividad.orden,
+                  responsableId: actividad.responsableId,
+                  responsableNombre: actividad.user?.name || null
                 },
                 metadata: {
                   hasChildren: actividadTareas.length > 0,
@@ -293,6 +315,8 @@ export async function GET(
                       prioridad: tarea.prioridad,
                       orden: tarea.orden,
                       responsable: tarea.user,
+                      responsableId: tarea.responsableId,
+                      responsableNombre: tarea.user?.name || null,
                       recursoId: tarea.recursoId,
                       recursoNombre: tarea.recurso?.nombre,
                       recursoTipo: tarea.recurso?.tipo
@@ -303,7 +327,9 @@ export async function GET(
                       progressPercentage: tarea.porcentajeCompletado || 0,
                       status: tarea.estado || 'pendiente',
                       recursosTotales: 1,
-                      recursosAsignados: tarea.recursoId ? 1 : 0
+                      recursosAsignados: tarea.recursoId ? 1 : 0,
+                      responsablesTotales: 1,
+                      responsablesAsignados: tarea.responsableId ? 1 : 0
                     },
                     children: []
                   }))
@@ -338,11 +364,43 @@ export async function GET(
       propagateResources(fase)
     }
 
+    // ✅ Propagar conteo de responsables de abajo hacia arriba
+    const propagateResponsables = (node: any): { total: number; assigned: number } => {
+      if (!node.children || node.children.length === 0) {
+        return {
+          total: node.metadata.responsablesTotales || 0,
+          assigned: node.metadata.responsablesAsignados || 0
+        }
+      }
+      let total = 0
+      let assigned = 0
+      for (const child of node.children) {
+        const childRes = propagateResponsables(child)
+        total += childRes.total
+        assigned += childRes.assigned
+      }
+      node.metadata.responsablesTotales = total
+      node.metadata.responsablesAsignados = assigned
+      return { total, assigned }
+    }
+
+    for (const fase of faseNodes) {
+      propagateResponsables(fase)
+    }
+
     // ✅ Nodo raíz del proyecto (nivel 0) - envuelve todas las fases
     const proyectoRecursos = faseNodes.reduce(
       (acc: any, f: any) => ({
         total: acc.total + (f.metadata.recursosTotales || 0),
         assigned: acc.assigned + (f.metadata.recursosAsignados || 0)
+      }),
+      { total: 0, assigned: 0 }
+    )
+
+    const proyectoResponsables = faseNodes.reduce(
+      (acc: any, f: any) => ({
+        total: acc.total + (f.metadata.responsablesTotales || 0),
+        assigned: acc.assigned + (f.metadata.responsablesAsignados || 0)
       }),
       { total: 0, assigned: 0 }
     )
@@ -364,7 +422,9 @@ export async function GET(
         progressPercentage: 0,
         status: 'pendiente',
         recursosTotales: proyectoRecursos.total,
-        recursosAsignados: proyectoRecursos.assigned
+        recursosAsignados: proyectoRecursos.assigned,
+        responsablesTotales: proyectoResponsables.total,
+        responsablesAsignados: proyectoResponsables.assigned
       },
       children: faseNodes,
     }
