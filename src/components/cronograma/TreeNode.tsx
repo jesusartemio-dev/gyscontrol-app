@@ -182,7 +182,7 @@ export function TreeNode({
 
   return (
     <div
-      className={`tree-node group ${isSelected ? 'bg-blue-50 border-blue-200' : 'hover:bg-gray-50'} py-0.5 cursor-pointer transition-colors`}
+      className={`tree-node group ${isSelected ? 'bg-blue-100 border-l-2 border-l-blue-500' : 'hover:bg-gray-100'} py-0.5 cursor-pointer transition-colors`}
       onClick={onSelect}
     >
       <div className={`grid items-center gap-1 ${assignmentColumn ? 'grid-cols-[1fr_80px_65px_120px_75px_100px_28px]' : 'grid-cols-[1fr_80px_65px_120px_75px_28px]'}`}>
