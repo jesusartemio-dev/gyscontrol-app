@@ -156,13 +156,18 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
     // Calcular acumulados dinámicamente para cada partida
     const partidasConAcumulados = partidas.map(partida => {
-      // Buscar partidas anteriores que matcheen por FK (en orden de prioridad)
+      // Buscar partidas anteriores que matcheen por FK o por descripción
+      const tieneFk = partida.proyectoEdtId || partida.proyectoServicioCotizadoId || partida.proyectoEquipoCotizadoId || partida.proyectoGastoCotizadoId
       const anterioresMatch = partidasAnteriores.filter(pa => {
-        if (partida.proyectoEdtId && pa.proyectoEdtId === partida.proyectoEdtId) return true
-        if (partida.proyectoServicioCotizadoId && pa.proyectoServicioCotizadoId === partida.proyectoServicioCotizadoId) return true
-        if (partida.proyectoEquipoCotizadoId && pa.proyectoEquipoCotizadoId === partida.proyectoEquipoCotizadoId) return true
-        if (partida.proyectoGastoCotizadoId && pa.proyectoGastoCotizadoId === partida.proyectoGastoCotizadoId) return true
-        return false
+        if (tieneFk) {
+          if (partida.proyectoEdtId && pa.proyectoEdtId === partida.proyectoEdtId) return true
+          if (partida.proyectoServicioCotizadoId && pa.proyectoServicioCotizadoId === partida.proyectoServicioCotizadoId) return true
+          if (partida.proyectoEquipoCotizadoId && pa.proyectoEquipoCotizadoId === partida.proyectoEquipoCotizadoId) return true
+          if (partida.proyectoGastoCotizadoId && pa.proyectoGastoCotizadoId === partida.proyectoGastoCotizadoId) return true
+          return false
+        }
+        // Fallback: match por descripción exacta para partidas libres
+        return pa.descripcion === partida.descripcion
       })
 
       const porcentajeAcumuladoAnterior = Math.round(
