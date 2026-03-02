@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { RefreshCw, TreePine, List, Filter, Zap } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { TreeNode } from './TreeNode'
+import { TreeHeader } from './TreeHeader'
 import { TreeNodeForm } from './TreeNodeForm'
 import { ImportModal } from './ImportModal'
 
@@ -232,9 +233,12 @@ export function CronogramaTreeView({ cotizacionId, onRefresh, fechaInicioProyect
               <span className="text-sm mt-2 block">Usa el menú del nodo Proyecto para crear fases o EDTs.</span>
             </div>
           ) : (
-            <div className="p-4">
-              {renderTree(state.rootNodes)}
-            </div>
+            <>
+              <TreeHeader />
+              <div className="p-2">
+                {renderTree(state.rootNodes)}
+              </div>
+            </>
           )}
         </div>
 

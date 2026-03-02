@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { RefreshCw, TreePine, Plus, Download, List, Filter, Zap, Trash2, Clock } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { TreeNode } from '../../cronograma/TreeNode'
+import { TreeHeader } from '../../cronograma/TreeHeader'
 import { TreeNodeForm } from '../../cronograma/TreeNodeForm'
 import { ImportModal } from '../../cronograma/ImportModal'
 import { ImportEdtModal } from '../../cronograma/ImportEdtModal'
@@ -538,9 +539,12 @@ export function ProyectoCronogramaTreeView({
               )}
             </div>
           ) : (
-            <div className="p-2">
-              {renderTree(state.rootNodes)}
-            </div>
+            <>
+              <TreeHeader />
+              <div className="p-2">
+                {renderTree(state.rootNodes)}
+              </div>
+            </>
           )}
         </div>
 
