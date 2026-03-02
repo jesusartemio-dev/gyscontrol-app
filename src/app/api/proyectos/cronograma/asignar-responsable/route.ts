@@ -11,6 +11,10 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { z } from 'zod'
 import { logger } from '@/lib/logger'
+import { Role } from '@prisma/client'
+
+// Roles permitidos para ser asignados como responsable en un proyecto
+const ROLES_RESPONSABLE_PROYECTO: Role[] = ['proyectos', 'seguridad', 'coordinador', 'gestor']
 
 const asignarResponsableSchema = z.object({
   tipo: z.enum(['edt', 'tarea']), // Solo EDT y Tarea tienen responsables en el schema actual
@@ -248,9 +252,11 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Obtener todos los usuarios activos del sistema
-    // Cualquier personal puede ser asignado como responsable de EDT o Tarea
+    // Obtener usuarios con roles permitidos para ser responsable en proyectos
     const usuariosProyecto = await prisma.user.findMany({
+      where: {
+        role: { in: ROLES_RESPONSABLE_PROYECTO }
+      },
       select: {
         id: true,
         name: true,

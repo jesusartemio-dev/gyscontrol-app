@@ -119,7 +119,8 @@ export function CronogramaContainer({ proyectoId, proyecto }: CronogramaContaine
       setEdts(edtsData);
       setComercialEdts(comercialEdtsData);
       setEdtsCatalogo(categoriasData);
-      setUsuarios(usuariosData || []);
+      const ROLES_RESPONSABLE = ['proyectos', 'seguridad', 'coordinador', 'gestor']
+      setUsuarios((usuariosData || []).filter((u: User) => ROLES_RESPONSABLE.includes(u.role)));
 
       // Cargar analytics si hay EDT
       if (edtsData.length > 0) {

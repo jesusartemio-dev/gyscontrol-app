@@ -224,11 +224,11 @@ export function TreeNode({
             </Badge>
           )}
 
-          {/* Personas estimadas badge (solo tareas con > 1 persona) */}
-          {node.type === 'tarea' && (node.data.personasEstimadas || 1) > 1 && (
+          {/* Personas estimadas badge */}
+          {node.type === 'tarea' && (
             <span className="inline-flex items-center gap-0.5 text-[10px] text-blue-600 bg-blue-50 border border-blue-200 rounded px-1 py-0 shrink-0">
               <Users className="h-2.5 w-2.5" />
-              {node.data.personasEstimadas}
+              {node.data.personasEstimadas || 1}
             </span>
           )}
         </div>

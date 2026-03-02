@@ -110,11 +110,12 @@ export function ProyectoEdtForm({
         setEdts(edtsData.data || [])
       }
 
-      // Cargar usuarios (para responsables)
+      // Cargar usuarios (para responsables) - solo roles permitidos en proyectos
       const usuariosResponse = await fetch('/api/admin/users')
       if (usuariosResponse.ok) {
         const usuariosData = await usuariosResponse.json()
-        setUsuarios(usuariosData.data || [])
+        const ROLES_RESPONSABLE = ['proyectos', 'seguridad', 'coordinador', 'gestor']
+        setUsuarios((usuariosData.data || []).filter((u: any) => ROLES_RESPONSABLE.includes(u.role)))
       }
     } catch (error) {
       console.error('Error cargando datos iniciales:', error)

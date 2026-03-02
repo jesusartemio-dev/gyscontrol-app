@@ -74,7 +74,9 @@ export function EdtsPorFase({ fases, proyectoId, onRefresh }: EdtsPorFaseProps) 
         getUsers()
       ])
       setEdtsCatalogo(categoriasData || [])
-      setUsuarios(usuariosData || [])
+      const ROLES_RESPONSABLE = ['proyectos', 'seguridad', 'coordinador', 'gestor']
+      const filtrados = (usuariosData || []).filter((u: User) => ROLES_RESPONSABLE.includes(u.role))
+      setUsuarios(filtrados)
     } catch (error) {
       console.error('Error al cargar datos adicionales:', error)
     }
