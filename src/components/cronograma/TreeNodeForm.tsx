@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { AlertTriangle, CheckCircle, XCircle, Users } from 'lucide-react'
+import { AlertTriangle, CheckCircle, XCircle, Users, Clock, Lock } from 'lucide-react'
 // import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { TreeNode, NodeType, PositioningMode, PositioningConfig } from './types'
 import { obtenerCalendarioLaboral } from '@/lib/utils/calendarioLaboral'
@@ -448,8 +448,10 @@ export function TreeNodeForm({
     if (mode === 'create' && nodeType) {
       return `Crear ${NODE_TYPE_LABELS[nodeType]}`
     }
-    if (mode === 'edit') {
-      return 'Editar Nodo'
+    if (mode === 'edit' && nodeId) {
+      const editNode = nodes.get(nodeId)
+      const typeLabel = editNode ? NODE_TYPE_LABELS[editNode.type] : 'Nodo'
+      return `Editar ${typeLabel}`
     }
     return 'Formulario'
   }
@@ -473,8 +475,15 @@ export function TreeNodeForm({
         </DialogHeader>
 
         {(() => {
-          const isTarea = nodeType === 'tarea' || (mode === 'edit' && nodeId && nodes.get(nodeId)?.type === 'tarea')
-          const isFase = nodeType === 'fase' || (mode === 'edit' && nodeId && nodes.get(nodeId)?.type === 'fase')
+          const editNode = mode === 'edit' && nodeId ? nodes.get(nodeId) : undefined
+          const effectiveType = nodeType || editNode?.type
+          const isTarea = effectiveType === 'tarea'
+          const isFase = effectiveType === 'fase'
+          const isEdt = effectiveType === 'edt'
+          const isActividad = effectiveType === 'actividad'
+          const hasChildren = editNode?.metadata?.hasChildren ?? false
+          // Horas read-only: Fase/EDT siempre, Actividad solo si tiene tareas hijas
+          const horasReadOnly = isFase || isEdt || (isActividad && hasChildren)
 
           return (
             <form onSubmit={handleSubmit} className="space-y-3">
@@ -485,7 +494,7 @@ export function TreeNodeForm({
                   id="nombre"
                   value={formData.nombre}
                   onChange={(e) => setFormData(prev => ({ ...prev, nombre: e.target.value }))}
-                  placeholder={`Nombre del ${nodeType || 'elemento'}`}
+                  placeholder={`Nombre del ${effectiveType ? NODE_TYPE_LABELS[effectiveType] : 'elemento'}`}
                   required
                 />
               </div>
@@ -503,27 +512,27 @@ export function TreeNodeForm({
                 />
               </div>
 
-              {/* Fechas + Horas en una fila */}
-              <div className={`grid gap-3 ${isTarea ? 'grid-cols-[1fr_1fr_auto]' : 'grid-cols-2'}`}>
-                <div className="space-y-1.5">
-                  <Label htmlFor="fechaInicio">F. Inicio</Label>
-                  <Input
-                    id="fechaInicio"
-                    type="date"
-                    value={formData.fechaInicioComercial}
-                    onChange={(e) => setFormData(prev => ({ ...prev, fechaInicioComercial: e.target.value }))}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="fechaFin">F. Fin</Label>
-                  <Input
-                    id="fechaFin"
-                    type="date"
-                    value={formData.fechaFinComercial}
-                    onChange={(e) => setFormData(prev => ({ ...prev, fechaFinComercial: e.target.value }))}
-                  />
-                </div>
-                {isTarea && (
+              {/* ── TAREA: Fechas + Horas en una fila ── */}
+              {isTarea && (
+                <div className="grid grid-cols-[1fr_1fr_auto] gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="fechaInicio">F. Inicio</Label>
+                    <Input
+                      id="fechaInicio"
+                      type="date"
+                      value={formData.fechaInicioComercial}
+                      onChange={(e) => setFormData(prev => ({ ...prev, fechaInicioComercial: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="fechaFin">F. Fin</Label>
+                    <Input
+                      id="fechaFin"
+                      type="date"
+                      value={formData.fechaFinComercial}
+                      onChange={(e) => setFormData(prev => ({ ...prev, fechaFinComercial: e.target.value }))}
+                    />
+                  </div>
                   <div className="space-y-1.5 w-20">
                     <Label htmlFor="horasEstimadas">Horas</Label>
                     <Input
@@ -536,23 +545,68 @@ export function TreeNodeForm({
                       placeholder="0"
                     />
                   </div>
-                )}
-              </div>
+                </div>
+              )}
 
-              {/* Horas + Orden para no-tareas */}
+              {/* ── NO-TAREA: Fechas solas ── */}
               {!isTarea && (
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <Label htmlFor="horasEstimadas">Horas Estimadas</Label>
+                    <Label htmlFor="fechaInicio">F. Inicio</Label>
                     <Input
-                      id="horasEstimadas"
-                      type="number"
-                      min="0"
-                      step="0.5"
-                      value={formData.horasEstimadas}
-                      onChange={(e) => setFormData(prev => ({ ...prev, horasEstimadas: e.target.value }))}
-                      placeholder="0"
+                      id="fechaInicio"
+                      type="date"
+                      value={formData.fechaInicioComercial}
+                      onChange={(e) => setFormData(prev => ({ ...prev, fechaInicioComercial: e.target.value }))}
                     />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="fechaFin">F. Fin</Label>
+                    <Input
+                      id="fechaFin"
+                      type="date"
+                      value={formData.fechaFinComercial}
+                      onChange={(e) => setFormData(prev => ({ ...prev, fechaFinComercial: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* ── NO-TAREA: Horas (read-only o editable) + Orden ── */}
+              {!isTarea && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="horasEstimadas" className="flex items-center gap-1">
+                      <Clock className="h-3.5 w-3.5" />
+                      Horas
+                      {horasReadOnly && <Lock className="h-3 w-3 text-muted-foreground" />}
+                    </Label>
+                    {horasReadOnly ? (
+                      <>
+                        <Input
+                          id="horasEstimadas"
+                          type="number"
+                          value={formData.horasEstimadas}
+                          readOnly
+                          disabled
+                          className="bg-muted"
+                          placeholder="0"
+                        />
+                        <p className="text-[11px] text-muted-foreground">
+                          {isFase ? 'Suma de EDTs' : isEdt ? 'Suma de actividades' : 'Suma de tareas'}
+                        </p>
+                      </>
+                    ) : (
+                      <Input
+                        id="horasEstimadas"
+                        type="number"
+                        min="0"
+                        step="0.5"
+                        value={formData.horasEstimadas}
+                        onChange={(e) => setFormData(prev => ({ ...prev, horasEstimadas: e.target.value }))}
+                        placeholder="0"
+                      />
+                    )}
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="orden">Orden</Label>
@@ -568,7 +622,7 @@ export function TreeNodeForm({
                 </div>
               )}
 
-              {/* Recurso + Personas en una fila (solo tareas) */}
+              {/* ── TAREA: Recurso + Personas ── */}
               {isTarea && (
                 <div className="space-y-1.5">
                   <div className="grid grid-cols-[1fr_auto] gap-3 items-end">
@@ -616,7 +670,7 @@ export function TreeNodeForm({
                 </div>
               )}
 
-              {/* Prioridad + Estado + Orden en una fila */}
+              {/* ── Prioridad + Estado + Orden (tarea) ── */}
               <div className={`grid gap-3 ${isTarea ? 'grid-cols-3' : isFase ? 'grid-cols-1' : 'grid-cols-2'}`}>
                 <div className="space-y-1.5">
                   <Label htmlFor="prioridad">Prioridad</Label>
