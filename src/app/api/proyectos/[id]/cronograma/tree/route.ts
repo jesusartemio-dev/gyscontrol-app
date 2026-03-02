@@ -301,7 +301,9 @@ export async function GET(
                       hasChildren: false,
                       totalChildren: 0,
                       progressPercentage: tarea.porcentajeCompletado || 0,
-                      status: tarea.estado || 'pendiente'
+                      status: tarea.estado || 'pendiente',
+                      recursosTotales: 1,
+                      recursosAsignados: tarea.recursoId ? 1 : 0
                     },
                     children: []
                   }))
@@ -312,7 +314,39 @@ export async function GET(
       }
     })
 
+    // ✅ Propagar conteo de recursos de abajo hacia arriba
+    const propagateResources = (node: any): { total: number; assigned: number } => {
+      if (!node.children || node.children.length === 0) {
+        return {
+          total: node.metadata.recursosTotales || 0,
+          assigned: node.metadata.recursosAsignados || 0
+        }
+      }
+      let total = 0
+      let assigned = 0
+      for (const child of node.children) {
+        const childRes = propagateResources(child)
+        total += childRes.total
+        assigned += childRes.assigned
+      }
+      node.metadata.recursosTotales = total
+      node.metadata.recursosAsignados = assigned
+      return { total, assigned }
+    }
+
+    for (const fase of faseNodes) {
+      propagateResources(fase)
+    }
+
     // ✅ Nodo raíz del proyecto (nivel 0) - envuelve todas las fases
+    const proyectoRecursos = faseNodes.reduce(
+      (acc: any, f: any) => ({
+        total: acc.total + (f.metadata.recursosTotales || 0),
+        assigned: acc.assigned + (f.metadata.recursosAsignados || 0)
+      }),
+      { total: 0, assigned: 0 }
+    )
+
     const projectNode = {
       id: `proyecto-${id}`,
       type: 'proyecto',
@@ -328,7 +362,9 @@ export async function GET(
         hasChildren: faseNodes.length > 0,
         totalChildren: faseNodes.length,
         progressPercentage: 0,
-        status: 'pendiente'
+        status: 'pendiente',
+        recursosTotales: proyectoRecursos.total,
+        recursosAsignados: proyectoRecursos.assigned
       },
       children: faseNodes,
     }

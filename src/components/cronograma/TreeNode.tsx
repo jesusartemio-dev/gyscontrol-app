@@ -25,6 +25,7 @@ interface TreeNodeProps {
   isSelected: boolean
   readOnly?: boolean
   executionMode?: boolean
+  showRecurso?: boolean
 }
 
 const NODE_CONFIG: Record<string, { icon: string; color: string; canAdd: NodeType[]; label: string }> = {
@@ -70,7 +71,8 @@ export function TreeNode({
   onSelect,
   isSelected,
   readOnly = false,
-  executionMode = false
+  executionMode = false,
+  showRecurso = false
 }: TreeNodeProps) {
   const config = NODE_CONFIG[node.type]
   const hasChildren = node.metadata.hasChildren
@@ -181,7 +183,7 @@ export function TreeNode({
       className={`tree-node group ${isSelected ? 'bg-blue-50 border-blue-200' : 'hover:bg-gray-50'} py-0.5 cursor-pointer transition-colors`}
       onClick={onSelect}
     >
-      <div className="grid grid-cols-[1fr_80px_65px_120px_75px_28px] items-center gap-1">
+      <div className={`grid items-center gap-1 ${showRecurso ? 'grid-cols-[1fr_80px_65px_120px_75px_100px_28px]' : 'grid-cols-[1fr_80px_65px_120px_75px_28px]'}`}>
         {/* Columna 1: Nombre con indentación */}
         <div className="flex items-center gap-1 min-w-0" style={{ paddingLeft: `${node.level * 16 + 8}px` }}>
           {/* Toggle button */}
@@ -255,7 +257,38 @@ export function TreeNode({
           {totalHours > 0 ? `${totalHours}h` : ''}
         </div>
 
-        {/* Columna 6: Acciones */}
+        {/* Columna 6: Recurso (solo si showRecurso) */}
+        {showRecurso && (
+          <div className="text-center text-[11px] truncate">
+            {node.type === 'tarea' ? (
+              node.data.recursoNombre ? (
+                <span className="text-green-700 bg-green-50 border border-green-200 rounded px-1 py-0 text-[10px] truncate inline-block max-w-full">
+                  {node.data.recursoNombre}
+                </span>
+              ) : (
+                <span className="text-red-400 text-[10px]">Sin asignar</span>
+              )
+            ) : (
+              (node.metadata as any).recursosTotales > 0 ? (
+                <span className={`inline-flex items-center gap-0.5 border rounded px-1 py-0 text-[10px] font-medium ${
+                  (() => {
+                    const assigned = (node.metadata as any).recursosAsignados || 0
+                    const total = (node.metadata as any).recursosTotales || 0
+                    const ratio = total > 0 ? assigned / total : 0
+                    if (ratio >= 1) return 'bg-green-50 text-green-700 border-green-200'
+                    if (ratio > 0) return 'bg-amber-50 text-amber-700 border-amber-200'
+                    return 'bg-red-50 text-red-600 border-red-200'
+                  })()
+                }`}>
+                  <Users className="h-2.5 w-2.5" />
+                  {(node.metadata as any).recursosAsignados}/{(node.metadata as any).recursosTotales}
+                </span>
+              ) : null
+            )}
+          </div>
+        )}
+
+        {/* Columna 7: Acciones */}
         <div className="flex justify-center">
           <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
             <DropdownMenuTrigger asChild>

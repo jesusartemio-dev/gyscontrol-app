@@ -346,6 +346,7 @@ export function ProyectoCronogramaTreeView({
               onSelect={() => actions.selectNode(nodeId)}
               isSelected={isSelected}
               readOnly={isReadOnly}
+              showRecurso
             />
             
           </div>
@@ -540,7 +541,7 @@ export function ProyectoCronogramaTreeView({
             </div>
           ) : (
             <>
-              <TreeHeader />
+              <TreeHeader showRecurso />
               <div className="p-2">
                 {renderTree(state.rootNodes)}
               </div>
