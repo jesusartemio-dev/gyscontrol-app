@@ -176,9 +176,17 @@ function ChatMessageComponent({ message, isStreaming = false, isLastMessage = fa
 
         {/* Error banner (replaces message content when error-only) */}
         {errorOnly && errorText && (
-          <div className="flex items-center gap-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700 w-full">
-            <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-[#dc2626]" />
-            <span>Algo salio mal. Intenta de nuevo.</span>
+          <div className={cn(
+            'flex items-center gap-2 rounded-lg px-3 py-2 text-xs w-full',
+            errorText.includes('deshabilitad')
+              ? 'bg-amber-50 border border-amber-200 text-amber-700'
+              : 'bg-red-50 border border-red-200 text-red-700'
+          )}>
+            <AlertTriangle className={cn(
+              'h-3.5 w-3.5 shrink-0',
+              errorText.includes('deshabilitad') ? 'text-amber-500' : 'text-[#dc2626]'
+            )} />
+            <span>{errorText}</span>
           </div>
         )}
 

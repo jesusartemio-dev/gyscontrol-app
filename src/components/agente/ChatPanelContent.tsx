@@ -18,6 +18,7 @@ import {
   Search,
   Loader2,
   PenLine,
+  ShieldOff,
 } from 'lucide-react'
 import {
   Popover,
@@ -151,6 +152,19 @@ export function ChatPanelContent({ cotizacionId, mode, onClose, currentUserId, o
   const [statusDetail, setStatusDetail] = useState<string | undefined>()
   const scrollRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
+  const [featureDisabled, setFeatureDisabled] = useState(false)
+
+  // Check if chat feature is disabled
+  useEffect(() => {
+    fetch('/api/agente/features')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data) return
+        const key = cotizacionId ? 'chatCotizacion' : 'chatGeneral'
+        if (data[key] === false) setFeatureDisabled(true)
+      })
+      .catch(() => {})
+  }, [cotizacionId])
 
   // ── Conversation state ──
   const [conversacionId, setConversacionId] = useState<string | null>(null)
@@ -650,12 +664,22 @@ export function ChatPanelContent({ cotizacionId, mode, onClose, currentUserId, o
         <StatusBanner phase={statusPhase} detail={statusDetail} />
       )}
 
+      {/* ── Disabled banner ── */}
+      {featureDisabled && (
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border-t border-amber-200 text-amber-700 text-xs">
+          <ShieldOff className="h-4 w-4 shrink-0" />
+          <span>El asistente IA esta deshabilitado por el administrador.</span>
+        </div>
+      )}
+
       {/* ── Input ── */}
       <ChatInput
         onSend={handleSend}
-        disabled={isStreaming}
+        disabled={isStreaming || featureDisabled}
         placeholder={
-          isStreaming ? 'Esperando respuesta del asistente...' : undefined
+          featureDisabled
+            ? 'Asistente deshabilitado'
+            : isStreaming ? 'Esperando respuesta del asistente...' : undefined
         }
       />
     </div>
