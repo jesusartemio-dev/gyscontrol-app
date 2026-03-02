@@ -124,7 +124,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
     const valorizacion = await prisma.valorizacion.findUnique({
       where: { id: valId },
-      select: { id: true, proyectoId: true, periodoInicio: true },
+      select: { id: true, proyectoId: true, periodoInicio: true, numero: true },
     })
     if (!valorizacion || valorizacion.proyectoId !== proyectoId) {
       return NextResponse.json({ error: 'Valorización no encontrada' }, { status: 404 })
@@ -135,12 +135,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       orderBy: { orden: 'asc' },
     })
 
-    // Buscar valorizaciones anteriores aprobadas del mismo proyecto
+    // Buscar valorizaciones anteriores (no anuladas) del mismo proyecto
     const valorizacionesAnteriores = await prisma.valorizacion.findMany({
       where: {
         proyectoId,
-        estado: { in: ['aprobada_cliente', 'facturada', 'pagada'] },
-        periodoFin: { lt: valorizacion.periodoInicio },
+        estado: { not: 'anulada' },
+        numero: { lt: valorizacion.numero },
       },
       select: { id: true },
     })
