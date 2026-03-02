@@ -382,26 +382,23 @@ export function ProyectoCronogramaTreeView({
 
       return (
         <React.Fragment key={nodeId}>
-          <div className="flex items-center gap-1">
-            <TreeNode
-              node={node}
-              onToggle={() => actions.toggleNode(nodeId)}
-              onAddChild={isReadOnly ? undefined : (type) => handleAddChild(nodeId, type)}
-              onEdit={isReadOnly || node.type === 'proyecto' ? undefined : () => handleEditNode(nodeId)}
-              onDelete={isReadOnly || node.type === 'proyecto' ? undefined : () => actions.deleteNode(nodeId)}
-              onImport={isReadOnly ? undefined : () => handleImportItems(nodeId)}
-              onSelect={() => actions.selectNode(nodeId)}
-              isSelected={isSelected}
-              readOnly={isReadOnly}
-              assignmentColumn={assignmentColumn}
-              onAssignResponsable={
-                !isReadOnly && assignmentColumn === 'responsable' && (node.type === 'edt' || node.type === 'tarea')
-                  ? () => handleAssignResponsable(nodeId)
-                  : undefined
-              }
-            />
-            
-          </div>
+          <TreeNode
+            node={node}
+            onToggle={() => actions.toggleNode(nodeId)}
+            onAddChild={isReadOnly ? undefined : (type) => handleAddChild(nodeId, type)}
+            onEdit={isReadOnly || node.type === 'proyecto' ? undefined : () => handleEditNode(nodeId)}
+            onDelete={isReadOnly || node.type === 'proyecto' ? undefined : () => actions.deleteNode(nodeId)}
+            onImport={isReadOnly ? undefined : () => handleImportItems(nodeId)}
+            onSelect={() => actions.selectNode(nodeId)}
+            isSelected={isSelected}
+            readOnly={isReadOnly}
+            assignmentColumn={assignmentColumn}
+            onAssignResponsable={
+              !isReadOnly && assignmentColumn === 'responsable' && (node.type === 'edt' || node.type === 'tarea')
+                ? () => handleAssignResponsable(nodeId)
+                : undefined
+            }
+          />
           {state.expandedNodes.has(nodeId) && childNodeIds.length > 0 && (
             <div className="tree-children">
               {renderTree(childNodeIds, level + 1)}
