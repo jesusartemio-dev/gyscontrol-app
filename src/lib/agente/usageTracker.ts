@@ -194,10 +194,25 @@ export interface UsageStats {
 
 export async function getUsageStats(
   period: UsagePeriod,
-  userId?: string
+  userId?: string,
+  /** Optional YYYY-MM to query a specific month instead of the current period */
+  mes?: string
 ): Promise<UsageStats> {
-  const since = getPeriodStart(period)
-  const where: Record<string, unknown> = { createdAt: { gte: since } }
+  let since: Date
+  let until: Date | undefined
+
+  if (mes && /^\d{4}-\d{2}$/.test(mes)) {
+    const [year, month] = mes.split('-').map(Number)
+    since = new Date(year, month - 1, 1)
+    until = new Date(year, month, 1) // first day of next month
+  } else {
+    since = getPeriodStart(period)
+  }
+
+  const createdAtFilter: Record<string, unknown> = { gte: since }
+  if (until) createdAtFilter.lt = until
+
+  const where: Record<string, unknown> = { createdAt: createdAtFilter }
   if (userId) where.userId = userId
 
   // All records in period

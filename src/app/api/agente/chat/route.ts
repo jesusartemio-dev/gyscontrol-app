@@ -16,6 +16,7 @@ import {
 } from '@/lib/agente/types'
 import type { ChatRequest, ChatMessage, ToolContext, ToolCallInfo, ChatAttachment } from '@/lib/agente/types'
 import { trackUsage, getCompanyMonthlyUsage } from '@/lib/agente/usageTracker'
+import { getIAFeatureFlags } from '@/lib/agente/featureFlags'
 
 // Allow up to 5 minutes for PDF analysis + multi-tool loops
 export const maxDuration = 300
@@ -467,6 +468,26 @@ export async function POST(request: NextRequest) {
     })
   }
 
+  // ── Feature flag check ──
+  let iaFlags: Awaited<ReturnType<typeof getIAFeatureFlags>> | null = null
+  try {
+    iaFlags = await getIAFeatureFlags()
+    if (cotizacionId && !iaFlags.chatCotizacion) {
+      return new Response(
+        JSON.stringify({ error: 'El chat en cotización está deshabilitado por el administrador.' }),
+        { status: 403, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+    if (!cotizacionId && !iaFlags.chatGeneral) {
+      return new Response(
+        JSON.stringify({ error: 'El chat general está deshabilitado por el administrador.' }),
+        { status: 403, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+  } catch (err) {
+    console.error('[chat] Failed to check feature flags:', err)
+  }
+
   const userId = (session.user as { id: string }).id
   const toolContext: ToolContext = { userId, cotizacionId: cotizacionId || undefined }
 
@@ -583,7 +604,9 @@ export async function POST(request: NextRequest) {
 
   // Context-based tool filtering: only send relevant tools
   const lastUserContent = messages[messages.length - 1]?.content || ''
-  const tools = selectToolsByContext(lastUserContent)
+  const disabledToolGroups = new Set<import('@/lib/agente/tools').ToolGroup>()
+  if (iaFlags && !iaFlags.analisisTdr) disabledToolGroups.add('analysis')
+  const tools = selectToolsByContext(lastUserContent, disabledToolGroups)
 
   const encoder = new TextEncoder()
 

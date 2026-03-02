@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
 import {
   DollarSign,
   Zap,
@@ -11,6 +12,14 @@ import {
   RefreshCw,
   AlertTriangle,
   ShieldCheck,
+  ChevronLeft,
+  ChevronRight,
+  MessageSquare,
+  FileSpreadsheet,
+  ScanLine,
+  FileSearch,
+  MessagesSquare,
+  Settings2,
 } from 'lucide-react'
 import {
   BarChart,
@@ -45,6 +54,43 @@ interface UsageStats {
 
 type Periodo = 'hoy' | 'semana' | 'mes'
 
+interface IAFeatureFlags {
+  chatGeneral: boolean
+  chatCotizacion: boolean
+  analisisTdr: boolean
+  importacionExcel: boolean
+  ocrComprobantes: boolean
+}
+
+const FEATURE_DEFS: { key: keyof IAFeatureFlags; label: string; desc: string; icon: React.ElementType }[] = [
+  { key: 'chatGeneral', label: 'Chat General', desc: 'Boton flotante de asistente IA en toda la app', icon: MessageSquare },
+  { key: 'chatCotizacion', label: 'Chat en Cotizacion', desc: 'Asistente IA contextual dentro de cotizaciones', icon: MessagesSquare },
+  { key: 'analisisTdr', label: 'Analisis de TDR', desc: 'Herramientas de analisis de Terminos de Referencia', icon: FileSearch },
+  { key: 'importacionExcel', label: 'Importacion Excel/PDF', desc: 'Wizard de importacion de cotizaciones con IA', icon: FileSpreadsheet },
+  { key: 'ocrComprobantes', label: 'OCR Comprobantes', desc: 'Lectura automatica de facturas y boletas', icon: ScanLine },
+]
+
+const MONTH_NAMES = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+]
+
+function formatYearMonth(ym: string): string {
+  const [year, month] = ym.split('-').map(Number)
+  return `${MONTH_NAMES[month - 1]} ${year}`
+}
+
+function getCurrentYearMonth(): string {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+}
+
+function shiftMonth(ym: string, delta: number): string {
+  const [year, month] = ym.split('-').map(Number)
+  const d = new Date(year, month - 1 + delta, 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
 function getProgressColor(pct: number): string {
   if (pct < 60) return 'bg-emerald-500'
   if (pct < 80) return 'bg-amber-500'
@@ -65,18 +111,30 @@ function getProgressTextColor(pct: number): string {
 
 export default function UsoIAPage() {
   const [periodo, setPeriodo] = useState<Periodo>('mes')
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentYearMonth)
   const [stats, setStats] = useState<UsageStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [limitInput, setLimitInput] = useState('')
   const [savingLimit, setSavingLimit] = useState(false)
   const [limitMsg, setLimitMsg] = useState<string | null>(null)
+  const [features, setFeatures] = useState<IAFeatureFlags | null>(null)
+  const [savingFeature, setSavingFeature] = useState<string | null>(null)
+
+  const isCurrentMonth = selectedMonth === getCurrentYearMonth()
 
   const fetchStats = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`/api/agente/usage?periodo=${periodo}`)
+      const params = new URLSearchParams()
+      if (isCurrentMonth) {
+        params.set('periodo', periodo)
+      } else {
+        params.set('periodo', 'mes')
+        params.set('mes', selectedMonth)
+      }
+      const res = await fetch(`/api/agente/usage?${params}`)
       if (!res.ok) {
         const data = await res.json()
         throw new Error(data.error || `Error ${res.status}`)
@@ -89,7 +147,7 @@ export default function UsoIAPage() {
     } finally {
       setLoading(false)
     }
-  }, [periodo])
+  }, [periodo, selectedMonth, isCurrentMonth])
 
   useEffect(() => {
     fetchStats()
@@ -122,6 +180,31 @@ export default function UsoIAPage() {
     }
   }
 
+  // ── Feature flags ──
+  useEffect(() => {
+    fetch('/api/agente/features')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (data) setFeatures(data) })
+      .catch(() => {})
+  }, [])
+
+  const toggleFeature = async (key: keyof IAFeatureFlags, value: boolean) => {
+    setSavingFeature(key)
+    try {
+      const res = await fetch('/api/agente/features', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [key]: value }),
+      })
+      if (res.ok) {
+        const updated = await res.json()
+        setFeatures(updated)
+      }
+    } catch { /* ignore */ } finally {
+      setSavingFeature(null)
+    }
+  }
+
   const promedioDiario = stats && stats.porDia.length > 0
     ? stats.resumen.costoTotal / stats.porDia.length
     : 0
@@ -150,16 +233,45 @@ export default function UsoIAPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Select value={periodo} onValueChange={(v) => setPeriodo(v as Periodo)}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="hoy">Hoy</SelectItem>
-              <SelectItem value="semana">Esta semana</SelectItem>
-              <SelectItem value="mes">Este mes</SelectItem>
-            </SelectContent>
-          </Select>
+          {/* Month picker */}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setSelectedMonth((m) => shiftMonth(m, -1))}
+              className="p-1.5 rounded-md border hover:bg-accent transition-colors"
+              title="Mes anterior"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <span className="text-sm font-medium w-[140px] text-center select-none">
+              {formatYearMonth(selectedMonth)}
+            </span>
+            <button
+              onClick={() => setSelectedMonth((m) => {
+                const next = shiftMonth(m, 1)
+                return next > getCurrentYearMonth() ? m : next
+              })}
+              disabled={isCurrentMonth}
+              className="p-1.5 rounded-md border hover:bg-accent transition-colors disabled:opacity-30"
+              title="Mes siguiente"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* Period filter (only for current month) */}
+          {isCurrentMonth && (
+            <Select value={periodo} onValueChange={(v) => setPeriodo(v as Periodo)}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="hoy">Hoy</SelectItem>
+                <SelectItem value="semana">Esta semana</SelectItem>
+                <SelectItem value="mes">Este mes</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+
           <button
             onClick={fetchStats}
             disabled={loading}
@@ -174,6 +286,42 @@ export default function UsoIAPage() {
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {error}
         </div>
+      )}
+
+      {/* ── Feature Toggles ── */}
+      {features && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Settings2 className="h-4 w-4" />
+              Herramientas de IA
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {FEATURE_DEFS.map(({ key, label, desc, icon: Icon }) => (
+                <div
+                  key={key}
+                  className={`flex items-start gap-3 rounded-lg border p-3 transition-colors ${
+                    features[key] ? 'bg-white' : 'bg-gray-50 opacity-60'
+                  }`}
+                >
+                  <Icon className="h-5 w-5 mt-0.5 shrink-0 text-muted-foreground" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium leading-tight">{label}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>
+                  </div>
+                  <Switch
+                    checked={features[key]}
+                    disabled={savingFeature === key}
+                    onCheckedChange={(v) => toggleFeature(key, v)}
+                    className="shrink-0"
+                  />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* ── Monthly Limit Card ── */}
@@ -267,7 +415,7 @@ export default function UsoIAPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Costo {periodo === 'hoy' ? 'hoy' : periodo === 'semana' ? 'esta semana' : 'este mes'}
+              Costo {!isCurrentMonth ? formatYearMonth(selectedMonth) : periodo === 'hoy' ? 'hoy' : periodo === 'semana' ? 'esta semana' : 'este mes'}
             </CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -292,19 +440,21 @@ export default function UsoIAPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Costo hoy
-            </CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              ${costoHoy.toFixed(2)}
-            </div>
-          </CardContent>
-        </Card>
+        {isCurrentMonth && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Costo hoy
+              </CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                ${costoHoy.toFixed(2)}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

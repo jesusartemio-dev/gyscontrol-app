@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import Anthropic from '@anthropic-ai/sdk'
 import { getModelForTask } from '@/lib/agente/models'
 import { trackUsage } from '@/lib/agente/usageTracker'
+import { isIAFeatureEnabled } from '@/lib/agente/featureFlags'
 
 // ── Tipos ────────────────────────────────────────────────
 
@@ -202,6 +203,14 @@ function parseOcrResponse(text: string): OcrResult {
 
 export async function POST(request: NextRequest) {
   try {
+    // Feature flag check
+    if (!(await isIAFeatureEnabled('ocrComprobantes'))) {
+      return NextResponse.json(
+        { error: 'El OCR de comprobantes está deshabilitado por el administrador.' },
+        { status: 403 }
+      )
+    }
+
     const session = await getServerSession(authOptions)
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })

@@ -39,6 +39,14 @@ export default function CotizacionesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [importOpen, setImportOpen] = useState(false)
+  const [importEnabled, setImportEnabled] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/agente/features')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (data) setImportEnabled(data.importacionExcel !== false) })
+      .catch(() => {})
+  }, [])
 
   // Filtros
   const [search, setSearch] = useState('')
@@ -142,10 +150,12 @@ export default function CotizacionesPage() {
             </div>
           </div>
 
-          <Button variant="outline" size="sm" className="h-8" onClick={() => setImportOpen(true)}>
-            <FileSpreadsheet className="h-3.5 w-3.5 mr-1.5" />
-            Importar Excel
-          </Button>
+          {importEnabled && (
+            <Button variant="outline" size="sm" className="h-8" onClick={() => setImportOpen(true)}>
+              <FileSpreadsheet className="h-3.5 w-3.5 mr-1.5" />
+              Importar Excel
+            </Button>
+          )}
           <Button variant="outline" size="sm" className="h-8">
             <Download className="h-3.5 w-3.5 mr-1.5" />
             Exportar

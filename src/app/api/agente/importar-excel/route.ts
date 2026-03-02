@@ -9,6 +9,7 @@ import { prisma } from '@/lib/prisma'
 import { readExcelSheets, extractWithClaude } from '@/lib/agente/excelExtractor'
 import { extractPdfProposal } from '@/lib/agente/pdfProposalExtractor'
 import type { PropuestaExtraida } from '@/lib/agente/pdfProposalExtractor'
+import { isIAFeatureEnabled } from '@/lib/agente/featureFlags'
 
 // Allow up to 300 seconds for Claude API processing of large Excel files
 export const maxDuration = 300
@@ -46,6 +47,14 @@ function writeSSE(
 }
 
 export async function POST(request: NextRequest) {
+  // Feature flag check
+  if (!(await isIAFeatureEnabled('importacionExcel'))) {
+    return NextResponse.json(
+      { error: 'La importación Excel con IA está deshabilitada por el administrador.' },
+      { status: 403 }
+    )
+  }
+
   const session = await getServerSession(authOptions)
   if (!session?.user) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 })

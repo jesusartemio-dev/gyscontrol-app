@@ -8,11 +8,22 @@ import { ChatPanel } from './ChatPanel'
 export function ChatButton() {
   const [open, setOpen] = useState(false)
   const [pulse, setPulse] = useState(true)
+  const [enabled, setEnabled] = useState(true)
+
+  // Check feature flag
+  useEffect(() => {
+    fetch('/api/agente/features')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (data) setEnabled(data.chatGeneral !== false) })
+      .catch(() => {})
+  }, [])
 
   // Stop pulsing after the user opens the chat for the first time
   useEffect(() => {
     if (open) setPulse(false)
   }, [open])
+
+  if (!enabled) return null
 
   return (
     <>

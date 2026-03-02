@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { MessageSquare } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ChatPanel } from './ChatPanel'
@@ -11,6 +11,16 @@ interface Props {
 
 export function CotizacionChatButton({ cotizacionId }: Props) {
   const [open, setOpen] = useState(false)
+  const [enabled, setEnabled] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/agente/features')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (data) setEnabled(data.chatCotizacion !== false) })
+      .catch(() => {})
+  }, [])
+
+  if (!enabled) return null
 
   return (
     <>

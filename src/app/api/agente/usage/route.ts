@@ -20,13 +20,18 @@ export async function GET(request: NextRequest) {
   const url = new URL(request.url)
   const periodo = (url.searchParams.get('periodo') || 'mes') as UsagePeriod
   const userId = url.searchParams.get('userId') || undefined
+  const mes = url.searchParams.get('mes') || undefined // YYYY-MM
 
   if (!['hoy', 'semana', 'mes'].includes(periodo)) {
     return NextResponse.json({ error: 'Periodo invalido. Usar: hoy, semana, mes' }, { status: 400 })
   }
 
+  if (mes && !/^\d{4}-\d{2}$/.test(mes)) {
+    return NextResponse.json({ error: 'Formato de mes invalido. Usar: YYYY-MM' }, { status: 400 })
+  }
+
   const [stats, monthlyUsage] = await Promise.all([
-    getUsageStats(periodo, userId),
+    getUsageStats(periodo, userId, mes),
     getCompanyMonthlyUsage(),
   ])
 

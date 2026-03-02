@@ -876,8 +876,9 @@ const TOOL_GROUPS: Record<ToolGroup, AnthropicTool[]> = {
 /**
  * Returns a subset of tools based on context keywords in the message.
  * Reduces token usage by not sending irrelevant tool schemas to Claude.
+ * @param disabledGroups - Optional set of tool groups to exclude (e.g., feature flags)
  */
-export function selectToolsByContext(message: string): AnthropicTool[] {
+export function selectToolsByContext(message: string, disabledGroups?: Set<ToolGroup>): AnthropicTool[] {
   const lower = message.toLowerCase()
   const groups = new Set<ToolGroup>()
 
@@ -918,6 +919,7 @@ export function selectToolsByContext(message: string): AnthropicTool[] {
 
   const result: AnthropicTool[] = []
   for (const g of groups) {
+    if (disabledGroups?.has(g)) continue
     result.push(...TOOL_GROUPS[g])
   }
   return result
