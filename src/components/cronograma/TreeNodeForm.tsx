@@ -472,206 +472,243 @@ export function TreeNodeForm({
           )}
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Nombre */}
-          <div className="space-y-2">
-            <Label htmlFor="nombre">Nombre *</Label>
-            <Input
-              id="nombre"
-              value={formData.nombre}
-              onChange={(e) => setFormData(prev => ({ ...prev, nombre: e.target.value }))}
-              placeholder={`Nombre del ${nodeType || 'elemento'}`}
-              required
-            />
-          </div>
+        {(() => {
+          const isTarea = nodeType === 'tarea' || (mode === 'edit' && nodeId && nodes.get(nodeId)?.type === 'tarea')
+          const isFase = nodeType === 'fase' || (mode === 'edit' && nodeId && nodes.get(nodeId)?.type === 'fase')
 
-          {/* Descripción */}
-          <div className="space-y-2">
-            <Label htmlFor="descripcion">Descripción</Label>
-            <Textarea
-              id="descripcion"
-              value={formData.descripcion}
-              onChange={(e) => setFormData(prev => ({ ...prev, descripcion: e.target.value }))}
-              placeholder="Descripción opcional"
-              rows={3}
-            />
-          </div>
-
-          {/* Fechas */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="fechaInicio">Fecha Inicio</Label>
-              <Input
-                id="fechaInicio"
-                type="date"
-                value={formData.fechaInicioComercial}
-                onChange={(e) => setFormData(prev => ({ ...prev, fechaInicioComercial: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="fechaFin">Fecha Fin</Label>
-              <Input
-                id="fechaFin"
-                type="date"
-                value={formData.fechaFinComercial}
-                onChange={(e) => setFormData(prev => ({ ...prev, fechaFinComercial: e.target.value }))}
-              />
-            </div>
-          </div>
-
-          {/* Horas estimadas, personas y orden */}
-          <div className={`grid gap-4 ${(nodeType === 'tarea' || (mode === 'edit' && nodeId && nodes.get(nodeId)?.type === 'tarea')) ? 'grid-cols-3' : 'grid-cols-2'}`}>
-            <div className="space-y-2">
-              <Label htmlFor="horasEstimadas">Horas Estimadas</Label>
-              <Input
-                id="horasEstimadas"
-                type="number"
-                min="0"
-                step="0.5"
-                value={formData.horasEstimadas}
-                onChange={(e) => setFormData(prev => ({ ...prev, horasEstimadas: e.target.value }))}
-                placeholder="0"
-              />
-            </div>
-            {(nodeType === 'tarea' || (mode === 'edit' && nodeId && nodes.get(nodeId)?.type === 'tarea')) && (
-              <div className="space-y-2">
-                <Label htmlFor="personasEstimadas">
-                  <Users className="h-3.5 w-3.5 inline mr-1" />
-                  Personas
-                </Label>
+          return (
+            <form onSubmit={handleSubmit} className="space-y-3">
+              {/* Nombre */}
+              <div className="space-y-1.5">
+                <Label htmlFor="nombre">Nombre *</Label>
                 <Input
-                  id="personasEstimadas"
-                  type="number"
-                  min="1"
-                  max="99"
-                  value={formData.personasEstimadas}
-                  onChange={(e) => setFormData(prev => ({ ...prev, personasEstimadas: e.target.value }))}
-                  placeholder="1"
+                  id="nombre"
+                  value={formData.nombre}
+                  onChange={(e) => setFormData(prev => ({ ...prev, nombre: e.target.value }))}
+                  placeholder={`Nombre del ${nodeType || 'elemento'}`}
+                  required
                 />
               </div>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="orden">Orden</Label>
-              <Input
-                id="orden"
-                type="number"
-                min="0"
-                value={formData.orden}
-                onChange={(e) => setFormData(prev => ({ ...prev, orden: e.target.value }))}
-                placeholder="0"
-              />
-            </div>
-          </div>
 
-          {/* Recurso (solo para tareas) */}
-          {(nodeType === 'tarea' || (mode === 'edit' && nodeId && nodes.get(nodeId)?.type === 'tarea')) && (
-            <>
-              <RecursoSelect
-                value={formData.recursoId}
-                onChange={(id, recurso) => {
-                  setFormData(prev => ({ ...prev, recursoId: id }))
-                  if (recurso) {
-                    const totalPersonas = recurso.tipo === 'cuadrilla' && recurso.composiciones?.length
-                      ? recurso.composiciones.reduce((sum, c) => sum + (c.cantidad ?? 1), 0)
-                      : 1
-                    setRecursoInfo({ tipo: recurso.tipo, totalPersonas })
-                    if (recurso.tipo === 'cuadrilla') {
-                      setFormData(prev => ({ ...prev, recursoId: id, personasEstimadas: totalPersonas.toString() }))
-                    }
-                  } else {
-                    setRecursoInfo(null)
-                  }
-                }}
-              />
-              {recursoInfo && (
-                <p className="text-xs text-muted-foreground -mt-2">
-                  {recursoInfo.tipo === 'cuadrilla'
-                    ? `Cuadrilla de ${recursoInfo.totalPersonas} personas — Costo = horas × costo/hora (ya incluye al equipo completo)`
-                    : `Individual — Costo = horas × personas × costo/hora`
-                  }
-                </p>
+              {/* Descripción */}
+              <div className="space-y-1.5">
+                <Label htmlFor="descripcion">Descripción</Label>
+                <Textarea
+                  id="descripcion"
+                  value={formData.descripcion}
+                  onChange={(e) => setFormData(prev => ({ ...prev, descripcion: e.target.value }))}
+                  placeholder="Descripción opcional"
+                  rows={1}
+                  className="min-h-[36px] resize-y"
+                />
+              </div>
+
+              {/* Fechas + Horas en una fila */}
+              <div className={`grid gap-3 ${isTarea ? 'grid-cols-[1fr_1fr_auto]' : 'grid-cols-2'}`}>
+                <div className="space-y-1.5">
+                  <Label htmlFor="fechaInicio">F. Inicio</Label>
+                  <Input
+                    id="fechaInicio"
+                    type="date"
+                    value={formData.fechaInicioComercial}
+                    onChange={(e) => setFormData(prev => ({ ...prev, fechaInicioComercial: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="fechaFin">F. Fin</Label>
+                  <Input
+                    id="fechaFin"
+                    type="date"
+                    value={formData.fechaFinComercial}
+                    onChange={(e) => setFormData(prev => ({ ...prev, fechaFinComercial: e.target.value }))}
+                  />
+                </div>
+                {isTarea && (
+                  <div className="space-y-1.5 w-20">
+                    <Label htmlFor="horasEstimadas">Horas</Label>
+                    <Input
+                      id="horasEstimadas"
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      value={formData.horasEstimadas}
+                      onChange={(e) => setFormData(prev => ({ ...prev, horasEstimadas: e.target.value }))}
+                      placeholder="0"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Horas + Orden para no-tareas */}
+              {!isTarea && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="horasEstimadas">Horas Estimadas</Label>
+                    <Input
+                      id="horasEstimadas"
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      value={formData.horasEstimadas}
+                      onChange={(e) => setFormData(prev => ({ ...prev, horasEstimadas: e.target.value }))}
+                      placeholder="0"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="orden">Orden</Label>
+                    <Input
+                      id="orden"
+                      type="number"
+                      min="0"
+                      value={formData.orden}
+                      onChange={(e) => setFormData(prev => ({ ...prev, orden: e.target.value }))}
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
               )}
-            </>
-          )}
 
-          {/* Prioridad */}
-          <div className="space-y-2">
-            <Label htmlFor="prioridad">Prioridad</Label>
-            <Select
-              value={formData.prioridad}
-              onValueChange={(value: any) => setFormData(prev => ({ ...prev, prioridad: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {PRIORITY_OPTIONS.map(option => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+              {/* Recurso + Personas en una fila (solo tareas) */}
+              {isTarea && (
+                <div className="space-y-1.5">
+                  <div className="grid grid-cols-[1fr_auto] gap-3 items-end">
+                    <RecursoSelect
+                      value={formData.recursoId}
+                      onChange={(id, recurso) => {
+                        setFormData(prev => ({ ...prev, recursoId: id }))
+                        if (recurso) {
+                          const totalPersonas = recurso.tipo === 'cuadrilla' && recurso.composiciones?.length
+                            ? recurso.composiciones.reduce((sum, c) => sum + (c.cantidad ?? 1), 0)
+                            : 1
+                          setRecursoInfo({ tipo: recurso.tipo, totalPersonas })
+                          setFormData(prev => ({ ...prev, recursoId: id, personasEstimadas: totalPersonas.toString() }))
+                        } else {
+                          setRecursoInfo(null)
+                        }
+                      }}
+                    />
+                    <div className="w-16">
+                      <Label htmlFor="personasEstimadas" className="text-xs">
+                        <Users className="h-3 w-3 inline mr-0.5" />
+                        Pers.
+                      </Label>
+                      <Input
+                        id="personasEstimadas"
+                        type="number"
+                        min="1"
+                        max="99"
+                        value={formData.personasEstimadas}
+                        readOnly
+                        disabled
+                        className="bg-muted text-center"
+                        placeholder="1"
+                      />
+                    </div>
+                  </div>
+                  {recursoInfo && (
+                    <p className="text-xs text-muted-foreground">
+                      {recursoInfo.tipo === 'cuadrilla'
+                        ? `Cuadrilla de ${recursoInfo.totalPersonas} personas — Costo = horas × costo/hora (ya incluye al equipo completo)`
+                        : `Individual — Costo = horas × personas × costo/hora`
+                      }
+                    </p>
+                  )}
+                </div>
+              )}
 
-          {/* Estado - Solo mostrar para EDTs, actividades y tareas, no para fases */}
-          {(nodeType !== 'fase' && !(mode === 'edit' && nodeId && nodes.get(nodeId)?.type === 'fase')) && (
-            <div className="space-y-2">
-              <Label htmlFor="estado">Estado</Label>
-              <Select
-                value={formData.estado}
-                onValueChange={(value: any) => setFormData(prev => ({ ...prev, estado: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {STATUS_OPTIONS.map(option => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+              {/* Prioridad + Estado + Orden en una fila */}
+              <div className={`grid gap-3 ${isTarea ? 'grid-cols-3' : isFase ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                <div className="space-y-1.5">
+                  <Label htmlFor="prioridad">Prioridad</Label>
+                  <Select
+                    value={formData.prioridad}
+                    onValueChange={(value: any) => setFormData(prev => ({ ...prev, prioridad: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PRIORITY_OPTIONS.map(option => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {!isFase && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="estado">Estado</Label>
+                    <Select
+                      value={formData.estado}
+                      onValueChange={(value: any) => setFormData(prev => ({ ...prev, estado: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {STATUS_OPTIONS.map(option => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                {isTarea && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="orden">Orden</Label>
+                    <Input
+                      id="orden"
+                      type="number"
+                      min="0"
+                      value={formData.orden}
+                      onChange={(e) => setFormData(prev => ({ ...prev, orden: e.target.value }))}
+                      placeholder="0"
+                    />
+                  </div>
+                )}
+              </div>
 
-          {/* Sistema de posicionamiento flexible (solo para creación) */}
-          {mode === 'create' && (
-            <div className="space-y-3">
-              <Label htmlFor="posicionamiento">Posicionamiento</Label>
-              <Select
-                value={formData.posicionamiento}
-                onValueChange={(value: PositioningMode) =>
-                  setFormData(prev => ({ ...prev, posicionamiento: value }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="inicio_padre">Al inicio del padre</SelectItem>
-                  <SelectItem value="despues_ultima">Después del último hermano</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-gray-500">
-                {formData.posicionamiento === 'inicio_padre'
-                  ? 'El elemento se colocará al inicio de su contenedor padre'
-                  : 'El elemento se colocará después del último elemento del mismo nivel'
-                }
-              </p>
-            </div>
-          )}
+              {/* Posicionamiento (solo creación) */}
+              {mode === 'create' && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="posicionamiento">Posicionamiento</Label>
+                  <Select
+                    value={formData.posicionamiento}
+                    onValueChange={(value: PositioningMode) =>
+                      setFormData(prev => ({ ...prev, posicionamiento: value }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="inicio_padre">Al inicio del padre</SelectItem>
+                      <SelectItem value="despues_ultima">Después del último hermano</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-gray-500">
+                    {formData.posicionamiento === 'inicio_padre'
+                      ? 'El elemento se colocará al inicio de su contenedor padre'
+                      : 'El elemento se colocará después del último elemento del mismo nivel'
+                    }
+                  </p>
+                </div>
+              )}
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={handleCancel}>
-              Cancelar
-            </Button>
-            <Button type="submit">
-              {mode === 'create' ? 'Crear' : 'Actualizar'}
-            </Button>
-          </DialogFooter>
-        </form>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={handleCancel}>
+                  Cancelar
+                </Button>
+                <Button type="submit">
+                  {mode === 'create' ? 'Crear' : 'Actualizar'}
+                </Button>
+              </DialogFooter>
+            </form>
+          )
+        })()}
       </DialogContent>
     </Dialog>
   )
