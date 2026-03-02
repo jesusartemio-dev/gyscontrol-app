@@ -157,27 +157,65 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       calculados.adelantoMonto = adelantoCalc.adelantoMonto
     }
 
-    const valorizacion = await prisma.valorizacion.create({
-      data: {
-        proyectoId,
-        numero,
-        codigo,
-        periodoInicio: new Date(body.periodoInicio),
-        periodoFin: new Date(body.periodoFin),
-        moneda: body.moneda || 'PEN',
-        tipoCambio: body.tipoCambio || null,
-        presupuestoContractual,
-        acumuladoAnterior,
-        montoValorizacion,
-        descuentoComercialPorcentaje,
-        adelantoPorcentaje,
-        igvPorcentaje,
-        fondoGarantiaPorcentaje,
-        observaciones: body.observaciones || null,
-        ...calculados,
-        updatedAt: new Date(),
-      },
-      include: includeRelations,
+    // Buscar la última valorización no anulada del proyecto para copiar sus partidas
+    const ultimaValNoAnulada = await prisma.valorizacion.findFirst({
+      where: { proyectoId, estado: { not: 'anulada' } },
+      orderBy: { numero: 'desc' },
+      select: { id: true },
+    })
+
+    const valorizacion = await prisma.$transaction(async (tx) => {
+      const val = await tx.valorizacion.create({
+        data: {
+          proyectoId,
+          numero,
+          codigo,
+          periodoInicio: new Date(body.periodoInicio),
+          periodoFin: new Date(body.periodoFin),
+          moneda: body.moneda || 'PEN',
+          tipoCambio: body.tipoCambio || null,
+          presupuestoContractual,
+          acumuladoAnterior,
+          montoValorizacion,
+          descuentoComercialPorcentaje,
+          adelantoPorcentaje,
+          igvPorcentaje,
+          fondoGarantiaPorcentaje,
+          observaciones: body.observaciones || null,
+          ...calculados,
+          updatedAt: new Date(),
+        },
+        include: includeRelations,
+      })
+
+      // Pre-cargar partidas de la valorización anterior (con % avance reseteado a 0)
+      if (ultimaValNoAnulada) {
+        const partidasAnteriores = await tx.partidaValorizacion.findMany({
+          where: { valorizacionId: ultimaValNoAnulada.id },
+          orderBy: { orden: 'asc' },
+        })
+
+        if (partidasAnteriores.length > 0) {
+          await tx.partidaValorizacion.createMany({
+            data: partidasAnteriores.map((p, idx) => ({
+              valorizacionId: val.id,
+              numero: idx + 1,
+              descripcion: p.descripcion,
+              origen: p.origen,
+              proyectoEquipoCotizadoId: p.proyectoEquipoCotizadoId,
+              proyectoServicioCotizadoId: p.proyectoServicioCotizadoId,
+              proyectoGastoCotizadoId: p.proyectoGastoCotizadoId,
+              proyectoEdtId: p.proyectoEdtId,
+              montoContractual: p.montoContractual,
+              porcentajeAvance: 0,
+              montoAvance: 0,
+              orden: idx + 1,
+            })),
+          })
+        }
+      }
+
+      return val
     })
 
     return NextResponse.json(valorizacion, { status: 201 })
