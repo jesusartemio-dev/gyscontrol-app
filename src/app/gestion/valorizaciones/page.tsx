@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, FileSpreadsheet, Loader2, Search, Eye, Send, CheckCircle, Edit, Ban, Upload, Download, AlertTriangle, RefreshCw, Trash2, Clock, Undo2 } from 'lucide-react'
+import { Plus, FileSpreadsheet, Loader2, Search, Eye, Send, CheckCircle, Edit, Ban, Upload, Download, AlertTriangle, RefreshCw, Trash2, Clock, Undo2, Info } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 import toast from 'react-hot-toast'
 import ValorizacionImportExcelModal from '@/components/gestion/ValorizacionImportExcelModal'
@@ -192,6 +192,21 @@ export default function ValorizacionesPage() {
     }
     return result
   }, [items, filterProyecto, filterEstado, searchTerm])
+
+  // Preview info: qué número de valorización se creará y si hay partidas anteriores
+  const formPreview = useMemo(() => {
+    if (!formProyectoId) return null
+    const valsProyecto = items
+      .filter(v => v.proyectoId === formProyectoId)
+      .sort((a, b) => b.numero - a.numero)
+    const ultimaNoAnulada = valsProyecto.find(v => v.estado !== 'anulada')
+    const maxNumero = valsProyecto.length > 0 ? valsProyecto[0].numero : 0
+    return {
+      siguienteNumero: maxNumero + 1,
+      ultimaVal: ultimaNoAnulada ? { codigo: ultimaNoAnulada.codigo, numero: ultimaNoAnulada.numero } : null,
+      totalExistentes: valsProyecto.length,
+    }
+  }, [formProyectoId, items])
 
   const resetForm = () => {
     setFormProyectoId('')
@@ -576,6 +591,19 @@ export default function ValorizacionesPage() {
                   ))}
                 </SelectContent>
               </Select>
+              {formPreview && (
+                <div className="mt-2 flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2">
+                  <Info className="h-4 w-4 text-blue-600 mt-0.5 shrink-0" />
+                  <div className="text-xs text-blue-800 space-y-0.5">
+                    <p className="font-medium">Se creará la Valorización #{formPreview.siguienteNumero}</p>
+                    {formPreview.ultimaVal ? (
+                      <p>Las partidas y configuración de <span className="font-semibold">{formPreview.ultimaVal.codigo}</span> se precargarán automáticamente.</p>
+                    ) : (
+                      <p>Primera valorización del proyecto — sin partidas previas para precargar.</p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
