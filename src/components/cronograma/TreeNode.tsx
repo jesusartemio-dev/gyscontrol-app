@@ -6,7 +6,7 @@
 // ===================================================
 
 import React from 'react'
-import { ChevronRight, ChevronDown, Plus, Edit, Trash2, MoreHorizontal, Download, Users } from 'lucide-react'
+import { ChevronRight, ChevronDown, Plus, Edit, Trash2, Settings2, Download, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -31,7 +31,7 @@ const NODE_CONFIG: Record<string, { icon: string; color: string; canAdd: NodeTyp
   proyecto: {
     icon: '📁',
     color: 'bg-indigo-100 text-indigo-800',
-    canAdd: ['fase'] as NodeType[],
+    canAdd: ['fase', 'edt'] as NodeType[],
     label: 'Proyecto'
   },
   fase: {
@@ -248,36 +248,50 @@ export function TreeNode({
         </div>
 
         {/* Actions */}
-        <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center">
           {/* More actions menu */}
           <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-5 w-5 p-0">
-                <MoreHorizontal className="h-3 w-3" />
+              <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-gray-400 hover:text-gray-700 transition-colors">
+                <Settings2 className="h-3.5 w-3.5" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               {/* Create child options - only if not read-only */}
-              {!readOnly && config.canAdd.map(childType => (
-                <DropdownMenuItem
-                  key={`create-${childType}`}
-                  onClick={() => {
-                    setDropdownOpen(false)
-                    onAddChild?.(childType)
-                  }}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Crear {childType === 'edt' ? 'EDT' : childType === 'actividad' ? 'Actividad' : childType === 'tarea' ? 'Tarea' : childType}
-                </DropdownMenuItem>
-              ))}
+              {!readOnly && config.canAdd.map(childType => {
+                const childLabel = childType === 'fase' ? 'Fase' : childType === 'edt' ? 'EDT' : childType === 'actividad' ? 'Actividad' : childType === 'tarea' ? 'Tarea' : childType
+                return (
+                  <DropdownMenuItem
+                    key={`create-${childType}`}
+                    onClick={() => {
+                      setDropdownOpen(false)
+                      onAddChild?.(childType)
+                    }}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Crear {childLabel}
+                  </DropdownMenuItem>
+                )
+              })}
 
-              {/* Separator if there are both create and other options */}
-              {!readOnly && config.canAdd.length > 0 && (
+              {/* Import option - only if not read-only and for applicable node types */}
+              {!readOnly && (node.type === 'proyecto' || node.type === 'fase' || node.type === 'actividad') && (
+                <DropdownMenuItem onClick={() => {
+                  setDropdownOpen(false)
+                  onImport?.()
+                }}>
+                  <Download className="h-4 w-4 mr-2" />
+                  {node.type === 'proyecto' ? 'Importar Fases' : node.type === 'fase' ? 'Importar EDT' : 'Importar Tareas'}
+                </DropdownMenuItem>
+              )}
+
+              {/* Separator if there are create/import options and edit/delete options */}
+              {!readOnly && (config.canAdd.length > 0 || node.type === 'proyecto' || node.type === 'fase' || node.type === 'actividad') && (
                 <div className="h-px bg-gray-200 my-1" />
               )}
 
-              {/* Edit option - only if not read-only */}
-              {!readOnly && (
+              {/* Edit option - only if not read-only and not proyecto */}
+              {!readOnly && node.type !== 'proyecto' && (
                 <DropdownMenuItem onClick={() => {
                   setDropdownOpen(false)
                   onEdit?.()
@@ -287,19 +301,8 @@ export function TreeNode({
                 </DropdownMenuItem>
               )}
 
-              {/* Import option - only if not read-only and for specific node types */}
-              {!readOnly && (node.type === 'fase' || node.type === 'actividad') && (
-                <DropdownMenuItem onClick={() => {
-                  setDropdownOpen(false)
-                  onImport?.()
-                }}>
-                  <Download className="h-4 w-4 mr-2" />
-                  {node.type === 'actividad' ? 'Importar Tarea' : node.type === 'fase' ? 'Importar EDT' : 'Importar'}
-                </DropdownMenuItem>
-              )}
-
-              {/* Delete option - only if not read-only */}
-              {!readOnly && (
+              {/* Delete option - only if not read-only and not proyecto */}
+              {!readOnly && node.type !== 'proyecto' && (
                 <DropdownMenuItem
                   onClick={() => {
                     setDropdownOpen(false)

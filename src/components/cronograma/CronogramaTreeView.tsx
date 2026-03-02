@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { RefreshCw, TreePine, Plus, Download, List, Filter, Zap } from 'lucide-react'
+import { RefreshCw, TreePine, List, Filter, Zap } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { TreeNode } from './TreeNode'
 import { TreeNodeForm } from './TreeNodeForm'
@@ -203,43 +203,23 @@ export function CronogramaTreeView({ cotizacionId, onRefresh, fechaInicioProyect
       </CardHeader>
 
       <CardContent>
-        {/* Toolbar de acciones globales */}
-        <div className="mb-4 flex flex-wrap gap-2">
-          {/* Generación automática */}
-          <div className="flex gap-2 border-r pr-4 mr-4">
-            <Button
-              size="sm"
-              variant="default"
-              onClick={async () => {
-                try {
-                  await actions.generateFromServices(fechaInicioProyecto ? { fechaInicioProyecto } : undefined)
-                  onRefresh?.()
-                } catch (error) {
-                  console.error('Error generating cronograma:', error)
-                }
-              }}
-              disabled={state.loadingNodes.has('root')}
-            >
-              <Zap className="h-4 w-4 mr-2" />
-              {state.loadingNodes.has('root') ? 'Generando...' : 'Generar Cronograma'}
-            </Button>
-          </div>
-
-          {/* Creación manual */}
+        {/* Generación automática */}
+        <div className="mb-4">
           <Button
             size="sm"
-            onClick={() => handleAddChild('root', 'fase')}
+            variant="default"
+            onClick={async () => {
+              try {
+                await actions.generateFromServices(fechaInicioProyecto ? { fechaInicioProyecto } : undefined)
+                onRefresh?.()
+              } catch (error) {
+                console.error('Error generating cronograma:', error)
+              }
+            }}
+            disabled={state.loadingNodes.has('root')}
           >
-            <Plus className="h-4 w-4 mr-2" />
-            Agregar Fase
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => handleAddChild('root', 'edt')}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Agregar EDT Global
+            <Zap className="h-4 w-4 mr-2" />
+            {state.loadingNodes.has('root') ? 'Generando...' : 'Generar Cronograma'}
           </Button>
         </div>
 
@@ -249,12 +229,7 @@ export function CronogramaTreeView({ cotizacionId, onRefresh, fechaInicioProyect
             <div className="text-center py-12 text-gray-500">
               No hay elementos en el cronograma.
               <br />
-              <Button
-                className="mt-4"
-                onClick={() => handleAddChild('root', 'fase')}
-              >
-                Crear primera fase
-              </Button>
+              <span className="text-sm mt-2 block">Usa el menú del nodo Proyecto para crear fases o EDTs.</span>
             </div>
           ) : (
             <div className="p-4">

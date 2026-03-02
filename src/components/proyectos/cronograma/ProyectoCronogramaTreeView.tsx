@@ -112,6 +112,59 @@ export function ProyectoCronogramaTreeView({
 
       console.log('✅ [FRONTEND] Node found:', { id: node.id, type: node.type, nombre: node.nombre })
 
+      // Para nodo proyecto, importar fases desde configuración global
+      if (node.type === 'proyecto') {
+        try {
+          const response = await fetch('/api/configuracion/fases')
+          if (!response.ok) throw new Error('Error obteniendo fases por defecto')
+
+          const data = await response.json()
+          if (!data.success || !data.data || data.data.length === 0) {
+            alert('No hay fases por defecto configuradas. Ve a Configuración > Fases por Defecto para crearlas.')
+            return
+          }
+
+          let successCount = 0
+          let errorCount = 0
+
+          for (const faseDefault of data.data) {
+            try {
+              const createResponse = await fetch(`/api/proyectos/${proyectoId}/cronograma/fases`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  proyectoCronogramaId: selectedCronograma?.id,
+                  nombre: faseDefault.nombre,
+                  descripcion: faseDefault.descripcion,
+                  orden: faseDefault.orden
+                })
+              })
+
+              if (createResponse.ok) {
+                successCount++
+              } else {
+                errorCount++
+              }
+            } catch (createError) {
+              console.error(`Error creando fase ${faseDefault.nombre}:`, createError)
+              errorCount++
+            }
+          }
+
+          if (successCount > 0) {
+            await actions.loadTree([...state.expandedNodes])
+            onRefresh?.()
+            alert(`Se crearon ${successCount} fases${errorCount > 0 ? ` (${errorCount} errores)` : ''}.`)
+          } else {
+            alert('No se pudieron crear las fases. Verifica la configuración.')
+          }
+        } catch (error) {
+          console.error('Error importando fases:', error)
+          alert('Error importando fases desde configuración.')
+        }
+        return
+      }
+
       // Para actividades, importar tareas desde catálogo de servicios
       if (node.type === 'actividad') {
         console.log('🔍 [FRONTEND] Importing tasks for activity, calling API...')
@@ -278,9 +331,6 @@ export function ProyectoCronogramaTreeView({
 
       // Determinar permisos según el tipo de cronograma o estado de bloqueo
       const isReadOnly = selectedCronograma?.tipo === 'comercial' || selectedCronograma?.bloqueado === true
-      const isExecutionLimited = selectedCronograma?.tipo === 'ejecucion'
-      // Nodo proyecto es solo lectura (no editable, no eliminable)
-      const isProjectNode = node.type === 'proyecto'
 
       return (
         <React.Fragment key={nodeId}>
@@ -288,13 +338,13 @@ export function ProyectoCronogramaTreeView({
             <TreeNode
               node={node}
               onToggle={() => actions.toggleNode(nodeId)}
-              onAddChild={isReadOnly || isProjectNode ? undefined : (type) => handleAddChild(nodeId, type)}
-              onEdit={isReadOnly || isProjectNode ? undefined : () => handleEditNode(nodeId)}
-              onDelete={isReadOnly || isProjectNode ? undefined : () => actions.deleteNode(nodeId)}
-              onImport={isReadOnly || isProjectNode ? undefined : () => handleImportItems(nodeId)}
+              onAddChild={isReadOnly ? undefined : (type) => handleAddChild(nodeId, type)}
+              onEdit={isReadOnly || node.type === 'proyecto' ? undefined : () => handleEditNode(nodeId)}
+              onDelete={isReadOnly || node.type === 'proyecto' ? undefined : () => actions.deleteNode(nodeId)}
+              onImport={isReadOnly ? undefined : () => handleImportItems(nodeId)}
               onSelect={() => actions.selectNode(nodeId)}
               isSelected={isSelected}
-              readOnly={isReadOnly || isProjectNode}
+              readOnly={isReadOnly}
             />
             
           </div>
@@ -382,105 +432,24 @@ export function ProyectoCronogramaTreeView({
       </CardHeader>
 
       <CardContent>
-        {/* Toolbar de acciones globales - Solo para cronogramas editables (no comercial) */}
-        {selectedCronograma?.tipo !== 'comercial' && (
-          <div className="mb-4 flex flex-wrap gap-2">
-            {/* Generación automática - Solo para cronograma de planificación (Línea Base) */}
-            {selectedCronograma?.tipo === 'planificacion' && (
-              <div className="flex gap-2 border-r pr-4 mr-4">
-                <Button
-                  size="sm"
-                  variant="default"
-                  onClick={async () => {
-                    try {
-                      await actions.generateFromServices(fechaInicioProyecto ? { fechaInicioProyecto } : undefined)
-                      onRefresh?.()
-                    } catch (error) {
-                      console.error('Error generating cronograma:', error)
-                    }
-                  }}
-                  disabled={state.loadingNodes.has('root')}
-                >
-                  <Zap className="h-4 w-4 mr-2" />
-                  {state.loadingNodes.has('root') ? 'Generando...' : 'Generar Cronograma'}
-                </Button>
-              </div>
-            )}
-
-            {/* Creación manual */}
+        {/* Generación automática - Solo para cronograma de planificación (Línea Base) */}
+        {selectedCronograma?.tipo !== 'comercial' && selectedCronograma?.tipo === 'planificacion' && (
+          <div className="mb-4">
             <Button
               size="sm"
-              onClick={() => handleAddChild('root', 'fase')}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Agregar Fase
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
+              variant="default"
               onClick={async () => {
                 try {
-                  // Importar fases desde configuración global
-                  const response = await fetch('/api/configuracion/fases')
-                  if (!response.ok) throw new Error('Error obteniendo fases por defecto')
-
-                  const data = await response.json()
-                  if (!data.success || !data.data || data.data.length === 0) {
-                    alert('No hay fases por defecto configuradas. Ve a Configuración > Fases por Defecto para crearlas.')
-                    return
-                  }
-
-                  // Crear fases en el proyecto
-                  let successCount = 0
-                  let errorCount = 0
-
-                  for (const faseDefault of data.data) {
-                    try {
-                      const createResponse = await fetch(`/api/proyectos/${proyectoId}/cronograma/fases`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          proyectoCronogramaId: selectedCronograma?.id,
-                          nombre: faseDefault.nombre,
-                          descripcion: faseDefault.descripcion,
-                          orden: faseDefault.orden
-                        })
-                      })
-
-                      if (createResponse.ok) {
-                        successCount++
-                      } else {
-                        errorCount++
-                      }
-                    } catch (createError) {
-                      console.error(`Error creando fase ${faseDefault.nombre}:`, createError)
-                      errorCount++
-                    }
-                  }
-
-                  if (successCount > 0) {
-                    await actions.loadTree([...state.expandedNodes])
-                    onRefresh?.()
-                    alert(`Se crearon ${successCount} fases${errorCount > 0 ? ` (${errorCount} errores)` : ''}.`)
-                  } else {
-                    alert('No se pudieron crear las fases. Verifica la configuración.')
-                  }
+                  await actions.generateFromServices(fechaInicioProyecto ? { fechaInicioProyecto } : undefined)
+                  onRefresh?.()
                 } catch (error) {
-                  console.error('Error importando fases:', error)
-                  alert('Error importando fases desde configuración.')
+                  console.error('Error generating cronograma:', error)
                 }
               }}
+              disabled={state.loadingNodes.has('root')}
             >
-              <Download className="h-4 w-4 mr-2" />
-              Importar Fases
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handleAddChild('root', 'edt')}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Agregar EDT Global
+              <Zap className="h-4 w-4 mr-2" />
+              {state.loadingNodes.has('root') ? 'Generando...' : 'Generar Cronograma'}
             </Button>
           </div>
         )}
