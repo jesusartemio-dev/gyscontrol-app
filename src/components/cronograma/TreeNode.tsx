@@ -263,31 +263,6 @@ export function TreeNode({
             </Badge>
           )}
 
-          {/* Personas estimadas badge */}
-          {node.type === 'tarea' && (
-            <span className="inline-flex items-center gap-0.5 text-[10px] text-blue-600 bg-blue-50 border border-blue-200 rounded px-1 py-0 shrink-0">
-              <Users className="h-2.5 w-2.5" />
-              {node.data.personasEstimadas || 1}
-            </span>
-          )}
-
-          {/* Recursos asignados badge para nodos padre */}
-          {node.type !== 'tarea' && (node.metadata.recursosTotales ?? 0) > 0 && (() => {
-            const assigned = node.metadata.recursosAsignados ?? 0
-            const total = node.metadata.recursosTotales ?? 0
-            const ratio = total > 0 ? assigned / total : 0
-            const colorClasses = ratio >= 1
-              ? 'text-green-700 bg-green-50 border-green-200'
-              : ratio > 0
-                ? 'text-amber-700 bg-amber-50 border-amber-200'
-                : 'text-red-600 bg-red-50 border-red-200'
-            return (
-              <span className={`inline-flex items-center gap-0.5 text-[10px] border rounded px-1 py-0 shrink-0 ${colorClasses}`}>
-                <Users className="h-2.5 w-2.5" />
-                {assigned}/{total}
-              </span>
-            )
-          })()}
         </div>
 
         {/* Columna 2: Progreso */}
