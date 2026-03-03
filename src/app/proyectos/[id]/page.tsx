@@ -193,9 +193,13 @@ export default function ProyectoHubPage() {
   const progresoServiciosEjec = costosReales.loading ? null : calcularProgreso(costosReales.servicios, totalServiciosInterno)
   const progresoGastosEjec = costosReales.loading ? null : calcularProgreso(costosReales.gastos, totalGastosInterno)
 
-  // Planificación vs Presupuesto (servicios only)
-  const progresoServiciosPlan = cronogramaStats.costoPlanificado > 0
-    ? calcularProgreso(cronogramaStats.costoPlanificado, totalServiciosInterno)
+  // Planificación vs Presupuesto (servicios only) — sin cap para detectar scope creep real
+  const progresoServiciosPlan = cronogramaStats.costoPlanificado > 0 && totalServiciosInterno > 0
+    ? (() => {
+        const porcentaje = (cronogramaStats.costoPlanificado / totalServiciosInterno) * 100
+        const estado: 'ok' | 'warning' | 'danger' = porcentaje > 100 ? 'danger' : porcentaje > 80 ? 'warning' : 'ok'
+        return { porcentaje, estado }
+      })()
     : null
 
   const baseUrl = `/proyectos/${proyecto.id}`
