@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Wrench, Table, Grid3X3, Download, Search, Clock } from 'lucide-react'
+import { Wrench, Table, Grid3X3, Download, Search, Clock, AlertTriangle, Target } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -27,7 +27,7 @@ function ServiciosSkeleton() {
 }
 
 export default function ProyectoServiciosPage() {
-  const { proyecto } = useProyectoContext()
+  const { proyecto, cronogramaStats } = useProyectoContext()
   const [loading, setLoading] = useState(true)
   const [viewMode, setViewMode] = useState<'table' | 'card'>('table')
   const [busqueda, setBusqueda] = useState('')
@@ -55,6 +55,10 @@ export default function ProyectoServiciosPage() {
     sum + (s.items?.reduce((h, i) => h + i.cantidadHoras, 0) || 0), 0
   )
   const totalCosto = servicios.reduce((sum, s) => sum + (s.subtotalCliente || 0), 0)
+  const totalInterno = servicios.reduce((sum, s) => sum + (s.subtotalInterno || 0), 0)
+  const costoPorEdt = cronogramaStats.costoPorEdt || {}
+  const totalPlanificado = Object.values(costoPorEdt).reduce((sum, e) => sum + e.costo, 0)
+  const hayCostoPlanificado = totalPlanificado > 0
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -139,7 +143,13 @@ export default function ProyectoServiciosPage() {
                 <th className="text-center p-3 font-medium">Horas</th>
                 <th className="text-center p-3 font-medium w-24">Progreso</th>
                 <th className="text-right p-3 font-medium">Cliente</th>
-                <th className="text-right p-3 font-medium">Interno</th>
+                <th className="text-right p-3 font-medium">Ppto</th>
+                {hayCostoPlanificado && (
+                  <th className="text-right p-3 font-medium">Plan</th>
+                )}
+                {hayCostoPlanificado && (
+                  <th className="text-center p-3 font-medium">Δ</th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -149,6 +159,12 @@ export default function ProyectoServiciosPage() {
                 const horasEjecutadas = items.reduce((sum, item) => sum + item.horasEjecutadas, 0)
                 const progreso = horasTotales > 0 ? (horasEjecutadas / horasTotales) * 100 : 0
                 const edtNombre = (servicio as any).edt?.nombre || '—'
+                const edtId = (servicio as any).edt?.id
+                const planEdt = edtId ? costoPorEdt[edtId] : undefined
+                const ppto = servicio.subtotalInterno
+                const plan = planEdt?.costo || 0
+                const varianza = plan > 0 ? ((plan - ppto) / ppto) * 100 : 0
+                const excede = plan > ppto && ppto > 0
 
                 return (
                   <tr key={servicio.id} className="border-t hover:bg-muted/30">
@@ -173,11 +189,58 @@ export default function ProyectoServiciosPage() {
                       {formatCurrency(servicio.subtotalCliente)}
                     </td>
                     <td className="p-3 text-right text-muted-foreground">
-                      {formatCurrency(servicio.subtotalInterno)}
+                      {formatCurrency(ppto)}
                     </td>
+                    {hayCostoPlanificado && (
+                      <td className={`p-3 text-right font-medium ${excede ? 'text-red-600' : 'text-indigo-600'}`}>
+                        {plan > 0 ? formatCurrency(plan) : (
+                          <span className="text-muted-foreground/50 text-xs">—</span>
+                        )}
+                      </td>
+                    )}
+                    {hayCostoPlanificado && (
+                      <td className="p-3 text-center">
+                        {plan > 0 && ppto > 0 ? (
+                          <span className={`inline-flex items-center gap-0.5 text-xs font-medium ${
+                            excede ? 'text-red-600' : 'text-green-600'
+                          }`}>
+                            {excede && <AlertTriangle className="h-3 w-3" />}
+                            {varianza > 0 ? '+' : ''}{Math.round(varianza)}%
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground/50 text-xs">—</span>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 )
               })}
+              {/* Fila de totales */}
+              <tr className="border-t-2 bg-muted/30 font-medium">
+                <td className="p-3" colSpan={5}>
+                  <span className="text-muted-foreground">Total</span>
+                </td>
+                <td className="p-3 text-right text-green-600">{formatCurrency(totalCosto)}</td>
+                <td className="p-3 text-right">{formatCurrency(totalInterno)}</td>
+                {hayCostoPlanificado && (
+                  <td className={`p-3 text-right ${totalPlanificado > totalInterno ? 'text-red-600' : 'text-indigo-600'}`}>
+                    {formatCurrency(totalPlanificado)}
+                  </td>
+                )}
+                {hayCostoPlanificado && (
+                  <td className="p-3 text-center">
+                    {totalInterno > 0 ? (
+                      <span className={`inline-flex items-center gap-0.5 text-xs font-medium ${
+                        totalPlanificado > totalInterno ? 'text-red-600' : 'text-green-600'
+                      }`}>
+                        {totalPlanificado > totalInterno && <AlertTriangle className="h-3 w-3" />}
+                        {((totalPlanificado - totalInterno) / totalInterno * 100) > 0 ? '+' : ''}
+                        {Math.round((totalPlanificado - totalInterno) / totalInterno * 100)}%
+                      </span>
+                    ) : '—'}
+                  </td>
+                )}
+              </tr>
             </tbody>
           </table>
         </div>
@@ -189,6 +252,11 @@ export default function ProyectoServiciosPage() {
             const horasTotales = items.reduce((sum, item) => sum + item.cantidadHoras, 0)
             const horasEjecutadas = items.reduce((sum, item) => sum + item.horasEjecutadas, 0)
             const progreso = horasTotales > 0 ? (horasEjecutadas / horasTotales) * 100 : 0
+            const edtId = (servicio as any).edt?.id
+            const planEdt = edtId ? costoPorEdt[edtId] : undefined
+            const ppto = servicio.subtotalInterno
+            const plan = planEdt?.costo || 0
+            const excede = plan > ppto && ppto > 0
 
             return (
               <Card key={servicio.id} className="hover:shadow-md transition-shadow">
@@ -223,10 +291,30 @@ export default function ProyectoServiciosPage() {
                       <div className="text-[10px] text-muted-foreground">Cliente</div>
                     </div>
                     <div className="text-right">
-                      <div className="font-medium text-muted-foreground">{formatCurrency(servicio.subtotalInterno)}</div>
-                      <div className="text-[10px] text-muted-foreground">Interno</div>
+                      <div className="font-medium text-muted-foreground">{formatCurrency(ppto)}</div>
+                      <div className="text-[10px] text-muted-foreground">Ppto</div>
                     </div>
                   </div>
+
+                  {hayCostoPlanificado && plan > 0 && (
+                    <div className={`flex items-center justify-between pt-2 border-t text-sm ${excede ? 'bg-red-50/50 -mx-6 px-6 pb-1 rounded-b-lg' : ''}`}>
+                      <div className="flex items-center gap-1">
+                        <Target className="h-3 w-3 text-indigo-500" />
+                        <span className="text-[10px] text-muted-foreground">Plan:</span>
+                        <span className={`font-medium ${excede ? 'text-red-600' : 'text-indigo-600'}`}>
+                          {formatCurrency(plan)}
+                        </span>
+                      </div>
+                      {ppto > 0 && (
+                        <span className={`inline-flex items-center gap-0.5 text-xs font-medium ${
+                          excede ? 'text-red-600' : 'text-green-600'
+                        }`}>
+                          {excede && <AlertTriangle className="h-3 w-3" />}
+                          {((plan - ppto) / ppto * 100) > 0 ? '+' : ''}{Math.round((plan - ppto) / ppto * 100)}%
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )

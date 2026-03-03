@@ -219,6 +219,7 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
       let horasReales = 0
       let costoPlanificado = 0
       let tareasConRecurso = 0
+      let costoPorEdt: Record<string, { edtNombre: string; costo: number; tareas: number; tareasConRecurso: number }> = {}
 
       if (fasesResponse.ok) {
         const fasesData = await fasesResponse.json()
@@ -253,6 +254,7 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
         const costoPlanData = await costoPlanResponse.json()
         costoPlanificado = costoPlanData.costoPlanificado || 0
         tareasConRecurso = costoPlanData.tareasConRecurso || 0
+        costoPorEdt = costoPlanData.costoPorEdt || {}
       }
 
       if (cronogramasList.length === 0) {
@@ -295,6 +297,7 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
         horasReales,
         costoPlanificado,
         tareasConRecurso,
+        costoPorEdt,
         activeCronograma
       })
     } catch (error) {
