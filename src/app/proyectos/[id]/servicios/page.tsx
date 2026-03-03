@@ -60,6 +60,13 @@ export default function ProyectoServiciosPage() {
   const totalPlanificado = Object.values(costoPorEdt).reduce((sum, e) => sum + e.costo, 0)
   const hayCostoPlanificado = totalPlanificado > 0
 
+  // EDTs del cronograma que NO tienen servicio cotizado
+  const edtsCotizados = new Set(servicios.map(s => (s as any).edt?.id).filter(Boolean))
+  const edtsNoCotizados = Object.entries(costoPorEdt)
+    .filter(([edtId]) => edtId !== 'sin-edt' && !edtsCotizados.has(edtId))
+    .map(([edtId, data]) => ({ edtId, ...data }))
+  const costoEdtsNoCotizados = edtsNoCotizados.reduce((sum, e) => sum + e.costo, 0)
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -215,6 +222,51 @@ export default function ProyectoServiciosPage() {
                   </tr>
                 )
               })}
+              {/* EDTs no cotizados */}
+              {hayCostoPlanificado && edtsNoCotizados.length > 0 && (
+                <>
+                  <tr className="border-t-2 bg-amber-50/50">
+                    <td className="p-3 text-xs font-medium text-amber-700" colSpan={hayCostoPlanificado ? 9 : 7}>
+                      <span className="flex items-center gap-1">
+                        <AlertTriangle className="h-3.5 w-3.5" />
+                        EDTs en cronograma sin presupuesto comercial ({edtsNoCotizados.length})
+                      </span>
+                    </td>
+                  </tr>
+                  {edtsNoCotizados.map((edt) => (
+                    <tr key={edt.edtId} className="border-t bg-amber-50/30 hover:bg-amber-50/50">
+                      <td className="p-3 text-muted-foreground italic">{edt.edtNombre}</td>
+                      <td className="p-3">
+                        <Badge variant="outline" className="text-xs border-amber-300 text-amber-700">
+                          {edt.edtNombre}
+                        </Badge>
+                      </td>
+                      <td className="p-3 text-center text-muted-foreground text-xs">{edt.tareas}</td>
+                      <td className="p-3 text-center text-muted-foreground/50 text-xs">—</td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-muted-foreground">{edt.tareasConRecurso}/{edt.tareas} con recurso</span>
+                        </div>
+                      </td>
+                      <td className="p-3 text-right text-muted-foreground/50 text-xs">$0</td>
+                      <td className="p-3 text-right text-muted-foreground/50 text-xs">$0</td>
+                      <td className={`p-3 text-right font-medium ${edt.costo > 0 ? 'text-red-600' : 'text-muted-foreground/50'}`}>
+                        {edt.costo > 0 ? formatCurrency(edt.costo) : '—'}
+                      </td>
+                      <td className="p-3 text-center">
+                        {edt.costo > 0 ? (
+                          <span className="inline-flex items-center gap-0.5 text-xs font-medium text-red-600">
+                            <AlertTriangle className="h-3 w-3" />
+                            sin ppto
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground/50 text-xs">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </>
+              )}
               {/* Fila de totales */}
               <tr className="border-t-2 bg-muted/30 font-medium">
                 <td className="p-3" colSpan={5}>
@@ -319,6 +371,47 @@ export default function ProyectoServiciosPage() {
               </Card>
             )
           })}
+
+          {/* Cards de EDTs no cotizados */}
+          {hayCostoPlanificado && edtsNoCotizados.length > 0 && (
+            <>
+              <div className="col-span-full flex items-center gap-2 pt-2">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                <span className="text-sm font-medium text-amber-700">
+                  EDTs sin presupuesto comercial ({edtsNoCotizados.length})
+                </span>
+              </div>
+              {edtsNoCotizados.map((edt) => (
+                <Card key={edt.edtId} className="border-amber-200 bg-amber-50/30 hover:shadow-md transition-shadow">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between">
+                      <CardTitle className="text-sm font-medium text-amber-800">{edt.edtNombre}</CardTitle>
+                      <Badge variant="outline" className="text-[10px] border-amber-300 text-amber-700">
+                        No cotizado
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>{edt.tareas} tareas</span>
+                      <span>{edt.tareasConRecurso} con recurso</span>
+                    </div>
+
+                    <div className="flex justify-between pt-2 border-t text-sm">
+                      <div>
+                        <div className="text-muted-foreground/50">$0</div>
+                        <div className="text-[10px] text-muted-foreground">Ppto</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-medium text-red-600">{formatCurrency(edt.costo)}</div>
+                        <div className="text-[10px] text-red-500">Plan (sin ppto)</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </>
+          )}
         </div>
       )}
     </div>
