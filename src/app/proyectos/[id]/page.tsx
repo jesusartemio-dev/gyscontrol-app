@@ -24,6 +24,7 @@ import {
   Save,
   X,
   Loader2,
+  Target,
 } from 'lucide-react'
 
 import { Card, CardContent } from '@/components/ui/card'
@@ -192,6 +193,11 @@ export default function ProyectoHubPage() {
   const progresoServiciosEjec = costosReales.loading ? null : calcularProgreso(costosReales.servicios, totalServiciosInterno)
   const progresoGastosEjec = costosReales.loading ? null : calcularProgreso(costosReales.gastos, totalGastosInterno)
 
+  // Planificación vs Presupuesto (servicios only)
+  const progresoServiciosPlan = cronogramaStats.costoPlanificado > 0
+    ? calcularProgreso(cronogramaStats.costoPlanificado, totalServiciosInterno)
+    : null
+
   const baseUrl = `/proyectos/${proyecto.id}`
 
   // Tareas progress
@@ -227,7 +233,7 @@ export default function ProyectoHubPage() {
       progreso: progresoEquiposEjec,
       real: costosReales.equipos,
       plan: totalEquiposInterno,
-      realLabel: costosReales.loading ? 'Cargando...' : `Ejec: ${formatCurrency(costosReales.equipos)}`,
+      realLabel: costosReales.loading ? 'Cargando...' : `Real: ${formatCurrency(costosReales.equipos)}`,
       cotizado: totalEquiposReal,
       cobertura: progresoCobertura,
     },
@@ -249,8 +255,14 @@ export default function ProyectoHubPage() {
       progreso: progresoServiciosEjec,
       real: costosReales.servicios,
       plan: totalServiciosInterno,
-      realLabel: costosReales.loading ? 'Cargando...' : `Ejec: ${formatCurrency(costosReales.servicios)}`,
-      cotizado: totalServiciosReal
+      realLabel: costosReales.loading ? 'Cargando...' : `Real: ${formatCurrency(costosReales.servicios)}`,
+      cotizado: totalServiciosReal,
+      // Planificación layer
+      planificado: cronogramaStats.costoPlanificado,
+      progresoPlanificado: progresoServiciosPlan,
+      planificadoLabel: cronogramaStats.costoPlanificado > 0
+        ? `Plan: ${formatCurrency(cronogramaStats.costoPlanificado)}`
+        : undefined,
     },
     {
       id: 'gastos',
@@ -270,7 +282,7 @@ export default function ProyectoHubPage() {
       progreso: progresoGastosEjec,
       real: costosReales.gastos,
       plan: totalGastosInterno,
-      realLabel: costosReales.loading ? 'Cargando...' : `Ejec: ${formatCurrency(costosReales.gastos)}`,
+      realLabel: costosReales.loading ? 'Cargando...' : `Real: ${formatCurrency(costosReales.gastos)}`,
       cotizado: totalGastosReal
     },
     // Row 2
@@ -427,7 +439,38 @@ export default function ProyectoHubPage() {
                   )}
                 </div>
 
-                {/* Progress bar for cost tracking */}
+                {/* Planificación bar (only for servicios) */}
+                {card.progresoPlanificado && card.planificado && card.planificado > 0 && (
+                  <div className="space-y-0.5">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-indigo-600 flex items-center gap-1">
+                        <Target className="h-3 w-3" />
+                        {card.planificadoLabel}
+                      </span>
+                      <span className={`font-medium ${
+                        card.progresoPlanificado.estado === 'danger' ? 'text-red-600' :
+                        card.progresoPlanificado.estado === 'warning' ? 'text-amber-600' :
+                        'text-emerald-600'
+                      }`}>
+                        {card.progresoPlanificado.porcentaje.toFixed(0)}% ppto
+                      </span>
+                    </div>
+                    <div className="relative h-1 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className="absolute inset-y-0 left-0 rounded-full transition-all bg-indigo-400"
+                        style={{ width: `${Math.min(card.progresoPlanificado.porcentaje, 100)}%` }}
+                      />
+                      {card.progresoPlanificado.porcentaje > 100 && (
+                        <div
+                          className="absolute inset-y-0 bg-red-300 rounded-full"
+                          style={{ left: '100%', width: `${Math.min(card.progresoPlanificado.porcentaje - 100, 50)}%` }}
+                        />
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Progress bar for cost tracking (Real vs Ppto) */}
                 {card.progreso && card.plan && card.plan > 0 && (
                   <div className="space-y-0.5">
                     <div className="flex items-center justify-between text-[11px]">

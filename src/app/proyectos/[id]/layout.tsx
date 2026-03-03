@@ -643,7 +643,7 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
                     </Button>
                   )}
 
-                  <ResumenTotalesProyecto proyecto={proyecto} costosReales={costosReales} />
+                  <ResumenTotalesProyecto proyecto={proyecto} costosReales={costosReales} costoPlanificado={cronogramaStats.costoPlanificado} />
 
                   {!isHubPage && (
                     <Button

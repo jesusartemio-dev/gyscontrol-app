@@ -101,9 +101,10 @@ function formatCurrency(amount: number): string {
 interface Props {
   proyecto: Proyecto
   costosReales?: CostosReales
+  costoPlanificado?: number
 }
 
-export default function ResumenTotalesProyecto({ proyecto, costosReales }: Props) {
+export default function ResumenTotalesProyecto({ proyecto, costosReales, costoPlanificado = 0 }: Props) {
   // Calculate stats
   const equiposCount = proyecto.equipos?.length || 0
   const serviciosCount = proyecto.servicios?.length || 0
@@ -134,10 +135,15 @@ export default function ResumenTotalesProyecto({ proyecto, costosReales }: Props
   const realServicios = !transacLoading && ejecutadoTotal > 0 ? ejecutadoServicios : totalServiciosReal
   const realGastos = !transacLoading && ejecutadoTotal > 0 ? ejecutadoGastos : totalGastosReal
 
-  // Calculate varianzas (Plan = Interno, el presupuesto real de ejecución)
+  // Calculate varianzas (Ppto = Interno, el presupuesto de cotización)
   const varianzaEquipos = calcularVarianza(totalEquiposInterno, realEquipos)
   const varianzaServicios = calcularVarianza(totalServiciosInterno, realServicios)
   const varianzaGastos = calcularVarianza(totalGastosInterno, realGastos)
+
+  // Varianza planificación vs presupuesto (scope creep detection)
+  const varianzaPlanServicios = costoPlanificado > 0
+    ? calcularVarianza(totalServiciosInterno, costoPlanificado)
+    : null
 
   const categorias = [
     {
@@ -160,7 +166,9 @@ export default function ResumenTotalesProyecto({ proyecto, costosReales }: Props
       totalReal: realServicios,
       totalCotizado: totalServiciosReal,
       varianza: varianzaServicios,
-      config: categoriasConfig.servicios
+      config: categoriasConfig.servicios,
+      costoPlanificado: costoPlanificado,
+      varianzaPlan: varianzaPlanServicios,
     },
     {
       key: `gastos-${proyecto.id}`,
@@ -231,13 +239,13 @@ export default function ResumenTotalesProyecto({ proyecto, costosReales }: Props
                       </Badge>
                     </div>
 
-                    {/* Plan vs Ejecutado progress */}
+                    {/* Ppto vs Real progress */}
                     {categoria.totalInterno > 0 && (
                       <div className="space-y-1">
                         <div className="flex justify-between text-[10px]">
                           <span className="text-gray-500 flex items-center gap-1">
                             <Target className="h-2.5 w-2.5" />
-                            Plan: {formatCurrency(categoria.totalInterno)}
+                            Ppto: {formatCurrency(categoria.totalInterno)}
                           </span>
                           <span className={`font-medium flex items-center gap-1 ${getStatusColor(categoria.varianza.estado)}`}>
                             {categoria.varianza.estado === 'danger' ? (
@@ -245,7 +253,7 @@ export default function ResumenTotalesProyecto({ proyecto, costosReales }: Props
                             ) : categoria.varianza.estado === 'ok' && categoria.totalReal > 0 ? (
                               <TrendingDown className="h-2.5 w-2.5" />
                             ) : null}
-                            {transacLoading ? '…' : `Ejec: ${formatCurrency(categoria.totalReal)}`}
+                            {transacLoading ? '…' : `Real: ${formatCurrency(categoria.totalReal)}`}
                           </span>
                         </div>
                         <div className="relative h-1 bg-gray-200 rounded-full overflow-hidden">
@@ -260,6 +268,40 @@ export default function ResumenTotalesProyecto({ proyecto, costosReales }: Props
                             />
                           )}
                         </div>
+
+                        {/* Planificación bar - solo para Servicios */}
+                        {(categoria.costoPlanificado ?? 0) > 0 && categoria.varianzaPlan && (
+                          <div className="mt-0.5">
+                            <div className="flex justify-between text-[10px]">
+                              <span className="text-indigo-500 flex items-center gap-1">
+                                <ArrowRight className="h-2.5 w-2.5" />
+                                Plan: {formatCurrency(categoria.costoPlanificado)}
+                              </span>
+                              <span className={`font-medium ${getStatusColor(categoria.varianzaPlan.estado)}`}>
+                                {categoria.varianzaPlan.porcentaje.toFixed(0)}% del ppto
+                              </span>
+                            </div>
+                            <div className="relative h-1 bg-gray-200 rounded-full overflow-hidden mt-0.5">
+                              <div
+                                className="absolute inset-y-0 left-0 rounded-full transition-all bg-indigo-400"
+                                style={{ width: `${Math.min(categoria.varianzaPlan.porcentaje, 100)}%` }}
+                              />
+                              {categoria.varianzaPlan.porcentaje > 100 && (
+                                <div
+                                  className="absolute inset-y-0 bg-red-300 rounded-r-full"
+                                  style={{ left: '100%', width: `${Math.min(categoria.varianzaPlan.porcentaje - 100, 50)}%` }}
+                                />
+                              )}
+                            </div>
+                            {categoria.varianzaPlan.diferencia > 0 && (
+                              <div className="flex items-center gap-1 text-[10px] text-red-600 mt-0.5">
+                                <AlertTriangle className="h-2.5 w-2.5" />
+                                Planificación excede ppto por {formatCurrency(categoria.varianzaPlan.diferencia)}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
                         <div className="flex justify-between">
                           {categoria.totalCotizado > 0 && (
                             <span className="text-[10px] text-gray-400">
@@ -333,12 +375,17 @@ export default function ResumenTotalesProyecto({ proyecto, costosReales }: Props
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-[10px]">
-                  <span className="text-gray-600">Plan: {formatCurrency(totalInterno)}</span>
+                  <span className="text-gray-600">Ppto: {formatCurrency(totalInterno)}</span>
                   <ArrowRight className="h-2.5 w-2.5 text-gray-400" />
                   <span className={`font-medium ${getStatusColor(varianzaTotal.estado)}`}>
-                    Ejec: {transacLoading ? '…' : formatCurrency(totalRealDisplay)}
+                    Real: {transacLoading ? '…' : formatCurrency(totalRealDisplay)}
                   </span>
                 </div>
+                {costoPlanificado > 0 && (
+                  <div className="text-[10px] mt-0.5 text-indigo-600">
+                    Plan: {formatCurrency(costoPlanificado)} ({totalServiciosInterno > 0 ? ((costoPlanificado / totalServiciosInterno) * 100).toFixed(0) : 0}% del ppto servicios)
+                  </div>
+                )}
                 {varianzaTotal.diferencia !== 0 && !transacLoading && (
                   <div className={`text-[10px] mt-1 ${getStatusColor(varianzaTotal.estado)}`}>
                     {varianzaTotal.diferencia > 0 ? '+' : ''}{formatCurrency(varianzaTotal.diferencia)}
