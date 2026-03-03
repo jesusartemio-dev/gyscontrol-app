@@ -220,6 +220,7 @@ export async function POST(
           nombre: nombreAutomatico,
           copiadoDesdeCotizacionId: validatedData.copiadoDesdeCotizacionId,
           esBaseline: validatedData.tipo === 'planificacion', // Línea Base es baseline automáticamente
+          bloqueado: validatedData.tipo === 'planificacion', // Baseline se bloquea automáticamente
           version: 1,
           updatedAt: new Date()
         }
@@ -442,6 +443,7 @@ export async function POST(
       // Solo incluir copiadoDesdeCotizacionId si tiene valor (evitar undefined)
       ...(validatedData.copiadoDesdeCotizacionId ? { copiadoDesdeCotizacionId: validatedData.copiadoDesdeCotizacionId } : {}),
       esBaseline: esBaseline,
+      bloqueado: esBaseline, // Baseline se bloquea automáticamente
       version: 1,
       updatedAt: new Date()
     }
