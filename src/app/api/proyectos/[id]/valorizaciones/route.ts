@@ -206,6 +206,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
               proyectoServicioCotizadoId: p.proyectoServicioCotizadoId,
               proyectoGastoCotizadoId: p.proyectoGastoCotizadoId,
               proyectoEdtId: p.proyectoEdtId,
+              partidaOrigenId: p.partidaOrigenId || p.id,
               montoContractual: p.montoContractual,
               porcentajeAvance: 0,
               montoAvance: 0,

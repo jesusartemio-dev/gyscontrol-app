@@ -1691,6 +1691,9 @@ model PartidaValorizacion {
   // Vínculo con cronograma de ejecución
   proyectoEdtId String?
 
+  // Vínculo con partida origen (cadena cross-valorización)
+  partidaOrigenId String?
+
   // Montos
   montoContractual Float @default(0)
   porcentajeAvance Float @default(0)
@@ -1705,6 +1708,7 @@ model PartidaValorizacion {
   updatedAt DateTime @updatedAt
 
   @@index([valorizacionId])
+  @@index([partidaOrigenId])
   @@map("partida_valorizacion")
 }
 

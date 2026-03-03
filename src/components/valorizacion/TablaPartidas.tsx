@@ -18,6 +18,7 @@ interface Partida {
   proyectoServicioCotizadoId?: string | null
   proyectoGastoCotizadoId?: string | null
   proyectoEdtId?: string | null
+  partidaOrigenId?: string | null
   montoContractual: number
   porcentajeAvance: number
   montoAvance: number
@@ -117,6 +118,7 @@ export default function TablaPartidas({ valorizacionId, proyectoId, readOnly, ti
         proyectoServicioCotizadoId: p.proyectoServicioCotizadoId || null,
         proyectoGastoCotizadoId: p.proyectoGastoCotizadoId || null,
         proyectoEdtId: p.proyectoEdtId || null,
+        partidaOrigenId: p.partidaOrigenId || null,
         montoContractual: p.montoContractual,
         porcentajeAvance: p.porcentajeAvance,
         orden: idx + 1,

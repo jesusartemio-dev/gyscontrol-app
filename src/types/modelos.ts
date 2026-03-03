@@ -1629,6 +1629,7 @@ export interface PartidaValorizacion {
   proyectoServicioCotizadoId?: string | null
   proyectoGastoCotizadoId?: string | null
   proyectoEdtId?: string | null
+  partidaOrigenId?: string | null
   montoContractual: number
   porcentajeAvance: number
   montoAvance: number
@@ -1647,6 +1648,7 @@ export type PartidaValorizacionInput = {
   proyectoServicioCotizadoId?: string | null
   proyectoGastoCotizadoId?: string | null
   proyectoEdtId?: string | null
+  partidaOrigenId?: string | null
   montoContractual: number
   porcentajeAvance: number
   orden?: number
