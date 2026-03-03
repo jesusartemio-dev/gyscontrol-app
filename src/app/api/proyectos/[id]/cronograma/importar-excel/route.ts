@@ -28,6 +28,13 @@ interface ActividadData { row: RowData; tareas: TareaData[] }
 interface EdtData { row: RowData; actividades: ActividadData[] }
 interface FaseData { row: RowData; edts: EdtData[] }
 
+interface AssignmentData {
+  taskName: string
+  resourceName: string
+  work: string
+  units: number
+}
+
 interface ImportRequest {
   project: string
   fases: FaseData[]
@@ -35,6 +42,7 @@ interface ImportRequest {
   edtMappings?: Record<string, string> // Excel EDT name → catalog edtId
   reemplazar?: boolean // If true, delete existing content before importing
   dateRange?: { start: string | null; finish: string | null } // Pre-computed date range from parser
+  assignments?: AssignmentData[] // Resource assignments from Assignment_Table
 }
 
 export async function POST(
@@ -74,6 +82,26 @@ export async function POST(
         horasPorDia = defaultCalendario.horasPorDia
       }
     }
+
+    // Load active resources from catalog for auto-matching
+    const recursos = await prisma.recurso.findMany({ where: { activo: true } })
+    const recursosByNombre = new Map(recursos.map(r => [r.nombre.toLowerCase().trim(), r]))
+
+    // Build assignment map: taskName → list of assignments
+    const assignments = body.assignments || []
+    const assignmentsByTask = new Map<string, { resourceName: string; work: number; units: number }[]>()
+    for (const a of assignments) {
+      const list = assignmentsByTask.get(a.taskName) || []
+      list.push({
+        resourceName: a.resourceName,
+        work: parseWork(a.work, horasPorDia),
+        units: a.units,
+      })
+      assignmentsByTask.set(a.taskName, list)
+    }
+
+    let tareasConRecursoAsignado = 0
+    const recursosSinMatch = new Set<string>()
 
     // Buscar o crear cronograma de planificación
     let cronograma = await prisma.proyectoCronograma.findFirst({
@@ -270,13 +298,44 @@ export async function POST(
 
             // Si Work is available, use it as horasEstimadas (total person-hours)
             // Otherwise fallback to Duration × horasPorDia (single-person hours)
-            const horasEstimadas = tareaWork > 0 ? tareaWork : tareaDur.hours
+            let horasEstimadas = tareaWork > 0 ? tareaWork : tareaDur.hours
 
             // Calculate personasEstimadas: Work / (Duration × horasPorDia)
             // If Work = Duration × horasPorDia → 1 person; if Work > → multiple people
             let personasEstimadas = 1
             if (tareaWork > 0 && tareaDur.hours > 0) {
               personasEstimadas = Math.max(1, Math.round(tareaWork / tareaDur.hours))
+            }
+
+            // Check for assignments from Assignment_Table
+            const tareaAssignments = assignmentsByTask.get(tareaData.row.name)
+            let recursoId: string | null = null
+
+            if (tareaAssignments && tareaAssignments.length > 0) {
+              // Use aggregated Work from assignments (overrides Task_Table Work/Duration)
+              const totalAssignmentWork = tareaAssignments.reduce((sum, a) => sum + a.work, 0)
+              if (totalAssignmentWork > 0) {
+                horasEstimadas = totalAssignmentWork
+                if (tareaDur.hours > 0) {
+                  personasEstimadas = Math.max(1, Math.round(totalAssignmentWork / tareaDur.hours))
+                }
+              }
+
+              // Resource: take the assignment with most Work as primary
+              const primary = [...tareaAssignments].sort((a, b) => b.work - a.work)[0]
+              // Auto-match by name (case-insensitive)
+              const matched = recursosByNombre.get(primary.resourceName.toLowerCase().trim())
+              if (matched) {
+                recursoId = matched.id
+                tareasConRecursoAsignado++
+              } else {
+                recursosSinMatch.add(primary.resourceName)
+              }
+
+              // Consume the assignment so duplicate task names get different assignments
+              assignmentsByTask.delete(tareaData.row.name)
+              // If there were multiple tasks with the same name, re-add remaining
+              // (this handles the first-match approach for duplicate names)
             }
 
             const tareaStart = tareaData.row.start
@@ -299,6 +358,7 @@ export async function POST(
                 fechaFin: tareaFinish,
                 horasEstimadas,
                 personasEstimadas,
+                recursoId,
                 estado: 'pendiente',
                 prioridad: 'media',
                 porcentajeCompletado: 0,
@@ -433,6 +493,11 @@ export async function POST(
         tareas: tareasCreadas,
         dependencias: dependenciasCreadas,
       },
+      recursoStats: assignments.length > 0 ? {
+        totalAssignments: assignments.length,
+        tareasConRecurso: tareasConRecursoAsignado,
+        recursosSinMatch: [...recursosSinMatch],
+      } : null,
     })
   } catch (error) {
     logger.error('[ERROR importar-excel]', error)

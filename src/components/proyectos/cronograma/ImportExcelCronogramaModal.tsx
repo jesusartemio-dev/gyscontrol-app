@@ -17,8 +17,8 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import {
-  parseMSProjectExcel, buildHierarchy, serializeTree,
-  type MSProjectTree, type MSProjectFase
+  parseMSProjectExcelFull, buildHierarchy, serializeTree,
+  type MSProjectTree, type MSProjectFase, type MSProjectAssignment
 } from '@/lib/utils/msProjectExcelParser'
 
 type Step = 'upload' | 'preview' | 'mapping' | 'importing' | 'success' | 'error' | 'conflict'
@@ -68,12 +68,16 @@ export default function ImportExcelCronogramaModal({
   const [errorMessage, setErrorMessage] = useState('')
   const [importStats, setImportStats] = useState<Record<string, number>>({})
   const [conflictData, setConflictData] = useState<{ fases: number; edts: number; actividades: number; tareas: number; registrosHoras: number } | null>(null)
+  const [recursoStats, setRecursoStats] = useState<{ totalAssignments: number; tareasConRecurso: number; recursosSinMatch: string[] } | null>(null)
   const [expandedFases, setExpandedFases] = useState<Set<number>>(new Set())
 
   // EDT mapping state
   const [catalogEdts, setCatalogEdts] = useState<CatalogEdt[]>([])
   const [edtMappings, setEdtMappings] = useState<Record<string, string>>({})
   const [loadingCatalog, setLoadingCatalog] = useState(false)
+
+  // Assignment data from Assignment_Table
+  const [assignments, setAssignments] = useState<MSProjectAssignment[]>([])
 
   // Inline editing state: "faseIdx-edtIdx-actIdx" or "faseIdx-edtIdx-actIdx-tareaIdx"
   const [editingKey, setEditingKey] = useState<string | null>(null)
@@ -89,10 +93,12 @@ export default function ImportExcelCronogramaModal({
     setErrorMessage('')
     setImportStats({})
     setConflictData(null)
+    setRecursoStats(null)
     setExpandedFases(new Set())
     setCatalogEdts([])
     setEdtMappings({})
     setLoadingCatalog(false)
+    setAssignments([])
     setEditingKey(null)
     setEditingValue('')
   }, [])
@@ -113,15 +119,22 @@ export default function ImportExcelCronogramaModal({
     setFileName(file.name)
 
     try {
-      const rows = await parseMSProjectExcel(file)
-      const hierarchy = buildHierarchy(rows)
+      const fullData = await parseMSProjectExcelFull(file)
+      const hierarchy = buildHierarchy(fullData.rows)
 
       if (hierarchy.fases.length === 0) {
         toast.error('No se encontraron fases (Outline Level 2) en el archivo')
         return
       }
 
+      // Update stats with assignment info
+      hierarchy.stats.assignmentsCount = fullData.assignments.length
+      hierarchy.stats.resourcesCount = fullData.resources.length
+      const taskNamesWithAssignment = new Set(fullData.assignments.map(a => a.taskName))
+      hierarchy.stats.tasksWithAssignment = taskNamesWithAssignment.size
+
       setTree(hierarchy)
+      setAssignments(fullData.assignments)
       setExpandedFases(new Set([0, 1]))
       setStep('preview')
     } catch (error) {
@@ -198,6 +211,14 @@ export default function ImportExcelCronogramaModal({
     return {
       ...serializeTree(filteredTree) as Record<string, unknown>,
       edtMappings: finalMappings,
+      ...(assignments.length > 0 ? {
+        assignments: assignments.map(a => ({
+          taskName: a.taskName,
+          resourceName: a.resourceName,
+          work: a.work,
+          units: a.units,
+        })),
+      } : {}),
     }
   }
 
@@ -235,6 +256,7 @@ export default function ImportExcelCronogramaModal({
 
       setProgress(100)
       setImportStats({ ...data.stats, horasPorDia: data.horasPorDia })
+      if (data.recursoStats) setRecursoStats(data.recursoStats)
       setStep('success')
       toast.success('Cronograma importado exitosamente')
       onImportSuccess()
@@ -341,10 +363,10 @@ export default function ImportExcelCronogramaModal({
                 Archivos .xlsx o .xls exportados de MS Project
               </p>
               <p className="text-xs text-gray-400 mt-1">
-                Columnas requeridas: ID, Name, Duration, Start, Finish, Predecessors, Outline Level
+                Hoja requerida: <strong>Task_Table</strong> (ID, Name, Duration, Start, Finish, Predecessors, Outline Level)
               </p>
               <p className="text-xs text-gray-400 mt-0.5">
-                Columna opcional: <strong>Work</strong> (horas persona-esfuerzo para cuadrillas)
+                Hojas opcionales: <strong>Resource_Table</strong> y <strong>Assignment_Table</strong> (recursos y asignaciones para auto-match)
               </p>
             </div>
 
@@ -377,18 +399,18 @@ export default function ImportExcelCronogramaModal({
               <CardContent className="p-3 text-xs space-y-1.5">
                 <p className="font-medium text-amber-700 flex items-center gap-1">
                   <Users className="h-3.5 w-3.5" />
-                  Columna &quot;Work&quot; para tareas con cuadrillas
+                  Recursos y Assignment_Table
                 </p>
                 <p className="text-amber-600">
-                  Si tu Excel incluye la columna <strong>Work</strong>, el sistema la usa como horas
-                  totales de esfuerzo (persona-horas) y calcula autom&aacute;ticamente el n&uacute;mero de personas estimadas.
+                  Si tu Excel incluye <strong>Assignment_Table</strong>, el sistema usa el campo Work como horas
+                  de esfuerzo y asigna recursos autom&aacute;ticamente (match por nombre con el cat&aacute;logo).
                 </p>
                 <p className="text-amber-600">
-                  <strong>Sin Work:</strong> las horas se calculan como Duration &times; horas/d&iacute;a (1 persona).
+                  <strong>Sin Assignment_Table:</strong> las horas se calculan como Duration &times; horas/d&iacute;a (1 persona).
                 </p>
                 <p className="text-amber-600">
-                  <strong>En MS Project:</strong> asegura que las tareas de cuadrilla tengan recursos asignados
-                  para que el campo Work refleje el esfuerzo total del equipo.
+                  <strong>Tip:</strong> Al exportar desde GySControl, el Excel ya incluye Resource_Table con
+                  los recursos del cat&aacute;logo para que el gestor los asigne en MS Project.
                 </p>
               </CardContent>
             </Card>
@@ -435,11 +457,22 @@ export default function ImportExcelCronogramaModal({
               </div>
             )}
 
-            {!tree.stats.hasWork && (
+            {!tree.stats.hasWork && tree.stats.assignmentsCount === 0 && (
               <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-500 flex items-center gap-1.5">
                 <Info className="h-3.5 w-3.5 flex-shrink-0" />
                 <span>
-                  Sin columna Work. Las horas se calcular&aacute;n como Duration &times; horas/d&iacute;a (1 persona por tarea).
+                  Sin columna Work ni Assignment_Table. Las horas se calcular&aacute;n como Duration &times; horas/d&iacute;a (1 persona por tarea).
+                </span>
+              </div>
+            )}
+
+            {tree.stats.assignmentsCount > 0 && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-700 flex items-center gap-1.5">
+                <Users className="h-3.5 w-3.5 flex-shrink-0" />
+                <span>
+                  <strong>{tree.stats.assignmentsCount} asignaciones</strong> detectadas en Assignment_Table
+                  ({tree.stats.tasksWithAssignment} tareas con recurso).
+                  Se usar&aacute; Work de assignments y se asignar&aacute;n recursos autom&aacute;ticamente.
                 </span>
               </div>
             )}
@@ -711,6 +744,27 @@ export default function ImportExcelCronogramaModal({
                 <Calendar className="h-3 w-3 inline mr-1" />
                 Horas calculadas con <strong>{importStats.horasPorDia}h/día</strong> del calendario laboral
               </p>
+            )}
+
+            {recursoStats && (
+              <div className="max-w-md mx-auto space-y-2">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-700 flex items-center gap-1.5">
+                  <Users className="h-3.5 w-3.5 flex-shrink-0" />
+                  <span>
+                    <strong>{recursoStats.tareasConRecurso} tareas</strong> con recurso asignado autom&aacute;ticamente
+                    (de {recursoStats.totalAssignments} asignaciones)
+                  </span>
+                </div>
+                {recursoStats.recursosSinMatch.length > 0 && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700 flex items-start gap-1.5">
+                    <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <strong>Recursos no encontrados en cat&aacute;logo:</strong>
+                      <span className="ml-1">{recursoStats.recursosSinMatch.join(', ')}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
 
             <Button onClick={handleClose} className="mt-4">

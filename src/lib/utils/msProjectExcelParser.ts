@@ -18,6 +18,32 @@ export interface MSProjectRow {
   notes: string
 }
 
+// Asignación recurso-tarea del Assignment_Table
+export interface MSProjectAssignment {
+  taskName: string
+  resourceName: string
+  workCompletePercent: number
+  work: string           // raw string e.g. "475 hrs"
+  workHours: number      // parsed hours
+  units: number          // decimal, e.g. 1.0 = 100%
+}
+
+// Recurso del Resource_Table
+export interface MSProjectResource {
+  id: number
+  name: string
+  type: string
+  maxUnits: number
+  standardRate: string
+}
+
+// Resultado completo del parser con las 3 hojas
+export interface MSProjectFullData {
+  rows: MSProjectRow[]
+  assignments: MSProjectAssignment[]
+  resources: MSProjectResource[]
+}
+
 // Jerarquía de 5 niveles
 export interface MSProjectTarea {
   row: MSProjectRow
@@ -48,6 +74,9 @@ export interface MSProjectTree {
     tareas: number
     ignored: number
     hasWork: boolean
+    assignmentsCount: number
+    resourcesCount: number
+    tasksWithAssignment: number
   }
   dateRange: {
     start: Date | null
@@ -252,64 +281,9 @@ export function parsePredecessors(predStr: string | null | undefined): number[] 
     .filter(n => !isNaN(n))
 }
 
-// Leer Excel de MS Project y retornar filas planas
+// Leer Excel de MS Project y retornar filas planas (backward compatible — reads only Task_Table)
 export function parseMSProjectExcel(file: File): Promise<MSProjectRow[]> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target?.result as ArrayBuffer)
-        const workbook = XLSX.read(data, { type: 'array', cellDates: false })
-        const worksheet = workbook.Sheets[workbook.SheetNames[0]]
-        const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, { defval: '' })
-
-        if (rawRows.length === 0) {
-          reject(new Error('El archivo Excel está vacío'))
-          return
-        }
-
-        // Detectar columnas por nombre de header
-        const firstRow = rawRows[0]
-        const headers = Object.keys(firstRow)
-
-        // Buscar columnas por nombre (flexible)
-        const findCol = (patterns: string[]) =>
-          headers.find(h => patterns.some(p => h.toLowerCase().includes(p.toLowerCase())))
-
-        const colId = findCol(['ID']) || headers[0]
-        const colName = findCol(['Name', 'Nombre', 'Task Name']) || headers[3]
-        const colDuration = findCol(['Duration', 'Duración']) || headers[4]
-        const colStart = findCol(['Start', 'Inicio', 'Comienzo']) || headers[5]
-        const colFinish = findCol(['Finish', 'Fin', 'Finalizar']) || headers[6]
-        const colPredecessors = findCol(['Predecessors', 'Predecesoras', 'Predecesores']) || headers[7]
-        const colOutlineLevel = findCol(['Outline Level', 'Nivel de esquema', 'Outline']) || headers[8]
-        const colNotes = findCol(['Notes', 'Notas']) || headers[9]
-        const colWork = findCol(['Work', 'Trabajo'])
-
-        const rows: MSProjectRow[] = rawRows
-          .map((raw) => ({
-            id: parseInt(String(raw[colId])) || 0,
-            name: String(raw[colName] || '').trim(),
-            duration: String(raw[colDuration] || '').trim(),
-            work: colWork ? String(raw[colWork] || '').trim() : '',
-            start: parseMSProjectDate(raw[colStart] as string | number),
-            finish: parseMSProjectDate(raw[colFinish] as string | number),
-            predecessors: parsePredecessors(raw[colPredecessors] as string),
-            outlineLevel: parseInt(String(raw[colOutlineLevel])) || 0,
-            notes: String(raw[colNotes] || '').trim(),
-          }))
-          .filter(row => row.name && row.id > 0)
-
-        resolve(rows)
-      } catch (error) {
-        reject(new Error(`Error al parsear el archivo: ${error instanceof Error ? error.message : 'Error desconocido'}`))
-      }
-    }
-
-    reader.onerror = () => reject(new Error('Error al leer el archivo'))
-    reader.readAsArrayBuffer(file)
-  })
+  return parseMSProjectExcelFull(file).then(data => data.rows)
 }
 
 // Construir jerarquía desde filas planas usando Outline Level
@@ -456,12 +430,219 @@ export function buildHierarchy(rows: MSProjectRow[]): MSProjectTree {
       tareas: tareaCount,
       ignored,
       hasWork,
+      assignmentsCount: 0,
+      resourcesCount: 0,
+      tasksWithAssignment: 0,
     },
     dateRange: {
       start: minDate,
       finish: maxDate,
     },
   }
+}
+
+/**
+ * Parse Assignment_Table sheet from the workbook.
+ */
+function parseAssignmentSheet(
+  workbook: XLSX.WorkBook,
+  horasPorDia: number
+): MSProjectAssignment[] {
+  // Find the assignment sheet (case-insensitive)
+  const sheetName = workbook.SheetNames.find(
+    n => n.toLowerCase().includes('assignment')
+  )
+  if (!sheetName) return []
+
+  const ws = workbook.Sheets[sheetName]
+  const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' })
+  if (rawRows.length === 0) return []
+
+  const headers = Object.keys(rawRows[0])
+  const findCol = (patterns: string[]) =>
+    headers.find(h => patterns.some(p => h.toLowerCase().includes(p.toLowerCase())))
+
+  const colTaskName = findCol(['Task Name', 'Nombre de tarea', 'Task']) || headers[0]
+  const colResourceName = findCol(['Resource Name', 'Nombre del recurso', 'Resource']) || headers[1]
+  const colWorkComplete = findCol(['% Work Complete', '% Trabajo completado', 'Work Complete'])
+  const colWork = findCol(['Work', 'Trabajo'])
+  const colUnits = findCol(['Units', 'Unidades'])
+
+  return rawRows
+    .map(raw => {
+      const taskName = String(raw[colTaskName] || '').trim()
+      const resourceName = String(raw[colResourceName] || '').trim()
+      if (!taskName || !resourceName) return null
+
+      const workStr = colWork ? String(raw[colWork] || '').trim() : ''
+      const workHours = workStr ? parseWork(workStr, horasPorDia) : 0
+
+      let workCompletePercent = 0
+      if (colWorkComplete) {
+        const wcStr = String(raw[colWorkComplete] || '').replace('%', '').trim()
+        workCompletePercent = parseFloat(wcStr) || 0
+      }
+
+      let units = 1
+      if (colUnits) {
+        const uStr = String(raw[colUnits] || '').replace('%', '').trim()
+        const uVal = parseFloat(uStr)
+        if (!isNaN(uVal)) units = uVal > 1 ? uVal / 100 : uVal
+      }
+
+      return { taskName, resourceName, workCompletePercent, work: workStr, workHours, units }
+    })
+    .filter((a): a is MSProjectAssignment => a !== null)
+}
+
+/**
+ * Parse Resource_Table sheet from the workbook.
+ */
+function parseResourceSheet(workbook: XLSX.WorkBook): MSProjectResource[] {
+  const sheetName = workbook.SheetNames.find(
+    n => n.toLowerCase().includes('resource')
+  )
+  if (!sheetName) return []
+
+  const ws = workbook.Sheets[sheetName]
+  const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' })
+  if (rawRows.length === 0) return []
+
+  const headers = Object.keys(rawRows[0])
+  const findCol = (patterns: string[]) =>
+    headers.find(h => patterns.some(p => h.toLowerCase().includes(p.toLowerCase())))
+
+  const colId = findCol(['ID']) || headers[0]
+  const colName = findCol(['Name', 'Nombre']) || headers[1]
+  const colType = findCol(['Type', 'Tipo']) || headers[2]
+  const colMaxUnits = findCol(['Max Units', 'Max', 'Unidades'])
+  const colStdRate = findCol(['Standard Rate', 'Tasa', 'Rate'])
+
+  return rawRows
+    .map(raw => {
+      const name = String(raw[colName] || '').trim()
+      if (!name) return null
+
+      let maxUnits = 1
+      if (colMaxUnits) {
+        const muStr = String(raw[colMaxUnits] || '').replace('%', '').trim()
+        const muVal = parseFloat(muStr)
+        if (!isNaN(muVal)) maxUnits = muVal > 1 ? muVal / 100 : muVal
+      }
+
+      return {
+        id: parseInt(String(raw[colId])) || 0,
+        name,
+        type: String(raw[colType] || 'Work').trim(),
+        maxUnits,
+        standardRate: colStdRate ? String(raw[colStdRate] || '').trim() : '',
+      }
+    })
+    .filter((r): r is MSProjectResource => r !== null)
+}
+
+/**
+ * Parse Task_Table rows from the workbook (shared logic for both parsers).
+ */
+function parseTaskSheet(workbook: XLSX.WorkBook): { rows: MSProjectRow[]; hasWorkColumn: boolean } {
+  // Find Task_Table sheet or fallback to first sheet
+  const taskSheetName = workbook.SheetNames.find(
+    n => n.toLowerCase().includes('task')
+  ) || workbook.SheetNames[0]
+
+  const worksheet = workbook.Sheets[taskSheetName]
+  const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, { defval: '' })
+
+  if (rawRows.length === 0) {
+    return { rows: [], hasWorkColumn: false }
+  }
+
+  const firstRow = rawRows[0]
+  const headers = Object.keys(firstRow)
+
+  const findCol = (patterns: string[]) =>
+    headers.find(h => patterns.some(p => h.toLowerCase().includes(p.toLowerCase())))
+
+  const colId = findCol(['ID']) || headers[0]
+  const colName = findCol(['Name', 'Nombre', 'Task Name']) || headers[3]
+  const colDuration = findCol(['Duration', 'Duración']) || headers[4]
+  const colStart = findCol(['Start', 'Inicio', 'Comienzo']) || headers[5]
+  const colFinish = findCol(['Finish', 'Fin', 'Finalizar']) || headers[6]
+  const colPredecessors = findCol(['Predecessors', 'Predecesoras', 'Predecesores']) || headers[7]
+  const colOutlineLevel = findCol(['Outline Level', 'Nivel de esquema', 'Outline']) || headers[8]
+  const colNotes = findCol(['Notes', 'Notas']) || headers[9]
+  const colWork = findCol(['Work', 'Trabajo'])
+
+  const rows: MSProjectRow[] = rawRows
+    .map((raw) => ({
+      id: parseInt(String(raw[colId])) || 0,
+      name: String(raw[colName] || '').trim(),
+      duration: String(raw[colDuration] || '').trim(),
+      work: colWork ? String(raw[colWork] || '').trim() : '',
+      start: parseMSProjectDate(raw[colStart] as string | number),
+      finish: parseMSProjectDate(raw[colFinish] as string | number),
+      predecessors: parsePredecessors(raw[colPredecessors] as string),
+      outlineLevel: parseInt(String(raw[colOutlineLevel])) || 0,
+      notes: String(raw[colNotes] || '').trim(),
+    }))
+    .filter(row => row.name && row.id > 0)
+
+  return { rows, hasWorkColumn: !!colWork }
+}
+
+/**
+ * Full parser: reads all 3 MS Project sheets (Task_Table, Resource_Table, Assignment_Table).
+ * If Assignment_Table has Work data and Task_Table doesn't, enriches task rows with Work from assignments.
+ */
+export function parseMSProjectExcelFull(file: File): Promise<MSProjectFullData> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer)
+        const workbook = XLSX.read(data, { type: 'array', cellDates: false })
+
+        const { rows, hasWorkColumn } = parseTaskSheet(workbook)
+        if (rows.length === 0) {
+          reject(new Error('El archivo Excel está vacío'))
+          return
+        }
+
+        const assignments = parseAssignmentSheet(workbook, 8)
+        const resources = parseResourceSheet(workbook)
+
+        // If Task_Table has no Work column but Assignment_Table has work data,
+        // enrich task rows with aggregated Work from assignments
+        if (!hasWorkColumn && assignments.length > 0) {
+          // Group assignments by task name and aggregate work
+          const workByTask = new Map<string, number>()
+          for (const a of assignments) {
+            workByTask.set(a.taskName, (workByTask.get(a.taskName) || 0) + a.workHours)
+          }
+
+          // Match by name — for duplicate task names, assign sequentially
+          const usedIndices = new Map<string, number>()
+          for (const [taskName, totalWork] of workByTask) {
+            if (totalWork <= 0) continue
+            const startIdx = usedIndices.get(taskName) || 0
+            const matchIdx = rows.findIndex((r, i) => i >= startIdx && r.name === taskName)
+            if (matchIdx >= 0) {
+              rows[matchIdx].work = `${totalWork} hrs`
+              usedIndices.set(taskName, matchIdx + 1)
+            }
+          }
+        }
+
+        resolve({ rows, assignments, resources })
+      } catch (error) {
+        reject(new Error(`Error al parsear el archivo: ${error instanceof Error ? error.message : 'Error desconocido'}`))
+      }
+    }
+
+    reader.onerror = () => reject(new Error('Error al leer el archivo'))
+    reader.readAsArrayBuffer(file)
+  })
 }
 
 // Serializar tree para enviar al API (convertir Dates a ISO strings)

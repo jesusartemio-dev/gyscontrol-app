@@ -15,6 +15,9 @@ interface TreeNode {
     estado?: string
     progreso?: number
     personasEstimadas?: number
+    recursoId?: string | null
+    recursoNombre?: string | null
+    recursoTipo?: string | null
   }
   children?: TreeNode[]
 }
@@ -23,6 +26,21 @@ interface Dependencia {
   tareaOrigenId: string
   tareaDependienteId: string
   tipo: string
+}
+
+export interface RecursoExport {
+  id: string
+  nombre: string
+  tipo: 'individual' | 'cuadrilla'
+  costoHoraProyecto: number | null
+}
+
+interface TareaRecursoRow {
+  taskName: string
+  nodeId: string
+  recursoNombre: string
+  horasEstimadas: number
+  personasEstimadas: number
 }
 
 interface FlatRow {
@@ -149,13 +167,98 @@ function formatExcelDate(date: Date): string {
 }
 
 /**
- * Export cronograma tree + dependencies to an Excel file matching MS Project Task_Table format.
+ * Collect task-resource assignments from the flattened tree.
+ * Only level-5 (tarea) nodes with a recurso assigned are included.
+ */
+function collectTareaRecursos(tree: TreeNode[]): TareaRecursoRow[] {
+  const result: TareaRecursoRow[] = []
+
+  function visit(n: TreeNode) {
+    const data = n.data || {}
+    const outlineLevel = n.level + 1
+    const hasChildren = n.children && n.children.length > 0
+
+    if (outlineLevel === 5 && !hasChildren && data.recursoNombre) {
+      const nodeId = n.id.replace(/^(proyecto|fase|edt|actividad|tarea)-/, '')
+      result.push({
+        taskName: n.nombre || '',
+        nodeId,
+        recursoNombre: data.recursoNombre,
+        horasEstimadas: Number(data.horasEstimadas || 0),
+        personasEstimadas: data.personasEstimadas || 1,
+      })
+    }
+
+    if (n.children) {
+      for (const child of n.children) visit(child)
+    }
+  }
+
+  for (const root of tree) visit(root)
+  return result
+}
+
+/**
+ * Build the Resource_Table sheet with catalog resources.
+ */
+function buildResourceSheet(recursos: RecursoExport[]): XLSX.WorkSheet {
+  const header = ['ID', 'Name', 'Type', 'Max Units', 'Standard Rate']
+  const dataRows = recursos.map((r, idx) => [
+    idx + 1,
+    r.nombre,
+    'Work',
+    '100%',
+    r.costoHoraProyecto != null ? `${r.costoHoraProyecto.toFixed(2)}/hr` : '0.00/hr',
+  ])
+
+  const ws = XLSX.utils.aoa_to_sheet([header, ...dataRows])
+  ws['!cols'] = [
+    { wch: 5 },   // ID
+    { wch: 30 },  // Name
+    { wch: 10 },  // Type
+    { wch: 12 },  // Max Units
+    { wch: 16 },  // Standard Rate
+  ]
+  return ws
+}
+
+/**
+ * Build the Assignment_Table sheet from task-resource assignments.
+ */
+function buildAssignmentSheet(tareaRecursos: TareaRecursoRow[]): XLSX.WorkSheet {
+  const header = ['Task Name', 'Resource Name', '% Work Complete', 'Work', 'Units']
+  const dataRows = tareaRecursos.map(t => {
+    const totalWork = t.horasEstimadas * t.personasEstimadas
+    return [
+      t.taskName,
+      t.recursoNombre,
+      '0%',
+      totalWork > 0 ? `${totalWork} hrs` : '0 hrs',
+      `${t.personasEstimadas * 100}%`,
+    ]
+  })
+
+  const ws = XLSX.utils.aoa_to_sheet([header, ...dataRows])
+  ws['!cols'] = [
+    { wch: 55 },  // Task Name
+    { wch: 30 },  // Resource Name
+    { wch: 18 },  // % Work Complete
+    { wch: 14 },  // Work
+    { wch: 10 },  // Units
+  ]
+  return ws
+}
+
+/**
+ * Export cronograma tree + dependencies to an Excel file matching MS Project format.
+ * Creates 3 sheets: Task_Table, Resource_Table, Assignment_Table.
  */
 export function exportCronogramaToExcel(
   tree: TreeNode[],
   dependencias: Dependencia[],
   projectName: string,
-  horasPorDia: number = 8
+  horasPorDia: number = 8,
+  recursos?: RecursoExport[]
 ): void {
   // Flatten all tree roots (should be 1 project node)
   let allRows: FlatRow[] = []
@@ -171,13 +274,14 @@ export function exportCronogramaToExcel(
   // Resolve predecessors
   resolvePredecessors(allRows, dependencias)
 
-  // Build sheet data
+  // Build Task_Table sheet
   const header = [
     'ID',
     'Active',
     'Task Mode',
     'Name',
     'Duration',
+    'Work',
     'Start',
     'Finish',
     'Predecessors',
@@ -191,6 +295,7 @@ export function exportCronogramaToExcel(
     'Auto Scheduled',
     row.name,
     row.duration,
+    row.work,
     row.start ? formatExcelDate(row.start) : '',
     row.finish ? formatExcelDate(row.finish) : '',
     row.predecessors,
@@ -207,6 +312,7 @@ export function exportCronogramaToExcel(
     { wch: 16 },  // Task Mode
     { wch: 55 },  // Name
     { wch: 12 },  // Duration
+    { wch: 14 },  // Work
     { wch: 30 },  // Start
     { wch: 30 },  // Finish
     { wch: 14 },  // Predecessors
@@ -216,6 +322,27 @@ export function exportCronogramaToExcel(
 
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, 'Task_Table')
+
+  // Build Resource_Table sheet
+  if (recursos && recursos.length > 0) {
+    const resourceWs = buildResourceSheet(recursos)
+    XLSX.utils.book_append_sheet(wb, resourceWs, 'Resource_Table')
+  } else {
+    // Empty sheet with headers only
+    const emptyResourceWs = XLSX.utils.aoa_to_sheet([['ID', 'Name', 'Type', 'Max Units', 'Standard Rate']])
+    XLSX.utils.book_append_sheet(wb, emptyResourceWs, 'Resource_Table')
+  }
+
+  // Build Assignment_Table sheet from tree data
+  const tareaRecursos = collectTareaRecursos(tree)
+  if (tareaRecursos.length > 0) {
+    const assignmentWs = buildAssignmentSheet(tareaRecursos)
+    XLSX.utils.book_append_sheet(wb, assignmentWs, 'Assignment_Table')
+  } else {
+    // Empty sheet with headers only
+    const emptyAssignmentWs = XLSX.utils.aoa_to_sheet([['Task Name', 'Resource Name', '% Work Complete', 'Work', 'Units']])
+    XLSX.utils.book_append_sheet(wb, emptyAssignmentWs, 'Assignment_Table')
+  }
 
   const filename = `cronograma-${projectName.replace(/[^a-zA-Z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.xlsx`
   XLSX.writeFile(wb, filename)

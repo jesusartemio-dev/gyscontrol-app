@@ -56,7 +56,7 @@ import { ProyectoGanttView } from './ProyectoGanttView'
 import { CronogramaGanttViewPro } from '@/components/comercial/cronograma/CronogramaGanttViewPro'
 import { ProyectoDependencyManager } from './ProyectoDependencyManager'
 import { convertToMSProjectXML, downloadMSProjectXML } from '@/lib/utils/msProjectXmlExport'
-import { exportCronogramaToExcel } from '@/lib/utils/msProjectExcelExport'
+import { exportCronogramaToExcel, type RecursoExport } from '@/lib/utils/msProjectExcelExport'
 import ImportExcelCronogramaModal from './ImportExcelCronogramaModal'
 import { CronogramaVarianza } from './CronogramaVarianza'
 import { CronogramaTableView } from './CronogramaTableView'
@@ -521,14 +521,16 @@ export function ProyectoCronogramaTab({
 
       const cronogramaId = selectedCronograma?.id
 
-      // Fetch tree + dependencies in parallel
+      // Fetch tree + dependencies + recursos + calendar in parallel
       const treeUrl = cronogramaId
         ? `/api/proyectos/${proyectoId}/cronograma/tree?cronogramaId=${cronogramaId}`
         : `/api/proyectos/${proyectoId}/cronograma/tree`
 
-      const [treeResponse, depsResponse] = await Promise.all([
+      const [treeResponse, depsResponse, recursosResponse, calendarResponse] = await Promise.all([
         fetch(treeUrl),
         fetch(`/api/proyectos/${proyectoId}/cronograma/dependencias`),
+        fetch('/api/recurso?activos=true'),
+        fetch(`/api/proyectos/${proyectoId}/calendario`),
       ])
 
       if (!treeResponse.ok) throw new Error('Error al obtener estructura')
@@ -544,10 +546,33 @@ export function ProyectoCronogramaTab({
         ? (await depsResponse.json()).data || []
         : []
 
-      // Use 8 as default horasPorDia (could be fetched from calendar if needed)
-      exportCronogramaToExcel(treeArray, dependencias, proyectoNombre, 8)
+      // Get active recursos for Resource_Table
+      let recursos: RecursoExport[] = []
+      if (recursosResponse.ok) {
+        const recursosData = await recursosResponse.json()
+        const recursosList = Array.isArray(recursosData) ? recursosData : (recursosData.data || [])
+        recursos = recursosList
+          .filter((r: Record<string, unknown>) => r.activo !== false)
+          .map((r: Record<string, unknown>) => ({
+            id: r.id as string,
+            nombre: r.nombre as string,
+            tipo: (r.tipo as 'individual' | 'cuadrilla') || 'individual',
+            costoHoraProyecto: (r.costoHoraProyecto as number) || null,
+          }))
+      }
 
-      toast({ title: 'Exportación completada', description: 'Archivo Excel descargado.' })
+      // Get horasPorDia from project calendar
+      let horasPorDia = 8
+      if (calendarResponse.ok) {
+        const calData = await calendarResponse.json()
+        if (calData.calendarioAsignado?.horasPorDia) {
+          horasPorDia = calData.calendarioAsignado.horasPorDia
+        }
+      }
+
+      exportCronogramaToExcel(treeArray, dependencias, proyectoNombre, horasPorDia, recursos)
+
+      toast({ title: 'Exportación completada', description: 'Archivo Excel descargado con 3 hojas (Task_Table, Resource_Table, Assignment_Table).' })
     } catch (error) {
       toast({
         title: 'Error en exportación',
