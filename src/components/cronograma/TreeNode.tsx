@@ -231,6 +231,24 @@ export function TreeNode({
               {node.data.personasEstimadas || 1}
             </span>
           )}
+
+          {/* Recursos asignados badge para nodos padre */}
+          {node.type !== 'tarea' && (node.metadata.recursosTotales ?? 0) > 0 && (() => {
+            const assigned = node.metadata.recursosAsignados ?? 0
+            const total = node.metadata.recursosTotales ?? 0
+            const ratio = total > 0 ? assigned / total : 0
+            const colorClasses = ratio >= 1
+              ? 'text-green-700 bg-green-50 border-green-200'
+              : ratio > 0
+                ? 'text-amber-700 bg-amber-50 border-amber-200'
+                : 'text-red-600 bg-red-50 border-red-200'
+            return (
+              <span className={`inline-flex items-center gap-0.5 text-[10px] border rounded px-1 py-0 shrink-0 ${colorClasses}`}>
+                <Users className="h-2.5 w-2.5" />
+                {assigned}/{total}
+              </span>
+            )
+          })()}
         </div>
 
         {/* Columna 2: Progreso */}
@@ -271,11 +289,11 @@ export function TreeNode({
                 <span className="text-red-400 text-[10px]">Sin asignar</span>
               )
             ) : (
-              (node.metadata as any).recursosTotales > 0 ? (
+              (node.metadata.recursosTotales ?? 0) > 0 ? (
                 <span className={`inline-flex items-center gap-0.5 border rounded px-1 py-0 text-[10px] font-medium ${
                   (() => {
-                    const assigned = (node.metadata as any).recursosAsignados || 0
-                    const total = (node.metadata as any).recursosTotales || 0
+                    const assigned = node.metadata.recursosAsignados ?? 0
+                    const total = node.metadata.recursosTotales ?? 0
                     const ratio = total > 0 ? assigned / total : 0
                     if (ratio >= 1) return 'bg-green-50 text-green-700 border-green-200'
                     if (ratio > 0) return 'bg-amber-50 text-amber-700 border-amber-200'
@@ -283,7 +301,7 @@ export function TreeNode({
                   })()
                 }`}>
                   <Users className="h-2.5 w-2.5" />
-                  {(node.metadata as any).recursosAsignados}/{(node.metadata as any).recursosTotales}
+                  {node.metadata.recursosAsignados}/{node.metadata.recursosTotales}
                 </span>
               ) : null
             )}
@@ -298,11 +316,11 @@ export function TreeNode({
             ) : node.type === 'tarea' ? (
               <span className="text-red-400 text-[10px]">Sin asignar</span>
             ) : (
-              (node.metadata as any).responsablesTotales > 0 ? (
+              (node.metadata.responsablesTotales ?? 0) > 0 ? (
                 <span className={`inline-flex items-center gap-0.5 border rounded px-1 py-0 text-[10px] font-medium ${
                   (() => {
-                    const assigned = (node.metadata as any).responsablesAsignados || 0
-                    const total = (node.metadata as any).responsablesTotales || 0
+                    const assigned = node.metadata.responsablesAsignados ?? 0
+                    const total = node.metadata.responsablesTotales ?? 0
                     const ratio = total > 0 ? assigned / total : 0
                     if (ratio >= 1) return 'bg-blue-50 text-blue-700 border-blue-200'
                     if (ratio > 0) return 'bg-amber-50 text-amber-700 border-amber-200'
@@ -310,7 +328,7 @@ export function TreeNode({
                   })()
                 }`}>
                   <Users className="h-2.5 w-2.5" />
-                  {(node.metadata as any).responsablesAsignados}/{(node.metadata as any).responsablesTotales}
+                  {node.metadata.responsablesAsignados}/{node.metadata.responsablesTotales}
                 </span>
               ) : null
             )}

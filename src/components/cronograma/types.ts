@@ -23,6 +23,10 @@ export interface TreeNode {
     totalChildren: number
     progressPercentage: number
     status: 'pending' | 'in_progress' | 'completed' | 'paused' | 'cancelled'
+    recursosTotales?: number
+    recursosAsignados?: number
+    responsablesTotales?: number
+    responsablesAsignados?: number
   }
 }
 
