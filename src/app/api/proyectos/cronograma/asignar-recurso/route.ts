@@ -6,12 +6,23 @@ import { z } from 'zod'
 
 const ROLES_ALLOWED = ['admin', 'gerente', 'gestor', 'coordinador']
 
-const asignarRecursoSchema = z.object({
-  edtId: z.string(),
-  recursoId: z.string().nullable(),
-})
+// Supports two formats:
+// New: { tipo: 'edt'|'tarea', id, recursoId, cascadeToTasks? }
+// Legacy: { edtId, recursoId } (backward compat for AsignarRecursoPorEdt)
+const asignarRecursoSchema = z.union([
+  z.object({
+    tipo: z.enum(['edt', 'tarea']),
+    id: z.string(),
+    recursoId: z.string().nullable(),
+    cascadeToTasks: z.boolean().optional(),
+  }),
+  z.object({
+    edtId: z.string(),
+    recursoId: z.string().nullable(),
+  }),
+])
 
-// PUT — Asignar recurso a todas las tareas de una EDT
+// PUT — Asignar recurso a EDT (cascade) o tarea individual
 export async function PUT(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -28,21 +39,16 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Datos inválidos', details: parsed.error.flatten() }, { status: 400 })
     }
 
-    const { edtId, recursoId } = parsed.data
+    // Normalize input
+    const data = parsed.data
+    const tipo = 'tipo' in data ? data.tipo : 'edt'
+    const id = 'tipo' in data ? data.id : data.edtId
+    const recursoId = data.recursoId
+    const cascadeToTasks = 'cascadeToTasks' in data ? data.cascadeToTasks ?? true : true
 
-    // Verificar que la EDT existe
-    const edt = await prisma.proyectoEdt.findUnique({
-      where: { id: edtId },
-      select: { id: true, nombre: true, proyectoCronogramaId: true },
-    })
-    if (!edt) {
-      return NextResponse.json({ error: 'EDT no encontrada' }, { status: 404 })
-    }
-
+    // Calculate personasEstimadas if recurso is set
     let personasEstimadas = 1
-
     if (recursoId) {
-      // Verificar recurso existe y está activo
       const recurso = await prisma.recurso.findUnique({
         where: { id: recursoId },
         select: { id: true, nombre: true, tipo: true, activo: true },
@@ -50,8 +56,6 @@ export async function PUT(request: NextRequest) {
       if (!recurso || !recurso.activo) {
         return NextResponse.json({ error: 'Recurso no encontrado o inactivo' }, { status: 404 })
       }
-
-      // Si es cuadrilla, calcular personasEstimadas desde composiciones
       if (recurso.tipo === 'cuadrilla') {
         const composiciones = await prisma.recursoComposicion.aggregate({
           where: { recursoId, activo: true },
@@ -61,23 +65,61 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    // Actualizar todas las tareas de la EDT
-    const result = await prisma.proyectoTarea.updateMany({
-      where: { proyectoEdtId: edtId },
-      data: {
-        recursoId,
-        personasEstimadas: recursoId ? personasEstimadas : 1,
-        updatedAt: new Date(),
-      },
+    if (tipo === 'tarea') {
+      // Single task assignment
+      const tarea = await prisma.proyectoTarea.findUnique({
+        where: { id },
+        select: { id: true, nombre: true },
+      })
+      if (!tarea) {
+        return NextResponse.json({ error: 'Tarea no encontrada' }, { status: 404 })
+      }
+      await prisma.proyectoTarea.update({
+        where: { id },
+        data: {
+          recursoId,
+          personasEstimadas: recursoId ? personasEstimadas : 1,
+          updatedAt: new Date(),
+        },
+      })
+      return NextResponse.json({
+        success: true,
+        tareasActualizadas: 1,
+        message: recursoId
+          ? `Recurso asignado a "${tarea.nombre}"`
+          : `Recurso removido de "${tarea.nombre}"`,
+      })
+    }
+
+    // EDT assignment
+    const edt = await prisma.proyectoEdt.findUnique({
+      where: { id },
+      select: { id: true, nombre: true, proyectoCronogramaId: true },
     })
+    if (!edt) {
+      return NextResponse.json({ error: 'EDT no encontrada' }, { status: 404 })
+    }
+
+    let tareasActualizadas = 0
+    if (cascadeToTasks) {
+      const result = await prisma.proyectoTarea.updateMany({
+        where: { proyectoEdtId: id },
+        data: {
+          recursoId,
+          personasEstimadas: recursoId ? personasEstimadas : 1,
+          updatedAt: new Date(),
+        },
+      })
+      tareasActualizadas = result.count
+    }
 
     return NextResponse.json({
       success: true,
-      tareasActualizadas: result.count,
+      tareasActualizadas,
       edtNombre: edt.nombre,
       message: recursoId
-        ? `Recurso asignado a ${result.count} tarea(s) en "${edt.nombre}"`
-        : `Recurso removido de ${result.count} tarea(s) en "${edt.nombre}"`,
+        ? `Recurso asignado a ${tareasActualizadas} tarea(s) en "${edt.nombre}"`
+        : `Recurso removido de ${tareasActualizadas} tarea(s) en "${edt.nombre}"`,
     })
   } catch (error) {
     console.error('Error al asignar recurso:', error)

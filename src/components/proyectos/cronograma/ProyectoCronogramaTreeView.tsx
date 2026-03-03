@@ -12,6 +12,7 @@ import { ImportModal } from '../../cronograma/ImportModal'
 import { ImportEdtModal } from '../../cronograma/ImportEdtModal'
 import { ImportTareasModal } from '../../cronograma/ImportTareasModal'
 import { AsignarResponsable } from './AsignarResponsable'
+import { AsignarRecurso } from './AsignarRecurso'
 import { CronogramaTreeViewProps, TreeNode as TreeNodeType, NodeType } from '../../cronograma/types'
 import { useProyectoCronogramaTree } from './hooks/useProyectoCronogramaTree'
 import '../../cronograma/CronogramaTreeView.css'
@@ -59,12 +60,9 @@ export function ProyectoCronogramaTreeView({
   const [importItemsData, setImportItemsData] = useState<any[]>([])
   const [currentImportNode, setCurrentImportNode] = useState<{ id: string; type: string } | null>(null)
 
-  // Columna inteligente según tipo de cronograma
-  const assignmentColumn: 'recurso' | 'responsable' | undefined = (() => {
-    if (!selectedCronograma) return undefined
-    if (selectedCronograma.tipo === 'ejecucion') return 'responsable'
-    return 'recurso'
-  })()
+  // Columnas de asignación: Recurso siempre visible, Responsable solo en ejecución
+  const showRecursoColumn = !!selectedCronograma
+  const showResponsableColumn = selectedCronograma?.tipo === 'ejecucion'
 
   // Estado para modal de asignar responsable
   const [responsableModal, setResponsableModal] = useState<{
@@ -73,6 +71,20 @@ export function ProyectoCronogramaTreeView({
     elementoId: string
     elementoNombre: string
     responsableActual?: { id: string; name: string; email: string; role: string } | null
+  }>({
+    open: false,
+    tipo: 'edt',
+    elementoId: '',
+    elementoNombre: ''
+  })
+
+  // Estado para modal de asignar recurso
+  const [recursoModal, setRecursoModal] = useState<{
+    open: boolean
+    tipo: 'edt' | 'tarea'
+    elementoId: string
+    elementoNombre: string
+    recursoActual?: { id: string; nombre: string; tipo: string } | null
   }>({
     open: false,
     tipo: 'edt',
@@ -281,6 +293,30 @@ export function ProyectoCronogramaTreeView({
     })
   }
 
+  const handleAssignRecurso = (nodeId: string) => {
+    const node = state.nodes.get(nodeId)
+    if (!node) return
+
+    const realId = nodeId.replace(/^(edt|tarea)-/, '')
+    const tipo = node.type as 'edt' | 'tarea'
+
+    const recursoActual = node.data.recursoId
+      ? {
+          id: node.data.recursoId,
+          nombre: node.data.recursoNombre || '',
+          tipo: node.data.recursoTipo || 'individual'
+        }
+      : null
+
+    setRecursoModal({
+      open: true,
+      tipo,
+      elementoId: realId,
+      elementoNombre: node.nombre,
+      recursoActual
+    })
+  }
+
   const handleExecuteImport = async (selectedIds: string[]) => {
     if (!currentImportNode) return
 
@@ -392,9 +428,15 @@ export function ProyectoCronogramaTreeView({
             onSelect={() => actions.selectNode(nodeId)}
             isSelected={isSelected}
             readOnly={isReadOnly}
-            assignmentColumn={assignmentColumn}
+            showRecursoColumn={showRecursoColumn}
+            showResponsableColumn={showResponsableColumn}
+            onAssignRecurso={
+              !isReadOnly && showRecursoColumn && (node.type === 'edt' || node.type === 'tarea')
+                ? () => handleAssignRecurso(nodeId)
+                : undefined
+            }
             onAssignResponsable={
-              !isReadOnly && assignmentColumn === 'responsable' && (node.type === 'edt' || node.type === 'tarea')
+              !isReadOnly && showResponsableColumn && (node.type === 'edt' || node.type === 'tarea')
                 ? () => handleAssignResponsable(nodeId)
                 : undefined
             }
@@ -590,7 +632,7 @@ export function ProyectoCronogramaTreeView({
             </div>
           ) : (
             <>
-              <TreeHeader assignmentColumn={assignmentColumn} />
+              <TreeHeader showRecursoColumn={showRecursoColumn} showResponsableColumn={showResponsableColumn} />
               <div className="p-2">
                 {renderTree(state.rootNodes)}
               </div>
@@ -695,6 +737,21 @@ export function ProyectoCronogramaTreeView({
           responsableActual={responsableModal.responsableActual}
           onAsignacionExitosa={async () => {
             setResponsableModal(prev => ({ ...prev, open: false }))
+            await actions.loadTree([...state.expandedNodes])
+            onRefresh?.()
+          }}
+        />
+
+        {/* Modal de asignación de recurso */}
+        <AsignarRecurso
+          open={recursoModal.open}
+          onOpenChange={(open) => setRecursoModal(prev => ({ ...prev, open }))}
+          tipo={recursoModal.tipo}
+          elementoId={recursoModal.elementoId}
+          elementoNombre={recursoModal.elementoNombre}
+          recursoActual={recursoModal.recursoActual}
+          onAsignacionExitosa={async () => {
+            setRecursoModal(prev => ({ ...prev, open: false }))
             await actions.loadTree([...state.expandedNodes])
             onRefresh?.()
           }}
