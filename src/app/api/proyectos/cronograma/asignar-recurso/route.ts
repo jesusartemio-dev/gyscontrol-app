@@ -102,8 +102,22 @@ export async function PUT(request: NextRequest) {
 
     let tareasActualizadas = 0
     if (cascadeToTasks) {
-      const result = await prisma.proyectoTarea.updateMany({
+      // Find actividades under this EDT for robust task lookup
+      const actividades = await prisma.proyectoActividad.findMany({
         where: { proyectoEdtId: id },
+        select: { id: true },
+      })
+      const actividadIds = actividades.map(a => a.id)
+
+      const result = await prisma.proyectoTarea.updateMany({
+        where: {
+          OR: [
+            { proyectoEdtId: id },
+            ...(actividadIds.length > 0
+              ? [{ proyectoActividadId: { in: actividadIds } }]
+              : []),
+          ],
+        },
         data: {
           recursoId,
           personasEstimadas: recursoId ? personasEstimadas : 1,
