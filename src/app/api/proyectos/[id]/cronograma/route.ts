@@ -271,6 +271,7 @@ export async function POST(
                 prioridad: edtOrigen.prioridad,
                 orden: edtOrigen.orden,
                 estado: edtOrigen.estado,
+                responsableId: edtOrigen.responsableId,
                 updatedAt: new Date()
               }
             })
@@ -293,6 +294,7 @@ export async function POST(
                   "prioridad",
                   "orden",
                   "estado",
+                  "responsableId",
                   "createdAt",
                   "updatedAt"
                 ) VALUES (
@@ -307,6 +309,7 @@ export async function POST(
                   ${actividadOrigen.prioridad}::"PrioridadEdt",
                   ${actividadOrigen.orden},
                   ${actividadOrigen.estado}::"EstadoActividad",
+                  ${actividadOrigen.responsableId},
                   NOW(),
                   NOW()
                 )
@@ -336,6 +339,8 @@ export async function POST(
                     "prioridad",
                     "orden",
                     "estado",
+                    "recursoId",
+                    "responsableId",
                     "createdAt",
                     "updatedAt"
                   ) VALUES (
@@ -352,6 +357,8 @@ export async function POST(
                     ${tareaOrigen.prioridad}::"PrioridadTarea",
                     ${tareaOrigen.orden},
                     ${tareaOrigen.estado}::"EstadoTarea",
+                    ${tareaOrigen.recursoId},
+                    ${tareaOrigen.responsableId},
                     NOW(),
                     NOW()
                   )
