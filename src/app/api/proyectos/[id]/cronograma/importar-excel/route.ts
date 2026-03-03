@@ -421,6 +421,37 @@ export async function POST(
       }
     }
 
+    // ── Roll-up: recalcular horasPlan de Actividades y EDTs como suma de hijos ──
+    // (El Excel exporta Duration propia en cada nivel; necesitamos la suma real)
+    const actividadesConHoras = await prisma.proyectoActividad.findMany({
+      where: { proyectoCronogramaId: cronograma.id },
+      select: { id: true },
+    })
+    for (const act of actividadesConHoras) {
+      const sumTareas = await prisma.proyectoTarea.aggregate({
+        where: { proyectoActividadId: act.id },
+        _sum: { horasEstimadas: true },
+      })
+      await prisma.proyectoActividad.update({
+        where: { id: act.id },
+        data: { horasPlan: sumTareas._sum.horasEstimadas || 0, updatedAt: new Date() },
+      })
+    }
+    const edtsConHoras = await prisma.proyectoEdt.findMany({
+      where: { proyectoCronogramaId: cronograma.id },
+      select: { id: true },
+    })
+    for (const edt of edtsConHoras) {
+      const sumActs = await prisma.proyectoActividad.aggregate({
+        where: { proyectoEdtId: edt.id },
+        _sum: { horasPlan: true },
+      })
+      await prisma.proyectoEdt.update({
+        where: { id: edt.id },
+        data: { horasPlan: sumActs._sum.horasPlan || 0, updatedAt: new Date() },
+      })
+    }
+
     // Asegurar que el cronograma es baseline
     if (!cronograma.esBaseline) {
       // Desmarcar otros baselines
