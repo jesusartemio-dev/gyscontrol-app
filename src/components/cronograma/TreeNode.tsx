@@ -88,6 +88,35 @@ export function TreeNode({
   // El roll-up GYS-GEN-16 asegura que los nodos summary tengan la suma correcta
   const totalHours = Number(node.data.horasEstimadas) || 0
 
+  // Calcular Duration (días calendario entre fechaInicio y fechaFin)
+  const calcDurationDays = (): number => {
+    let fechaInicio: string | null = null
+    let fechaFin: string | null = null
+    if (node.type === 'tarea') {
+      fechaInicio = node.data.fechaInicio
+      fechaFin = node.data.fechaFin
+    } else {
+      fechaInicio = node.data.fechaInicioComercial || node.data.fechaInicioPlan
+      fechaFin = node.data.fechaFinComercial || node.data.fechaFinPlan
+    }
+    if (!fechaInicio || !fechaFin) return 0
+    try {
+      const start = new Date(fechaInicio)
+      const end = new Date(fechaFin)
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) return 0
+      // Count business days (Mon-Fri)
+      let days = 0
+      const current = new Date(start)
+      while (current <= end) {
+        const dow = current.getDay()
+        if (dow !== 0 && dow !== 6) days++
+        current.setDate(current.getDate() + 1)
+      }
+      return days
+    } catch { return 0 }
+  }
+  const durationDays = calcDurationDays()
+
   // Función para calcular el resumen de eliminación
   const getDeleteSummary = () => {
     const summary = {
@@ -185,7 +214,7 @@ export function TreeNode({
       className={`tree-node group ${isSelected ? 'bg-blue-100 border-l-2 border-l-blue-500' : 'hover:bg-gray-100'} py-0.5 cursor-pointer transition-colors`}
       onClick={onSelect}
     >
-      <div className={`grid items-center gap-1 ${assignmentColumn ? 'grid-cols-[1fr_80px_65px_120px_75px_100px_28px]' : 'grid-cols-[1fr_80px_65px_120px_75px_28px]'}`}>
+      <div className={`grid items-center gap-1 ${assignmentColumn ? 'grid-cols-[1fr_80px_65px_120px_55px_55px_100px_28px]' : 'grid-cols-[1fr_80px_65px_120px_55px_55px_28px]'}`}>
         {/* Columna 1: Nombre con indentación */}
         <div className="flex items-center gap-1 min-w-0" style={{ paddingLeft: `${node.level * 16 + 8}px` }}>
           {/* Toggle button */}
@@ -272,12 +301,17 @@ export function TreeNode({
           {formatDates()}
         </div>
 
-        {/* Columna 5: Horas */}
+        {/* Columna 5: Duration (días hábiles desde fechas) */}
+        <div className="text-right text-[11px] text-gray-500 font-mono pr-1">
+          {durationDays > 0 ? `${durationDays}d` : ''}
+        </div>
+
+        {/* Columna 6: Work (horasEstimadas) */}
         <div className="text-right text-[11px] text-gray-600 font-mono pr-1">
           {totalHours > 0 ? `${totalHours}h` : ''}
         </div>
 
-        {/* Columna 6: Recurso o Responsable según assignmentColumn */}
+        {/* Columna 7: Recurso o Responsable según assignmentColumn */}
         {assignmentColumn === 'recurso' && (
           <div className="text-center text-[11px] truncate">
             {node.type === 'tarea' ? (
@@ -335,7 +369,7 @@ export function TreeNode({
           </div>
         )}
 
-        {/* Columna 7: Acciones */}
+        {/* Columna 8: Acciones */}
         <div className="flex justify-center">
           <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
             <DropdownMenuTrigger asChild>

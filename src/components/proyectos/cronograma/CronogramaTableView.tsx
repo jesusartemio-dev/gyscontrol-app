@@ -29,7 +29,8 @@ interface FlatRow {
   level: number        // 0=proyecto, 1=fase, 2=edt, 3=actividad, 4=tarea
   nombre: string
   descripcion: string
-  horasEstimadas: number // raw hours for duration formatting
+  horasEstimadas: number // raw hours (Work)
+  duracionDias: number   // business days between fechaInicio and fechaFin
   fechaInicio: string
   fechaFin: string
   estado: string
@@ -53,6 +54,23 @@ const TIPO_LABEL: Record<string, string> = {
 
 const LEVEL_INDENT = 20 // pixels per level
 
+function calcBusinessDays(startStr: string, endStr: string): number {
+  if (!startStr || !endStr) return 0
+  try {
+    const start = new Date(startStr)
+    const end = new Date(endStr)
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return 0
+    let days = 0
+    const current = new Date(start)
+    while (current <= end) {
+      const dow = current.getDay()
+      if (dow !== 0 && dow !== 6) days++
+      current.setDate(current.getDate() + 1)
+    }
+    return days
+  } catch { return 0 }
+}
+
 function flattenTree(node: any): FlatRow[] {
   const rows: FlatRow[] = []
   const data = node.data || {}
@@ -71,6 +89,7 @@ function flattenTree(node: any): FlatRow[] {
     nombre: node.nombre || '',
     descripcion: data.descripcion || '',
     horasEstimadas: horas,
+    duracionDias: calcBusinessDays(fechaInicio, fechaFin),
     fechaInicio: fechaInicio ? formatDate(fechaInicio) : '',
     fechaFin: fechaFin ? formatDate(fechaFin) : '',
     estado: data.estado || 'pendiente',
@@ -98,15 +117,6 @@ function formatDate(dateStr: string): string {
   } catch {
     return ''
   }
-}
-
-function formatDuration(horas: number, horasPorDia: number): string {
-  if (!horas || horas === 0) return '\u2014'
-  const dias = Math.floor(horas / horasPorDia)
-  const hsRestantes = Math.round(horas % horasPorDia)
-  if (dias === 0) return `${hsRestantes}h`
-  if (hsRestantes === 0) return `${dias}d`
-  return `${dias}d ${hsRestantes}h`
 }
 
 function formatHoras(value: number): string {
@@ -196,11 +206,14 @@ export function CronogramaTableView({ proyectoId, cronogramaId, refreshKey, hora
       cellRenderer: NombreCellRenderer,
     },
     {
-      field: 'horasEstimadas',
-      headerName: 'Duración',
-      width: 100,
+      field: 'duracionDias',
+      headerName: 'Duration',
+      width: 90,
       editable: false,
-      valueFormatter: (params: ValueFormatterParams) => formatDuration(params.value, horasPorDia),
+      valueFormatter: (params: ValueFormatterParams) => {
+        if (!params.value || params.value === 0) return '\u2014'
+        return `${params.value}d`
+      },
     },
     {
       field: 'fechaInicio',
@@ -231,7 +244,7 @@ export function CronogramaTableView({ proyectoId, cronogramaId, refreshKey, hora
     },
     {
       field: 'horasPlan',
-      headerName: 'Hrs Plan',
+      headerName: 'Work',
       width: 85,
       minWidth: 80,
       editable: (params) => params.data?.tipo === 'tarea',
@@ -267,7 +280,7 @@ export function CronogramaTableView({ proyectoId, cronogramaId, refreshKey, hora
       editable: true,
       hide: true,
     },
-  ], [horasPorDia])
+  ], [])
 
   const defaultColDef = useMemo<ColDef>(() => ({
     sortable: true,
