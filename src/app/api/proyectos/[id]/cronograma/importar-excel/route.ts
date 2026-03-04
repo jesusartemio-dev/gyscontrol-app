@@ -513,14 +513,6 @@ export async function POST(
       })
     }
 
-    // Auto-lock baseline after successful import
-    if (cronograma.esBaseline) {
-      await prisma.proyectoCronograma.update({
-        where: { id: cronograma.id },
-        data: { bloqueado: true, updatedAt: new Date() },
-      })
-    }
-
     return NextResponse.json({
       success: true,
       cronogramaId: cronograma.id,

@@ -406,6 +406,14 @@ export async function POST(
         throw new Error(`Error copiando estructura: ${copyError instanceof Error ? copyError.message : 'Error desconocido'}`)
       }
 
+      // Lock the baseline when ejecución is created from it
+      if (validatedData.tipo === 'ejecucion' && cronogramaOrigen.esBaseline) {
+        await prisma.proyectoCronograma.update({
+          where: { id: cronogramaOrigen.id },
+          data: { bloqueado: true, updatedAt: new Date() },
+        })
+      }
+
       console.log('Copia completada:', {
         fases: fasesCopiadas,
         edts: edtsCopiados,
