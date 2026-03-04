@@ -38,15 +38,17 @@ export async function POST(req: Request) {
     const nuevo = await prisma.cliente.create({
       data: {
         ...data,
-        numeroSecuencia: data.numeroSecuencia ?? 1
+        numeroSecuencia: data.numeroSecuencia ?? 1,
+        updatedAt: new Date(),
       }
     })
 
     return NextResponse.json(nuevo)
   } catch (error) {
     console.error('❌ Error creating client:', error)
+    const message = error instanceof Error ? error.message : 'Error al crear cliente'
     return NextResponse.json(
-      { error: 'Error al crear cliente' },
+      { error: message },
       { status: 500 }
     )
   }
@@ -58,7 +60,7 @@ export async function PUT(req: Request) {
   const { id, ...rest } = data
   const actualizado = await prisma.cliente.update({
     where: { id },
-    data: rest,
+    data: { ...rest, updatedAt: new Date() },
   })
   return NextResponse.json(actualizado)
 }

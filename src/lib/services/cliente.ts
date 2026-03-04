@@ -74,7 +74,8 @@ export async function createCliente(data: Omit<Cliente, 'id'>): Promise<Cliente>
     })
 
     if (!response.ok) {
-      throw new Error(`Error al crear cliente: ${response.statusText}`)
+      const body = await response.json().catch(() => null)
+      throw new Error(body?.error || `Error al crear cliente: ${response.statusText}`)
     }
 
     return await response.json()

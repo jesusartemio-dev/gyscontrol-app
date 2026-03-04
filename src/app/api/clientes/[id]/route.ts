@@ -73,7 +73,7 @@ export async function PUT(
 
     const actualizado = await prisma.cliente.update({
       where: { id },
-      data
+      data: { ...data, updatedAt: new Date() }
     })
 
     return NextResponse.json(actualizado)

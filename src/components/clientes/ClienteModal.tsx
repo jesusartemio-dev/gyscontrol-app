@@ -54,6 +54,7 @@ const sectores = [
   'Energía',
   'Construcción',
   'Tecnología',
+  'Integrador',
   'Salud',
   'Educación',
   'Comercio',

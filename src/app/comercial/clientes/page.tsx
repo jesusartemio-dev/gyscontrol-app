@@ -244,6 +244,7 @@ export default function ClientesPage() {
             <SelectItem value="Energía">Energía</SelectItem>
             <SelectItem value="Construcción">Construcción</SelectItem>
             <SelectItem value="Tecnología">Tecnología</SelectItem>
+            <SelectItem value="Integrador">Integrador</SelectItem>
             <SelectItem value="Salud">Salud</SelectItem>
             <SelectItem value="Educación">Educación</SelectItem>
             <SelectItem value="Comercio">Comercio</SelectItem>
