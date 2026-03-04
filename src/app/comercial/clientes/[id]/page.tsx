@@ -28,6 +28,22 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { getClienteById } from '@/lib/services/cliente'
 import type { Cliente } from '@/types'
 
+interface ProyectoResumen {
+  id: string
+  nombre: string
+  estado: string
+  totalCliente: number | null
+  createdAt: string
+}
+
+interface CotizacionResumen {
+  id: string
+  nombre: string
+  estado: string
+  totalCliente: number | null
+  createdAt: string
+}
+
 // Extended Cliente type with CRM fields
 interface ClienteCRM extends Cliente {
   sector?: string
@@ -39,6 +55,8 @@ interface ClienteCRM extends Cliente {
   ultimoProyecto?: string
   estadoRelacion?: string
   calificacion?: number
+  proyecto?: ProyectoResumen[]
+  cotizacion?: CotizacionResumen[]
 }
 
 export default function ClienteDetailPage() {
@@ -103,6 +121,39 @@ export default function ClienteDetailPage() {
       default: return 'Sin Estado'
     }
   }
+
+  const getProyectoEstadoConfig = (estado: string) => {
+    const config: Record<string, { label: string; className: string }> = {
+      creado: { label: 'Creado', className: 'bg-blue-100 text-blue-800' },
+      en_planificacion: { label: 'Planificación', className: 'bg-slate-100 text-slate-800' },
+      listas_pendientes: { label: 'Listas Pend.', className: 'bg-yellow-100 text-yellow-800' },
+      listas_aprobadas: { label: 'Listas Aprob.', className: 'bg-green-100 text-green-800' },
+      pedidos_creados: { label: 'Pedidos', className: 'bg-purple-100 text-purple-800' },
+      en_ejecucion: { label: 'Ejecución', className: 'bg-cyan-100 text-cyan-800' },
+      en_cierre: { label: 'Cierre', className: 'bg-amber-100 text-amber-800' },
+      cerrado: { label: 'Cerrado', className: 'bg-emerald-100 text-emerald-800' },
+      pausado: { label: 'Pausado', className: 'bg-orange-100 text-orange-800' },
+      cancelado: { label: 'Cancelado', className: 'bg-red-100 text-red-800' },
+    }
+    return config[estado] || { label: estado, className: 'bg-gray-100 text-gray-800' }
+  }
+
+  const getCotizacionEstadoConfig = (estado: string) => {
+    const config: Record<string, { label: string; className: string }> = {
+      borrador: { label: 'Borrador', className: 'bg-gray-100 text-gray-800' },
+      revisado: { label: 'Revisado', className: 'bg-blue-100 text-blue-800' },
+      enviada: { label: 'Enviada', className: 'bg-yellow-100 text-yellow-800' },
+      aprobada: { label: 'Aprobada', className: 'bg-green-100 text-green-800' },
+      rechazada: { label: 'Rechazada', className: 'bg-red-100 text-red-800' },
+    }
+    return config[estado] || { label: estado, className: 'bg-gray-100 text-gray-800' }
+  }
+
+  const proyectos = cliente?.proyecto || []
+  const cotizaciones = cliente?.cotizacion || []
+  const totalValorProyectos = proyectos.reduce((sum, p) => sum + (p.totalCliente || 0), 0)
+  const totalValorCotizaciones = cotizaciones.reduce((sum, c) => sum + (c.totalCliente || 0), 0)
+  const ultimoProyectoDate = proyectos.length > 0 ? proyectos[0].createdAt : null
 
   if (loading) {
     return (
@@ -283,7 +334,7 @@ export default function ClienteDetailPage() {
                   <FileText className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">0</div>
+                  <div className="text-2xl font-bold">{proyectos.length}</div>
                   <p className="text-xs text-muted-foreground">Total de proyectos</p>
                 </CardContent>
               </Card>
@@ -294,7 +345,7 @@ export default function ClienteDetailPage() {
                   <FileText className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">0</div>
+                  <div className="text-2xl font-bold">{cotizaciones.length}</div>
                   <p className="text-xs text-muted-foreground">Total de cotizaciones</p>
                 </CardContent>
               </Card>
@@ -305,7 +356,7 @@ export default function ClienteDetailPage() {
                   <DollarSign className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">$0</div>
+                  <div className="text-2xl font-bold">{formatCurrency(totalValorProyectos + totalValorCotizaciones)}</div>
                   <p className="text-xs text-muted-foreground">Valor total de contratos</p>
                 </CardContent>
               </Card>
@@ -316,7 +367,7 @@ export default function ClienteDetailPage() {
                   <Calendar className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">-</div>
+                  <div className="text-2xl font-bold">{ultimoProyectoDate ? formatDate(ultimoProyectoDate) : '-'}</div>
                   <p className="text-xs text-muted-foreground">Fecha del último proyecto</p>
                 </CardContent>
               </Card>
@@ -368,17 +419,49 @@ export default function ClienteDetailPage() {
                   Historial de Proyectos
                 </CardTitle>
                 <CardDescription>
-                  Proyectos asociados a este cliente
+                  {proyectos.length} proyecto{proyectos.length !== 1 ? 's' : ''} asociado{proyectos.length !== 1 ? 's' : ''} a este cliente
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-8">
-                  <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No hay proyectos registrados</h3>
-                  <p className="text-muted-foreground">
-                    Los proyectos asociados aparecerán aquí.
-                  </p>
-                </div>
+                {proyectos.length === 0 ? (
+                  <div className="text-center py-8">
+                    <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">No hay proyectos registrados</h3>
+                    <p className="text-muted-foreground">
+                      Los proyectos asociados aparecerán aquí.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {proyectos.map((proyecto) => {
+                      const estadoConfig = getProyectoEstadoConfig(proyecto.estado)
+                      return (
+                        <div
+                          key={proyecto.id}
+                          className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
+                          onClick={() => router.push(`/proyectos/${proyecto.id}`)}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">{proyecto.nombre}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {formatDate(proyecto.createdAt)}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-3 ml-4">
+                            {proyecto.totalCliente != null && (
+                              <span className="text-sm font-medium text-green-600">
+                                {formatCurrency(proyecto.totalCliente)}
+                              </span>
+                            )}
+                            <Badge variant="outline" className={estadoConfig.className}>
+                              {estadoConfig.label}
+                            </Badge>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -388,21 +471,53 @@ export default function ClienteDetailPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
+                  <DollarSign className="h-5 w-5" />
                   Cotizaciones
                 </CardTitle>
                 <CardDescription>
-                  Cotizaciones enviadas a este cliente
+                  {cotizaciones.length} cotizaci{cotizaciones.length !== 1 ? 'ones' : 'ón'} asociada{cotizaciones.length !== 1 ? 's' : ''} a este cliente
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-8">
-                  <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No hay cotizaciones registradas</h3>
-                  <p className="text-muted-foreground">
-                    Las cotizaciones enviadas aparecerán aquí.
-                  </p>
-                </div>
+                {cotizaciones.length === 0 ? (
+                  <div className="text-center py-8">
+                    <DollarSign className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">No hay cotizaciones registradas</h3>
+                    <p className="text-muted-foreground">
+                      Las cotizaciones enviadas aparecerán aquí.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {cotizaciones.map((cotizacion) => {
+                      const estadoConfig = getCotizacionEstadoConfig(cotizacion.estado)
+                      return (
+                        <div
+                          key={cotizacion.id}
+                          className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
+                          onClick={() => router.push(`/comercial/cotizaciones/${cotizacion.id}`)}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">{cotizacion.nombre}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {formatDate(cotizacion.createdAt)}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-3 ml-4">
+                            {cotizacion.totalCliente != null && (
+                              <span className="text-sm font-medium text-green-600">
+                                {formatCurrency(cotizacion.totalCliente)}
+                              </span>
+                            )}
+                            <Badge variant="outline" className={estadoConfig.className}>
+                              {estadoConfig.label}
+                            </Badge>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
