@@ -24,6 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { toast } from 'sonner'
+import { createCliente, updateCliente } from '@/lib/services/cliente'
 import type { Cliente } from '@/types'
 
 // Extended Cliente type with CRM fields
@@ -90,6 +91,7 @@ export default function ClienteModal({
   mode = 'create'
 }: ClienteModalProps) {
   const [formData, setFormData] = useState<Partial<ClienteCRM>>({
+    codigo: '',
     nombre: '',
     ruc: '',
     direccion: '',
@@ -111,11 +113,13 @@ export default function ClienteModal({
     if (initial) {
       setFormData({
         ...initial,
+        codigo: initial.codigo || '',
         potencialAnual: initial.potencialAnual || 0,
         calificacion: initial.calificacion || 3
       })
     } else {
       setFormData({
+        codigo: '',
         nombre: '',
         ruc: '',
         direccion: '',
@@ -169,13 +173,7 @@ export default function ClienteModal({
     setLoading(true)
 
     try {
-      // Simulate API call - replace with actual API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-
-      const clienteData: ClienteCRM = {
-        id: initial?.id || `temp-${Date.now()}`,
-        codigo: initial?.codigo || `CLI-${Date.now()}`,
-        numeroSecuencia: initial?.numeroSecuencia || 1,
+      const payload: any = {
         nombre: formData.nombre!,
         ruc: formData.ruc || '',
         direccion: formData.direccion || '',
@@ -188,18 +186,27 @@ export default function ClienteModal({
         frecuenciaCompra: formData.frecuenciaCompra || '',
         estadoRelacion: formData.estadoRelacion || 'prospecto',
         calificacion: formData.calificacion || 3,
-        createdAt: initial?.createdAt || new Date().toISOString(),
-        updatedAt: new Date().toISOString()
       }
 
-      onSaved(clienteData)
+      let clienteData: ClienteCRM
 
       if (mode === 'create') {
+        // Only send codigo if user typed one; otherwise API auto-generates
+        if (formData.codigo?.trim()) {
+          payload.codigo = formData.codigo.trim()
+        }
+        clienteData = await createCliente(payload) as ClienteCRM
         toast.success('Cliente creado exitosamente')
       } else {
+        // On edit, allow changing codigo
+        if (formData.codigo?.trim()) {
+          payload.codigo = formData.codigo.trim()
+        }
+        clienteData = await updateCliente(initial!.id, payload) as ClienteCRM
         toast.success('Cliente actualizado exitosamente')
       }
 
+      onSaved(clienteData)
       onClose()
     } catch (error) {
       console.error('Error saving cliente:', error)
@@ -265,14 +272,30 @@ export default function ClienteModal({
                     )}
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="ruc">RUC</Label>
-                    <Input
-                      id="ruc"
-                      value={formData.ruc || ''}
-                      onChange={(e) => handleInputChange('ruc', e.target.value)}
-                      placeholder="Ingrese el RUC"
-                    />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="codigo">Codigo</Label>
+                      <Input
+                        id="codigo"
+                        value={formData.codigo || ''}
+                        onChange={(e) => handleInputChange('codigo', e.target.value.toUpperCase())}
+                        placeholder={mode === 'create' ? 'Auto' : ''}
+                        className="font-mono"
+                      />
+                      {mode === 'create' && (
+                        <p className="text-[10px] text-muted-foreground">Vacio = auto-genera</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="ruc">RUC</Label>
+                      <Input
+                        id="ruc"
+                        value={formData.ruc || ''}
+                        onChange={(e) => handleInputChange('ruc', e.target.value)}
+                        placeholder="Ingrese el RUC"
+                      />
+                    </div>
                   </div>
 
                   <div className="space-y-2">

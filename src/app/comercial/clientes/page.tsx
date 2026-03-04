@@ -100,6 +100,7 @@ export default function ClientesPage() {
     if (searchTerm) {
       filtered = filtered.filter(cliente =>
         cliente.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        cliente.codigo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         cliente.ruc?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         cliente.correo?.toLowerCase().includes(searchTerm.toLowerCase())
       )
@@ -213,7 +214,7 @@ export default function ClientesPage() {
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por nombre, RUC o email..."
+            placeholder="Buscar por codigo, nombre, RUC o email..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-9 pr-9 h-9"

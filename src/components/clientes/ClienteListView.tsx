@@ -25,6 +25,7 @@ import {
 
 interface Cliente {
   id: string
+  codigo?: string
   nombre: string
   ruc?: string
   correo?: string
@@ -141,6 +142,9 @@ export default function ClienteListView({
             <tr className="border-b bg-muted/40">
               <th className="w-10 py-2 px-3"></th>
               <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Codigo
+              </th>
+              <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Cliente
               </th>
               <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -176,6 +180,12 @@ export default function ClienteListView({
                       {cliente.nombre.substring(0, 2).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
+                </td>
+
+                <td className="py-2 px-3">
+                  <span className="text-xs font-mono text-muted-foreground">
+                    {cliente.codigo || '—'}
+                  </span>
                 </td>
 
                 <td className="py-2 px-3">
