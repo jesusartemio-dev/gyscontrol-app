@@ -1,31 +1,31 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Calendar, MessageSquare, Phone, Mail, Users, FileText, Clock, User, Loader2, AlertCircle } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { MessageSquare, Phone, Mail, Users, FileText, Clock, Loader2, AlertCircle, Plus } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { getActividadesOportunidad, CrmActividad, TIPOS_ACTIVIDAD, RESULTADOS_ACTIVIDAD } from '@/lib/services/crm/actividades'
 
-// ✅ Formateadores de utilidad
-const formatDate = (dateString: string): string => {
+const formatDateShort = (dateString: string): string => {
   return new Date(dateString).toLocaleDateString('es-ES', {
-    year: 'numeric',
-    month: 'short',
     day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
+    month: 'short'
   })
 }
 
-const formatDateOnly = (dateString: string): string => {
-  return new Date(dateString).toLocaleDateString('es-ES', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  })
+const formatRelativeDate = (dateString: string): string => {
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffHours = diffMs / (1000 * 60 * 60)
+  const diffDays = diffMs / (1000 * 60 * 60 * 24)
+
+  if (diffHours < 1) return 'Hace <1h'
+  if (diffHours < 24) return `Hace ${Math.floor(diffHours)}h`
+  if (diffDays < 7) return `Hace ${Math.floor(diffDays)}d`
+  return formatDateShort(dateString)
 }
 
 interface ActividadListProps {
@@ -33,17 +33,30 @@ interface ActividadListProps {
   onNuevaActividad?: () => void
 }
 
+const tipoConfig: Record<string, { icon: typeof Phone; label: string }> = {
+  [TIPOS_ACTIVIDAD.LLAMADA]: { icon: Phone, label: 'Llamada' },
+  [TIPOS_ACTIVIDAD.EMAIL]: { icon: Mail, label: 'Email' },
+  [TIPOS_ACTIVIDAD.REUNION]: { icon: Users, label: 'Reunion' },
+  [TIPOS_ACTIVIDAD.PROPUESTA]: { icon: FileText, label: 'Propuesta' },
+  [TIPOS_ACTIVIDAD.SEGUIMIENTO]: { icon: Clock, label: 'Seguimiento' },
+}
+
+const resultadoConfig: Record<string, { className: string; dot: string }> = {
+  [RESULTADOS_ACTIVIDAD.POSITIVO]: { className: 'text-green-700 bg-green-50', dot: 'bg-green-500' },
+  [RESULTADOS_ACTIVIDAD.NEGATIVO]: { className: 'text-red-700 bg-red-50', dot: 'bg-red-500' },
+  [RESULTADOS_ACTIVIDAD.NEUTRO]: { className: 'text-yellow-700 bg-yellow-50', dot: 'bg-yellow-500' },
+  [RESULTADOS_ACTIVIDAD.PENDIENTE]: { className: 'text-gray-600 bg-gray-50', dot: 'bg-gray-400' },
+}
+
 export default function ActividadList({ oportunidadId, onNuevaActividad }: ActividadListProps) {
   const [actividades, setActividades] = useState<CrmActividad[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // ✅ Cargar actividades
   const loadActividades = async () => {
     try {
       setLoading(true)
       setError(null)
-
       const response = await getActividadesOportunidad(oportunidadId)
       setActividades(response.data)
     } catch (err) {
@@ -54,65 +67,24 @@ export default function ActividadList({ oportunidadId, onNuevaActividad }: Activ
     }
   }
 
-  // ✅ Efecto para cargar actividades
   useEffect(() => {
     if (oportunidadId) {
       loadActividades()
     }
   }, [oportunidadId])
 
-  // ✅ Función para agregar nueva actividad a la lista
   const handleNuevaActividad = (nuevaActividad: CrmActividad) => {
     setActividades(prev => [nuevaActividad, ...prev])
   }
 
-  // ✅ Obtener icono según tipo de actividad
-  const getTipoIcon = (tipo: string) => {
-    switch (tipo) {
-      case TIPOS_ACTIVIDAD.LLAMADA:
-        return <Phone className="h-3 w-3" />
-      case TIPOS_ACTIVIDAD.EMAIL:
-        return <Mail className="h-3 w-3" />
-      case TIPOS_ACTIVIDAD.REUNION:
-        return <Users className="h-3 w-3" />
-      case TIPOS_ACTIVIDAD.PROPUESTA:
-        return <FileText className="h-3 w-3" />
-      case TIPOS_ACTIVIDAD.SEGUIMIENTO:
-        return <Clock className="h-3 w-3" />
-      default:
-        return <MessageSquare className="h-3 w-3" />
-    }
-  }
-
-  // ✅ Obtener color del badge según resultado
-  const getResultadoVariant = (resultado?: string) => {
-    switch (resultado) {
-      case RESULTADOS_ACTIVIDAD.POSITIVO:
-        return 'default'
-      case RESULTADOS_ACTIVIDAD.NEGATIVO:
-        return 'destructive'
-      case RESULTADOS_ACTIVIDAD.NEUTRO:
-        return 'secondary'
-      default:
-        return 'outline'
-    }
-  }
-
-  // ✅ Loading state
   if (loading) {
     return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-center py-8">
-          <div className="text-center space-y-4">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-            <p className="text-muted-foreground">Cargando actividades...</p>
-          </div>
-        </div>
+      <div className="flex items-center justify-center py-6">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
       </div>
     )
   }
 
-  // ✅ Error state
   if (error) {
     return (
       <Alert variant="destructive">
@@ -122,117 +94,90 @@ export default function ActividadList({ oportunidadId, onNuevaActividad }: Activ
     )
   }
 
-  // ✅ Empty state compacto
   if (actividades.length === 0) {
     return (
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="text-center py-8 space-y-3"
-      >
-        <div className="mx-auto w-16 h-16 bg-muted rounded-full flex items-center justify-center">
-          <MessageSquare className="h-8 w-8 text-muted-foreground" />
-        </div>
-        <div className="space-y-1">
-          <h3 className="text-lg font-semibold">Sin actividades</h3>
-          <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-            Registra la primera actividad para hacer seguimiento
-          </p>
-        </div>
+      <div className="text-center py-6 space-y-2">
+        <MessageSquare className="h-6 w-6 text-muted-foreground mx-auto" />
+        <p className="text-sm text-muted-foreground">Sin actividades registradas</p>
         {onNuevaActividad && (
-          <Button onClick={onNuevaActividad} size="sm">
-            <MessageSquare className="h-3 w-3 mr-1" />
+          <Button onClick={onNuevaActividad} size="sm" variant="outline">
+            <Plus className="h-3 w-3 mr-1" />
             Registrar Primera
           </Button>
         )}
-      </motion.div>
+      </div>
     )
   }
 
   return (
-    <div className="space-y-3">
-      {/* Header compacto */}
+    <div className="space-y-2">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <MessageSquare className="h-4 w-4 text-primary" />
-          <h3 className="text-base font-semibold">
-            Actividades ({actividades.length})
-          </h3>
-        </div>
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+          Actividades ({actividades.length})
+        </h3>
         {onNuevaActividad && (
-          <Button onClick={onNuevaActividad} size="sm" variant="outline">
-            <MessageSquare className="h-3 w-3 mr-1" />
+          <Button onClick={onNuevaActividad} size="sm" variant="ghost" className="h-7 px-2 text-xs">
+            <Plus className="h-3 w-3 mr-1" />
             Nueva
           </Button>
         )}
       </div>
 
-      {/* Lista de actividades compacta */}
-      <div className="space-y-2">
-        <AnimatePresence>
-          {actividades.map((actividad, index) => (
-            <motion.div
-              key={actividad.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{
-                duration: 0.3,
-                delay: index * 0.1,
-                ease: [0.4, 0, 0.2, 1]
-              }}
-            >
-              <Card className="hover:shadow-sm transition-shadow">
-                <CardContent className="p-3">
-                  <div className="flex items-start gap-3">
-                    {/* Icono del tipo compacto */}
-                    <div className="flex-shrink-0">
-                      <div className="w-6 h-6 bg-primary/10 rounded-full flex items-center justify-center">
-                        {getTipoIcon(actividad.tipo)}
-                      </div>
+      {/* Lista plana */}
+      <TooltipProvider delayDuration={300}>
+        <div className="divide-y divide-border">
+          {actividades.map((actividad) => {
+            const tipo = tipoConfig[actividad.tipo] || { icon: MessageSquare, label: actividad.tipo }
+            const TipoIcon = tipo.icon
+            const resultado = actividad.resultado ? resultadoConfig[actividad.resultado] : null
+
+            return (
+              <div key={actividad.id} className="flex items-center gap-3 py-2 group hover:bg-muted/30 -mx-2 px-2 rounded-sm transition-colors">
+                {/* Icono tipo */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="shrink-0 w-7 h-7 rounded-full bg-muted flex items-center justify-center">
+                      <TipoIcon className="h-3.5 w-3.5 text-muted-foreground" />
                     </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="left"><p>{tipo.label}</p></TooltipContent>
+                </Tooltip>
 
-                    {/* Contenido compacto */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2 mb-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium capitalize text-sm">
-                            {actividad.tipo}
-                          </span>
-                          {actividad.resultado && (
-                            <Badge variant={getResultadoVariant(actividad.resultado)} className="text-xs px-1.5 py-0.5">
-                              {actividad.resultado}
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <span>{formatDateOnly(actividad.fecha)}</span>
-                          {actividad.user && (
-                            <>
-                              <span>•</span>
-                              <span>{actividad.user.name}</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
+                {/* Contenido principal */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm truncate">
+                    <span className="font-medium capitalize">{actividad.tipo}</span>
+                    <span className="text-muted-foreground mx-1.5">-</span>
+                    <span className="text-muted-foreground">{actividad.descripcion}</span>
+                  </p>
+                  {actividad.notas && (
+                    <p className="text-xs text-muted-foreground/70 truncate italic">
+                      {actividad.notas}
+                    </p>
+                  )}
+                </div>
 
-                      <p className="text-sm text-muted-foreground mb-1">
-                        {actividad.descripcion}
-                      </p>
+                {/* Resultado */}
+                {resultado && (
+                  <Badge variant="outline" className={`shrink-0 text-[10px] px-1.5 py-0 h-5 border-0 ${resultado.className}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full mr-1 ${resultado.dot}`} />
+                    {actividad.resultado}
+                  </Badge>
+                )}
 
-                      {actividad.notas && (
-                        <p className="text-xs text-muted-foreground italic">
-                          "{actividad.notas}"
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      </div>
+                {/* Fecha + Usuario */}
+                <div className="shrink-0 text-right">
+                  <span className="text-xs text-muted-foreground">{formatRelativeDate(actividad.fecha)}</span>
+                  {actividad.user && (
+                    <p className="text-[10px] text-muted-foreground/60">{actividad.user.name}</p>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </TooltipProvider>
     </div>
   )
 }
