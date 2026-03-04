@@ -89,6 +89,7 @@ export function ProyectoCronogramaTab({
   const [showConfigPanel, setShowConfigPanel] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [showDeleteCronogramaModal, setShowDeleteCronogramaModal] = useState(false)
+  const [showDeleteCronogramaCompletoModal, setShowDeleteCronogramaCompletoModal] = useState(false)
   const [showGenerarCronogramaModal, setShowGenerarCronogramaModal] = useState(false)
   const [showImportExcelModal, setShowImportExcelModal] = useState(false)
   const [showAsignarRecursoModal, setShowAsignarRecursoModal] = useState(false)
@@ -109,6 +110,7 @@ export function ProyectoCronogramaTab({
   const { toast } = useToast()
   const { data: session } = useSession()
   const isAdmin = session?.user?.role === 'admin'
+  const canDeleteBaseline = ['admin', 'gerente', 'coordinador'].includes(session?.user?.role as string)
 
   // Desbloquear/bloquear cronograma (toggle baseline)
   const handleToggleBloqueo = async () => {
@@ -976,11 +978,14 @@ export function ProyectoCronogramaTab({
                     <Trash2 className="h-4 w-4 mr-2" />
                     Vaciar Contenido
                   </DropdownMenuItem>
-                  {!selectedCronograma?.esBaseline && cronogramas.length > 1 && !esBloqueado && (
+                  {(
+                    (!selectedCronograma?.esBaseline && cronogramas.length > 1 && !esBloqueado) ||
+                    (selectedCronograma?.esBaseline && canDeleteBaseline && !tieneEjecucion)
+                  ) && (
                     <DropdownMenuItem
                       onSelect={() => {
                         setDropdownOpen(false)
-                        setTimeout(() => handleEliminarCronogramaCompleto(), 150)
+                        setTimeout(() => setShowDeleteCronogramaCompletoModal(true), 150)
                       }}
                       className="text-red-600 focus:text-red-600"
                     >
@@ -1108,6 +1113,45 @@ export function ProyectoCronogramaTab({
             <Button variant="destructive" onClick={handleDeleteCronograma} disabled={isLoading}>
               {isLoading && <RefreshCw className="h-4 w-4 mr-2 animate-spin" />}
               Eliminar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de confirmación para eliminar cronograma completo */}
+      <Dialog open={showDeleteCronogramaCompletoModal} onOpenChange={(open) => {
+        if (!isLoading) setShowDeleteCronogramaCompletoModal(open)
+      }}>
+        <DialogContent
+          className="sm:max-w-md"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+          onCloseAutoFocus={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <Trash2 className="h-5 w-5" />
+              Eliminar Cronograma
+            </DialogTitle>
+            <DialogDescription>
+              Esta acción eliminará permanentemente el cronograma <strong>&quot;{selectedCronograma?.nombre}&quot;</strong> y todo su contenido.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm space-y-1">
+            <p className="text-red-800 font-medium">Se eliminarán permanentemente:</p>
+            <p className="text-red-700">• Todas las fases, EDTs, actividades y tareas</p>
+            <p className="text-red-700">• Todas las dependencias y asignaciones</p>
+            <p className="text-red-700">• El registro del cronograma completo</p>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setShowDeleteCronogramaCompletoModal(false)} disabled={isLoading}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={async () => {
+              setShowDeleteCronogramaCompletoModal(false)
+              await handleEliminarCronogramaCompleto()
+            }} disabled={isLoading}>
+              {isLoading && <RefreshCw className="h-4 w-4 mr-2 animate-spin" />}
+              Eliminar Cronograma
             </Button>
           </div>
         </DialogContent>

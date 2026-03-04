@@ -542,12 +542,25 @@ export async function DELETE(
       )
     }
 
-    // ✅ No permitir eliminar el cronograma baseline
+    // ✅ Baseline: solo se puede eliminar si no hay ejecución y el usuario tiene rol permitido
     if (cronograma.esBaseline) {
-      return NextResponse.json(
-        { error: 'No se puede eliminar el cronograma baseline. Es el cronograma de planificación activo.' },
-        { status: 400 }
-      )
+      const rolesPermitidos = ['admin', 'gerente', 'coordinador']
+      const userRole = (session.user as any).role
+      if (!rolesPermitidos.includes(userRole)) {
+        return NextResponse.json(
+          { error: 'No tiene permisos para eliminar el cronograma baseline.' },
+          { status: 403 }
+        )
+      }
+      const ejecucionExists = await prisma.proyectoCronograma.findFirst({
+        where: { proyectoId: id, tipo: 'ejecucion' }
+      })
+      if (ejecucionExists) {
+        return NextResponse.json(
+          { error: 'No se puede eliminar la línea base mientras exista un cronograma de ejecución.' },
+          { status: 400 }
+        )
+      }
     }
 
     // ✅ No permitir eliminar cronogramas comerciales (son de solo lectura)
