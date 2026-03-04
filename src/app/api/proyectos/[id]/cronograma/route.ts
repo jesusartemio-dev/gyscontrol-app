@@ -220,7 +220,7 @@ export async function POST(
           nombre: nombreAutomatico,
           copiadoDesdeCotizacionId: validatedData.copiadoDesdeCotizacionId,
           esBaseline: validatedData.tipo === 'planificacion', // Línea Base es baseline automáticamente
-          bloqueado: validatedData.tipo === 'planificacion', // Baseline se bloquea automáticamente
+          bloqueado: false, // Solo se bloquea cuando se crea el cronograma de ejecución
           version: 1,
           updatedAt: new Date()
         }
