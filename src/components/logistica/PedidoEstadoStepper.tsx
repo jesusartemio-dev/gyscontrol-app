@@ -1,7 +1,6 @@
 'use client'
 
-import { CheckCircle, Circle, XCircle } from 'lucide-react'
-import clsx from 'clsx'
+import StatusStepper, { type StatusStep } from '@/components/ui/status-stepper'
 
 const STEPS = [
   { key: 'borrador', label: 'Borrador' },
@@ -17,54 +16,16 @@ interface PedidoEstadoStepperProps {
 
 export default function PedidoEstadoStepper({ estado }: PedidoEstadoStepperProps) {
   if (estado === 'cancelado') {
-    return (
-      <div className="flex items-center gap-1.5">
-        <XCircle className="h-4 w-4 text-red-500" />
-        <span className="text-[10px] text-red-600 font-semibold">Cancelado</span>
-      </div>
-    )
+    return <StatusStepper steps={[{ key: 'cancelado', label: 'Cancelado', status: 'cancelled' }]} />
   }
 
   const currentIndex = STEPS.findIndex(s => s.key === estado)
 
-  return (
-    <div className="flex items-center gap-1 overflow-x-auto">
-      {STEPS.map((step, i) => {
-        const isCompleted = currentIndex > i
-        const isCurrent = currentIndex === i
+  const steps: StatusStep[] = STEPS.map((step, i) => ({
+    key: step.key,
+    label: step.label,
+    status: i < currentIndex ? 'completed' : i === currentIndex ? 'current' : 'future',
+  }))
 
-        return (
-          <div key={step.key} className="flex items-center">
-            {i > 0 && (
-              <div className={clsx(
-                'w-4 h-px mx-0.5',
-                isCompleted ? 'bg-emerald-400' : 'bg-gray-200'
-              )} />
-            )}
-            <div className="flex items-center gap-1" title={step.label}>
-              {isCompleted ? (
-                <CheckCircle className="h-4 w-4 text-emerald-500 flex-shrink-0" />
-              ) : isCurrent ? (
-                <Circle className={clsx(
-                  'h-4 w-4 flex-shrink-0',
-                  step.key === 'parcial' ? 'text-orange-500 fill-orange-100' : 'text-blue-500 fill-blue-100'
-                )} />
-              ) : (
-                <Circle className="h-4 w-4 text-gray-300 flex-shrink-0" />
-              )}
-              <span className={clsx(
-                'text-[10px] whitespace-nowrap',
-                isCompleted ? 'text-emerald-700' :
-                isCurrent && step.key === 'parcial' ? 'text-orange-700 font-semibold' :
-                isCurrent ? 'text-blue-700 font-semibold' :
-                'text-gray-400'
-              )}>
-                {step.label}
-              </span>
-            </div>
-          </div>
-        )
-      })}
-    </div>
-  )
+  return <StatusStepper steps={steps} />
 }

@@ -39,13 +39,13 @@ import {
   Trophy,
   XCircle,
   Loader2,
-  ChevronRight,
   ChevronDown,
   CheckCircle,
   FileText,
   MessageSquareWarning
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { StepPill, StepLine, type StepStatus } from '@/components/ui/status-stepper'
 
 interface Props {
   oportunidad: CrmOportunidad
@@ -53,125 +53,38 @@ interface Props {
   compact?: boolean
 }
 
-// Configuración de etapas del flujo CRM
-// Flujo: Inicio → Contacto → Propuesta (V.Técnica / V.Comercial) → Negociación → [Seg.Proyecto / Feedback]
 const etapasConfig = {
-  inicio: {
-    icon: Target,
-    color: 'text-purple-600',
-    bgColor: 'bg-purple-100',
-    activeColor: 'bg-purple-600 text-white',
-    label: 'Inicio',
-    shortLabel: 'Inicio',
-    order: 1,
-    group: 'inicio'
-  },
-  contacto_cliente: {
-    icon: Users,
-    color: 'text-blue-600',
-    bgColor: 'bg-blue-100',
-    activeColor: 'bg-blue-600 text-white',
-    label: 'Contacto',
-    shortLabel: 'Contacto',
-    order: 2,
-    group: 'contacto'
-  },
-  validacion_tecnica: {
-    icon: ClipboardCheck,
-    color: 'text-cyan-600',
-    bgColor: 'bg-cyan-100',
-    activeColor: 'bg-cyan-600 text-white',
-    label: 'Validación Técnica',
-    shortLabel: 'V. Técnica',
-    description: 'Alcance y recursos necesarios',
-    order: 3,
-    group: 'propuesta'
-  },
-  validacion_comercial: {
-    icon: FileCheck,
-    color: 'text-violet-600',
-    bgColor: 'bg-violet-100',
-    activeColor: 'bg-violet-600 text-white',
-    label: 'Validación Comercial',
-    shortLabel: 'V. Comercial',
-    description: 'Costeo, margen, condiciones',
-    order: 4,
-    group: 'propuesta'
-  },
-  negociacion: {
-    icon: Handshake,
-    color: 'text-orange-600',
-    bgColor: 'bg-orange-100',
-    activeColor: 'bg-orange-600 text-white',
-    label: 'Negociación',
-    shortLabel: 'Negociación',
-    description: 'Post-envío de cotización',
-    order: 5,
-    group: 'negociacion'
-  },
-  seguimiento_proyecto: {
-    icon: FolderKanban,
-    color: 'text-green-600',
-    bgColor: 'bg-green-100',
-    activeColor: 'bg-green-600 text-white',
-    label: 'Seguimiento Proyecto',
-    shortLabel: 'Seg. Proyecto',
-    description: 'Seguimiento de ejecución',
-    order: 6,
-    group: 'cierre'
-  },
-  feedback_mejora: {
-    icon: MessageSquareWarning,
-    color: 'text-red-600',
-    bgColor: 'bg-red-100',
-    activeColor: 'bg-red-600 text-white',
-    label: 'Feedback de Mejora',
-    shortLabel: 'Feedback',
-    description: 'Motivo, competidor, aprendizajes',
-    order: 6,
-    group: 'cierre'
-  },
-  // Legacy states - mantener para compatibilidad con datos existentes
-  cerrada_ganada: {
-    icon: Trophy,
-    color: 'text-green-600',
-    bgColor: 'bg-green-100',
-    activeColor: 'bg-green-600 text-white',
-    label: 'Cerrada Ganada',
-    shortLabel: 'Ganada',
-    order: 6,
-    group: 'cierre'
-  },
-  cerrada_perdida: {
-    icon: XCircle,
-    color: 'text-red-600',
-    bgColor: 'bg-red-100',
-    activeColor: 'bg-red-600 text-white',
-    label: 'Cerrada Perdida',
-    shortLabel: 'Perdida',
-    order: 6,
-    group: 'cierre'
-  }
+  inicio: { icon: Target, color: 'text-purple-600', bgColor: 'bg-purple-100', activeColor: 'bg-purple-600 text-white', label: 'Inicio', shortLabel: 'Inicio', order: 1, group: 'inicio' },
+  contacto_cliente: { icon: Users, color: 'text-blue-600', bgColor: 'bg-blue-100', activeColor: 'bg-blue-600 text-white', label: 'Contacto', shortLabel: 'Contacto', order: 2, group: 'contacto' },
+  validacion_tecnica: { icon: ClipboardCheck, color: 'text-cyan-600', bgColor: 'bg-cyan-100', activeColor: 'bg-cyan-600 text-white', label: 'Validación Técnica', shortLabel: 'V. Técnica', description: 'Alcance y recursos necesarios', order: 3, group: 'propuesta' },
+  validacion_comercial: { icon: FileCheck, color: 'text-violet-600', bgColor: 'bg-violet-100', activeColor: 'bg-violet-600 text-white', label: 'Validación Comercial', shortLabel: 'V. Comercial', description: 'Costeo, margen, condiciones', order: 4, group: 'propuesta' },
+  negociacion: { icon: Handshake, color: 'text-orange-600', bgColor: 'bg-orange-100', activeColor: 'bg-orange-600 text-white', label: 'Negociación', shortLabel: 'Negociación', description: 'Post-envío de cotización', order: 5, group: 'negociacion' },
+  seguimiento_proyecto: { icon: FolderKanban, color: 'text-green-600', bgColor: 'bg-green-100', activeColor: 'bg-green-600 text-white', label: 'Seguimiento Proyecto', shortLabel: 'Seg. Proyecto', description: 'Seguimiento de ejecución', order: 6, group: 'cierre' },
+  feedback_mejora: { icon: MessageSquareWarning, color: 'text-red-600', bgColor: 'bg-red-100', activeColor: 'bg-red-600 text-white', label: 'Feedback de Mejora', shortLabel: 'Feedback', description: 'Motivo, competidor, aprendizajes', order: 6, group: 'cierre' },
+  cerrada_ganada: { icon: Trophy, color: 'text-green-600', bgColor: 'bg-green-100', activeColor: 'bg-green-600 text-white', label: 'Cerrada Ganada', shortLabel: 'Ganada', order: 6, group: 'cierre' },
+  cerrada_perdida: { icon: XCircle, color: 'text-red-600', bgColor: 'bg-red-100', activeColor: 'bg-red-600 text-white', label: 'Cerrada Perdida', shortLabel: 'Perdida', order: 6, group: 'cierre' },
 }
 
-// Estados por grupo
 const propuestaStates = ['validacion_tecnica', 'validacion_comercial']
 const cierreGanadoStates = ['seguimiento_proyecto', 'cerrada_ganada']
 const cierrePerdidoStates = ['feedback_mejora', 'cerrada_perdida']
 const allCierreStates = [...cierreGanadoStates, ...cierrePerdidoStates]
 
-// Todos los estados en orden para dropdown
-const allStatesOrdered = [
-  'inicio',
-  'contacto_cliente',
-  'validacion_tecnica',
-  'validacion_comercial',
-  'negociacion',
-  'seguimiento_proyecto',
-  'feedback_mejora'
-]
+const activeStates = ['inicio', 'contacto_cliente', 'validacion_tecnica', 'validacion_comercial', 'negociacion']
+const terminalStates = ['seguimiento_proyecto', 'feedback_mejora']
 
-// Motivos de pérdida predefinidos
+const validTransitions: Record<string, string[]> = {
+  inicio: ['contacto_cliente', 'feedback_mejora'],
+  contacto_cliente: ['validacion_tecnica', 'validacion_comercial', 'feedback_mejora'],
+  validacion_tecnica: ['validacion_comercial', 'negociacion', 'feedback_mejora'],
+  validacion_comercial: ['validacion_tecnica', 'negociacion', 'feedback_mejora'],
+  negociacion: ['seguimiento_proyecto', 'feedback_mejora'],
+  seguimiento_proyecto: [...activeStates, 'feedback_mejora'],
+  feedback_mejora: [...activeStates, 'seguimiento_proyecto'],
+  cerrada_ganada: [...activeStates, 'seguimiento_proyecto', 'feedback_mejora'],
+  cerrada_perdida: [...activeStates, 'seguimiento_proyecto', 'feedback_mejora'],
+}
+
 const CRM_MOTIVOS_PERDIDA = [
   { value: 'precio', label: 'Precio más alto que competencia' },
   { value: 'tiempo', label: 'Tiempo de entrega' },
@@ -182,26 +95,6 @@ const CRM_MOTIVOS_PERDIDA = [
   { value: 'cancelado', label: 'Proyecto cancelado por cliente' },
   { value: 'otro', label: 'Otro motivo' }
 ]
-
-// Estados activos (no terminales)
-const activeStates = ['inicio', 'contacto_cliente', 'validacion_tecnica', 'validacion_comercial', 'negociacion']
-// Estados terminales (cierre)
-const terminalStates = ['seguimiento_proyecto', 'feedback_mejora']
-
-// Transiciones válidas entre estados
-const validTransitions: Record<string, string[]> = {
-  inicio: ['contacto_cliente', 'feedback_mejora'],
-  contacto_cliente: ['validacion_tecnica', 'validacion_comercial', 'feedback_mejora'],
-  validacion_tecnica: ['validacion_comercial', 'negociacion', 'feedback_mejora'],
-  validacion_comercial: ['validacion_tecnica', 'negociacion', 'feedback_mejora'],
-  negociacion: ['seguimiento_proyecto', 'feedback_mejora'],
-  // Terminal states can reopen to any active state
-  seguimiento_proyecto: [...activeStates, 'feedback_mejora'],
-  feedback_mejora: [...activeStates, 'seguimiento_proyecto'],
-  // Legacy states can also reopen
-  cerrada_ganada: [...activeStates, 'seguimiento_proyecto', 'feedback_mejora'],
-  cerrada_perdida: [...activeStates, 'seguimiento_proyecto', 'feedback_mejora'],
-}
 
 function isValidTransition(from: string, to: string): boolean {
   const allowed = validTransitions[from]
@@ -218,11 +111,11 @@ export default function CrmEtapasStepper({ oportunidad, onUpdated, compact = fal
   const [feedbackLoading, setFeedbackLoading] = useState(false)
   const currentEstado = oportunidad.estado || 'inicio'
   const currentConfig = etapasConfig[currentEstado as keyof typeof etapasConfig]
+  const currentStepIndex = currentConfig?.order || 1
 
   const handleEtapaChange = async (nuevaEtapa: string) => {
     if (nuevaEtapa === currentEstado) return
 
-    // BUG 4: Validate state transition
     if (!isValidTransition(currentEstado, nuevaEtapa)) {
       const fromLabel = etapasConfig[currentEstado as keyof typeof etapasConfig]?.label || currentEstado
       const toLabel = etapasConfig[nuevaEtapa as keyof typeof etapasConfig]?.label || nuevaEtapa
@@ -230,7 +123,6 @@ export default function CrmEtapasStepper({ oportunidad, onUpdated, compact = fal
       return
     }
 
-    // BUG 3: Intercept feedback_mejora to show dialog
     if (nuevaEtapa === 'feedback_mejora') {
       setFeedbackMotivo('')
       setFeedbackCompetidor('')
@@ -274,15 +166,6 @@ export default function CrmEtapasStepper({ oportunidad, onUpdated, compact = fal
     }
   }
 
-  // Get the step index for the current estado (for visual progress)
-  const getCurrentStepIndex = () => {
-    const config = etapasConfig[currentEstado as keyof typeof etapasConfig]
-    return config?.order || 1
-  }
-
-  const currentStepIndex = getCurrentStepIndex()
-
-  // Feedback dialog (rendered always, controlled by feedbackOpen state)
   const feedbackDialog = (
     <Dialog open={feedbackOpen} onOpenChange={setFeedbackOpen}>
       <DialogContent className="sm:max-w-md">
@@ -298,9 +181,7 @@ export default function CrmEtapasStepper({ oportunidad, onUpdated, compact = fal
               </SelectTrigger>
               <SelectContent>
                 {CRM_MOTIVOS_PERDIDA.map((m) => (
-                  <SelectItem key={m.value} value={m.value}>
-                    {m.label}
-                  </SelectItem>
+                  <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -342,336 +223,225 @@ export default function CrmEtapasStepper({ oportunidad, onUpdated, compact = fal
   if (compact) {
     return (
       <>
-      {feedbackDialog}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="outline"
-            size="sm"
-            className={cn(
-              "h-7 gap-1.5 text-xs font-medium border-0",
-              currentConfig?.activeColor
-            )}
-            disabled={loadingEtapa !== null}
-          >
-            {loadingEtapa ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
-            ) : (
-              React.createElement(currentConfig?.icon || Target, { className: 'h-3 w-3' })
-            )}
-            {currentConfig?.shortLabel}
-            <ChevronDown className="h-3 w-3 ml-0.5" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-52">
-          <DropdownMenuLabel className="text-xs text-muted-foreground">Inicio</DropdownMenuLabel>
-          <DropdownMenuItem
-            onClick={() => handleEtapaChange('inicio')}
-            disabled={loadingEtapa !== null}
-            className={cn("gap-2", currentEstado === 'inicio' && "bg-muted")}
-          >
-            <Target className="h-4 w-4 text-purple-600" />
-            Inicio
-            {currentEstado === 'inicio' && <CheckCircle className="h-3 w-3 ml-auto text-green-500" />}
-          </DropdownMenuItem>
-
-          <DropdownMenuSeparator />
-          <DropdownMenuLabel className="text-xs text-muted-foreground">Contacto</DropdownMenuLabel>
-          <DropdownMenuItem
-            onClick={() => handleEtapaChange('contacto_cliente')}
-            disabled={loadingEtapa !== null}
-            className={cn("gap-2", currentEstado === 'contacto_cliente' && "bg-muted")}
-          >
-            <Users className="h-4 w-4 text-blue-600" />
-            Contacto
-            {currentEstado === 'contacto_cliente' && <CheckCircle className="h-3 w-3 ml-auto text-green-500" />}
-          </DropdownMenuItem>
-
-          <DropdownMenuSeparator />
-          <DropdownMenuLabel className="text-xs text-muted-foreground">Propuesta</DropdownMenuLabel>
-          {propuestaStates.map(estado => {
-            const config = etapasConfig[estado as keyof typeof etapasConfig]
-            return (
-              <DropdownMenuItem
-                key={estado}
-                onClick={() => handleEtapaChange(estado)}
-                disabled={loadingEtapa !== null}
-                className={cn("gap-2", currentEstado === estado && "bg-muted")}
-              >
-                {React.createElement(config.icon, { className: `h-4 w-4 ${config.color}` })}
-                {config.label}
-                {currentEstado === estado && <CheckCircle className="h-3 w-3 ml-auto text-green-500" />}
-              </DropdownMenuItem>
-            )
-          })}
-
-          <DropdownMenuSeparator />
-          <DropdownMenuLabel className="text-xs text-muted-foreground">Negociación</DropdownMenuLabel>
-          <DropdownMenuItem
-            onClick={() => handleEtapaChange('negociacion')}
-            disabled={loadingEtapa !== null}
-            className={cn("gap-2", currentEstado === 'negociacion' && "bg-muted")}
-          >
-            <Handshake className="h-4 w-4 text-orange-600" />
-            Negociación
-            {currentEstado === 'negociacion' && <CheckCircle className="h-3 w-3 ml-auto text-green-500" />}
-          </DropdownMenuItem>
-
-          <DropdownMenuSeparator />
-          <DropdownMenuLabel className="text-xs text-muted-foreground">Cierre</DropdownMenuLabel>
-          <DropdownMenuItem
-            onClick={() => handleEtapaChange('seguimiento_proyecto')}
-            disabled={loadingEtapa !== null}
-            className={cn("gap-2", cierreGanadoStates.includes(currentEstado) && "bg-muted")}
-          >
-            <FolderKanban className="h-4 w-4 text-green-600" />
-            Seguimiento Proyecto
-            {cierreGanadoStates.includes(currentEstado) && <CheckCircle className="h-3 w-3 ml-auto text-green-500" />}
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() => handleEtapaChange('feedback_mejora')}
-            disabled={loadingEtapa !== null}
-            className={cn("gap-2", cierrePerdidoStates.includes(currentEstado) && "bg-muted")}
-          >
-            <MessageSquareWarning className="h-4 w-4 text-red-600" />
-            Feedback de Mejora
-            {cierrePerdidoStates.includes(currentEstado) && <CheckCircle className="h-3 w-3 ml-auto text-green-500" />}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+        {feedbackDialog}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className={cn("h-7 gap-1.5 text-xs font-medium border-0", currentConfig?.activeColor)}
+              disabled={loadingEtapa !== null}
+            >
+              {loadingEtapa ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                React.createElement(currentConfig?.icon || Target, { className: 'h-3 w-3' })
+              )}
+              {currentConfig?.shortLabel}
+              <ChevronDown className="h-3 w-3 ml-0.5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-52">
+            <DropdownMenuLabel className="text-xs text-muted-foreground">Inicio</DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => handleEtapaChange('inicio')} disabled={loadingEtapa !== null} className={cn("gap-2", currentEstado === 'inicio' && "bg-muted")}>
+              <Target className="h-4 w-4 text-purple-600" />
+              Inicio
+              {currentEstado === 'inicio' && <CheckCircle className="h-3 w-3 ml-auto text-green-500" />}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-xs text-muted-foreground">Contacto</DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => handleEtapaChange('contacto_cliente')} disabled={loadingEtapa !== null} className={cn("gap-2", currentEstado === 'contacto_cliente' && "bg-muted")}>
+              <Users className="h-4 w-4 text-blue-600" />
+              Contacto
+              {currentEstado === 'contacto_cliente' && <CheckCircle className="h-3 w-3 ml-auto text-green-500" />}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-xs text-muted-foreground">Propuesta</DropdownMenuLabel>
+            {propuestaStates.map(estado => {
+              const config = etapasConfig[estado as keyof typeof etapasConfig]
+              return (
+                <DropdownMenuItem key={estado} onClick={() => handleEtapaChange(estado)} disabled={loadingEtapa !== null} className={cn("gap-2", currentEstado === estado && "bg-muted")}>
+                  {React.createElement(config.icon, { className: `h-4 w-4 ${config.color}` })}
+                  {config.label}
+                  {currentEstado === estado && <CheckCircle className="h-3 w-3 ml-auto text-green-500" />}
+                </DropdownMenuItem>
+              )
+            })}
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-xs text-muted-foreground">Negociación</DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => handleEtapaChange('negociacion')} disabled={loadingEtapa !== null} className={cn("gap-2", currentEstado === 'negociacion' && "bg-muted")}>
+              <Handshake className="h-4 w-4 text-orange-600" />
+              Negociación
+              {currentEstado === 'negociacion' && <CheckCircle className="h-3 w-3 ml-auto text-green-500" />}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-xs text-muted-foreground">Cierre</DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => handleEtapaChange('seguimiento_proyecto')} disabled={loadingEtapa !== null} className={cn("gap-2", cierreGanadoStates.includes(currentEstado) && "bg-muted")}>
+              <FolderKanban className="h-4 w-4 text-green-600" />
+              Seguimiento Proyecto
+              {cierreGanadoStates.includes(currentEstado) && <CheckCircle className="h-3 w-3 ml-auto text-green-500" />}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleEtapaChange('feedback_mejora')} disabled={loadingEtapa !== null} className={cn("gap-2", cierrePerdidoStates.includes(currentEstado) && "bg-muted")}>
+              <MessageSquareWarning className="h-4 w-4 text-red-600" />
+              Feedback de Mejora
+              {cierrePerdidoStates.includes(currentEstado) && <CheckCircle className="h-3 w-3 ml-auto text-green-500" />}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </>
     )
   }
 
-  // Full stepper version - Flujo: Inicio → Contacto → Propuesta → Negociación → [Seg. Proyecto / Feedback]
+  // Helper to get pill status for a step
+  const getStepStatus = (order: number): StepStatus => {
+    if (currentStepIndex > order) return 'completed'
+    if (currentStepIndex === order) return 'current'
+    return 'future'
+  }
+
+  // Propuesta dropdown pill
+  const isInPropuesta = propuestaStates.includes(currentEstado)
+  const isPropuestaPast = currentStepIndex > 4
+  const propuestaStatus: StepStatus = isInPropuesta ? 'current' : isPropuestaPast ? 'completed' : 'future'
+  const propuestaLabel = isInPropuesta
+    ? (etapasConfig[currentEstado as keyof typeof etapasConfig]?.shortLabel || 'Propuesta')
+    : 'Propuesta'
+
+  // Cierre status
+  const isInCierre = allCierreStates.includes(currentEstado)
+  const cierreStatus: StepStatus = isInCierre
+    ? (cierrePerdidoStates.includes(currentEstado) ? 'rejected' : 'current')
+    : 'future'
+
+  // Full stepper version with pills
   return (
     <>
-    {feedbackDialog}
-    <div className="flex items-center gap-1 flex-wrap">
-      {/* Phase 1: Inicio */}
-      <StepButton
-        estado="inicio"
-        config={etapasConfig.inicio}
-        isActive={currentEstado === 'inicio'}
-        isPast={currentStepIndex > 1}
-        isLoading={loadingEtapa === 'inicio'}
-        disabled={loadingEtapa !== null}
-        onClick={() => handleEtapaChange('inicio')}
-      />
-
-      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-
-      {/* Phase 2: Contacto */}
-      <StepButton
-        estado="contacto_cliente"
-        config={etapasConfig.contacto_cliente}
-        isActive={currentEstado === 'contacto_cliente'}
-        isPast={currentStepIndex > 2}
-        isLoading={loadingEtapa === 'contacto_cliente'}
-        disabled={loadingEtapa !== null}
-        onClick={() => handleEtapaChange('contacto_cliente')}
-      />
-
-      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-
-      {/* Phase 3: Propuesta (dropdown con validacion_tecnica, validacion_comercial) */}
-      <PropuestaDropdown
-        currentEstado={currentEstado}
-        currentStepIndex={currentStepIndex}
-        loadingEtapa={loadingEtapa}
-        onEtapaChange={handleEtapaChange}
-      />
-
-      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-
-      {/* Phase 4: Negociación (estado único) */}
-      <StepButton
-        estado="negociacion"
-        config={etapasConfig.negociacion}
-        isActive={currentEstado === 'negociacion'}
-        isPast={currentStepIndex > 5}
-        isLoading={loadingEtapa === 'negociacion'}
-        disabled={loadingEtapa !== null}
-        onClick={() => handleEtapaChange('negociacion')}
-      />
-
-      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-
-      {/* Phase 5: Cierre (Seguimiento Proyecto / Feedback de Mejora) */}
-      {allCierreStates.includes(currentEstado) ? (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className={cn(
-                "h-7 gap-1 text-xs font-medium px-2",
-                currentConfig?.activeColor
-              )}
-              disabled={loadingEtapa !== null}
-            >
-              {loadingEtapa && allCierreStates.includes(loadingEtapa) ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : (
-                React.createElement(currentConfig?.icon || FolderKanban, { className: 'h-3 w-3' })
-              )}
-              {currentConfig?.shortLabel}
-              <ChevronDown className="h-3 w-3" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              onClick={() => handleEtapaChange('seguimiento_proyecto')}
-              disabled={loadingEtapa !== null}
-              className="gap-2"
-            >
-              <FolderKanban className="h-4 w-4 text-green-600" />
-              Seguimiento Proyecto
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => handleEtapaChange('feedback_mejora')}
-              disabled={loadingEtapa !== null}
-              className="gap-2"
-            >
-              <MessageSquareWarning className="h-4 w-4 text-red-600" />
-              Feedback de Mejora
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ) : (
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 gap-1 text-xs font-medium px-2 text-green-600 hover:bg-green-50 hover:text-green-700"
-            onClick={() => handleEtapaChange('seguimiento_proyecto')}
+      {feedbackDialog}
+      <div className="flex items-center gap-1 flex-wrap">
+        <div className="flex items-center">
+          {/* Phase 1: Inicio */}
+          <StepPill
+            label="Inicio"
+            status={getStepStatus(1)}
+            interactive
+            loading={loadingEtapa === 'inicio'}
             disabled={loadingEtapa !== null}
-          >
-            {loadingEtapa === 'seguimiento_proyecto' ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
-            ) : (
-              <FolderKanban className="h-3 w-3" />
-            )}
-            Seg. Proyecto
-          </Button>
-          <span className="text-muted-foreground text-xs">/</span>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 gap-1 text-xs font-medium px-2 text-red-600 hover:bg-red-50 hover:text-red-700"
-            onClick={() => handleEtapaChange('feedback_mejora')}
+            onClick={() => handleEtapaChange('inicio')}
+          />
+
+          <StepLine nextStatus={getStepStatus(2)} />
+
+          {/* Phase 2: Contacto */}
+          <StepPill
+            label="Contacto"
+            status={getStepStatus(2)}
+            interactive
+            loading={loadingEtapa === 'contacto_cliente'}
             disabled={loadingEtapa !== null}
-          >
-            {loadingEtapa === 'feedback_mejora' ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
-            ) : (
-              <MessageSquareWarning className="h-3 w-3" />
-            )}
-            Feedback
-          </Button>
-        </div>
-      )}
-    </div>
-    </>
-  )
-}
+            onClick={() => handleEtapaChange('contacto_cliente')}
+          />
 
-// Dropdown for Propuesta sub-phases (Validación Técnica + Validación Comercial)
-interface PropuestaDropdownProps {
-  currentEstado: string
-  currentStepIndex: number
-  loadingEtapa: string | null
-  onEtapaChange: (estado: string) => void
-}
+          <StepLine nextStatus={propuestaStatus} />
 
-function PropuestaDropdown({ currentEstado, currentStepIndex, loadingEtapa, onEtapaChange }: PropuestaDropdownProps) {
-  const isInPropuesta = propuestaStates.includes(currentEstado)
-  const isPast = currentStepIndex > 4
+          {/* Phase 3: Propuesta (dropdown) */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <span>
+                <StepPill
+                  label={propuestaLabel}
+                  status={propuestaStatus}
+                  interactive
+                >
+                  <ChevronDown className="h-3 w-3" />
+                </StepPill>
+              </span>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuLabel className="text-xs text-muted-foreground">Etapas de Propuesta</DropdownMenuLabel>
+              {propuestaStates.map(estado => {
+                const config = etapasConfig[estado as keyof typeof etapasConfig]
+                return (
+                  <DropdownMenuItem
+                    key={estado}
+                    onClick={() => handleEtapaChange(estado)}
+                    disabled={loadingEtapa !== null}
+                    className={cn("gap-2 flex-col items-start", currentEstado === estado && "bg-muted")}
+                  >
+                    <div className="flex items-center gap-2 w-full">
+                      {React.createElement(config.icon, { className: `h-4 w-4 ${config.color}` })}
+                      <span className="flex-1">{config.label}</span>
+                      {currentEstado === estado && <CheckCircle className="h-3 w-3 text-green-500" />}
+                    </div>
+                    {'description' in config && (
+                      <span className="text-xs text-muted-foreground ml-6">{config.description}</span>
+                    )}
+                  </DropdownMenuItem>
+                )
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
 
-  const currentConfig = isInPropuesta
-    ? etapasConfig[currentEstado as keyof typeof etapasConfig]
-    : etapasConfig.validacion_tecnica
+          <StepLine nextStatus={getStepStatus(5)} />
 
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          className={cn(
-            "h-7 gap-1 text-xs font-medium px-2 transition-all",
-            isInPropuesta && currentConfig.activeColor,
-            isPast && !isInPropuesta && "bg-cyan-100 text-cyan-600",
-            !isInPropuesta && !isPast && "text-muted-foreground hover:bg-muted"
-          )}
-          disabled={loadingEtapa !== null}
-        >
-          {loadingEtapa && propuestaStates.includes(loadingEtapa) ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
+          {/* Phase 4: Negociación */}
+          <StepPill
+            label="Negociación"
+            status={getStepStatus(5)}
+            interactive
+            loading={loadingEtapa === 'negociacion'}
+            disabled={loadingEtapa !== null}
+            onClick={() => handleEtapaChange('negociacion')}
+          />
+
+          <StepLine nextStatus={cierreStatus} />
+
+          {/* Phase 5: Cierre (Seg. Proyecto / Feedback) */}
+          {isInCierre ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <span>
+                  <StepPill
+                    label={currentConfig?.shortLabel || ''}
+                    status={cierreStatus}
+                  >
+                    <ChevronDown className="h-3 w-3" />
+                  </StepPill>
+                </span>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleEtapaChange('seguimiento_proyecto')} disabled={loadingEtapa !== null} className="gap-2">
+                  <FolderKanban className="h-4 w-4 text-green-600" />
+                  Seguimiento Proyecto
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleEtapaChange('feedback_mejora')} disabled={loadingEtapa !== null} className="gap-2">
+                  <MessageSquareWarning className="h-4 w-4 text-red-600" />
+                  Feedback de Mejora
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           ) : (
-            <FileText className="h-3 w-3" />
+            <div className="flex items-center gap-1">
+              <StepPill
+                label="Seg. Proyecto"
+                status="future"
+                interactive
+                loading={loadingEtapa === 'seguimiento_proyecto'}
+                disabled={loadingEtapa !== null}
+                onClick={() => handleEtapaChange('seguimiento_proyecto')}
+              />
+              <span className="text-muted-foreground text-xs">/</span>
+              <StepPill
+                label="Feedback"
+                status="future"
+                interactive
+                loading={loadingEtapa === 'feedback_mejora'}
+                disabled={loadingEtapa !== null}
+                onClick={() => handleEtapaChange('feedback_mejora')}
+              />
+            </div>
           )}
-          {isInPropuesta ? currentConfig.shortLabel : 'Propuesta'}
-          <ChevronDown className="h-3 w-3" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-56">
-        <DropdownMenuLabel className="text-xs text-muted-foreground">Etapas de Propuesta</DropdownMenuLabel>
-        {propuestaStates.map(estado => {
-          const config = etapasConfig[estado as keyof typeof etapasConfig]
-          return (
-            <DropdownMenuItem
-              key={estado}
-              onClick={() => onEtapaChange(estado)}
-              disabled={loadingEtapa !== null}
-              className={cn("gap-2 flex-col items-start", currentEstado === estado && "bg-muted")}
-            >
-              <div className="flex items-center gap-2 w-full">
-                {React.createElement(config.icon, { className: `h-4 w-4 ${config.color}` })}
-                <span className="flex-1">{config.label}</span>
-                {currentEstado === estado && <CheckCircle className="h-3 w-3 text-green-500" />}
-              </div>
-              {'description' in config && (
-                <span className="text-xs text-muted-foreground ml-6">{config.description}</span>
-              )}
-            </DropdownMenuItem>
-          )
-        })}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-}
-
-interface StepButtonProps {
-  estado: string
-  config: typeof etapasConfig.inicio
-  isActive: boolean
-  isPast: boolean
-  isLoading: boolean
-  disabled: boolean
-  onClick: () => void
-}
-
-function StepButton({ config, isActive, isPast, isLoading, disabled, onClick }: StepButtonProps) {
-  return (
-    <Button
-      variant="ghost"
-      size="sm"
-      className={cn(
-        "h-7 gap-1 text-xs font-medium px-2 transition-all",
-        isActive && config.activeColor,
-        isPast && !isActive && `${config.bgColor} ${config.color}`,
-        !isActive && !isPast && "text-muted-foreground hover:bg-muted"
-      )}
-      onClick={onClick}
-      disabled={disabled}
-    >
-      {isLoading ? (
-        <Loader2 className="h-3 w-3 animate-spin" />
-      ) : (
-        React.createElement(config.icon, { className: 'h-3 w-3' })
-      )}
-      {config.shortLabel}
-    </Button>
+        </div>
+      </div>
+    </>
   )
 }
