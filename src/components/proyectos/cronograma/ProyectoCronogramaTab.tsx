@@ -110,15 +110,16 @@ export function ProyectoCronogramaTab({
   const { toast } = useToast()
   const { data: session } = useSession()
   const isAdmin = session?.user?.role === 'admin'
-  const canDeleteBaseline = ['admin', 'gerente', 'gestor', 'coordinador'].includes(session?.user?.role as string)
+  const canManageLock = ['admin', 'gerente', 'gestor', 'coordinador'].includes(session?.user?.role as string)
+  const canDeleteBaseline = canManageLock
 
-  // Desbloquear/bloquear cronograma (toggle baseline)
+  // Desbloquear/bloquear cronograma (solo toggle bloqueado, sin afectar baseline)
   const handleToggleBloqueo = async () => {
     if (!selectedCronograma) return
     try {
       setIsLoading(true)
       const response = await fetch(
-        `/api/proyectos/${proyectoId}/cronograma/${selectedCronograma.id}/baseline`,
+        `/api/proyectos/${proyectoId}/cronograma/${selectedCronograma.id}/bloqueo`,
         { method: 'PUT' }
       )
       if (!response.ok) {
@@ -126,7 +127,6 @@ export function ProyectoCronogramaTab({
         throw new Error(errorData.error || 'Error al cambiar estado de bloqueo')
       }
       const result = await response.json()
-      // Actualizar cronograma seleccionado y lista
       setSelectedCronograma(result.data)
       setCronogramas(prev => prev.map(c => c.id === result.data.id ? result.data : c))
       toast({
@@ -898,15 +898,18 @@ export function ProyectoCronogramaTab({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52">
-              {/* Desbloquear - solo admin cuando esta bloqueado */}
-              {selectedCronograma?.bloqueado && isAdmin && (
+              {/* Desbloquear/Bloquear - roles con permiso */}
+              {canManageLock && !esComercial && (
                 <>
                   <DropdownMenuItem onSelect={() => {
                     setDropdownOpen(false)
                     setTimeout(() => handleToggleBloqueo(), 100)
                   }} disabled={isLoading}>
-                    <Unlock className="h-4 w-4 mr-2" />
-                    Desbloquear Cronograma
+                    {selectedCronograma?.bloqueado ? (
+                      <><Unlock className="h-4 w-4 mr-2" />Desbloquear Cronograma</>
+                    ) : (
+                      <><Lock className="h-4 w-4 mr-2" />Bloquear Cronograma</>
+                    )}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                 </>
