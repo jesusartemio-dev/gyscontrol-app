@@ -760,7 +760,7 @@ export function ProyectoCronogramaTab({
                     <Icon className={`h-3 w-3 ${info.color}`} />
                     <span className={info.color}>{info.label}</span>
                     {selectedCronograma.esBaseline && <Star className="h-3 w-3 text-yellow-500 fill-yellow-500" />}
-                    {(selectedCronograma.bloqueado || selectedCronograma.esBaseline || selectedCronograma.tipo === 'comercial') && <Lock className="h-3 w-3 text-amber-500" />}
+                    {(selectedCronograma.bloqueado || selectedCronograma.tipo === 'comercial') && <Lock className="h-3 w-3 text-amber-500" />}
                   </div>
                 )
               })()}
@@ -779,7 +779,7 @@ export function ProyectoCronogramaTab({
                     <Icon className={`h-3 w-3 ${info.color}`} />
                     <span className={info.color}>{info.label}</span>
                     {cron.esBaseline && <Star className="h-3 w-3 text-yellow-500 fill-yellow-500" />}
-                    {(cron.bloqueado || cron.esBaseline || cron.tipo === 'comercial') && <Lock className="h-3 w-3 text-amber-500" />}
+                    {(cron.bloqueado || cron.tipo === 'comercial') && <Lock className="h-3 w-3 text-amber-500" />}
                   </div>
                 </SelectItem>
               )

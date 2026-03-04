@@ -414,7 +414,7 @@ export function ProyectoCronogramaTreeView({
       const childNodeIds = node.children?.map(child => child.id) || []
 
       // Determinar permisos según el tipo de cronograma o estado de bloqueo
-      const isReadOnly = selectedCronograma?.tipo === 'comercial' || selectedCronograma?.bloqueado === true || selectedCronograma?.esBaseline === true
+      const isReadOnly = selectedCronograma?.tipo === 'comercial' || selectedCronograma?.bloqueado === true
 
       return (
         <React.Fragment key={nodeId}>
