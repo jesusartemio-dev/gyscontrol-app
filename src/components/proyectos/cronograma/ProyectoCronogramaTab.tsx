@@ -898,19 +898,25 @@ export function ProyectoCronogramaTab({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52">
-              {/* Desbloquear/Bloquear - roles con permiso */}
-              {canManageLock && !esComercial && (
+              {/* Desbloquear (solo admin) / Bloquear (roles con permiso) */}
+              {!esComercial && (
                 <>
-                  <DropdownMenuItem onSelect={() => {
-                    setDropdownOpen(false)
-                    setTimeout(() => handleToggleBloqueo(), 100)
-                  }} disabled={isLoading}>
-                    {selectedCronograma?.bloqueado ? (
-                      <><Unlock className="h-4 w-4 mr-2" />Desbloquear Cronograma</>
-                    ) : (
-                      <><Lock className="h-4 w-4 mr-2" />Bloquear Cronograma</>
-                    )}
-                  </DropdownMenuItem>
+                  {selectedCronograma?.bloqueado && isAdmin && (
+                    <DropdownMenuItem onSelect={() => {
+                      setDropdownOpen(false)
+                      setTimeout(() => handleToggleBloqueo(), 100)
+                    }} disabled={isLoading}>
+                      <Unlock className="h-4 w-4 mr-2" />Desbloquear Cronograma
+                    </DropdownMenuItem>
+                  )}
+                  {!selectedCronograma?.bloqueado && canManageLock && (
+                    <DropdownMenuItem onSelect={() => {
+                      setDropdownOpen(false)
+                      setTimeout(() => handleToggleBloqueo(), 100)
+                    }} disabled={isLoading}>
+                      <Lock className="h-4 w-4 mr-2" />Bloquear Cronograma
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator />
                 </>
               )}

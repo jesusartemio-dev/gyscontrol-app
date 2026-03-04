@@ -17,13 +17,6 @@ export async function PUT(
     }
 
     const userRole = (session.user as any).role
-    const rolesPermitidos = ['admin', 'gerente', 'gestor', 'coordinador']
-    if (!rolesPermitidos.includes(userRole)) {
-      return NextResponse.json(
-        { error: 'No tiene permisos para bloquear/desbloquear cronogramas' },
-        { status: 403 }
-      )
-    }
 
     const { id, cronogramaId } = await params
 
@@ -46,6 +39,21 @@ export async function PUT(
     }
 
     const nuevoEstado = !cronograma.bloqueado
+
+    // Desbloquear: solo admin | Bloquear: admin, gerente, gestor, coordinador
+    if (nuevoEstado === false && userRole !== 'admin') {
+      return NextResponse.json(
+        { error: 'Solo el administrador puede desbloquear cronogramas' },
+        { status: 403 }
+      )
+    }
+    const rolesBloquear = ['admin', 'gerente', 'gestor', 'coordinador']
+    if (nuevoEstado === true && !rolesBloquear.includes(userRole)) {
+      return NextResponse.json(
+        { error: 'No tiene permisos para bloquear cronogramas' },
+        { status: 403 }
+      )
+    }
 
     const updated = await prisma.proyectoCronograma.update({
       where: { id: cronogramaId },
