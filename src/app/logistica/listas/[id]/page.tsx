@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
@@ -22,6 +22,8 @@ import { getLogisticaListaById } from '@/lib/services/logisticaLista'
 import { updateListaEstado } from '@/lib/services/listaEquipo'
 import { flujoEstados, estadoLabels, type EstadoListaEquipo } from '@/lib/utils/flujoListaEquipo'
 import { Badge } from '@/components/ui/badge'
+import { StepPill, StepLine, type StepStatus } from '@/components/ui/status-stepper'
+import { estadosList } from '@/lib/utils/flujoListaEquipo'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
@@ -215,12 +217,7 @@ export default function LogisticaListaDetallePage() {
                   <FileText className="h-4 w-4 text-blue-600" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h1 className="text-base font-semibold">{lista.codigo}</h1>
-                    <Badge className={`text-[10px] h-5 ${getEstadoBadge(lista.estado)}`}>
-                      {lista.estado?.replace(/_/g, ' ')}
-                    </Badge>
-                  </div>
+                  <h1 className="text-base font-semibold">{lista.codigo}</h1>
                   <p className="text-[10px] text-muted-foreground">
                     {lista.proyecto?.nombre || 'Sin proyecto'}
                   </p>
@@ -272,6 +269,31 @@ export default function LogisticaListaDetallePage() {
                 </Button>
               )}
             </div>
+          </div>
+
+          {/* Estado flow stepper */}
+          <div className="flex items-center mt-2 overflow-x-auto">
+            {estadosList.map((etapa, i) => {
+              const currentIndex = estadosList.findIndex(s => s.key === lista.estado)
+              const isRechazada = lista.estado === 'rechazada'
+              let status: StepStatus = 'future'
+              if (!isRechazada) {
+                if (i < currentIndex) status = 'completed'
+                else if (etapa.key === lista.estado) status = 'current'
+              }
+              return (
+                <React.Fragment key={etapa.key}>
+                  {i > 0 && <StepLine nextStatus={status} />}
+                  <StepPill label={etapa.label} status={status} />
+                </React.Fragment>
+              )
+            })}
+            {lista.estado === 'rechazada' && (
+              <>
+                <StepLine nextStatus="rejected" />
+                <StepPill label="Rechazada" status="rejected" />
+              </>
+            )}
           </div>
         </div>
       </div>

@@ -1,5 +1,6 @@
 'use client'
 
+import React, { useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
 import {
@@ -7,11 +8,9 @@ import {
   X,
   RotateCcw,
   Loader2,
-  ChevronRight
 } from 'lucide-react'
 import { updateListaEstado } from '@/lib/services/listaEquipo'
 import { flujoEstados, estadosList, type EstadoListaEquipo } from '@/lib/utils/flujoListaEquipo'
-
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -27,9 +26,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { RollbackButton } from '@/components/RollbackButton'
-import type { EstadoListaEquipo as EstadoListaType } from '@/lib/utils/flujoListaEquipo'
-
-import { useState } from 'react'
+import { StepPill, StepLine, type StepStatus } from '@/components/ui/status-stepper'
 
 const estados = estadosList
 
@@ -42,20 +39,6 @@ interface Props {
   className?: string
 }
 
-/**
- * 🎯 ListaEstadoFlujoBanner - Minimalist Status Flow Component
- * 
- * Professional and compact status flow visualization that stays always visible.
- * Positioned between tabs and content for optimal UX.
- * 
- * Features:
- * - ✅ Compact horizontal layout
- * - ✅ Current status highlight
- * - ✅ Progress visualization
- * - ✅ Quick action buttons
- * - ✅ Professional styling
- * - ✅ Responsive design
- */
 export default function ListaEstadoFlujoBanner({ estado, listaId, totalItems = 0, itemsVerificados = 0, onUpdated, className }: Props) {
   const { data: session } = useSession()
   const rol = session?.user?.role || ''
@@ -72,10 +55,9 @@ export default function ListaEstadoFlujoBanner({ estado, listaId, totalItems = 0
   const [loading, setLoading] = useState(false)
 
   const faltanVerificar = totalItems > 0 && itemsVerificados < totalItems
-
-  // ✅ Get current estado info
   const siguienteEstado = estados.find(e => e.key === flujo.siguiente)
   const currentIndex = estados.findIndex(e => e.key === estado)
+  const isRechazada = estado === 'rechazada'
 
   const cambiarEstado = async (nuevoEstado: EstadoListaEquipo, mensaje: string, motivo?: string) => {
     if (!listaId || !session?.user?.id) return
@@ -95,6 +77,16 @@ export default function ListaEstadoFlujoBanner({ estado, listaId, totalItems = 0
     }
   }
 
+  // Build pill steps
+  const steps = estados.map((etapa, i) => {
+    let status: StepStatus = 'future'
+    if (!isRechazada) {
+      if (i < currentIndex) status = 'completed'
+      else if (etapa.key === estado) status = 'current'
+    }
+    return { key: etapa.key, label: etapa.label, status }
+  })
+
   return (
     <div
       className={cn(
@@ -102,42 +94,25 @@ export default function ListaEstadoFlujoBanner({ estado, listaId, totalItems = 0
         className
       )}
     >
-      {/* 🎯 Minimalist Progress Flow - Text only */}
-      <div className="flex items-center gap-1 overflow-x-auto flex-1 min-w-0">
-        {estados.map((etapa, i) => {
-          const isActive = estado === etapa.key
-          const isPast = currentIndex > i
+      {/* Pill flow */}
+      <div className="flex items-center overflow-x-auto flex-1 min-w-0">
+        {steps.map((step, i) => (
+          <React.Fragment key={step.key}>
+            {i > 0 && <StepLine nextStatus={step.status} />}
+            <StepPill label={step.label} status={step.status} />
+          </React.Fragment>
+        ))}
 
-          return (
-            <div key={etapa.key} className="flex items-center flex-shrink-0">
-              {/* Status text */}
-              <span
-                className={cn(
-                  'text-xs px-2 py-1 rounded-md transition-all whitespace-nowrap',
-                  isActive
-                    ? 'bg-white font-semibold text-gray-900 shadow-sm border border-gray-300'
-                    : isPast
-                      ? 'text-gray-500'
-                      : 'text-gray-400'
-                )}
-              >
-                {isPast && <span className="text-green-500 mr-1">✓</span>}
-                {etapa.label}
-              </span>
-
-              {/* Separator */}
-              {i < estados.length - 1 && (
-                <ChevronRight className={cn(
-                  'w-3 h-3 mx-0.5 flex-shrink-0',
-                  isPast ? 'text-gray-400' : 'text-gray-300'
-                )} />
-              )}
-            </div>
-          )
-        })}
+        {/* Rechazada pill */}
+        {isRechazada && (
+          <>
+            <StepLine nextStatus="rejected" />
+            <StepPill label="Rechazada" status="rejected" />
+          </>
+        )}
       </div>
 
-      {/* 🎯 Action Buttons - Compact */}
+      {/* Action Buttons */}
       <div className="flex items-center gap-2 flex-shrink-0">
         {loading && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
 
@@ -218,7 +193,6 @@ export default function ListaEstadoFlujoBanner({ estado, listaId, totalItems = 0
                   Indica la razón del rechazo para que el equipo pueda hacer correcciones.
                 </AlertDialogDescription>
               </AlertDialogHeader>
-
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">
                   Justificación *
@@ -231,7 +205,6 @@ export default function ListaEstadoFlujoBanner({ estado, listaId, totalItems = 0
                   className="resize-none"
                 />
               </div>
-
               <AlertDialogFooter>
                 <AlertDialogCancel disabled={loading}>Cancelar</AlertDialogCancel>
                 <AlertDialogAction
@@ -254,7 +227,7 @@ export default function ListaEstadoFlujoBanner({ estado, listaId, totalItems = 0
           </AlertDialog>
         )}
 
-        {/* Rollback Button */}
+        {/* Rollback Buttons */}
         {listaId && estado === 'por_aprobar' && (
           <RollbackButton
             entityType="listaEquipo"
@@ -297,7 +270,6 @@ export default function ListaEstadoFlujoBanner({ estado, listaId, totalItems = 0
                   Esta acción reiniciará el flujo de aprobación.
                 </AlertDialogDescription>
               </AlertDialogHeader>
-
               <AlertDialogFooter>
                 <AlertDialogCancel disabled={loading}>Cancelar</AlertDialogCancel>
                 <AlertDialogAction
