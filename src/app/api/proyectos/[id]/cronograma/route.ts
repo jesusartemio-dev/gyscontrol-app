@@ -544,7 +544,7 @@ export async function DELETE(
 
     // ✅ Baseline: solo se puede eliminar si no hay ejecución y el usuario tiene rol permitido
     if (cronograma.esBaseline) {
-      const rolesPermitidos = ['admin', 'gerente', 'coordinador']
+      const rolesPermitidos = ['admin', 'gerente', 'gestor', 'coordinador']
       const userRole = (session.user as any).role
       if (!rolesPermitidos.includes(userRole)) {
         return NextResponse.json(

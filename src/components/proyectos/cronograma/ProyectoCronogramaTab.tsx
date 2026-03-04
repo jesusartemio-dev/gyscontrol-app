@@ -110,7 +110,7 @@ export function ProyectoCronogramaTab({
   const { toast } = useToast()
   const { data: session } = useSession()
   const isAdmin = session?.user?.role === 'admin'
-  const canDeleteBaseline = ['admin', 'gerente', 'coordinador'].includes(session?.user?.role as string)
+  const canDeleteBaseline = ['admin', 'gerente', 'gestor', 'coordinador'].includes(session?.user?.role as string)
 
   // Desbloquear/bloquear cronograma (toggle baseline)
   const handleToggleBloqueo = async () => {
