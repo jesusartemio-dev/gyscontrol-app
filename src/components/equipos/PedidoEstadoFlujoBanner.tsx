@@ -1,23 +1,15 @@
 /**
- * 📦 PedidoEstadoFlujoBanner - Diseño minimalista
- * @author GYS Team
+ * PedidoEstadoFlujoBanner - Flujo de estados con píldoras conectadas
  */
 
 'use client'
 
 import React, { useState } from 'react'
 import {
-  Clock,
-  Send,
-  CheckCircle,
-  Package,
-  Truck,
-  X,
   Loader2,
-  ChevronRight,
+  X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,10 +21,10 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
-import { flujoEstadosPedido, estadosPedidoList, estadoPedidoLabels, validarTransicionPedido, type EstadoPedidoEquipo } from '@/lib/utils/flujoPedidoEquipo'
+import { validarTransicionPedido } from '@/lib/utils/flujoPedidoEquipo'
 import { useSession } from 'next-auth/react'
 import { RollbackButton } from '@/components/RollbackButton'
+import { StepPill, StepLine, type StepStatus } from '@/components/ui/status-stepper'
 
 interface PedidoEstadoFlujoBannerProps {
   estado: string
@@ -44,27 +36,24 @@ interface PedidoEstadoFlujoBannerProps {
 }
 
 const ESTADOS_FLUJO = [
-  { key: 'borrador', label: 'Borrador', icon: Clock, color: 'gray', orden: 1 },
-  { key: 'enviado', label: 'Enviado', icon: Send, color: 'blue', orden: 2 },
-  { key: 'atendido', label: 'Atendido', icon: CheckCircle, color: 'amber', orden: 3 },
-  { key: 'parcial', label: 'Parcial', icon: Package, color: 'orange', orden: 4 },
-  { key: 'entregado', label: 'Entregado', icon: Truck, color: 'green', orden: 5 },
-  { key: 'cancelado', label: 'Cancelado', icon: X, color: 'red', orden: 6 },
+  { key: 'borrador', label: 'Borrador', orden: 1 },
+  { key: 'enviado', label: 'Enviado', orden: 2 },
+  { key: 'atendido', label: 'Atendido', orden: 3 },
+  { key: 'parcial', label: 'Parcial', orden: 4 },
+  { key: 'entregado', label: 'Entregado', orden: 5 },
 ]
 
-const getEstadoInfo = (estadoKey: string) => {
-  return ESTADOS_FLUJO.find((e) => e.key === estadoKey) || ESTADOS_FLUJO[0]
+const getEstadoLabel = (key: string) => {
+  return ESTADOS_FLUJO.find(e => e.key === key)?.label || key
 }
 
-const puedeAvanzarA = (estadoActual: string, estadoSiguiente: string, rol: string): boolean => {
-  const resultado = validarTransicionPedido(estadoActual, estadoSiguiente, rol)
-  return resultado.valido
+const getEstadoOrden = (key: string) => {
+  return ESTADOS_FLUJO.find(e => e.key === key)?.orden || 0
 }
 
-// Transiciones de avanzar permitidas por contexto (admin/gerente ven todo)
 const AVANZAR_POR_CONTEXTO: Record<string, string[]> = {
-  proyectos: ['enviado'],          // borrador → enviado
-  logistica: ['atendido', 'parcial', 'entregado'], // enviado→atendido, atendido→parcial, parcial→entregado
+  proyectos: ['enviado'],
+  logistica: ['atendido', 'parcial', 'entregado'],
 }
 
 const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
@@ -79,11 +68,15 @@ const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [pendingEstado, setPendingEstado] = useState('')
 
-  const estadoActual = getEstadoInfo(estado)
+  const currentOrden = getEstadoOrden(estado)
+
+  const puedeAvanzarA = (target: string): boolean => {
+    return validarTransicionPedido(estado, target, userRole).valido
+  }
 
   const handleEstadoChange = (nuevoEstado: string) => {
     if (nuevoEstado === estado) return
-    if (!puedeAvanzarA(estado, nuevoEstado, userRole)) {
+    if (!puedeAvanzarA(nuevoEstado)) {
       toast.error('No se puede cambiar a este estado')
       return
     }
@@ -102,7 +95,7 @@ const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
 
       if (!response.ok) throw new Error('Error al actualizar')
 
-      toast.success(`Estado: ${getEstadoInfo(pendingEstado).label}`)
+      toast.success(`Estado: ${getEstadoLabel(pendingEstado)}`)
       onUpdated?.(pendingEstado)
     } catch {
       toast.error('Error al actualizar el estado')
@@ -113,59 +106,57 @@ const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
     }
   }
 
-  // Estados principales (sin cancelado en la línea)
-  const estadosPrincipales = ESTADOS_FLUJO.filter((e) => e.key !== 'cancelado')
-  const puedeCancelar = puedeAvanzarA(estado, 'cancelado', userRole)
+  const isCancelled = estado === 'cancelado'
+  const puedeCancelar = !isCancelled && puedeAvanzarA('cancelado')
+
+  // Build pill steps
+  const steps = ESTADOS_FLUJO.map((est) => {
+    let status: StepStatus = 'future'
+    if (isCancelled) {
+      status = 'future'
+    } else if (est.orden < currentOrden) {
+      status = 'completed'
+    } else if (est.key === estado) {
+      status = 'current'
+    }
+
+    const isSuperUser = ['admin', 'gerente'].includes(userRole)
+    const isNext = est.orden === currentOrden + 1
+    const contextoPermiteAvanzar = isSuperUser || (AVANZAR_POR_CONTEXTO[contexto] || []).includes(est.key)
+    const canAdvance = !isCancelled && isNext && contextoPermiteAvanzar && puedeAvanzarA(est.key)
+
+    return { ...est, status, canAdvance }
+  })
 
   return (
     <>
       <div className="bg-white rounded-lg border p-3">
         <div className="flex items-center justify-between gap-4">
-          {/* Flujo de estados horizontal */}
-          <div className="flex items-center gap-1 flex-1 overflow-x-auto">
-            {estadosPrincipales.map((est, idx) => {
-              const isCompleted = est.orden < estadoActual.orden
-              const isCurrent = est.key === estado
-              const isNext = est.orden === estadoActual.orden + 1
-              const isSuperUser = ['admin', 'gerente'].includes(userRole)
-              const contextoPermiteAvanzar = isSuperUser || (AVANZAR_POR_CONTEXTO[contexto] || []).includes(est.key)
-              const canAdvance = isNext && contextoPermiteAvanzar && puedeAvanzarA(estado, est.key, userRole)
-              const Icon = est.icon
+          {/* Flow pills */}
+          <div className="flex items-center flex-1 overflow-x-auto">
+            {steps.map((step, idx) => (
+              <React.Fragment key={step.key}>
+                {idx > 0 && <StepLine nextStatus={step.status} />}
+                <StepPill
+                  label={step.label}
+                  status={step.status}
+                  interactive={step.canAdvance}
+                  disabled={isUpdating}
+                  onClick={step.canAdvance ? () => handleEstadoChange(step.key) : undefined}
+                />
+              </React.Fragment>
+            ))}
 
-              return (
-                <React.Fragment key={est.key}>
-                  <button
-                    onClick={() => canAdvance && handleEstadoChange(est.key)}
-                    disabled={!canAdvance}
-                    className={cn(
-                      'flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-all whitespace-nowrap',
-                      isCurrent && 'bg-blue-100 text-blue-700 ring-1 ring-blue-300',
-                      isCompleted && 'bg-green-50 text-green-600',
-                      !isCurrent && !isCompleted && !canAdvance && 'text-gray-400',
-                      canAdvance && 'hover:bg-blue-50 text-blue-600 cursor-pointer',
-                      !canAdvance && !isCurrent && !isCompleted && 'cursor-default'
-                    )}
-                  >
-                    <Icon className={cn(
-                      'h-3.5 w-3.5',
-                      isCompleted && 'text-green-500',
-                      isCurrent && 'text-blue-600'
-                    )} />
-                    <span className="hidden sm:inline">{est.label}</span>
-                  </button>
-
-                  {idx < estadosPrincipales.length - 1 && (
-                    <ChevronRight className={cn(
-                      'h-3 w-3 shrink-0',
-                      est.orden < estadoActual.orden ? 'text-green-400' : 'text-gray-300'
-                    )} />
-                  )}
-                </React.Fragment>
-              )
-            })}
+            {/* Cancelled pill */}
+            {isCancelled && (
+              <>
+                <StepLine nextStatus="cancelled" />
+                <StepPill label="Cancelado" status="cancelled" />
+              </>
+            )}
           </div>
 
-          {/* Rollback buttons por estado */}
+          {/* Rollback buttons */}
           {estado === 'enviado' && ['admin', 'gerente', 'proyectos'].includes(userRole) && (
             <RollbackButton
               entityType="pedidoEquipo"
@@ -207,8 +198,8 @@ const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
             />
           )}
 
-          {/* Botón cancelar */}
-          {puedeCancelar && estado !== 'cancelado' && (
+          {/* Cancel button */}
+          {puedeCancelar && (
             <Button
               variant="ghost"
               size="sm"
@@ -219,25 +210,17 @@ const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
               Cancelar
             </Button>
           )}
-
-          {/* Estado cancelado badge */}
-          {estado === 'cancelado' && (
-            <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200 text-xs">
-              <X className="h-3 w-3 mr-1" />
-              Cancelado
-            </Badge>
-          )}
         </div>
       </div>
 
-      {/* Dialog de confirmación compacto */}
+      {/* Confirmation dialog */}
       <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
         <AlertDialogContent className="max-w-sm">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-base">Cambiar estado</AlertDialogTitle>
             <AlertDialogDescription className="text-sm">
-              ¿Cambiar de <strong>{estadoActual.label}</strong> a{' '}
-              <strong>{pendingEstado ? getEstadoInfo(pendingEstado).label : ''}</strong>?
+              ¿Cambiar de <strong>{getEstadoLabel(estado)}</strong> a{' '}
+              <strong>{getEstadoLabel(pendingEstado)}</strong>?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

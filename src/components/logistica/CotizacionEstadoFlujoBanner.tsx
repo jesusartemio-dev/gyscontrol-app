@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   AlertDialog,
@@ -15,13 +15,12 @@ import {
 import {
   ArrowRight,
   X,
-  Loader2,
-  ChevronRight,
   Info,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { updateCotizacionProveedor } from '@/lib/services/cotizacionProveedor'
+import { StepPill, StepLine, type StepStatus } from '@/components/ui/status-stepper'
 
 interface CotizacionEstadoFlujoBannerProps {
   estado: string
@@ -65,13 +64,11 @@ export default function CotizacionEstadoFlujoBanner({
     try {
       setIsUpdating(true)
 
-      // Persist estado to database via service layer
       const updated = await updateCotizacionProveedor(cotizacionId, { estado: pendingEstado as any })
       if (!updated) {
         throw new Error('Error al actualizar el estado')
       }
 
-      // Log audit
       if (usuarioId) {
         try {
           await fetch('/api/audit/log-status-change', {
@@ -115,65 +112,51 @@ export default function CotizacionEstadoFlujoBanner({
     setShowConfirmDialog(true)
   }
 
+  // Build pill steps
+  const isRechazado = estado === 'rechazado'
+  const steps = ESTADOS.map((etapa, i) => {
+    let status: StepStatus = 'future'
+    if (isRechazado) {
+      // When rejected, show steps before rejection point as completed
+      if (i < currentIndex) status = 'completed'
+    } else if (i < currentIndex || isLegacySeleccionado) {
+      status = 'completed'
+    } else if (estado === etapa.key) {
+      status = 'current'
+    }
+    return { key: etapa.key, label: etapa.label, status }
+  })
+
   return (
     <div className="flex items-center justify-between gap-4 py-2 px-3 bg-gray-50/80 border border-gray-200 rounded-lg">
       {/* Progress Flow */}
-      <div className="flex items-center gap-1 overflow-x-auto flex-1 min-w-0">
-        {ESTADOS.map((etapa, i) => {
-          const isActive = estado === etapa.key
-          const isPast = currentIndex > i
+      <div className="flex items-center overflow-x-auto flex-1 min-w-0">
+        {steps.map((step, i) => (
+          <React.Fragment key={step.key}>
+            {i > 0 && <StepLine nextStatus={step.status} />}
+            <StepPill label={step.label} status={step.status} />
+          </React.Fragment>
+        ))}
 
-          return (
-            <div key={etapa.key} className="flex items-center flex-shrink-0">
-              <span
-                className={cn(
-                  'text-xs px-2 py-1 rounded-md transition-all whitespace-nowrap',
-                  isActive
-                    ? 'bg-white font-semibold text-gray-900 shadow-sm border border-gray-300'
-                    : isPast
-                      ? 'text-gray-500'
-                      : 'text-gray-400'
-                )}
-              >
-                {isPast && <span className="text-green-500 mr-1">&#10003;</span>}
-                {etapa.label}
-              </span>
-
-              {i < ESTADOS.length - 1 && (
-                <ChevronRight className={cn(
-                  'w-3 h-3 mx-0.5 flex-shrink-0',
-                  isPast ? 'text-gray-400' : 'text-gray-300'
-                )} />
-              )}
-            </div>
-          )
-        })}
-
-        {/* Show rechazado tag when active */}
-        {estado === 'rechazado' && (
+        {/* Rechazado pill */}
+        {isRechazado && (
           <>
-            <span className="text-gray-300 mx-1">|</span>
-            <span className="text-xs px-2 py-1 rounded-md bg-red-50 font-semibold text-red-600 border border-red-200">
-              Rechazado
-            </span>
+            <StepLine nextStatus="rejected" />
+            <StepPill label="Rechazado" status="rejected" />
           </>
         )}
 
-        {/* Show legacy seleccionado tag */}
+        {/* Legacy seleccionado pill */}
         {isLegacySeleccionado && (
           <>
-            <span className="text-gray-300 mx-1">|</span>
-            <span className="text-xs px-2 py-1 rounded-md bg-green-50 font-semibold text-green-600 border border-green-200">
-              Seleccionado
-            </span>
+            <StepLine nextStatus="current" />
+            <StepPill label="Seleccionado" status="current" />
           </>
         )}
       </div>
 
       {/* Action Buttons */}
       <div className="flex items-center gap-2 flex-shrink-0">
-        {isUpdating && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
-
         {flujo.siguiente && siguienteEstado && (
           <Button
             onClick={handleAvanzar}
