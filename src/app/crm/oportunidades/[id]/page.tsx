@@ -391,9 +391,9 @@ export default function OportunidadDetailPage() {
       />
 
       <Dialog open={showActividadForm} onOpenChange={setShowActividadForm}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Registrar Nueva Actividad</DialogTitle>
+            <DialogTitle>Nueva Actividad</DialogTitle>
           </DialogHeader>
           <ActividadForm
             oportunidadId={id}
