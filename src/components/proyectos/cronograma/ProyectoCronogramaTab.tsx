@@ -730,7 +730,7 @@ export function ProyectoCronogramaTab({
   const puedeCrearLineaBase = !tieneLineaBase
   const puedeIniciarEjecucion = tieneBaseline && !tieneEjecucion
   const esComercial = selectedCronograma?.tipo === 'comercial'
-  const esBloqueado = selectedCronograma?.bloqueado === true || selectedCronograma?.esBaseline === true || selectedCronograma?.tipo === 'comercial'
+  const esBloqueado = selectedCronograma?.tipo === 'comercial' || ((selectedCronograma?.bloqueado === true || selectedCronograma?.esBaseline === true) && totalItems > 0)
 
   return (
     <div className="space-y-4">

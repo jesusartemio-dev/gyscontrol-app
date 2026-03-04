@@ -443,7 +443,7 @@ export async function POST(
       // Solo incluir copiadoDesdeCotizacionId si tiene valor (evitar undefined)
       ...(validatedData.copiadoDesdeCotizacionId ? { copiadoDesdeCotizacionId: validatedData.copiadoDesdeCotizacionId } : {}),
       esBaseline: esBaseline,
-      bloqueado: esBaseline, // Baseline se bloquea automáticamente
+      bloqueado: false, // Se bloquea después de importar contenido
       version: 1,
       updatedAt: new Date()
     }
