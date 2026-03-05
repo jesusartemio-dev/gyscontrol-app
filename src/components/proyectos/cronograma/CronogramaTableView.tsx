@@ -11,6 +11,9 @@ import {
   type ICellRendererParams,
 } from 'ag-grid-community'
 import { useToast } from '@/hooks/use-toast'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Badge } from '@/components/ui/badge'
+import { Table2 } from 'lucide-react'
 
 // Register all community modules
 import { ModuleRegistry } from 'ag-grid-community'
@@ -149,6 +152,7 @@ function NombreCellRenderer(params: ICellRendererParams<FlatRow>) {
 export function CronogramaTableView({ proyectoId, cronogramaId, refreshKey, horasPorDia = 8 }: CronogramaTableViewProps) {
   const [rowData, setRowData] = useState<FlatRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [filtroTipo, setFiltroTipo] = useState<string>('todos')
   const gridRef = useRef<AgGridReact>(null)
   const { toast } = useToast()
 
@@ -282,11 +286,14 @@ export function CronogramaTableView({ proyectoId, cronogramaId, refreshKey, hora
     },
   ], [])
 
+  const filteredRowData = useMemo(() => {
+    if (filtroTipo === 'todos') return rowData
+    return rowData.filter(r => r.tipo === filtroTipo || r.tipo === 'proyecto')
+  }, [rowData, filtroTipo])
+
   const defaultColDef = useMemo<ColDef>(() => ({
     sortable: true,
     resizable: true,
-    filter: true,
-    floatingFilter: true,
     suppressMovable: false,
     cellStyle: { fontSize: '12px' },
   }), [])
@@ -378,7 +385,32 @@ export function CronogramaTableView({ proyectoId, cronogramaId, refreshKey, hora
   }
 
   return (
-    <div className="ag-theme-alpine cronograma-table-wrapper" style={{ height: 'calc(100vh - 200px)', minHeight: 500, width: '100%' }}>
+    <div>
+      {/* Toolbar */}
+      <div className="flex items-center justify-between px-3 py-2 border-b bg-gray-50/50 rounded-t-lg border border-b-0 border-gray-200">
+        <div className="flex items-center gap-2">
+          <Table2 className="h-4 w-4 text-blue-600" />
+          <span className="text-sm font-semibold">Tabla</span>
+          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+            {filteredRowData.length} filas
+          </Badge>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Select value={filtroTipo} onValueChange={setFiltroTipo}>
+            <SelectTrigger className="h-7 w-36 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos los niveles</SelectItem>
+              <SelectItem value="fase">Solo fases</SelectItem>
+              <SelectItem value="edt">Solo EDTs</SelectItem>
+              <SelectItem value="actividad">Solo actividades</SelectItem>
+              <SelectItem value="tarea">Solo tareas</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+    <div className="ag-theme-alpine cronograma-table-wrapper" style={{ height: 'calc(100vh - 240px)', minHeight: 500, width: '100%' }}>
       <style>{`
         .cronograma-table-wrapper.ag-theme-alpine {
           --ag-font-size: 12px;
@@ -421,7 +453,7 @@ export function CronogramaTableView({ proyectoId, cronogramaId, refreshKey, hora
       `}</style>
       <AgGridReact<FlatRow>
         ref={gridRef}
-        rowData={rowData}
+        rowData={filteredRowData}
         columnDefs={columnDefs}
         defaultColDef={defaultColDef}
         animateRows={true}
@@ -435,6 +467,7 @@ export function CronogramaTableView({ proyectoId, cronogramaId, refreshKey, hora
         stopEditingWhenCellsLoseFocus={true}
         suppressClickEdit={false}
       />
+    </div>
     </div>
   )
 }
