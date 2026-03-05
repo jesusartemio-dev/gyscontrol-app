@@ -65,9 +65,22 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick }: Pro
   const [zoomLevel, setZoomLevel] = useState(1)
   const [filtroNivel, setFiltroNivel] = useState<string>('todos')
   const [timeRangeMonths, setTimeRangeMonths] = useState(6)
+  const [containerWidth, setContainerWidth] = useState(0)
   const { toast } = useToast()
   const timelineScrollRef = useRef<HTMLDivElement>(null)
   const bodyScrollRef = useRef<HTMLDivElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  // Measure available timeline width
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const ro = new ResizeObserver(([entry]) => {
+      setContainerWidth(entry.contentRect.width - NAME_COL_WIDTH)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   // Sync horizontal scroll between header and body
   const handleBodyScroll = useCallback(() => {
@@ -214,7 +227,8 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick }: Pro
     }
 
     const totalDays = differenceInDays(maxDate, minDate) || 1
-    const dayWidth = Math.max(3, 8 * zoomLevel)
+    const baseDayWidth = containerWidth > 0 ? containerWidth / totalDays : 8
+    const dayWidth = Math.max(3, baseDayWidth * zoomLevel)
     const totalWidth = totalDays * dayWidth
 
     // Generate month columns
@@ -249,7 +263,7 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick }: Pro
     const showToday = today >= minDate && today <= maxDate
 
     return { minDate, maxDate, totalDays, dayWidth, totalWidth, months, weekLines, todayX, showToday }
-  }, [visibleItems, zoomLevel, timeRangeMonths])
+  }, [visibleItems, zoomLevel, timeRangeMonths, containerWidth])
 
   // Export CSV
   const exportToCSV = () => {
@@ -305,7 +319,7 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick }: Pro
   }
 
   return (
-    <Card>
+    <Card ref={containerRef}>
       {/* Toolbar */}
       <div className="flex items-center justify-between px-3 py-2 border-b bg-gray-50/50">
         <div className="flex items-center gap-2">
