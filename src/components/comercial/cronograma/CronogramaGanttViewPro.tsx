@@ -222,58 +222,8 @@ export function CronogramaGanttViewPro({ cotizacionId, cronogramaId, refreshKey 
       }
       const data = await response.json()
 
-      const processedChildren = processTreeData(data.data.tree, true)
-      let processedTasks: GanttTask[] = processedChildren
-
-      let projectFechaInicio: Date | null = null
-      let projectFechaFin: Date | null = null
-
-      const collectDates = (tasks: GanttTask[]): { starts: Date[], ends: Date[] } => {
-        const starts: Date[] = []
-        const ends: Date[] = []
-        for (const task of tasks) {
-          if (task.fechaInicio instanceof Date && !isNaN(task.fechaInicio.getTime())) {
-            starts.push(task.fechaInicio)
-          }
-          if (task.fechaFin instanceof Date && !isNaN(task.fechaFin.getTime())) {
-            ends.push(task.fechaFin)
-          }
-          if (task.children?.length) {
-            const childDates = collectDates(task.children)
-            starts.push(...childDates.starts)
-            ends.push(...childDates.ends)
-          }
-        }
-        return { starts, ends }
-      }
-
-      const allDates = collectDates(processedChildren)
-
-      if (allDates.starts.length > 0) {
-        projectFechaInicio = new Date(Math.min(...allDates.starts.map(d => d.getTime())))
-      } else if (entityData?.fechaInicio) {
-        projectFechaInicio = new Date(entityData.fechaInicio)
-      }
-
-      if (allDates.ends.length > 0) {
-        projectFechaFin = new Date(Math.max(...allDates.ends.map(d => d.getTime())))
-      } else if (entityData?.fechaFin) {
-        projectFechaFin = new Date(entityData.fechaFin)
-      }
-
-      const rootNode: GanttTask = {
-        id: entityData?.id || cotizacionId,
-        nombre: entityData?.nombre || (entityType === 'proyecto' ? 'Proyecto' : 'Cotización'),
-        tipo: entityType,
-        fechaInicio: projectFechaInicio,
-        fechaFin: projectFechaFin,
-        progreso: entityData?.progresoGeneral || 0,
-        estado: entityData?.estado || 'en_progreso',
-        nivel: 0,
-        color: entityType === 'proyecto' ? '#1e40af' : '#4f46e5',
-        children: processedChildren
-      }
-      processedTasks = [rootNode]
+      // Tree API already returns [projectNode] with children, process as-is (no level offset)
+      const processedTasks = processTreeData(data.data.tree, false)
       setTasks(processedTasks)
 
       const initialExpanded = new Set<string>()
@@ -489,12 +439,9 @@ export function CronogramaGanttViewPro({ cotizacionId, cronogramaId, refreshKey 
 
     // Si timeRangeMonths es 0 ("Completo"), mostrar todo el proyecto
     if (timeRangeMonths === 0) {
-      // Usar las fechas reales del proyecto con un pequeño buffer
-      minDate = new Date(projectMinDate)
-      maxDate = new Date(projectMaxDate)
-      // Buffer de 7 días a cada lado
-      minDate.setDate(minDate.getDate() - 7)
-      maxDate.setDate(maxDate.getDate() + 7)
+      // Alinear a inicio de mes con buffer de 1 mes extra a cada lado
+      minDate = new Date(projectMinDate.getFullYear(), projectMinDate.getMonth(), 1)
+      maxDate = new Date(projectMaxDate.getFullYear(), projectMaxDate.getMonth() + 2, 1)
     } else {
       // Calcular el rango basado en timeRangeMonths centrado en el proyecto
       const projectDuration = projectMaxDate.getTime() - projectMinDate.getTime()

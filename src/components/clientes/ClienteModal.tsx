@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Building2, Star, Loader2 } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -59,6 +59,18 @@ const estadosRelacion = [
 ]
 
 const NONE = '__none__'
+
+function Field({ id, label, required, error, children }: { id: string; label: string; required?: boolean; error?: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1">
+      <Label htmlFor={id} className="text-xs font-medium">
+        {label}{required && <span className="text-red-500 ml-0.5">*</span>}
+      </Label>
+      {children}
+      {error && <p className="text-[10px] text-red-500">{error}</p>}
+    </div>
+  )
+}
 
 export default function ClienteModal({
   isOpen,
@@ -143,17 +155,6 @@ export default function ClienteModal({
     setFormData(prev => ({ ...prev, [field]: value }))
     if (errors[field]) setErrors(prev => { const n = { ...prev }; delete n[field]; return n })
   }
-
-  // Helper for field with label + error
-  const Field = ({ id, label, required, error, children }: { id: string; label: string; required?: boolean; error?: string; children: React.ReactNode }) => (
-    <div className="space-y-1">
-      <Label htmlFor={id} className="text-xs font-medium">
-        {label}{required && <span className="text-red-500 ml-0.5">*</span>}
-      </Label>
-      {children}
-      {error && <p className="text-[10px] text-red-500">{error}</p>}
-    </div>
-  )
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
