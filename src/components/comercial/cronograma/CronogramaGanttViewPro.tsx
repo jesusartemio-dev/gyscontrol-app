@@ -237,7 +237,7 @@ export function CronogramaGanttViewPro({ cotizacionId, cronogramaId, refreshKey 
           }
         }
       }
-      expandLevels(processedTasks, 1)
+      expandLevels(processedTasks, 0)
       setExpandedTasks(initialExpanded)
 
       const dependenciesResponse = await fetch(`/api/${apiPath}/${cotizacionId}/cronograma/dependencias`)
@@ -262,7 +262,10 @@ export function CronogramaGanttViewPro({ cotizacionId, cronogramaId, refreshKey 
       let fechaInicio: string | null = null
       let fechaFin: string | null = null
 
-      if (node.type === 'fase') {
+      if (node.type === 'proyecto') {
+        fechaInicio = node.data?.fechaInicioComercial || node.data?.fechaInicioPlan || node.data?.fechaInicio
+        fechaFin = node.data?.fechaFinComercial || node.data?.fechaFinPlan || node.data?.fechaFin
+      } else if (node.type === 'fase') {
         fechaInicio = node.data?.fechaInicioPlan || node.data?.fechaInicioComercial || node.data?.fechaInicio
         fechaFin = node.data?.fechaFinPlan || node.data?.fechaFinComercial || node.data?.fechaFin
       } else if (node.type === 'edt') {
