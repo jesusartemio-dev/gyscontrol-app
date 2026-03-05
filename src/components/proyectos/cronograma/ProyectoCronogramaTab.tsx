@@ -23,7 +23,6 @@ import {
   Settings,
   CheckCircle,
   TreePine,
-  TrendingUp,
   Trash2,
   Zap,
   ChevronDown,
@@ -53,7 +52,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { ProyectoCronogramaTreeView } from './ProyectoCronogramaTreeView'
 import { ProyectoGanttView } from './ProyectoGanttView'
-import { CronogramaGanttViewPro } from '@/components/comercial/cronograma/CronogramaGanttViewPro'
+// CronogramaGanttViewPro deshabilitado - funcionalidad consolidada en Gantt
 import { ProyectoDependencyManager } from './ProyectoDependencyManager'
 import { convertToMSProjectXML, downloadMSProjectXML } from '@/lib/utils/msProjectXmlExport'
 import { exportCronogramaToExcel, type RecursoExport } from '@/lib/utils/msProjectExcelExport'
@@ -1193,10 +1192,7 @@ export function ProyectoCronogramaTab({
             <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
             Gantt
           </TabsTrigger>
-          <TabsTrigger value="gantt-pro" className="text-xs px-3">
-            <TrendingUp className="h-3.5 w-3.5 mr-1.5" />
-            Gantt Pro
-          </TabsTrigger>
+          {/* Gantt Pro deshabilitado - funcionalidad consolidada en Gantt */}
           <TabsTrigger value="tabla" className="text-xs px-3">
             <Table2 className="h-3.5 w-3.5 mr-1.5" />
             Tabla
@@ -1232,13 +1228,7 @@ export function ProyectoCronogramaTab({
           />
         </TabsContent>
 
-        <TabsContent value="gantt-pro" className="mt-3">
-          <CronogramaGanttViewPro
-            cotizacionId={proyectoId}
-            cronogramaId={selectedCronograma?.id}
-            refreshKey={refreshKey}
-          />
-        </TabsContent>
+        {/* Gantt Pro deshabilitado - funcionalidad consolidada en Gantt */}
 
         <TabsContent value="tabla" className="mt-3">
           <CronogramaTableView
