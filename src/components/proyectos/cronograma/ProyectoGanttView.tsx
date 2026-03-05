@@ -64,6 +64,7 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick }: Pro
   const [loading, setLoading] = useState(true)
   const [zoomLevel, setZoomLevel] = useState(1)
   const [filtroNivel, setFiltroNivel] = useState<string>('todos')
+  const [timeRangeMonths, setTimeRangeMonths] = useState(6)
   const { toast } = useToast()
   const timelineScrollRef = useRef<HTMLDivElement>(null)
   const bodyScrollRef = useRef<HTMLDivElement>(null)
@@ -183,9 +184,34 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick }: Pro
     const allDates = visibleItems.flatMap(i => [i.fechaInicio, i.fechaFin]).filter(d => !isNaN(d.getTime()))
     if (allDates.length === 0) return null
 
-    const minDate = startOfMonth(new Date(Math.min(...allDates.map(d => d.getTime()))))
-    const rawMax = new Date(Math.max(...allDates.map(d => d.getTime())))
-    const maxDate = startOfMonth(addMonths(rawMax, 2))
+    const projectMinDate = new Date(Math.min(...allDates.map(d => d.getTime())))
+    const projectMaxDate = new Date(Math.max(...allDates.map(d => d.getTime())))
+
+    let minDate: Date
+    let maxDate: Date
+
+    if (timeRangeMonths === 0) {
+      // Completo: show full project with month-aligned buffer
+      minDate = startOfMonth(projectMinDate)
+      maxDate = startOfMonth(addMonths(projectMaxDate, 2))
+    } else {
+      const projectDuration = projectMaxDate.getTime() - projectMinDate.getTime()
+      const requestedDuration = timeRangeMonths * 30 * 24 * 60 * 60 * 1000
+
+      if (requestedDuration >= projectDuration) {
+        // Requested range larger than project: center the project
+        const buffer = (requestedDuration - projectDuration) / 2
+        minDate = new Date(projectMinDate.getTime() - buffer)
+        maxDate = new Date(projectMaxDate.getTime() + buffer)
+      } else {
+        // Requested range smaller: show from project start
+        minDate = new Date(projectMinDate)
+        maxDate = new Date(projectMinDate.getTime() + requestedDuration)
+      }
+      // Add small buffer
+      minDate = addDays(minDate, -7)
+      maxDate = addDays(maxDate, 7)
+    }
 
     const totalDays = differenceInDays(maxDate, minDate) || 1
     const dayWidth = Math.max(3, 8 * zoomLevel)
@@ -223,7 +249,7 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick }: Pro
     const showToday = today >= minDate && today <= maxDate
 
     return { minDate, maxDate, totalDays, dayWidth, totalWidth, months, weekLines, todayX, showToday }
-  }, [visibleItems, zoomLevel])
+  }, [visibleItems, zoomLevel, timeRangeMonths])
 
   // Export CSV
   const exportToCSV = () => {
@@ -301,6 +327,20 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick }: Pro
               <SelectItem value="edt">Solo EDTs</SelectItem>
               <SelectItem value="actividad">Solo actividades</SelectItem>
               <SelectItem value="tarea">Solo tareas</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={timeRangeMonths.toString()} onValueChange={(v) => setTimeRangeMonths(parseInt(v))}>
+            <SelectTrigger className="h-7 w-28 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="0">Completo</SelectItem>
+              <SelectItem value="1">1 mes</SelectItem>
+              <SelectItem value="3">3 meses</SelectItem>
+              <SelectItem value="6">6 meses</SelectItem>
+              <SelectItem value="12">1 año</SelectItem>
+              <SelectItem value="24">2 años</SelectItem>
             </SelectContent>
           </Select>
 
