@@ -37,6 +37,7 @@ export async function POST(req: Request) {
 
     const nuevo = await prisma.cliente.create({
       data: {
+        id: crypto.randomUUID(),
         ...data,
         numeroSecuencia: data.numeroSecuencia ?? 1,
         updatedAt: new Date(),
