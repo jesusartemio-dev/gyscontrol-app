@@ -293,21 +293,27 @@ export default function ClienteListView({
                       </TooltipTrigger>
                       <TooltipContent>Editar</TooltipContent>
                     </Tooltip>
-                    {onDelete && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                            onClick={() => setDeleteTarget(cliente)}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Eliminar</TooltipContent>
-                      </Tooltip>
-                    )}
+                    {onDelete && (() => {
+                      const hasRelations = (cliente._count?.cotizacion ?? 0) > 0 || (cliente._count?.proyecto ?? 0) > 0
+                      return (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className={`h-7 w-7 p-0 ${hasRelations ? 'text-muted-foreground cursor-not-allowed opacity-50' : 'text-destructive hover:text-destructive hover:bg-destructive/10'}`}
+                              onClick={() => !hasRelations && setDeleteTarget(cliente)}
+                              disabled={hasRelations}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {hasRelations ? 'No se puede eliminar (tiene cotizaciones o proyectos)' : 'Eliminar'}
+                          </TooltipContent>
+                        </Tooltip>
+                      )
+                    })()}
                   </div>
                 </td>
               </tr>

@@ -90,29 +90,24 @@ export async function DELETE(req: Request) {
       )
     }
 
-    // 🚫 Verificar si tiene proyectos activos (no se pueden eliminar)
-    if (clienteConDependencias.proyecto.length > 0) {
+    // 🚫 Verificar si tiene dependencias (no se pueden eliminar)
+    const cotCount = clienteConDependencias.cotizacion.length
+    const proCount = clienteConDependencias.proyecto.length
+
+    if (cotCount > 0 || proCount > 0) {
+      const parts: string[] = []
+      if (cotCount > 0) parts.push(`${cotCount} cotización(es)`)
+      if (proCount > 0) parts.push(`${proCount} proyecto(s)`)
       return NextResponse.json(
         {
-          error: 'No se puede eliminar el cliente porque tiene proyectos asociados',
-          details: `El cliente tiene ${clienteConDependencias.proyecto.length} proyecto(s) asociado(s)`
+          error: `No se puede eliminar el cliente porque tiene ${parts.join(' y ')} asociado(s)`,
         },
         { status: 400 }
       )
     }
 
-    // 🗑️ Eliminar cotizaciones en cascada y luego el cliente
-    await prisma.$transaction(async (tx) => {
-      // Eliminar cotizaciones relacionadas (esto eliminará automáticamente sus items por onDelete: Cascade)
-      if (clienteConDependencias.cotizacion.length > 0) {
-        await tx.cotizacion.deleteMany({
-          where: { clienteId: id }
-        })
-      }
-
-      // Eliminar el cliente
-      await tx.cliente.delete({ where: { id } })
-    })
+    // 🗑️ Eliminar el cliente (sin dependencias)
+    await prisma.cliente.delete({ where: { id } })
     
     return NextResponse.json({ ok: true })
   } catch (error) {
