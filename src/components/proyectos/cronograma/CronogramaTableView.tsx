@@ -285,6 +285,8 @@ export function CronogramaTableView({ proyectoId, cronogramaId, refreshKey, hora
   const defaultColDef = useMemo<ColDef>(() => ({
     sortable: true,
     resizable: true,
+    filter: true,
+    floatingFilter: true,
     suppressMovable: false,
     cellStyle: { fontSize: '12px' },
   }), [])
