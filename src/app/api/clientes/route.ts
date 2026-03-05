@@ -6,7 +6,10 @@ import { generateNextClienteCode } from '@/lib/utils/clienteCodeGenerator'
 // ✅ GET: Listar todos los clientes
 export async function GET() {
   const clientes = await prisma.cliente.findMany({
-    orderBy: { createdAt: 'desc' } // ✅ Ordenar por fecha de creación
+    orderBy: { createdAt: 'desc' },
+    include: {
+      _count: { select: { cotizacion: true, proyecto: true } }
+    }
   })
   return NextResponse.json(clientes)
 }

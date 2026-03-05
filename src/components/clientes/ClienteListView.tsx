@@ -35,6 +35,7 @@ interface Cliente {
   estadoRelacion?: string
   calificacion?: number
   createdAt?: string
+  _count?: { cotizacion: number; proyecto: number }
 }
 
 interface ClienteListViewProps {
@@ -153,6 +154,9 @@ export default function ClienteListView({
               <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Sector
               </th>
+              <th className="text-center py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Uso
+              </th>
               <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Estado
               </th>
@@ -221,6 +225,25 @@ export default function ClienteListView({
                   <span className="text-sm text-muted-foreground">
                     {cliente.sector || '—'}
                   </span>
+                </td>
+
+                <td className="py-2 px-3 text-center">
+                  {(cliente._count?.cotizacion || cliente._count?.proyecto) ? (
+                    <div className="flex items-center justify-center gap-1">
+                      {(cliente._count?.cotizacion ?? 0) > 0 && (
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-700">
+                          C {cliente._count!.cotizacion}
+                        </span>
+                      )}
+                      {(cliente._count?.proyecto ?? 0) > 0 && (
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-700">
+                          P {cliente._count!.proyecto}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  )}
                 </td>
 
                 <td className="py-2 px-3">

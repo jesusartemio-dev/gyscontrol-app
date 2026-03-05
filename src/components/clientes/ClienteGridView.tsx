@@ -18,6 +18,7 @@ interface Cliente {
   sector?: string
   estadoRelacion?: string
   calificacion?: number
+  _count?: { cotizacion: number; proyecto: number }
 }
 
 interface ClienteGridViewProps {
@@ -150,12 +151,24 @@ export default function ClienteGridView({
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-2">
-                  <Badge
-                    variant={getEstadoBadgeVariant(cliente.estadoRelacion) as any}
-                    className="font-medium"
-                  >
-                    {getEstadoLabel(cliente.estadoRelacion)}
-                  </Badge>
+                  <div className="flex items-center gap-1">
+                    {(cliente._count?.cotizacion ?? 0) > 0 && (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-700">
+                        C {cliente._count!.cotizacion}
+                      </span>
+                    )}
+                    {(cliente._count?.proyecto ?? 0) > 0 && (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-700">
+                        P {cliente._count!.proyecto}
+                      </span>
+                    )}
+                    <Badge
+                      variant={getEstadoBadgeVariant(cliente.estadoRelacion) as any}
+                      className="font-medium"
+                    >
+                      {getEstadoLabel(cliente.estadoRelacion)}
+                    </Badge>
+                  </div>
                   {cliente.calificacion && (
                     <div className="flex items-center gap-1 text-sm">
                       <span className="text-muted-foreground">Calificación:</span>
