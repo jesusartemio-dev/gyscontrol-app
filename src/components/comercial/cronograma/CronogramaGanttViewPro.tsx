@@ -1122,34 +1122,54 @@ export function CronogramaGanttViewPro({ cotizacionId, cronogramaId, refreshKey 
                   </div>
                 )
               })()}
-              <div className="flex" style={{ width: `${timeline.totalWidth}px`, minWidth: '100%' }}>
-                {/* Generate timeline units */}
-                {Array.from({ length: Math.ceil((timeline.endDate.getTime() - timeline.startDate.getTime()) / (1000 * 60 * 60 * 24 * (timeline.unit === 'days' ? 1 : timeline.unit === 'weeks' ? 7 : 30))) }, (_, i) => {
-                  const date = new Date(timeline.startDate)
-                  if (timeline.unit === 'days') {
-                    date.setDate(date.getDate() + i)
+              <div className="flex" style={{ width: '100%' }}>
+                {/* Generate timeline units with proportional widths */}
+                {(() => {
+                  const totalRange = timeline.endDate.getTime() - timeline.startDate.getTime()
+                  if (totalRange <= 0) return null
+                  const units: { date: Date; widthPercent: number }[] = []
+                  const d = new Date(timeline.startDate)
+
+                  if (timeline.unit === 'months') {
+                    while (d < timeline.endDate) {
+                      const next = new Date(d.getFullYear(), d.getMonth() + 1, 1)
+                      const end = next > timeline.endDate ? timeline.endDate : next
+                      units.push({ date: new Date(d), widthPercent: ((end.getTime() - d.getTime()) / totalRange) * 100 })
+                      d.setTime(next.getTime())
+                    }
                   } else if (timeline.unit === 'weeks') {
-                    date.setDate(date.getDate() + (i * 7))
+                    const weekMs = 7 * 24 * 60 * 60 * 1000
+                    while (d < timeline.endDate) {
+                      const next = new Date(d.getTime() + weekMs)
+                      const end = next > timeline.endDate ? timeline.endDate : next
+                      units.push({ date: new Date(d), widthPercent: ((end.getTime() - d.getTime()) / totalRange) * 100 })
+                      d.setTime(next.getTime())
+                    }
                   } else {
-                    date.setMonth(date.getMonth() + i)
+                    const dayMs = 24 * 60 * 60 * 1000
+                    while (d < timeline.endDate) {
+                      const next = new Date(d.getTime() + dayMs)
+                      units.push({ date: new Date(d), widthPercent: (dayMs / totalRange) * 100 })
+                      d.setTime(next.getTime())
+                    }
                   }
 
-                  return (
+                  return units.map((u, i) => (
                     <div
                       key={i}
                       className="flex-shrink-0 border-r border-gray-200 px-2 py-2 text-center"
-                      style={{ width: timeline.unitWidth }}
+                      style={{ width: `${u.widthPercent}%` }}
                     >
                       <div className="text-xs font-medium text-gray-700">
-                        {date.toLocaleDateString('es-ES', {
+                        {u.date.toLocaleDateString('es-ES', {
                           day: timeline.unit === 'days' ? 'numeric' : undefined,
                           month: timeline.unit === 'months' ? 'short' : timeline.unit === 'weeks' ? 'short' : undefined,
                           year: timeline.unit === 'months' ? 'numeric' : undefined
                         })}
                       </div>
                     </div>
-                  )
-                })}
+                  ))
+                })()}
               </div>
             </div>
           </div>

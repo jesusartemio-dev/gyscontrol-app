@@ -132,29 +132,16 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick }: Pro
         return item
       }
 
-      const fases = treeArray.map((node: any) => processNode(node, 1))
-
-      // Create project root
-      const projStart = proyectoData?.fechaInicio ? new Date(proyectoData.fechaInicio) : new Date()
-      const projEnd = proyectoData?.fechaFin ? new Date(proyectoData.fechaFin) : addMonths(new Date(), 6)
-
-      const proyectoItem: GanttItem = {
-        id: proyectoData?.id || proyectoId,
-        nombre: proyectoData?.nombre || 'Proyecto',
-        tipo: 'proyecto',
-        fechaInicio: fases.length > 0 ? new Date(Math.min(...fases.map((f: GanttItem) => f.fechaInicio.getTime()))) : projStart,
-        fechaFin: fases.length > 0 ? new Date(Math.max(...fases.map((f: GanttItem) => f.fechaFin.getTime()))) : projEnd,
-        porcentajeAvance: proyectoData?.progresoGeneral || 0,
-        estado: proyectoData?.estado || 'en_progreso',
-        nivel: 0,
-        color: TIPO_COLORS.proyecto.bar,
-        expandable: fases.length > 0,
-        expanded: true,
-        horasEstimadas: fases.reduce((s: number, f: GanttItem) => s + (f.horasEstimadas || 0), 0),
-        hijos: fases,
+      // Tree API returns [projectNode] with children (fases)
+      // Process the project node directly at level 0
+      const projectNode = treeArray[0]
+      if (projectNode) {
+        const proyectoItem = processNode(projectNode, 0)
+        proyectoItem.expanded = true
+        setItems([proyectoItem])
+      } else {
+        setItems([])
       }
-
-      setItems([proyectoItem])
     } catch (error) {
       toast({ title: 'Error cargando Gantt', description: String(error), variant: 'destructive' })
     } finally {
