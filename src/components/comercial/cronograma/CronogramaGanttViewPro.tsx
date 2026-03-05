@@ -1176,7 +1176,7 @@ export function CronogramaGanttViewPro({ cotizacionId, cronogramaId, refreshKey 
         </div>
 
         {/* Tasks */}
-        <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 300px)', minHeight: 200 }} ref={tasksContainerRef}>
+        <div ref={tasksContainerRef}>
           {filteredTasks.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
               <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />

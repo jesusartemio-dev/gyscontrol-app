@@ -348,8 +348,7 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick }: Pro
 
         {/* Body: rows */}
         <div
-          className="overflow-auto"
-          style={{ maxHeight: 'calc(100vh - 340px)', minHeight: 200 }}
+          className="overflow-x-auto"
           ref={bodyScrollRef}
           onScroll={handleBodyScroll}
         >

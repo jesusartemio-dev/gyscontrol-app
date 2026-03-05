@@ -376,7 +376,7 @@ export function CronogramaTableView({ proyectoId, cronogramaId, refreshKey, hora
   }
 
   return (
-    <div className="ag-theme-alpine cronograma-table-wrapper" style={{ height: 'calc(100vh - 340px)', width: '100%' }}>
+    <div className="ag-theme-alpine cronograma-table-wrapper" style={{ height: 'calc(100vh - 200px)', minHeight: 500, width: '100%' }}>
       <style>{`
         .cronograma-table-wrapper.ag-theme-alpine {
           --ag-font-size: 12px;
