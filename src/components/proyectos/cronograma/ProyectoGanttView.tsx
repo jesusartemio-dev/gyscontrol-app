@@ -489,6 +489,8 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick }: Pro
                 const barLeft = startDay * timeline.dayWidth
                 const barWidth = Math.max(durationDays * timeline.dayWidth, 20)
                 const colors = TIPO_COLORS[item.tipo] || TIPO_COLORS.tarea
+                const labelText = `${durationDays}d${item.horasEstimadas ? ` · ${item.horasEstimadas}h` : ''}`
+                const labelFitsInside = barWidth > 60
 
                 return (
                   <TooltipProvider key={item.id}>
@@ -499,25 +501,27 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick }: Pro
                           style={{
                             top: rowIdx * ROW_HEIGHT + 6,
                             left: barLeft,
-                            width: barWidth,
                             height: ROW_HEIGHT - 12,
                           }}
                           onClick={() => onItemClick?.(item)}
                         >
                           {/* Bar background */}
                           <div
-                            className="absolute inset-0 rounded shadow-sm"
-                            style={{ backgroundColor: item.color + '40', border: `1px solid ${item.color}80` }}
+                            className="absolute top-0 left-0 h-full rounded shadow-sm"
+                            style={{ width: barWidth, backgroundColor: item.color + '40', border: `1px solid ${item.color}80` }}
                           />
                           {/* Progress fill */}
                           <div
                             className="absolute left-0 top-0 h-full rounded-l"
-                            style={{ width: `${item.porcentajeAvance}%`, backgroundColor: item.color + 'A0' }}
+                            style={{ width: `${(item.porcentajeAvance / 100) * barWidth}px`, backgroundColor: item.color + 'A0' }}
                           />
-                          {/* Label */}
-                          <div className="absolute inset-0 flex items-center px-1.5 overflow-hidden">
-                            <span className="text-[10px] font-medium truncate" style={{ color: item.color }}>
-                              {durationDays}d{item.horasEstimadas ? ` · ${item.horasEstimadas}h` : ''}
+                          {/* Label - inside bar if fits, outside to the right if not */}
+                          <div
+                            className="absolute top-0 h-full flex items-center whitespace-nowrap"
+                            style={{ left: labelFitsInside ? 0 : barWidth + 4, paddingLeft: labelFitsInside ? 6 : 0 }}
+                          >
+                            <span className="text-[10px] font-medium" style={{ color: item.color }}>
+                              {labelText}
                             </span>
                           </div>
                         </div>
