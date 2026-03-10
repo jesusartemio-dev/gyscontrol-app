@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Pencil, Trash2, CheckCircle2, X, Search, Package, Clock, AlertTriangle, CheckCircle, Grid3X3, List, RotateCcw, Recycle, Plus, ShoppingCart, FileText, Download, Tag, ChevronDown, Wrench, Trophy, Layers } from 'lucide-react'
+import { Pencil, Trash2, Search, Package, Clock, AlertTriangle, CheckCircle, Grid3X3, List, RotateCcw, Recycle, Plus, ShoppingCart, FileText, Download, Tag, ChevronDown, Wrench, Trophy, Layers } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ListaEquipoItem } from '@/types'
@@ -27,6 +27,7 @@ import ModalAgregarItemDesdeCatalogo from './ModalAgregarItemDesdeCatalogo'
 import ModalAgregarItemDesdeEquipo from './ModalAgregarItemDesdeEquipo'
 import ModalImportarExcelLista from './ModalImportarExcelLista'
 import ModalAgregarItemLibre from './ModalAgregarItemLibre'
+import ModalEditarListaItem from './ModalEditarListaItem'
 import TipoItemBadge from '@/components/shared/TipoItemBadge'
 import {
   DropdownMenu,
@@ -114,10 +115,9 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
   const rol = (session?.user as any)?.role || ''
   const puedeSeleccionarCotizacion = ['admin', 'gerente', 'gestor', 'coordinador'].includes(rol)
   const [selectorItem, setSelectorItem] = useState<ListaEquipoItem | null>(null)
-  const [editCantidadItemId, setEditCantidadItemId] = useState<string | null>(null)
-  const [editCantidadValues, setEditCantidadValues] = useState<Record<string, string>>({})
   const [editComentarioItemId, setEditComentarioItemId] = useState<string | null>(null)
   const [editComentarioValues, setEditComentarioValues] = useState<Record<string, string>>({})
+  const [editingItem, setEditingItem] = useState<ListaEquipoItem | null>(null)
   const [itemReemplazoOriginal, setItemReemplazoOriginal] = useState<ListaEquipoItem | null>(null)
   const [itemReemplazoReemplazo, setItemReemplazoReemplazo] = useState<ListaEquipoItem | null>(null)
   const deleteValidation = useDeleteWithValidation({
@@ -208,28 +208,6 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
 
     return filtered.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
   }, [itemsWithResumen, searchTerm, categoriaFiltro])
-
-  const handleSaveCantidad = async (itemId: string) => {
-    try {
-      const cantidad = parseFloat(editCantidadValues[itemId] || '')
-      if (isNaN(cantidad) || cantidad <= 0) {
-        toast.error('Cantidad inválida')
-        return
-      }
-      await updateListaEquipoItem(itemId, { cantidad })
-      toast.success('Cantidad actualizada')
-      setEditCantidadItemId(null)
-      setEditCantidadValues((prev) => {
-        const updated = { ...prev }
-        delete updated[itemId]
-        return updated
-      })
-      onItemUpdated?.(itemId)
-      onItemsUpdated?.()
-    } catch {
-      toast.error('Error al guardar cantidad')
-    }
-  }
 
   const handleSaveComentario = async (itemId: string) => {
     try {
@@ -578,14 +556,10 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
             </thead>
           <tbody>
             {filteredItems.map((item) => {
-              const isEditingCantidad = editCantidadItemId === item.id
               const isEditingComentario = editComentarioItemId === item.id
               const costoTotal = calcularCostoItem(item)
               const resumenPedidos = item.resumen
               const clasesFilaPorEstado = getClasesFilaPorEstado(resumenPedidos.estado)
-
-              // 🔍 Debug: Log each render of motion.tr
-                // console.log('🔍 ListaEquipoItemList - Rendering motion.tr for item:', item.id, { estado: item.estado, resumenPedidos })
 
               const rowIndex = filteredItems.indexOf(item)
               return (
@@ -628,40 +602,18 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                        </span>
                    </td>
                    <td className={`${cellPadding} ${columnWidths.cantidadUnidad}`}>
-                      {isEditingCantidad ? (
-                        <div className="flex gap-1 items-center justify-center">
-                          <Input
-                            type="number"
-                            value={editCantidadValues[item.id] ?? item.cantidad?.toString() ?? ''}
-                            onChange={(e) => setEditCantidadValues((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                            className="w-12 h-7 text-center text-xs"
-                          />
-                          <span className="text-xs text-gray-500 mx-1">{item.unidad}</span>
-                          <Button size="sm" onClick={() => handleSaveCantidad(item.id)} className="h-7 w-7 p-0">
-                            <CheckCircle2 className="h-3 w-3" />
-                          </Button>
-                          <Button size="sm" variant="ghost" onClick={() => setEditCantidadItemId(null)} className="h-7 w-7 p-0">
-                            <X className="h-3 w-3" />
-                          </Button>
+                      <div>
+                        <div className="flex items-center justify-center gap-1 font-medium">
+                          <span>{item.cantidad}</span>
+                          <span className="text-xs text-gray-500">{item.unidad}</span>
                         </div>
-                      ) : (
-                        <div>
-                          <div
-                            className="flex items-center justify-center gap-1 font-medium cursor-pointer hover:text-blue-600 transition-colors"
-                            onClick={() => editable && setEditCantidadItemId(item.id)}
-                          >
-                            <span>{item.cantidad}</span>
-                            <span className="text-xs text-gray-500">{item.unidad}</span>
-                            {editable && <Pencil className="h-3 w-3 text-muted-foreground" />}
+                        {item.origen === 'cotizado' && item.proyectoEquipoItem?.cantidad != null && item.cantidad > item.proyectoEquipoItem.cantidad && (
+                          <div className="flex items-center justify-center gap-0.5 mt-0.5">
+                            <AlertTriangle className="h-3 w-3 text-amber-500" />
+                            <span className="text-[10px] text-amber-600">Cotizado: {item.proyectoEquipoItem.cantidad}</span>
                           </div>
-                          {item.origen === 'cotizado' && item.proyectoEquipoItem?.cantidad != null && item.cantidad > item.proyectoEquipoItem.cantidad && (
-                            <div className="flex items-center justify-center gap-0.5 mt-0.5">
-                              <AlertTriangle className="h-3 w-3 text-amber-500" />
-                              <span className="text-[10px] text-amber-600">Cotizado: {item.proyectoEquipoItem.cantidad}</span>
-                            </div>
-                          )}
-                        </div>
-                      )}
+                        )}
+                      </div>
                    </td>
                    <td className={`${cellPadding} ${columnWidths.cotizacion}`}>
                       <div className="flex flex-col items-center gap-0.5">
@@ -888,6 +840,21 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                               size="sm"
                               variant="ghost"
                               disabled={!editable}
+                              onClick={() => setEditingItem(item)}
+                              className="h-7 w-7 p-0 text-gray-400 hover:text-blue-500 hover:bg-blue-50"
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Editar ítem</TooltipContent>
+                        </Tooltip>
+
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={!editable}
                               onClick={() => deleteValidation.requestDelete(item.id)}
                               className="h-7 w-7 p-0 text-gray-400 hover:text-red-500 hover:bg-red-50"
                             >
@@ -920,7 +887,6 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
       ) : viewMode === 'cards' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {filteredItems.map((item) => {
-              const isEditingCantidad = editCantidadItemId === item.id
               const isEditingComentario = editComentarioItemId === item.id
               const costoTotal = calcularCostoItem(item)
 
@@ -983,29 +949,9 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                       <div className="flex items-center justify-between text-xs">
                         <div className="flex items-center gap-2">
                           <span className="text-muted-foreground">Cant:</span>
-                          {isEditingCantidad ? (
-                            <div className="flex gap-1 items-center">
-                              <Input
-                                type="number"
-                                value={editCantidadValues[item.id] ?? item.cantidad?.toString() ?? ''}
-                                onChange={(e) => setEditCantidadValues((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                                className="h-6 w-16 text-xs"
-                              />
-                              <Button size="sm" onClick={() => handleSaveCantidad(item.id)} className="h-6 w-6 p-0">
-                                <CheckCircle2 className="h-3 w-3" />
-                              </Button>
-                              <Button size="sm" variant="ghost" onClick={() => setEditCantidadItemId(null)} className="h-6 w-6 p-0">
-                                <X className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          ) : (
-                            <span
-                              className="font-medium cursor-pointer hover:text-orange-600"
-                              onClick={() => editable && setEditCantidadItemId(item.id)}
-                            >
-                              {item.cantidad} {item.unidad}
-                            </span>
-                          )}
+                          <span className="font-medium">
+                            {item.cantidad} {item.unidad}
+                          </span>
                         </div>
                         <span className="font-mono font-semibold text-green-600">
                           {costoTotal > 0 ? formatCurrency(costoTotal) : '—'}
@@ -1135,15 +1081,26 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                           )}
                         </div>
 
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          disabled={!editable}
-                          onClick={() => deleteValidation.requestDelete(item.id)}
-                          className="h-6 w-6 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={!editable}
+                            onClick={() => setEditingItem(item)}
+                            className="h-6 w-6 p-0 text-gray-400 hover:text-blue-500 hover:bg-blue-50"
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={!editable}
+                            onClick={() => deleteValidation.requestDelete(item.id)}
+                            className="h-6 w-6 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -1234,6 +1191,20 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
         onClose={() => setShowModalItemLibre(false)}
         onCreated={async () => { await onCreated?.() }}
       />
+
+      {/* Modal de edición de item */}
+      {editingItem && (
+        <ModalEditarListaItem
+          isOpen={!!editingItem}
+          item={editingItem}
+          proyectoId={proyectoId}
+          onClose={() => setEditingItem(null)}
+          onUpdated={async () => {
+            await onItemsUpdated?.()
+            await onCreated?.()
+          }}
+        />
+      )}
 
       {/* Modal de selección de cotización ganadora */}
       <Dialog open={!!selectorItem} onOpenChange={(open) => { if (!open) setSelectorItem(null) }}>

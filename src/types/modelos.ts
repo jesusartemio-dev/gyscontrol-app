@@ -1405,11 +1405,13 @@ export interface ListaEquipoItem {
     cantidad: number
     precioCliente: number
     proyectoEquipo?: {
+      id: string
       nombre: string
     }
   }
 
   proyectoEquipo?: {
+    id: string
     nombre: string
   }
 }
