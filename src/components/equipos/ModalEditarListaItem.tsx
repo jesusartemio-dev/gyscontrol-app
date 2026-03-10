@@ -51,7 +51,7 @@ export default function ModalEditarListaItem({ isOpen, item, proyectoId, onClose
       getProyectoEquipos(proyectoId).then(setEquipos).catch(() => {})
       const grupoId = (item as any).proyectoEquipoId
         || item.proyectoEquipo?.id
-        || item.proyectoEquipoItem?.proyectoEquipo?.id
+        || item.proyectoEquipoItem?.proyectoEquipoCotizado?.id
         || ''
       setForm({
         codigo: item.codigo || '',

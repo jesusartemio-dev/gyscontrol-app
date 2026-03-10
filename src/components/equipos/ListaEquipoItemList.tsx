@@ -587,7 +587,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                          )}
                          {(() => {
                            const grupoNombre = (item as any).proyectoEquipo?.nombre
-                             || item.proyectoEquipoItem?.proyectoEquipo?.nombre
+                             || item.proyectoEquipoItem?.proyectoEquipoCotizado?.nombre
                            return grupoNombre ? (
                              <span className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0 rounded bg-amber-50 text-amber-600 border border-amber-200">
                                <Layers className="h-2 w-2" />{grupoNombre}
@@ -668,9 +668,32 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                       )}
                    </td>
                    <td className={`${cellPadding} ${columnWidths.origen} text-center`}>
-                      <span className={`text-[11px] ${item.origen === 'nuevo' ? 'text-amber-600' : 'text-muted-foreground'}`}>
-                        {labelOrigen[item.origen] || item.origen}
-                      </span>
+                      {(item.origen === 'cotizado' || item.origen === 'reemplazo') && item.proyectoEquipoItem ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className={`text-[11px] text-muted-foreground cursor-help border-b border-dotted border-gray-400`}>
+                              {labelOrigen[item.origen] || item.origen}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-xs">
+                            <p className="text-[10px] font-semibold mb-0.5">
+                              {item.origen === 'reemplazo' ? 'Reemplaza a:' : 'Equipo cotizado:'}
+                            </p>
+                            <p className="text-[10px]">
+                              <span className="font-medium">{item.proyectoEquipoItem.codigo}</span> — {item.proyectoEquipoItem.descripcion}
+                            </p>
+                            {item.proyectoEquipoItem.proyectoEquipoCotizado?.nombre && (
+                              <p className="text-[9px] text-muted-foreground mt-0.5">
+                                Grupo: {item.proyectoEquipoItem.proyectoEquipoCotizado.nombre}
+                              </p>
+                            )}
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        <span className={`text-[11px] ${item.origen === 'nuevo' ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                          {labelOrigen[item.origen] || item.origen}
+                        </span>
+                      )}
                    </td>
                    <td className={`${cellPadding} ${columnWidths.estado} text-center`}>
                       <span className={`text-[11px] ${
@@ -938,9 +961,32 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                         <Badge variant={getStatusVariant(item.estado) as "default" | "secondary" | "outline"} className="text-[10px] px-1.5 py-0">
                           {item.estado || 'Sin estado'}
                         </Badge>
-                        <Badge variant={getOrigenVariant(item.origen)} className="text-[10px] px-1.5 py-0">
-                          {labelOrigen[item.origen] || item.origen}
-                        </Badge>
+                        {(item.origen === 'cotizado' || item.origen === 'reemplazo') && item.proyectoEquipoItem ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge variant={getOrigenVariant(item.origen)} className="text-[10px] px-1.5 py-0 cursor-help">
+                                {labelOrigen[item.origen] || item.origen}
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-xs">
+                              <p className="text-[10px] font-semibold mb-0.5">
+                                {item.origen === 'reemplazo' ? 'Reemplaza a:' : 'Equipo cotizado:'}
+                              </p>
+                              <p className="text-[10px]">
+                                <span className="font-medium">{item.proyectoEquipoItem.codigo}</span> — {item.proyectoEquipoItem.descripcion}
+                              </p>
+                              {item.proyectoEquipoItem.proyectoEquipoCotizado?.nombre && (
+                                <p className="text-[9px] text-muted-foreground mt-0.5">
+                                  Grupo: {item.proyectoEquipoItem.proyectoEquipoCotizado.nombre}
+                                </p>
+                              )}
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          <Badge variant={getOrigenVariant(item.origen)} className="text-[10px] px-1.5 py-0">
+                            {labelOrigen[item.origen] || item.origen}
+                          </Badge>
+                        )}
                       </div>
                     </CardHeader>
                     

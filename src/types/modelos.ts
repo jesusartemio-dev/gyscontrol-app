@@ -1402,9 +1402,11 @@ export interface ListaEquipoItem {
   // 🧠 Relaciones de origen y reemplazo
   proyectoEquipoItem?: {
     id: string
+    codigo: string
+    descripcion: string
     cantidad: number
     precioCliente: number
-    proyectoEquipo?: {
+    proyectoEquipoCotizado?: {
       id: string
       nombre: string
     }
