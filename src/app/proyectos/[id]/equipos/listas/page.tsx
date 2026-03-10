@@ -242,6 +242,7 @@ const ListasTable = memo(function ListasTable({
                   Nombre<SortIcon field="nombre" />
                 </button>
               </TableHead>
+              <TableHead className="text-xs font-medium">Grupo(s)</TableHead>
               <TableHead className="w-[80px] text-right">
                 <button
                   onClick={() => handleSort('totalItems')}
@@ -260,6 +261,14 @@ const ListasTable = memo(function ListasTable({
                   Fecha<SortIcon field="createdAt" />
                 </button>
               </TableHead>
+              <TableHead className="w-[90px]">
+                <button
+                  onClick={() => handleSort('fechaNecesaria')}
+                  className="flex items-center text-xs font-medium"
+                >
+                  F. Necesaria<SortIcon field="fechaNecesaria" />
+                </button>
+              </TableHead>
               <TableHead className="w-[110px] text-xs font-medium">Estado</TableHead>
               <TableHead className="w-[80px] text-xs font-medium">Acciones</TableHead>
             </TableRow>
@@ -267,7 +276,7 @@ const ListasTable = memo(function ListasTable({
           <TableBody>
             {sortedListas.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground text-sm">
+                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground text-sm">
                   {search || filterEstado !== 'all' ? 'No se encontraron listas' : 'Sin listas de equipos'}
                 </TableCell>
               </TableRow>
@@ -291,6 +300,29 @@ const ListasTable = memo(function ListasTable({
                       )}
                     </div>
                   </TableCell>
+                  <TableCell className="py-2">
+                    {(() => {
+                      const grupos = [...new Map<string, string>(
+                        (lista.items || [])
+                          .filter((i: any) => i.proyectoEquipoItem?.proyectoEquipoCotizado)
+                          .map((i: any) => [
+                            i.proyectoEquipoItem.proyectoEquipoCotizado.id as string,
+                            i.proyectoEquipoItem.proyectoEquipoCotizado.nombre as string
+                          ])
+                      ).values()];
+                      return grupos.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {grupos.map((nombre, idx) => (
+                            <Badge key={idx} variant="outline" className="text-[10px] px-1.5 py-0 font-normal whitespace-nowrap">
+                              {nombre}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      );
+                    })()}
+                  </TableCell>
                   <TableCell className="text-right font-mono text-sm py-2">
                     {lista.totalItems || lista.items?.length || 0}
                   </TableCell>
@@ -311,6 +343,9 @@ const ListasTable = memo(function ListasTable({
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground py-2">
                     {formatDate(lista.createdAt)}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground py-2">
+                    {lista.fechaNecesaria ? formatDate(lista.fechaNecesaria) : '—'}
                   </TableCell>
                   <TableCell className="py-2">
                     {getEstadoBadge(lista.estado)}

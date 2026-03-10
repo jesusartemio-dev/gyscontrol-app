@@ -1,6 +1,3 @@
-#!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
-
 # 🔍 Auditoría de Consistencia BD-API-Componentes
 echo "🔍 Ejecutando auditoría de consistencia..."
 npm run audit:consistency
