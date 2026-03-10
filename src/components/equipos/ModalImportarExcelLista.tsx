@@ -83,6 +83,7 @@ function VinculacionCombobox({
   isReplacement,
   matchedQuoted,
   proyectoEquipos,
+  selectedGroupId,
   usedByOthers,
   onSelect,
 }: {
@@ -92,6 +93,7 @@ function VinculacionCombobox({
   isReplacement: boolean
   matchedQuoted: QuotedItemOption | null | undefined
   proyectoEquipos: ProyectoEquipoCotizado[]
+  selectedGroupId: string
   usedByOthers: Set<string>
   onSelect: (val: string) => void
 }) {
@@ -118,16 +120,13 @@ function VinculacionCombobox({
     if (open) setTimeout(() => inputRef.current?.focus(), 50)
   }, [open])
 
-  const excelCategoria = (item.categoria || '').toLowerCase()
-  const allItems = proyectoEquipos.flatMap(grupo =>
-    (grupo.items || []).map((qi: any) => ({ ...qi, grupoNombre: grupo.nombre }))
-  )
-  const sameCategory = excelCategoria
-    ? allItems.filter((qi: any) => ((qi as any).categoria || '').toLowerCase() === excelCategoria)
+  // Filter items to only selected group
+  const selectedGroup = selectedGroupId
+    ? proyectoEquipos.find(g => g.id === selectedGroupId)
+    : null
+  const groupItems = selectedGroup
+    ? (selectedGroup.items || []).map((qi: any) => ({ ...qi, grupoNombre: selectedGroup.nombre }))
     : []
-  const otherItems = excelCategoria
-    ? allItems.filter((qi: any) => ((qi as any).categoria || '').toLowerCase() !== excelCategoria)
-    : allItems
 
   // Filter by search term
   const term = search.toLowerCase()
@@ -135,9 +134,8 @@ function VinculacionCombobox({
     if (!term) return true
     return `${qi.codigo} ${qi.descripcion} ${qi.categoria || ''}`.toLowerCase().includes(term)
   }
-  const filteredSame = sameCategory.filter(filterItem)
-  const filteredOther = otherItems.filter(filterItem)
-  const hasResults = filteredSame.length > 0 || filteredOther.length > 0 || (!term || 'sin vincular'.includes(term))
+  const filteredItems = groupItems.filter(filterItem)
+  const hasResults = filteredItems.length > 0 || (!term || 'sin vincular'.includes(term))
 
   const handleSelect = (val: string) => {
     onSelect(val)
@@ -222,28 +220,23 @@ function VinculacionCombobox({
                 {currentMapping === MAPPING_NONE && <Check className="ml-auto h-3 w-3 text-green-600" />}
               </div>
             )}
-            {/* Same category group */}
-            {filteredSame.length > 0 && (
-              <div className="mt-1">
-                <div className="px-2 py-1 text-[10px] font-semibold text-green-600 uppercase">
-                  Misma categoría ({item.categoria})
-                </div>
-                {filteredSame.map(renderItem)}
+            {/* Items from selected group */}
+            {!selectedGroupId && (
+              <div className="py-3 text-center text-[10px] text-muted-foreground">
+                Selecciona un equipo cotizado primero
               </div>
             )}
-            {/* Other categories group */}
-            {filteredOther.length > 0 && (
+            {selectedGroupId && filteredItems.length > 0 && (
               <div className="mt-1">
-                <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase">
-                  {filteredSame.length > 0 || sameCategory.length > 0 ? 'Otras categorías' : 'Equipos cotizados'}
+                <div className="px-2 py-1 text-[10px] font-semibold text-amber-600 uppercase">
+                  {selectedGroup?.nombre}
                 </div>
-                {filteredOther.map(renderItem)}
+                {filteredItems.map(renderItem)}
               </div>
             )}
-            {/* No results */}
-            {!hasResults && (
-              <div className="py-4 text-center text-xs text-muted-foreground">
-                No se encontraron items
+            {selectedGroupId && filteredItems.length === 0 && (
+              <div className="py-3 text-center text-xs text-muted-foreground">
+                {term ? 'No se encontraron items' : 'Este grupo no tiene items cotizados'}
               </div>
             )}
           </div>
@@ -476,9 +469,10 @@ export default function ModalImportarExcelLista({
       }
       setSaveToCatalog(preChecked)
 
-      // 5. Pre-populate per-item group from Excel "Equipo Cotizado" column
+      // 5. Pre-populate per-item group: from Excel column, auto-match vinculación, or single group
       const groupMappings: Record<string, string> = {}
       for (const excelItem of resumen.items) {
+        // Priority 1: Excel "Equipo Cotizado" column
         const excelGroupName = excelEquipoCotizadoNames[excelItem.codigo] || ''
         if (excelGroupName) {
           const matchedGroup = proyectoEquipos.find(
@@ -486,15 +480,24 @@ export default function ModalImportarExcelLista({
           )
           if (matchedGroup) {
             groupMappings[excelItem.codigo] = matchedGroup.id
+            continue
           }
+        }
+        // Priority 2: From auto-matched vinculación
+        const autoMappedId = mappings[excelItem.codigo]
+        if (autoMappedId) {
+          const matchedQuoted = quotedItems.find(q => q.id === autoMappedId)
+          if (matchedQuoted) {
+            groupMappings[excelItem.codigo] = matchedQuoted.grupoId
+            continue
+          }
+        }
+        // Priority 3: If only one group exists, assign it
+        if (proyectoEquipos.length === 1) {
+          groupMappings[excelItem.codigo] = proyectoEquipos[0].id
         }
       }
       setItemGroupMappings(groupMappings)
-
-      // 6. Auto-select default equipment group if there's only one
-      if (proyectoEquipos.length === 1) {
-        setSelectedProyectoEquipoId(proyectoEquipos[0].id)
-      }
 
       setStep('mapping')
     } catch (error) {
@@ -564,21 +567,22 @@ export default function ModalImportarExcelLista({
       }
       setImportProgress(20)
 
-      // === Path 1b: Import replacement items ===
+      // === Path 1b: Import replacement items (grouped by equipo cotizado) ===
       if (replacementItems.length > 0) {
-        // Determine equipment group: use selected or find from the quoted item
-        const equipoIdForReplacements = selectedProyectoEquipoId ||
-          (() => {
-            const firstQuotedId = replacementItems[0].quotedItemId
-            const matched = allQuotedItems.find(q => q.id === firstQuotedId)
-            return matched?.grupoId || ''
-          })()
-
-        if (equipoIdForReplacements) {
+        const replacementsByGroup: Record<string, typeof replacementItems> = {}
+        for (const r of replacementItems) {
+          const groupId = itemGroupMappings[r.excelItem.codigo]
+            || allQuotedItems.find(q => q.id === r.quotedItemId)?.grupoId
+            || ''
+          if (!groupId) continue
+          if (!replacementsByGroup[groupId]) replacementsByGroup[groupId] = []
+          replacementsByGroup[groupId].push(r)
+        }
+        for (const [groupId, items] of Object.entries(replacementsByGroup)) {
           await importarComoReemplazo(
             listaId,
-            equipoIdForReplacements,
-            replacementItems.map(r => ({
+            groupId,
+            items.map(r => ({
               excelItem: {
                 codigo: r.excelItem.codigo,
                 descripcion: r.excelItem.descripcion,
@@ -628,7 +632,7 @@ export default function ModalImportarExcelLista({
         const catalogByGroup: Record<string, { catalogoIds: string[]; cantidades: Record<string, number> }> = {}
         for (const item of resumenActualizado.items) {
           if (item.catalogoId) {
-            const groupId = itemGroupMappings[item.codigo] || selectedProyectoEquipoId
+            const groupId = itemGroupMappings[item.codigo]
             if (!groupId) throw new Error(`Item "${item.codigo}" no tiene grupo asignado`)
             if (!catalogByGroup[groupId]) {
               catalogByGroup[groupId] = { catalogoIds: [], cantidades: {} }
@@ -649,7 +653,7 @@ export default function ModalImportarExcelLista({
         // Group direct items by their assigned equipment group
         const directByGroup: Record<string, typeof unmappedDirect> = {}
         for (const item of unmappedDirect) {
-          const groupId = itemGroupMappings[item.codigo] || selectedProyectoEquipoId
+          const groupId = itemGroupMappings[item.codigo]
           if (!groupId) throw new Error(`Item "${item.codigo}" no tiene grupo asignado`)
           if (!directByGroup[groupId]) directByGroup[groupId] = []
           directByGroup[groupId].push(item)
@@ -986,16 +990,11 @@ export default function ModalImportarExcelLista({
     const replacedCount = mappedItems.filter(item => replacementFlags[item.codigo]).length
     const mappedCount = mappedItems.length
     const unmappedCount = resumen.items.length - mappedCount
-    const unmappedItems = resumen.items.filter(item => {
-      const m = itemMappings[item.codigo]
-      return !m || m === MAPPING_NONE
-    })
-    const needsGroup = unmappedCount > 0
-    // All unmapped items must have a group (per-item or fallback global)
-    const allUnmappedHaveGroup = unmappedItems.every(
-      item => itemGroupMappings[item.codigo] || selectedProyectoEquipoId
+    // Every item must have a group assigned (per-item)
+    const allItemsHaveGroup = resumen.items.every(
+      item => itemGroupMappings[item.codigo]
     )
-    const canImport = resumen.items.length > 0 && (!needsGroup || allUnmappedHaveGroup)
+    const canImport = resumen.items.length > 0 && allItemsHaveGroup
 
     return (
       <div className="space-y-3">
@@ -1106,7 +1105,37 @@ export default function ModalImportarExcelLista({
                     </div>
                   )}
 
-                  {/* Mapping combobox with search */}
+                  {/* Per-item Equipo Cotizado selector + Vinculación */}
+                  <div className="flex items-center gap-1.5">
+                    <Layers className="h-3 w-3 text-amber-500 shrink-0" />
+                    <Select
+                      value={itemGroupMappings[item.codigo] || ''}
+                      onValueChange={(val) => {
+                        setItemGroupMappings(prev => ({ ...prev, [item.codigo]: val }))
+                        // Clear vinculación if switching group (mapped item may not belong to new group)
+                        const currentMapped = itemMappings[item.codigo]
+                        if (currentMapped && currentMapped !== MAPPING_NONE) {
+                          const matchedItem = allQuotedItems.find(q => q.id === currentMapped)
+                          if (matchedItem && matchedItem.grupoId !== val) {
+                            setItemMappings(prev => ({ ...prev, [item.codigo]: MAPPING_NONE }))
+                            setReplacementFlags(prev => { const next = { ...prev }; delete next[item.codigo]; return next })
+                            setReplacementMotivos(prev => { const next = { ...prev }; delete next[item.codigo]; return next })
+                          }
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="h-6 text-[10px] flex-1">
+                        <SelectValue placeholder="Seleccionar equipo cotizado..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {proyectoEquipos.map((equipo) => (
+                          <SelectItem key={equipo.id} value={equipo.id} className="text-xs">
+                            {equipo.nombre}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div className="flex items-center gap-1.5">
                     <ArrowRight className="h-3 w-3 text-gray-400 shrink-0" />
                     <VinculacionCombobox
@@ -1116,12 +1145,19 @@ export default function ModalImportarExcelLista({
                       isReplacement={isReplacement}
                       matchedQuoted={matchedQuoted}
                       proyectoEquipos={proyectoEquipos}
+                      selectedGroupId={itemGroupMappings[item.codigo] || ''}
                       usedByOthers={usedByOthers}
                       onSelect={(val) => {
                         setItemMappings(prev => ({ ...prev, [item.codigo]: val }))
                         if (val === MAPPING_NONE) {
                           setReplacementFlags(prev => { const next = { ...prev }; delete next[item.codigo]; return next })
                           setReplacementMotivos(prev => { const next = { ...prev }; delete next[item.codigo]; return next })
+                        } else {
+                          // Auto-set group from the vinculado item
+                          const matched = allQuotedItems.find(q => q.id === val)
+                          if (matched) {
+                            setItemGroupMappings(prev => ({ ...prev, [item.codigo]: matched.grupoId }))
+                          }
                         }
                       }}
                     />
@@ -1221,71 +1257,45 @@ export default function ModalImportarExcelLista({
           </div>
         </div>
 
-        {/* Equipment group assignment for unmapped items */}
-        {needsGroup && (
-          <div className="space-y-2 pt-2 border-t">
-            <div className="flex items-center gap-1.5">
-              <Layers className="h-3.5 w-3.5 text-gray-500" />
-              <span className="text-xs font-medium text-gray-700">
-                Equipo Cotizado para items sin vincular ({unmappedCount})
-              </span>
-            </div>
+        {/* Bulk assign group — assign all items without group at once */}
+        {resumen.items.some(item => !itemGroupMappings[item.codigo]) && proyectoEquipos.length > 0 && (
+          <div className="flex items-center gap-2 pt-2 border-t">
+            <Layers className="h-3 w-3 text-gray-400 shrink-0" />
+            <span className="text-[10px] text-gray-500 shrink-0">Asignar todos sin grupo a:</span>
+            <Select
+              value=""
+              onValueChange={(val) => {
+                // Assign to all items that don't have a group yet
+                const updates: Record<string, string> = {}
+                for (const item of resumen.items) {
+                  if (!itemGroupMappings[item.codigo]) {
+                    updates[item.codigo] = val
+                  }
+                }
+                setItemGroupMappings(prev => ({ ...prev, ...updates }))
+              }}
+            >
+              <SelectTrigger className="h-6 text-[10px] flex-1">
+                <SelectValue placeholder="Seleccionar grupo..." />
+              </SelectTrigger>
+              <SelectContent>
+                {proyectoEquipos.map((equipo) => (
+                  <SelectItem key={equipo.id} value={equipo.id} className="text-xs">
+                    {equipo.nombre}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
-            {/* Per-item group selectors */}
-            <div className="space-y-1.5 max-h-[140px] overflow-y-auto">
-              {unmappedItems.map(item => {
-                const currentGroup = itemGroupMappings[item.codigo] || ''
-                return (
-                  <div key={item.codigo} className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono shrink-0 w-[70px] justify-center truncate" title={item.codigo}>
-                      {item.codigo}
-                    </Badge>
-                    <span className="text-[10px] text-gray-500 truncate flex-1 min-w-0" title={item.descripcion}>
-                      {item.descripcion}
-                    </span>
-                    <Select
-                      value={currentGroup}
-                      onValueChange={(val) => setItemGroupMappings(prev => ({ ...prev, [item.codigo]: val }))}
-                    >
-                      <SelectTrigger className="h-6 text-[10px] w-[180px] shrink-0">
-                        <SelectValue placeholder="Seleccionar grupo..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {proyectoEquipos.map((equipo) => (
-                          <SelectItem key={equipo.id} value={equipo.id} className="text-xs">
-                            {equipo.nombre}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )
-              })}
-            </div>
-
-            {/* Bulk assign fallback */}
-            {unmappedItems.some(item => !itemGroupMappings[item.codigo]) && proyectoEquipos.length > 1 && (
-              <div className="flex items-center gap-2 pt-1">
-                <span className="text-[10px] text-gray-400 shrink-0">Asignar todos sin grupo a:</span>
-                <Select
-                  value={selectedProyectoEquipoId}
-                  onValueChange={(val) => {
-                    setSelectedProyectoEquipoId(val)
-                  }}
-                >
-                  <SelectTrigger className="h-6 text-[10px] flex-1">
-                    <SelectValue placeholder="Grupo por defecto..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {proyectoEquipos.map((equipo) => (
-                      <SelectItem key={equipo.id} value={equipo.id} className="text-xs">
-                        {equipo.nombre}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+        {/* Warning when not all items have group */}
+        {!allItemsHaveGroup && (
+          <div className="flex items-center gap-1.5 px-2 py-1.5 rounded bg-amber-50 border border-amber-200">
+            <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />
+            <span className="text-[10px] text-amber-700">
+              Todos los items deben tener un equipo cotizado asignado para importar
+            </span>
           </div>
         )}
 
