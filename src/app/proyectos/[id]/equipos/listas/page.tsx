@@ -304,11 +304,11 @@ const ListasTable = memo(function ListasTable({
                     {(() => {
                       const grupos = [...new Map<string, string>(
                         (lista.items || [])
-                          .filter((i: any) => i.proyectoEquipoItem?.proyectoEquipoCotizado)
-                          .map((i: any) => [
-                            i.proyectoEquipoItem.proyectoEquipoCotizado.id as string,
-                            i.proyectoEquipoItem.proyectoEquipoCotizado.nombre as string
-                          ])
+                          .filter((i: any) => i.proyectoEquipoCotizado || i.proyectoEquipoItem?.proyectoEquipoCotizado)
+                          .map((i: any) => {
+                            const grupo = i.proyectoEquipoCotizado || i.proyectoEquipoItem?.proyectoEquipoCotizado;
+                            return [grupo.id as string, grupo.nombre as string];
+                          })
                       ).values()];
                       return grupos.length > 0 ? (
                         <div className="flex flex-wrap gap-1">

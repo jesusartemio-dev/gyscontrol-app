@@ -1221,6 +1221,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
         isOpen={showModalItemLibre}
         tipoItem={tipoItemLibre}
         listaId={listaId}
+        proyectoId={proyectoId}
         onClose={() => setShowModalItemLibre(false)}
         onCreated={async () => { await onCreated?.() }}
       />

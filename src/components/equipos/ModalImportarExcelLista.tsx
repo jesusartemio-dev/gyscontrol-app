@@ -289,6 +289,10 @@ export default function ModalImportarExcelLista({
   const [replacementFlags, setReplacementFlags] = useState<Record<string, boolean>>({})
   // Replacement motivos: Excel item code → motivo text
   const [replacementMotivos, setReplacementMotivos] = useState<Record<string, string>>({})
+  // Per-item group assignment: Excel item code → ProyectoEquipoCotizado ID
+  const [itemGroupMappings, setItemGroupMappings] = useState<Record<string, string>>({})
+  // Excel "Equipo Cotizado" column values (names, not IDs) - stored before verification
+  const [excelEquipoCotizadoNames, setExcelEquipoCotizadoNames] = useState<Record<string, string>>({})
 
   const resetModal = useCallback(() => {
     setStep('upload')
@@ -304,6 +308,8 @@ export default function ModalImportarExcelLista({
     setDuplicateCodes(new Set())
     setReplacementFlags({})
     setReplacementMotivos({})
+    setItemGroupMappings({})
+    setExcelEquipoCotizadoNames({})
   }, [])
 
   useEffect(() => {
@@ -363,9 +369,19 @@ export default function ModalImportarExcelLista({
           categoria: row['Categoría'] || '',
           unidad: row['Unidad'] || '',
           marca: row['Marca'] || '',
-          cantidad: parseFloat(row['Cantidad']) || 1
+          cantidad: parseFloat(row['Cantidad']) || 1,
+          equipoCotizado: String(row['Equipo Cotizado'] || '').trim(),
         }
       })
+
+      // Store per-item equipoCotizado names from Excel (before verification strips it)
+      const excelGroupNames: Record<string, string> = {}
+      for (const item of itemsExcel) {
+        if (item.equipoCotizado) {
+          excelGroupNames[item.codigo] = item.equipoCotizado
+        }
+      }
+      setExcelEquipoCotizadoNames(excelGroupNames)
 
       const resumenData = await verificarExistenciaEquipos(itemsExcel, proyectoId)
       setResumen(resumenData)
@@ -460,7 +476,22 @@ export default function ModalImportarExcelLista({
       }
       setSaveToCatalog(preChecked)
 
-      // 5. Auto-select equipment group if there's only one
+      // 5. Pre-populate per-item group from Excel "Equipo Cotizado" column
+      const groupMappings: Record<string, string> = {}
+      for (const excelItem of resumen.items) {
+        const excelGroupName = excelEquipoCotizadoNames[excelItem.codigo] || ''
+        if (excelGroupName) {
+          const matchedGroup = proyectoEquipos.find(
+            eq => eq.nombre.toLowerCase() === excelGroupName.toLowerCase()
+          )
+          if (matchedGroup) {
+            groupMappings[excelItem.codigo] = matchedGroup.id
+          }
+        }
+      }
+      setItemGroupMappings(groupMappings)
+
+      // 6. Auto-select default equipment group if there's only one
       if (proyectoEquipos.length === 1) {
         setSelectedProyectoEquipoId(proyectoEquipos[0].id)
       }
@@ -593,44 +624,52 @@ export default function ModalImportarExcelLista({
           proyectoId
         )
 
-        const catalogoIds: string[] = []
-        const cantidades: Record<string, number> = {}
+        // Group catalog items by their assigned equipment group
+        const catalogByGroup: Record<string, { catalogoIds: string[]; cantidades: Record<string, number> }> = {}
         for (const item of resumenActualizado.items) {
           if (item.catalogoId) {
-            catalogoIds.push(item.catalogoId)
-            cantidades[item.catalogoId] = item.cantidad
+            const groupId = itemGroupMappings[item.codigo] || selectedProyectoEquipoId
+            if (!groupId) throw new Error(`Item "${item.codigo}" no tiene grupo asignado`)
+            if (!catalogByGroup[groupId]) {
+              catalogByGroup[groupId] = { catalogoIds: [], cantidades: {} }
+            }
+            catalogByGroup[groupId].catalogoIds.push(item.catalogoId)
+            catalogByGroup[groupId].cantidades[item.catalogoId] = item.cantidad
           }
         }
 
-        if (catalogoIds.length > 0) {
-          if (!selectedProyectoEquipoId) throw new Error('Seleccione un grupo de equipo')
-          await importarDesdeCatalogo(
-            listaId,
-            selectedProyectoEquipoId,
-            catalogoIds,
-            cantidades,
-            responsableId
-          )
+        for (const [groupId, { catalogoIds, cantidades }] of Object.entries(catalogByGroup)) {
+          await importarDesdeCatalogo(listaId, groupId, catalogoIds, cantidades, responsableId)
         }
       }
       setImportProgress(70)
 
       // === Path 3: Direct to list without catalog ===
       if (unmappedDirect.length > 0) {
-        if (!selectedProyectoEquipoId) throw new Error('Seleccione un grupo de equipo')
-        await importarDirectoALista(
-          listaId,
-          selectedProyectoEquipoId,
-          unmappedDirect.map(item => ({
-            codigo: item.codigo,
-            descripcion: item.descripcion,
-            categoria: item.categoria,
-            unidad: item.unidad,
-            marca: item.marca,
-            cantidad: item.cantidad,
-          })),
-          responsableId
-        )
+        // Group direct items by their assigned equipment group
+        const directByGroup: Record<string, typeof unmappedDirect> = {}
+        for (const item of unmappedDirect) {
+          const groupId = itemGroupMappings[item.codigo] || selectedProyectoEquipoId
+          if (!groupId) throw new Error(`Item "${item.codigo}" no tiene grupo asignado`)
+          if (!directByGroup[groupId]) directByGroup[groupId] = []
+          directByGroup[groupId].push(item)
+        }
+
+        for (const [groupId, items] of Object.entries(directByGroup)) {
+          await importarDirectoALista(
+            listaId,
+            groupId,
+            items.map(item => ({
+              codigo: item.codigo,
+              descripcion: item.descripcion,
+              categoria: item.categoria,
+              unidad: item.unidad,
+              marca: item.marca,
+              cantidad: item.cantidad,
+            })),
+            responsableId
+          )
+        }
       }
 
       setImportProgress(100)
@@ -659,6 +698,9 @@ export default function ModalImportarExcelLista({
       const categorias: Array<{ id: string; nombre: string; descripcion?: string }> = catRes.ok ? await catRes.json() : []
       const unidades: Array<{ id: string; nombre: string }> = uniRes.ok ? await uniRes.json() : []
 
+      // Get equipment groups for the project
+      const equiposGrupos = proyectoEquipos.map(eq => eq.nombre)
+
       const wb = new ExcelJS.Workbook()
 
       // --- Sheet 1: Plantilla ---
@@ -670,6 +712,7 @@ export default function ModalImportarExcelLista({
         { header: 'Unidad', key: 'unidad', width: 10 },
         { header: 'Marca', key: 'marca', width: 15 },
         { header: 'Cantidad', key: 'cantidad', width: 10 },
+        { header: 'Equipo Cotizado', key: 'equipoCotizado', width: 35 },
       ]
       // Header style
       wsPlantilla.getRow(1).font = { bold: true }
@@ -680,13 +723,15 @@ export default function ModalImportarExcelLista({
         codigo: 'EQ001', descripcion: 'Ejemplo de Equipo',
         categoria: categorias[0]?.nombre || 'Eléctricos',
         unidad: unidades[0]?.nombre || 'UND',
-        marca: 'Siemens', cantidad: 1
+        marca: 'Siemens', cantidad: 1,
+        equipoCotizado: equiposGrupos[0] || '',
       })
       wsPlantilla.addRow({
         codigo: 'EQ002', descripcion: 'Otro Equipo',
         categoria: categorias[1]?.nombre || 'Mecánicos',
         unidad: unidades[1]?.nombre || 'KG',
-        marca: 'ABB', cantidad: 2
+        marca: 'ABB', cantidad: 2,
+        equipoCotizado: equiposGrupos[1] || equiposGrupos[0] || '',
       })
 
       // --- Sheet 2: Categorias (VISIBLE - reference with description) ---
@@ -701,7 +746,18 @@ export default function ModalImportarExcelLista({
         wsCategorias.addRow({ nombre: cat.nombre, descripcion: cat.descripcion || '' })
       }
 
-      // --- Sheet 3: Unidades (HIDDEN) ---
+      // --- Sheet 3: Equipos Cotizados (VISIBLE - reference) ---
+      const wsEquipos = wb.addWorksheet('Equipos Cotizados')
+      wsEquipos.columns = [
+        { header: 'Equipo Cotizado', key: 'nombre', width: 40 },
+      ]
+      wsEquipos.getRow(1).font = { bold: true }
+      wsEquipos.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } }
+      for (const eq of proyectoEquipos) {
+        wsEquipos.addRow({ nombre: eq.nombre })
+      }
+
+      // --- Sheet 4: Unidades (HIDDEN) ---
       const wsUnidades = wb.addWorksheet('Unidades')
       wsUnidades.columns = [{ header: 'Unidad', key: 'nombre', width: 15 }]
       for (const uni of unidades) {
@@ -731,6 +787,18 @@ export default function ModalImportarExcelLista({
             showErrorMessage: true,
             errorTitle: 'Unidad inválida',
             error: 'Selecciona una unidad de la lista',
+          }
+        }
+      }
+      if (equiposGrupos.length > 0) {
+        for (let row = 2; row <= 500; row++) {
+          wsPlantilla.getCell(`G${row}`).dataValidation = {
+            type: 'list',
+            allowBlank: true,
+            formulae: [`'Equipos Cotizados'!$A$2:$A$${equiposGrupos.length + 1}`],
+            showErrorMessage: true,
+            errorTitle: 'Equipo Cotizado inválido',
+            error: 'Selecciona un equipo cotizado de la lista o consulta la hoja "Equipos Cotizados"',
           }
         }
       }
@@ -918,8 +986,16 @@ export default function ModalImportarExcelLista({
     const replacedCount = mappedItems.filter(item => replacementFlags[item.codigo]).length
     const mappedCount = mappedItems.length
     const unmappedCount = resumen.items.length - mappedCount
+    const unmappedItems = resumen.items.filter(item => {
+      const m = itemMappings[item.codigo]
+      return !m || m === MAPPING_NONE
+    })
     const needsGroup = unmappedCount > 0
-    const canImport = resumen.items.length > 0 && (!needsGroup || selectedProyectoEquipoId)
+    // All unmapped items must have a group (per-item or fallback global)
+    const allUnmappedHaveGroup = unmappedItems.every(
+      item => itemGroupMappings[item.codigo] || selectedProyectoEquipoId
+    )
+    const canImport = resumen.items.length > 0 && (!needsGroup || allUnmappedHaveGroup)
 
     return (
       <div className="space-y-3">
@@ -1145,27 +1221,71 @@ export default function ModalImportarExcelLista({
           </div>
         </div>
 
-        {/* Equipment group selector for unmapped items */}
+        {/* Equipment group assignment for unmapped items */}
         {needsGroup && (
-          <div className="space-y-1.5 pt-1 border-t">
+          <div className="space-y-2 pt-2 border-t">
             <div className="flex items-center gap-1.5">
               <Layers className="h-3.5 w-3.5 text-gray-500" />
               <span className="text-xs font-medium text-gray-700">
-                Grupo para items sin vincular ({unmappedCount})
+                Equipo Cotizado para items sin vincular ({unmappedCount})
               </span>
             </div>
-            <Select value={selectedProyectoEquipoId} onValueChange={setSelectedProyectoEquipoId}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue placeholder="Selecciona un grupo del proyecto" />
-              </SelectTrigger>
-              <SelectContent>
-                {proyectoEquipos.map((equipo) => (
-                  <SelectItem key={equipo.id} value={equipo.id} className="text-xs">
-                    {equipo.nombre}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+
+            {/* Per-item group selectors */}
+            <div className="space-y-1.5 max-h-[140px] overflow-y-auto">
+              {unmappedItems.map(item => {
+                const currentGroup = itemGroupMappings[item.codigo] || ''
+                return (
+                  <div key={item.codigo} className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono shrink-0 w-[70px] justify-center truncate" title={item.codigo}>
+                      {item.codigo}
+                    </Badge>
+                    <span className="text-[10px] text-gray-500 truncate flex-1 min-w-0" title={item.descripcion}>
+                      {item.descripcion}
+                    </span>
+                    <Select
+                      value={currentGroup}
+                      onValueChange={(val) => setItemGroupMappings(prev => ({ ...prev, [item.codigo]: val }))}
+                    >
+                      <SelectTrigger className="h-6 text-[10px] w-[180px] shrink-0">
+                        <SelectValue placeholder="Seleccionar grupo..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {proyectoEquipos.map((equipo) => (
+                          <SelectItem key={equipo.id} value={equipo.id} className="text-xs">
+                            {equipo.nombre}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Bulk assign fallback */}
+            {unmappedItems.some(item => !itemGroupMappings[item.codigo]) && proyectoEquipos.length > 1 && (
+              <div className="flex items-center gap-2 pt-1">
+                <span className="text-[10px] text-gray-400 shrink-0">Asignar todos sin grupo a:</span>
+                <Select
+                  value={selectedProyectoEquipoId}
+                  onValueChange={(val) => {
+                    setSelectedProyectoEquipoId(val)
+                  }}
+                >
+                  <SelectTrigger className="h-6 text-[10px] flex-1">
+                    <SelectValue placeholder="Grupo por defecto..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {proyectoEquipos.map((equipo) => (
+                      <SelectItem key={equipo.id} value={equipo.id} className="text-xs">
+                        {equipo.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
         )}
 

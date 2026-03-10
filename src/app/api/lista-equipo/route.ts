@@ -40,6 +40,7 @@ export async function GET(req: NextRequest) {
             listaEquipo: true,
             proveedor: true,
             cotizacionProveedorItems: true,
+            proyectoEquipoCotizado: true,
             pedidoEquipoItem: {
               include: {
                 pedidoEquipo: true

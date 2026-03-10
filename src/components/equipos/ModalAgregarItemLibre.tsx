@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
-import { Loader2, Package, Wrench } from 'lucide-react'
+import { Loader2, Package, Wrench, Layers } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -22,21 +22,25 @@ import {
 } from '@/components/ui/select'
 import { createListaEquipoItem } from '@/lib/services/listaEquipoItem'
 import { getUnidades } from '@/lib/services/unidad'
-import type { Unidad } from '@/types'
+import { getProyectoEquipos } from '@/lib/services/proyectoEquipo'
+import type { Unidad, ProyectoEquipoCotizado } from '@/types'
 
 interface Props {
   isOpen: boolean
   tipoItem: 'consumible' | 'servicio'
   listaId: string
+  proyectoId: string
   onClose: () => void
   onCreated?: () => Promise<void>
 }
 
 const UNIDADES_RAPIDAS = ['unidad', 'metro', 'kg', 'rollo', 'caja', 'bolsa', 'juego', 'global']
 
-export default function ModalAgregarItemLibre({ isOpen, tipoItem, listaId, onClose, onCreated }: Props) {
+export default function ModalAgregarItemLibre({ isOpen, tipoItem, listaId, proyectoId, onClose, onCreated }: Props) {
   const [loading, setLoading] = useState(false)
   const [unidades, setUnidades] = useState<Unidad[]>([])
+  const [equipos, setEquipos] = useState<ProyectoEquipoCotizado[]>([])
+  const [selectedEquipoId, setSelectedEquipoId] = useState('')
   const [form, setForm] = useState({
     codigo: '',
     descripcion: '',
@@ -48,6 +52,7 @@ export default function ModalAgregarItemLibre({ isOpen, tipoItem, listaId, onClo
   useEffect(() => {
     if (isOpen) {
       getUnidades().then(setUnidades).catch(() => {})
+      getProyectoEquipos(proyectoId).then(setEquipos).catch(() => {})
       setForm({
         codigo: '',
         descripcion: '',
@@ -55,15 +60,23 @@ export default function ModalAgregarItemLibre({ isOpen, tipoItem, listaId, onClo
         cantidad: tipoItem === 'servicio' ? 1 : 0,
         precioEstimado: '',
       })
+      setSelectedEquipoId('')
     }
-  }, [isOpen, tipoItem])
+  }, [isOpen, tipoItem, proyectoId])
+
+  // Auto-select if only one group
+  useEffect(() => {
+    if (equipos.length === 1 && !selectedEquipoId) {
+      setSelectedEquipoId(equipos[0].id)
+    }
+  }, [equipos, selectedEquipoId])
 
   const esServicio = tipoItem === 'servicio'
   const titulo = esServicio ? 'Agregar servicio / trabajo' : 'Agregar consumible / material'
   const IconTipo = esServicio ? Wrench : Package
 
   const handleSubmit = async () => {
-    if (!form.codigo.trim() || !form.descripcion.trim() || !form.unidad || !form.cantidad) {
+    if (!form.codigo.trim() || !form.descripcion.trim() || !form.unidad || !form.cantidad || !selectedEquipoId) {
       toast.error('Completa los campos obligatorios')
       return
     }
@@ -82,6 +95,7 @@ export default function ModalAgregarItemLibre({ isOpen, tipoItem, listaId, onClo
         marca: 'SIN-MARCA',
         estado: 'borrador' as any,
         origen: 'nuevo' as any,
+        proyectoEquipoId: selectedEquipoId,
       } as any)
 
       toast.success(`${esServicio ? 'Servicio' : 'Consumible'} agregado`)
@@ -116,6 +130,24 @@ export default function ModalAgregarItemLibre({ isOpen, tipoItem, listaId, onClo
         </DialogHeader>
 
         <div className="space-y-3 mt-2">
+          {/* Grupo (Equipo Cotizado) - obligatorio */}
+          <div>
+            <label className="text-xs font-medium mb-1 flex items-center gap-1">
+              <Layers className="h-3 w-3" />
+              Equipo Cotizado *
+            </label>
+            <Select value={selectedEquipoId} onValueChange={setSelectedEquipoId}>
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue placeholder="Selecciona un grupo..." />
+              </SelectTrigger>
+              <SelectContent>
+                {equipos.map(eq => (
+                  <SelectItem key={eq.id} value={eq.id} className="text-xs">{eq.nombre}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div>
             <label className="text-xs font-medium mb-1 block">Descripcion *</label>
             <Textarea
@@ -188,7 +220,7 @@ export default function ModalAgregarItemLibre({ isOpen, tipoItem, listaId, onClo
           <Button
             size="sm"
             onClick={handleSubmit}
-            disabled={loading || !form.codigo.trim() || !form.descripcion.trim() || !form.unidad || !form.cantidad}
+            disabled={loading || !form.codigo.trim() || !form.descripcion.trim() || !form.unidad || !form.cantidad || !selectedEquipoId}
             className={`h-7 text-xs ${esServicio ? 'bg-purple-600 hover:bg-purple-700' : 'bg-orange-600 hover:bg-orange-700'}`}
           >
             {loading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <IconTipo className="h-3 w-3 mr-1" />}
