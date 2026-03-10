@@ -62,6 +62,17 @@ const EquiposCardView = memo(function EquiposCardView({
     return { totalItems, cliente, presupuesto, plan, completedItems, progress }
   }
 
+  const getUniqueListas = (equipo: ProyectoEquipoCotizado) => {
+    const listaMap = new Map<string, { id: string; codigo: string }>()
+    equipo.items?.forEach(item => {
+      const lista = (item as any).listaEquipo
+      if (lista?.id) {
+        listaMap.set(lista.id, { id: lista.id, codigo: lista.codigo })
+      }
+    })
+    return Array.from(listaMap.values())
+  }
+
   return (
     <div className="space-y-3">
       {/* Search */}
@@ -91,6 +102,7 @@ const EquiposCardView = memo(function EquiposCardView({
         ) : (
           filteredEquipos.map((equipo) => {
             const stats = getEquipoStats(equipo)
+            const listas = getUniqueListas(equipo)
             return (
               <Link
                 key={equipo.id}
@@ -112,10 +124,21 @@ const EquiposCardView = memo(function EquiposCardView({
                 </div>
 
                 {/* Responsable */}
-                <div className="flex items-center gap-1 text-xs text-gray-500 mb-3">
+                <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
                   <User className="h-3 w-3" />
                   <span className="truncate">{equipo.responsable?.name || 'Sin asignar'}</span>
                 </div>
+
+                {/* Listas */}
+                {listas.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    {listas.map(l => (
+                      <span key={l.id} className="inline-flex items-center text-[9px] px-1.5 py-0 rounded bg-gray-100 text-gray-500 font-mono">
+                        {l.codigo}
+                      </span>
+                    ))}
+                  </div>
+                )}
 
                 {/* Stats */}
                 <div className="flex items-center gap-3 text-xs mb-2">
