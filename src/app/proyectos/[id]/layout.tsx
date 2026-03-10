@@ -141,7 +141,7 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
 
   // Páginas que necesitan ancho completo (sin sidebar)
   // Includes specific page names AND path patterns for detail views
-  const fullWidthPages = ['cronograma']
+  const fullWidthPages = ['cronograma', 'listas']
   const fullWidthPatterns = [
     '/equipos/listas/', // Lista detail view (e.g., /equipos/listas/[listaId])
     '/equipos/pedidos/', // Pedido detail view

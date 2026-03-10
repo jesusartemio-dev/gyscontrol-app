@@ -444,12 +444,15 @@ export default function EquipmentListsPage({ params }: PageProps) {
   if (loading && !proyecto) return <LoadingSkeleton />;
 
   const totalListas = listas.length;
+  const listasAprobadas = listas.filter(l => l.estado === 'aprobado').length;
+  const totalItems = listas.reduce((sum, l) => sum + (l.totalItems || l.items?.length || 0), 0);
+  const totalPresupuesto = listas.reduce((sum, l) => sum + (l.totalPresupuesto || 0), 0);
 
   return (
     <div className="space-y-4">
       {/* Header compacto */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-1">
           <Link
             href={`/proyectos/${proyectoId}/equipos`}
             className="inline-flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
@@ -457,14 +460,18 @@ export default function EquipmentListsPage({ params }: PageProps) {
             <ArrowLeft className="h-3 w-3 mr-1" />
             Equipos
           </Link>
-          <span className="text-gray-300">/</span>
+
           <div className="flex items-center gap-2">
-            <List className="h-4 w-4 text-blue-600" />
+            <List className="h-5 w-5 text-blue-600" />
             <h1 className="text-lg font-semibold">Listas de Equipos</h1>
           </div>
-          <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-normal">
-            {totalListas}
-          </Badge>
+
+          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+            <span>{totalListas} listas</span>
+            <span className="text-green-600">{listasAprobadas} aprobadas</span>
+            <span>{totalItems} items</span>
+            <span className="font-mono">${totalPresupuesto.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</span>
+          </div>
         </div>
 
         <ModalCrearListaEquipo
