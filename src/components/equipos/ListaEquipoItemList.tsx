@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Pencil, Trash2, CheckCircle2, X, Search, Package, Clock, AlertTriangle, CheckCircle, Grid3X3, List, RotateCcw, Recycle, Plus, ShoppingCart, FileText, Download, Tag, ChevronDown, Wrench, Trophy } from 'lucide-react'
+import { Pencil, Trash2, CheckCircle2, X, Search, Package, Clock, AlertTriangle, CheckCircle, Grid3X3, List, RotateCcw, Recycle, Plus, ShoppingCart, FileText, Download, Tag, ChevronDown, Wrench, Trophy, Layers } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ListaEquipoItem } from '@/types'
@@ -611,6 +611,15 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                              <Tag className="h-2 w-2" />{item.categoria}
                            </span>
                          )}
+                         {(() => {
+                           const grupoNombre = (item as any).proyectoEquipo?.nombre
+                             || item.proyectoEquipoItem?.proyectoEquipo?.nombre
+                           return grupoNombre ? (
+                             <span className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0 rounded bg-amber-50 text-amber-600 border border-amber-200">
+                               <Layers className="h-2 w-2" />{grupoNombre}
+                             </span>
+                           ) : null
+                         })()}
                        </div>
                    </td>
                    <td className={`${cellPadding} ${columnWidths.marca}`}>
