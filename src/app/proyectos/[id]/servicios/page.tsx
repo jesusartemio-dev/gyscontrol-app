@@ -150,7 +150,7 @@ export default function ProyectoServiciosPage() {
                 <th className="text-center p-3 font-medium">Horas</th>
                 <th className="text-center p-3 font-medium w-24">Progreso</th>
                 <th className="text-right p-3 font-medium">Cliente</th>
-                <th className="text-right p-3 font-medium">Ppto</th>
+                <th className="text-right p-3 font-medium">Presupuesto</th>
                 {hayCostoPlanificado && (
                   <th className="text-right p-3 font-medium">Plan</th>
                 )}
@@ -344,7 +344,7 @@ export default function ProyectoServiciosPage() {
                     </div>
                     <div className="text-right">
                       <div className="font-medium text-muted-foreground">{formatCurrency(ppto)}</div>
-                      <div className="text-[10px] text-muted-foreground">Ppto</div>
+                      <div className="text-[10px] text-muted-foreground">Presupuesto</div>
                     </div>
                   </div>
 
@@ -400,7 +400,7 @@ export default function ProyectoServiciosPage() {
                     <div className="flex justify-between pt-2 border-t text-sm">
                       <div>
                         <div className="text-muted-foreground/50">$0</div>
-                        <div className="text-[10px] text-muted-foreground">Ppto</div>
+                        <div className="text-[10px] text-muted-foreground">Presupuesto</div>
                       </div>
                       <div className="text-right">
                         <div className="font-medium text-red-600">{formatCurrency(edt.costo)}</div>

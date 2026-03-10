@@ -51,13 +51,15 @@ const EquiposCardView = memo(function EquiposCardView({
 
   const getEquipoStats = (equipo: ProyectoEquipoCotizado) => {
     const totalItems = equipo.items?.length || 0
-    const totalCost = equipo.items?.reduce((sum, item) => sum + (item.precioCliente * item.cantidad), 0) || 0
+    const cliente = equipo.subtotalCliente || 0
+    const presupuesto = equipo.subtotalInterno || 0
+    const plan = equipo.costoListas || 0
     const completedItems = equipo.items?.filter(item =>
       item.estado === 'en_lista' || item.estado === 'reemplazado' || item.listaId
     ).length || 0
     const progress = totalItems > 0 ? (completedItems / totalItems) * 100 : 0
 
-    return { totalItems, totalCost, completedItems, progress }
+    return { totalItems, cliente, presupuesto, plan, completedItems, progress }
   }
 
   return (
@@ -116,14 +118,33 @@ const EquiposCardView = memo(function EquiposCardView({
                 </div>
 
                 {/* Stats */}
-                <div className="flex items-center gap-3 text-xs mb-3">
+                <div className="flex items-center gap-3 text-xs mb-2">
                   <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-normal">
                     {stats.totalItems} items
                   </Badge>
-                  <span className="text-gray-300">|</span>
-                  <span className="font-mono text-green-600 font-medium">
-                    {formatCurrency(stats.totalCost)}
-                  </span>
+                </div>
+
+                {/* Costs */}
+                <div className="grid grid-cols-3 gap-1 text-[10px] mb-3">
+                  <div>
+                    <div className="text-muted-foreground">Cliente</div>
+                    <div className="font-mono font-medium text-green-600">{formatCurrency(stats.cliente)}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Presupuesto</div>
+                    <div className="font-mono font-medium text-gray-600">{formatCurrency(stats.presupuesto)}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Plan</div>
+                    <div className={cn(
+                      'font-mono font-medium',
+                      stats.plan > 0
+                        ? stats.plan > stats.presupuesto && stats.presupuesto > 0 ? 'text-red-600' : 'text-indigo-600'
+                        : 'text-muted-foreground/50'
+                    )}>
+                      {stats.plan > 0 ? formatCurrency(stats.plan) : '—'}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Progress */}

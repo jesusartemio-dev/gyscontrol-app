@@ -88,9 +88,9 @@ export default function ProyectoEquiposPage() {
   }
 
   const totalItems = equipos.reduce((sum, eq) => sum + (eq.items?.length || 0), 0)
-  const totalCosto = equipos.reduce((sum, eq) =>
-    sum + (eq.items?.reduce((s, i) => s + (i.precioCliente * i.cantidad), 0) || 0), 0
-  )
+  const totalCliente = equipos.reduce((sum, eq) => sum + (eq.subtotalCliente || 0), 0)
+  const totalPresupuesto = equipos.reduce((sum, eq) => sum + (eq.subtotalInterno || 0), 0)
+  const totalPlan = equipos.reduce((sum, eq) => sum + (eq.costoListas || 0), 0)
   const completedItems = equipos.reduce((sum, eq) =>
     sum + (eq.items?.filter(i => i.estado === 'en_lista' || i.estado === 'reemplazado' || i.listaId).length || 0), 0
   )
@@ -112,7 +112,15 @@ export default function ProyectoEquiposPage() {
           <span className="text-gray-300">|</span>
           <span className="text-green-600">{completedItems} en lista</span>
           <span className="text-gray-300">|</span>
-          <span className="font-mono text-green-600 font-medium">{formatCurrency(totalCosto)}</span>
+          <span className="font-mono text-green-600 font-medium">{formatCurrency(totalCliente)}</span>
+          <span className="text-gray-300">|</span>
+          <span className="text-muted-foreground">Ppto: <span className="font-mono">{formatCurrency(totalPresupuesto)}</span></span>
+          {totalPlan > 0 && (
+            <>
+              <span className="text-gray-300">|</span>
+              <span className="text-indigo-600">Plan: <span className="font-mono">{formatCurrency(totalPlan)}</span></span>
+            </>
+          )}
         </div>
 
         <div className="flex-1" />
@@ -148,7 +156,7 @@ export default function ProyectoEquiposPage() {
       {/* Mobile Stats */}
       <div className="sm:hidden flex items-center justify-between text-xs text-muted-foreground pb-2">
         <span>{equipos.length} grupos · {totalItems} items</span>
-        <span className="font-mono text-green-600 font-medium">{formatCurrency(totalCosto)}</span>
+        <span className="font-mono text-green-600 font-medium">{formatCurrency(totalCliente)}</span>
       </div>
 
       {/* Content */}

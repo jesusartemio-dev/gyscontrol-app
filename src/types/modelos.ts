@@ -1167,6 +1167,7 @@ export interface ProyectoEquipoCotizado {
   subtotalInterno: number
   subtotalCliente: number
   subtotalReal: number
+  costoListas?: number
   createdAt: string
   updatedAt: string
 

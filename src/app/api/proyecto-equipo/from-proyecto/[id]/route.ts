@@ -37,11 +37,25 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
       },
     })
 
+    // Aggregate costoElegido from ListaEquipoItem grouped by proyectoEquipoId
+    const costoListasAgg = await prisma.listaEquipoItem.groupBy({
+      by: ['proyectoEquipoId'],
+      where: {
+        proyectoEquipoId: { in: secciones.map(s => s.id) },
+      },
+      _sum: { costoElegido: true },
+    })
+
+    const costoListasMap = new Map(
+      costoListasAgg.map(r => [r.proyectoEquipoId, r._sum.costoElegido || 0])
+    )
+
     // Map relation names for frontend compatibility
     const seccionesFormatted = secciones.map((seccion: any) => ({
       ...seccion,
       responsable: seccion.user,
-      items: seccion.proyectoEquipoCotizadoItem
+      items: seccion.proyectoEquipoCotizadoItem,
+      costoListas: costoListasMap.get(seccion.id) || 0,
     }))
     return NextResponse.json(seccionesFormatted)
   } catch (error) {

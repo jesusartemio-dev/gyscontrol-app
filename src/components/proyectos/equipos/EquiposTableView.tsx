@@ -14,7 +14,8 @@ import {
   Eye,
   User,
   CheckCircle2,
-  Clock
+  Clock,
+  AlertTriangle
 } from 'lucide-react'
 
 const formatCurrency = (amount: number): string => {
@@ -62,9 +63,15 @@ const EquiposTableView = memo(function EquiposTableView({
       } else if (sortField === 'totalItems') {
         aValue = a.items?.length || 0
         bValue = b.items?.length || 0
-      } else if (sortField === 'totalCost') {
-        aValue = a.items?.reduce((sum, item) => sum + (item.precioCliente * item.cantidad), 0) || 0
-        bValue = b.items?.reduce((sum, item) => sum + (item.precioCliente * item.cantidad), 0) || 0
+      } else if (sortField === 'cliente') {
+        aValue = a.subtotalCliente || 0
+        bValue = b.subtotalCliente || 0
+      } else if (sortField === 'presupuesto') {
+        aValue = a.subtotalInterno || 0
+        bValue = b.subtotalInterno || 0
+      } else if (sortField === 'plan') {
+        aValue = a.costoListas || 0
+        bValue = b.costoListas || 0
       } else if (sortField === 'responsableName') {
         aValue = a.responsable?.name || ''
         bValue = b.responsable?.name || ''
@@ -101,13 +108,17 @@ const EquiposTableView = memo(function EquiposTableView({
 
   const getEquipoStats = (equipo: ProyectoEquipoCotizado) => {
     const totalItems = equipo.items?.length || 0
-    const totalCost = equipo.items?.reduce((sum, item) => sum + (item.precioCliente * item.cantidad), 0) || 0
+    const cliente = equipo.subtotalCliente || 0
+    const presupuesto = equipo.subtotalInterno || 0
+    const plan = equipo.costoListas || 0
     const completedItems = equipo.items?.filter(item =>
       item.estado === 'en_lista' || item.estado === 'reemplazado' || item.listaId
     ).length || 0
     const progress = totalItems > 0 ? (completedItems / totalItems) * 100 : 0
+    const varianza = plan > 0 && presupuesto > 0 ? ((plan - presupuesto) / presupuesto) * 100 : 0
+    const excede = plan > presupuesto && presupuesto > 0
 
-    return { totalItems, totalCost, completedItems, progress }
+    return { totalItems, cliente, presupuesto, plan, completedItems, progress, varianza, excede }
   }
 
   return (
@@ -151,11 +162,22 @@ const EquiposTableView = memo(function EquiposTableView({
                     Items<SortIcon field="totalItems" />
                   </button>
                 </th>
-                <th className="px-2 py-1.5 text-right font-semibold text-gray-700 w-28">
-                  <button onClick={() => handleSort('totalCost')} className="flex items-center justify-end w-full">
-                    Total<SortIcon field="totalCost" />
+                <th className="px-2 py-1.5 text-right font-semibold text-gray-700 w-24">
+                  <button onClick={() => handleSort('cliente')} className="flex items-center justify-end w-full">
+                    Cliente<SortIcon field="cliente" />
                   </button>
                 </th>
+                <th className="px-2 py-1.5 text-right font-semibold text-gray-700 w-24">
+                  <button onClick={() => handleSort('presupuesto')} className="flex items-center justify-end w-full">
+                    Presupuesto<SortIcon field="presupuesto" />
+                  </button>
+                </th>
+                <th className="px-2 py-1.5 text-right font-semibold text-gray-700 w-24">
+                  <button onClick={() => handleSort('plan')} className="flex items-center justify-end w-full">
+                    Plan<SortIcon field="plan" />
+                  </button>
+                </th>
+                <th className="px-2 py-1.5 text-center font-semibold text-gray-700 w-14">Δ</th>
                 <th className="px-2 py-1.5 text-center font-semibold text-gray-700 w-28">
                   <button onClick={() => handleSort('progress')} className="flex items-center justify-center w-full">
                     Progreso<SortIcon field="progress" />
@@ -167,7 +189,7 @@ const EquiposTableView = memo(function EquiposTableView({
             <tbody className="divide-y">
               {sortedEquipos.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-8 text-muted-foreground">
+                  <td colSpan={9} className="text-center py-8 text-muted-foreground">
                     {searchTerm ? 'No se encontraron equipos' : 'Sin equipos'}
                   </td>
                 </tr>
@@ -205,7 +227,31 @@ const EquiposTableView = memo(function EquiposTableView({
                       </td>
                       <td className="px-2 py-1.5 text-center font-medium">{stats.totalItems}</td>
                       <td className="px-2 py-1.5 text-right font-mono text-green-600 font-medium">
-                        {formatCurrency(stats.totalCost)}
+                        {formatCurrency(stats.cliente)}
+                      </td>
+                      <td className="px-2 py-1.5 text-right font-mono text-muted-foreground">
+                        {formatCurrency(stats.presupuesto)}
+                      </td>
+                      <td className={cn(
+                        'px-2 py-1.5 text-right font-mono font-medium',
+                        stats.excede ? 'text-red-600' : 'text-indigo-600'
+                      )}>
+                        {stats.plan > 0 ? formatCurrency(stats.plan) : (
+                          <span className="text-muted-foreground/50 text-[10px]">—</span>
+                        )}
+                      </td>
+                      <td className="px-2 py-1.5 text-center">
+                        {stats.plan > 0 && stats.presupuesto > 0 ? (
+                          <span className={cn(
+                            'inline-flex items-center gap-0.5 text-[10px] font-medium',
+                            stats.excede ? 'text-red-600' : 'text-green-600'
+                          )}>
+                            {stats.excede && <AlertTriangle className="h-2.5 w-2.5" />}
+                            {stats.varianza > 0 ? '+' : ''}{Math.round(stats.varianza)}%
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground/50 text-[10px]">—</span>
+                        )}
                       </td>
                       <td className="px-2 py-1.5">
                         <div className="flex items-center gap-1.5">
