@@ -292,7 +292,7 @@ const ListasTable = memo(function ListasTable({
                   </TableCell>
                   <TableCell className="py-2">
                     <div>
-                      <span className="text-sm font-medium line-clamp-1">{lista.nombre}</span>
+                      <span className="text-xs font-medium line-clamp-2">{lista.nombre}</span>
                       {lista.descripcion && (
                         <span className="text-xs text-muted-foreground line-clamp-1 block">
                           {lista.descripcion}
