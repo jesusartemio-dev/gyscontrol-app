@@ -37,11 +37,13 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
       },
     })
 
+    const seccionIds = secciones.map(s => s.id)
+
     // Aggregate costoElegido from ListaEquipoItem grouped by proyectoEquipoId
     const costoListasAgg = await prisma.listaEquipoItem.groupBy({
       by: ['proyectoEquipoId'],
       where: {
-        proyectoEquipoId: { in: secciones.map(s => s.id) },
+        proyectoEquipoId: { in: seccionIds },
       },
       _sum: { costoElegido: true },
     })
@@ -50,12 +52,36 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
       costoListasAgg.map(r => [r.proyectoEquipoId, r._sum.costoElegido || 0])
     )
 
+    // Get unique listas per equipo group (via ListaEquipoItem -> ListaEquipo)
+    const listaItems = await prisma.listaEquipoItem.findMany({
+      where: { proyectoEquipoId: { in: seccionIds } },
+      select: {
+        proyectoEquipoId: true,
+        listaEquipo: { select: { id: true, codigo: true, nombre: true } },
+      },
+    })
+
+    // Build map: proyectoEquipoId -> unique listas
+    const listasMap = new Map<string, { id: string; codigo: string; nombre: string }[]>()
+    for (const item of listaItems) {
+      if (!item.proyectoEquipoId) continue
+      const lista = item.listaEquipo
+      if (!listasMap.has(item.proyectoEquipoId)) {
+        listasMap.set(item.proyectoEquipoId, [])
+      }
+      const arr = listasMap.get(item.proyectoEquipoId)!
+      if (!arr.some(l => l.id === lista.id)) {
+        arr.push({ id: lista.id, codigo: lista.codigo, nombre: lista.nombre })
+      }
+    }
+
     // Map relation names for frontend compatibility
     const seccionesFormatted = secciones.map((seccion: any) => ({
       ...seccion,
       responsable: seccion.user,
       items: seccion.proyectoEquipoCotizadoItem,
       costoListas: costoListasMap.get(seccion.id) || 0,
+      listas: listasMap.get(seccion.id) || [],
     }))
     return NextResponse.json(seccionesFormatted)
   } catch (error) {

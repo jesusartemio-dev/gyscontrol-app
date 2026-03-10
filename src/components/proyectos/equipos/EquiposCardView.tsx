@@ -62,16 +62,6 @@ const EquiposCardView = memo(function EquiposCardView({
     return { totalItems, cliente, presupuesto, plan, completedItems, progress }
   }
 
-  const getUniqueListas = (equipo: ProyectoEquipoCotizado) => {
-    const listaMap = new Map<string, { id: string; codigo: string }>()
-    equipo.items?.forEach(item => {
-      const lista = (item as any).listaEquipo
-      if (lista?.id) {
-        listaMap.set(lista.id, { id: lista.id, codigo: lista.codigo })
-      }
-    })
-    return Array.from(listaMap.values())
-  }
 
   return (
     <div className="space-y-3">
@@ -102,7 +92,7 @@ const EquiposCardView = memo(function EquiposCardView({
         ) : (
           filteredEquipos.map((equipo) => {
             const stats = getEquipoStats(equipo)
-            const listas = getUniqueListas(equipo)
+            const listas = (equipo as any).listas || []
             return (
               <Link
                 key={equipo.id}
@@ -132,7 +122,7 @@ const EquiposCardView = memo(function EquiposCardView({
                 {/* Listas */}
                 {listas.length > 0 && (
                   <div className="flex flex-wrap gap-1 mb-2">
-                    {listas.map(l => (
+                    {listas.map((l: { id: string; codigo: string }) => (
                       <span key={l.id} className="inline-flex items-center text-[9px] px-1.5 py-0 rounded bg-gray-100 text-gray-500 font-mono">
                         {l.codigo}
                       </span>
