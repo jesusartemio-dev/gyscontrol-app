@@ -14,12 +14,18 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from '@/components/ui/select'
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import { toast } from 'sonner'
 import {
   Plus,
@@ -30,6 +36,8 @@ import {
   X,
   CheckCircle,
   AlertCircle,
+  ChevronsUpDown,
+  Check,
 } from 'lucide-react'
 
 import type {
@@ -62,6 +70,7 @@ export default function ModalCrearCotizacionDesdeLista({
   const router = useRouter()
   const [proveedorId, setProveedorId] = useState('')
   const [proveedores, setProveedores] = useState<Proveedor[]>([])
+  const [comboOpen, setComboOpen] = useState(false)
   const [items, setItems] = useState<ListaEquipoItem[]>([])
   const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(false)
@@ -96,6 +105,7 @@ export default function ModalCrearCotizacionDesdeLista({
   useEffect(() => {
     if (!open) {
       setProveedorId('')
+      setComboOpen(false)
       setSeleccionados(new Set())
       setSearchTerm('')
     }
@@ -208,18 +218,52 @@ export default function ModalCrearCotizacionDesdeLista({
             <label className="text-xs font-medium text-muted-foreground whitespace-nowrap">
               Proveedor:
             </label>
-            <Select value={proveedorId} onValueChange={setProveedorId} disabled={loadingData}>
-              <SelectTrigger className="h-7 flex-1 text-xs">
-                <SelectValue placeholder="Seleccionar proveedor..." />
-              </SelectTrigger>
-              <SelectContent>
-                {proveedores.map((p) => (
-                  <SelectItem key={p.id} value={p.id} className="text-xs">
-                    {p.nombre}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover open={comboOpen} onOpenChange={setComboOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={comboOpen}
+                  disabled={loadingData}
+                  className="h-7 flex-1 justify-between text-xs font-normal px-2"
+                >
+                  <span className="truncate">
+                    {proveedorId
+                      ? proveedores.find(p => p.id === proveedorId)?.nombre
+                      : 'Buscar proveedor...'}
+                  </span>
+                  <ChevronsUpDown className="h-3.5 w-3.5 ml-1 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
+                <Command>
+                  <CommandInput placeholder="Buscar proveedor..." className="h-8 text-xs" />
+                  <CommandList>
+                    <CommandEmpty className="py-4 text-center text-xs text-muted-foreground">
+                      No se encontró ningún proveedor.
+                    </CommandEmpty>
+                    <CommandGroup>
+                      {proveedores.map((p) => (
+                        <CommandItem
+                          key={p.id}
+                          value={p.nombre}
+                          onSelect={() => {
+                            setProveedorId(p.id)
+                            setComboOpen(false)
+                          }}
+                          className="text-xs"
+                        >
+                          <Check
+                            className={`mr-2 h-3.5 w-3.5 ${proveedorId === p.id ? 'opacity-100' : 'opacity-0'}`}
+                          />
+                          {p.nombre}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
 
