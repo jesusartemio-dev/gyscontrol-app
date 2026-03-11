@@ -154,13 +154,16 @@ export default function ModalEscanearCotizacionPDF({
     setApplying(true)
     try {
       await Promise.all(
-        selectedMatches.map(m =>
-          updateCotizacionProveedorItem(m.itemId, {
+        selectedMatches.map(m => {
+          const existingItem = itemMap.get(m.itemId)
+          const cantidad = existingItem?.cantidad ?? existingItem?.cantidadOriginal ?? 0
+          return updateCotizacionProveedorItem(m.itemId, {
             precioUnitario: m.precioUnitario ?? undefined,
             tiempoEntrega: m.tiempoEntrega ?? undefined,
             tiempoEntregaDias: m.tiempoEntregaDias ?? undefined,
+            costoTotal: m.precioUnitario !== null ? m.precioUnitario * cantidad : undefined,
           })
-        )
+        })
       )
       toast.success(`${selectedMatches.length} ítem(s) actualizados`)
       onApplied?.()

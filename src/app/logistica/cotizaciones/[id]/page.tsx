@@ -136,7 +136,11 @@ Equipo de Compras`
 
   const stats = {
     totalItems: cotizacion.items?.length || 0,
-    totalCost: cotizacion.items?.reduce((sum, item) => sum + (item.costoTotal || 0), 0) || 0,
+    totalCost: cotizacion.items?.reduce((sum, item) => {
+      const precio = item.precioUnitario || 0
+      const cantidad = item.cantidad ?? item.cantidadOriginal ?? 0
+      return sum + (item.costoTotal || precio * cantidad)
+    }, 0) || 0,
     selectedItems: cotizacion.items?.filter(item => item.esSeleccionada).length || 0,
     itemsSinPrecio: cotizacion.items?.filter(item => !item.precioUnitario).length || 0,
   }
