@@ -60,6 +60,7 @@ interface IAFeatureFlags {
   analisisTdr: boolean
   importacionExcel: boolean
   ocrComprobantes: boolean
+  scanCotizacionPDF: boolean
 }
 
 const FEATURE_DEFS: { key: keyof IAFeatureFlags; label: string; desc: string; icon: React.ElementType }[] = [
@@ -68,6 +69,7 @@ const FEATURE_DEFS: { key: keyof IAFeatureFlags; label: string; desc: string; ic
   { key: 'analisisTdr', label: 'Analisis de TDR', desc: 'Herramientas de analisis de Terminos de Referencia', icon: FileSearch },
   { key: 'importacionExcel', label: 'Importacion Excel/PDF', desc: 'Wizard de importacion de cotizaciones con IA', icon: FileSpreadsheet },
   { key: 'ocrComprobantes', label: 'OCR Comprobantes', desc: 'Lectura automatica de facturas y boletas', icon: ScanLine },
+  { key: 'scanCotizacionPDF', label: 'Escanear PDF Cotizacion', desc: 'Auto-deteccion de precios y entregas desde PDF del proveedor', icon: FileSearch },
 ]
 
 const MONTH_NAMES = [

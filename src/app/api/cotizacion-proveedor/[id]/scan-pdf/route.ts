@@ -197,7 +197,7 @@ Devuelve SOLO un JSON array con exactamente ${items.length} elementos, uno por c
     const userId = (session.user as { id: string }).id
     trackUsage({
       userId,
-      tipo: 'ocr',
+      tipo: 'scan-cotizacion',
       modelo: model,
       tokensInput: message.usage?.input_tokens ?? 0,
       tokensOutput: message.usage?.output_tokens ?? 0,

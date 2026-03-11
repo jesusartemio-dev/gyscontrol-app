@@ -40,6 +40,7 @@ export async function PUT(request: NextRequest) {
     'analisisTdr',
     'importacionExcel',
     'ocrComprobantes',
+    'scanCotizacionPDF',
   ]
 
   // Only allow known boolean keys
