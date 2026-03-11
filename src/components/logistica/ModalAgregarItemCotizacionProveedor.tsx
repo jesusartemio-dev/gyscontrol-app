@@ -34,6 +34,15 @@ import { createCotizacionProveedorItem } from '@/lib/services/cotizacionProveedo
 
 type ItemConLista = ListaEquipoItem & { listaInfo: ListaEquipo }
 
+type GrupoItem = {
+  codigo: string
+  descripcion: string
+  items: ItemConLista[]          // non-added items across all listas
+  itemsAgregados: ItemConLista[] // already in cotizacion (yaAgregados)
+  totalCantidad: number          // sum of cantidad for non-added items
+  hasCotizacion: boolean         // any non-added item has cotizaciones
+}
+
 interface Props {
   open: boolean
   onClose: () => void
@@ -52,7 +61,7 @@ export default function ModalAgregarItemCotizacionProveedor({
   const [listas, setListas] = useState<ListaEquipo[]>([])
   const [allItems, setAllItems] = useState<ItemConLista[]>([])
   const [filtroListaId, setFiltroListaId] = useState('')
-  const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set())
+  const [seleccionadosCodigos, setSeleccionadosCodigos] = useState<Set<string>>(new Set())
   const [yaAgregados, setYaAgregados] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(false)
   const [loadingItems, setLoadingItems] = useState(false)
@@ -98,60 +107,97 @@ export default function ModalAgregarItemCotizacionProveedor({
   }
 
   const resetForm = () => {
-    setSeleccionados(new Set())
+    setSeleccionadosCodigos(new Set())
     setSearchTerm('')
     setFiltroListaId('')
   }
 
-  // Items no agregados, filtrados por lista y búsqueda
-  const itemsDisponibles = useMemo(() => {
-    let result = allItems.filter(item => !yaAgregados.has(item.id))
+  // Agrupa todos los items por codigo
+  const allGrupos = useMemo((): GrupoItem[] => {
+    const map = new Map<string, GrupoItem>()
+    for (const item of allItems) {
+      const key = item.codigo || ''
+      if (!map.has(key)) {
+        map.set(key, {
+          codigo: key,
+          descripcion: item.descripcion || '',
+          items: [],
+          itemsAgregados: [],
+          totalCantidad: 0,
+          hasCotizacion: false,
+        })
+      }
+      const grupo = map.get(key)!
+      if (yaAgregados.has(item.id)) {
+        grupo.itemsAgregados.push(item)
+      } else {
+        grupo.items.push(item)
+        grupo.totalCantidad += item.cantidad ?? 0
+        if (item.cotizaciones && item.cotizaciones.length > 0) {
+          grupo.hasCotizacion = true
+        }
+      }
+    }
+    return Array.from(map.values())
+  }, [allItems, yaAgregados])
+
+  // Grupos con items no agregados, filtrados por lista y búsqueda
+  const gruposDisponibles = useMemo(() => {
+    let result = allGrupos.filter(g => g.items.length > 0)
     if (filtroListaId) {
-      result = result.filter(item => item.listaInfo?.id === filtroListaId)
+      result = result.filter(g => g.items.some(i => i.listaInfo?.id === filtroListaId))
     }
     if (searchTerm) {
       const term = searchTerm.toLowerCase()
-      result = result.filter(item =>
-        item.descripcion?.toLowerCase().includes(term) ||
-        item.codigo?.toLowerCase().includes(term)
+      result = result.filter(g =>
+        g.codigo.toLowerCase().includes(term) ||
+        g.descripcion.toLowerCase().includes(term)
       )
     }
     return result
-  }, [allItems, yaAgregados, filtroListaId, searchTerm])
+  }, [allGrupos, filtroListaId, searchTerm])
 
-  // Items seleccionados (siempre visibles arriba)
-  const itemsSeleccionadosData = useMemo(
-    () => allItems.filter(item => seleccionados.has(item.id)),
-    [allItems, seleccionados]
+  // Grupos seleccionados (siempre visibles arriba)
+  const gruposSeleccionados = useMemo(
+    () => allGrupos.filter(g => seleccionadosCodigos.has(g.codigo)),
+    [allGrupos, seleccionadosCodigos]
   )
 
-  const toggleSeleccion = (id: string) => {
-    if (yaAgregados.has(id)) return
-    setSeleccionados(prev => {
+  const toggleGrupo = (grupo: GrupoItem) => {
+    setSeleccionadosCodigos(prev => {
       const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
+      if (next.has(grupo.codigo)) next.delete(grupo.codigo)
+      else next.add(grupo.codigo)
       return next
     })
   }
 
   const toggleSelectAll = () => {
-    if (itemsDisponibles.length === 0) {
-      setSeleccionados(new Set())
-    } else {
-      setSeleccionados(prev => {
-        const next = new Set(prev)
-        itemsDisponibles.forEach(i => next.add(i.id))
-        return next
-      })
-    }
+    if (gruposDisponibles.length === 0) return
+    setSeleccionadosCodigos(prev => {
+      const next = new Set(prev)
+      const allSelected = gruposDisponibles.every(g => next.has(g.codigo))
+      if (allSelected) {
+        gruposDisponibles.forEach(g => next.delete(g.codigo))
+      } else {
+        gruposDisponibles.forEach(g => next.add(g.codigo))
+      }
+      return next
+    })
   }
 
   const handleAgregar = async () => {
-    if (seleccionados.size === 0) return
+    if (seleccionadosCodigos.size === 0) return
     try {
       setLoading(true)
-      const promises = Array.from(seleccionados).map(itemId => {
+      // Resolve codigos → item IDs (non-added items only)
+      const itemIds: string[] = []
+      for (const grupo of allGrupos) {
+        if (seleccionadosCodigos.has(grupo.codigo)) {
+          itemIds.push(...grupo.items.map(i => i.id))
+        }
+      }
+      const promises = itemIds.map(itemId => {
         const item = allItems.find(i => i.id === itemId)
         return createCotizacionProveedorItem({
           cotizacionId: cotizacion.id,
@@ -160,7 +206,7 @@ export default function ModalAgregarItemCotizacionProveedor({
         })
       })
       await Promise.all(promises)
-      toast.success(`${seleccionados.size} item(s) agregado(s)`)
+      toast.success(`${itemIds.length} item(s) agregado(s)`)
       resetForm()
       onAdded?.()
       onClose()
@@ -172,15 +218,8 @@ export default function ModalAgregarItemCotizacionProveedor({
     }
   }
 
-  const getItemStatus = (item: ItemConLista) => {
-    if (item.cotizaciones && item.cotizaciones.length > 0) {
-      return { label: 'Cotizado', color: 'text-green-600' }
-    }
-    return { label: 'Pendiente', color: 'text-orange-600' }
-  }
-
-  const hasDraft = seleccionados.size > 0
-  const totalDisponibles = allItems.filter(i => !yaAgregados.has(i.id)).length
+  const hasDraft = seleccionadosCodigos.size > 0
+  const totalGruposDisponibles = allGrupos.filter(g => g.items.length > 0).length
 
   return (
     <Dialog open={open} onOpenChange={(val) => !val && onClose()}>
@@ -240,11 +279,11 @@ export default function ModalAgregarItemCotizacionProveedor({
                       : 'bg-white text-muted-foreground border-gray-200 hover:border-blue-400 hover:text-blue-600'
                   }`}
                 >
-                  Todas ({totalDisponibles})
+                  Todas ({totalGruposDisponibles})
                 </button>
                 {listas.map(lista => {
-                  const count = allItems.filter(
-                    i => !yaAgregados.has(i.id) && i.listaInfo?.id === lista.id
+                  const count = allGrupos.filter(
+                    g => g.items.some(i => i.listaInfo?.id === lista.id)
                   ).length
                   return (
                     <button
@@ -286,53 +325,68 @@ export default function ModalAgregarItemCotizacionProveedor({
                   <tr className="border-b">
                     <th className="py-2 px-2 w-8">
                       <Checkbox
-                        checked={itemsDisponibles.length === 0 && seleccionados.size > 0}
+                        checked={
+                          gruposDisponibles.length > 0 &&
+                          gruposDisponibles.every(g => seleccionadosCodigos.has(g.codigo))
+                        }
                         onCheckedChange={toggleSelectAll}
-                        disabled={loadingItems}
+                        disabled={loadingItems || gruposDisponibles.length === 0}
                         className="h-3.5 w-3.5"
                       />
                     </th>
                     <th className="py-2 px-2 text-left font-medium text-muted-foreground w-24">Código</th>
                     <th className="py-2 px-2 text-left font-medium text-muted-foreground">Descripción</th>
-                    <th className="py-2 px-2 text-left font-medium text-muted-foreground w-20">Lista</th>
+                    <th className="py-2 px-2 text-left font-medium text-muted-foreground">Listas</th>
                     <th className="py-2 px-2 text-center font-medium text-muted-foreground w-14">Cant.</th>
                     <th className="py-2 px-2 text-center font-medium text-muted-foreground w-20">Estado</th>
                   </tr>
                 </thead>
                 <tbody>
                   {/* ── Sección SELECCIONADOS ── */}
-                  {itemsSeleccionadosData.length > 0 && (
+                  {gruposSeleccionados.length > 0 && (
                     <>
                       <tr className="bg-blue-50 border-b">
                         <td colSpan={6} className="py-1 px-3">
                           <span className="text-[10px] font-semibold text-blue-700 uppercase tracking-wide">
-                            Seleccionados ({itemsSeleccionadosData.length})
+                            Seleccionados ({gruposSeleccionados.length})
                           </span>
                         </td>
                       </tr>
-                      {itemsSeleccionadosData.map(item => {
-                        const status = getItemStatus(item)
-                        return (
-                          <tr
-                            key={item.id}
-                            className="border-b bg-blue-50/40 hover:bg-blue-50 cursor-pointer transition-colors"
-                            onClick={() => toggleSeleccion(item.id)}
-                          >
-                            <td className="py-1.5 px-2">
-                              <Checkbox checked onCheckedChange={() => toggleSeleccion(item.id)} className="h-3.5 w-3.5" />
-                            </td>
-                            <td className="py-1.5 px-2 font-mono text-[11px]">{item.codigo}</td>
-                            <td className="py-1.5 px-2 truncate max-w-[180px]" title={item.descripcion}>{item.descripcion}</td>
-                            <td className="py-1.5 px-2">
-                              <Badge variant="outline" className="text-[10px] h-5 px-1.5 font-normal">{item.listaInfo?.codigo}</Badge>
-                            </td>
-                            <td className="py-1.5 px-2 text-center font-medium">{item.cantidad}</td>
-                            <td className="py-1.5 px-2 text-center">
-                              <Badge variant="outline" className={`text-[10px] h-5 px-1.5 ${status.color}`}>{status.label}</Badge>
-                            </td>
-                          </tr>
-                        )
-                      })}
+                      {gruposSeleccionados.map(grupo => (
+                        <tr
+                          key={grupo.codigo}
+                          className="border-b bg-blue-50/40 hover:bg-blue-50 cursor-pointer transition-colors"
+                          onClick={() => toggleGrupo(grupo)}
+                        >
+                          <td className="py-1.5 px-2">
+                            <Checkbox checked onCheckedChange={() => toggleGrupo(grupo)} className="h-3.5 w-3.5" />
+                          </td>
+                          <td className="py-1.5 px-2 font-mono text-[11px]">{grupo.codigo}</td>
+                          <td className="py-1.5 px-2 truncate max-w-[150px]" title={grupo.descripcion}>{grupo.descripcion}</td>
+                          <td className="py-1.5 px-2">
+                            <div className="flex flex-wrap gap-1">
+                              {grupo.items.map(item => (
+                                <Badge key={item.id} variant="outline" className="text-[10px] h-5 px-1.5 font-normal">
+                                  {item.listaInfo?.codigo} {item.cantidad}u
+                                </Badge>
+                              ))}
+                              {grupo.itemsAgregados.map(item => (
+                                <Badge key={item.id} variant="secondary" className="text-[10px] h-5 px-1.5 font-normal opacity-50 line-through">
+                                  {item.listaInfo?.codigo} {item.cantidad}u
+                                </Badge>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="py-1.5 px-2 text-center font-medium">{grupo.totalCantidad}</td>
+                          <td className="py-1.5 px-2 text-center">
+                            {grupo.itemsAgregados.length > 0 && (
+                              <Badge variant="outline" className="text-[10px] h-5 px-1.5 text-amber-600 border-amber-300">
+                                Parcial
+                              </Badge>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
                     </>
                   )}
 
@@ -340,13 +394,13 @@ export default function ModalAgregarItemCotizacionProveedor({
                   <tr className="bg-gray-50 border-b">
                     <td colSpan={6} className="py-1 px-3">
                       <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
-                        Disponibles ({itemsDisponibles.length}
+                        Disponibles ({gruposDisponibles.length}
                         {searchTerm ? ` — "${searchTerm}"` : ''}
                         {filtroListaId ? ` en ${listas.find(l => l.id === filtroListaId)?.codigo}` : ''})
                       </span>
                     </td>
                   </tr>
-                  {itemsDisponibles.length === 0 ? (
+                  {gruposDisponibles.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="py-8 text-center text-xs text-muted-foreground">
                         {searchTerm ? (
@@ -354,34 +408,52 @@ export default function ModalAgregarItemCotizacionProveedor({
                             Sin resultados para &quot;{searchTerm}&quot;.{' '}
                             <button className="text-blue-600 underline" onClick={() => setSearchTerm('')}>Limpiar búsqueda</button>
                           </>
-                        ) : totalDisponibles === 0
+                        ) : totalGruposDisponibles === 0
                           ? 'Todos los items ya fueron agregados a esta cotización'
                           : 'No hay items disponibles con estos filtros'}
                       </td>
                     </tr>
                   ) : (
-                    itemsDisponibles.map(item => {
-                      const isSelected = seleccionados.has(item.id)
-                      const status = getItemStatus(item)
+                    gruposDisponibles.map(grupo => {
+                      const isSelected = seleccionadosCodigos.has(grupo.codigo)
                       return (
                         <tr
-                          key={item.id}
+                          key={grupo.codigo}
                           className={`border-b cursor-pointer transition-colors ${
                             isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'
                           }`}
-                          onClick={() => toggleSeleccion(item.id)}
+                          onClick={() => toggleGrupo(grupo)}
                         >
                           <td className="py-1.5 px-2">
-                            <Checkbox checked={isSelected} onCheckedChange={() => toggleSeleccion(item.id)} className="h-3.5 w-3.5" />
+                            <Checkbox checked={isSelected} onCheckedChange={() => toggleGrupo(grupo)} className="h-3.5 w-3.5" />
                           </td>
-                          <td className="py-1.5 px-2 font-mono text-[11px]">{item.codigo}</td>
-                          <td className="py-1.5 px-2 truncate max-w-[180px]" title={item.descripcion}>{item.descripcion}</td>
+                          <td className="py-1.5 px-2 font-mono text-[11px]">{grupo.codigo}</td>
+                          <td className="py-1.5 px-2 truncate max-w-[150px]" title={grupo.descripcion}>{grupo.descripcion}</td>
                           <td className="py-1.5 px-2">
-                            <Badge variant="outline" className="text-[10px] h-5 px-1.5 font-normal">{item.listaInfo?.codigo}</Badge>
+                            <div className="flex flex-wrap gap-1">
+                              {grupo.items.map(item => (
+                                <Badge key={item.id} variant="outline" className="text-[10px] h-5 px-1.5 font-normal">
+                                  {item.listaInfo?.codigo} {item.cantidad}u
+                                </Badge>
+                              ))}
+                              {grupo.itemsAgregados.map(item => (
+                                <Badge key={item.id} variant="secondary" className="text-[10px] h-5 px-1.5 font-normal opacity-50 line-through">
+                                  {item.listaInfo?.codigo} {item.cantidad}u
+                                </Badge>
+                              ))}
+                            </div>
                           </td>
-                          <td className="py-1.5 px-2 text-center font-medium">{item.cantidad}</td>
+                          <td className="py-1.5 px-2 text-center font-medium">{grupo.totalCantidad}</td>
                           <td className="py-1.5 px-2 text-center">
-                            <Badge variant="outline" className={`text-[10px] h-5 px-1.5 ${status.color}`}>{status.label}</Badge>
+                            {grupo.itemsAgregados.length > 0 ? (
+                              <Badge variant="outline" className="text-[10px] h-5 px-1.5 text-amber-600 border-amber-300">
+                                Parcial
+                              </Badge>
+                            ) : grupo.hasCotizacion ? (
+                              <Badge variant="outline" className="text-[10px] h-5 px-1.5 text-green-600">
+                                Cotizado
+                              </Badge>
+                            ) : null}
                           </td>
                         </tr>
                       )
@@ -397,10 +469,10 @@ export default function ModalAgregarItemCotizacionProveedor({
         <div className="px-4 py-3 border-t bg-gray-50/50 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="text-xs">
-              {seleccionados.size > 0 ? (
-                <span className="text-blue-600 font-medium">{seleccionados.size} seleccionado(s)</span>
+              {seleccionadosCodigos.size > 0 ? (
+                <span className="text-blue-600 font-medium">{seleccionadosCodigos.size} grupo(s) seleccionado(s)</span>
               ) : (
-                <span className="text-muted-foreground">{totalDisponibles} disponibles · {yaAgregados.size} ya agregados</span>
+                <span className="text-muted-foreground">{totalGruposDisponibles} disponibles · {yaAgregados.size} ya agregados</span>
               )}
             </div>
             <div className="flex items-center gap-2">
@@ -428,13 +500,13 @@ export default function ModalAgregarItemCotizacionProveedor({
               <Button
                 size="sm"
                 onClick={handleAgregar}
-                disabled={loading || seleccionados.size === 0}
+                disabled={loading || seleccionadosCodigos.size === 0}
                 className="h-7 text-xs min-w-[100px]"
               >
                 {loading ? (
                   <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Agregando...</>
                 ) : (
-                  <><Plus className="h-3 w-3 mr-1" />Agregar ({seleccionados.size})</>
+                  <><Plus className="h-3 w-3 mr-1" />Agregar ({seleccionadosCodigos.size})</>
                 )}
               </Button>
             </div>
