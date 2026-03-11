@@ -1,12 +1,22 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
@@ -19,6 +29,7 @@ import {
   ArrowLeft,
   AlertCircle,
   CheckCircle2,
+  ArrowRight,
 } from 'lucide-react'
 
 import type { CotizacionProveedor } from '@/types'
@@ -53,6 +64,12 @@ export default function ModalEscanearCotizacionPDF({
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [applying, setApplying] = useState(false)
   const [dragOver, setDragOver] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
+
+  const itemMap = useMemo(
+    () => new Map((cotizacion.items || []).map(item => [item.id, item])),
+    [cotizacion.items]
+  )
 
   const handleFileSelect = (f: File) => {
     if (f.type !== 'application/pdf') {
@@ -114,10 +131,26 @@ export default function ModalEscanearCotizacionPDF({
     })
   }
 
-  const handleApply = async () => {
+  const getOverwriteCount = () => {
+    return matches.filter(m => {
+      if (!selected.has(m.itemId) || m.precioUnitario === null) return false
+      const existing = itemMap.get(m.itemId)
+      return existing?.precioUnitario && existing.precioUnitario > 0
+    }).length
+  }
+
+  const handleApply = () => {
     const selectedMatches = matches.filter(m => selected.has(m.itemId))
     if (selectedMatches.length === 0) return
+    if (getOverwriteCount() > 0) {
+      setShowConfirm(true)
+    } else {
+      doApply()
+    }
+  }
 
+  const doApply = async () => {
+    const selectedMatches = matches.filter(m => selected.has(m.itemId))
     setApplying(true)
     try {
       await Promise.all(
@@ -145,12 +178,14 @@ export default function ModalEscanearCotizacionPDF({
     setFile(null)
     setMatches([])
     setSelected(new Set())
+    setShowConfirm(false)
     onClose()
   }
 
   const foundCount = matches.filter(m => m.precioUnitario !== null).length
 
   return (
+    <>
     <Dialog open={open} onOpenChange={(val) => !val && handleClose()}>
       <DialogContent className="max-w-2xl w-full max-h-[85vh] flex flex-col p-0 gap-0">
         {/* Header */}
@@ -289,6 +324,11 @@ export default function ModalEscanearCotizacionPDF({
                   {matches.map(match => {
                     const found = match.precioUnitario !== null
                     const isSelected = selected.has(match.itemId)
+                    const existing = itemMap.get(match.itemId)
+                    const existingPrice = existing?.precioUnitario || 0
+                    const willOverwritePrice = found && existingPrice > 0 && match.precioUnitario !== existingPrice
+                    const existingEntrega = existing?.tiempoEntrega || ''
+                    const willOverwriteEntrega = found && existingEntrega && match.tiempoEntrega && match.tiempoEntrega !== existingEntrega
                     return (
                       <tr
                         key={match.itemId}
@@ -314,13 +354,38 @@ export default function ModalEscanearCotizacionPDF({
                           {match.descripcion}
                         </td>
                         <td className="py-1.5 px-2 text-right font-medium">
-                          {found
-                            ? `$${match.precioUnitario!.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
-                            : <span className="text-muted-foreground text-[10px]">no encontrado</span>
-                          }
+                          {found ? (
+                            willOverwritePrice ? (
+                              <span className="flex items-center justify-end gap-1 flex-wrap">
+                                <span className="text-muted-foreground line-through text-[10px]">
+                                  ${existingPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                </span>
+                                <ArrowRight className="h-2.5 w-2.5 text-amber-500 shrink-0" />
+                                <span className="text-amber-700 font-semibold">
+                                  ${match.precioUnitario!.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                </span>
+                              </span>
+                            ) : (
+                              `$${match.precioUnitario!.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+                            )
+                          ) : (
+                            <span className="text-muted-foreground text-[10px]">no encontrado</span>
+                          )}
                         </td>
                         <td className="py-1.5 px-2 text-[11px]">
-                          {match.tiempoEntrega || <span className="text-muted-foreground">—</span>}
+                          {found && match.tiempoEntrega ? (
+                            willOverwriteEntrega ? (
+                              <span className="flex items-center gap-1 flex-wrap">
+                                <span className="text-muted-foreground line-through text-[10px]">{existingEntrega}</span>
+                                <ArrowRight className="h-2.5 w-2.5 text-amber-500 shrink-0" />
+                                <span className="text-amber-700">{match.tiempoEntrega}</span>
+                              </span>
+                            ) : (
+                              match.tiempoEntrega
+                            )
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
                         </td>
                         <td className="py-1.5 px-2 text-center">
                           {found && (
@@ -352,9 +417,15 @@ export default function ModalEscanearCotizacionPDF({
         {/* Footer */}
         <div className="px-4 py-3 border-t bg-gray-50/50 flex-shrink-0">
           <div className="flex items-center justify-between">
-            <div className="text-xs text-muted-foreground">
+            <div className="text-xs text-muted-foreground space-y-0.5">
               {phase === 'review' && selected.size > 0 && (
                 <span className="text-blue-600 font-medium">{selected.size} ítem(s) seleccionados para aplicar</span>
+              )}
+              {phase === 'review' && selected.size > 0 && getOverwriteCount() > 0 && (
+                <div className="flex items-center gap-1 text-amber-600">
+                  <AlertCircle className="h-3 w-3" />
+                  <span>{getOverwriteCount()} ítem(s) con precio existente serán sobreescritos</span>
+                </div>
               )}
             </div>
             <div className="flex items-center gap-2">
@@ -409,5 +480,30 @@ export default function ModalEscanearCotizacionPDF({
         </div>
       </DialogContent>
     </Dialog>
+
+    <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>¿Sobreescribir precios existentes?</AlertDialogTitle>
+          <AlertDialogDescription>
+            <strong>{getOverwriteCount()} ítem(s)</strong> ya tienen un precio cargado que será reemplazado por el
+            valor detectado en el PDF. Esta acción no se puede deshacer.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={() => setShowConfirm(false)}>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => {
+              setShowConfirm(false)
+              doApply()
+            }}
+            className="bg-amber-600 hover:bg-amber-700"
+          >
+            Sobreescribir y aplicar
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   )
 }
