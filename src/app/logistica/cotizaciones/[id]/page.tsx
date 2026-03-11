@@ -20,6 +20,7 @@ import {
   ChevronDown,
   History,
   CheckCircle2,
+  ScanSearch,
 } from 'lucide-react'
 import type { CotizacionProveedor } from '@/types'
 import CotizacionProveedorHistorial from '@/components/logistica/CotizacionProveedorHistorial'
@@ -27,6 +28,7 @@ import CotizacionEstadoFlujoBanner from '@/components/logistica/CotizacionEstado
 import CotizacionProveedorTabla from '@/components/logistica/CotizacionProveedorTabla'
 import ModalAgregarItemCotizacionProveedor from '@/components/logistica/ModalAgregarItemCotizacionProveedor'
 import ModalSeleccionarCotizacionCompleta from '@/components/logistica/ModalSeleccionarCotizacionCompleta'
+import ModalEscanearCotizacionPDF from '@/components/logistica/ModalEscanearCotizacionPDF'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -41,6 +43,7 @@ export default function CotizacionProveedorDetailPage({ params }: PageProps) {
   const [showAgregarItems, setShowAgregarItems] = useState(false)
   const [showSeleccionarCompleta, setShowSeleccionarCompleta] = useState(false)
   const [showHistorial, setShowHistorial] = useState(false)
+  const [showScanPdf, setShowScanPdf] = useState(false)
 
   useEffect(() => {
     params.then((p) => setCotizacionId(p.id))
@@ -210,6 +213,17 @@ Equipo de Compras`
                   Items
                 </Button>
               )}
+              {!esEstadoFinal && stats.totalItems > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowScanPdf(true)}
+                  className="h-7 text-xs"
+                >
+                  <ScanSearch className="h-3 w-3 mr-1" />
+                  Escanear PDF
+                </Button>
+              )}
               {(estado === 'cotizado' || estado === 'seleccionado') && stats.totalItems > 0 && (
                 <Button
                   size="sm"
@@ -344,6 +358,14 @@ Equipo de Compras`
         cotizacion={cotizacion}
         proyectoId={cotizacion.proyectoId || ''}
         onAdded={handleRefresh}
+      />
+
+      {/* Modal escanear PDF */}
+      <ModalEscanearCotizacionPDF
+        open={showScanPdf}
+        onClose={() => setShowScanPdf(false)}
+        cotizacion={cotizacion}
+        onApplied={handleRefresh}
       />
 
       {/* Modal seleccionar cotización completa */}
