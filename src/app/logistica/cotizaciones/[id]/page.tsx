@@ -21,6 +21,7 @@ import {
   History,
   CheckCircle2,
   ScanSearch,
+  UserPlus,
 } from 'lucide-react'
 import type { CotizacionProveedor } from '@/types'
 import CotizacionProveedorHistorial from '@/components/logistica/CotizacionProveedorHistorial'
@@ -29,6 +30,7 @@ import CotizacionProveedorTabla from '@/components/logistica/CotizacionProveedor
 import ModalAgregarItemCotizacionProveedor from '@/components/logistica/ModalAgregarItemCotizacionProveedor'
 import ModalSeleccionarCotizacionCompleta from '@/components/logistica/ModalSeleccionarCotizacionCompleta'
 import ModalEscanearCotizacionPDF from '@/components/logistica/ModalEscanearCotizacionPDF'
+import ModalSolicitarOtroProveedor from '@/components/logistica/ModalSolicitarOtroProveedor'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -44,6 +46,7 @@ export default function CotizacionProveedorDetailPage({ params }: PageProps) {
   const [showSeleccionarCompleta, setShowSeleccionarCompleta] = useState(false)
   const [showHistorial, setShowHistorial] = useState(false)
   const [showScanPdf, setShowScanPdf] = useState(false)
+  const [showSolicitarOtro, setShowSolicitarOtro] = useState(false)
 
   useEffect(() => {
     params.then((p) => setCotizacionId(p.id))
@@ -228,6 +231,17 @@ Equipo de Compras`
                   Escanear PDF
                 </Button>
               )}
+              {stats.totalItems > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowSolicitarOtro(true)}
+                  className="h-7 text-xs"
+                >
+                  <UserPlus className="h-3 w-3 mr-1" />
+                  Otro proveedor
+                </Button>
+              )}
               {(estado === 'cotizado' || estado === 'seleccionado') && stats.totalItems > 0 && (
                 <Button
                   size="sm"
@@ -370,6 +384,13 @@ Equipo de Compras`
         onClose={() => setShowScanPdf(false)}
         cotizacion={cotizacion}
         onApplied={handleRefresh}
+      />
+
+      {/* Modal solicitar a otro proveedor */}
+      <ModalSolicitarOtroProveedor
+        open={showSolicitarOtro}
+        onClose={() => setShowSolicitarOtro(false)}
+        cotizacion={cotizacion}
       />
 
       {/* Modal seleccionar cotización completa */}
