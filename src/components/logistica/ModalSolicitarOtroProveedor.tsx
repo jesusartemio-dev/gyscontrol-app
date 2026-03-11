@@ -11,15 +11,17 @@ import {
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
 import { toast } from 'sonner'
-import { UserPlus, Loader2, Building2 } from 'lucide-react'
+import { UserPlus, Loader2, Building2, ChevronsUpDown, Check } from 'lucide-react'
 import type { CotizacionProveedor, Proveedor } from '@/types'
 import { getProveedores } from '@/lib/services/proveedor'
 import { createCotizacionProveedor } from '@/lib/services/cotizacionProveedor'
@@ -37,6 +39,7 @@ export default function ModalSolicitarOtroProveedor({ open, onClose, cotizacion 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [creating, setCreating] = useState(false)
   const [loadingProveedores, setLoadingProveedores] = useState(false)
+  const [comboOpen, setComboOpen] = useState(false)
 
   const items = cotizacion.items || []
   const itemsValidos = items.filter(i => i.listaEquipoItemId)
@@ -143,20 +146,57 @@ export default function ModalSolicitarOtroProveedor({ open, onClose, cotizacion 
         </DialogHeader>
 
         <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
-          {/* Provider selector */}
+          {/* Provider combobox */}
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-gray-700">Proveedor destino</label>
-            <Select value={proveedorId} onValueChange={setProveedorId} disabled={loadingProveedores}>
-              <SelectTrigger className="h-8 text-xs">
-                <Building2 className="h-3.5 w-3.5 text-gray-400 mr-1.5 shrink-0" />
-                <SelectValue placeholder={loadingProveedores ? 'Cargando…' : 'Seleccionar proveedor'} />
-              </SelectTrigger>
-              <SelectContent>
-                {proveedores.map(p => (
-                  <SelectItem key={p.id} value={p.id} className="text-xs">{p.nombre}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover open={comboOpen} onOpenChange={setComboOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  disabled={loadingProveedores}
+                  className="w-full h-8 text-xs justify-between font-normal"
+                >
+                  <span className="flex items-center gap-1.5 truncate">
+                    <Building2 className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                    {loadingProveedores
+                      ? 'Cargando…'
+                      : selectedProveedor
+                      ? selectedProveedor.nombre
+                      : 'Buscar proveedor…'
+                    }
+                  </span>
+                  <ChevronsUpDown className="h-3.5 w-3.5 text-gray-400 shrink-0 ml-1" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Buscar por nombre…" className="h-8 text-xs" />
+                  <CommandList>
+                    <CommandEmpty className="py-4 text-xs text-center text-muted-foreground">
+                      No se encontraron proveedores.
+                    </CommandEmpty>
+                    <CommandGroup>
+                      {proveedores.map(p => (
+                        <CommandItem
+                          key={p.id}
+                          value={p.nombre}
+                          onSelect={() => {
+                            setProveedorId(p.id)
+                            setComboOpen(false)
+                          }}
+                          className="text-xs"
+                        >
+                          <Check className={`h-3.5 w-3.5 mr-2 shrink-0 ${proveedorId === p.id ? 'opacity-100' : 'opacity-0'}`} />
+                          {p.nombre}
+                          {p.ruc && <span className="ml-auto text-[10px] text-muted-foreground">{p.ruc}</span>}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
             {proveedores.length === 0 && !loadingProveedores && (
               <p className="text-[10px] text-amber-600">No hay otros proveedores registrados.</p>
             )}
