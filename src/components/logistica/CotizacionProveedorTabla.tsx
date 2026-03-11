@@ -30,7 +30,7 @@ function parseTiempoEntrega(value: string | null | undefined): {
   tiempoEntregaValor: number
   tiempoEntregaTexto: string
 } {
-  if (!value || value.toLowerCase() === 'stock') {
+  if (!value || /^(stock|inmediato|immediate)$/i.test(value.trim())) {
     return { tiempoEntregaModo: 'stock', tiempoEntregaValor: 0, tiempoEntregaTexto: '' }
   }
   const dias = value.match(/^(\d+)\s*d[ií]as?$/i)
