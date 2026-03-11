@@ -149,7 +149,7 @@ export default function ModalSolicitarOtroProveedor({ open, onClose, cotizacion 
           {/* Provider combobox */}
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-gray-700">Proveedor destino</label>
-            <Popover open={comboOpen} onOpenChange={setComboOpen}>
+            <Popover open={comboOpen} onOpenChange={setComboOpen} modal={false}>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
