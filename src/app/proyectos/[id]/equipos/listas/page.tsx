@@ -226,7 +226,7 @@ const ListasTable = memo(function ListasTable({
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50 hover:bg-muted/50">
-              <TableHead>
+              <TableHead className="w-[25%]">
                 <button
                   onClick={() => handleSort('nombre')}
                   className="flex items-center text-xs font-medium"
@@ -234,7 +234,7 @@ const ListasTable = memo(function ListasTable({
                   Nombre<SortIcon field="nombre" />
                 </button>
               </TableHead>
-              <TableHead className="text-xs font-medium">Grupo(s)</TableHead>
+              <TableHead className="w-[25%] text-xs font-medium">Equipos Cotizados</TableHead>
               <TableHead className="w-[80px] text-right">
                 <button
                   onClick={() => handleSort('totalItems')}
