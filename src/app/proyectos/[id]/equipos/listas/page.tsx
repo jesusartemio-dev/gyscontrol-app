@@ -226,14 +226,6 @@ const ListasTable = memo(function ListasTable({
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50 hover:bg-muted/50">
-              <TableHead className="w-[140px]">
-                <button
-                  onClick={() => handleSort('codigo')}
-                  className="flex items-center text-xs font-medium"
-                >
-                  Código<SortIcon field="codigo" />
-                </button>
-              </TableHead>
               <TableHead>
                 <button
                   onClick={() => handleSort('nombre')}
@@ -276,7 +268,7 @@ const ListasTable = memo(function ListasTable({
           <TableBody>
             {sortedListas.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground text-sm">
+                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground text-sm">
                   {search || filterEstado !== 'all' ? 'No se encontraron listas' : 'Sin listas de equipos'}
                 </TableCell>
               </TableRow>
@@ -287,17 +279,10 @@ const ListasTable = memo(function ListasTable({
                   className="group cursor-pointer hover:bg-muted/50"
                   onClick={() => router.push(`/proyectos/${proyectoId}/equipos/listas/${lista.id}`)}
                 >
-                  <TableCell className="font-mono text-xs text-muted-foreground py-2">
-                    {lista.codigo || '-'}
-                  </TableCell>
                   <TableCell className="py-2">
                     <div>
                       <span className="text-xs font-medium line-clamp-2">{lista.nombre}</span>
-                      {lista.descripcion && (
-                        <span className="text-xs text-muted-foreground line-clamp-1 block">
-                          {lista.descripcion}
-                        </span>
-                      )}
+                      <span className="font-mono text-[10px] text-muted-foreground block">{lista.codigo || '-'}</span>
                     </div>
                   </TableCell>
                   <TableCell className="py-2">
