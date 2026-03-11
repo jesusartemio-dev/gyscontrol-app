@@ -90,16 +90,37 @@ export default function ModalCrearCotizacionDesdeLista({
     loadData()
   }, [open, lista?.id])
 
-  // Reset on close
+  // Reset when lista changes (different lista = fresh state)
   useEffect(() => {
-    if (!open) {
-      setProveedorId('')
-      setProveedorSearch('')
-      setComboOpen(false)
-      setSeleccionados(new Set())
-      setSearchTerm('')
-    }
-  }, [open])
+    setProveedorId('')
+    setProveedorSearch('')
+    setComboOpen(false)
+    setSeleccionados(new Set())
+    setSearchTerm('')
+  }, [lista?.id])
+
+  // After items reload, remove stale selections
+  useEffect(() => {
+    if (items.length === 0) return
+    const validIds = new Set(items.map(i => i.id))
+    setSeleccionados(prev => {
+      const filtered = new Set([...prev].filter(id => validIds.has(id)))
+      return filtered.size === prev.size ? prev : filtered
+    })
+  }, [items])
+
+  const resetForm = () => {
+    setProveedorId('')
+    setProveedorSearch('')
+    setComboOpen(false)
+    setSeleccionados(new Set())
+    setSearchTerm('')
+  }
+
+  const handleCancelar = () => {
+    resetForm()
+    onClose()
+  }
 
   const proveedoresFiltrados = useMemo(() => {
     if (!proveedorSearch) return proveedores
@@ -168,6 +189,7 @@ export default function ModalCrearCotizacionDesdeLista({
 
       toast.success(`Cotización creada con ${seleccionados.size} items`)
       onCreated?.()
+      resetForm()
       onClose()
       router.push(`/logistica/cotizaciones/${cotizacion.id}`)
     } catch (err) {
@@ -190,7 +212,7 @@ export default function ModalCrearCotizacionDesdeLista({
     return { icon: AlertCircle, color: 'text-red-500', bg: 'bg-red-50', label: `0/${MIN_COT}` }
   }
 
-  if (!open) return null
+  const hasDraft = seleccionados.size > 0 || !!proveedorId
 
   return (
     <Dialog open={open} onOpenChange={(val) => !val && onClose()}>
@@ -205,6 +227,11 @@ export default function ModalCrearCotizacionDesdeLista({
             <Badge variant="secondary" className="text-[10px] h-5 ml-auto">
               {lista.codigo}
             </Badge>
+            {hasDraft && (
+              <Badge variant="outline" className="text-[10px] h-5 text-amber-600 border-amber-300 bg-amber-50">
+                borrador guardado
+              </Badge>
+            )}
           </div>
         </DialogHeader>
 
@@ -414,14 +441,26 @@ export default function ModalCrearCotizacionDesdeLista({
             </div>
             <div className="flex items-center gap-2">
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 onClick={onClose}
                 disabled={loading}
                 className="h-7 text-xs"
               >
-                Cancelar
+                Cerrar
               </Button>
+              {hasDraft && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCancelar}
+                  disabled={loading}
+                  className="h-7 text-xs text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                >
+                  <X className="h-3 w-3 mr-1" />
+                  Descartar
+                </Button>
+              )}
               <Button
                 size="sm"
                 onClick={handleCrear}
