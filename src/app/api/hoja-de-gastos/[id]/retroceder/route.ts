@@ -42,6 +42,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     // Campos a limpiar según el estado desde el que se retrocede
     const extraData: Record<string, any> = {}
+    if (estadoActual === 'enviado') {
+      extraData.fechaEnvio = null
+    }
     if (estadoActual === 'aprobado') {
       extraData.aprobadorId = null
       extraData.fechaAprobacion = null
@@ -49,9 +52,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (estadoActual === 'depositado') {
       extraData.montoDepositado = 0
       extraData.saldo = 0
+      extraData.fechaDeposito = null
+    }
+    if (estadoActual === 'rendido') {
+      extraData.fechaRendicion = null
     }
     if (estadoActual === 'validado') {
-      extraData.validadorId = null
       extraData.fechaValidacion = null
     }
     if (estadoActual === 'cerrado') {
