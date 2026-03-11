@@ -33,6 +33,7 @@ import {
   Upload,
   X,
   History,
+  Undo2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -44,6 +45,7 @@ import {
   validarHoja,
   cerrarHoja,
   rechazarHoja,
+  retrocederHoja,
 } from '@/lib/services/hojaDeGastos'
 import { getGastoLineas } from '@/lib/services/gastoLinea'
 import EstadoStepper from '@/components/finanzas/EstadoStepper'
@@ -167,6 +169,8 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
     }
   }
 
+  const handleRetroceder = () => executeAction(() => retrocederHoja(id), 'Estado retrocedido')
+
   const handleRechazar = async () => {
     if (!comentarioRechazo.trim()) {
       toast.error('Ingrese un comentario de rechazo')
@@ -197,6 +201,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
   const canValidar = canValidarLineas && allLineasConforme
   const canCerrar = hoja.estado === 'validado' && ['admin', 'gerente', 'coordinador', 'administracion'].includes(role || '')
   const canRechazar = ['enviado', 'rendido', 'validado'].includes(hoja.estado) && ['admin', 'gerente', 'gestor', 'coordinador', 'administracion'].includes(role || '')
+  const canRetroceder = !['borrador', 'rechazado'].includes(hoja.estado) && ['admin', 'gerente', 'administracion'].includes(role || '')
 
   return (
     <div className="container mx-auto p-4 sm:p-6 space-y-4 max-w-4xl">
@@ -313,7 +318,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
       </Card>
 
       {/* Actions */}
-      {(canEnviar || canAprobar || canDepositar || canRendir || canValidarLineas || canCerrar || canRechazar) && (
+      {(canEnviar || canAprobar || canDepositar || canRendir || canValidarLineas || canCerrar || canRechazar || canRetroceder) && (
         <Card>
           <CardContent className="p-3 flex flex-wrap gap-2">
             {canEnviar && (
@@ -363,6 +368,12 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
               <Button size="sm" variant="destructive" onClick={() => setShowRechazo(true)} disabled={actionLoading}>
                 <XCircle className="h-3.5 w-3.5 mr-1" />
                 Rechazar
+              </Button>
+            )}
+            {canRetroceder && (
+              <Button size="sm" variant="outline" onClick={handleRetroceder} disabled={actionLoading} className="border-amber-400 text-amber-700 hover:bg-amber-50">
+                <Undo2 className="h-3.5 w-3.5 mr-1" />
+                Retroceder estado
               </Button>
             )}
             {actionLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}

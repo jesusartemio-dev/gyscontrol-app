@@ -90,3 +90,4 @@ export const validarHoja = (id: string) => postAction(id, 'validar')
 export const cerrarHoja = (id: string) => postAction(id, 'cerrar')
 export const rechazarHoja = (id: string, comentario: string) =>
   postAction(id, 'rechazar', { comentario })
+export const retrocederHoja = (id: string) => postAction(id, 'retroceder')
