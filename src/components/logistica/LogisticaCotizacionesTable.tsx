@@ -34,7 +34,7 @@ import { useDeleteWithValidation } from '@/hooks/useDeleteWithValidation'
 import { DeleteWithValidationDialog } from '@/components/DeleteWithValidationDialog'
 import type { CotizacionProveedor } from '@/types'
 
-type SortField = 'codigo' | 'proveedor' | 'proyecto' | 'estado' | 'createdAt' | 'itemsCount'
+type SortField = 'codigo' | 'proveedor' | 'proyecto' | 'estado' | 'createdAt' | 'itemsCount' | 'totalCost'
 type SortDirection = 'asc' | 'desc'
 
 interface LogisticaCotizacionesTableProps {
@@ -109,6 +109,16 @@ export default function LogisticaCotizacionesTable({ cotizaciones, loading = fal
           aValue = a.items?.length || 0
           bValue = b.items?.length || 0
           break
+        case 'totalCost': {
+          const calcTotal = (items: any[]) => items.reduce((s: number, i: any) => {
+            const precio = i.precioUnitario || 0
+            const cantidad = i.cantidad ?? i.cantidadOriginal ?? 0
+            return s + (i.costoTotal || precio * cantidad)
+          }, 0)
+          aValue = calcTotal(a.items || (a as any).cotizacionProveedorItem || [])
+          bValue = calcTotal(b.items || (b as any).cotizacionProveedorItem || [])
+          break
+        }
         default:
           return 0
       }
@@ -244,6 +254,12 @@ export default function LogisticaCotizacionesTable({ cotizaciones, loading = fal
               <span className="flex items-center justify-center gap-1">Selección</span>
             </TableHead>
             <TableHead
+              className="text-xs cursor-pointer hover:bg-gray-50 w-[110px] text-right"
+              onClick={() => handleSort('totalCost')}
+            >
+              <span className="flex items-center justify-end gap-1">Total <SortIcon field="totalCost" /></span>
+            </TableHead>
+            <TableHead
               className="text-xs cursor-pointer hover:bg-gray-50 w-[90px]"
               onClick={() => handleSort('estado')}
             >
@@ -264,6 +280,11 @@ export default function LogisticaCotizacionesTable({ cotizaciones, loading = fal
             const cotItems = cot.items || (cot as any).cotizacionProveedorItem || []
             const itemsCount = cotItems.length
             const conPrecio = cotItems.filter((i: any) => i.precioUnitario && i.precioUnitario > 0).length
+            const totalCost = cotItems.reduce((s: number, i: any) => {
+              const precio = i.precioUnitario || 0
+              const cantidad = i.cantidad ?? i.cantidadOriginal ?? 0
+              return s + (i.costoTotal || precio * cantidad)
+            }, 0)
             const preciosCompletos = itemsCount > 0 && conPrecio === itemsCount
             const flujo = FLUJO_COTIZACION[cot.estado as string]
             // pendiente → solicitado: cuando tiene items (se envió al proveedor)
@@ -349,6 +370,14 @@ export default function LogisticaCotizacionesTable({ cotizaciones, loading = fal
                       </Tooltip>
                     )
                   })()}
+                </TableCell>
+                <TableCell className="py-2 text-right">
+                  <span className={`text-xs font-mono ${totalCost > 0 ? 'font-medium text-gray-900' : 'text-muted-foreground'}`}>
+                    {totalCost > 0
+                      ? `$${totalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      : '—'
+                    }
+                  </span>
                 </TableCell>
                 <TableCell className="py-2">
                   <div className="flex items-center gap-1">
