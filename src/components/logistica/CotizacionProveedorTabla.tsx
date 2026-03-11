@@ -20,8 +20,36 @@ import {
 import { toast } from 'sonner'
 
 type LocalEditCotizacion = Partial<CotizacionProveedorItem> & {
-  tiempoEntregaModo?: 'stock' | 'dias' | 'semanas'
+  tiempoEntregaModo?: 'stock' | 'dias' | 'semanas' | 'custom'
   tiempoEntregaValor?: number
+  tiempoEntregaTexto?: string
+}
+
+function parseTiempoEntrega(value: string | null | undefined): {
+  tiempoEntregaModo: 'stock' | 'dias' | 'semanas' | 'custom'
+  tiempoEntregaValor: number
+  tiempoEntregaTexto: string
+} {
+  if (!value || value.toLowerCase() === 'stock') {
+    return { tiempoEntregaModo: 'stock', tiempoEntregaValor: 0, tiempoEntregaTexto: '' }
+  }
+  const dias = value.match(/^(\d+)\s*d[ií]as?$/i)
+  if (dias) return { tiempoEntregaModo: 'dias', tiempoEntregaValor: parseInt(dias[1]), tiempoEntregaTexto: '' }
+  const sem = value.match(/^(\d+)\s*semanas?$/i)
+  if (sem) return { tiempoEntregaModo: 'semanas', tiempoEntregaValor: parseInt(sem[1]), tiempoEntregaTexto: '' }
+  return { tiempoEntregaModo: 'custom', tiempoEntregaValor: 0, tiempoEntregaTexto: value }
+}
+
+function estimarDiasDesdeTexto(texto: string): number {
+  const rangoSem = texto.match(/(\d+)\s*[-–]\s*(\d+)\s*sem/i)
+  if (rangoSem) return parseInt(rangoSem[2]) * 7
+  const rangoDias = texto.match(/(\d+)\s*[-–]\s*(\d+)\s*d[ií]/i)
+  if (rangoDias) return parseInt(rangoDias[2])
+  const singleSem = texto.match(/(\d+)\s*sem/i)
+  if (singleSem) return parseInt(singleSem[1]) * 7
+  const singleDias = texto.match(/(\d+)\s*d[ií]/i)
+  if (singleDias) return parseInt(singleDias[1])
+  return 0
 }
 
 interface Props {
@@ -65,6 +93,10 @@ export default function CotizacionProveedorTabla({ items, onUpdated, onItemUpdat
       } else if (modo === 'semanas') {
         tiempoEntregaDias = tiempoEntregaValor * 7
         tiempoEntrega = `${tiempoEntregaValor} semanas`
+      } else if (modo === 'custom') {
+        const texto = updated.tiempoEntregaTexto?.trim() || ''
+        tiempoEntrega = texto || 'Stock'
+        tiempoEntregaDias = estimarDiasDesdeTexto(texto)
       }
 
       const payload = {
@@ -270,6 +302,7 @@ export default function CotizacionProveedorTabla({ items, onUpdated, onItemUpdat
                             <SelectItem value="stock">Stock</SelectItem>
                             <SelectItem value="dias">Días</SelectItem>
                             <SelectItem value="semanas">Semanas</SelectItem>
+                            <SelectItem value="custom">Personalizado</SelectItem>
                           </SelectContent>
                         </Select>
                         {(edited.tiempoEntregaModo === 'dias' || edited.tiempoEntregaModo === 'semanas') && (
@@ -282,6 +315,14 @@ export default function CotizacionProveedorTabla({ items, onUpdated, onItemUpdat
                             }
                             className="w-16 h-7 text-center text-[10px]"
                             placeholder="0"
+                          />
+                        )}
+                        {edited.tiempoEntregaModo === 'custom' && (
+                          <Input
+                            value={edited.tiempoEntregaTexto ?? ''}
+                            onChange={(e) => handleChange(item.id, 'tiempoEntregaTexto', e.target.value)}
+                            className="w-24 h-7 text-center text-[10px]"
+                            placeholder="ej. 6-8 sem"
                           />
                         )}
                       </div>
@@ -328,12 +369,12 @@ export default function CotizacionProveedorTabla({ items, onUpdated, onItemUpdat
                             onClick={() => {
                               if (!item.esSeleccionada) {
                                 setEditModeId(item.id)
+                                const parsed = parseTiempoEntrega(item.tiempoEntrega)
                                 setEditValues((prev) => ({
                                   ...prev,
                                   [item.id]: {
                                     precioUnitario: item.precioUnitario,
-                                    tiempoEntregaModo: 'stock',
-                                    tiempoEntregaValor: 0,
+                                    ...parsed,
                                     estado: item.estado,
                                   },
                                 }))
