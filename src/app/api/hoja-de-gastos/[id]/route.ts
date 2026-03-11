@@ -15,7 +15,7 @@ const includeRelations = {
   adjuntos: { orderBy: { createdAt: 'asc' as const } },
   eventos: {
     include: { usuario: { select: { id: true, name: true } } },
-    orderBy: { creadoEn: 'asc' as const },
+    orderBy: { creadoEn: 'desc' as const },
   },
 }
 
