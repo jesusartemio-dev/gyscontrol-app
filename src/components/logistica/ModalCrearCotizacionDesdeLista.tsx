@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Dialog,
@@ -68,6 +68,7 @@ export default function ModalCrearCotizacionDesdeLista({
   onCreated,
 }: Props) {
   const router = useRouter()
+  const proveedorInputRef = useRef<HTMLInputElement>(null)
   const [proveedorId, setProveedorId] = useState('')
   const [proveedores, setProveedores] = useState<Proveedor[]>([])
   const [comboOpen, setComboOpen] = useState(false)
@@ -235,9 +236,16 @@ export default function ModalCrearCotizacionDesdeLista({
                   <ChevronsUpDown className="h-3.5 w-3.5 ml-1 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
+              <PopoverContent
+                className="p-0 w-[--radix-popover-trigger-width]"
+                align="start"
+                onOpenAutoFocus={(e) => {
+                  e.preventDefault()
+                  setTimeout(() => proveedorInputRef.current?.focus(), 0)
+                }}
+              >
                 <Command>
-                  <CommandInput placeholder="Buscar proveedor..." className="h-8 text-xs" />
+                  <CommandInput ref={proveedorInputRef} placeholder="Buscar proveedor..." className="h-8 text-xs" />
                   <CommandList>
                     <CommandEmpty className="py-4 text-center text-xs text-muted-foreground">
                       No se encontró ningún proveedor.
