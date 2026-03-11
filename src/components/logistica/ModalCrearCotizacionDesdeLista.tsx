@@ -13,19 +13,6 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command'
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover'
 import { toast } from 'sonner'
 import {
   Plus,
@@ -70,6 +57,7 @@ export default function ModalCrearCotizacionDesdeLista({
   const router = useRouter()
   const proveedorInputRef = useRef<HTMLInputElement>(null)
   const [proveedorId, setProveedorId] = useState('')
+  const [proveedorSearch, setProveedorSearch] = useState('')
   const [proveedores, setProveedores] = useState<Proveedor[]>([])
   const [comboOpen, setComboOpen] = useState(false)
   const [items, setItems] = useState<ListaEquipoItem[]>([])
@@ -106,11 +94,18 @@ export default function ModalCrearCotizacionDesdeLista({
   useEffect(() => {
     if (!open) {
       setProveedorId('')
+      setProveedorSearch('')
       setComboOpen(false)
       setSeleccionados(new Set())
       setSearchTerm('')
     }
   }, [open])
+
+  const proveedoresFiltrados = useMemo(() => {
+    if (!proveedorSearch) return proveedores
+    const term = proveedorSearch.toLowerCase()
+    return proveedores.filter(p => p.nombre.toLowerCase().includes(term))
+  }, [proveedores, proveedorSearch])
 
   const itemsFiltrados = useMemo(() => {
     if (!searchTerm) return items
@@ -219,59 +214,65 @@ export default function ModalCrearCotizacionDesdeLista({
             <label className="text-xs font-medium text-muted-foreground whitespace-nowrap">
               Proveedor:
             </label>
-            <Popover open={comboOpen} onOpenChange={setComboOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={comboOpen}
+            <div className="flex-1 relative">
+              <div className="relative">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                <Input
+                  ref={proveedorInputRef}
+                  placeholder="Buscar proveedor..."
+                  value={comboOpen ? proveedorSearch : (proveedores.find(p => p.id === proveedorId)?.nombre ?? '')}
+                  onChange={(e) => {
+                    setProveedorSearch(e.target.value)
+                    setComboOpen(true)
+                  }}
+                  onFocus={() => {
+                    setProveedorSearch('')
+                    setComboOpen(true)
+                  }}
+                  onBlur={() => setTimeout(() => setComboOpen(false), 150)}
                   disabled={loadingData}
-                  className="h-7 flex-1 justify-between text-xs font-normal px-2"
-                >
-                  <span className="truncate">
-                    {proveedorId
-                      ? proveedores.find(p => p.id === proveedorId)?.nombre
-                      : 'Buscar proveedor...'}
-                  </span>
-                  <ChevronsUpDown className="h-3.5 w-3.5 ml-1 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent
-                className="p-0 w-[--radix-popover-trigger-width]"
-                align="start"
-                onOpenAutoFocus={(e) => {
-                  e.preventDefault()
-                  setTimeout(() => proveedorInputRef.current?.focus(), 0)
-                }}
-              >
-                <Command>
-                  <CommandInput ref={proveedorInputRef} placeholder="Buscar proveedor..." className="h-8 text-xs" />
-                  <CommandList>
-                    <CommandEmpty className="py-4 text-center text-xs text-muted-foreground">
+                  className="h-7 text-xs pl-7 pr-6"
+                  autoComplete="off"
+                />
+                {proveedorId ? (
+                  <button
+                    type="button"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    onMouseDown={(e) => { e.preventDefault(); setProveedorId(''); setProveedorSearch('') }}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                ) : (
+                  <ChevronsUpDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                )}
+              </div>
+              {comboOpen && (
+                <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                  {proveedoresFiltrados.length === 0 ? (
+                    <div className="py-4 text-center text-xs text-muted-foreground">
                       No se encontró ningún proveedor.
-                    </CommandEmpty>
-                    <CommandGroup>
-                      {proveedores.map((p) => (
-                        <CommandItem
-                          key={p.id}
-                          value={p.nombre}
-                          onSelect={() => {
-                            setProveedorId(p.id)
-                            setComboOpen(false)
-                          }}
-                          className="text-xs"
-                        >
-                          <Check
-                            className={`mr-2 h-3.5 w-3.5 ${proveedorId === p.id ? 'opacity-100' : 'opacity-0'}`}
-                          />
-                          {p.nombre}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
+                    </div>
+                  ) : (
+                    proveedoresFiltrados.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        className={`w-full text-left px-3 py-2 text-xs hover:bg-accent flex items-center gap-2 ${proveedorId === p.id ? 'bg-accent font-medium' : ''}`}
+                        onMouseDown={(e) => {
+                          e.preventDefault()
+                          setProveedorId(p.id)
+                          setProveedorSearch('')
+                          setComboOpen(false)
+                        }}
+                      >
+                        <Check className={`h-3.5 w-3.5 shrink-0 ${proveedorId === p.id ? 'opacity-100' : 'opacity-0'}`} />
+                        {p.nombre}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
