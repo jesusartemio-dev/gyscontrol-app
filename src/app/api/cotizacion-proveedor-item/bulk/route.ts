@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { randomUUID } from 'crypto'
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,8 +20,10 @@ export async function POST(req: NextRequest) {
 
     const now = new Date()
     const mappedItems = body.items.map((item: any) => ({
+      id: randomUUID(),
       cotizacionId: item.cotizacionId,
       listaEquipoItemId: item.listaEquipoItemId,
+      listaId: item.listaId,
       codigo: item.codigo,
       descripcion: item.descripcion,
       unidad: item.unidad,
