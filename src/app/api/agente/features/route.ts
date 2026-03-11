@@ -4,16 +4,11 @@ import { authOptions } from '@/lib/auth'
 import { getIAFeatureFlags, updateIAFeatureFlags } from '@/lib/agente/featureFlags'
 import type { IAFeatureFlags } from '@/lib/agente/featureFlags'
 
-// GET /api/agente/features
+// GET /api/agente/features — any authenticated user can read flags
 export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session?.user) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-  }
-
-  const role = (session.user as { role?: string }).role
-  if (!['admin', 'gerente'].includes(role || '')) {
-    return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
   }
 
   const flags = await getIAFeatureFlags()
