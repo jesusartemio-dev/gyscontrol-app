@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Dialog,
@@ -11,17 +11,9 @@ import {
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command'
+import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
-import { UserPlus, Loader2, Building2, ChevronsUpDown, Check } from 'lucide-react'
+import { UserPlus, Loader2, Building2, ChevronsUpDown, Check, X } from 'lucide-react'
 import type { CotizacionProveedor, Proveedor } from '@/types'
 import { getProveedores } from '@/lib/services/proveedor'
 import { createCotizacionProveedor } from '@/lib/services/cotizacionProveedor'
@@ -40,6 +32,9 @@ export default function ModalSolicitarOtroProveedor({ open, onClose, cotizacion 
   const [creating, setCreating] = useState(false)
   const [loadingProveedores, setLoadingProveedores] = useState(false)
   const [comboOpen, setComboOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const searchRef = useRef<HTMLInputElement>(null)
+  const comboRef = useRef<HTMLDivElement>(null)
 
   const items = cotizacion.items || []
   const itemsValidos = items.filter(i => i.listaEquipoItemId)
@@ -48,6 +43,8 @@ export default function ModalSolicitarOtroProveedor({ open, onClose, cotizacion 
     if (open) {
       setSelectedIds(new Set(itemsValidos.map(i => i.id)))
       setProveedorId('')
+      setSearch('')
+      setComboOpen(false)
     }
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -58,6 +55,30 @@ export default function ModalSolicitarOtroProveedor({ open, onClose, cotizacion 
       .then(data => setProveedores((data || []).filter(p => p.id !== cotizacion.proveedorId)))
       .finally(() => setLoadingProveedores(false))
   }, [open, cotizacion.proveedorId])
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    if (!comboOpen) return
+    const handler = (e: MouseEvent) => {
+      if (comboRef.current && !comboRef.current.contains(e.target as Node)) {
+        setComboOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [comboOpen])
+
+  // Focus search input when dropdown opens
+  useEffect(() => {
+    if (comboOpen) {
+      setTimeout(() => searchRef.current?.focus(), 0)
+    }
+  }, [comboOpen])
+
+  const filteredProveedores = proveedores.filter(p =>
+    p.nombre.toLowerCase().includes(search.toLowerCase()) ||
+    (p.ruc && p.ruc.includes(search))
+  )
 
   const toggleItem = (id: string) => {
     setSelectedIds(prev => {
@@ -146,57 +167,75 @@ export default function ModalSolicitarOtroProveedor({ open, onClose, cotizacion 
         </DialogHeader>
 
         <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
-          {/* Provider combobox */}
+          {/* Provider inline dropdown */}
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-gray-700">Proveedor destino</label>
-            <Popover open={comboOpen} onOpenChange={setComboOpen} modal={false}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  disabled={loadingProveedores}
-                  className="w-full h-8 text-xs justify-between font-normal"
-                >
-                  <span className="flex items-center gap-1.5 truncate">
-                    <Building2 className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+            <div className="relative" ref={comboRef}>
+              {/* Trigger button */}
+              <button
+                type="button"
+                disabled={loadingProveedores}
+                onClick={() => setComboOpen(v => !v)}
+                className="w-full h-8 px-3 text-xs border rounded-md bg-white flex items-center justify-between gap-1.5 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span className="flex items-center gap-1.5 truncate text-left">
+                  <Building2 className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                  <span className={selectedProveedor ? 'text-gray-900' : 'text-gray-400'}>
                     {loadingProveedores
                       ? 'Cargando…'
                       : selectedProveedor
                       ? selectedProveedor.nombre
-                      : 'Buscar proveedor…'
+                      : 'Seleccionar proveedor…'
                     }
                   </span>
-                  <ChevronsUpDown className="h-3.5 w-3.5 text-gray-400 shrink-0 ml-1" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                <Command>
-                  <CommandInput placeholder="Buscar por nombre…" className="h-8 text-xs" />
-                  <CommandList>
-                    <CommandEmpty className="py-4 text-xs text-center text-muted-foreground">
-                      No se encontraron proveedores.
-                    </CommandEmpty>
-                    <CommandGroup>
-                      {proveedores.map(p => (
-                        <CommandItem
+                </span>
+                <ChevronsUpDown className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+              </button>
+
+              {/* Inline dropdown panel */}
+              {comboOpen && (
+                <div className="absolute z-50 top-full left-0 right-0 mt-1 border rounded-md bg-white shadow-lg overflow-hidden">
+                  {/* Search input */}
+                  <div className="flex items-center border-b px-2">
+                    <Input
+                      ref={searchRef}
+                      value={search}
+                      onChange={e => setSearch(e.target.value)}
+                      placeholder="Buscar por nombre o RUC…"
+                      className="h-8 border-0 shadow-none focus-visible:ring-0 text-xs px-1"
+                    />
+                    {search && (
+                      <button type="button" onClick={() => setSearch('')} className="text-gray-400 hover:text-gray-600">
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  {/* List */}
+                  <div className="max-h-48 overflow-y-auto">
+                    {filteredProveedores.length === 0 ? (
+                      <p className="py-4 text-xs text-center text-gray-400">No se encontraron proveedores.</p>
+                    ) : (
+                      filteredProveedores.map(p => (
+                        <button
                           key={p.id}
-                          value={p.nombre}
-                          onSelect={() => {
+                          type="button"
+                          onClick={() => {
                             setProveedorId(p.id)
+                            setSearch('')
                             setComboOpen(false)
                           }}
-                          className="text-xs"
+                          className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-gray-50 text-left"
                         >
-                          <Check className={`h-3.5 w-3.5 mr-2 shrink-0 ${proveedorId === p.id ? 'opacity-100' : 'opacity-0'}`} />
-                          {p.nombre}
-                          {p.ruc && <span className="ml-auto text-[10px] text-muted-foreground">{p.ruc}</span>}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
+                          <Check className={`h-3.5 w-3.5 shrink-0 ${proveedorId === p.id ? 'text-blue-600' : 'opacity-0'}`} />
+                          <span className="flex-1 truncate">{p.nombre}</span>
+                          {p.ruc && <span className="text-[10px] text-gray-400 shrink-0">{p.ruc}</span>}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
             {proveedores.length === 0 && !loadingProveedores && (
               <p className="text-[10px] text-amber-600">No hay otros proveedores registrados.</p>
             )}
