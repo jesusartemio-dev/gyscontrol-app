@@ -128,14 +128,22 @@ export default function ModalCrearCotizacionDesdeLista({
     return proveedores.filter(p => p.nombre.toLowerCase().includes(term))
   }, [proveedores, proveedorSearch])
 
-  const itemsFiltrados = useMemo(() => {
-    if (!searchTerm) return items
+  // Siempre visible, sin filtro
+  const itemsSeleccionadosData = useMemo(
+    () => items.filter(item => seleccionados.has(item.id)),
+    [items, seleccionados]
+  )
+
+  // No seleccionados, filtrados por búsqueda
+  const itemsDisponibles = useMemo(() => {
+    const noSel = items.filter(item => !seleccionados.has(item.id))
+    if (!searchTerm) return noSel
     const term = searchTerm.toLowerCase()
-    return items.filter(item =>
+    return noSel.filter(item =>
       item.descripcion?.toLowerCase().includes(term) ||
       item.codigo?.toLowerCase().includes(term)
     )
-  }, [items, searchTerm])
+  }, [items, seleccionados, searchTerm])
 
   const toggleSeleccion = (id: string) => {
     setSeleccionados(prev => {
@@ -147,10 +155,16 @@ export default function ModalCrearCotizacionDesdeLista({
   }
 
   const toggleSelectAll = () => {
-    if (seleccionados.size === itemsFiltrados.length) {
+    if (itemsDisponibles.length === 0) {
+      // todos seleccionados → deseleccionar todo
       setSeleccionados(new Set())
     } else {
-      setSeleccionados(new Set(itemsFiltrados.map(i => i.id)))
+      // seleccionar todos los disponibles (filtrados)
+      setSeleccionados(prev => {
+        const next = new Set(prev)
+        itemsDisponibles.forEach(i => next.add(i.id))
+        return next
+      })
     }
   }
 
@@ -325,7 +339,7 @@ export default function ModalCrearCotizacionDesdeLista({
             )}
           </div>
           <div className="text-[10px] text-muted-foreground ml-auto">
-            {seleccionados.size} de {itemsFiltrados.length} seleccionados
+            {itemsDisponibles.length} disponibles
           </div>
         </div>
 
@@ -337,22 +351,10 @@ export default function ModalCrearCotizacionDesdeLista({
                 <Skeleton key={i} className="h-10 w-full" />
               ))}
             </div>
-          ) : itemsFiltrados.length === 0 ? (
+          ) : items.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12">
               <Package className="h-10 w-10 text-gray-300 mb-3" />
-              <p className="text-sm text-muted-foreground">
-                {searchTerm ? 'No se encontraron items' : 'No hay items'}
-              </p>
-              {searchTerm && (
-                <Button
-                  variant="link"
-                  size="sm"
-                  className="text-xs mt-2"
-                  onClick={() => setSearchTerm('')}
-                >
-                  Limpiar búsqueda
-                </Button>
-              )}
+              <p className="text-sm text-muted-foreground">No hay items</p>
             </div>
           ) : (
             <div className="max-h-[45vh] overflow-y-auto">
@@ -361,7 +363,7 @@ export default function ModalCrearCotizacionDesdeLista({
                   <tr className="border-b">
                     <th className="py-2 px-2 w-8">
                       <Checkbox
-                        checked={seleccionados.size === itemsFiltrados.length && itemsFiltrados.length > 0}
+                        checked={items.length > 0 && itemsDisponibles.length === 0}
                         onCheckedChange={toggleSelectAll}
                         className="h-3.5 w-3.5"
                       />
@@ -381,42 +383,81 @@ export default function ModalCrearCotizacionDesdeLista({
                   </tr>
                 </thead>
                 <tbody>
-                  {itemsFiltrados.map((item) => {
-                    const isSelected = seleccionados.has(item.id)
-                    const status = getItemStatus(item)
-
-                    return (
-                      <tr
-                        key={item.id}
-                        className={`border-b transition-colors cursor-pointer ${
-                          isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'
-                        }`}
-                        onClick={() => toggleSeleccion(item.id)}
-                      >
-                        <td className="py-1.5 px-2">
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={() => toggleSeleccion(item.id)}
-                            className="h-3.5 w-3.5"
-                          />
-                        </td>
-                        <td className="py-1.5 px-2 font-mono text-[11px]">
-                          {item.codigo}
-                        </td>
-                        <td className="py-1.5 px-2 truncate max-w-xs" title={item.descripcion}>
-                          {item.descripcion}
-                        </td>
-                        <td className="py-1.5 px-2 text-center font-medium">
-                          {item.cantidad}
-                        </td>
-                        <td className="py-1.5 px-2 text-center">
-                          <Badge variant="outline" className={`text-[10px] h-5 px-1.5 ${status.color}`}>
-                            {status.label}
-                          </Badge>
+                  {/* ── Sección SELECCIONADOS ── */}
+                  {itemsSeleccionadosData.length > 0 && (
+                    <>
+                      <tr className="bg-blue-50 border-b">
+                        <td colSpan={5} className="py-1 px-3">
+                          <span className="text-[10px] font-semibold text-blue-700 uppercase tracking-wide">
+                            Seleccionados ({itemsSeleccionadosData.length})
+                          </span>
                         </td>
                       </tr>
-                    )
-                  })}
+                      {itemsSeleccionadosData.map((item) => {
+                        const status = getItemStatus(item)
+                        return (
+                          <tr
+                            key={item.id}
+                            className="border-b bg-blue-50/40 hover:bg-blue-50 transition-colors cursor-pointer"
+                            onClick={() => toggleSeleccion(item.id)}
+                          >
+                            <td className="py-1.5 px-2">
+                              <Checkbox checked onCheckedChange={() => toggleSeleccion(item.id)} className="h-3.5 w-3.5" />
+                            </td>
+                            <td className="py-1.5 px-2 font-mono text-[11px]">{item.codigo}</td>
+                            <td className="py-1.5 px-2 truncate max-w-xs" title={item.descripcion}>{item.descripcion}</td>
+                            <td className="py-1.5 px-2 text-center font-medium">{item.cantidad}</td>
+                            <td className="py-1.5 px-2 text-center">
+                              <Badge variant="outline" className={`text-[10px] h-5 px-1.5 ${status.color}`}>{status.label}</Badge>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </>
+                  )}
+
+                  {/* ── Sección DISPONIBLES ── */}
+                  <tr className="bg-gray-50 border-b">
+                    <td colSpan={5} className="py-1 px-3">
+                      <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+                        Disponibles ({itemsDisponibles.length}
+                        {searchTerm ? ` — "${searchTerm}"` : ''})
+                      </span>
+                    </td>
+                  </tr>
+                  {itemsDisponibles.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-6 text-center text-xs text-muted-foreground">
+                        {searchTerm ? (
+                          <>
+                            Sin resultados para &quot;{searchTerm}&quot;.{' '}
+                            <button className="text-blue-600 underline" onClick={() => setSearchTerm('')}>Limpiar</button>
+                          </>
+                        ) : 'Todos los items están seleccionados'}
+                      </td>
+                    </tr>
+                  ) : (
+                    itemsDisponibles.map((item) => {
+                      const status = getItemStatus(item)
+                      return (
+                        <tr
+                          key={item.id}
+                          className="border-b hover:bg-gray-50 transition-colors cursor-pointer"
+                          onClick={() => toggleSeleccion(item.id)}
+                        >
+                          <td className="py-1.5 px-2">
+                            <Checkbox checked={false} onCheckedChange={() => toggleSeleccion(item.id)} className="h-3.5 w-3.5" />
+                          </td>
+                          <td className="py-1.5 px-2 font-mono text-[11px]">{item.codigo}</td>
+                          <td className="py-1.5 px-2 truncate max-w-xs" title={item.descripcion}>{item.descripcion}</td>
+                          <td className="py-1.5 px-2 text-center font-medium">{item.cantidad}</td>
+                          <td className="py-1.5 px-2 text-center">
+                            <Badge variant="outline" className={`text-[10px] h-5 px-1.5 ${status.color}`}>{status.label}</Badge>
+                          </td>
+                        </tr>
+                      )
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
