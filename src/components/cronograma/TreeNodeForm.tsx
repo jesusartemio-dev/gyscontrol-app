@@ -258,29 +258,6 @@ export function TreeNodeForm({
     }
   }
 
-  // Función para calcular fecha fin según horas estimadas (8 horas por día para actividades, 4 horas para tareas)
-  const calculateEndDateFromHours = (fechaInicio: string, horasEstimadas: number) => {
-    console.log('🔢 [FRONT FORM] calculateEndDateFromHours:', { fechaInicio, horasEstimadas, nodeType })
-
-    if (!fechaInicio || !horasEstimadas) {
-      console.log('⚠️ [FRONT FORM] Faltan parámetros para calcular fecha fin')
-      return ''
-    }
-
-    const fechaInicioDate = new Date(fechaInicio)
-    // Usar 8 horas por día para actividades, 4 horas para tareas (son más cortas)
-    const horasPorDia = nodeType === 'tarea' ? 4 : 8
-    const diasNecesarios = Math.ceil(horasEstimadas / horasPorDia)
-    console.log('🔢 [FRONT FORM] Días necesarios:', diasNecesarios, `(usando ${horasPorDia}h/día para ${nodeType})`)
-
-    const fechaFinDate = new Date(fechaInicioDate)
-    fechaFinDate.setDate(fechaFinDate.getDate() + diasNecesarios - 1) // -1 porque el día de inicio cuenta
-
-    const result = fechaFinDate.toISOString().split('T')[0]
-    console.log('✅ [FRONT FORM] Fecha fin calculada:', result)
-
-    return result
-  }
 
   // Efecto para actualizar fechas cuando cambia el posicionamiento
   useEffect(() => {
@@ -315,30 +292,6 @@ export function TreeNodeForm({
       })
     }
   }, [formData.posicionamiento, parentId, mode])
-
-  // Efecto para actualizar fecha fin cuando cambian horas estimadas o fecha inicio
-  useEffect(() => {
-    console.log('🔄 [FRONT FORM] Horas o fecha inicio cambiaron:', {
-      fechaInicio: formData.fechaInicioComercial,
-      horasEstimadas: formData.horasEstimadas
-    })
-    if (formData.fechaInicioComercial && formData.horasEstimadas) {
-      const horas = parseFloat(formData.horasEstimadas)
-      if (!isNaN(horas) && horas > 0) {
-        const nuevaFechaFin = calculateEndDateFromHours(formData.fechaInicioComercial, horas)
-        console.log('🔄 [FRONT FORM] Nueva fecha fin calculada:', nuevaFechaFin)
-        if (nuevaFechaFin && nuevaFechaFin !== formData.fechaFinComercial) {
-          setFormData(prev => {
-            console.log('🔄 [FRONT FORM] Actualizando fecha fin en formData:', nuevaFechaFin)
-            return {
-              ...prev,
-              fechaFinComercial: nuevaFechaFin
-            }
-          })
-        }
-      }
-    }
-  }, [formData.fechaInicioComercial, formData.horasEstimadas])
 
   // Estado del recurso seleccionado (para auto-fill de personas en cuadrillas)
   const [recursoInfo, setRecursoInfo] = useState<{ tipo: string; totalPersonas: number } | null>(null)
