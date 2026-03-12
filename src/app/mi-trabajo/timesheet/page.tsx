@@ -354,9 +354,7 @@ export default function TimesheetPage() {
       return
     }
 
-    const headers = esSupervisor
-      ? 'Fecha,Proyecto,EDT,Tarea,Horas,Descripción,Costo Hora (PEN),Origen'
-      : 'Fecha,Proyecto,EDT,Tarea,Horas,Descripción,Origen'
+    const headers = 'Fecha,Proyecto,EDT,Tarea,Horas,Descripción,Origen'
     const rows = registrosFiltrados.map(r => {
       const fecha = format(new Date(r.fechaTrabajo), 'dd/MM/yyyy')
       const proyecto = r.proyecto ? `${r.proyecto.codigo} - ${r.proyecto.nombre}` : ''
@@ -365,10 +363,6 @@ export default function TimesheetPage() {
       const horas = r.horasTrabajadas
       const desc = (r.descripcion || '').replace(/"/g, '""')
       const origen = r.origen || ''
-      if (esSupervisor) {
-        const costo = r.costoHora ? r.costoHora.toFixed(2) : ''
-        return `"${fecha}","${proyecto}","${edt}","${tarea}",${horas},"${desc}",${costo},"${origen}"`
-      }
       return `"${fecha}","${proyecto}","${edt}","${tarea}",${horas},"${desc}","${origen}"`
     })
 
@@ -704,7 +698,6 @@ export default function TimesheetPage() {
                     <TableHead>Tarea</TableHead>
                     <TableHead className="text-right">Horas</TableHead>
                     <TableHead className="hidden md:table-cell">Descripción</TableHead>
-                    {esSupervisor && <TableHead className="text-right hidden lg:table-cell">Costo/h</TableHead>}
                     <TableHead className="hidden sm:table-cell">Origen</TableHead>
                     <TableHead className="hidden sm:table-cell">Estado</TableHead>
                     <TableHead className="w-[50px]"></TableHead>
@@ -713,13 +706,13 @@ export default function TimesheetPage() {
                 <TableBody>
                   {loadingHistorial ? (
                     <TableRow>
-                      <TableCell colSpan={esSupervisor ? 10 : 9} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                         Cargando...
                       </TableCell>
                     </TableRow>
                   ) : registrosFiltrados.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={esSupervisor ? 10 : 9} className="text-center py-8">
+                      <TableCell colSpan={9} className="text-center py-8">
                         <FileText className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
                         <p className="text-sm text-muted-foreground">
                           {tieneFiltros ? 'No se encontraron registros con los filtros aplicados' : 'No hay registros de horas'}
@@ -748,11 +741,6 @@ export default function TimesheetPage() {
                         <TableCell className="py-2 text-sm text-muted-foreground hidden md:table-cell max-w-[200px] truncate">
                           {r.descripcion || '-'}
                         </TableCell>
-                        {esSupervisor && (
-                          <TableCell className="py-2 text-sm text-right text-muted-foreground hidden lg:table-cell">
-                            {r.costoHora ? `S/${r.costoHora.toFixed(2)}` : '-'}
-                          </TableCell>
-                        )}
                         <TableCell className="py-2 hidden sm:table-cell">
                           {r.origen === 'campo' ? (
                             <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700 border-orange-300">Campo</Badge>
