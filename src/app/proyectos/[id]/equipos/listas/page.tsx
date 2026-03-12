@@ -324,7 +324,7 @@ const ListasTable = memo(function ListasTable({
                     )}
                   </TableCell>
                   <TableCell className="text-right font-mono text-xs text-muted-foreground py-2">
-                    ${(lista.totalPresupuesto || 0).toLocaleString('es-PE', { minimumFractionDigits: 2 })}
+                    ${(lista.montoEstimado || 0).toLocaleString('es-PE', { minimumFractionDigits: 2 })}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground py-2">
                     {formatDate(lista.createdAt)}
@@ -431,7 +431,7 @@ export default function EquipmentListsPage({ params }: PageProps) {
   const totalListas = listas.length;
   const listasAprobadas = listas.filter(l => l.estado === 'aprobado').length;
   const totalItems = listas.reduce((sum, l) => sum + (l.totalItems || l.items?.length || 0), 0);
-  const totalPresupuesto = listas.reduce((sum, l) => sum + (l.totalPresupuesto || 0), 0);
+  const totalPresupuesto = listas.reduce((sum, l) => sum + (l.montoEstimado || 0), 0);
 
   return (
     <div className="space-y-4">
