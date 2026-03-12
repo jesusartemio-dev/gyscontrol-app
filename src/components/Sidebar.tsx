@@ -1,11 +1,10 @@
 'use client'
 
-import React, { useMemo } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import clsx from 'clsx'
-import { useState } from 'react'
 import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -65,9 +64,16 @@ import { useNotifications } from '@/lib/hooks/useNotifications'
 import type { RolUsuario, SidebarSection, NotificationBadgeType } from '@/types/modelos'
 
 export default function Sidebar() {
-  const { data: session } = useSession()
+  const { data: session, update: updateSession } = useSession()
   const pathname = usePathname()
   const { getBadgeCount, hasNotifications } = useNotifications()
+
+  // Refresh sectionAccess from DB on window focus (picks up admin changes)
+  useEffect(() => {
+    const onFocus = () => updateSession()
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [updateSession])
 
   const [collapsed, setCollapsed] = useState(false)
   const [openSubmenus, setOpenSubmenus] = useState<Record<string, boolean>>({})

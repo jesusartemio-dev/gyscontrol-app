@@ -136,6 +136,20 @@ export default function ProyectoHubPage() {
     }
   }
 
+  // Costo planificado de equipos (montoEstimado de listas)
+  const [costoPlanificadoEquipos, setCostoPlanificadoEquipos] = useState(0)
+
+  useEffect(() => {
+    if (!proyecto?.id) return
+    fetch(`/api/lista-equipo?proyectoId=${proyecto.id}`)
+      .then(r => r.ok ? r.json() : [])
+      .then((listas: any[]) => {
+        const total = listas.reduce((sum: number, l: any) => sum + (l.montoEstimado || 0), 0)
+        setCostoPlanificadoEquipos(total)
+      })
+      .catch(() => {})
+  }, [proyecto?.id])
+
   useEffect(() => {
     if (!proyecto?.id) return
     fetch(`/api/proyectos/${proyecto.id}/condiciones-exclusiones`)
@@ -193,7 +207,15 @@ export default function ProyectoHubPage() {
   const progresoServiciosEjec = costosReales.loading ? null : calcularProgreso(costosReales.servicios, totalServiciosInterno)
   const progresoGastosEjec = costosReales.loading ? null : calcularProgreso(costosReales.gastos, totalGastosInterno)
 
-  // Planificación vs Presupuesto (servicios only) — sin cap para detectar scope creep real
+  // Planificación vs Presupuesto — equipos (listas) y servicios (cronograma)
+  const progresoEquiposPlan = costoPlanificadoEquipos > 0 && totalEquiposInterno > 0
+    ? (() => {
+        const porcentaje = (costoPlanificadoEquipos / totalEquiposInterno) * 100
+        const estado: 'ok' | 'warning' | 'danger' = porcentaje > 100 ? 'danger' : porcentaje > 80 ? 'warning' : 'ok'
+        return { porcentaje, estado }
+      })()
+    : null
+
   const progresoServiciosPlan = cronogramaStats.costoPlanificado > 0 && totalServiciosInterno > 0
     ? (() => {
         const porcentaje = (cronogramaStats.costoPlanificado / totalServiciosInterno) * 100
@@ -240,6 +262,12 @@ export default function ProyectoHubPage() {
       realLabel: costosReales.loading ? 'Cargando...' : `Real: ${formatCurrency(costosReales.equipos)}`,
       cotizado: totalEquiposReal,
       cobertura: progresoCobertura,
+      // Planificación layer (costo de listas de equipos)
+      planificado: costoPlanificadoEquipos,
+      progresoPlanificado: progresoEquiposPlan,
+      planificadoLabel: costoPlanificadoEquipos > 0
+        ? `Plan: ${formatCurrency(costoPlanificadoEquipos)}`
+        : undefined,
     },
     {
       id: 'servicios',

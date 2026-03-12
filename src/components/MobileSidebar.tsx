@@ -64,10 +64,22 @@ import type { RolUsuario, SidebarSection, NotificationBadgeType } from '@/types/
  * MobileSidebar - Drawer/Sheet que contiene la navegación en móvil
  */
 export default function MobileSidebar() {
-  const { data: session } = useSession()
+  const { data: session, update: updateSession } = useSession()
   const pathname = usePathname()
   const { isMobileOpen, setMobileOpen } = useSidebar()
   const { getBadgeCount } = useNotifications()
+
+  // Refresh sectionAccess from DB when sidebar opens
+  const hasRefreshed = React.useRef(false)
+  React.useEffect(() => {
+    if (isMobileOpen && !hasRefreshed.current) {
+      hasRefreshed.current = true
+      updateSession()
+    }
+    if (!isMobileOpen) {
+      hasRefreshed.current = false
+    }
+  }, [isMobileOpen, updateSession])
 
   const [openSections, setOpenSections] = React.useState<Record<string, boolean>>({
     configuracion: false,
