@@ -83,7 +83,7 @@ function parseSemanaLabel(semana: string): string {
 
 export default function SupervisionTimesheetPage() {
   const { toast } = useToast()
-  const [tab, setTab] = useState('enviado')
+  const [tab, setTab] = useState('todos')
   const [aprobaciones, setAprobaciones] = useState<Aprobacion[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
@@ -227,6 +227,8 @@ export default function SupervisionTimesheetPage() {
 
   const estadoBadge = (estado: string) => {
     switch (estado) {
+      case 'sin_enviar':
+        return <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-300">Sin enviar</Badge>
       case 'enviado':
         return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-300">Pendiente</Badge>
       case 'aprobado':
@@ -248,7 +250,7 @@ export default function SupervisionTimesheetPage() {
             Timesheet - Aprobación de Horas
           </h1>
           <p className="text-sm text-gray-500">
-            Revisa y aprueba los timesheets semanales de los empleados
+            Vista general de horas registradas (oficina y campo) con aprobación semanal
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={cargarDatos} disabled={loading}>
@@ -303,12 +305,16 @@ export default function SupervisionTimesheetPage() {
       {/* Tabs */}
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
+          <TabsTrigger value="todos">
+            Todos
+          </TabsTrigger>
+          <TabsTrigger value="sin_enviar" className="flex items-center gap-1">
+            <Clock className="h-4 w-4" />
+            Sin enviar
+          </TabsTrigger>
           <TabsTrigger value="enviado" className="flex items-center gap-1">
             <AlertCircle className="h-4 w-4" />
             Pendientes
-            {tab !== 'enviado' && aprobaciones.length > 0 && (
-              <Badge variant="secondary" className="ml-1 text-xs px-1.5 py-0">{aprobaciones.length}</Badge>
-            )}
           </TabsTrigger>
           <TabsTrigger value="aprobado" className="flex items-center gap-1">
             <CheckCircle className="h-4 w-4" />
@@ -317,9 +323,6 @@ export default function SupervisionTimesheetPage() {
           <TabsTrigger value="rechazado" className="flex items-center gap-1">
             <XCircle className="h-4 w-4" />
             Rechazados
-          </TabsTrigger>
-          <TabsTrigger value="todos">
-            Todos
           </TabsTrigger>
         </TabsList>
 
@@ -331,6 +334,7 @@ export default function SupervisionTimesheetPage() {
               <ClipboardCheck className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
               <p className="text-sm text-muted-foreground">
                 {tieneFiltros ? 'No se encontraron timesheets con los filtros aplicados' :
+                 tab === 'sin_enviar' ? 'No hay horas sin enviar' :
                  tab === 'enviado' ? 'No hay timesheets pendientes de aprobación' :
                  tab === 'aprobado' ? 'No hay timesheets aprobados' :
                  tab === 'rechazado' ? 'No hay timesheets rechazados' :
