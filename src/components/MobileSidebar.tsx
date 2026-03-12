@@ -71,7 +71,7 @@ export default function MobileSidebar() {
 
   const [openSections, setOpenSections] = React.useState<Record<string, boolean>>({
     configuracion: false,
-    comercial: true,
+    comercial: false,
     crm: false,
     proyectos: false,
     documentos: false,
@@ -84,8 +84,34 @@ export default function MobileSidebar() {
     gestion: false,
   })
 
+  // Accordion: only one section open at a time
   const toggleSection = (key: string) =>
-    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }))
+    setOpenSections((prev) => {
+      const isCurrentlyOpen = prev[key]
+      // Close all sections, then toggle the clicked one
+      const allClosed = Object.keys(prev).reduce((acc, k) => ({ ...acc, [k]: false }), {} as Record<string, boolean>)
+      return { ...allClosed, [key]: !isCurrentlyOpen }
+    })
+
+  // Track if nav is scrollable for fade indicator
+  const navRef = React.useRef<HTMLElement>(null)
+  const [showScrollIndicator, setShowScrollIndicator] = React.useState(false)
+
+  React.useEffect(() => {
+    const nav = navRef.current
+    if (!nav) return
+    const checkScroll = () => {
+      setShowScrollIndicator(nav.scrollHeight - nav.scrollTop - nav.clientHeight > 20)
+    }
+    checkScroll()
+    nav.addEventListener('scroll', checkScroll, { passive: true })
+    const observer = new ResizeObserver(checkScroll)
+    observer.observe(nav)
+    return () => {
+      nav.removeEventListener('scroll', checkScroll)
+      observer.disconnect()
+    }
+  }, [openSections])
 
   // Cerrar el drawer al navegar
   const handleLinkClick = () => {
@@ -306,7 +332,7 @@ export default function MobileSidebar() {
     [role, sectionAccess]
   )
 
-  // Auto-expand active section on mount
+  // Auto-expand only the active section (accordion style)
   React.useEffect(() => {
     const currentSection = allSections.find(section =>
       section.links.some(link =>
@@ -315,7 +341,10 @@ export default function MobileSidebar() {
       )
     )
     if (currentSection) {
-      setOpenSections(prev => ({ ...prev, [currentSection.key]: true }))
+      setOpenSections(prev => {
+        const allClosed = Object.keys(prev).reduce((acc, k) => ({ ...acc, [k]: false }), {} as Record<string, boolean>)
+        return { ...allClosed, [currentSection.key]: true }
+      })
     }
   }, [pathname])
 
@@ -364,7 +393,7 @@ export default function MobileSidebar() {
         )}
 
         {/* Navigation */}
-        <nav className="flex-1 min-h-0 overflow-y-auto px-2 py-4 custom-scrollbar overscroll-contain touch-pan-y">
+        <nav ref={navRef} className="flex-1 min-h-0 overflow-y-auto px-2 py-4 custom-scrollbar overscroll-contain touch-pan-y relative">
           <div className="space-y-2">
             {visibleSections.map((section) => {
               const SectionIcon = section.icon
@@ -446,6 +475,13 @@ export default function MobileSidebar() {
             })}
           </div>
         </nav>
+
+        {/* Scroll indicator - shows when more sections below */}
+        {showScrollIndicator && (
+          <div className="flex-shrink-0 flex items-center justify-center py-1.5 bg-gradient-to-t from-gray-900 to-transparent pointer-events-none">
+            <ChevronDown size={14} className="text-gray-400 animate-bounce" />
+          </div>
+        )}
 
         <Separator className="bg-gray-700/60 flex-shrink-0" />
 
