@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { RefreshCw, TreePine, List, Filter, Zap } from 'lucide-react'
@@ -122,6 +122,8 @@ export function CronogramaTreeView({ cotizacionId, onRefresh, fechaInicioProyect
     }
   }
 
+  const rowCounterRef = useRef(0)
+
   const renderTree = (nodeIds: string[], level = 0): React.ReactNode => {
     return nodeIds.map(nodeId => {
       const node = state.nodes.get(nodeId)
@@ -129,6 +131,8 @@ export function CronogramaTreeView({ cotizacionId, onRefresh, fechaInicioProyect
 
       const isSelected = state.selectedNodeId === nodeId
       const childNodeIds = node.children?.map(child => child.id) || []
+
+      const currentRowIndex = rowCounterRef.current++
 
       return (
         <React.Fragment key={nodeId}>
@@ -141,6 +145,7 @@ export function CronogramaTreeView({ cotizacionId, onRefresh, fechaInicioProyect
             onImport={() => handleImportItems(nodeId)}
             onSelect={() => actions.selectNode(nodeId)}
             isSelected={isSelected}
+            rowIndex={currentRowIndex}
           />
           {state.expandedNodes.has(nodeId) && childNodeIds.length > 0 && (
             <div className="tree-children">
@@ -236,7 +241,7 @@ export function CronogramaTreeView({ cotizacionId, onRefresh, fechaInicioProyect
             <>
               <TreeHeader />
               <div className="p-2">
-                {renderTree(state.rootNodes)}
+                {(() => { rowCounterRef.current = 0; return renderTree(state.rootNodes) })()}
               </div>
             </>
           )}

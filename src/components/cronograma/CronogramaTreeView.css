@@ -15,10 +15,6 @@
   @apply transition-all duration-200 ease-in-out;
 }
 
-.tree-node:hover {
-  @apply bg-gray-50 rounded-md;
-}
-
 .tree-node.selected {
   @apply bg-blue-50 border-blue-200;
 }

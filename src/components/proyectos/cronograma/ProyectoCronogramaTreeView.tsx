@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { RefreshCw, TreePine, Plus, Download, List, Filter, Zap, Trash2, Clock } from 'lucide-react'
@@ -405,6 +405,8 @@ export function ProyectoCronogramaTreeView({
     }
   }
 
+  const rowCounterRef = useRef(0)
+
   const renderTree = (nodeIds: string[], level = 0): React.ReactNode => {
     return nodeIds.map(nodeId => {
       const node = state.nodes.get(nodeId)
@@ -415,6 +417,8 @@ export function ProyectoCronogramaTreeView({
 
       // Determinar permisos según el tipo de cronograma o estado de bloqueo
       const isReadOnly = selectedCronograma?.tipo === 'comercial' || selectedCronograma?.bloqueado === true
+
+      const currentRowIndex = rowCounterRef.current++
 
       return (
         <React.Fragment key={nodeId}>
@@ -430,6 +434,7 @@ export function ProyectoCronogramaTreeView({
             readOnly={isReadOnly}
             showRecursoColumn={showRecursoColumn}
             showResponsableColumn={showResponsableColumn}
+            rowIndex={currentRowIndex}
             onAssignRecurso={
               !isReadOnly && showRecursoColumn && (node.type === 'edt' || node.type === 'tarea')
                 ? () => handleAssignRecurso(nodeId)
@@ -634,7 +639,7 @@ export function ProyectoCronogramaTreeView({
             <>
               <TreeHeader showRecursoColumn={showRecursoColumn} showResponsableColumn={showResponsableColumn} />
               <div className="p-2">
-                {renderTree(state.rootNodes)}
+                {(() => { rowCounterRef.current = 0; return renderTree(state.rootNodes) })()}
               </div>
             </>
           )}
