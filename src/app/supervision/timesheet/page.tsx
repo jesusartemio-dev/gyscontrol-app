@@ -36,6 +36,8 @@ import {
   Search,
   X,
   RefreshCw,
+  MapPin,
+  Monitor,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -47,6 +49,7 @@ interface Registro {
   horasTrabajadas: number
   descripcion: string | null
   nombreServicio: string
+  origen: string
   proyecto: { id: string; codigo: string; nombre: string }
   proyectoEdt: { nombre: string } | null
   proyectoTarea: { nombre: string } | null
@@ -433,6 +436,7 @@ export default function SupervisionTimesheetPage() {
                               <TableHeader>
                                 <TableRow>
                                   <TableHead>Fecha</TableHead>
+                                  <TableHead>Origen</TableHead>
                                   <TableHead>Proyecto</TableHead>
                                   <TableHead>EDT</TableHead>
                                   <TableHead>Tarea</TableHead>
@@ -445,6 +449,19 @@ export default function SupervisionTimesheetPage() {
                                   <TableRow key={r.id}>
                                     <TableCell className="text-sm whitespace-nowrap">
                                       {format(new Date(r.fechaTrabajo), 'dd MMM', { locale: es })}
+                                    </TableCell>
+                                    <TableCell>
+                                      {r.origen === 'campo' ? (
+                                        <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700 border-orange-300">
+                                          <MapPin className="h-3 w-3 mr-0.5" />
+                                          Campo
+                                        </Badge>
+                                      ) : (
+                                        <Badge variant="outline" className="text-xs bg-indigo-50 text-indigo-700 border-indigo-300">
+                                          <Monitor className="h-3 w-3 mr-0.5" />
+                                          Oficina
+                                        </Badge>
+                                      )}
                                     </TableCell>
                                     <TableCell className="text-sm">
                                       <span className="font-medium">{r.proyecto.codigo}</span>

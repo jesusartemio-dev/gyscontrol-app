@@ -35,12 +35,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Esta semana ya fue aprobada' }, { status: 400 })
     }
 
-    // Calculate total office hours for this week
+    // Calculate total hours for this week (oficina + campo)
     const { inicio, fin } = getWeekRange(semana)
     const totalHorasResult = await prisma.registroHoras.aggregate({
       where: {
         usuarioId: session.user.id,
-        origen: 'oficina',
+        origen: { in: ['oficina', 'campo'] },
         fechaTrabajo: {
           gte: inicio,
           lte: fin,
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
     const totalRegistros = totalHorasResult._count
 
     if (totalRegistros === 0) {
-      return NextResponse.json({ error: 'No hay horas de oficina registradas en esta semana' }, { status: 400 })
+      return NextResponse.json({ error: 'No hay horas registradas en esta semana' }, { status: 400 })
     }
 
     // Upsert: create or update (for rechazado → enviado re-send)

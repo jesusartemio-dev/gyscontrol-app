@@ -54,11 +54,11 @@ export async function GET(request: NextRequest) {
       aprobaciones.map(async (a) => {
         const { inicio, fin } = getWeekRange(a.semana)
 
-        // Get registrations grouped by project for this user+week (oficina only)
+        // Get registrations grouped by project for this user+week (oficina + campo)
         const registros = await prisma.registroHoras.findMany({
           where: {
             usuarioId: a.usuarioId,
-            origen: 'oficina',
+            origen: { in: ['oficina', 'campo'] },
             fechaTrabajo: { gte: inicio, lte: fin },
           },
           select: {
@@ -67,6 +67,7 @@ export async function GET(request: NextRequest) {
             horasTrabajadas: true,
             descripcion: true,
             nombreServicio: true,
+            origen: true,
             proyecto: { select: { id: true, codigo: true, nombre: true } },
             proyectoEdt: { select: { nombre: true } },
             proyectoTarea: { select: { nombre: true } },
