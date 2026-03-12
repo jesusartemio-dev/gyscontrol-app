@@ -225,6 +225,7 @@ export async function POST(
         }
 
         const dur = parseDuration(edtData.row.duration, horasPorDia)
+        const edtWork = parseWork(edtData.row.work, horasPorDia)
         const proyectoEdtId = crypto.randomUUID()
 
         await prisma.proyectoEdt.create({
@@ -239,7 +240,7 @@ export async function POST(
             orden: edtIdx,
             fechaInicioPlan: edtData.row.start ? new Date(edtData.row.start) : null,
             fechaFinPlan: edtData.row.finish ? new Date(edtData.row.finish) : null,
-            horasPlan: dur.hours,
+            horasPlan: edtWork > 0 ? edtWork : dur.hours,
             estado: 'planificado',
             prioridad: 'media',
             porcentajeAvance: 0,
@@ -256,6 +257,7 @@ export async function POST(
         for (let actIdx = 0; actIdx < edtData.actividades.length; actIdx++) {
           const actData = edtData.actividades[actIdx]
           const actDur = parseDuration(actData.row.duration, horasPorDia)
+          const actWork = parseWork(actData.row.work, horasPorDia)
           const actividadId = crypto.randomUUID()
 
           // Actividad requiere fechas, usar defaults si no hay
@@ -276,7 +278,7 @@ export async function POST(
               orden: actIdx,
               fechaInicioPlan: actStart,
               fechaFinPlan: actFinish,
-              horasPlan: actDur.hours,
+              horasPlan: actWork > 0 ? actWork : actDur.hours,
               estado: 'pendiente',
               prioridad: 'media',
               porcentajeAvance: 0,
