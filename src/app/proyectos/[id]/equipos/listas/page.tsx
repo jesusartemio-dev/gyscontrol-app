@@ -438,14 +438,6 @@ export default function EquipmentListsPage({ params }: PageProps) {
       {/* Header compacto */}
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1">
-          <Link
-            href={`/proyectos/${proyectoId}/equipos`}
-            className="inline-flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ArrowLeft className="h-3 w-3 mr-1" />
-            Equipos
-          </Link>
-
           <div className="flex items-center gap-2">
             <List className="h-5 w-5 text-blue-600" />
             <h1 className="text-lg font-semibold">Listas de Equipos</h1>

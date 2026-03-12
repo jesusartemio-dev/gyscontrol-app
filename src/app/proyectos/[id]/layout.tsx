@@ -411,7 +411,35 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
     <ProyectoContext.Provider value={{ proyecto, setProyecto: handleDataUpdate, refreshProyecto, loading, cronogramaStats, costosReales, refreshCostosReales: () => { if (typeof id === 'string') fetchCostosReales(id) } }}>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
         <div className="container mx-auto p-4 sm:p-6">
-          {/* Header - Hidden on detail/full-width views for maximum content space */}
+          {/* Breadcrumb - Always visible on sub-pages */}
+          {!isHubPage && (isDetailView || needsFullWidth) && (
+            <div className="flex items-center gap-2 flex-wrap text-sm mb-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.push('/proyectos')}
+                className="p-0 h-auto text-muted-foreground hover:text-foreground hover:underline"
+              >
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                Proyectos
+              </Button>
+              <span className="text-muted-foreground">/</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.push(`/proyectos/${id}`)}
+                className="p-0 h-auto text-muted-foreground hover:text-foreground hover:underline"
+              >
+                <span className="font-mono">{proyecto.codigo}</span>
+                <span className="mx-1">:</span>
+                <span className="truncate max-w-[300px]" title={proyecto.nombre}>{proyecto.nombre}</span>
+              </Button>
+              <span className="text-muted-foreground">/</span>
+              <span className="font-medium text-foreground">{currentSubPage}</span>
+            </div>
+          )}
+
+          {/* Full Header - Hidden on detail/full-width views for maximum content space */}
           {!isDetailView && !needsFullWidth && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
