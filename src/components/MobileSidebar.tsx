@@ -281,6 +281,7 @@ export default function MobileSidebar() {
         { href: '/gestion/reportes/pedidos', label: 'Pedidos', icon: Package },
         { href: '/gestion/reportes/performance', label: 'Performance', icon: TrendingUp },
         { href: '/gestion/reportes/financiero', label: 'Financiero', icon: DollarSign },
+        { href: '/gestion/reportes/costos-reales', label: 'Costos Reales', icon: DollarSign },
       ],
     },
     {

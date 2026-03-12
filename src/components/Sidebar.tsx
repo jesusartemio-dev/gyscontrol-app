@@ -54,6 +54,7 @@ import {
   ArrowUpCircle,
   Landmark,
   CheckCircle2,
+  DollarSign,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -310,6 +311,7 @@ export default function Sidebar() {
         { href: '/gestion/reportes/curva-s', label: 'Curva S', icon: TrendingUp },
         { href: '/gestion/reportes/aging-cxc', label: 'Aging CxC', icon: Clock },
         { href: '/gestion/reportes/margen-real', label: 'Margen Real', icon: BarChart3 },
+        { href: '/gestion/reportes/costos-reales', label: 'Costos Reales', icon: DollarSign },
         { href: '/gestion/cartas-fianza', label: 'Cartas Fianza', icon: Shield },
       ],
     },

@@ -14,6 +14,7 @@ import {
   TrendingUp,
   ArrowRight,
   Clock,
+  DollarSign,
 } from 'lucide-react'
 
 export const metadata: Metadata = {
@@ -63,6 +64,14 @@ const reportes = [
     href: '/gestion/reportes/margen-real',
     color: 'bg-emerald-100 text-emerald-600',
     roles: ['admin', 'gerente'],
+  },
+  {
+    titulo: 'Costos Reales',
+    descripcion: 'Desglose de costos ejecutados por proyecto: equipos (OC), servicios (HH por usuario) y gastos operativos. Expandible para ver detalle por persona.',
+    icono: DollarSign,
+    href: '/gestion/reportes/costos-reales',
+    color: 'bg-red-100 text-red-600',
+    roles: ['admin', 'gerente', 'gestor'],
   },
   {
     titulo: 'KPIs de Gestión',
