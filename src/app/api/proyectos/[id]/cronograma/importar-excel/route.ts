@@ -240,7 +240,7 @@ export async function POST(
             orden: edtIdx,
             fechaInicioPlan: edtData.row.start ? new Date(edtData.row.start) : null,
             fechaFinPlan: edtData.row.finish ? new Date(edtData.row.finish) : null,
-            horasPlan: edtWork > 0 ? edtWork : dur.hours,
+            horasPlan: edtData.row.work ? edtWork : dur.hours,
             estado: 'planificado',
             prioridad: 'media',
             porcentajeAvance: 0,
@@ -278,7 +278,7 @@ export async function POST(
               orden: actIdx,
               fechaInicioPlan: actStart,
               fechaFinPlan: actFinish,
-              horasPlan: actWork > 0 ? actWork : actDur.hours,
+              horasPlan: actData.row.work ? actWork : actDur.hours,
               estado: 'pendiente',
               prioridad: 'media',
               porcentajeAvance: 0,
@@ -298,9 +298,9 @@ export async function POST(
             const tareaWork = parseWork(tareaData.row.work, horasPorDia)
             const tareaId = crypto.randomUUID()
 
-            // Si Work is available, use it as horasEstimadas (total person-hours)
+            // Si Work column has data (even "0h"), use parsed value (respects explicit zero-effort tasks)
             // Otherwise fallback to Duration × horasPorDia (single-person hours)
-            let horasEstimadas = tareaWork > 0 ? tareaWork : tareaDur.hours
+            let horasEstimadas = tareaData.row.work ? tareaWork : tareaDur.hours
 
             // Calculate personasEstimadas: Work / (Duration × horasPorDia)
             // If Work = Duration × horasPorDia → 1 person; if Work > → multiple people
@@ -424,34 +424,44 @@ export async function POST(
     }
 
     // ── Roll-up: recalcular horasPlan de Actividades y EDTs como suma de hijos ──
-    // (El Excel exporta Duration propia en cada nivel; necesitamos la suma real)
+    // Solo sobreescribir si el nodo tiene hijos (para no borrar el Work del Excel en nodos hoja)
     const actividadesConHoras = await prisma.proyectoActividad.findMany({
       where: { proyectoCronogramaId: cronograma.id },
       select: { id: true },
     })
     for (const act of actividadesConHoras) {
-      const sumTareas = await prisma.proyectoTarea.aggregate({
+      const tareasCount = await prisma.proyectoTarea.count({
         where: { proyectoActividadId: act.id },
-        _sum: { horasEstimadas: true },
       })
-      await prisma.proyectoActividad.update({
-        where: { id: act.id },
-        data: { horasPlan: sumTareas._sum.horasEstimadas || 0, updatedAt: new Date() },
-      })
+      if (tareasCount > 0) {
+        const sumTareas = await prisma.proyectoTarea.aggregate({
+          where: { proyectoActividadId: act.id },
+          _sum: { horasEstimadas: true },
+        })
+        await prisma.proyectoActividad.update({
+          where: { id: act.id },
+          data: { horasPlan: sumTareas._sum.horasEstimadas || 0, updatedAt: new Date() },
+        })
+      }
     }
     const edtsConHoras = await prisma.proyectoEdt.findMany({
       where: { proyectoCronogramaId: cronograma.id },
       select: { id: true },
     })
     for (const edt of edtsConHoras) {
-      const sumActs = await prisma.proyectoActividad.aggregate({
+      const actsCount = await prisma.proyectoActividad.count({
         where: { proyectoEdtId: edt.id },
-        _sum: { horasPlan: true },
       })
-      await prisma.proyectoEdt.update({
-        where: { id: edt.id },
-        data: { horasPlan: sumActs._sum.horasPlan || 0, updatedAt: new Date() },
-      })
+      if (actsCount > 0) {
+        const sumActs = await prisma.proyectoActividad.aggregate({
+          where: { proyectoEdtId: edt.id },
+          _sum: { horasPlan: true },
+        })
+        await prisma.proyectoEdt.update({
+          where: { id: edt.id },
+          data: { horasPlan: sumActs._sum.horasPlan || 0, updatedAt: new Date() },
+        })
+      }
     }
 
     // Asegurar que el cronograma es baseline
