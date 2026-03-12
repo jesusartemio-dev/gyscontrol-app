@@ -199,6 +199,7 @@ export default function LogisticaListasTable({ listas, loading = false, onDelete
             </TableHead>
             <TableHead className="text-xs w-[80px] text-center">Cotización</TableHead>
             <TableHead className="text-xs w-[70px] text-center">Selección</TableHead>
+            <TableHead className="text-xs w-[100px] text-right">Total</TableHead>
             <TableHead
               className="text-xs cursor-pointer hover:bg-gray-50 w-[80px]"
               onClick={() => handleSort('createdAt')}
@@ -281,6 +282,9 @@ export default function LogisticaListasTable({ listas, loading = false, onDelete
                       </Tooltip>
                     )
                   })()}
+                </TableCell>
+                <TableCell className="text-right font-mono text-xs text-muted-foreground py-2">
+                  ${((lista as any).montoEstimado || 0).toLocaleString('es-PE', { minimumFractionDigits: 2 })}
                 </TableCell>
                 <TableCell className="py-2 text-xs text-muted-foreground">
                   {formatDate(lista.createdAt)}
