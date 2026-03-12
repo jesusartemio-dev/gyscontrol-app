@@ -105,13 +105,14 @@ export function parseWork(work: string, horasPorDia: number = 8): number {
 export function parseDuration(duration: string, horasPorDia: number = 8): ParsedDuration {
   if (!duration) return { days: 0, hours: 0, isMilestone: false }
 
-  const str = String(duration).trim().toLowerCase()
+  // Normalizar: quitar comas de miles (e.g. "2,285h" → "2285h")
+  const str = String(duration).trim().toLowerCase().replace(/,/g, '')
   const hpd = horasPorDia || 8
   const diasPorSemana = 5
   const diasPorMes = 20
 
   // Milestone
-  const zeroMatch = str.match(/^0\s*(days?|d[íi]as?|hrs?|hours?|horas?)$/i)
+  const zeroMatch = str.match(/^0\s*(days?|d[íi]as?|hrs?|hours?|horas?|h)$/i)
   if (zeroMatch) {
     return { days: 0, hours: 0, isMilestone: true }
   }
@@ -123,8 +124,8 @@ export function parseDuration(duration: string, horasPorDia: number = 8): Parsed
     return { days, hours: days * hpd, isMilestone: false }
   }
 
-  // "X hours" / "X hrs" / "X horas" / "X hora"
-  const hourMatch = str.match(/^([\d.]+)\s*(hours?|hrs?|horas?)$/i)
+  // "X hours" / "X hrs" / "X h" / "X horas" / "X hora"
+  const hourMatch = str.match(/^([\d.]+)\s*(hours?|hrs?|h|horas?)$/i)
   if (hourMatch) {
     const hours = parseFloat(hourMatch[1])
     return { days: hours / hpd, hours, isMilestone: false }
