@@ -217,7 +217,7 @@ export function TreeNode({
 
   return (
     <div
-      className={`tree-node group ${isSelected ? 'bg-blue-100 border-l-2 border-l-blue-500' : `${rowIndex != null && rowIndex % 2 === 0 ? 'bg-muted/30' : ''} hover:bg-blue-50/60`} py-0.5 cursor-pointer transition-colors`}
+      className={`tree-node group ${isSelected ? 'bg-blue-100 border-l-2 border-l-blue-500' : `${rowIndex != null && rowIndex % 2 === 0 ? 'bg-gray-100' : ''} hover:bg-blue-100/70`} py-0.5 cursor-pointer transition-colors`}
       onClick={onSelect}
     >
       <div className={`grid items-center gap-1 ${
