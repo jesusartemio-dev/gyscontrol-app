@@ -29,9 +29,19 @@ import {
   Clock,
   XCircle,
   RefreshCw,
-  Filter
+  Filter,
+  MoreHorizontal,
+  Trash2,
+  Undo2
 } from 'lucide-react'
-import type { Proyecto, ProyectoEquipoCotizado, ProyectoEquipoCotizadoItem, ListaEquipo, ListaEquipoItem } from '@prisma/client'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { useToast } from '@/components/ui/use-toast'
+import type { Proyecto, ProyectoEquipoCotizado, ProyectoEquipoCotizadoItem, ListaEquipo, ListaEquipoItem, EstadoEquipoItem } from '@prisma/client'
 import CrearListaMultipleModal from '@/components/proyectos/equipos/CrearListaMultipleModal'
 
 type ListaInfo = Pick<ListaEquipo, 'id' | 'codigo' | 'nombre'>
@@ -93,11 +103,12 @@ function LoadingSkeleton() {
   )
 }
 
-function ItemsTable({ items, proyectoId }: { items: ItemWithLista[], proyectoId: string }) {
+function ItemsTable({ items, proyectoId, onEstadoChange }: { items: ItemWithLista[], proyectoId: string, onEstadoChange: (itemId: string, estado: string) => Promise<void> }) {
   const [search, setSearch] = useState('')
   const [categoriaFiltro, setCategoriaFiltro] = useState('__todas__')
   const [sortField, setSortField] = useState<string>('codigo')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const [updatingId, setUpdatingId] = useState<string | null>(null)
 
   const categoriasUnicas = useMemo(() =>
     [...new Set(items.map(i => i.categoria || 'SIN-CATEGORIA'))].sort()
@@ -254,12 +265,13 @@ function ItemsTable({ items, proyectoId }: { items: ItemWithLista[], proyectoId:
                 <th className="px-2 py-1.5 text-right font-semibold text-gray-700 w-24">Subtotal</th>
                 <th className="px-2 py-1.5 text-center font-semibold text-gray-700 w-20">Estado</th>
                 <th className="px-2 py-1.5 text-left font-semibold text-gray-700 w-36">En Lista</th>
+                <th className="px-2 py-1.5 text-center font-semibold text-gray-700 w-10"></th>
               </tr>
             </thead>
             <tbody className="divide-y">
               {sortedItems.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="text-center py-8 text-muted-foreground">
+                  <td colSpan={10} className="text-center py-8 text-muted-foreground">
                     {search || categoriaFiltro !== '__todas__' ? 'No se encontraron items con los filtros aplicados' : 'Sin items'}
                   </td>
                 </tr>
@@ -328,6 +340,45 @@ function ItemsTable({ items, proyectoId }: { items: ItemWithLista[], proyectoId:
                         )
                       })()}
                     </td>
+                    <td className="px-1 py-1.5 text-center">
+                      {(item.estado === 'pendiente' || item.estado === 'descartado') && !item.listaId && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button className="p-0.5 rounded hover:bg-gray-200 transition-colors" disabled={updatingId === item.id}>
+                              <MoreHorizontal className="h-3.5 w-3.5 text-gray-400" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-40">
+                            {item.estado === 'pendiente' && (
+                              <DropdownMenuItem
+                                className="text-xs text-red-600 focus:text-red-600"
+                                onClick={async () => {
+                                  setUpdatingId(item.id)
+                                  await onEstadoChange(item.id, 'descartado')
+                                  setUpdatingId(null)
+                                }}
+                              >
+                                <Trash2 className="h-3.5 w-3.5 mr-2" />
+                                Descartar
+                              </DropdownMenuItem>
+                            )}
+                            {item.estado === 'descartado' && (
+                              <DropdownMenuItem
+                                className="text-xs"
+                                onClick={async () => {
+                                  setUpdatingId(item.id)
+                                  await onEstadoChange(item.id, 'pendiente')
+                                  setUpdatingId(null)
+                                }}
+                              >
+                                <Undo2 className="h-3.5 w-3.5 mr-2" />
+                                Restaurar
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                    </td>
                   </tr>
                 ))
               )}
@@ -340,7 +391,7 @@ function ItemsTable({ items, proyectoId }: { items: ItemWithLista[], proyectoId:
                 <td className="px-2 py-1.5 text-right font-mono font-bold text-green-700">
                   {formatCurrency(totalFiltered)}
                 </td>
-                <td colSpan={2}></td>
+                <td colSpan={3}></td>
               </tr>
             </tfoot>
           </table>
@@ -357,6 +408,37 @@ export default function ProjectEquipmentDetailPage({ params }: PageProps) {
   const [proyectoId, setProyectoId] = useState<string>('')
   const [equipoId, setEquipoId] = useState<string>('')
   const [showCreateListModal, setShowCreateListModal] = useState(false)
+  const { toast } = useToast()
+
+  const handleEstadoChange = async (itemId: string, nuevoEstado: string) => {
+    try {
+      const res = await fetch(`/api/proyecto-equipo-item/${itemId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estado: nuevoEstado }),
+      })
+      if (!res.ok) throw new Error('Error al actualizar')
+      // Update local state
+      if (equipo) {
+        setEquipo({
+          ...equipo,
+          items: equipo.items.map(i => i.id === itemId ? { ...i, estado: nuevoEstado as EstadoEquipoItem } : i)
+        })
+      }
+      toast({
+        title: nuevoEstado === 'descartado' ? 'Ítem descartado' : 'Ítem restaurado',
+        description: nuevoEstado === 'descartado'
+          ? 'El ítem fue marcado como descartado'
+          : 'El ítem fue restaurado a pendiente',
+      })
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'No se pudo actualizar el estado del ítem',
+        variant: 'destructive',
+      })
+    }
+  }
 
   useEffect(() => {
     params.then(p => {
@@ -386,7 +468,8 @@ export default function ProjectEquipmentDetailPage({ params }: PageProps) {
 
   const totalItems = equipo.items?.length || 0
   const completedItems = equipo.items?.filter(i => i.listaId || i.estado === 'en_lista' || i.estado === 'reemplazado').length || 0
-  const pendingItems = totalItems - completedItems
+  const descartadosItems = equipo.items?.filter(i => i.estado === 'descartado').length || 0
+  const pendingItems = totalItems - completedItems - descartadosItems
   const totalCost = equipo.items?.reduce((sum, i) => sum + (i.cantidad * (i.precioCliente || 0)), 0) || 0
 
   return (
@@ -418,6 +501,12 @@ export default function ProjectEquipmentDetailPage({ params }: PageProps) {
             <span className="text-green-600">{completedItems} en lista</span>
             <span className="text-gray-300">|</span>
             <span className="text-amber-600">{pendingItems} pendientes</span>
+            {descartadosItems > 0 && (
+              <>
+                <span className="text-gray-300">|</span>
+                <span className="text-red-500">{descartadosItems} descartados</span>
+              </>
+            )}
             <span className="text-gray-300">|</span>
             <span className="font-mono text-green-600 font-medium">{formatCurrency(totalCost)}</span>
           </div>
@@ -443,7 +532,7 @@ export default function ProjectEquipmentDetailPage({ params }: PageProps) {
       )}
 
       {/* Items Table */}
-      <ItemsTable items={equipo.items || []} proyectoId={proyectoId} />
+      <ItemsTable items={equipo.items || []} proyectoId={proyectoId} onEstadoChange={handleEstadoChange} />
 
       {/* Modal */}
       <CrearListaMultipleModal
