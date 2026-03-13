@@ -15,14 +15,13 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Pencil, Trash2, Search, Package, Clock, AlertTriangle, CheckCircle, Grid3X3, List, RotateCcw, Recycle, Plus, ShoppingCart, FileText, Download, Tag, ChevronDown, Wrench, Trophy, Layers } from 'lucide-react'
+import { Pencil, Trash2, Search, Package, Clock, AlertTriangle, CheckCircle, Grid3X3, List, RotateCcw, Plus, ShoppingCart, FileText, Download, Tag, ChevronDown, Wrench, Trophy, Layers } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ListaEquipoItem } from '@/types'
 import { updateListaEquipoItem } from '@/lib/services/listaEquipoItem'
 import { toast } from 'sonner'
-import ModalReemplazarItemDesdeCatalogo from './ModalReemplazarItemDesdeCatalogo'
-import ModalReemplazarReemplazoDesdeCatalogo from './ModalReemplazarReemplazoDesdeCatalogo'
+import ModalReemplazarEquipo from './ModalReemplazarEquipo'
 import ModalAgregarItemDesdeCatalogo from './ModalAgregarItemDesdeCatalogo'
 import ModalAgregarItemDesdeEquipo from './ModalAgregarItemDesdeEquipo'
 import ModalImportarExcelLista from './ModalImportarExcelLista'
@@ -118,8 +117,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
   const [editComentarioItemId, setEditComentarioItemId] = useState<string | null>(null)
   const [editComentarioValues, setEditComentarioValues] = useState<Record<string, string>>({})
   const [editingItem, setEditingItem] = useState<ListaEquipoItem | null>(null)
-  const [itemReemplazoOriginal, setItemReemplazoOriginal] = useState<ListaEquipoItem | null>(null)
-  const [itemReemplazoReemplazo, setItemReemplazoReemplazo] = useState<ListaEquipoItem | null>(null)
+  const [itemReemplazo, setItemReemplazo] = useState<ListaEquipoItem | null>(null)
   const deleteValidation = useDeleteWithValidation({
     entity: 'listaEquipoItem',
     deleteEndpoint: (id) => `/api/lista-equipo-item/${id}`,
@@ -823,38 +821,21 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                    </td>
                    <td className={`${cellPadding} ${columnWidths.acciones} text-center`}>
                       <div className="flex justify-end gap-1 items-center">
-                        {(item.estado !== 'rechazado') && (item.origen === 'cotizado' || item.origen === 'reemplazo') && (
-                          !item.reemplazaProyectoEquipoCotizadoItemId ? (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="sm"
-                                  onClick={() => setItemReemplazoOriginal(item)}
-                                  variant="outline"
-                                  disabled={!editable}
-                                  className="h-7 w-7 p-0"
-                                >
-                                  <RotateCcw className="h-3 w-3" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Reemplazar ítem</TooltipContent>
-                            </Tooltip>
-                          ) : (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="sm"
-                                  onClick={() => setItemReemplazoReemplazo(item)}
-                                  variant="secondary"
-                                  disabled={!editable}
-                                  className="h-7 w-7 p-0"
-                                >
-                                  <Recycle className="h-3 w-3" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Reemplazar reemplazo</TooltipContent>
-                            </Tooltip>
-                          )
+                        {item.estado !== 'rechazado' && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="sm"
+                                onClick={() => setItemReemplazo(item)}
+                                variant="outline"
+                                disabled={!editable}
+                                className="h-7 w-7 p-0"
+                              >
+                                <RotateCcw className="h-3 w-3" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Reemplazar</TooltipContent>
+                          </Tooltip>
                         )}
 
                         <Tooltip>
@@ -1102,28 +1083,16 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                       {/* Actions */}
                       <div className="flex justify-between items-center pt-1 border-t">
                         <div className="flex gap-1">
-                          {(item.estado !== 'rechazado') && (item.origen === 'cotizado' || item.origen === 'reemplazo') && (
-                            !item.reemplazaProyectoEquipoCotizadoItemId ? (
-                              <Button
-                                size="sm"
-                                onClick={() => setItemReemplazoOriginal(item)}
-                                variant="ghost"
-                                disabled={!editable}
-                                className="h-6 px-2 text-xs"
-                              >
-                                <RotateCcw className="h-3 w-3" />
-                              </Button>
-                            ) : (
-                              <Button
-                                size="sm"
-                                onClick={() => setItemReemplazoReemplazo(item)}
-                                variant="ghost"
-                                disabled={!editable}
-                                className="h-6 px-2 text-xs"
-                              >
-                                <Recycle className="h-3 w-3" />
-                              </Button>
-                            )
+                          {item.estado !== 'rechazado' && (
+                            <Button
+                              size="sm"
+                              onClick={() => setItemReemplazo(item)}
+                              variant="ghost"
+                              disabled={!editable}
+                              className="h-6 px-2 text-xs"
+                            >
+                              <RotateCcw className="h-3 w-3" />
+                            </Button>
                           )}
                         </div>
 
@@ -1171,22 +1140,11 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
         entityLabel="item"
       />
 
-      {itemReemplazoOriginal && (
-        <ModalReemplazarItemDesdeCatalogo
-          open={!!itemReemplazoOriginal}
-          item={itemReemplazoOriginal}
-          onClose={() => setItemReemplazoOriginal(null)}
-          onUpdated={onCreated}
-          listaId={listaId}
-          proyectoId={proyectoId}
-        />
-      )}
-
-      {itemReemplazoReemplazo && (
-        <ModalReemplazarReemplazoDesdeCatalogo
-          open={!!itemReemplazoReemplazo}
-          item={itemReemplazoReemplazo}
-          onClose={() => setItemReemplazoReemplazo(null)}
+      {itemReemplazo && (
+        <ModalReemplazarEquipo
+          open={!!itemReemplazo}
+          item={itemReemplazo}
+          onClose={() => setItemReemplazo(null)}
           onUpdated={onCreated}
           listaId={listaId}
           proyectoId={proyectoId}
