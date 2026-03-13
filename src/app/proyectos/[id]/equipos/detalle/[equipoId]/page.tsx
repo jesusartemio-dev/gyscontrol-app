@@ -31,7 +31,6 @@ import {
   RefreshCw,
   Filter,
   MoreHorizontal,
-  Trash2,
   Undo2,
   Link2,
   Loader2
@@ -374,7 +373,7 @@ function ItemsTable({ items, proyectoId, onEstadoChange, onVincular }: { items: 
                                     setUpdatingId(null)
                                   }}
                                 >
-                                  <Trash2 className="h-3.5 w-3.5 mr-2" />
+                                  <XCircle className="h-3.5 w-3.5 mr-2" />
                                   Descartar
                                 </DropdownMenuItem>
                               </>
