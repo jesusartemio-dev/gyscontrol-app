@@ -833,17 +833,17 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-40">
                           {item.estado !== 'rechazado' && (
-                            <DropdownMenuItem onClick={() => setItemReemplazo(item)}>
+                            <DropdownMenuItem onSelect={() => setTimeout(() => setItemReemplazo(item), 0)}>
                               <RotateCcw className="h-3.5 w-3.5 mr-2" />
                               Reemplazar
                             </DropdownMenuItem>
                           )}
-                          <DropdownMenuItem onClick={() => setEditingItem(item)}>
+                          <DropdownMenuItem onSelect={() => setTimeout(() => setEditingItem(item), 0)}>
                             <Pencil className="h-3.5 w-3.5 mr-2" />
                             Editar
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            onClick={() => deleteValidation.requestDelete(item.id)}
+                            onSelect={() => setTimeout(() => deleteValidation.requestDelete(item.id), 0)}
                             className="text-red-600 focus:text-red-600"
                           >
                             <Trash2 className="h-3.5 w-3.5 mr-2" />
