@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { getWeekRange } from '@/lib/utils/timesheetAprobacion'
 
 const ROLES_ALLOWED = ['admin', 'gerente', 'gestor', 'coordinador']
 
@@ -44,18 +45,37 @@ export async function PUT(
       }
     }
 
-    const updated = await prisma.timesheetAprobacion.update({
-      where: { id },
-      data: {
-        estado: accion === 'aprobar' ? 'aprobado' : 'rechazado',
-        aprobadoPorId: session.user.id,
-        motivoRechazo: accion === 'rechazar' ? motivoRechazo!.trim() : null,
-        fechaResolucion: new Date(),
-        updatedAt: new Date(),
-      },
-      include: {
-        usuario: { select: { name: true, email: true } },
-      },
+    // Get week date range for updating RegistroHoras
+    const { inicio, fin } = getWeekRange(aprobacion.semana)
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const result = await tx.timesheetAprobacion.update({
+        where: { id },
+        data: {
+          estado: accion === 'aprobar' ? 'aprobado' : 'rechazado',
+          aprobadoPorId: session.user.id,
+          motivoRechazo: accion === 'rechazar' ? motivoRechazo!.trim() : null,
+          fechaResolucion: new Date(),
+          updatedAt: new Date(),
+        },
+        include: {
+          usuario: { select: { name: true, email: true } },
+        },
+      })
+
+      // Mark individual RegistroHoras as aprobado/not aprobado
+      await tx.registroHoras.updateMany({
+        where: {
+          usuarioId: aprobacion.usuarioId,
+          fechaTrabajo: { gte: inicio, lte: fin },
+          origen: { in: ['oficina', 'campo'] },
+        },
+        data: {
+          aprobado: accion === 'aprobar',
+        },
+      })
+
+      return result
     })
 
     return NextResponse.json({

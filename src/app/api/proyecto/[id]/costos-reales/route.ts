@@ -47,10 +47,11 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
           FROM registro_horas
           WHERE "proyectoId" = ${proyectoId}
             AND "costoHora" IS NOT NULL
+            AND "aprobado" = true
         `,
         prisma.registroHoras.groupBy({
           by: ['usuarioId'],
-          where: { proyectoId, costoHora: null },
+          where: { proyectoId, costoHora: null, aprobado: true },
           _sum: { horasTrabajadas: true },
         }),
         prisma.$queryRaw<{ moneda: string; total: number }[]>`

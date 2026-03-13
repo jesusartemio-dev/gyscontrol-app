@@ -102,11 +102,12 @@ export async function GET(request: NextRequest) {
         SELECT "proyectoId", COALESCE(SUM("horasTrabajadas" * "costoHora"), 0) as "total"
         FROM registro_horas
         WHERE "costoHora" IS NOT NULL
+          AND "aprobado" = true
         GROUP BY "proyectoId"
       `,
       prisma.registroHoras.groupBy({
         by: ['proyectoId', 'usuarioId'],
-        where: { costoHora: null },
+        where: { costoHora: null, aprobado: true },
         _sum: { horasTrabajadas: true },
       }),
       prisma.$queryRaw<{ proyectoId: string; moneda: string; total: number }[]>`
