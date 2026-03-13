@@ -208,17 +208,21 @@ export default function ProyectoHubPage() {
   const progresoGastosEjec = costosReales.loading ? null : calcularProgreso(costosReales.gastos, totalGastosInterno)
 
   // Planificación vs Presupuesto — equipos (listas) y servicios (cronograma)
-  const progresoEquiposPlan = costoPlanificadoEquipos > 0 && totalEquiposInterno > 0
+  const progresoEquiposPlan = totalEquiposInterno > 0
     ? (() => {
-        const porcentaje = (costoPlanificadoEquipos / totalEquiposInterno) * 100
+        const porcentaje = costoPlanificadoEquipos > 0
+          ? (costoPlanificadoEquipos / totalEquiposInterno) * 100
+          : 0
         const estado: 'ok' | 'warning' | 'danger' = porcentaje > 100 ? 'danger' : porcentaje > 80 ? 'warning' : 'ok'
         return { porcentaje, estado }
       })()
     : null
 
-  const progresoServiciosPlan = cronogramaStats.costoPlanificado > 0 && totalServiciosInterno > 0
+  const progresoServiciosPlan = totalServiciosInterno > 0
     ? (() => {
-        const porcentaje = (cronogramaStats.costoPlanificado / totalServiciosInterno) * 100
+        const porcentaje = cronogramaStats.costoPlanificado > 0
+          ? (cronogramaStats.costoPlanificado / totalServiciosInterno) * 100
+          : 0
         const estado: 'ok' | 'warning' | 'danger' = porcentaje > 100 ? 'danger' : porcentaje > 80 ? 'warning' : 'ok'
         return { porcentaje, estado }
       })()
@@ -265,7 +269,7 @@ export default function ProyectoHubPage() {
       // Planificación layer (costo de listas de equipos)
       planificado: costoPlanificadoEquipos,
       progresoPlanificado: progresoEquiposPlan,
-      planificadoLabel: costoPlanificadoEquipos > 0
+      planificadoLabel: totalEquiposInterno > 0
         ? `Plan: ${formatCurrency(costoPlanificadoEquipos)}`
         : undefined,
     },
@@ -292,7 +296,7 @@ export default function ProyectoHubPage() {
       // Planificación layer
       planificado: cronogramaStats.costoPlanificado,
       progresoPlanificado: progresoServiciosPlan,
-      planificadoLabel: cronogramaStats.costoPlanificado > 0
+      planificadoLabel: totalServiciosInterno > 0
         ? `Plan: ${formatCurrency(cronogramaStats.costoPlanificado)}`
         : undefined,
     },
@@ -472,7 +476,7 @@ export default function ProyectoHubPage() {
                 </div>
 
                 {/* Planificación bar (only for servicios) */}
-                {card.progresoPlanificado && card.planificado && card.planificado > 0 && (
+                {card.progresoPlanificado && card.planificadoLabel && (
                   <div className="space-y-0.5">
                     <div className="flex items-center justify-between text-[11px]">
                       <span className="text-indigo-600 flex items-center gap-1">
