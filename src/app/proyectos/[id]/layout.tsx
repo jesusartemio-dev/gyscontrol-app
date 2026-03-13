@@ -160,21 +160,40 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
   }, [needsFullWidth])
 
   // Obtener nombre de la sub-página actual
-  const getSubPageName = () => {
-    if (isHubPage) return null
-    const segments = pathname.split('/')
-    const lastSegment = segments[segments.length - 1]
-    const subPageNames: Record<string, string> = {
-      'equipos': 'Equipos',
-      'servicios': 'Servicios',
-      'gastos': 'Gastos',
-      'cronograma': 'Cronograma',
-      'listas': 'Listas',
-      'pedidos': 'Pedidos',
-    }
-    return subPageNames[lastSegment] || lastSegment
+  const subPageNames: Record<string, string> = {
+    'equipos': 'Equipos',
+    'servicios': 'Servicios',
+    'gastos': 'Gastos',
+    'cronograma': 'Cronograma',
+    'listas': 'Listas',
+    'pedidos': 'Pedidos',
+    'detalle': 'Detalle',
   }
-  const currentSubPage = getSubPageName()
+
+  // Build breadcrumb trail from path segments (e.g. equipos > listas for /equipos/listas/[id])
+  const getBreadcrumbTrail = (): { label: string; href?: string }[] => {
+    if (isHubPage) return []
+    // Get segments after /proyectos/[id]/
+    const base = `/proyectos/${id}`
+    const subPath = pathname.slice(base.length + 1) // e.g. "equipos/listas/abc123"
+    const segments = subPath.split('/')
+    const trail: { label: string; href?: string }[] = []
+    let accumulatedPath = base
+
+    for (const seg of segments) {
+      if (subPageNames[seg]) {
+        accumulatedPath += `/${seg}`
+        trail.push({ label: subPageNames[seg], href: accumulatedPath })
+      }
+      // Skip IDs and unknown segments
+    }
+    // Last item in trail should not be clickable (current page)
+    if (trail.length > 0) {
+      delete trail[trail.length - 1].href
+    }
+    return trail
+  }
+  const breadcrumbTrail = getBreadcrumbTrail()
 
   const refreshProyecto = async () => {
     if (typeof id === 'string') {
@@ -434,8 +453,23 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
                 <span className="mx-1">:</span>
                 <span className="truncate max-w-[300px]" title={proyecto.nombre}>{proyecto.nombre}</span>
               </Button>
-              <span className="text-muted-foreground">/</span>
-              <span className="font-medium text-foreground">{currentSubPage}</span>
+              {breadcrumbTrail.map((crumb, idx) => (
+                <span key={idx} className="flex items-center gap-2">
+                  <span className="text-muted-foreground">/</span>
+                  {crumb.href ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => router.push(crumb.href!)}
+                      className="p-0 h-auto text-muted-foreground hover:text-foreground hover:underline"
+                    >
+                      {crumb.label}
+                    </Button>
+                  ) : (
+                    <span className="font-medium text-foreground">{crumb.label}</span>
+                  )}
+                </span>
+              ))}
             </div>
           )}
 
@@ -460,7 +494,7 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
                     Proyectos
                   </Button>
                   <span className="text-muted-foreground">/</span>
-                  {currentSubPage ? (
+                  {breadcrumbTrail.length > 0 ? (
                     <>
                       <Button
                         variant="ghost"
@@ -472,8 +506,23 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
                         <span className="mx-1">:</span>
                         <span className="truncate max-w-[300px]" title={proyecto.nombre}>{proyecto.nombre}</span>
                       </Button>
-                      <span className="text-muted-foreground">/</span>
-                      <span className="font-medium text-foreground">{currentSubPage}</span>
+                      {breadcrumbTrail.map((crumb, idx) => (
+                        <span key={idx} className="flex items-center gap-2">
+                          <span className="text-muted-foreground">/</span>
+                          {crumb.href ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => router.push(crumb.href!)}
+                              className="p-0 h-auto text-muted-foreground hover:text-foreground hover:underline"
+                            >
+                              {crumb.label}
+                            </Button>
+                          ) : (
+                            <span className="font-medium text-foreground">{crumb.label}</span>
+                          )}
+                        </span>
+                      ))}
                     </>
                   ) : (
                     <div className="flex flex-col gap-0.5">
