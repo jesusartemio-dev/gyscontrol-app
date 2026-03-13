@@ -345,7 +345,9 @@ export function CotizacionCodigoSimple({
   return (
       <div className="flex flex-col gap-0.5">
         {cotizaciones.map((cotizacion) => {
-          const codigo = cotizacion.cotizacionProveedor?.codigo || "Sin código"
+          const codigoFull = cotizacion.cotizacionProveedor?.codigo || "Sin código"
+          // Abbreviate: "QRM15-COT-004" -> "COT-004" (strip project prefix)
+          const codigo = codigoFull.replace(/^[A-Z0-9]+-(?=COT-)/, '')
           const isSelected = cotizacion.id === cotizacionSeleccionadaId
           const precio = cotizacion.precioUnitario || 0
           const tiempoEntrega = cotizacion.tiempoEntrega || "No especificado"

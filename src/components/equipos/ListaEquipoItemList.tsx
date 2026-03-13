@@ -500,9 +500,8 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
       codigoDescripcion: 'min-w-[120px]',
       marca: 'w-24',
       cantidadUnidad: 'w-24',
-      cotizacion: 'w-32',
-      costo: 'w-20',
-      entrega: 'w-16',
+      cotizacion: 'w-28',
+      costoEntrega: 'w-24',
       origen: 'w-16',
       estado: 'w-20',
       pedidosLinks: 'w-28',
@@ -528,11 +527,8 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                 <th className={`${cellPadding} ${columnWidths.cotizacion} text-center font-semibold text-gray-700`}>
                   Cotización
                 </th>
-                <th className={`${cellPadding} ${columnWidths.costo} text-right font-semibold text-gray-700`}>
+                <th className={`${cellPadding} ${columnWidths.costoEntrega} text-right font-semibold text-gray-700`}>
                   Costo
-                </th>
-                <th className={`${cellPadding} ${columnWidths.entrega} text-center font-semibold text-gray-700`}>
-                  Entrega
                 </th>
                 <th className={`${cellPadding} ${columnWidths.origen} text-center font-semibold text-gray-700`}>
                   Origen
@@ -636,15 +632,19 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                           />
                         </div>
                         {puedeSeleccionarCotizacion && (item.cotizaciones?.length || 0) > 0 && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setSelectorItem(item)}
-                            className="h-5 text-[10px] px-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                          >
-                            <Trophy className="h-3 w-3 mr-0.5" />
-                            {item.cotizacionSeleccionadaId ? 'Cambiar' : 'Elegir'}
-                          </Button>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setSelectorItem(item)}
+                                className="h-5 w-5 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                              >
+                                <Trophy className="h-3 w-3" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>{item.cotizacionSeleccionadaId ? 'Cambiar cotización' : 'Elegir cotización'}</TooltipContent>
+                          </Tooltip>
                         )}
                         {(item as any).seleccionadoPor?.name && (
                           <span className="text-[9px] text-muted-foreground text-center leading-tight">
@@ -653,16 +653,14 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                         )}
                       </div>
                    </td>
-                   <td className={`${cellPadding} ${columnWidths.costo} text-right font-medium text-gray-900`}>
-                      {costoTotal > 0 ? formatCurrency(costoTotal) : '—'}
-                   </td>
-                   <td className={`${cellPadding} ${columnWidths.entrega} text-center text-gray-700`}>
-                      {item.tiempoEntrega ? (
-                        <span className="text-xs">{item.tiempoEntrega}</span>
-                      ) : item.tiempoEntregaDias ? (
-                        <span className="text-xs">{item.tiempoEntregaDias}d</span>
-                      ) : (
-                        <span className="text-gray-400 text-xs">—</span>
+                   <td className={`${cellPadding} ${columnWidths.costoEntrega} text-right`}>
+                      <div className="font-medium text-gray-900">
+                        {costoTotal > 0 ? formatCurrency(costoTotal) : '—'}
+                      </div>
+                      {(item.tiempoEntrega || item.tiempoEntregaDias) && (
+                        <div className="text-[10px] text-muted-foreground">
+                          {item.tiempoEntrega || `${item.tiempoEntregaDias}d`}
+                        </div>
                       )}
                    </td>
                    <td className={`${cellPadding} ${columnWidths.origen} text-center`}>
