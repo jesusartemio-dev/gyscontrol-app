@@ -30,6 +30,7 @@ import { RegistroHorasWizard } from '@/components/horas-hombre/RegistroHorasWiza
 interface TimesheetSemanalProps {
   semana?: Date
   onHorasRegistradas?: () => void
+  onSemanaChange?: (nuevaSemana: Date) => void
 }
 
 interface RegistroHoras {
@@ -63,7 +64,8 @@ interface ResumenSemana {
 
 export function TimesheetSemanal({
   semana = new Date(),
-  onHorasRegistradas
+  onHorasRegistradas,
+  onSemanaChange
 }: TimesheetSemanalProps) {
   const [semanaActual, setSemanaActual] = useState(semana)
   const [resumenSemana, setResumenSemana] = useState<ResumenSemana | null>(null)
@@ -73,6 +75,11 @@ export function TimesheetSemanal({
   const [diaSeleccionado, setDiaSeleccionado] = useState<Date | null>(null)
   const [fechaWizard, setFechaWizard] = useState<string>('')
   const { toast } = useToast()
+
+  // Sync with parent's semana prop
+  useEffect(() => {
+    setSemanaActual(semana)
+  }, [semana])
 
   // Cargar datos de la semana
   useEffect(() => {
@@ -133,6 +140,7 @@ export function TimesheetSemanal({
       ? subWeeks(semanaActual, 1)
       : addWeeks(semanaActual, 1)
     setSemanaActual(nuevaSemana)
+    onSemanaChange?.(nuevaSemana)
   }
 
   // ✅ Usar fechaString directamente para evitar problemas de timezone
@@ -229,7 +237,7 @@ export function TimesheetSemanal({
           <Button variant="outline" size="sm" onClick={() => navegarSemana('anterior')}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setSemanaActual(new Date())}>
+          <Button variant="outline" size="sm" onClick={() => { setSemanaActual(new Date()); onSemanaChange?.(new Date()) }}>
             Hoy
           </Button>
           <Button variant="outline" size="sm" onClick={() => navegarSemana('siguiente')}>

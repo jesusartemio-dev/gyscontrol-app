@@ -563,6 +563,7 @@ export default function TimesheetPage() {
               <TimesheetSemanal
                 semana={inicioSemana}
                 onHorasRegistradas={handleRegistroExitoso}
+                onSemanaChange={(nuevaSemana) => setSemanaActual(nuevaSemana)}
               />
             </CardContent>
           </Card>
