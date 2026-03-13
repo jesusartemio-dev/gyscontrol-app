@@ -348,7 +348,7 @@ function ItemsTable({ items, proyectoId, onEstadoChange, onVincular }: { items: 
                       })()}
                     </td>
                     <td className="px-1 py-1.5 text-center">
-                      {(item.estado === 'pendiente' || item.estado === 'descartado') && !item.listaId && (
+                      {(item.estado === 'pendiente' || item.estado === 'descartado') && !item.listaId && !item.listaEquipoSeleccionado && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <button className="p-0.5 rounded hover:bg-gray-200 transition-colors" disabled={updatingId === item.id}>
