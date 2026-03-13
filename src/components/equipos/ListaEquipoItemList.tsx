@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Pencil, Trash2, Search, Package, Clock, AlertTriangle, CheckCircle, Grid3X3, List, RotateCcw, Plus, ShoppingCart, FileText, Download, Tag, ChevronDown, Wrench, Trophy, Layers } from 'lucide-react'
+import { Pencil, Trash2, Search, Package, Clock, AlertTriangle, CheckCircle, Grid3X3, List, RotateCcw, Plus, ShoppingCart, FileText, Download, Tag, ChevronDown, Wrench, Trophy, Layers, MoreHorizontal } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ListaEquipoItem } from '@/types'
@@ -500,14 +500,14 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
       codigoDescripcion: 'min-w-[120px]',
       marca: 'w-24',
       cantidadUnidad: 'w-24',
-      cotizacion: 'w-24',
+      cotizacion: 'w-32',
       costo: 'w-20',
       entrega: 'w-16',
       origen: 'w-16',
       estado: 'w-20',
       pedidosLinks: 'w-28',
       verificadoComentario: 'min-w-[120px]',
-      acciones: 'w-20'
+      acciones: 'w-10'
     }
 
     return (
@@ -820,54 +820,37 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                       </div>
                    </td>
                    <td className={`${cellPadding} ${columnWidths.acciones} text-center`}>
-                      <div className="flex justify-end gap-1 items-center">
-                        {item.estado !== 'rechazado' && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                size="sm"
-                                onClick={() => setItemReemplazo(item)}
-                                variant="outline"
-                                disabled={!editable}
-                                className="h-7 w-7 p-0"
-                              >
-                                <RotateCcw className="h-3 w-3" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Reemplazar</TooltipContent>
-                          </Tooltip>
-                        )}
-
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              disabled={!editable}
-                              onClick={() => setEditingItem(item)}
-                              className="h-7 w-7 p-0 text-gray-400 hover:text-blue-500 hover:bg-blue-50"
-                            >
-                              <Pencil className="h-3 w-3" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Editar ítem</TooltipContent>
-                        </Tooltip>
-
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              disabled={!editable}
-                              onClick={() => deleteValidation.requestDelete(item.id)}
-                              className="h-7 w-7 p-0 text-gray-400 hover:text-red-500 hover:bg-red-50"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Eliminar ítem</TooltipContent>
-                        </Tooltip>
-                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={!editable}
+                            className="h-7 w-7 p-0 text-gray-400 hover:text-gray-600"
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-40">
+                          {item.estado !== 'rechazado' && (
+                            <DropdownMenuItem onClick={() => setItemReemplazo(item)}>
+                              <RotateCcw className="h-3.5 w-3.5 mr-2" />
+                              Reemplazar
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem onClick={() => setEditingItem(item)}>
+                            <Pencil className="h-3.5 w-3.5 mr-2" />
+                            Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => deleteValidation.requestDelete(item.id)}
+                            className="text-red-600 focus:text-red-600"
+                          >
+                            <Trash2 className="h-3.5 w-3.5 mr-2" />
+                            Eliminar
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                    </td>
                    </tr>
                )
