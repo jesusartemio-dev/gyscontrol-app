@@ -55,7 +55,7 @@ const EquiposCardView = memo(function EquiposCardView({
     const presupuesto = equipo.subtotalInterno || 0
     const plan = equipo.costoListas || 0
     const completedItems = equipo.items?.filter(item =>
-      item.estado === 'en_lista' || item.estado === 'reemplazado' || item.listaId
+      item.estado === 'en_lista' || item.estado === 'reemplazado' || item.estado === 'descartado' || item.listaId
     ).length || 0
     const progress = totalItems > 0 ? (completedItems / totalItems) * 100 : 0
 

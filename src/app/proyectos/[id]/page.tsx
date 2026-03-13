@@ -168,7 +168,7 @@ export default function ProyectoHubPage() {
   const totalEquiposItems = proyecto.equipos?.reduce((acc, e) => acc + (e.items?.length || 0), 0) || 0
   const totalEquiposInterno = proyecto.equipos?.reduce((acc, e) => acc + (e.subtotalInterno || 0), 0) || 0
   const totalEquiposReal = proyecto.equipos?.reduce((acc, e) => acc + (e.subtotalReal || 0), 0) || 0
-  // Cobertura: ítems cotizados ya vinculados a listas (en_lista, reemplazado, descartado)
+  // Progreso: ítems cotizados ya gestionados (en_lista, reemplazado, descartado)
   const equiposItemsEnLista = proyecto.equipos?.reduce((acc, e) =>
     acc + (e.items?.filter((i: any) => i.estado && i.estado !== 'pendiente').length || 0), 0) || 0
   const progresoCobertura = totalEquiposItems > 0
@@ -557,7 +557,7 @@ export default function ProyectoHubPage() {
                     <div className="flex items-center justify-between text-[11px]">
                       <span className="text-muted-foreground flex items-center gap-1">
                         <ClipboardList className="h-3 w-3 text-blue-500" />
-                        {card.coberturaLabel || 'Cobertura'}
+                        {card.coberturaLabel || 'Progreso'}
                       </span>
                       <span className={`font-medium ${
                         card.cobertura.porcentaje >= 100 ? 'text-emerald-600' :
