@@ -101,6 +101,7 @@ export default function TimesheetPage() {
   // ── Shared state ──
   const [showWizard, setShowWizard] = useState(false)
   const [aprobacionesMapa, setAprobacionesMapa] = useState<Record<string, string>>({})
+  const [semanasPendientes, setSemanasPendientes] = useState<{ semana: string; horas: number; estado: string }[]>([])
 
   // ── Semana tab state ──
   const [semanaActual, setSemanaActual] = useState(new Date())
@@ -179,6 +180,7 @@ export default function TimesheetPage() {
       if (res.ok) {
         const data = await res.json()
         setAprobacionesMapa(data.aprobaciones || {})
+        setSemanasPendientes(data.pendientes || [])
       }
     } catch { /* silent */ }
   }, [])
@@ -409,6 +411,50 @@ export default function TimesheetPage() {
           )}
         </div>
       </div>
+
+      {/* Alertas de semanas pendientes */}
+      {semanasPendientes.filter(p => p.semana !== semanaISOReal).length > 0 && (
+        <div className="space-y-2">
+          {semanasPendientes
+            .filter(p => p.semana !== semanaISOReal)
+            .slice(0, 5)
+            .map(p => (
+              <div
+                key={p.semana}
+                className={`flex items-center justify-between rounded-lg px-4 py-2.5 cursor-pointer transition-colors ${
+                  p.estado === 'rechazado'
+                    ? 'bg-red-50 border border-red-200 hover:bg-red-100'
+                    : 'bg-amber-50 border border-amber-200 hover:bg-amber-100'
+                }`}
+                onClick={() => {
+                  // Navigate to that week
+                  const [yearStr, weekStr] = p.semana.split('-W')
+                  const jan4 = new Date(Date.UTC(parseInt(yearStr), 0, 4))
+                  const dayOfWeek = jan4.getUTCDay() || 7
+                  const week1Monday = new Date(jan4)
+                  week1Monday.setUTCDate(jan4.getUTCDate() - dayOfWeek + 1)
+                  const targetMonday = new Date(week1Monday)
+                  targetMonday.setUTCDate(week1Monday.getUTCDate() + (parseInt(weekStr) - 1) * 7)
+                  setSemanaActual(targetMonday)
+                  setActiveTab('semana')
+                }}
+              >
+                <div className="flex items-center gap-2">
+                  <AlertCircle className={`h-4 w-4 ${p.estado === 'rechazado' ? 'text-red-500' : 'text-amber-500'}`} />
+                  <span className={`text-sm ${p.estado === 'rechazado' ? 'text-red-800' : 'text-amber-800'}`}>
+                    <strong>{p.semana}</strong>: {p.horas}h {p.estado === 'rechazado' ? 'rechazadas — reenviar' : 'sin enviar para aprobación'}
+                  </span>
+                </div>
+                <ChevronRight className={`h-4 w-4 ${p.estado === 'rechazado' ? 'text-red-400' : 'text-amber-400'}`} />
+              </div>
+            ))}
+          {semanasPendientes.filter(p => p.semana !== semanaISOReal).length > 5 && (
+            <p className="text-xs text-muted-foreground text-center">
+              y {semanasPendientes.filter(p => p.semana !== semanaISOReal).length - 5} semanas más pendientes
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
