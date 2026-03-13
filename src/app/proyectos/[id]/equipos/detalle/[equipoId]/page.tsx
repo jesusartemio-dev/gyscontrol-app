@@ -32,7 +32,9 @@ import {
   Filter,
   MoreHorizontal,
   Trash2,
-  Undo2
+  Undo2,
+  Link2,
+  Loader2
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -40,6 +42,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { useToast } from '@/components/ui/use-toast'
 import type { Proyecto, ProyectoEquipoCotizado, ProyectoEquipoCotizadoItem, ListaEquipo, ListaEquipoItem, EstadoEquipoItem } from '@prisma/client'
 import CrearListaMultipleModal from '@/components/proyectos/equipos/CrearListaMultipleModal'
@@ -103,7 +111,7 @@ function LoadingSkeleton() {
   )
 }
 
-function ItemsTable({ items, proyectoId, onEstadoChange }: { items: ItemWithLista[], proyectoId: string, onEstadoChange: (itemId: string, estado: string) => Promise<void> }) {
+function ItemsTable({ items, proyectoId, onEstadoChange, onVincular }: { items: ItemWithLista[], proyectoId: string, onEstadoChange: (itemId: string, estado: string) => Promise<void>, onVincular: (item: ItemWithLista) => void }) {
   const [search, setSearch] = useState('')
   const [categoriaFiltro, setCategoriaFiltro] = useState('__todas__')
   const [sortField, setSortField] = useState<string>('codigo')
@@ -350,17 +358,26 @@ function ItemsTable({ items, proyectoId, onEstadoChange }: { items: ItemWithList
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-40">
                             {item.estado === 'pendiente' && (
-                              <DropdownMenuItem
-                                className="text-xs text-red-600 focus:text-red-600"
-                                onClick={async () => {
-                                  setUpdatingId(item.id)
-                                  await onEstadoChange(item.id, 'descartado')
-                                  setUpdatingId(null)
-                                }}
-                              >
-                                <Trash2 className="h-3.5 w-3.5 mr-2" />
-                                Descartar
-                              </DropdownMenuItem>
+                              <>
+                                <DropdownMenuItem
+                                  className="text-xs"
+                                  onClick={() => onVincular(item)}
+                                >
+                                  <Link2 className="h-3.5 w-3.5 mr-2" />
+                                  Vincular
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-xs text-red-600 focus:text-red-600"
+                                  onClick={async () => {
+                                    setUpdatingId(item.id)
+                                    await onEstadoChange(item.id, 'descartado')
+                                    setUpdatingId(null)
+                                  }}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5 mr-2" />
+                                  Descartar
+                                </DropdownMenuItem>
+                              </>
                             )}
                             {item.estado === 'descartado' && (
                               <DropdownMenuItem
@@ -408,6 +425,10 @@ export default function ProjectEquipmentDetailPage({ params }: PageProps) {
   const [proyectoId, setProyectoId] = useState<string>('')
   const [equipoId, setEquipoId] = useState<string>('')
   const [showCreateListModal, setShowCreateListModal] = useState(false)
+  const [vincularItem, setVincularItem] = useState<ItemWithLista | null>(null)
+  const [unlinkedItems, setUnlinkedItems] = useState<any[]>([])
+  const [loadingUnlinked, setLoadingUnlinked] = useState(false)
+  const [linkingId, setLinkingId] = useState<string | null>(null)
   const { toast } = useToast()
 
   const handleEstadoChange = async (itemId: string, nuevoEstado: string) => {
@@ -437,6 +458,71 @@ export default function ProjectEquipmentDetailPage({ params }: PageProps) {
         description: 'No se pudo actualizar el estado del ítem',
         variant: 'destructive',
       })
+    }
+  }
+
+  const handleOpenVincular = async (item: ItemWithLista) => {
+    setVincularItem(item)
+    setLoadingUnlinked(true)
+    try {
+      const res = await fetch(`/api/lista-equipo-item/sin-vincular?proyectoId=${proyectoId}&equipoGrupoId=${equipoId}`)
+      if (res.ok) {
+        const data = await res.json()
+        setUnlinkedItems(data)
+      }
+    } catch {
+      toast({ title: 'Error', description: 'No se pudo cargar ítems de listas', variant: 'destructive' })
+    } finally {
+      setLoadingUnlinked(false)
+    }
+  }
+
+  const handleVincular = async (listaItemId: string) => {
+    if (!vincularItem) return
+    setLinkingId(listaItemId)
+    try {
+      // 1. Update ListaEquipoItem to link to the cotizado item
+      const res1 = await fetch(`/api/lista-equipo-item/${listaItemId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          proyectoEquipoItemId: vincularItem.id,
+          reemplazaProyectoEquipoCotizadoItemId: vincularItem.id,
+          origen: 'reemplazo',
+        }),
+      })
+      if (!res1.ok) throw new Error('Error al vincular ítem de lista')
+
+      // 2. Update ProyectoEquipoCotizadoItem to mark as reemplazado
+      const res2 = await fetch(`/api/proyecto-equipo-item/${vincularItem.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          estado: 'reemplazado',
+          listaEquipoSeleccionadoId: listaItemId,
+          motivoCambio: 'Vinculado manualmente como reemplazo',
+        }),
+      })
+      if (!res2.ok) throw new Error('Error al actualizar ítem cotizado')
+
+      // Update local state
+      if (equipo) {
+        setEquipo({
+          ...equipo,
+          items: equipo.items.map(i =>
+            i.id === vincularItem.id
+              ? { ...i, estado: 'reemplazado' as EstadoEquipoItem }
+              : i
+          ),
+        })
+      }
+
+      toast({ title: 'Vinculado', description: 'El ítem fue vinculado como reemplazo correctamente' })
+      setVincularItem(null)
+    } catch {
+      toast({ title: 'Error', description: 'No se pudo vincular el ítem', variant: 'destructive' })
+    } finally {
+      setLinkingId(null)
     }
   }
 
@@ -532,7 +618,71 @@ export default function ProjectEquipmentDetailPage({ params }: PageProps) {
       )}
 
       {/* Items Table */}
-      <ItemsTable items={equipo.items || []} proyectoId={proyectoId} onEstadoChange={handleEstadoChange} />
+      <ItemsTable items={equipo.items || []} proyectoId={proyectoId} onEstadoChange={handleEstadoChange} onVincular={handleOpenVincular} />
+
+      {/* Dialog Vincular */}
+      <Dialog open={!!vincularItem} onOpenChange={() => setVincularItem(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogTitle className="text-base font-semibold flex items-center gap-2">
+            <Link2 className="h-4 w-4 text-blue-600" />
+            Vincular reemplazo
+          </DialogTitle>
+          <p className="text-xs text-muted-foreground -mt-2">
+            Selecciona el ítem de lista que reemplaza a <strong>{vincularItem?.codigo}</strong> — <span className="text-gray-500">{vincularItem?.descripcion}</span>
+          </p>
+
+          {loadingUnlinked ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : unlinkedItems.length === 0 ? (
+            <div className="text-center py-8 text-sm text-muted-foreground">
+              No hay ítems sin vincular en las listas de este grupo de equipos.
+            </div>
+          ) : (
+            <ScrollArea className="max-h-[350px]">
+              <div className="space-y-1">
+                {unlinkedItems.map((li: any) => (
+                  <div
+                    key={li.id}
+                    className="flex items-center justify-between gap-2 p-2 rounded-lg border hover:bg-blue-50 transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono text-xs text-gray-600">{li.codigo}</span>
+                        <Badge variant="outline" className="text-[9px] px-1 py-0">
+                          {li.listaEquipo?.codigo}
+                        </Badge>
+                        <Badge variant="secondary" className="text-[9px] px-1 py-0">
+                          {li.origen}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-gray-700 truncate mt-0.5">{li.descripcion}</p>
+                      <p className="text-[10px] text-muted-foreground">{li.cantidad} {li.unidad}</p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs shrink-0"
+                      disabled={linkingId === li.id}
+                      onClick={() => handleVincular(li.id)}
+                    >
+                      {linkingId === li.id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <>
+                          <Link2 className="h-3 w-3 mr-1" />
+                          Vincular
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Modal */}
       <CrearListaMultipleModal
