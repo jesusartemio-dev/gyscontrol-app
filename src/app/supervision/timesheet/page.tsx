@@ -31,6 +31,7 @@ import {
   ChevronDown,
   ChevronUp,
   User,
+  Users,
   Calendar,
   Briefcase,
   Search,
@@ -38,6 +39,7 @@ import {
   RefreshCw,
   MapPin,
   Monitor,
+  Send,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -97,10 +99,23 @@ export default function SupervisionTimesheetPage() {
   // Users list for filter
   const [usuarios, setUsuarios] = useState<{ id: string; name: string }[]>([])
 
+  // Summary
+  const [resumen, setResumen] = useState<any>(null)
+
   // Reject dialog
   const [rejectId, setRejectId] = useState<string | null>(null)
   const [motivoRechazo, setMotivoRechazo] = useState('')
   const [processing, setProcessing] = useState(false)
+
+  const cargarResumen = useCallback(async () => {
+    try {
+      const res = await fetch('/api/horas-hombre/timesheet-aprobacion/resumen')
+      if (res.ok) {
+        const data = await res.json()
+        setResumen(data)
+      }
+    } catch { /* silent */ }
+  }, [])
 
   const cargarUsuarios = useCallback(async () => {
     try {
@@ -140,7 +155,8 @@ export default function SupervisionTimesheetPage() {
 
   useEffect(() => {
     cargarUsuarios()
-  }, [cargarUsuarios])
+    cargarResumen()
+  }, [cargarUsuarios, cargarResumen])
 
   useEffect(() => {
     cargarDatos()
@@ -192,6 +208,7 @@ export default function SupervisionTimesheetPage() {
       if (!res.ok) throw new Error(data.error)
       toast({ title: data.message || 'Semana aprobada' })
       cargarDatos()
+      cargarResumen()
     } catch (error: any) {
       toast({ title: error.message || 'Error al aprobar', variant: 'destructive' })
     } finally {
@@ -218,6 +235,7 @@ export default function SupervisionTimesheetPage() {
       setRejectId(null)
       setMotivoRechazo('')
       cargarDatos()
+      cargarResumen()
     } catch (error: any) {
       toast({ title: error.message || 'Error al rechazar', variant: 'destructive' })
     } finally {
@@ -258,6 +276,115 @@ export default function SupervisionTimesheetPage() {
           Refrescar
         </Button>
       </div>
+
+      {/* Resumen semana actual */}
+      {resumen?.semanaActual && (
+        <div className="space-y-3">
+          {/* KPI Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Card>
+              <CardContent className="p-3">
+                <div className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-blue-500" />
+                  <div>
+                    <p className="text-lg font-bold">{resumen.semanaActual.totalUsuarios}</p>
+                    <p className="text-xs text-muted-foreground">Con horas esta semana</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className={resumen.semanaActual.sinEnviar.length > 0 ? 'border-amber-300' : ''}>
+              <CardContent className="p-3">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-amber-500" />
+                  <div>
+                    <p className="text-lg font-bold">{resumen.semanaActual.sinEnviar.length}</p>
+                    <p className="text-xs text-muted-foreground">Sin enviar</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className={resumen.semanaActual.pendientes.length > 0 ? 'border-yellow-300' : ''}>
+              <CardContent className="p-3">
+                <div className="flex items-center gap-2">
+                  <Send className="h-5 w-5 text-yellow-500" />
+                  <div>
+                    <p className="text-lg font-bold">{resumen.semanaActual.pendientes.length}</p>
+                    <p className="text-xs text-muted-foreground">Por aprobar</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-3">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                  <div>
+                    <p className="text-lg font-bold">{resumen.semanaActual.aprobados}</p>
+                    <p className="text-xs text-muted-foreground">Aprobados</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Alert: employees who haven't submitted */}
+          {resumen.semanaActual.sinEnviar.length > 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <AlertCircle className="h-4 w-4 text-amber-600" />
+                <span className="text-sm font-semibold text-amber-800">
+                  {resumen.semanaActual.sinEnviar.length} empleado{resumen.semanaActual.sinEnviar.length !== 1 ? 's' : ''} no ha{resumen.semanaActual.sinEnviar.length !== 1 ? 'n' : ''} enviado la semana {resumen.semana}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {resumen.semanaActual.sinEnviar.map((u: any) => (
+                  <div
+                    key={u.id}
+                    className="flex items-center gap-1.5 bg-white border border-amber-200 px-3 py-1 rounded-full text-sm cursor-pointer hover:bg-amber-100 transition-colors"
+                    onClick={() => {
+                      setFiltroUsuarioId(u.id)
+                      setTab('sin_enviar')
+                    }}
+                  >
+                    <User className="h-3 w-3 text-amber-600" />
+                    <span className="text-amber-900">{u.nombre}</span>
+                    <Badge variant="secondary" className="text-xs px-1.5 py-0">{u.horas}h</Badge>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Alert: pending approval */}
+          {resumen.semanaActual.pendientes.length > 0 && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Send className="h-4 w-4 text-yellow-600" />
+                <span className="text-sm font-semibold text-yellow-800">
+                  {resumen.semanaActual.pendientes.length} timesheet{resumen.semanaActual.pendientes.length !== 1 ? 's' : ''} esperando tu aprobación esta semana
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {resumen.semanaActual.pendientes.map((u: any) => (
+                  <div
+                    key={u.id}
+                    className="flex items-center gap-1.5 bg-white border border-yellow-200 px-3 py-1 rounded-full text-sm cursor-pointer hover:bg-yellow-100 transition-colors"
+                    onClick={() => {
+                      setFiltroUsuarioId(u.id)
+                      setTab('enviado')
+                    }}
+                  >
+                    <User className="h-3 w-3 text-yellow-600" />
+                    <span className="text-yellow-900">{u.nombre}</span>
+                    <Badge variant="secondary" className="text-xs px-1.5 py-0">{u.horas}h</Badge>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2">
