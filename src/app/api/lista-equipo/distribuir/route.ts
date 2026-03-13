@@ -107,24 +107,24 @@ export async function POST(req: Request) {
         }
       })
 
-      // 2. Crear los ListaEquipoItem desde los ProyectoEquipoItem seleccionados
+      // 2. Crear los ListaEquipoItem y actualizar ProyectoEquipoItem
       for (const [index, itemId] of itemsIds.entries()) {
         const proyectoItem = proyectoEquipoItems.find(item => item.id === itemId)
         if (!proyectoItem) continue
 
-        await tx.listaEquipoItem.create({
+        const nuevoItem = await tx.listaEquipoItem.create({
           data: {
             id: `lista-item-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
             listaId: lista.id,
             proyectoEquipoItemId: proyectoItem.id,
-            codigo: proyectoItem.codigo || `${lista.codigo}-${index + 1}`, // ✅ Usar código original
+            codigo: proyectoItem.codigo || `${lista.codigo}-${index + 1}`,
             descripcion: proyectoItem.descripcion,
-            marca: proyectoItem.marca || '', // ✅ Copiar marca
-            categoria: proyectoItem.categoria || '', // ✅ Copiar categoria
+            marca: proyectoItem.marca || '',
+            categoria: proyectoItem.categoria || '',
             unidad: proyectoItem.unidad || 'UND',
             cantidad: proyectoItem.cantidad,
             cantidadPedida: 0,
-            presupuesto: proyectoItem.precioCliente || 0, // ✅ Copiar presupuesto
+            presupuesto: proyectoItem.precioCliente || 0,
             catalogoEquipoId: proyectoItem.catalogoEquipoId ?? null,
             estado: 'borrador',
             origen: 'cotizado' as const,
@@ -133,18 +133,17 @@ export async function POST(req: Request) {
             updatedAt: new Date()
           }
         })
-      }
 
-      // 3. Actualizar el estado de los ProyectoEquipoItem a 'en_lista'
-      await tx.proyectoEquipoCotizadoItem.updateMany({
-        where: {
-          id: { in: itemsIds }
-        },
-        data: {
-          estado: 'en_lista',
-          listaId: lista.id
-        }
-      })
+        // Actualizar estado y vincular listaEquipoSeleccionadoId
+        await tx.proyectoEquipoCotizadoItem.update({
+          where: { id: proyectoItem.id },
+          data: {
+            estado: 'en_lista',
+            listaId: lista.id,
+            listaEquipoSeleccionadoId: nuevoItem.id,
+          }
+        })
+      }
 
       return lista
     })

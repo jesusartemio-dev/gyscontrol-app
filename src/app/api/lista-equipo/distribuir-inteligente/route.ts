@@ -148,24 +148,24 @@ export async function POST(req: Request) {
           }
         })
 
-        // Crear los ListaEquipoItem desde los ProyectoEquipoItem seleccionados
+        // Crear los ListaEquipoItem y actualizar ProyectoEquipoItem
         for (const [itemIndex, itemId] of sugerencia.itemsIds.entries()) {
           const proyectoItem = itemsMap.get(itemId)
           if (!proyectoItem) continue
 
-          await tx.listaEquipoItem.create({
+          const nuevoItem = await tx.listaEquipoItem.create({
             data: {
               id: `lista-item-${Date.now()}-${itemIndex}-${Math.random().toString(36).substr(2, 9)}`,
               listaId: lista.id,
               proyectoEquipoItemId: proyectoItem.id,
-              codigo: proyectoItem.codigo, // ✅ Usar código original del catálogo
+              codigo: proyectoItem.codigo,
               descripcion: proyectoItem.descripcion,
-              marca: proyectoItem.marca || '', // ✅ Copiar marca
-              categoria: proyectoItem.categoria || '', // ✅ Copiar categoria
+              marca: proyectoItem.marca || '',
+              categoria: proyectoItem.categoria || '',
               unidad: proyectoItem.unidad || 'UND',
               cantidad: proyectoItem.cantidad,
               cantidadPedida: 0,
-              presupuesto: proyectoItem.precioCliente || 0, // ✅ Copiar presupuesto
+              presupuesto: proyectoItem.precioCliente || 0,
               catalogoEquipoId: proyectoItem.catalogoEquipoId ?? null,
               estado: 'borrador',
               origen: 'cotizado' as const,
@@ -174,17 +174,16 @@ export async function POST(req: Request) {
               updatedAt: new Date()
             }
           })
-        }
 
-        // Asociar los ProyectoEquipoItem a la lista
-        await tx.proyectoEquipoCotizadoItem.updateMany({
-          where: {
-            id: { in: sugerencia.itemsIds }
-          },
-          data: {
-            listaId: lista.id
-          }
-        })
+          await tx.proyectoEquipoCotizadoItem.update({
+            where: { id: proyectoItem.id },
+            data: {
+              listaId: lista.id,
+              estado: 'en_lista',
+              listaEquipoSeleccionadoId: nuevoItem.id,
+            }
+          })
+        }
 
         listasCreadas.push({
           ...lista,

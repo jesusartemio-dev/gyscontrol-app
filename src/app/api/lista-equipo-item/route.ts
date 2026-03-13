@@ -206,6 +206,7 @@ export async function POST(request: Request) {
         where: { id: body.proyectoEquipoItemId },
         data: {
           listaEquipoSeleccionadoId: nuevo.id,
+          estado: 'en_lista',
         },
       })
       console.log(`🔄 ProyectoEquipoItem actualizado con listaEquipoSeleccionadoId: ${nuevo.id}`)

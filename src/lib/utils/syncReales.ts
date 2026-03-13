@@ -33,6 +33,7 @@ export async function sincronizarRealesProyecto(proyectoId: string): Promise<num
             precioReal: item.precioElegido ?? 0,
             costoReal: (item.precioElegido ?? 0) * item.cantidad,
             estado: 'en_lista',
+            listaEquipoSeleccionadoId: item.id,
           },
         })
       )

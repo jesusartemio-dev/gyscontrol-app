@@ -18,6 +18,7 @@ import {
   SelectValue
 } from '@/components/ui/select'
 import {
+  AlertTriangle,
   ArrowLeft,
   Package,
   Search,
@@ -169,9 +170,14 @@ function ItemsTable({ items, proyectoId, onEstadoChange, onVincular }: { items: 
 
   const getStatusBadge = (item: ItemWithLista) => {
     if (item.listaId || item.estado === 'en_lista') {
+      const esParcial = item.listaEquipoSeleccionado && item.listaEquipoSeleccionado.cantidad < item.cantidad
       return (
-        <span className="inline-flex items-center gap-0.5 text-[10px] text-green-700 bg-green-100 px-1.5 py-0.5 rounded">
-          <CheckCircle2 className="h-2.5 w-2.5" />En Lista
+        <span className={cn(
+          'inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded',
+          esParcial ? 'text-amber-700 bg-amber-100' : 'text-green-700 bg-green-100'
+        )}>
+          {esParcial ? <AlertTriangle className="h-2.5 w-2.5" /> : <CheckCircle2 className="h-2.5 w-2.5" />}
+          {esParcial ? 'Parcial' : 'En Lista'}
         </span>
       )
     }
@@ -552,6 +558,9 @@ export default function ProjectEquipmentDetailPage({ params }: PageProps) {
   if (!proyecto || !equipo) notFound()
 
   const totalItems = equipo.items?.length || 0
+  const parcialesItems = equipo.items?.filter(i =>
+    (i.listaId || i.estado === 'en_lista') && i.listaEquipoSeleccionado && i.listaEquipoSeleccionado.cantidad < i.cantidad
+  ).length || 0
   const completedItems = equipo.items?.filter(i => i.listaId || i.estado === 'en_lista' || i.estado === 'reemplazado').length || 0
   const descartadosItems = equipo.items?.filter(i => i.estado === 'descartado').length || 0
   const pendingItems = totalItems - completedItems - descartadosItems
@@ -583,7 +592,13 @@ export default function ProjectEquipmentDetailPage({ params }: PageProps) {
               {totalItems} items
             </Badge>
             <span className="text-gray-300">|</span>
-            <span className="text-green-600">{completedItems} en lista</span>
+            <span className="text-green-600">{completedItems - parcialesItems} en lista</span>
+            {parcialesItems > 0 && (
+              <>
+                <span className="text-gray-300">|</span>
+                <span className="text-amber-600">{parcialesItems} parcial</span>
+              </>
+            )}
             <span className="text-gray-300">|</span>
             <span className="text-amber-600">{pendingItems} pendientes</span>
             {descartadosItems > 0 && (
