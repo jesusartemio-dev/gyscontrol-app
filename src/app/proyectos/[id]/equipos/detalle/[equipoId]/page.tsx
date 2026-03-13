@@ -20,6 +20,7 @@ import {
 import {
   AlertTriangle,
   ArrowLeft,
+  ArrowUpCircle,
   Package,
   Search,
   List,
@@ -170,14 +171,20 @@ function ItemsTable({ items, proyectoId, onEstadoChange, onVincular }: { items: 
 
   const getStatusBadge = (item: ItemWithLista) => {
     if (item.listaId || item.estado === 'en_lista') {
-      const esParcial = item.listaEquipoSeleccionado && item.listaEquipoSeleccionado.cantidad < item.cantidad
+      const sel = item.listaEquipoSeleccionado
+      const esParcial = sel && sel.cantidad < item.cantidad
+      const esExcede = sel && sel.cantidad > item.cantidad
       return (
         <span className={cn(
           'inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded',
-          esParcial ? 'text-amber-700 bg-amber-100' : 'text-green-700 bg-green-100'
+          esParcial ? 'text-amber-700 bg-amber-100'
+            : esExcede ? 'text-orange-700 bg-orange-100'
+            : 'text-green-700 bg-green-100'
         )}>
-          {esParcial ? <AlertTriangle className="h-2.5 w-2.5" /> : <CheckCircle2 className="h-2.5 w-2.5" />}
-          {esParcial ? 'Parcial' : 'En Lista'}
+          {esParcial ? <AlertTriangle className="h-2.5 w-2.5" />
+            : esExcede ? <ArrowUpCircle className="h-2.5 w-2.5" />
+            : <CheckCircle2 className="h-2.5 w-2.5" />}
+          {esParcial ? 'Parcial' : esExcede ? 'Excede' : 'En Lista'}
         </span>
       )
     }
@@ -342,9 +349,11 @@ function ItemsTable({ items, proyectoId, onEstadoChange, onVincular }: { items: 
                             {item.listaEquipoSeleccionado && (
                               <span className={cn(
                                 'text-[10px] px-1 py-0.5 rounded font-medium',
-                                item.listaEquipoSeleccionado.cantidad >= item.cantidad
-                                  ? 'bg-green-100 text-green-700'
-                                  : 'bg-amber-100 text-amber-700'
+                                item.listaEquipoSeleccionado.cantidad < item.cantidad
+                                  ? 'bg-amber-100 text-amber-700'
+                                  : item.listaEquipoSeleccionado.cantidad > item.cantidad
+                                  ? 'bg-orange-100 text-orange-700'
+                                  : 'bg-green-100 text-green-700'
                               )}>
                                 {item.listaEquipoSeleccionado.cantidad}/{item.cantidad}
                               </span>
@@ -561,6 +570,9 @@ export default function ProjectEquipmentDetailPage({ params }: PageProps) {
   const parcialesItems = equipo.items?.filter(i =>
     (i.listaId || i.estado === 'en_lista') && i.listaEquipoSeleccionado && i.listaEquipoSeleccionado.cantidad < i.cantidad
   ).length || 0
+  const excedeItems = equipo.items?.filter(i =>
+    (i.listaId || i.estado === 'en_lista') && i.listaEquipoSeleccionado && i.listaEquipoSeleccionado.cantidad > i.cantidad
+  ).length || 0
   const completedItems = equipo.items?.filter(i => i.listaId || i.estado === 'en_lista' || i.estado === 'reemplazado').length || 0
   const descartadosItems = equipo.items?.filter(i => i.estado === 'descartado').length || 0
   const pendingItems = totalItems - completedItems - descartadosItems
@@ -592,11 +604,17 @@ export default function ProjectEquipmentDetailPage({ params }: PageProps) {
               {totalItems} items
             </Badge>
             <span className="text-gray-300">|</span>
-            <span className="text-green-600">{completedItems - parcialesItems} en lista</span>
+            <span className="text-green-600">{completedItems - parcialesItems - excedeItems} en lista</span>
             {parcialesItems > 0 && (
               <>
                 <span className="text-gray-300">|</span>
                 <span className="text-amber-600">{parcialesItems} parcial</span>
+              </>
+            )}
+            {excedeItems > 0 && (
+              <>
+                <span className="text-gray-300">|</span>
+                <span className="text-orange-600">{excedeItems} excede</span>
               </>
             )}
             <span className="text-gray-300">|</span>
