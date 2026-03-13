@@ -76,10 +76,12 @@ export function TimesheetSemanal({
   const [fechaWizard, setFechaWizard] = useState<string>('')
   const { toast } = useToast()
 
-  // Sync with parent's semana prop
+  // Sync with parent's semana prop (compare by timestamp to avoid infinite loops)
   useEffect(() => {
-    setSemanaActual(semana)
-  }, [semana])
+    if (semana.getTime() !== semanaActual.getTime()) {
+      setSemanaActual(semana)
+    }
+  }, [semana.getTime()])
 
   // Cargar datos de la semana
   useEffect(() => {

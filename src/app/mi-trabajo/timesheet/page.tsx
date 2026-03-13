@@ -427,14 +427,16 @@ export default function TimesheetPage() {
                     : 'bg-amber-50 border border-amber-200 hover:bg-amber-100'
                 }`}
                 onClick={() => {
-                  // Navigate to that week
+                  // Navigate to that week using local dates (not UTC)
                   const [yearStr, weekStr] = p.semana.split('-W')
-                  const jan4 = new Date(Date.UTC(parseInt(yearStr), 0, 4))
-                  const dayOfWeek = jan4.getUTCDay() || 7
+                  const year = parseInt(yearStr)
+                  const week = parseInt(weekStr)
+                  const jan4 = new Date(year, 0, 4, 12) // noon to avoid DST issues
+                  const dayOfWeek = jan4.getDay() || 7
                   const week1Monday = new Date(jan4)
-                  week1Monday.setUTCDate(jan4.getUTCDate() - dayOfWeek + 1)
+                  week1Monday.setDate(jan4.getDate() - dayOfWeek + 1)
                   const targetMonday = new Date(week1Monday)
-                  targetMonday.setUTCDate(week1Monday.getUTCDate() + (parseInt(weekStr) - 1) * 7)
+                  targetMonday.setDate(week1Monday.getDate() + (week - 1) * 7)
                   setSemanaActual(targetMonday)
                   setActiveTab('semana')
                 }}
