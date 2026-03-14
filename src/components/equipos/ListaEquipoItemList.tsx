@@ -632,11 +632,6 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                             interactive={false}
                           />
                         </div>
-                        {(item as any).seleccionadoPor?.name && (
-                          <span className="text-[9px] text-muted-foreground text-center leading-tight">
-                            por {(item as any).seleccionadoPor.name}
-                          </span>
-                        )}
                       </div>
                    </td>
                    <td className={`${cellPadding} ${columnWidths.costoEntrega} text-right`}>
