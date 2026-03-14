@@ -416,11 +416,13 @@ export default function ProyectoHubPage() {
       borderColor: 'border-amber-200',
       href: `${baseUrl}/tareas`,
       stats: [
-        { label: 'Total', value: cronogramaStats.tareas },
+        { label: 'Planif.', value: cronogramaStats.tareas - cronogramaStats.tareasExtra },
+        ...(cronogramaStats.tareasExtra > 0 ? [{ label: 'Extras', value: cronogramaStats.tareasExtra }] : []),
         { label: 'En progreso', value: cronogramaStats.tareasEnProgreso },
         { label: 'Completadas', value: cronogramaStats.tareasCompletadas },
       ],
       cobertura: progresoTareas,
+      coberturaLabel: `Avance ${cronogramaStats.tareasCompletadas}/${cronogramaStats.tareas}`,
     },
   ]
 

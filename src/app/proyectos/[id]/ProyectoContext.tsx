@@ -11,6 +11,7 @@ export interface CronogramaStats {
   tareas: number
   tareasCompletadas: number
   tareasEnProgreso: number
+  tareasExtra: number
   horasPlan: number
   horasReales: number
   costoPlanificado: number

@@ -2791,6 +2791,7 @@ model ProyectoTarea {
   creadoPorId                 String?
   proyectoActividadId         String?
   recursoId                   String?
+  esExtra                     Boolean                     @default(false)
   createdAt                   DateTime                    @default(now())
   updatedAt                   DateTime
   registroHoras               RegistroHoras[]

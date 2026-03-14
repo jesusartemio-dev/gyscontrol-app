@@ -69,6 +69,7 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
     tareas: 0,
     tareasCompletadas: 0,
     tareasEnProgreso: 0,
+    tareasExtra: 0,
     horasPlan: 0,
     horasReales: 0,
     costoPlanificado: 0,
@@ -240,6 +241,7 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
       let tareasCount = 0
       let tareasCompletadas = 0
       let tareasEnProgreso = 0
+      let tareasExtra = 0
       let horasPlan = 0
       let horasReales = 0
       let costoPlanificado = 0
@@ -268,10 +270,11 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
       if (tareasResponse.ok) {
         const tareasData = await tareasResponse.json()
         if (tareasData.success) {
-          const tareasList = tareasData.data as Array<{ estado: string }>
+          const tareasList = tareasData.data as Array<{ estado: string; esExtra?: boolean }>
           tareasCount = tareasList.length
           tareasCompletadas = tareasList.filter(t => t.estado === 'completada').length
           tareasEnProgreso = tareasList.filter(t => t.estado === 'en_progreso').length
+          tareasExtra = tareasList.filter(t => t.esExtra).length
         }
       }
 
@@ -323,6 +326,7 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
         tareas: tareasCount,
         tareasCompletadas,
         tareasEnProgreso,
+        tareasExtra,
         horasPlan,
         horasReales,
         costoPlanificado,

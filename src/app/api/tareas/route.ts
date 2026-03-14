@@ -96,6 +96,7 @@ export async function POST(request: NextRequest) {
         porcentajeCompletado: 0,
         horasReales: 0,
         orden: 999,
+        esExtra: true,
         creadoPorId: session.user.id,
         updatedAt: new Date()
       }

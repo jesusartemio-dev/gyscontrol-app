@@ -310,7 +310,8 @@ export async function POST(
       responsableId: validatedData.responsableId,
       recursoId: validatedData.recursoId,
       estado: 'pendiente' as const,
-      porcentajeCompletado: 0
+      porcentajeCompletado: 0,
+      esExtra: cronograma.tipo === 'ejecucion'
     }
 
     console.log('🔍 [API TAREAS] Datos finales para crear tarea:', tareaData)
