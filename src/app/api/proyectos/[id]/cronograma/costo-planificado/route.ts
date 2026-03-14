@@ -20,10 +20,13 @@ export async function GET(
 
     const { id } = await params
 
-    // Obtener cronograma activo (baseline primero, o el primero disponible)
+    // Priorizar: ejecución > planificación > comercial
     const cronograma = await prisma.proyectoCronograma.findFirst({
-      where: { proyectoId: id },
-      orderBy: { esBaseline: 'desc' }
+      where: { proyectoId: id, tipo: 'ejecucion' }
+    }) || await prisma.proyectoCronograma.findFirst({
+      where: { proyectoId: id, tipo: 'planificacion' }
+    }) || await prisma.proyectoCronograma.findFirst({
+      where: { proyectoId: id }
     })
 
     if (!cronograma) {

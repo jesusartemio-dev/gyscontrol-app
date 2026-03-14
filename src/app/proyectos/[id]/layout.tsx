@@ -221,10 +221,16 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
         }
       }
 
+      // Priorizar: ejecución > planificación > comercial
+      const activeCrono = cronogramasList.find(c => c.tipo === 'ejecucion')
+        || cronogramasList.find(c => c.tipo === 'planificacion')
+        || cronogramasList[0] || null
+      const cronoFilter = activeCrono ? `?cronogramaId=${activeCrono.id}` : ''
+
       const [fasesResponse, edtsResponse, tareasResponse, costoPlanResponse] = await Promise.all([
-        fetch(`/api/proyectos/${projectId}/cronograma/fases`),
-        fetch(`/api/proyectos/${projectId}/cronograma/edts`),
-        fetch(`/api/proyectos/${projectId}/cronograma/tareas`),
+        fetch(`/api/proyectos/${projectId}/cronograma/fases${cronoFilter}`),
+        fetch(`/api/proyectos/${projectId}/cronograma/edts${cronoFilter}`),
+        fetch(`/api/proyectos/${projectId}/cronograma/tareas${cronoFilter}`),
         fetch(`/api/proyectos/${projectId}/cronograma/costo-planificado`)
       ])
 
@@ -273,6 +279,11 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
         const costoPlanData = await costoPlanResponse.json()
         costoPlanificado = costoPlanData.costoPlanificado || 0
         tareasConRecurso = costoPlanData.tareasConRecurso || 0
+        // Usar totalTareas del mismo endpoint para consistencia
+        // (el endpoint de tareas sin filtro trae de TODOS los cronogramas)
+        if (costoPlanData.totalTareas) {
+          tareasCount = costoPlanData.totalTareas
+        }
         costoPorEdt = costoPlanData.costoPorEdt || {}
       }
 
@@ -302,7 +313,7 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
         }
       }
 
-      const activeCronograma = cronogramasList.find(c => c.esBaseline) || cronogramasList[0] || null
+      const activeCronograma = activeCrono
 
       setCronogramaStats({
         cronogramas: cronogramasList.length,
