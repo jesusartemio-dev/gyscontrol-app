@@ -33,6 +33,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu'
 import { calcularCostoItem, calcularCostoTotal, formatCurrency } from '@/lib/utils/costoCalculations'
 import { exportarListaEquipoAExcel } from '@/lib/utils/listaEquipoExcel'
@@ -631,21 +632,6 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                             interactive={false}
                           />
                         </div>
-                        {puedeSeleccionarCotizacion && (item.cotizaciones?.length || 0) > 0 && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setSelectorItem(item)}
-                                className="h-5 w-5 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                              >
-                                <Trophy className="h-3 w-3" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>{item.cotizacionSeleccionadaId ? 'Cambiar cotización' : 'Elegir cotización'}</TooltipContent>
-                          </Tooltip>
-                        )}
                         {(item as any).seleccionadoPor?.name && (
                           <span className="text-[9px] text-muted-foreground text-center leading-tight">
                             por {(item as any).seleccionadoPor.name}
@@ -830,6 +816,12 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-40">
+                          {puedeSeleccionarCotizacion && (item.cotizaciones?.length || 0) > 0 && (
+                            <DropdownMenuItem onSelect={() => setTimeout(() => setSelectorItem(item), 0)}>
+                              <Trophy className="h-3.5 w-3.5 mr-2" />
+                              {item.cotizacionSeleccionadaId ? 'Cambiar cotización' : 'Elegir cotización'}
+                            </DropdownMenuItem>
+                          )}
                           {item.estado !== 'rechazado' && (
                             <DropdownMenuItem onSelect={() => setTimeout(() => setItemReemplazo(item), 0)}>
                               <RotateCcw className="h-3.5 w-3.5 mr-2" />
@@ -840,6 +832,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                             <Pencil className="h-3.5 w-3.5 mr-2" />
                             Editar
                           </DropdownMenuItem>
+                          <DropdownMenuSeparator />
                           <DropdownMenuItem
                             onSelect={() => setTimeout(() => deleteValidation.requestDelete(item.id), 0)}
                             className="text-red-600 focus:text-red-600"
