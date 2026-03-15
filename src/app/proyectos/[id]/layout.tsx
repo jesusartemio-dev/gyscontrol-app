@@ -74,6 +74,8 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
     horasReales: 0,
     costoPlanificado: 0,
     tareasConRecurso: 0,
+    fechaInicioPlan: null,
+    fechaFinPlan: null,
     activeCronograma: null
   })
 
@@ -242,6 +244,8 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
       let tareasCompletadas = 0
       let tareasEnProgreso = 0
       let tareasExtra = 0
+      let fechaInicioPlan: string | null = null
+      let fechaFinPlan: string | null = null
       let horasPlan = 0
       let horasReales = 0
       let costoPlanificado = 0
@@ -270,11 +274,20 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
       if (tareasResponse.ok) {
         const tareasData = await tareasResponse.json()
         if (tareasData.success) {
-          const tareasList = tareasData.data as Array<{ estado: string; esExtra?: boolean }>
+          const tareasList = tareasData.data as Array<{ estado: string; esExtra?: boolean; fechaInicio?: string; fechaFin?: string }>
           tareasCount = tareasList.length
           tareasCompletadas = tareasList.filter(t => t.estado === 'completada').length
           tareasEnProgreso = tareasList.filter(t => t.estado === 'en_progreso').length
           tareasExtra = tareasList.filter(t => t.esExtra).length
+          // Calcular rango de fechas del cronograma
+          for (const t of tareasList) {
+            if (t.fechaInicio && (!fechaInicioPlan || t.fechaInicio < fechaInicioPlan)) {
+              fechaInicioPlan = t.fechaInicio
+            }
+            if (t.fechaFin && (!fechaFinPlan || t.fechaFin > fechaFinPlan)) {
+              fechaFinPlan = t.fechaFin
+            }
+          }
         }
       }
 
@@ -331,6 +344,8 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
         horasReales,
         costoPlanificado,
         tareasConRecurso,
+        fechaInicioPlan,
+        fechaFinPlan,
         costoPorEdt,
         activeCronograma
       })

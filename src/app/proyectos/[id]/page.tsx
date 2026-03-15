@@ -25,6 +25,7 @@ import {
   X,
   Loader2,
   Target,
+  Clock,
 } from 'lucide-react'
 
 import { Card, CardContent } from '@/components/ui/card'
@@ -238,6 +239,14 @@ export default function ProyectoHubPage() {
   // Cronograma hours progress
   const progresoHoras = calcularProgreso(cronogramaStats.horasReales, cronogramaStats.horasPlan)
 
+  // Cronograma duration
+  const duracionPlanDias = cronogramaStats.fechaInicioPlan && cronogramaStats.fechaFinPlan
+    ? Math.ceil((new Date(cronogramaStats.fechaFinPlan).getTime() - new Date(cronogramaStats.fechaInicioPlan).getTime()) / (1000 * 60 * 60 * 24))
+    : null
+  const diasTranscurridos = proyecto.fechaInicio
+    ? Math.max(0, Math.ceil((Date.now() - new Date(proyecto.fechaInicio).getTime()) / (1000 * 60 * 60 * 24)))
+    : null
+
   // Grid order: row by row (3 cols)
   // Row 1: Equipos | Servicios | Gastos
   // Row 2: Listas  | Cronograma | Personal
@@ -357,6 +366,12 @@ export default function ProyectoHubPage() {
         { label: 'EDTs', value: cronogramaStats.edts },
       ],
       total: cronogramaStats.costoPlanificado,
+      duracionLabel: duracionPlanDias !== null && diasTranscurridos !== null
+        ? `${diasTranscurridos}d / ${duracionPlanDias}d`
+        : undefined,
+      duracionProgreso: duracionPlanDias && diasTranscurridos !== null
+        ? calcularProgreso(diasTranscurridos, duracionPlanDias)
+        : undefined,
       progreso: progresoHoras,
       real: cronogramaStats.horasReales,
       plan: cronogramaStats.horasPlan,
@@ -476,6 +491,37 @@ export default function ProyectoHubPage() {
                     <span className="text-muted-foreground">Ver detalles</span>
                   )}
                 </div>
+
+                {/* Duration bar (cronograma) */}
+                {card.duracionLabel && card.duracionProgreso && (
+                  <div className="space-y-0.5">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-muted-foreground flex items-center gap-1">
+                        <Clock className="h-3 w-3 text-purple-500" />
+                        Duración {card.duracionLabel}
+                      </span>
+                      <span className={`font-medium ${
+                        card.duracionProgreso.estado === 'danger' ? 'text-red-600' :
+                        card.duracionProgreso.estado === 'warning' ? 'text-amber-600' :
+                        'text-emerald-600'
+                      }`}>
+                        {card.duracionProgreso.porcentaje.toFixed(0)}%
+                      </span>
+                    </div>
+                    <div className="relative h-1 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className={`absolute inset-y-0 left-0 rounded-full transition-all ${getProgressColor(card.duracionProgreso.estado)}`}
+                        style={{ width: `${Math.min(card.duracionProgreso.porcentaje, 100)}%` }}
+                      />
+                      {card.duracionProgreso.porcentaje > 100 && (
+                        <div
+                          className="absolute inset-y-0 bg-red-300 rounded-full"
+                          style={{ left: '100%', width: `${Math.min(card.duracionProgreso.porcentaje - 100, 50)}%` }}
+                        />
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Planificación bar (only for servicios) */}
                 {card.progresoPlanificado && card.planificadoLabel && (

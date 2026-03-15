@@ -16,6 +16,8 @@ export interface CronogramaStats {
   horasReales: number
   costoPlanificado: number
   tareasConRecurso: number
+  fechaInicioPlan: string | null
+  fechaFinPlan: string | null
   costoPorEdt?: Record<string, { edtNombre: string; costo: number; tareas: number; tareasConRecurso: number }>
   activeCronograma: ProyectoCronograma | null
 }
