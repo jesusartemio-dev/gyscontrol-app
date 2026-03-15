@@ -39,7 +39,7 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
         }),
         prisma.ordenCompra.groupBy({
           by: ['moneda'],
-          where: { proyectoId, estado: { not: 'cancelada' } },
+          where: { proyectoId, estado: { notIn: ['cancelada', 'borrador'] } },
           _sum: { total: true },
         }),
         prisma.$queryRaw<{ total: number }[]>`
