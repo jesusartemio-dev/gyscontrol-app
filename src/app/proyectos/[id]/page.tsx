@@ -435,9 +435,14 @@ export default function ProyectoHubPage() {
         ...(cronogramaStats.tareasExtra > 0 ? [{ label: 'Extras', value: cronogramaStats.tareasExtra }] : []),
         { label: 'En progreso', value: cronogramaStats.tareasEnProgreso },
         { label: 'Completadas', value: cronogramaStats.tareasCompletadas },
+        ...(cronogramaStats.tareasVencidas > 0 ? [{ label: '⚠ Vencidas', value: cronogramaStats.tareasVencidas }] : []),
       ],
       cobertura: progresoTareas,
       coberturaLabel: `Avance ${cronogramaStats.tareasCompletadas}/${cronogramaStats.tareas}`,
+      coberturaSecundaria: cronogramaStats.tareas > 0
+        ? { porcentaje: (cronogramaStats.tareasConResponsable / cronogramaStats.tareas) * 100, estado: 'ok' as const }
+        : undefined,
+      coberturaSecundariaLabel: `Responsables ${cronogramaStats.tareasConResponsable}/${cronogramaStats.tareas}`,
     },
   ]
 
@@ -623,6 +628,35 @@ export default function ProyectoHubPage() {
                           'bg-blue-300'
                         }`}
                         style={{ width: `${Math.min(card.cobertura.porcentaje, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Secondary coverage bar (e.g., responsables) */}
+                {card.coberturaSecundaria && card.coberturaSecundaria.porcentaje >= 0 && (
+                  <div className="space-y-0.5">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-muted-foreground flex items-center gap-1">
+                        <Users className="h-3 w-3 text-purple-500" />
+                        {card.coberturaSecundariaLabel || 'Cobertura'}
+                      </span>
+                      <span className={`font-medium ${
+                        card.coberturaSecundaria.porcentaje >= 100 ? 'text-emerald-600' :
+                        card.coberturaSecundaria.porcentaje >= 50 ? 'text-purple-600' :
+                        'text-gray-500'
+                      }`}>
+                        {card.coberturaSecundaria.porcentaje.toFixed(0)}%
+                      </span>
+                    </div>
+                    <div className="relative h-1 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className={`absolute inset-y-0 left-0 rounded-full transition-all ${
+                          card.coberturaSecundaria.porcentaje >= 100 ? 'bg-emerald-500' :
+                          card.coberturaSecundaria.porcentaje >= 50 ? 'bg-purple-500' :
+                          'bg-purple-300'
+                        }`}
+                        style={{ width: `${Math.min(card.coberturaSecundaria.porcentaje, 100)}%` }}
                       />
                     </div>
                   </div>

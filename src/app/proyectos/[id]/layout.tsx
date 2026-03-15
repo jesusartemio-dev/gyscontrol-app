@@ -74,6 +74,8 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
     horasReales: 0,
     costoPlanificado: 0,
     tareasConRecurso: 0,
+    tareasConResponsable: 0,
+    tareasVencidas: 0,
     fechaInicioPlan: null,
     fechaFinPlan: null,
     activeCronograma: null
@@ -244,6 +246,8 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
       let tareasCompletadas = 0
       let tareasEnProgreso = 0
       let tareasExtra = 0
+      let tareasConResponsable = 0
+      let tareasVencidas = 0
       let fechaInicioPlan: string | null = null
       let fechaFinPlan: string | null = null
       let horasPlan = 0
@@ -274,11 +278,14 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
       if (tareasResponse.ok) {
         const tareasData = await tareasResponse.json()
         if (tareasData.success) {
-          const tareasList = tareasData.data as Array<{ estado: string; esExtra?: boolean; fechaInicio?: string; fechaFin?: string }>
+          const tareasList = tareasData.data as Array<{ estado: string; esExtra?: boolean; fechaInicio?: string; fechaFin?: string; responsableId?: string | null }>
           tareasCount = tareasList.length
           tareasCompletadas = tareasList.filter(t => t.estado === 'completada').length
           tareasEnProgreso = tareasList.filter(t => t.estado === 'en_progreso').length
           tareasExtra = tareasList.filter(t => t.esExtra).length
+          tareasConResponsable = tareasList.filter(t => t.responsableId).length
+          const hoy = new Date().toISOString()
+          tareasVencidas = tareasList.filter(t => t.fechaFin && t.fechaFin < hoy && t.estado !== 'completada' && t.estado !== 'cancelada').length
           // Calcular rango de fechas del cronograma
           for (const t of tareasList) {
             if (t.fechaInicio && (!fechaInicioPlan || t.fechaInicio < fechaInicioPlan)) {
@@ -344,6 +351,8 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
         horasReales,
         costoPlanificado,
         tareasConRecurso,
+        tareasConResponsable,
+        tareasVencidas,
         fechaInicioPlan,
         fechaFinPlan,
         costoPorEdt,
