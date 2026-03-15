@@ -484,7 +484,7 @@ export default function ProyectoHubPage() {
                 </div>
 
                 {/* Row 2: Stats */}
-                <div className="flex items-center gap-3 text-xs">
+                <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5 text-xs">
                   {card.stats && card.stats.length > 0 ? (
                     card.stats.map((stat, i) => (
                       <div key={i} className="flex items-center gap-1">
