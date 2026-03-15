@@ -430,11 +430,13 @@ export default function ProyectoHubPage() {
       hoverBg: 'hover:bg-amber-50',
       borderColor: 'border-amber-200',
       href: `${baseUrl}/tareas`,
+      badge: cronogramaStats.tareasExtra > 0
+        ? `Plan: ${cronogramaStats.tareas - cronogramaStats.tareasExtra} | Ejec: ${cronogramaStats.tareas}`
+        : `Plan: ${cronogramaStats.tareas}`,
       stats: [
-        { label: 'Planif.', value: cronogramaStats.tareas - cronogramaStats.tareasExtra },
-        ...(cronogramaStats.tareasExtra > 0 ? [{ label: 'Extras', value: cronogramaStats.tareasExtra }] : []),
         { label: 'En progreso', value: cronogramaStats.tareasEnProgreso },
         { label: 'Completadas', value: cronogramaStats.tareasCompletadas },
+        ...(cronogramaStats.tareasExtra > 0 ? [{ label: 'Extras', value: cronogramaStats.tareasExtra }] : []),
         ...(cronogramaStats.tareasVencidas > 0 ? [{ label: '⚠ Vencidas', value: cronogramaStats.tareasVencidas }] : []),
       ],
       cobertura: progresoTareas,
