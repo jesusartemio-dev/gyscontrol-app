@@ -32,7 +32,7 @@ const SYSTEM_PROMPT = `Eres un especialista en extracción de datos de cotizacio
 Tu tarea: extraer TODOS los equipos/ítems del PDF con sus datos técnicos y precios.
 
 Para cada equipo, extrae:
-- codigo: código alfanumérico del fabricante/proveedor (part number, modelo, referencia)
+- codigo: código del producto/catálogo del fabricante (part number, modelo, referencia). IMPORTANTE: si el documento tiene columnas separadas como "Código" (código interno del proveedor) y "Catálogo" (código del fabricante/producto), SIEMPRE usa el valor de "Catálogo" como codigo. El código de catálogo del fabricante es la prioridad.
 - descripcion: descripción completa del equipo incluyendo especificaciones técnicas
 - marca: marca o fabricante del equipo
 - precioLista: precio unitario como número decimal (sin símbolo de moneda, sin separadores de miles). Si no hay precio, null
@@ -43,6 +43,7 @@ Para cada equipo, extrae:
 Reglas:
 - Extrae TODOS los ítems del documento, no omitas ninguno
 - Si un ítem no tiene código claro, usa la descripción abreviada como código
+- Prioridad de código: Catálogo > Part Number > Modelo > Código interno del proveedor
 - Devuelve ÚNICAMENTE un JSON array válido, sin markdown, backticks ni texto adicional
 - Los precios deben ser números, no strings`
 
