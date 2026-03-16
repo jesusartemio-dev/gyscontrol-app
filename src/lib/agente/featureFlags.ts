@@ -10,6 +10,7 @@ export interface IAFeatureFlags {
   importacionExcel: boolean
   ocrComprobantes: boolean
   scanCotizacionPDF: boolean
+  importCatalogoPDF: boolean
 }
 
 const DEFAULT_FLAGS: IAFeatureFlags = {
@@ -19,6 +20,7 @@ const DEFAULT_FLAGS: IAFeatureFlags = {
   importacionExcel: true,
   ocrComprobantes: true,
   scanCotizacionPDF: true,
+  importCatalogoPDF: true,
 }
 
 function parseFlags(raw: unknown): IAFeatureFlags {
@@ -31,6 +33,7 @@ function parseFlags(raw: unknown): IAFeatureFlags {
     importacionExcel: typeof obj.importacionExcel === 'boolean' ? obj.importacionExcel : DEFAULT_FLAGS.importacionExcel,
     ocrComprobantes: typeof obj.ocrComprobantes === 'boolean' ? obj.ocrComprobantes : DEFAULT_FLAGS.ocrComprobantes,
     scanCotizacionPDF: typeof obj.scanCotizacionPDF === 'boolean' ? obj.scanCotizacionPDF : DEFAULT_FLAGS.scanCotizacionPDF,
+    importCatalogoPDF: typeof obj.importCatalogoPDF === 'boolean' ? obj.importCatalogoPDF : DEFAULT_FLAGS.importCatalogoPDF,
   }
 }
 

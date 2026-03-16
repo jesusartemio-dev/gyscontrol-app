@@ -20,6 +20,7 @@ import {
   FileSearch,
   MessagesSquare,
   Settings2,
+  FileUp,
 } from 'lucide-react'
 import {
   BarChart,
@@ -61,6 +62,7 @@ interface IAFeatureFlags {
   importacionExcel: boolean
   ocrComprobantes: boolean
   scanCotizacionPDF: boolean
+  importCatalogoPDF: boolean
 }
 
 const FEATURE_DEFS: { key: keyof IAFeatureFlags; label: string; desc: string; icon: React.ElementType }[] = [
@@ -70,6 +72,7 @@ const FEATURE_DEFS: { key: keyof IAFeatureFlags; label: string; desc: string; ic
   { key: 'importacionExcel', label: 'Importacion Excel/PDF', desc: 'Wizard de importacion de cotizaciones con IA', icon: FileSpreadsheet },
   { key: 'ocrComprobantes', label: 'OCR Comprobantes', desc: 'Lectura automatica de facturas y boletas', icon: ScanLine },
   { key: 'scanCotizacionPDF', label: 'Escanear PDF Cotizacion', desc: 'Auto-deteccion de precios y entregas desde PDF del proveedor', icon: FileSearch },
+  { key: 'importCatalogoPDF', label: 'Importar Catalogo PDF', desc: 'Extraer equipos de cotizaciones PDF con IA para agregar al catalogo', icon: FileUp },
 ]
 
 const MONTH_NAMES = [

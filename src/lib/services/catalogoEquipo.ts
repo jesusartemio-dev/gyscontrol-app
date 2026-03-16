@@ -107,3 +107,49 @@ export async function deleteCatalogoEquipo(id: string): Promise<void> {
     throw error
   }
 }
+
+// ✅ Escanear PDF con IA para extraer equipos
+export async function scanPdfCatalogo(file: File) {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const res = await fetch(buildApiUrl('/api/catalogo-equipo/import-pdf'), {
+    method: 'POST',
+    body: formData,
+  })
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({ error: 'Error desconocido' }))
+    throw new Error(data.error || 'Error al escanear PDF')
+  }
+
+  return await res.json()
+}
+
+// ✅ Crear múltiples equipos en catálogo (bulk)
+export async function bulkCreateCatalogoEquipo(items: {
+  codigo: string
+  descripcion: string
+  marca: string
+  precioLista: number
+  factorCosto: number
+  factorVenta: number
+  precioInterno: number
+  precioVenta: number
+  categoriaId: string
+  unidadId: string
+  estado: string
+}[]) {
+  const res = await fetch(buildApiUrl('/api/catalogo-equipo/import-pdf/bulk'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items }),
+  })
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({ error: 'Error desconocido' }))
+    throw new Error(data.error || 'Error al crear equipos')
+  }
+
+  return await res.json()
+}

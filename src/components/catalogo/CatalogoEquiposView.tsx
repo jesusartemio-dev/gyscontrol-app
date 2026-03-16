@@ -13,7 +13,8 @@ import { getUnidades } from '@/lib/services/unidad'
 import { getCatalogoEquipos, createCatalogoEquipo, updateCatalogoEquipo, deleteCatalogoEquipo } from '@/lib/services/catalogoEquipo'
 import { getVistaConfig, getCatalogoEquiposVista, updateEquipoVista, type Vista, type VistaConfig } from '@/lib/services/catalogoEquipoVista'
 import CatalogoEquipoPrecioHistorial from '@/components/catalogo/CatalogoEquipoPrecioHistorial'
-import type { CatalogoEquipo, CatalogoEquipoPayload } from '@/types'
+import ImportarPdfDialog from '@/components/catalogo/ImportarPdfDialog'
+import type { CatalogoEquipo, CatalogoEquipoPayload, CategoriaEquipo, Unidad } from '@/types'
 
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -37,7 +38,7 @@ import {
   Plus, Search, Package, Pencil, Trash2, X, Loader2, AlertCircle,
   CheckCircle, Clock, XCircle, ChevronDown, ChevronUp,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
-  BarChart3, Filter
+  BarChart3, Filter, Sparkles
 } from 'lucide-react'
 
 type CatalogoEquipoConId = CatalogoEquipoPayload & { id: string }
@@ -105,6 +106,9 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
   const [equiposDuplicados, setEquiposDuplicados] = useState<CatalogoEquipoConId[]>([])
   const [mostrarModal, setMostrarModal] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showPdfImport, setShowPdfImport] = useState(false)
+  const [allCategorias, setAllCategorias] = useState<CategoriaEquipo[]>([])
+  const [allUnidades, setAllUnidades] = useState<Unidad[]>([])
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('')
@@ -232,6 +236,20 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
   const handleCreated = () => {
     cargarDatos()
     setShowCreateModal(false)
+  }
+
+  const handleOpenPdfImport = async () => {
+    if (allCategorias.length === 0 || allUnidades.length === 0) {
+      try {
+        const [cats, units] = await Promise.all([getCategoriasEquipo(), getUnidades()])
+        setAllCategorias(cats)
+        setAllUnidades(units)
+      } catch {
+        toast.error('Error al cargar categorías/unidades')
+        return
+      }
+    }
+    setShowPdfImport(true)
   }
 
   const handleExportar = async () => {
@@ -546,8 +564,23 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
                 onImportar={canImport ? handleImportar : undefined}
               />
             )}
+            {canImport && (
+              <Button size="sm" variant="outline" onClick={handleOpenPdfImport} className="gap-1.5">
+                <Sparkles className="h-3.5 w-3.5 text-purple-600" />
+                Importar PDF
+              </Button>
+            )}
           </div>
         </div>
+
+        {/* PDF Import Dialog */}
+        <ImportarPdfDialog
+          open={showPdfImport}
+          onClose={() => setShowPdfImport(false)}
+          categorias={allCategorias}
+          unidades={allUnidades}
+          onSuccess={cargarDatos}
+        />
 
         {/* Stats Bar */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
