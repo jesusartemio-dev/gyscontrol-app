@@ -117,9 +117,9 @@ export default function JornadaCampoSupervisionPage() {
   const [motivoRechazo, setMotivoRechazo] = useState('')
   const [procesandoRechazo, setProcesandoRechazo] = useState(false)
 
-  const cargarJornadas = useCallback(async () => {
+  const cargarJornadas = useCallback(async (silent = false) => {
     try {
-      setLoading(true)
+      if (!silent) setLoading(true)
       const response = await fetch('/api/horas-hombre/jornada/todas')
 
       if (!response.ok) {
@@ -131,7 +131,7 @@ export default function JornadaCampoSupervisionPage() {
     } catch (error) {
       console.error('Error:', error)
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [])
 
@@ -153,7 +153,7 @@ export default function JornadaCampoSupervisionPage() {
         title: 'Jornada aprobada',
         description: 'La jornada fue aprobada exitosamente'
       })
-      cargarJornadas()
+      cargarJornadas(true)
     } catch (error) {
       toast({
         variant: 'destructive',
@@ -189,7 +189,7 @@ export default function JornadaCampoSupervisionPage() {
         description: 'La jornada fue rechazada'
       })
       setRechazarModalOpen(false)
-      cargarJornadas()
+      cargarJornadas(true)
     } catch (error) {
       toast({
         variant: 'destructive',
