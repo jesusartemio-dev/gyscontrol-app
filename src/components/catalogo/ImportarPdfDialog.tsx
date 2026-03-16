@@ -10,7 +10,6 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
@@ -362,7 +361,7 @@ export default function ImportarPdfDialog({ open, onClose, categorias, unidades,
               </div>
 
               {/* Table */}
-              <ScrollArea className="flex-1">
+              <div className="flex-1 overflow-auto">
                 <div className="min-w-[900px]">
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50 sticky top-0 z-10">
@@ -502,7 +501,7 @@ export default function ImportarPdfDialog({ open, onClose, categorias, unidades,
                     </tbody>
                   </table>
                 </div>
-              </ScrollArea>
+              </div>
             </motion.div>
           )}
 
