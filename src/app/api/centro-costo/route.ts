@@ -21,9 +21,25 @@ export async function GET(req: Request) {
     const data = await prisma.centroCosto.findMany({
       where,
       orderBy: { nombre: 'asc' },
+      include: {
+        _count: {
+          select: {
+            hojas: true,
+            ordenesCompra: true,
+          },
+        },
+      },
     })
 
-    return NextResponse.json(data)
+    const result = data.map(item => ({
+      ...item,
+      _count: undefined,
+      hojasCount: item._count.hojas,
+      ordenesCount: item._count.ordenesCompra,
+      enUso: item._count.hojas > 0 || item._count.ordenesCompra > 0,
+    }))
+
+    return NextResponse.json(result)
   } catch (error) {
     console.error('Error al obtener centros de costo:', error)
     return NextResponse.json({ error: 'Error al obtener centros de costo' }, { status: 500 })

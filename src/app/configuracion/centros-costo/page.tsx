@@ -15,18 +15,24 @@ import { toast } from 'sonner'
 import { getCentrosCosto, createCentroCosto, updateCentroCosto, deleteCentroCosto } from '@/lib/services/centroCosto'
 import type { CentroCosto } from '@/types'
 
+interface CentroCostoWithUsage extends CentroCosto {
+  hojasCount: number
+  ordenesCount: number
+  enUso: boolean
+}
+
 const TIPOS = [
   { value: 'departamento', label: 'Departamento' },
   { value: 'administrativo', label: 'Administrativo' },
 ]
 
 export default function CentrosCostoPage() {
-  const [items, setItems] = useState<CentroCosto[]>([])
+  const [items, setItems] = useState<CentroCostoWithUsage[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [showForm, setShowForm] = useState(false)
-  const [editing, setEditing] = useState<CentroCosto | null>(null)
-  const [deleteTarget, setDeleteTarget] = useState<CentroCosto | null>(null)
+  const [editing, setEditing] = useState<CentroCostoWithUsage | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<CentroCostoWithUsage | null>(null)
   const [filterTipo, setFilterTipo] = useState<string>('all')
   const [searchTerm, setSearchTerm] = useState('')
 
@@ -39,7 +45,7 @@ export default function CentrosCostoPage() {
   const loadData = async () => {
     try {
       setLoading(true)
-      const data = await getCentrosCosto()
+      const data = await getCentrosCosto() as CentroCostoWithUsage[]
       setItems(data)
     } catch {
       toast.error('Error al cargar centros de costo')
@@ -73,7 +79,7 @@ export default function CentrosCostoPage() {
     setShowForm(true)
   }
 
-  const openEdit = (item: CentroCosto) => {
+  const openEdit = (item: CentroCostoWithUsage) => {
     setEditing(item)
     setNombre(item.nombre)
     setTipo(item.tipo)
@@ -108,12 +114,14 @@ export default function CentrosCostoPage() {
   const handleDelete = async () => {
     if (!deleteTarget) return
     try {
-      await deleteCentroCosto(deleteTarget.id)
-      toast.success('Centro de costo desactivado')
+      const res = await fetch(`/api/centro-costo/${deleteTarget.id}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      toast.success(data.action === 'eliminado' ? 'Centro de costo eliminado' : 'Centro de costo desactivado')
       setDeleteTarget(null)
       loadData()
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Error al desactivar')
+      toast.error(error instanceof Error ? error.message : 'Error al procesar')
     }
   }
 
@@ -185,6 +193,7 @@ export default function CentrosCostoPage() {
                   <TableHead>Nombre</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Descripción</TableHead>
+                  <TableHead>Uso</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead className="w-[80px]"></TableHead>
                 </TableRow>
@@ -200,6 +209,17 @@ export default function CentrosCostoPage() {
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
                       {item.descripcion || '-'}
+                    </TableCell>
+                    <TableCell>
+                      {item.enUso ? (
+                        <div className="text-xs text-muted-foreground">
+                          {item.hojasCount > 0 && <span>{item.hojasCount} hojas</span>}
+                          {item.hojasCount > 0 && item.ordenesCount > 0 && <span> · </span>}
+                          {item.ordenesCount > 0 && <span>{item.ordenesCount} órdenes</span>}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Sin uso</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Badge variant={item.activo ? 'default' : 'secondary'} className="text-xs">
@@ -287,15 +307,27 @@ export default function CentrosCostoPage() {
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Desactivar Centro de Costo</AlertDialogTitle>
+            <AlertDialogTitle>
+              {deleteTarget?.enUso ? 'Desactivar' : 'Eliminar'} Centro de Costo
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              ¿Desactivar &quot;{deleteTarget?.nombre}&quot;? No se eliminará, solo se marcará como inactivo.
+              {deleteTarget?.enUso ? (
+                <>
+                  &quot;{deleteTarget.nombre}&quot; está en uso
+                  ({deleteTarget.hojasCount > 0 && `${deleteTarget.hojasCount} hojas de gastos`}
+                  {deleteTarget.hojasCount > 0 && deleteTarget.ordenesCount > 0 && ', '}
+                  {deleteTarget.ordenesCount > 0 && `${deleteTarget.ordenesCount} órdenes de compra`}).
+                  Se marcará como inactivo.
+                </>
+              ) : (
+                <>¿Eliminar &quot;{deleteTarget?.nombre}&quot;? Esta acción no se puede deshacer.</>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700 text-white">
-              Desactivar
+              {deleteTarget?.enUso ? 'Desactivar' : 'Eliminar'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

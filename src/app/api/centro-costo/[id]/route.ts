@@ -66,13 +66,34 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
 
     const { id } = await params
 
-    // Soft delete - set activo = false
-    await prisma.centroCosto.update({
+    // Check if in use
+    const usage = await prisma.centroCosto.findUnique({
       where: { id },
-      data: { activo: false, updatedAt: new Date() },
+      include: {
+        _count: {
+          select: { hojas: true, ordenesCompra: true },
+        },
+      },
     })
 
-    return NextResponse.json({ success: true })
+    if (!usage) {
+      return NextResponse.json({ error: 'Centro de costo no encontrado' }, { status: 404 })
+    }
+
+    const enUso = usage._count.hojas > 0 || usage._count.ordenesCompra > 0
+
+    if (enUso) {
+      // Soft delete - set activo = false
+      await prisma.centroCosto.update({
+        where: { id },
+        data: { activo: false, updatedAt: new Date() },
+      })
+      return NextResponse.json({ success: true, action: 'desactivado' })
+    } else {
+      // Hard delete - no references
+      await prisma.centroCosto.delete({ where: { id } })
+      return NextResponse.json({ success: true, action: 'eliminado' })
+    }
   } catch (error) {
     console.error('Error al eliminar centro de costo:', error)
     return NextResponse.json({ error: 'Error al eliminar centro de costo' }, { status: 500 })
