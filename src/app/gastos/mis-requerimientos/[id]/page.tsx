@@ -191,7 +191,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
 
   if (!hoja) return null
 
-  const isEditable = ['borrador', 'rechazado', 'aprobado', 'depositado'].includes(hoja.estado)
+  const isEditable = !['rendido', 'validado', 'cerrado'].includes(hoja.estado)
   const canEnviar = ['borrador', 'rechazado'].includes(hoja.estado)
   const canAprobar = hoja.estado === 'enviado' && ['admin', 'gerente', 'gestor', 'coordinador', 'coordinador_logistico', 'administracion'].includes(role || '')
   const canDepositar = hoja.estado === 'aprobado' && hoja.requiereAnticipo && ['admin', 'gerente', 'administracion'].includes(role || '')
