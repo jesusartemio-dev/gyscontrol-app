@@ -59,7 +59,7 @@ export default function ListaEstadoFlujoBanner({ estado, listaId, totalItems = 0
   const [openConfirmAvanzar, setOpenConfirmAvanzar] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  const faltanVerificar = totalItems > 0 && itemsVerificados < totalItems
+  const faltanVerificar = estado === 'por_revisar' && totalItems > 0 && itemsVerificados < totalItems
   const siguienteLabel = flujo.siguiente ? (estadoLabels[flujo.siguiente] || flujo.siguiente) : ''
   const currentIndex = estadosFlujoPrincipal.indexOf(estado)
   const isAnulada = estado === 'anulada'
@@ -126,8 +126,8 @@ export default function ListaEstadoFlujoBanner({ estado, listaId, totalItems = 0
       <div className="flex items-center gap-2 flex-shrink-0">
         {loading && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
 
-        {/* Verification progress */}
-        {totalItems > 0 && (
+        {/* Verification progress - only relevant in por_revisar */}
+        {estado === 'por_revisar' && totalItems > 0 && (
           <span className={cn(
             'text-[10px] font-medium',
             itemsVerificados === totalItems ? 'text-green-600' : 'text-muted-foreground'
