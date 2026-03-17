@@ -363,7 +363,7 @@ export const useListaEquipoMaster = ({
   
   // 🔄 Navigation
   const navigateToDetail = useCallback((listaId: string) => {
-    router.push(`/proyectos/${proyectoId}/equipos/listas/${listaId}`);
+    router.push(`/proyectos/${proyectoId}/listas/${listaId}`);
   }, [router, proyectoId]);
   
   // 🔄 Load view mode preference on mount

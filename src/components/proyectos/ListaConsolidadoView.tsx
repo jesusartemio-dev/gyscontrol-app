@@ -369,7 +369,7 @@ export function ListaConsolidadoView() {
                           {item.origenes.map((origen) => (
                             <Link
                               key={origen.listaId}
-                              href={`/proyectos/${origen.proyectoId}/equipos/listas/${origen.listaId}`}
+                              href={`/proyectos/${origen.proyectoId}/listas/${origen.listaId}`}
                               onClick={(e) => e.stopPropagation()}
                             >
                               <Badge

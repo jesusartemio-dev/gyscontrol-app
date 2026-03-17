@@ -178,7 +178,7 @@ const PedidoCard: React.FC<{
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <Link href={`/proyectos/${proyectoId}/equipos/pedidos/${pedido.id}`}>
+                  <Link href={`/proyectos/${proyectoId}/pedidos/${pedido.id}`}>
                     <DropdownMenuItem>
                       <Eye className="h-4 w-4 mr-2" />
                       Ver Detalle
@@ -240,7 +240,7 @@ const PedidoCard: React.FC<{
               variant="outline" 
               size="sm" 
               className="w-full"
-              onClick={() => router.push(`/proyectos/${proyectoId}/equipos/pedidos/${pedido.id}`)}
+              onClick={() => router.push(`/proyectos/${proyectoId}/pedidos/${pedido.id}`)}
             >
               <Eye className="h-4 w-4 mr-2" />
               Ver Detalle
@@ -392,7 +392,7 @@ const PedidoEquipoMasterList: React.FC<PedidoEquipoMasterListProps> = ({
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <Link href={`/proyectos/${proyectoId}/equipos/pedidos/${pedido.id}`}>
+                          <Link href={`/proyectos/${proyectoId}/pedidos/${pedido.id}`}>
                             <DropdownMenuItem>
                               <Eye className="h-4 w-4 mr-2" />
                               Ver Detalle

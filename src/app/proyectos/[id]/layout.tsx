@@ -146,10 +146,10 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
 
   // Páginas que necesitan ancho completo (sin sidebar)
   // Includes specific page names AND path patterns for detail views
-  const fullWidthPages = ['cronograma', 'listas']
+  const fullWidthPages = ['cronograma', 'listas', 'pedidos']
   const fullWidthPatterns = [
-    '/equipos/listas/', // Lista detail view (e.g., /equipos/listas/[listaId])
-    '/equipos/pedidos/', // Pedido detail view
+    '/listas/', // Lista detail view (e.g., /listas/[listaId])
+    '/pedidos/', // Pedido detail view
     '/equipos/detalle/' // Equipo detail view
   ]
   const currentPageSegment = pathname.split('/').pop() || ''
@@ -175,12 +175,12 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
     'detalle': 'Detalle',
   }
 
-  // Build breadcrumb trail from path segments (e.g. equipos > listas for /equipos/listas/[id])
+  // Build breadcrumb trail from path segments (e.g. equipos > listas for /listas/[id])
   const getBreadcrumbTrail = (): { label: string; href?: string }[] => {
     if (isHubPage) return []
     // Get segments after /proyectos/[id]/
     const base = `/proyectos/${id}`
-    const subPath = pathname.slice(base.length + 1) // e.g. "equipos/listas/abc123"
+    const subPath = pathname.slice(base.length + 1) // e.g. "listas/abc123"
     const segments = subPath.split('/')
     const trail: { label: string; href?: string }[] = []
     let accumulatedPath = base

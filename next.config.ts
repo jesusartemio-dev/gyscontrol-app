@@ -124,7 +124,7 @@ const nextConfig: NextConfig = {
       },
       // ❌ REMOVED: Conflicting redirect that was breaking new structure
       // {
-      //   source: '/proyectos/:id/equipos/listas/:listaId',
+      //   source: '/proyectos/:id/listas/:listaId',
       //   destination: '/proyectos/:id/equipos/:listaId/detalle',
       //   permanent: true,
       // },

@@ -67,7 +67,7 @@ export function PedidosPageContent({ pedidos, pagination, stats }: Props) {
 
   const handlePedidoClick = (pedido: PedidoEquipo) => {
     if (pedido.proyectoId) {
-      router.push(`/proyectos/${pedido.proyectoId}/equipos/pedidos/${pedido.id}`)
+      router.push(`/proyectos/${pedido.proyectoId}/pedidos/${pedido.id}`)
     } else {
       router.push(`/finanzas/aprovisionamiento/pedidos/${pedido.id}`)
     }

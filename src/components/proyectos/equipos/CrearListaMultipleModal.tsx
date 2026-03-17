@@ -184,7 +184,7 @@ export default function CrearListaMultipleModal({
 
       const listaCreada = await response.json()
       toast.success(`Lista "${nombreLista}" creada con ${itemsSeleccionados.length} items`)
-      router.push(`/proyectos/${proyectoId}/equipos/listas/${listaCreada.id}`)
+      router.push(`/proyectos/${proyectoId}/listas/${listaCreada.id}`)
 
     } catch {
       toast.error('Error al crear la lista')

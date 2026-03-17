@@ -277,7 +277,7 @@ const ListasTable = memo(function ListasTable({
                 <TableRow
                   key={lista.id}
                   className="group cursor-pointer hover:bg-muted/50"
-                  onClick={() => router.push(`/proyectos/${proyectoId}/equipos/listas/${lista.id}`)}
+                  onClick={() => router.push(`/proyectos/${proyectoId}/listas/${lista.id}`)}
                 >
                   <TableCell className="py-2">
                     <div>
@@ -341,7 +341,7 @@ const ListasTable = memo(function ListasTable({
                         variant="ghost"
                         size="sm"
                         className="h-7 w-7 p-0"
-                        onClick={() => router.push(`/proyectos/${proyectoId}/equipos/listas/${lista.id}`)}
+                        onClick={() => router.push(`/proyectos/${proyectoId}/listas/${lista.id}`)}
                       >
                         <Eye className="h-3.5 w-3.5" />
                       </Button>
@@ -455,7 +455,7 @@ export default function EquipmentListsPage({ params }: PageProps) {
           proyectoId={proyectoId}
           onCreated={(lista: any) => {
             toast.success('Lista creada');
-            router.push(`/proyectos/${proyectoId}/equipos/listas/${lista.id}`);
+            router.push(`/proyectos/${proyectoId}/listas/${lista.id}`);
           }}
           triggerClassName="h-8"
         />

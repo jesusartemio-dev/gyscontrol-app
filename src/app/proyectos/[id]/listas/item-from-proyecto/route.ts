@@ -1,6 +1,6 @@
 // ===================================================
 // 📁 Archivo: route.ts
-// 📍 Ubicación: src/app/proyectos/[id]/equipos/listas/item-from-proyecto/route.ts
+// 📍 Ubicación: src/app/proyectos/[id]/listas/item-from-proyecto/route.ts
 // 🔧 Descripción: Agrega un ProyectoEquipoItem a una ListaEquipoItem
 // ✍️ Autor: Asistente IA GYS
 // 📅 Última actualización: 2025-05-11

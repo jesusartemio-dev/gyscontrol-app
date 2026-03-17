@@ -54,7 +54,7 @@ const subMenu = [
   },
   { 
     label: 'Listas', 
-    path: 'equipos/listas', 
+    path: 'listas', 
     icon: List,
     description: 'Gestión de listas de equipos',
     color: 'text-purple-600',
@@ -72,7 +72,7 @@ const subMenu = [
   },
   { 
     label: 'Pedidos', 
-    path: 'equipos/pedidos', 
+    path: 'pedidos', 
     icon: ShoppingCart,
     description: 'Gestión de pedidos',
     color: 'text-indigo-600',

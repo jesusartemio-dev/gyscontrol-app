@@ -34,7 +34,7 @@ export const PedidoEquipoTableWrapper: React.FC<PedidoEquipoTableWrapperProps> =
   const handlePedidoClick = (pedido: PedidoEquipo) => {
     // Navegar al detalle del pedido dentro del proyecto
     if (pedido.proyectoId) {
-      router.push(`/proyectos/${pedido.proyectoId}/equipos/pedidos/${pedido.id}`);
+      router.push(`/proyectos/${pedido.proyectoId}/pedidos/${pedido.id}`);
     } else {
       // Fallback si no hay proyectoId
       router.push(`/finanzas/aprovisionamiento/pedidos/${pedido.id}`);
@@ -45,7 +45,7 @@ export const PedidoEquipoTableWrapper: React.FC<PedidoEquipoTableWrapperProps> =
     console.log('Edit pedido:', pedido.id);
     // Navegar a edición
     if (pedido.proyectoId) {
-      router.push(`/proyectos/${pedido.proyectoId}/equipos/pedidos/${pedido.id}?edit=true`);
+      router.push(`/proyectos/${pedido.proyectoId}/pedidos/${pedido.id}?edit=true`);
     }
   };
 
@@ -61,7 +61,7 @@ export const PedidoEquipoTableWrapper: React.FC<PedidoEquipoTableWrapperProps> =
 
   const handleViewTracking = (pedido: PedidoEquipo) => {
     if (pedido.proyectoId) {
-      router.push(`/proyectos/${pedido.proyectoId}/equipos/pedidos/${pedido.id}#tracking`);
+      router.push(`/proyectos/${pedido.proyectoId}/pedidos/${pedido.id}#tracking`);
     } else {
       router.push(`/finanzas/aprovisionamiento/pedidos/${pedido.id}/tracking`);
     }

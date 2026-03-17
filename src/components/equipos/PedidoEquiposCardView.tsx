@@ -78,7 +78,7 @@ const PedidoEquiposCardView = memo(function PedidoEquiposCardView({
   const getDetailUrl = (pedidoId: string) => {
     return isLogisticsContext
       ? `/logistica/pedidos/${pedidoId}`
-      : `/proyectos/${proyectoId}/equipos/pedidos/${pedidoId}`;
+      : `/proyectos/${proyectoId}/pedidos/${pedidoId}`;
   };
 
   // ✅ Filtrar pedidos

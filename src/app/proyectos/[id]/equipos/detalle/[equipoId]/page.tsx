@@ -340,7 +340,7 @@ function ItemsTable({ items, proyectoId, onEstadoChange, onVincular }: { items: 
                         return (
                           <div className="flex items-center gap-1">
                             <Link
-                              href={`/proyectos/${proyectoId}/equipos/listas/${lista.id}`}
+                              href={`/proyectos/${proyectoId}/listas/${lista.id}`}
                               className="text-[10px] font-mono text-blue-600 hover:underline truncate max-w-[80px]"
                               title={lista.nombre}
                             >

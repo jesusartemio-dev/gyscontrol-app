@@ -358,7 +358,7 @@ export default function SupervisionListasEquipoPage() {
                   <TableRow key={lista.id} className="group hover:bg-muted/50">
                     <TableCell className="py-2">
                       <button
-                        onClick={() => router.push(`/proyectos/${lista.proyectoId}/equipos/listas/${lista.id}`)}
+                        onClick={() => router.push(`/proyectos/${lista.proyectoId}/listas/${lista.id}`)}
                         className="font-mono text-xs text-blue-600 hover:text-blue-800 hover:underline"
                       >
                         {lista.codigo || '-'}
@@ -400,7 +400,7 @@ export default function SupervisionListasEquipoPage() {
                           variant="ghost"
                           size="sm"
                           className="h-7 w-7 p-0"
-                          onClick={() => router.push(`/proyectos/${lista.proyectoId}/equipos/listas/${lista.id}`)}
+                          onClick={() => router.push(`/proyectos/${lista.proyectoId}/listas/${lista.id}`)}
                         >
                           <Eye className="h-3.5 w-3.5" />
                         </Button>

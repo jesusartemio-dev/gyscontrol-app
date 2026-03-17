@@ -317,7 +317,7 @@ const PedidosTable = memo(function PedidosTable({
                   <TableRow
                     key={pedido.id}
                     className="group cursor-pointer hover:bg-muted/50"
-                    onClick={() => router.push(`/proyectos/${proyectoId}/equipos/pedidos/${pedido.id}`)}
+                    onClick={() => router.push(`/proyectos/${proyectoId}/pedidos/${pedido.id}`)}
                   >
                     <TableCell className="font-mono text-xs text-muted-foreground py-2">
                       <div className="flex items-center gap-1.5">
@@ -355,7 +355,7 @@ const PedidosTable = memo(function PedidosTable({
                           variant="ghost"
                           size="sm"
                           className="h-7 w-7 p-0"
-                          onClick={() => router.push(`/proyectos/${proyectoId}/equipos/pedidos/${pedido.id}`)}
+                          onClick={() => router.push(`/proyectos/${proyectoId}/pedidos/${pedido.id}`)}
                         >
                           <Eye className="h-3.5 w-3.5" />
                         </Button>
@@ -545,7 +545,7 @@ export default function PedidosProyectoPage() {
         onCreated={cargarDatos}
         proyectoId={proyectoId}
         proyectoNombre={proyecto ? `${proyecto.codigo} — ${proyecto.nombre}` : undefined}
-        redirectBase={`/proyectos/${proyectoId}/equipos/pedidos`}
+        redirectBase={`/proyectos/${proyectoId}/pedidos`}
       />
     </div>
   )

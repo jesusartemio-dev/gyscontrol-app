@@ -340,7 +340,7 @@ export default function ProyectoHubPage() {
       bgColor: 'bg-emerald-50',
       hoverBg: 'hover:bg-emerald-50',
       borderColor: 'border-emerald-200',
-      href: `${baseUrl}/equipos/listas`,
+      href: `${baseUrl}/listas`,
       stats: [
         { label: 'Listas', value: totalListas },
         { label: 'Items', value: totalListasItems },
@@ -408,7 +408,7 @@ export default function ProyectoHubPage() {
       bgColor: 'bg-cyan-50',
       hoverBg: 'hover:bg-cyan-50',
       borderColor: 'border-cyan-200',
-      href: `${baseUrl}/equipos/pedidos`,
+      href: `${baseUrl}/pedidos`,
       stats: [
         { label: 'Pedidos', value: totalPedidos },
         { label: 'Entregados', value: pedidosEntregados },
@@ -885,7 +885,7 @@ export default function ProyectoHubPage() {
                 </div>
                 <ChevronRight
                   className="h-4 w-4 text-amber-600 cursor-pointer hover:text-amber-800"
-                  onClick={() => router.push(`${baseUrl}/equipos/listas`)}
+                  onClick={() => router.push(`${baseUrl}/listas`)}
                 />
               </div>
             </CardContent>

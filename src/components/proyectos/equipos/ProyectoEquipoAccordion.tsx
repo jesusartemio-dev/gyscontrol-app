@@ -94,7 +94,7 @@ const ProyectoEquipoAccordion = memo(function ProyectoEquipoAccordion({
   const handleDistribucionCompletada = (listaId: string) => {
     // Navegar al detalle de la lista creada
     const proyectoId = window.location.pathname.split('/')[2]
-    router.push(`/proyectos/${proyectoId}/equipos/listas/${listaId}`)
+    router.push(`/proyectos/${proyectoId}/listas/${listaId}`)
   }
 
   // 🧠 Función para abrir distribución inteligente

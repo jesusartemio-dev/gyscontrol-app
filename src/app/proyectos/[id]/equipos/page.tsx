@@ -146,7 +146,7 @@ export default function ProyectoEquiposPage() {
         </div>
 
         <Button variant="outline" size="sm" asChild className="h-7 text-xs">
-          <Link href={`/proyectos/${proyecto.id}/equipos/listas`}>
+          <Link href={`/proyectos/${proyecto.id}/listas`}>
             <List className="h-3 w-3 mr-1" />
             Listas
           </Link>

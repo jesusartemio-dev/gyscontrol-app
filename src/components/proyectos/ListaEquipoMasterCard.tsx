@@ -158,7 +158,7 @@ const ListaEquipoMasterCard: React.FC<ListaEquipoMasterCardProps> = ({
   // 🔁 Handle navigation to detail view
   const handleViewDetail = (e: React.MouseEvent) => {
     e.stopPropagation();
-    router.push(`/proyectos/${proyectoId}/equipos/listas/${lista.id}`);
+    router.push(`/proyectos/${proyectoId}/listas/${lista.id}`);
   };
   
   // 🔁 Handle card selection
@@ -166,7 +166,7 @@ const ListaEquipoMasterCard: React.FC<ListaEquipoMasterCardProps> = ({
     if (onSelect) {
       onSelect(lista.id);
     } else {
-      router.push(`/proyectos/${proyectoId}/equipos/listas/${lista.id}`);
+      router.push(`/proyectos/${proyectoId}/listas/${lista.id}`);
     }
   };
   
@@ -291,7 +291,7 @@ const ListaEquipoMasterCard: React.FC<ListaEquipoMasterCardProps> = ({
                   onClick={(e) => {
                     e.stopPropagation();
                     e.preventDefault();
-                    router.push(`/proyectos/${proyectoId}/equipos/listas/${lista.id}`);
+                    router.push(`/proyectos/${proyectoId}/listas/${lista.id}`);
                   }}
                   className={`h-8 px-3 text-xs hover:bg-blue-50 hover:text-blue-600 ${touchButtonClasses}`}
                 >

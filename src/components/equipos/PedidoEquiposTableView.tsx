@@ -73,7 +73,7 @@ const PedidoEquiposTableView = memo(function PedidoEquiposTableView({
   const getDetailUrl = (pedidoId: string) => {
     return isLogisticsContext
       ? `/logistica/pedidos/${pedidoId}`
-      : `/proyectos/${proyectoId}/equipos/pedidos/${pedidoId}`;
+      : `/proyectos/${proyectoId}/pedidos/${pedidoId}`;
   };
   const [searchTerm, setSearchTerm] = useState('');
   const [sortField, setSortField] = useState<string>('fechaPedido');

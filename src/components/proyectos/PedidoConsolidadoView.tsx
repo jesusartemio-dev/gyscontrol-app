@@ -385,7 +385,7 @@ export function PedidoConsolidadoView() {
                             {item.origenes.map((origen) => (
                               <Link
                                 key={origen.pedidoId}
-                                href={`/proyectos/${origen.proyectoId}/equipos/pedidos/${origen.pedidoId}`}
+                                href={`/proyectos/${origen.proyectoId}/pedidos/${origen.pedidoId}`}
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 <Badge

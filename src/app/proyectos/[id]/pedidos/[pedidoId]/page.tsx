@@ -113,7 +113,7 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
     deleteEndpoint: (id) => `/api/pedido-equipo/${id}`,
     onSuccess: () => {
       toast.success('Pedido eliminado')
-      router.push(`/proyectos/${proyectoId}/equipos/pedidos`)
+      router.push(`/proyectos/${proyectoId}/pedidos`)
     },
     onError: (error) => toast.error(error),
   })
@@ -245,7 +245,7 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
             <ChevronRight className="h-3 w-3" />
             <Link href={`/proyectos/${proyectoId}`} className="hover:text-foreground">{proyecto.codigo}</Link>
             <ChevronRight className="h-3 w-3" />
-            <Link href={`/proyectos/${proyectoId}/equipos/pedidos`} className="hover:text-foreground">Pedidos</Link>
+            <Link href={`/proyectos/${proyectoId}/pedidos`} className="hover:text-foreground">Pedidos</Link>
             <ChevronRight className="h-3 w-3" />
             <span className="text-foreground font-medium">{pedido.codigo}</span>
           </div>
@@ -254,7 +254,7 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Button variant="ghost" size="sm" asChild className="h-7 px-2">
-                <Link href={`/proyectos/${proyectoId}/equipos/pedidos`}>
+                <Link href={`/proyectos/${proyectoId}/pedidos`}>
                   <ArrowLeft className="h-3.5 w-3.5" />
                 </Link>
               </Button>
@@ -557,7 +557,7 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
                 <div>
                   <span className="text-muted-foreground">Lista Origen</span>
                   <Link
-                    href={`/proyectos/${proyectoId}/equipos/listas/${(pedido as any).lista.id}`}
+                    href={`/proyectos/${proyectoId}/listas/${(pedido as any).lista.id}`}
                     className="font-medium text-blue-600 hover:underline flex items-center gap-1"
                   >
                     {(pedido as any).lista.codigo || (pedido as any).lista.nombre}

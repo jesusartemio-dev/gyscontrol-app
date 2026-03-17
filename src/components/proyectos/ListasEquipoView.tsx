@@ -397,7 +397,7 @@ export function ListasEquipoView() {
                   <TableCell>
                     <div>
                       <Link
-                        href={`/proyectos/${lista.proyecto?.id}/equipos/listas/${lista.id}`}
+                        href={`/proyectos/${lista.proyecto?.id}/listas/${lista.id}`}
                         className="font-medium text-gray-900 hover:text-blue-600 hover:underline"
                       >
                         {lista.nombre}
@@ -477,7 +477,7 @@ export function ListasEquipoView() {
                   {/* Actions */}
                   <TableCell className="text-center">
                     <Button variant="ghost" size="sm" className="h-7 w-7 p-0" asChild>
-                      <Link href={`/proyectos/${lista.proyecto?.id}/equipos/listas/${lista.id}`}>
+                      <Link href={`/proyectos/${lista.proyecto?.id}/listas/${lista.id}`}>
                         <Eye className="h-4 w-4 text-gray-500" />
                       </Link>
                     </Button>
@@ -500,7 +500,7 @@ export function ListasEquipoView() {
                 <div className="flex items-start justify-between mb-2">
                   <div>
                     <Link
-                      href={`/proyectos/${lista.proyecto?.id}/equipos/listas/${lista.id}`}
+                      href={`/proyectos/${lista.proyecto?.id}/listas/${lista.id}`}
                       className="font-mono text-sm font-semibold text-blue-600 hover:underline"
                     >
                       {lista.codigo}

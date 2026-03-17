@@ -245,7 +245,7 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
                   if (result) {
                     toast.success('Pedido creado');
                     await refreshItems();
-                    router.push(`/proyectos/${proyectoId}/equipos/pedidos/${result.id}`);
+                    router.push(`/proyectos/${proyectoId}/pedidos/${result.id}`);
                     return result;
                   }
                   return null;

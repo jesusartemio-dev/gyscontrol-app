@@ -387,7 +387,7 @@ export function PedidoItemsView() {
                     <span className="text-muted-foreground">{group.items.length} items</span>
                     <span className="font-semibold text-emerald-600">{formatCurrency(group.montoTotal)}</span>
                     <Button variant="ghost" size="sm" className="h-6 w-6 p-0" asChild onClick={(e) => e.stopPropagation()}>
-                      <Link href={`/proyectos/${group.proyectoId}/equipos/pedidos/${group.pedidoId}`}>
+                      <Link href={`/proyectos/${group.proyectoId}/pedidos/${group.pedidoId}`}>
                         <Eye className="h-3.5 w-3.5 text-gray-500" />
                       </Link>
                     </Button>
