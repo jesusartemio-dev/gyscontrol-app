@@ -19,6 +19,7 @@ const coloresEstado: Record<EstadoEquipoItem, string> = {
   en_lista: 'bg-blue-400',
   reemplazado: 'bg-yellow-400 text-black',
   descartado: 'bg-red-600',
+  desglosado: 'bg-purple-400',
 }
 
 export default function ProyectoEquipoItemList({ proyectoId, filtroEquipoId, modoRevision }: Props) {

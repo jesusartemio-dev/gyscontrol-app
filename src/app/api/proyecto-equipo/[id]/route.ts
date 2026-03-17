@@ -35,6 +35,11 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
               include: {
                 listaEquipo: { select: { id: true, codigo: true, nombre: true } }
               }
+            },
+            desgloses: {
+              include: {
+                listaEquipo: { select: { id: true, codigo: true, nombre: true } }
+              }
             }
           }
         }

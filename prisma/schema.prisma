@@ -641,6 +641,7 @@ model ListaEquipo {
   pedidoEquipoItem           PedidoEquipoItem[]
   proyectoEquipoCotizadoItem ProyectoEquipoCotizadoItem[]
   eventosTrazabilidad        EventoTrazabilidad[]
+  desgloses                  DesgloseEquipoItem[]
 
   @@index([estado, fechaNecesaria, createdAt(sort: Desc)], map: "idx_lista_estado_necesaria_fecha")
   @@index([proyectoId, estado, createdAt(sort: Desc)], map: "idx_lista_proyecto_estado_fecha")
@@ -1172,12 +1173,26 @@ model ProyectoEquipoCotizadoItem {
   listaEquipoSeleccionadoId String?
   listaEquipoItemsAsociados ListaEquipoItem[]      @relation("listaEquipoItemProyectoEquipoItem")
   listaEquipoItemsReemplazo ListaEquipoItem[]      @relation("listaEquipoItemReemplazaProyectoEquipoItem")
+  desgloses                 DesgloseEquipoItem[]
   catalogoEquipo            CatalogoEquipo?        @relation(fields: [catalogoEquipoId], references: [id])
   listaEquipoSeleccionado   ListaEquipoItem?       @relation("proyectoEquipoCotizadoItemListaEquipoSeleccionado", fields: [listaEquipoSeleccionadoId], references: [id])
   listaEquipo               ListaEquipo?           @relation(fields: [listaId], references: [id])
   proyectoEquipoCotizado    ProyectoEquipoCotizado @relation(fields: [proyectoEquipoId], references: [id], onDelete: Cascade)
 
   @@map("proyecto_equipo_cotizado_item")
+}
+
+model DesgloseEquipoItem {
+  id                             String                     @id @default(cuid())
+  proyectoEquipoCotizadoItemId   String
+  listaEquipoId                  String
+  nota                           String?
+  createdAt                      DateTime                   @default(now())
+  proyectoEquipoCotizadoItem     ProyectoEquipoCotizadoItem @relation(fields: [proyectoEquipoCotizadoItemId], references: [id], onDelete: Cascade)
+  listaEquipo                    ListaEquipo                @relation(fields: [listaEquipoId], references: [id], onDelete: Cascade)
+
+  @@unique([proyectoEquipoCotizadoItemId, listaEquipoId])
+  @@map("desglose_equipo_item")
 }
 
 model ProyectoGastoCotizado {
@@ -3006,6 +3021,7 @@ enum EstadoEquipoItem {
   en_lista
   reemplazado
   descartado
+  desglosado
 }
 
 enum EstadoFase {

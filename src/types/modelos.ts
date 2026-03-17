@@ -75,6 +75,7 @@ export type EstadoEquipo =
   | 'en_lista'
   | 'reemplazado'
   | 'descartado'
+  | 'desglosado'
 
 export type EstadoListaItem =
   | 'borrador'

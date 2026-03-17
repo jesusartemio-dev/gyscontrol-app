@@ -35,7 +35,8 @@ import {
   MoreHorizontal,
   Undo2,
   Link2,
-  Loader2
+  Loader2,
+  Layers
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -49,17 +50,24 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/components/ui/use-toast'
 import type { Proyecto, ProyectoEquipoCotizado, ProyectoEquipoCotizadoItem, ListaEquipo, ListaEquipoItem, EstadoEquipoItem } from '@prisma/client'
 import CrearListaMultipleModal from '@/components/proyectos/equipos/CrearListaMultipleModal'
 
 type ListaInfo = Pick<ListaEquipo, 'id' | 'codigo' | 'nombre'>
 
+type DesgloseInfo = {
+  id: string
+  listaEquipo: ListaInfo
+}
+
 type ItemWithLista = ProyectoEquipoCotizadoItem & {
   listaEquipo?: ListaInfo | null
   listaEquipoSeleccionado?: (Pick<ListaEquipoItem, 'id' | 'cantidad'> & {
     listaEquipo?: ListaInfo | null
   }) | null
+  desgloses?: DesgloseInfo[]
 }
 
 type ProyectoEquipoCotizadoWithItems = Omit<ProyectoEquipoCotizado, 'proyecto' | 'responsable'> & {
@@ -112,7 +120,7 @@ function LoadingSkeleton() {
   )
 }
 
-function ItemsTable({ items, proyectoId, onEstadoChange, onVincular }: { items: ItemWithLista[], proyectoId: string, onEstadoChange: (itemId: string, estado: string) => Promise<void>, onVincular: (item: ItemWithLista) => void }) {
+function ItemsTable({ items, proyectoId, onEstadoChange, onVincular, onDesglosar, onRevertirDesglose }: { items: ItemWithLista[], proyectoId: string, onEstadoChange: (itemId: string, estado: string) => Promise<void>, onVincular: (item: ItemWithLista) => void, onDesglosar: (item: ItemWithLista) => void, onRevertirDesglose: (itemId: string) => Promise<void> }) {
   const [search, setSearch] = useState('')
   const [categoriaFiltro, setCategoriaFiltro] = useState('__todas__')
   const [sortField, setSortField] = useState<string>('codigo')
@@ -192,6 +200,13 @@ function ItemsTable({ items, proyectoId, onEstadoChange, onVincular }: { items: 
       return (
         <span className="inline-flex items-center gap-0.5 text-[10px] text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded">
           <RefreshCw className="h-2.5 w-2.5" />Reempl.
+        </span>
+      )
+    }
+    if (item.estado === 'desglosado') {
+      return (
+        <span className="inline-flex items-center gap-0.5 text-[10px] text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded">
+          <Layers className="h-2.5 w-2.5" />Desglosado
         </span>
       )
     }
@@ -335,6 +350,24 @@ function ItemsTable({ items, proyectoId, onEstadoChange, onVincular }: { items: 
                     </td>
                     <td className="px-2 py-1.5">
                       {(() => {
+                        // Desglosado: show multiple listas
+                        if (item.estado === 'desglosado' && item.desgloses && item.desgloses.length > 0) {
+                          return (
+                            <div className="flex flex-wrap gap-0.5">
+                              {item.desgloses.map((d) => (
+                                <Link
+                                  key={d.id}
+                                  href={`/proyectos/${proyectoId}/listas/${d.listaEquipo.id}`}
+                                  className="text-[10px] font-mono text-purple-600 hover:underline"
+                                  title={d.listaEquipo.nombre}
+                                >
+                                  {d.listaEquipo.codigo}
+                                </Link>
+                              ))}
+                            </div>
+                          )
+                        }
+                        // Normal: single lista
                         const lista = item.listaEquipo ?? item.listaEquipoSeleccionado?.listaEquipo
                         if (!lista) return <span className="text-[10px] text-muted-foreground">—</span>
                         return (
@@ -363,7 +396,7 @@ function ItemsTable({ items, proyectoId, onEstadoChange, onVincular }: { items: 
                       })()}
                     </td>
                     <td className="px-1 py-1.5 text-center">
-                      {(item.estado === 'pendiente' || item.estado === 'descartado') && !item.listaId && !item.listaEquipoSeleccionado && (
+                      {(item.estado === 'pendiente' || item.estado === 'descartado' || item.estado === 'desglosado') && !item.listaId && !item.listaEquipoSeleccionado && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <button className="p-0.5 rounded hover:bg-gray-200 transition-colors" disabled={updatingId === item.id}>
@@ -381,6 +414,13 @@ function ItemsTable({ items, proyectoId, onEstadoChange, onVincular }: { items: 
                                   Vincular
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
+                                  className="text-xs"
+                                  onClick={() => onDesglosar(item)}
+                                >
+                                  <Layers className="h-3.5 w-3.5 mr-2" />
+                                  Desglosar
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
                                   className="text-xs text-red-600 focus:text-red-600"
                                   onClick={async () => {
                                     setUpdatingId(item.id)
@@ -390,6 +430,28 @@ function ItemsTable({ items, proyectoId, onEstadoChange, onVincular }: { items: 
                                 >
                                   <XCircle className="h-3.5 w-3.5 mr-2" />
                                   Descartar
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                            {item.estado === 'desglosado' && (
+                              <>
+                                <DropdownMenuItem
+                                  className="text-xs"
+                                  onClick={() => onDesglosar(item)}
+                                >
+                                  <Layers className="h-3.5 w-3.5 mr-2" />
+                                  Editar desglose
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-xs"
+                                  onClick={async () => {
+                                    setUpdatingId(item.id)
+                                    await onRevertirDesglose(item.id)
+                                    setUpdatingId(null)
+                                  }}
+                                >
+                                  <Undo2 className="h-3.5 w-3.5 mr-2" />
+                                  Revertir desglose
                                 </DropdownMenuItem>
                               </>
                             )}
@@ -443,6 +505,10 @@ export default function ProjectEquipmentDetailPage({ params }: PageProps) {
   const [unlinkedItems, setUnlinkedItems] = useState<any[]>([])
   const [loadingUnlinked, setLoadingUnlinked] = useState(false)
   const [linkingId, setLinkingId] = useState<string | null>(null)
+  const [desgloseItem, setDesgloseItem] = useState<ItemWithLista | null>(null)
+  const [desgloseListasProyecto, setDesgloseListasProyecto] = useState<ListaInfo[]>([])
+  const [desgloseSelected, setDesgloseSelected] = useState<string[]>([])
+  const [desgloseSaving, setDesgloseSaving] = useState(false)
   const { toast } = useToast()
 
   const handleEstadoChange = async (itemId: string, nuevoEstado: string) => {
@@ -540,6 +606,62 @@ export default function ProjectEquipmentDetailPage({ params }: PageProps) {
     }
   }
 
+  const handleOpenDesglosar = async (item: ItemWithLista) => {
+    setDesgloseItem(item)
+    setDesgloseSelected(item.desgloses?.map(d => d.listaEquipo.id) || [])
+    try {
+      const res = await fetch(`/api/lista-equipo?proyectoId=${proyectoId}`)
+      if (res.ok) {
+        const data = await res.json()
+        setDesgloseListasProyecto(data.map((l: any) => ({ id: l.id, codigo: l.codigo, nombre: l.nombre })))
+      }
+    } catch {
+      toast({ title: 'Error', description: 'No se pudo cargar listas del proyecto', variant: 'destructive' })
+    }
+  }
+
+  const handleDesglosar = async () => {
+    if (!desgloseItem || desgloseSelected.length === 0) return
+    setDesgloseSaving(true)
+    try {
+      const res = await fetch(`/api/proyecto-equipo-item/${desgloseItem.id}/desglosar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ listaIds: desgloseSelected }),
+      })
+      if (!res.ok) throw new Error('Error al desglosar')
+      const updated = await res.json()
+      if (equipo) {
+        setEquipo({
+          ...equipo,
+          items: equipo.items.map(i => i.id === desgloseItem.id ? { ...i, estado: 'desglosado' as EstadoEquipoItem, desgloses: updated.desgloses } : i)
+        })
+      }
+      toast({ title: 'Desglosado', description: `Ítem desglosado en ${desgloseSelected.length} lista(s)` })
+      setDesgloseItem(null)
+    } catch {
+      toast({ title: 'Error', description: 'No se pudo desglosar el ítem', variant: 'destructive' })
+    } finally {
+      setDesgloseSaving(false)
+    }
+  }
+
+  const handleRevertirDesglose = async (itemId: string) => {
+    try {
+      const res = await fetch(`/api/proyecto-equipo-item/${itemId}/desglosar`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Error al revertir')
+      if (equipo) {
+        setEquipo({
+          ...equipo,
+          items: equipo.items.map(i => i.id === itemId ? { ...i, estado: 'pendiente' as EstadoEquipoItem, desgloses: [] } : i)
+        })
+      }
+      toast({ title: 'Revertido', description: 'El desglose fue revertido' })
+    } catch {
+      toast({ title: 'Error', description: 'No se pudo revertir el desglose', variant: 'destructive' })
+    }
+  }
+
   useEffect(() => {
     params.then(p => {
       setProyectoId(p.id)
@@ -574,8 +696,9 @@ export default function ProjectEquipmentDetailPage({ params }: PageProps) {
     (i.listaId || i.estado === 'en_lista') && i.listaEquipoSeleccionado && i.listaEquipoSeleccionado.cantidad > i.cantidad
   ).length || 0
   const completedItems = equipo.items?.filter(i => i.listaId || i.estado === 'en_lista' || i.estado === 'reemplazado').length || 0
+  const desglosadosItems = equipo.items?.filter(i => i.estado === 'desglosado').length || 0
   const descartadosItems = equipo.items?.filter(i => i.estado === 'descartado').length || 0
-  const pendingItems = totalItems - completedItems - descartadosItems
+  const pendingItems = totalItems - completedItems - desglosadosItems - descartadosItems
   const totalCost = equipo.items?.reduce((sum, i) => sum + (i.cantidad * (i.precioCliente || 0)), 0) || 0
 
   return (
@@ -650,7 +773,7 @@ export default function ProjectEquipmentDetailPage({ params }: PageProps) {
       )}
 
       {/* Items Table */}
-      <ItemsTable items={equipo.items || []} proyectoId={proyectoId} onEstadoChange={handleEstadoChange} onVincular={handleOpenVincular} />
+      <ItemsTable items={equipo.items || []} proyectoId={proyectoId} onEstadoChange={handleEstadoChange} onVincular={handleOpenVincular} onDesglosar={handleOpenDesglosar} onRevertirDesglose={handleRevertirDesglose} />
 
       {/* Dialog Vincular */}
       <Dialog open={!!vincularItem} onOpenChange={() => setVincularItem(null)}>
@@ -713,6 +836,71 @@ export default function ProjectEquipmentDetailPage({ params }: PageProps) {
               </div>
             </ScrollArea>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Desglosar */}
+      <Dialog open={!!desgloseItem} onOpenChange={() => setDesgloseItem(null)}>
+        <DialogContent className="max-w-md">
+          <DialogTitle className="text-base font-semibold flex items-center gap-2">
+            <Layers className="h-4 w-4 text-purple-600" />
+            Desglosar ítem
+          </DialogTitle>
+          <p className="text-xs text-muted-foreground -mt-2">
+            Selecciona las listas donde se desglosó <strong>{desgloseItem?.codigo}</strong> — <span className="text-gray-500">{desgloseItem?.descripcion}</span>
+          </p>
+
+          {desgloseListasProyecto.length === 0 ? (
+            <div className="text-center py-8 text-sm text-muted-foreground">
+              No hay listas en este proyecto.
+            </div>
+          ) : (
+            <ScrollArea className="max-h-[300px]">
+              <div className="space-y-1">
+                {desgloseListasProyecto.map((lista) => (
+                  <label
+                    key={lista.id}
+                    className={cn(
+                      'flex items-center gap-3 p-2 rounded-lg border cursor-pointer transition-colors',
+                      desgloseSelected.includes(lista.id) ? 'bg-purple-50 border-purple-200' : 'hover:bg-gray-50'
+                    )}
+                  >
+                    <Checkbox
+                      checked={desgloseSelected.includes(lista.id)}
+                      onCheckedChange={(checked) => {
+                        setDesgloseSelected(prev =>
+                          checked ? [...prev, lista.id] : prev.filter(id => id !== lista.id)
+                        )
+                      }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <span className="font-mono text-xs text-gray-600">{lista.codigo}</span>
+                      <p className="text-xs text-gray-700 truncate">{lista.nombre}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </ScrollArea>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" size="sm" onClick={() => setDesgloseItem(null)}>
+              Cancelar
+            </Button>
+            <Button
+              size="sm"
+              disabled={desgloseSelected.length === 0 || desgloseSaving}
+              onClick={handleDesglosar}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              {desgloseSaving ? (
+                <Loader2 className="h-3 w-3 animate-spin mr-1" />
+              ) : (
+                <Layers className="h-3 w-3 mr-1" />
+              )}
+              Desglosar en {desgloseSelected.length} lista(s)
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
