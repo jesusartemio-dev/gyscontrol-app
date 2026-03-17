@@ -103,6 +103,7 @@ export default function ListaEquipoCard({
         <ListaEquipoItemList
           listaId={lista.id}
           proyectoId={proyectoId}
+          listaEstado={lista.estado}
           items={items}
           onCreated={onRefreshItems}
         />

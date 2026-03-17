@@ -282,6 +282,7 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
           proyectoId={proyectoId}
           listaCodigo={lista?.codigo || ''}
           listaNombre={lista?.nombre || ''}
+          listaEstado={lista?.estado}
           items={items}
           editable={true}
           onCreated={handleRefreshItems}

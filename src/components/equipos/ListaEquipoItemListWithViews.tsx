@@ -22,6 +22,7 @@ import ListaEquipoItemList from './ListaEquipoItemList'
 interface Props {
   listaId: string
   proyectoId: string
+  listaEstado?: string
   items: ListaEquipoItem[]
   editable?: boolean
   onCreated?: () => void
@@ -36,6 +37,7 @@ interface Props {
 export default function ListaEquipoItemListWithViews({
   listaId,
   proyectoId,
+  listaEstado,
   items,
   editable = true,
   onCreated,
@@ -55,6 +57,7 @@ export default function ListaEquipoItemListWithViews({
       <ListaEquipoItemList
         listaId={listaId}
         proyectoId={proyectoId}
+        listaEstado={listaEstado}
         items={items}
         editable={editable}
         onCreated={onCreated}

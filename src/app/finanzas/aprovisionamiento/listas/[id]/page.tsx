@@ -357,6 +357,7 @@ export default async function ListaEquipoDetallePage({ params, searchParams }: P
                  proyectoId={lista.proyecto?.id || ''}
                  listaCodigo={lista.codigo || ''}
                  listaNombre={lista.nombre || ''}
+                 listaEstado={lista.estado}
                  items={equiposData.items}
                  editable={true}
                />

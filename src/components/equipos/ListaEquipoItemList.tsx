@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Pencil, Trash2, Search, Package, Clock, AlertTriangle, CheckCircle, Grid3X3, List, RotateCcw, Plus, ShoppingCart, FileText, Download, Tag, ChevronDown, Wrench, Trophy, Layers, MoreHorizontal } from 'lucide-react'
+import { Pencil, Trash2, Search, Package, Clock, AlertTriangle, CheckCircle, XCircle, Grid3X3, List, RotateCcw, Plus, ShoppingCart, FileText, Download, Tag, ChevronDown, Wrench, Trophy, Layers, MoreHorizontal } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ListaEquipoItem } from '@/types'
@@ -73,6 +73,7 @@ interface Props {
   proyectoId: string
   listaCodigo?: string
   listaNombre?: string
+  listaEstado?: string
   items: ListaEquipoItem[]
   editable?: boolean
   onCreated?: () => void | Promise<void>
@@ -108,7 +109,7 @@ const getOrigenVariant = (origen: string): "default" | "secondary" | "outline" =
 }
 
 
-export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, listaNombre, items, editable = true, onCreated, onItemUpdated, onItemsUpdated, onDeleted, onRefresh }: Props) {
+export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, listaNombre, listaEstado, items, editable = true, onCreated, onItemUpdated, onItemsUpdated, onDeleted, onRefresh }: Props) {
   const router = useRouter()
   const { data: session } = useSession()
   const rol = (session?.user as any)?.role || ''
@@ -539,12 +540,14 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                 <th className={`${cellPadding} ${columnWidths.pedidosLinks} text-center font-semibold text-gray-700`}>
                   Pedidos
                 </th>
+                {listaEstado !== 'borrador' && (
                 <th className={`${cellPadding} ${columnWidths.verificadoComentario} text-left font-semibold text-gray-700`}>
                   <div className="flex items-center gap-1">
                     <CheckCircle className="h-3 w-3" />
-                    <span>Comentario</span>
+                    <span>{listaEstado === 'por_revisar' ? 'Rev.' : 'Rev.'}</span>
                   </div>
                 </th>
+                )}
                 <th className={`${cellPadding} ${columnWidths.acciones} text-center font-semibold text-gray-700`}></th>
               </tr>
             </thead>
@@ -720,82 +723,101 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                         })()}
                       </div>
                    </td>
+                   {listaEstado !== 'borrador' && (
                    <td className={`${cellPadding} ${columnWidths.verificadoComentario}`}>
-                      <div className="flex items-center gap-2">
-                        <div className="flex-shrink-0">
-                          <Checkbox
-                            checked={item.verificado}
-                            disabled={!editable}
-                            onCheckedChange={(val) => editable && handleVerificado(item, Boolean(val))}
-                          />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <Popover
-                            open={isEditingComentario}
-                            onOpenChange={(open) => {
-                              if (!open) setEditComentarioItemId(null)
-                            }}
-                          >
-                            <PopoverTrigger asChild>
-                              {(() => {
-                                const displayComment = editComentarioValues[item.id] ?? item.comentarioRevision
-                                return (
-                                  <div
-                                    onClick={() => editable && setEditComentarioItemId(item.id)}
-                                    className={`text-xs cursor-pointer hover:bg-muted/50 rounded transition-colors leading-tight ${
-                                      editable ? 'hover:text-blue-600' : ''
-                                    } ${item.verificado ? 'text-green-700' : 'text-gray-600'}`}
-                                    title={displayComment || 'Click para agregar comentario'}
-                                  >
-                                    {displayComment ? (
-                                      <span>{displayComment}</span>
-                                    ) : (
-                                      <span className="text-muted-foreground italic text-xs">
-                                        {editable ? '+' : '—'}
-                                      </span>
-                                    )}
+                      {listaEstado === 'por_revisar' ? (
+                        /* Por Revisar: checkbox interactivo + comentario */
+                        <div className="flex items-center gap-2">
+                          <div className="flex-shrink-0">
+                            <Checkbox
+                              checked={item.verificado}
+                              disabled={!editable}
+                              onCheckedChange={(val) => editable && handleVerificado(item, Boolean(val))}
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <Popover
+                              open={isEditingComentario}
+                              onOpenChange={(open) => {
+                                if (!open) setEditComentarioItemId(null)
+                              }}
+                            >
+                              <PopoverTrigger asChild>
+                                {(() => {
+                                  const displayComment = editComentarioValues[item.id] ?? item.comentarioRevision
+                                  return (
+                                    <div
+                                      onClick={() => editable && setEditComentarioItemId(item.id)}
+                                      className={`text-xs cursor-pointer hover:bg-muted/50 rounded transition-colors leading-tight ${
+                                        editable ? 'hover:text-blue-600' : ''
+                                      } ${item.verificado ? 'text-green-700' : 'text-gray-600'}`}
+                                      title={displayComment || 'Click para agregar comentario'}
+                                    >
+                                      {displayComment ? (
+                                        <span>{displayComment}</span>
+                                      ) : (
+                                        <span className="text-muted-foreground italic text-xs">
+                                          {editable ? '+' : '—'}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )
+                                })()}
+                              </PopoverTrigger>
+                              {editable && (
+                                <PopoverContent className="w-72 p-3" align="start" side="bottom">
+                                  <div className="space-y-2">
+                                    <p className="text-xs font-medium text-muted-foreground">Comentario de revisión</p>
+                                    <Textarea
+                                      id={`comentario-${item.id}`}
+                                      value={editComentarioValues[item.id] ?? item.comentarioRevision ?? ''}
+                                      onChange={(e) => setEditComentarioValues((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                          e.preventDefault()
+                                          handleSaveComentario(item.id)
+                                        }
+                                      }}
+                                      placeholder="Escribe un comentario..."
+                                      className="text-xs min-h-[72px] resize-none"
+                                      rows={3}
+                                    />
+                                    <div className="flex justify-end gap-1">
+                                      <Button size="sm" variant="ghost" onClick={() => setEditComentarioItemId(null)} className="h-7 text-xs">
+                                        Cancelar
+                                      </Button>
+                                      <Button size="sm" onClick={() => handleSaveComentario(item.id)} className="h-7 text-xs">
+                                        Guardar
+                                      </Button>
+                                    </div>
                                   </div>
-                                )
-                              })()}
-                            </PopoverTrigger>
-                            {editable && (
-                              <PopoverContent className="w-72 p-3" align="start" side="bottom">
-                                <div className="space-y-2">
-                                  <p className="text-xs font-medium text-muted-foreground">Comentario de revisión</p>
-                                  <Textarea
-                                    id={`comentario-${item.id}`}
-                                    value={editComentarioValues[item.id] ?? item.comentarioRevision ?? ''}
-                                    onChange={(e) => setEditComentarioValues((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter' && !e.shiftKey) {
-                                        e.preventDefault()
-                                        handleSaveComentario(item.id)
-                                      }
-                                    }}
-                                    placeholder="Escribe un comentario..."
-                                    className="text-xs min-h-[72px] resize-none"
-                                    rows={3}
-                                  />
-                                  <div className="flex justify-end gap-1">
-                                    <Button size="sm" variant="ghost" onClick={() => setEditComentarioItemId(null)} className="h-7 text-xs">
-                                      Cancelar
-                                    </Button>
-                                    <Button size="sm" onClick={() => handleSaveComentario(item.id)} className="h-7 text-xs">
-                                      Guardar
-                                    </Button>
-                                  </div>
-                                </div>
-                              </PopoverContent>
+                                </PopoverContent>
+                              )}
+                            </Popover>
+                            {item.verificado && item.verificadoPor && (
+                              <span className="text-[9px] text-muted-foreground leading-none mt-0.5 block">
+                                {item.verificadoPor.name?.split(' ')[0]} · {item.verificadoAt ? new Date(item.verificadoAt).toLocaleDateString('es-PE', { day: '2-digit', month: 'short' }) : ''}
+                              </span>
                             )}
-                          </Popover>
-                          {item.verificado && item.verificadoPor && (
-                            <span className="text-[9px] text-muted-foreground leading-none mt-0.5 block">
-                              {item.verificadoPor.name?.split(' ')[0]} · {item.verificadoAt ? new Date(item.verificadoAt).toLocaleDateString('es-PE', { day: '2-digit', month: 'short' }) : ''}
+                          </div>
+                        </div>
+                      ) : (
+                        /* Por Cotizar en adelante: icono de solo lectura */
+                        <div className="flex items-center gap-1.5">
+                          {item.verificado ? (
+                            <CheckCircle className="h-3.5 w-3.5 text-green-600" />
+                          ) : (
+                            <XCircle className="h-3.5 w-3.5 text-red-400" />
+                          )}
+                          {item.comentarioRevision && (
+                            <span className="text-xs text-gray-500 truncate max-w-[100px]" title={item.comentarioRevision}>
+                              {item.comentarioRevision}
                             </span>
                           )}
                         </div>
-                      </div>
+                      )}
                    </td>
+                   )}
                    <td className={`${cellPadding} ${columnWidths.acciones} text-center`}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
