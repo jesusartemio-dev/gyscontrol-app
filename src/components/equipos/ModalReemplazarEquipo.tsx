@@ -191,7 +191,7 @@ export default function ModalReemplazarEquipo({
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-4xl w-full max-h-[90vh] overflow-hidden p-0 flex flex-col">
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-full min-h-0 overflow-hidden">
           {/* Header */}
           <div className="flex items-center gap-3 px-6 py-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50">
             <div className="p-2 bg-blue-100 rounded-lg">
