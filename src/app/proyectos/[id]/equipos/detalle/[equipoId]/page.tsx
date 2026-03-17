@@ -47,6 +47,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogTitle,
 } from '@/components/ui/dialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -408,14 +409,14 @@ function ItemsTable({ items, proyectoId, onEstadoChange, onVincular, onDesglosar
                               <>
                                 <DropdownMenuItem
                                   className="text-xs"
-                                  onClick={() => onVincular(item)}
+                                  onSelect={() => setTimeout(() => onVincular(item), 0)}
                                 >
                                   <Link2 className="h-3.5 w-3.5 mr-2" />
                                   Vincular
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                   className="text-xs"
-                                  onClick={() => onDesglosar(item)}
+                                  onSelect={() => setTimeout(() => onDesglosar(item), 0)}
                                 >
                                   <Layers className="h-3.5 w-3.5 mr-2" />
                                   Desglosar
@@ -450,7 +451,7 @@ function ItemsTable({ items, proyectoId, onEstadoChange, onVincular, onDesglosar
                               <>
                                 <DropdownMenuItem
                                   className="text-xs"
-                                  onClick={() => onDesglosar(item)}
+                                  onSelect={() => setTimeout(() => onDesglosar(item), 0)}
                                 >
                                   <Layers className="h-3.5 w-3.5 mr-2" />
                                   Editar desglose
@@ -824,9 +825,9 @@ export default function ProjectEquipmentDetailPage({ params }: PageProps) {
             <Link2 className="h-4 w-4 text-blue-600" />
             Vincular reemplazo
           </DialogTitle>
-          <p className="text-xs text-muted-foreground -mt-2">
+          <DialogDescription className="text-xs text-muted-foreground -mt-2">
             Selecciona el ítem de lista que reemplaza a <strong>{vincularItem?.codigo}</strong> — <span className="text-gray-500">{vincularItem?.descripcion}</span>
-          </p>
+          </DialogDescription>
 
           {loadingUnlinked ? (
             <div className="flex items-center justify-center py-8">
@@ -888,9 +889,9 @@ export default function ProjectEquipmentDetailPage({ params }: PageProps) {
             <Layers className="h-4 w-4 text-purple-600" />
             Desglosar ítem
           </DialogTitle>
-          <p className="text-xs text-muted-foreground -mt-2">
+          <DialogDescription className="text-xs text-muted-foreground -mt-2">
             Selecciona las listas donde se desglosó <strong>{desgloseItem?.codigo}</strong> — <span className="text-gray-500">{desgloseItem?.descripcion}</span>
-          </p>
+          </DialogDescription>
 
           {desgloseListasProyecto.length === 0 ? (
             <div className="text-center py-8 text-sm text-muted-foreground">
