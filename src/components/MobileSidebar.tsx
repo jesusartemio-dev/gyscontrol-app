@@ -200,7 +200,7 @@ export default function MobileSidebar() {
       title: 'Supervisión',
       icon: Users,
       color: 'text-red-400',
-      roles: ['admin', 'gerente', 'gestor', 'coordinador', 'coordinador_logistico', 'proyectos'],
+      roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos'],
       links: [
         { href: '/supervision/timesheet', label: 'Timesheet', icon: ClipboardList },
         { href: '/supervision/jornada-campo', label: 'Jornada Campo', icon: MapPin },
@@ -210,7 +210,7 @@ export default function MobileSidebar() {
         { href: '/supervision/listas-equipo', label: 'Listas Equipo', icon: ClipboardList },
         { href: '/supervision/resumen', label: 'Resumen Proyectos', icon: BarChart3 },
         { href: '/supervision/analisis-edt', label: 'Análisis EDT', icon: Target },
-        { href: '/supervision/gastos', label: 'Aprobar Requerimientos', icon: CheckCircle2, roles: ['admin', 'gerente', 'gestor', 'coordinador', 'coordinador_logistico'] as any },
+        { href: '/supervision/gastos', label: 'Aprobar Requerimientos', icon: CheckCircle2, roles: ['admin', 'gerente', 'gestor', 'coordinador'] as any },
       ]
     },
     {
@@ -247,9 +247,10 @@ export default function MobileSidebar() {
       title: 'Gastos',
       icon: Receipt,
       color: 'text-amber-400',
-      roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos', 'colaborador', 'logistico', 'administracion'],
+      roles: ['admin', 'gerente', 'gestor', 'coordinador', 'coordinador_logistico', 'proyectos', 'colaborador', 'logistico', 'administracion'],
       links: [
         { href: '/gastos/mis-requerimientos', label: 'Mis Requerimientos', icon: CreditCard },
+        { href: '/supervision/gastos', label: 'Aprobar Requerimientos', icon: CheckCircle2, roles: ['admin', 'gerente', 'gestor', 'coordinador', 'coordinador_logistico', 'administracion'] as any },
       ],
     },
     {
