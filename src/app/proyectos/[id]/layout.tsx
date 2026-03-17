@@ -172,7 +172,7 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
     'cronograma': 'Cronograma',
     'listas': 'Listas',
     'pedidos': 'Pedidos',
-    'detalle': 'Detalle',
+    'comparacion': 'Comparación',
   }
 
   // Build breadcrumb trail from path segments (e.g. listas/[id] → Listas > Detalle)
