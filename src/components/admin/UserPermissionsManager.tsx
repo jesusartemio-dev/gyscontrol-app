@@ -100,6 +100,7 @@ const roleDisplayMap: Record<RolUsuario, { label: string; color: string }> = {
   presupuestos: { label: 'Presupuestos', color: 'bg-green-100 text-green-800' },
   proyectos: { label: 'Proyectos', color: 'bg-purple-100 text-purple-800' },
   coordinador: { label: 'Coordinador', color: 'bg-orange-100 text-orange-800' },
+  coordinador_logistico: { label: 'Coord. Logístico', color: 'bg-amber-100 text-amber-800' },
   logistico: { label: 'Logístico', color: 'bg-yellow-100 text-yellow-800' },
   gestor: { label: 'Gestor', color: 'bg-indigo-100 text-indigo-800' },
   gerente: { label: 'Gerente', color: 'bg-pink-100 text-pink-800' },

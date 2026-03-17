@@ -364,6 +364,7 @@ export function JornadaFormModal({
       colaborador: 'Colaborador',
       comercial: 'Comercial',
       coordinador: 'Coordinador',
+      coordinador_logistico: 'Coord. Logístico',
       logistico: 'Logístico',
       gestor: 'Gestor',
       proyectos: 'Proyectos',

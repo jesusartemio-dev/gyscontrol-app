@@ -133,6 +133,12 @@ const roleDisplayMap: Record<RolUsuario, { label: string; color: string; bgColor
     bgColor: 'bg-orange-50 border-orange-200',
     description: 'Coordinación de equipos'
   },
+  coordinador_logistico: {
+    label: 'Coord. Logístico',
+    color: 'text-amber-700',
+    bgColor: 'bg-amber-50 border-amber-200',
+    description: 'Coordinación logística con aprobación de gastos'
+  },
   logistico: {
     label: 'Logístico',
     color: 'text-yellow-700',
@@ -189,6 +195,7 @@ function getAvatarColor(role: RolUsuario): string {
     presupuestos: 'bg-green-500',
     proyectos: 'bg-purple-500',
     coordinador: 'bg-orange-500',
+    coordinador_logistico: 'bg-amber-500',
     logistico: 'bg-yellow-500',
     gestor: 'bg-indigo-500',
     gerente: 'bg-pink-500',

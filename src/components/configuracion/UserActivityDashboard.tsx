@@ -76,6 +76,7 @@ const ROL_LABELS: Record<string, string> = {
   gerente: 'Gerente',
   gestor: 'Gestor',
   coordinador: 'Coordinador',
+  coordinador_logistico: 'Coord. Logístico',
   proyectos: 'Proyectos',
   seguridad: 'Seguridad',
   comercial: 'Comercial',

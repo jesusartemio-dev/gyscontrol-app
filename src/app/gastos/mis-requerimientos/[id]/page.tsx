@@ -193,14 +193,14 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
 
   const isEditable = ['borrador', 'rechazado', 'aprobado', 'depositado'].includes(hoja.estado)
   const canEnviar = ['borrador', 'rechazado'].includes(hoja.estado)
-  const canAprobar = hoja.estado === 'enviado' && ['admin', 'gerente', 'gestor', 'coordinador', 'administracion'].includes(role || '')
+  const canAprobar = hoja.estado === 'enviado' && ['admin', 'gerente', 'gestor', 'coordinador', 'coordinador_logistico', 'administracion'].includes(role || '')
   const canDepositar = hoja.estado === 'aprobado' && hoja.requiereAnticipo && ['admin', 'gerente', 'administracion'].includes(role || '')
   const canRendir = (hoja.estado === 'aprobado' && !hoja.requiereAnticipo) || hoja.estado === 'depositado'
   const canValidarLineas = hoja.estado === 'rendido' && ['admin', 'gerente', 'administracion'].includes(role || '')
   const allLineasConforme = lineas.length > 0 && lineas.every(l => l.conformidad === 'conforme')
   const canValidar = canValidarLineas && allLineasConforme
-  const canCerrar = hoja.estado === 'validado' && ['admin', 'gerente', 'coordinador', 'administracion'].includes(role || '')
-  const canRechazar = ['enviado', 'rendido', 'validado'].includes(hoja.estado) && ['admin', 'gerente', 'gestor', 'coordinador', 'administracion'].includes(role || '')
+  const canCerrar = hoja.estado === 'validado' && ['admin', 'gerente', 'coordinador', 'coordinador_logistico', 'administracion'].includes(role || '')
+  const canRechazar = ['enviado', 'rendido', 'validado'].includes(hoja.estado) && ['admin', 'gerente', 'gestor', 'coordinador', 'coordinador_logistico', 'administracion'].includes(role || '')
   const canRetroceder = !['borrador', 'rechazado'].includes(hoja.estado) && ['admin', 'gerente', 'administracion'].includes(role || '')
 
   return (

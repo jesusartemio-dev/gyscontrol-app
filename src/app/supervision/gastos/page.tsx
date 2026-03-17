@@ -26,7 +26,7 @@ import {
 } from '@/lib/services/hojaDeGastos'
 import type { HojaDeGastos } from '@/types'
 
-const ALLOWED_ROLES = ['admin', 'gerente', 'gestor', 'coordinador']
+const ALLOWED_ROLES = ['admin', 'gerente', 'gestor', 'coordinador', 'coordinador_logistico']
 
 type TabKey = 'por-aprobar' | 'por-cerrar'
 

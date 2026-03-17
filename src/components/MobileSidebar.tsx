@@ -210,7 +210,7 @@ export default function MobileSidebar() {
         { href: '/supervision/listas-equipo', label: 'Listas Equipo', icon: ClipboardList },
         { href: '/supervision/resumen', label: 'Resumen Proyectos', icon: BarChart3 },
         { href: '/supervision/analisis-edt', label: 'Análisis EDT', icon: Target },
-        { href: '/supervision/gastos', label: 'Aprobar Requerimientos', icon: CheckCircle2, roles: ['admin', 'gerente', 'gestor', 'coordinador'] as any },
+        { href: '/supervision/gastos', label: 'Aprobar Requerimientos', icon: CheckCircle2, roles: ['admin', 'gerente', 'gestor', 'coordinador', 'coordinador_logistico'] as any },
       ]
     },
     {
