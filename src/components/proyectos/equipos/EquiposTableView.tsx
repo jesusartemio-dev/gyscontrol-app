@@ -112,7 +112,7 @@ const EquiposTableView = memo(function EquiposTableView({
     const presupuesto = equipo.subtotalInterno || 0
     const plan = equipo.costoListas || 0
     const completedItems = equipo.items?.filter(item =>
-      item.estado === 'en_lista' || item.estado === 'reemplazado' || item.estado === 'descartado' || item.listaId
+      item.estado !== 'pendiente'
     ).length || 0
     const progress = totalItems > 0 ? (completedItems / totalItems) * 100 : 0
     const varianza = plan > 0 && presupuesto > 0 ? ((plan - presupuesto) / presupuesto) * 100 : 0

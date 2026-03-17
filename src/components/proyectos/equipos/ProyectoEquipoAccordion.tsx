@@ -49,7 +49,7 @@ const ProyectoEquipoAccordion = memo(function ProyectoEquipoAccordion({
     const items = equipo.items || []
     const totalItems = items.length
     const completedItems = items.filter(item =>
-      item.estado === 'en_lista' || item.estado === 'reemplazado'
+      item.estado !== 'pendiente'
     ).length
     const progressPercentage = totalItems > 0 ? (completedItems / totalItems) * 100 : 0
 
