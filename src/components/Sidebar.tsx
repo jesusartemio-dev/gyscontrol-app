@@ -232,7 +232,6 @@ export default function Sidebar() {
         { href: '/supervision/listas-equipo', label: 'Listas Equipo', icon: ClipboardList },
         { href: '/supervision/resumen', label: 'Resumen Proyectos', icon: BarChart3 },
         { href: '/supervision/analisis-edt', label: 'Análisis EDT', icon: Target },
-        { href: '/supervision/gastos', label: 'Aprobar Requerimientos', icon: CheckCircle2, roles: ['admin', 'gerente', 'gestor', 'coordinador'] as any },
       ]
     },
     // 3. Logística - Gestión completa de la cadena logística
@@ -276,7 +275,7 @@ export default function Sidebar() {
       roles: ['admin', 'gerente', 'gestor', 'coordinador', 'coordinador_logistico', 'proyectos', 'colaborador', 'logistico', 'administracion'],
       links: [
         { href: '/gastos/mis-requerimientos', label: 'Mis Requerimientos', icon: CreditCard },
-        { href: '/supervision/gastos', label: 'Aprobar Requerimientos', icon: CheckCircle2, roles: ['admin', 'gerente', 'gestor', 'coordinador', 'coordinador_logistico', 'administracion'] as any },
+        { href: '/gastos/requerimientos', label: 'Aprobar Requerimientos', icon: CheckCircle2, roles: ['admin', 'gerente', 'gestor', 'coordinador', 'coordinador_logistico', 'administracion'] as any },
       ],
     },
     // 4.2. Administración - Gestión financiera y administrativa
