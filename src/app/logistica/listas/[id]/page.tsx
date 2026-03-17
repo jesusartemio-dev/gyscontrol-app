@@ -26,7 +26,6 @@ import { StepPill, StepLine, type StepStatus } from '@/components/ui/status-step
 import { estadosList } from '@/lib/utils/flujoListaEquipo'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Textarea } from '@/components/ui/textarea'
 import {
   AlertDialog,
   AlertDialogContent,
@@ -49,9 +48,7 @@ export default function LogisticaListaDetallePage() {
   const [loading, setLoading] = useState(true)
   const [showCrearCotizacion, setShowCrearCotizacion] = useState(false)
   const [updatingEstado, setUpdatingEstado] = useState(false)
-  const [openRechazo, setOpenRechazo] = useState(false)
   const [openConfirmAvanzar, setOpenConfirmAvanzar] = useState(false)
-  const [justificacion, setJustificacion] = useState('')
 
   const handleRefetch = async () => {
     try {
@@ -75,7 +72,7 @@ export default function LogisticaListaDetallePage() {
   const rol = session?.user?.role || ''
   const flujo = lista ? flujoEstados[lista.estado as EstadoListaEquipo] : null
   const puedeAvanzar = !!flujo?.siguiente && flujo.roles.includes(rol)
-  const puedeRechazar = !!flujo?.rechazar && flujo.roles.includes(rol)
+  const puedeRetroceder = !!flujo?.retroceder && flujo.roles.includes(rol)
 
   const handleAvanzarEstado = async () => {
     if (!lista || !flujo?.siguiente) return
@@ -91,17 +88,15 @@ export default function LogisticaListaDetallePage() {
     }
   }
 
-  const handleRechazar = async () => {
-    if (!lista || !flujo?.rechazar || justificacion.trim().length < 10) return
+  const handleRetroceder = async () => {
+    if (!lista || !flujo?.retroceder) return
     try {
       setUpdatingEstado(true)
-      await updateListaEstado(lista.id, flujo.rechazar, justificacion.trim())
-      toast.success('Lista rechazada')
-      setJustificacion('')
-      setOpenRechazo(false)
+      await updateListaEstado(lista.id, flujo.retroceder)
+      toast.success(`Estado actualizado a "${estadoLabels[flujo.retroceder]}"`)
       handleRefetch()
     } catch (error: any) {
-      toast.error(error?.message || 'Error al rechazar')
+      toast.error(error?.message || 'Error al retroceder')
     } finally {
       setUpdatingEstado(false)
     }
@@ -112,12 +107,9 @@ export default function LogisticaListaDetallePage() {
       borrador: 'bg-gray-100 text-gray-700',
       por_revisar: 'bg-yellow-100 text-yellow-700',
       por_cotizar: 'bg-blue-100 text-blue-700',
-      por_validar: 'bg-purple-100 text-purple-700',
       por_aprobar: 'bg-orange-100 text-orange-700',
       aprobada: 'bg-green-100 text-green-700',
-      rechazada: 'bg-red-100 text-red-700',
-      enviada: 'bg-cyan-100 text-cyan-700',
-      completada: 'bg-emerald-100 text-emerald-700',
+      anulada: 'bg-red-100 text-red-700',
     }
     return styles[estado] || 'bg-gray-100 text-gray-700'
   }
@@ -256,16 +248,16 @@ export default function LogisticaListaDetallePage() {
                   Avanzar
                 </Button>
               )}
-              {puedeRechazar && (
+              {puedeRetroceder && (
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setOpenRechazo(true)}
+                  onClick={handleRetroceder}
                   disabled={updatingEstado}
                   className="h-7 text-xs border-gray-300 text-gray-600 hover:bg-gray-100"
                 >
                   <X className="h-3 w-3 mr-1" />
-                  Rechazar
+                  Retroceder
                 </Button>
               )}
             </div>
@@ -273,11 +265,12 @@ export default function LogisticaListaDetallePage() {
 
           {/* Estado flow stepper */}
           <div className="flex items-center mt-2 overflow-x-auto">
-            {estadosList.map((etapa, i) => {
-              const currentIndex = estadosList.findIndex(s => s.key === lista.estado)
-              const isRechazada = lista.estado === 'rechazada'
+            {estadosList.filter(e => e.key !== 'anulada').map((etapa, i) => {
+              const mainStates = estadosList.filter(e => e.key !== 'anulada')
+              const currentIndex = mainStates.findIndex(s => s.key === lista.estado)
+              const isAnulada = lista.estado === 'anulada'
               let status: StepStatus = 'future'
-              if (!isRechazada) {
+              if (!isAnulada) {
                 if (i < currentIndex) status = 'completed'
                 else if (etapa.key === lista.estado) status = 'current'
               }
@@ -288,10 +281,10 @@ export default function LogisticaListaDetallePage() {
                 </React.Fragment>
               )
             })}
-            {lista.estado === 'rechazada' && (
+            {lista.estado === 'anulada' && (
               <>
                 <StepLine nextStatus="rejected" />
-                <StepPill label="Rechazada" status="rejected" />
+                <StepPill label="Anulada" status="rejected" />
               </>
             )}
           </div>
@@ -482,39 +475,6 @@ export default function LogisticaListaDetallePage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Dialog Rechazo */}
-      <AlertDialog open={openRechazo} onOpenChange={setOpenRechazo}>
-        <AlertDialogContent className="sm:max-w-md">
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Rechazar esta lista?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Indica la razón del rechazo para que el equipo pueda hacer correcciones.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">
-              Justificación *
-            </label>
-            <Textarea
-              placeholder="Describe las razones del rechazo..."
-              value={justificacion}
-              onChange={(e) => setJustificacion(e.target.value)}
-              rows={3}
-              className="resize-none"
-            />
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={updatingEstado}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleRechazar}
-              disabled={updatingEstado || justificacion.trim().length < 10}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              {updatingEstado ? 'Rechazando...' : 'Rechazar'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
 }

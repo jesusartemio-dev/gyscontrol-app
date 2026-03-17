@@ -125,15 +125,15 @@ export default function ModalReemplazarEquipo({
         const tieneCotizaciones = item.cotizaciones && item.cotizaciones.length > 0
         if (tieneCotizaciones) {
           await updateListaEquipoItem(item.id, {
-            estado: 'rechazado',
+            estado: 'borrador',
             proyectoEquipoItemId: undefined,
           })
         } else {
           await deleteListaEquipoItem(item.id)
         }
       } else {
-        // reemplazo or nuevo — just mark as rechazado
-        await updateListaEquipoItem(item.id, { estado: 'rechazado' })
+        // reemplazo or nuevo — reset to borrador since it's being replaced
+        await updateListaEquipoItem(item.id, { estado: 'borrador' })
       }
 
       // Step 2: Create new replacement item

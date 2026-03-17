@@ -140,9 +140,9 @@ export default function ModalReemplazarReemplazoDesdeCatalogo({
         throw new Error('No se pudo identificar el ProyectoEquipoItem original')
       }
 
-      // ✅ Paso 1: Actualizar item actual a 'rechazado'
+      // ✅ Paso 1: Actualizar item actual a 'borrador' (reset al ser reemplazado)
       await updateListaEquipoItem(item.id, {
-        estado: 'rechazado',
+        estado: 'borrador',
       })
 
       // ✅ Paso 2: Crear nuevo ítem con origen "reemplazo" y trazabilidad correcta

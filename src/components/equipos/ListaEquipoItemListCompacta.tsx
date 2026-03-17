@@ -161,7 +161,7 @@ export default function ListaEquipoItemListCompacta({
     const total = items.length
     const verificados = items.filter(i => i.verificado).length
     const aprobados = items.filter(i => i.estado === 'aprobado').length
-    const rechazados = items.filter(i => i.estado === 'rechazado').length
+    const rechazados = 0 // rechazado state removed from EstadoListaItem
     const conCotizacion = items.filter(i => i.cotizacionSeleccionada).length
     const costoTotal = calcularCostoTotal(items)
     
@@ -487,7 +487,6 @@ export default function ListaEquipoItemListCompacta({
                       <SelectItem value="all">Todos los estados</SelectItem>
                       <SelectItem value="borrador">Borrador</SelectItem>
                       <SelectItem value="aprobado">Aprobado</SelectItem>
-                      <SelectItem value="rechazado">Rechazado</SelectItem>
                       <SelectItem value="revision">En Revisión</SelectItem>
                     </SelectContent>
                   </Select>

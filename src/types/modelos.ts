@@ -80,10 +80,8 @@ export type EstadoListaItem =
   | 'borrador'
   | 'por_revisar'
   | 'por_cotizar'
-  | 'por_validar'
   | 'por_aprobar'
   | 'aprobado'
-  | 'rechazado'
 
 export type OrigenListaItem =
   | 'cotizado'
@@ -92,14 +90,11 @@ export type OrigenListaItem =
 
 export type EstadoListaEquipo =
   | 'borrador'
-  | 'enviada'
   | 'por_revisar'
   | 'por_cotizar'
-  | 'por_validar'
   | 'por_aprobar'
   | 'aprobada'
-  | 'rechazada'
-  | 'completada'
+  | 'anulada'
 
 export type EstadoFase =
   | 'planificado'

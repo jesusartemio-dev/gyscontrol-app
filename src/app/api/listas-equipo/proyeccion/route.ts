@@ -15,7 +15,7 @@ const FiltrosProyeccionSchema = z.object({
   proyectoId: z.string().optional(),
   fechaDesde: z.string().optional(),
   fechaHasta: z.string().optional(),
-  estado: z.enum(['borrador', 'por_revisar', 'por_cotizar', 'por_validar', 'por_aprobar', 'aprobado', 'rechazado']).optional()
+  estado: z.enum(['borrador', 'por_revisar', 'por_cotizar', 'por_aprobar', 'aprobada', 'anulada']).optional()
 });
 
 const CrearListaProyeccionSchema = z.object({

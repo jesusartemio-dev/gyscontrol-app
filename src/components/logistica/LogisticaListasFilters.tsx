@@ -39,14 +39,11 @@ interface LogisticaListasFiltersProps {
 const ESTADOS_LISTA: { value: EstadoListaEquipo | 'all'; label: string; color: string }[] = [
   { value: 'all', label: 'Todos los estados', color: 'bg-gray-100' },
   { value: 'borrador', label: 'Borrador', color: 'bg-gray-500' },
-  { value: 'enviada', label: 'Enviada', color: 'bg-indigo-500' },
   { value: 'por_revisar', label: 'Por Revisar', color: 'bg-yellow-500' },
   { value: 'por_cotizar', label: 'Por Cotizar', color: 'bg-blue-500' },
-  { value: 'por_validar', label: 'Por Validar', color: 'bg-orange-500' },
   { value: 'por_aprobar', label: 'Por Aprobar', color: 'bg-purple-500' },
   { value: 'aprobada', label: 'Aprobada', color: 'bg-green-500' },
-  { value: 'rechazada', label: 'Rechazada', color: 'bg-red-500' },
-  { value: 'completada', label: 'Completada', color: 'bg-emerald-500' },
+  { value: 'anulada', label: 'Anulada', color: 'bg-red-500' },
 ]
 
 export default function LogisticaListasFilters({ proyectos, listas, onFiltersChange, className }: LogisticaListasFiltersProps) {

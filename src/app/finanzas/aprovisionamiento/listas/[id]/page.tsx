@@ -525,14 +525,14 @@ export default async function ListaEquipoDetallePage({ params, searchParams }: P
               <CardContent>
                 <div className="space-y-3">
                   {equiposData.items
-                    ?.filter(equipo => equipo.estado === 'rechazado' || equipo.verificado === false)
+                    ?.filter(equipo => equipo.verificado === false)
                     .slice(0, 5)
                     .map((equipo) => (
                       <div key={equipo.id} className="flex items-center justify-between p-3 bg-destructive/10 rounded">
                         <div>
                           <p className="font-medium">{equipo.codigo} - {equipo.descripcion}</p>
                           <p className="text-sm text-muted-foreground">
-                            {equipo.estado === 'rechazado' ? 'Equipo rechazado' : 'Requiere verificación'}
+                            Requiere verificación
                           </p>
                         </div>
                         <Button variant="outline" size="sm">

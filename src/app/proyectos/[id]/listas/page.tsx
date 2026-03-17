@@ -154,10 +154,9 @@ const ListasTable = memo(function ListasTable({
       borrador: { icon: FileText, className: 'bg-gray-100 text-gray-700', label: 'Borrador' },
       por_revisar: { icon: Clock, className: 'bg-yellow-100 text-yellow-700', label: 'Por Revisar' },
       por_cotizar: { icon: Clock, className: 'bg-orange-100 text-orange-700', label: 'Por Cotizar' },
-      por_validar: { icon: AlertCircle, className: 'bg-blue-100 text-blue-700', label: 'Por Validar' },
       por_aprobar: { icon: AlertCircle, className: 'bg-purple-100 text-purple-700', label: 'Por Aprobar' },
-      aprobado: { icon: CheckCircle2, className: 'bg-green-100 text-green-700', label: 'Aprobado' },
-      rechazado: { icon: AlertCircle, className: 'bg-red-100 text-red-700', label: 'Rechazado' }
+      aprobada: { icon: CheckCircle2, className: 'bg-green-100 text-green-700', label: 'Aprobada' },
+      anulada: { icon: AlertCircle, className: 'bg-red-100 text-red-700', label: 'Anulada' },
     };
 
     const config = estados[estado] || estados.borrador;
@@ -199,10 +198,9 @@ const ListasTable = memo(function ListasTable({
             <SelectItem value="borrador">Borrador</SelectItem>
             <SelectItem value="por_revisar">Por Revisar</SelectItem>
             <SelectItem value="por_cotizar">Por Cotizar</SelectItem>
-            <SelectItem value="por_validar">Por Validar</SelectItem>
             <SelectItem value="por_aprobar">Por Aprobar</SelectItem>
-            <SelectItem value="aprobado">Aprobado</SelectItem>
-            <SelectItem value="rechazado">Rechazado</SelectItem>
+            <SelectItem value="aprobada">Aprobada</SelectItem>
+            <SelectItem value="anulada">Anulada</SelectItem>
           </SelectContent>
         </Select>
 
@@ -429,7 +427,7 @@ export default function EquipmentListsPage({ params }: PageProps) {
   if (loading && !proyecto) return <LoadingSkeleton />;
 
   const totalListas = listas.length;
-  const listasAprobadas = listas.filter(l => l.estado === 'aprobado').length;
+  const listasAprobadas = listas.filter(l => l.estado === 'aprobada').length;
   const totalItems = listas.reduce((sum, l) => sum + (l.totalItems || l.items?.length || 0), 0);
   const totalPresupuesto = listas.reduce((sum, l) => sum + (l.montoEstimado || 0), 0);
 

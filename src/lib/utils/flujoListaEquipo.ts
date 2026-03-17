@@ -5,44 +5,42 @@
 
 export type EstadoListaEquipo =
   | 'borrador'
-  | 'enviada'
   | 'por_revisar'
   | 'por_cotizar'
-  | 'por_validar'
   | 'por_aprobar'
   | 'aprobada'
-  | 'rechazada'
-  | 'completada'
+  | 'anulada'
 
 export interface FlujoEstado {
   siguiente?: EstadoListaEquipo
-  rechazar?: EstadoListaEquipo
-  reset?: EstadoListaEquipo
+  retroceder?: EstadoListaEquipo
   roles: string[]
 }
 
 export const flujoEstados: Record<EstadoListaEquipo, FlujoEstado> = {
-  borrador:    { siguiente: 'por_revisar',                              roles: ['proyectos', 'admin'] },
-  enviada:     { siguiente: 'por_revisar',                              roles: ['coordinador', 'admin'] },
-  por_revisar: { siguiente: 'por_cotizar',  rechazar: 'rechazada',      roles: ['coordinador', 'admin'] },
-  por_cotizar: { siguiente: 'por_validar',  rechazar: 'rechazada',      roles: ['logistico', 'admin'] },
-  por_validar: { siguiente: 'por_aprobar',  rechazar: 'rechazada',      roles: ['gestor', 'admin'] },
-  por_aprobar: { siguiente: 'aprobada',     rechazar: 'rechazada',      roles: ['gerente', 'admin'] },
-  aprobada:    { siguiente: 'completada',   rechazar: 'rechazada',      roles: ['logistico', 'admin'] },
-  rechazada:   { reset: 'borrador',                                     roles: ['proyectos', 'admin'] },
-  completada:  {                                                        roles: [] },
+  borrador:    { siguiente: 'por_revisar',                                roles: ['proyectos', 'admin'] },
+  por_revisar: { siguiente: 'por_cotizar',  retroceder: 'borrador',      roles: ['coordinador', 'admin'] },
+  por_cotizar: { siguiente: 'por_aprobar',  retroceder: 'por_revisar',   roles: ['logistico', 'admin'] },
+  por_aprobar: { siguiente: 'aprobada',     retroceder: 'por_cotizar',   roles: ['gestor', 'admin'] },
+  aprobada:    {                                                          roles: [] },
+  anulada:     {                                                          roles: [] },
 }
+
+// Roles que pueden anular una lista (desde cualquier estado excepto aprobada)
+export const anulacionRoles = ['coordinador', 'admin']
 
 export const estadosList: { key: EstadoListaEquipo; label: string }[] = [
   { key: 'borrador',    label: 'Borrador' },
-  { key: 'por_revisar', label: 'Por revisar' },
-  { key: 'por_cotizar', label: 'Por cotizar' },
-  { key: 'por_validar', label: 'Por validar' },
-  { key: 'por_aprobar', label: 'Por aprobar' },
+  { key: 'por_revisar', label: 'Por Revisar' },
+  { key: 'por_cotizar', label: 'Por Cotizar' },
+  { key: 'por_aprobar', label: 'Por Aprobar' },
   { key: 'aprobada',    label: 'Aprobada' },
-  { key: 'rechazada',   label: 'Rechazada' },
-  { key: 'enviada',     label: 'Enviada' },
-  { key: 'completada',  label: 'Completada' },
+  { key: 'anulada',     label: 'Anulada' },
+]
+
+// Solo los estados del flujo principal (sin anulada) para el stepper UI
+export const estadosFlujoPrincipal: EstadoListaEquipo[] = [
+  'borrador', 'por_revisar', 'por_cotizar', 'por_aprobar', 'aprobada'
 ]
 
 export const estadoLabels: Record<string, string> = Object.fromEntries(
@@ -50,13 +48,25 @@ export const estadoLabels: Record<string, string> = Object.fromEntries(
 )
 
 /**
- * Validates whether a state transition is allowed for a given role
+ * Validates whether a state transition is allowed for a given role.
+ * Supports: forward (siguiente), backward (retroceder), and annulation (anulada).
  */
 export function validarTransicion(
   estadoActual: string,
   nuevoEstado: string,
   rol: string
 ): { valido: boolean; error?: string } {
+  // Anulación: desde cualquier estado excepto aprobada y anulada
+  if (nuevoEstado === 'anulada') {
+    if (estadoActual === 'aprobada' || estadoActual === 'anulada') {
+      return { valido: false, error: `No se puede anular una lista en estado '${estadoActual}'` }
+    }
+    if (!anulacionRoles.includes(rol) && rol !== 'admin') {
+      return { valido: false, error: `Rol '${rol}' no tiene permiso para anular listas` }
+    }
+    return { valido: true }
+  }
+
   const flujo = flujoEstados[estadoActual as EstadoListaEquipo]
   if (!flujo) {
     return { valido: false, error: `Estado actual '${estadoActual}' no reconocido` }
@@ -67,14 +77,37 @@ export function validarTransicion(
   }
 
   const esAvance = flujo.siguiente === nuevoEstado
-  const esRechazo = flujo.rechazar === nuevoEstado
-  const esReset = flujo.reset === nuevoEstado
+  const esRetroceso = flujo.retroceder === nuevoEstado
 
-  if (!esAvance && !esRechazo && !esReset) {
+  if (!esAvance && !esRetroceso) {
     return { valido: false, error: `Transición de '${estadoActual}' a '${nuevoEstado}' no es válida` }
   }
 
   return { valido: true }
+}
+
+/**
+ * Check if a list can be annulled from its current state
+ */
+export function canAnular(estadoActual: string, rol: string): boolean {
+  if (estadoActual === 'aprobada' || estadoActual === 'anulada') return false
+  return anulacionRoles.includes(rol) || rol === 'admin'
+}
+
+/**
+ * Returns what item editing operations are allowed based on lista estado
+ */
+export function getItemEditPermissions(listaEstado: EstadoListaEquipo) {
+  switch (listaEstado) {
+    case 'borrador':
+      return { canAddItems: true, canDeleteItems: true, canEditItems: true, canReplaceItems: true, canVerify: false, canQuote: false }
+    case 'por_revisar':
+      return { canAddItems: false, canDeleteItems: false, canEditItems: false, canReplaceItems: false, canVerify: true, canQuote: false }
+    case 'por_cotizar':
+      return { canAddItems: false, canDeleteItems: false, canEditItems: false, canReplaceItems: false, canVerify: false, canQuote: true }
+    default: // por_aprobar, aprobada, anulada
+      return { canAddItems: false, canDeleteItems: false, canEditItems: false, canReplaceItems: false, canVerify: false, canQuote: false }
+  }
 }
 
 /**
@@ -85,11 +118,9 @@ export function getFechasPorTransicion(nuevoEstado: EstadoListaEquipo): Record<s
   switch (nuevoEstado) {
     case 'por_revisar':  return { fechaEnvioRevision: now }
     case 'por_cotizar':  return { fechaEnvioLogistica: now, fechaInicioCotizacion: now }
-    case 'por_validar':  return { fechaFinCotizacion: now }
-    case 'por_aprobar':  return { fechaValidacion: now }
-    case 'aprobada':     return { fechaAprobacionRevision: now }
-    case 'completada':   return { fechaAprobacionFinal: now }
-    case 'rechazada':    return {}
+    case 'por_aprobar':  return { fechaFinCotizacion: now }
+    case 'aprobada':     return { fechaAprobacionFinal: now }
+    case 'anulada':      return { fechaAnulacion: now }
     default:             return {}
   }
 }

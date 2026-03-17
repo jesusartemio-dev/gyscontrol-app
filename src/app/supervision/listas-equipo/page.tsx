@@ -10,23 +10,12 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { Textarea } from '@/components/ui/textarea'
 import {
   ClipboardList,
   Search,
@@ -49,14 +38,11 @@ import { flujoEstados, estadoLabels, type EstadoListaEquipo } from '@/lib/utils/
 
 const estadoConfig: Record<string, { icon: any; className: string }> = {
   borrador:    { icon: FileText,     className: 'bg-gray-100 text-gray-700' },
-  enviada:     { icon: ArrowRight,   className: 'bg-blue-50 text-blue-700' },
   por_revisar: { icon: Clock,        className: 'bg-yellow-100 text-yellow-700' },
   por_cotizar: { icon: Clock,        className: 'bg-orange-100 text-orange-700' },
-  por_validar: { icon: AlertCircle,  className: 'bg-blue-100 text-blue-700' },
   por_aprobar: { icon: AlertCircle,  className: 'bg-purple-100 text-purple-700' },
   aprobada:    { icon: CheckCircle2, className: 'bg-green-100 text-green-700' },
-  rechazada:   { icon: XCircle,      className: 'bg-red-100 text-red-700' },
-  completada:  { icon: CheckCircle2, className: 'bg-emerald-100 text-emerald-700' },
+  anulada:     { icon: XCircle,      className: 'bg-red-100 text-red-700' },
 }
 
 function getEstadoBadge(estado: string) {
@@ -86,11 +72,6 @@ export default function SupervisionListasEquipoPage() {
   const [filterEstado, setFilterEstado] = useState('all')
   const [filterProyecto, setFilterProyecto] = useState('all')
   const [procesando, setProcesando] = useState<string | null>(null)
-
-  // Reject dialog state
-  const [rechazarDialogOpen, setRechazarDialogOpen] = useState(false)
-  const [rechazarListaId, setRechazarListaId] = useState<string | null>(null)
-  const [motivoRechazo, setMotivoRechazo] = useState('')
 
   // Advance summary modal state
   const [resumenModalOpen, setResumenModalOpen] = useState(false)
@@ -182,15 +163,15 @@ export default function SupervisionListasEquipoPage() {
     }
   }
 
-  const handleResetear = async (listaId: string, estado: string) => {
+  const handleRetroceder = async (listaId: string, estado: string) => {
     const flujo = flujoEstados[estado as EstadoListaEquipo]
-    if (!flujo?.reset) return
+    if (!flujo?.retroceder) return
 
     setProcesando(listaId)
     try {
-      const result = await updateListaEstado(listaId, flujo.reset)
+      const result = await updateListaEstado(listaId, flujo.retroceder)
       if (result) {
-        toast.success(`Lista restaurada a "${estadoLabels[flujo.reset]}"`)
+        toast.success(`Lista restaurada a "${estadoLabels[flujo.retroceder]}"`)
         fetchListas()
       } else {
         toast.error('Error al restaurar')
@@ -199,29 +180,6 @@ export default function SupervisionListasEquipoPage() {
       toast.error('Error al restaurar')
     } finally {
       setProcesando(null)
-    }
-  }
-
-  const openRechazarDialog = (listaId: string) => {
-    setRechazarListaId(listaId)
-    setMotivoRechazo('')
-    setRechazarDialogOpen(true)
-  }
-
-  const handleConfirmRechazar = async () => {
-    if (!rechazarListaId || motivoRechazo.trim().length < 10) return
-
-    setProcesando(rechazarListaId)
-    setRechazarDialogOpen(false)
-    try {
-      const result = await updateListaEstado(rechazarListaId, 'rechazada', motivoRechazo.trim())
-      toast.success('Lista rechazada')
-      fetchListas()
-    } catch (error: any) {
-      toast.error(error?.message || 'Error al rechazar')
-    } finally {
-      setProcesando(null)
-      setRechazarListaId(null)
     }
   }
 
@@ -261,7 +219,7 @@ export default function SupervisionListasEquipoPage() {
           {Object.entries(stats)
             .filter(([, count]) => count > 0)
             .sort(([a], [b]) => {
-              const order = ['por_revisar', 'por_cotizar', 'por_validar', 'por_aprobar', 'borrador', 'aprobada', 'rechazada', 'completada']
+              const order = ['por_revisar', 'por_cotizar', 'por_aprobar', 'borrador', 'aprobada', 'anulada']
               return order.indexOf(a) - order.indexOf(b)
             })
             .map(([estado, count]) => (
@@ -350,8 +308,7 @@ export default function SupervisionListasEquipoPage() {
               filteredListas.map((lista) => {
                 const flujo = flujoEstados[lista.estado as EstadoListaEquipo] || {}
                 const puedeAvanzar = !!flujo.siguiente && flujo.roles?.includes(userRole)
-                const puedeRechazar = !!flujo.rechazar && flujo.roles?.includes(userRole)
-                const puedeResetear = !!flujo.reset && flujo.roles?.includes(userRole)
+                const puedeRetroceder = !!flujo.retroceder && flujo.roles?.includes(userRole)
                 const esProcesando = procesando === lista.id
 
                 return (
@@ -424,25 +381,12 @@ export default function SupervisionListasEquipoPage() {
                           </Button>
                         )}
 
-                        {puedeRechazar && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 px-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
-                            onClick={() => openRechazarDialog(lista.id)}
-                            disabled={esProcesando}
-                          >
-                            <XCircle className="h-3 w-3 mr-1" />
-                            Rechazar
-                          </Button>
-                        )}
-
-                        {puedeResetear && (
+                        {puedeRetroceder && (
                           <Button
                             variant="ghost"
                             size="sm"
                             className="h-7 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                            onClick={() => handleResetear(lista.id, lista.estado)}
+                            onClick={() => handleRetroceder(lista.id, lista.estado)}
                             disabled={esProcesando}
                           >
                             <RotateCcw className="h-3 w-3 mr-1" />
@@ -600,39 +544,6 @@ export default function SupervisionListasEquipoPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Reject dialog */}
-      <AlertDialog open={rechazarDialogOpen} onOpenChange={setRechazarDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <XCircle className="h-5 w-5 text-red-600" />
-              Rechazar Lista
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Indica el motivo del rechazo. La lista volverá al estado &quot;Borrador&quot; para correcciones.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <Textarea
-            placeholder="Motivo del rechazo (mínimo 10 caracteres)..."
-            value={motivoRechazo}
-            onChange={(e) => setMotivoRechazo(e.target.value)}
-            className="min-h-[80px]"
-          />
-          {motivoRechazo.length > 0 && motivoRechazo.length < 10 && (
-            <p className="text-xs text-red-500">Mínimo 10 caracteres ({motivoRechazo.length}/10)</p>
-          )}
-          <AlertDialogFooter>
-            <AlertDialogCancel className="h-9">Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmRechazar}
-              disabled={motivoRechazo.trim().length < 10}
-              className="h-9 bg-red-600 hover:bg-red-700 text-white"
-            >
-              Confirmar Rechazo
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
 }

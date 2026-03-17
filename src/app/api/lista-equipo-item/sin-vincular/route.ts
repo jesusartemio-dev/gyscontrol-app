@@ -26,7 +26,6 @@ export async function GET(req: NextRequest) {
       where: {
         listaEquipo: { proyectoId },
         proyectoEquipoItemId: null,
-        estado: { not: 'rechazado' },
         // Optionally filter by equipment group
         ...(equipoGrupoId ? { proyectoEquipoId: equipoGrupoId } : {}),
       },

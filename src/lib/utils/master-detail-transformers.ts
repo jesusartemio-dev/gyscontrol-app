@@ -40,7 +40,6 @@ export const calculateMasterStats = (items: ListaEquipoItem[]): ListaEquipoMaste
     totalItems: items.length,
     itemsVerificados: 0,
     itemsAprobados: 0,
-    itemsRechazados: 0,
     costoTotal: 0,
     costoAprobado: 0,
     // 📦 Estadísticas de pedidos (inicializadas en 0, se calculan en otro lugar)
@@ -56,7 +55,6 @@ export const calculateMasterStats = (items: ListaEquipoItem[]): ListaEquipoMaste
     // ✅ Contadores por estado
     if (item.verificado) stats.itemsVerificados++
     if (item.estado === 'aprobado') stats.itemsAprobados++
-    if (item.estado === 'rechazado') stats.itemsRechazados++
 
     // 💰 Cálculos de costos
     const costoItem = item.precioElegido || item.presupuesto || 0
@@ -80,7 +78,6 @@ export const calculateDetailStats = (items: ListaEquipoItem[]): ListaEquipoDetai
   const extendedStats = {
     ...basicStats,
     itemsPendientes: 0,
-    costoRechazado: 0,
     costoPendiente: 0,
     
     // 📈 Estadísticas por origen
@@ -100,14 +97,12 @@ export const calculateDetailStats = (items: ListaEquipoItem[]): ListaEquipoDetai
     const costoTotal = costoItem * item.cantidad
     
     // ✅ Estados adicionales
-    if (item.estado === 'por_revisar' || item.estado === 'por_cotizar' || item.estado === 'por_validar' || item.estado === 'por_aprobar') {
+    if (item.estado === 'por_revisar' || item.estado === 'por_cotizar' || item.estado === 'por_aprobar') {
       extendedStats.itemsPendientes++
       extendedStats.costoPendiente += costoTotal
     }
     
-    if (item.estado === 'rechazado') {
-      extendedStats.costoRechazado += costoTotal
-    }
+    // (rechazado state removed from ListaEquipoItem)
     
     // 📊 Por origen
     if (item.origen === 'cotizado') extendedStats.itemsPorOrigen.cotizado++
@@ -242,14 +237,12 @@ export const calculateAvailableActions: ActionsCalculator = (
     
     // ✅ Aprobar
     canApprove: (
-      (estado === 'por_aprobar' && canManage) ||
-      (estado === 'por_validar' && canCoordinate)
+      (estado === 'por_aprobar' && canManage)
     ),
-    
+
     // ❌ Rechazar
     canReject: (
       (estado === 'por_aprobar' && canManage) ||
-      (estado === 'por_validar' && canCoordinate) ||
       (estado === 'por_revisar' && canCoordinate)
     ),
     
@@ -268,14 +261,11 @@ export const calculateAvailableActions: ActionsCalculator = (
 export const getEstadoListaBadgeVariant = (estado: EstadoListaEquipo) => {
   switch (estado) {
     case 'borrador': return 'secondary'
-    case 'enviada': return 'outline'
     case 'por_revisar': return 'outline'
     case 'por_cotizar': return 'outline'
-    case 'por_validar': return 'default'
     case 'por_aprobar': return 'default'
     case 'aprobada': return 'default'
-    case 'rechazada': return 'destructive'
-    case 'completada': return 'default'
+    case 'anulada': return 'destructive'
     default: return 'secondary'
   }
 }
@@ -288,10 +278,8 @@ export const getEstadoItemBadgeVariant = (estado: EstadoListaItem) => {
     case 'borrador': return 'secondary'
     case 'por_revisar': return 'outline'
     case 'por_cotizar': return 'outline'
-    case 'por_validar': return 'default'
     case 'por_aprobar': return 'default'
     case 'aprobado': return 'default'
-    case 'rechazado': return 'destructive'
     default: return 'secondary'
   }
 }

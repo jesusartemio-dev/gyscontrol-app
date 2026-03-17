@@ -19,9 +19,9 @@ export default function LogisticaListaTecnicaResumen({
 
   const totalListas = listas.length
   const totalPorCotizar = listas.filter((l) => l.estado === 'por_cotizar').length
-  const totalPorValidar = listas.filter((l) => l.estado === 'por_validar').length
+  const totalPorAprobar = listas.filter((l) => l.estado === 'por_aprobar').length
   const totalAprobadas = listas.filter((l) => l.estado === 'aprobada').length
-  const totalRechazadas = listas.filter((l) => l.estado === 'rechazada').length
+  const totalAnuladas = listas.filter((l) => l.estado === 'anulada').length
 
   const handleProyectoChange = (proyectoId: string) => {
     setSelectedProyecto(proyectoId)
@@ -57,14 +57,14 @@ export default function LogisticaListaTecnicaResumen({
         <div className="bg-yellow-100 px-3 py-1 rounded">
           Por cotizar: <strong>{totalPorCotizar}</strong>
         </div>
-        <div className="bg-blue-100 px-3 py-1 rounded">
-          Por validar: <strong>{totalPorValidar}</strong>
+        <div className="bg-purple-100 px-3 py-1 rounded">
+          Por aprobar: <strong>{totalPorAprobar}</strong>
         </div>
         <div className="bg-green-100 px-3 py-1 rounded">
           Aprobadas: <strong>{totalAprobadas}</strong>
         </div>
         <div className="bg-red-100 px-3 py-1 rounded">
-          Rechazadas: <strong>{totalRechazadas}</strong>
+          Anuladas: <strong>{totalAnuladas}</strong>
         </div>
       </div>
     </div>

@@ -30,8 +30,9 @@ const VALID_ROLLBACKS: Record<RollbackEntity, Record<string, string[]>> = {
     aprobada: ['borrador'],
   },
   listaEquipo: {
-    por_aprobar: ['por_validar'],
-    por_validar: ['por_cotizar'],
+    por_revisar: ['borrador'],
+    por_cotizar: ['por_revisar'],
+    por_aprobar: ['por_cotizar'],
   },
   pedidoEquipo: {
     enviado: ['borrador'],
@@ -188,8 +189,8 @@ async function checkListaEquipoRollback(id: string, targetEstado: string): Promi
 
   const blockers: RollbackBlocker[] = []
 
-  if (lista.estado === 'por_validar' && targetEstado === 'por_cotizar') {
-    // Verificar si hay items con cotización seleccionada
+  if (lista.estado === 'por_aprobar' && targetEstado === 'por_cotizar') {
+    // Verificar si hay items con cotización seleccionada que bloqueen
     const seleccionados = await prisma.listaEquipoItem.count({
       where: {
         listaId: id,
@@ -205,12 +206,19 @@ async function checkListaEquipoRollback(id: string, targetEstado: string): Promi
     }
   }
 
-  // por_aprobar → por_validar: siempre permitido
+  // por_revisar → borrador: siempre permitido
+  // por_cotizar → por_revisar: siempre permitido
 
   const allowed = blockers.length === 0
-  const fieldsToClean = targetEstado === 'por_cotizar'
-    ? ['fechaFinCotizacion']
-    : ['fechaValidacion'] // por_validar
+
+  let fieldsToClean: string[]
+  if (targetEstado === 'borrador') {
+    fieldsToClean = ['fechaEnvioRevision']
+  } else if (targetEstado === 'por_revisar') {
+    fieldsToClean = ['fechaEnvioLogistica', 'fechaInicioCotizacion']
+  } else {
+    fieldsToClean = ['fechaFinCotizacion'] // por_cotizar
+  }
 
   const message = allowed
     ? `La lista volverá a "${targetEstado.replace(/_/g, ' ')}".`

@@ -80,10 +80,13 @@ export async function POST(
 
     // Campos a limpiar según target
     const cleanFields: Record<string, null> = {}
-    if (targetEstado === 'por_cotizar') {
+    if (targetEstado === 'borrador') {
+      cleanFields.fechaEnvioRevision = null
+    } else if (targetEstado === 'por_revisar') {
+      cleanFields.fechaEnvioLogistica = null
+      cleanFields.fechaInicioCotizacion = null
+    } else if (targetEstado === 'por_cotizar') {
       cleanFields.fechaFinCotizacion = null
-    } else if (targetEstado === 'por_validar') {
-      cleanFields.fechaValidacion = null
     }
 
     const updated = await prisma.listaEquipo.update({

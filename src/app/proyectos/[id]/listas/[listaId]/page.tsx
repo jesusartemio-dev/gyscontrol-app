@@ -77,7 +77,7 @@ const ListaEquipoDetailPage: React.FC<ListaEquipoDetailPageProps> = async ({ par
       fechaFinCotizacion: lista.fechaFinCotizacion?.toISOString(),
       fechaInicioCotizacion: lista.fechaInicioCotizacion?.toISOString(),
       fechaNecesaria: lista.fechaNecesaria?.toISOString(),
-      fechaValidacion: lista.fechaValidacion?.toISOString(),
+      fechaAnulacion: lista.fechaAnulacion?.toISOString(),
     };
 
     // 🔄 Transform items dates to strings for compatibility

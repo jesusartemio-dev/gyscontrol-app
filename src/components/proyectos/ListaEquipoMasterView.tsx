@@ -326,10 +326,9 @@ export const ListaEquipoMasterView: React.FC<ListaEquipoMasterViewProps> = ({
                     <SelectItem value="borrador">Borrador</SelectItem>
                     <SelectItem value="por_revisar">Por Revisar</SelectItem>
                     <SelectItem value="por_cotizar">Por Cotizar</SelectItem>
-                    <SelectItem value="por_validar">Por Validar</SelectItem>
                     <SelectItem value="por_aprobar">Por Aprobar</SelectItem>
-                    <SelectItem value="aprobado">Aprobado</SelectItem>
-                    <SelectItem value="rechazado">Rechazado</SelectItem>
+                    <SelectItem value="aprobada">Aprobada</SelectItem>
+                    <SelectItem value="anulada">Anulada</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

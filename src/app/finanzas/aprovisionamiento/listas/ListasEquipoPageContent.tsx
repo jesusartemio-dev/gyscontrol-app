@@ -87,7 +87,7 @@ export default function ListasEquipoPageContent() {
       total: listasData.pagination.total || items.length,
       pendientes: items.filter((item: any) => item.estado === 'pendiente').length,
       aprobadas: items.filter((item: any) => item.estado === 'aprobada').length,
-      rechazadas: items.filter((item: any) => item.estado === 'rechazada').length,
+      anuladas: items.filter((item: any) => item.estado === 'anulada').length,
       montoTotal: items.reduce((sum: number, item: any) => {
         const itemTotal = (item.listaEquipoItem || []).reduce((s: number, i: any) => {
           return s + ((i.precioElegido || i.presupuesto || 0) * (i.cantidad || 0))
@@ -127,14 +127,12 @@ export default function ListasEquipoPageContent() {
         return <Badge className="bg-yellow-100 text-yellow-700 text-[10px] h-5">Por Revisar</Badge>
       case 'por_cotizar':
         return <Badge className="bg-orange-100 text-orange-700 text-[10px] h-5">Por Cotizar</Badge>
-      case 'por_validar':
-        return <Badge className="bg-amber-100 text-amber-700 text-[10px] h-5">Por Validar</Badge>
       case 'por_aprobar':
         return <Badge className="bg-blue-100 text-blue-700 text-[10px] h-5">Por Aprobar</Badge>
       case 'aprobado': case 'aprobada':
-        return <Badge className="bg-green-100 text-green-700 text-[10px] h-5">Aprobado</Badge>
-      case 'rechazado': case 'rechazada':
-        return <Badge className="bg-red-100 text-red-700 text-[10px] h-5">Rechazado</Badge>
+        return <Badge className="bg-green-100 text-green-700 text-[10px] h-5">Aprobada</Badge>
+      case 'anulada':
+        return <Badge className="bg-red-100 text-red-700 text-[10px] h-5">Anulada</Badge>
       default:
         return <Badge variant="secondary" className="text-[10px] h-5">{estado}</Badge>
     }
@@ -220,10 +218,10 @@ export default function ListasEquipoPageContent() {
 
         <div className="bg-white border rounded-lg p-3">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] text-muted-foreground font-medium">Rechazadas</span>
+            <span className="text-[10px] text-muted-foreground font-medium">Anuladas</span>
             <AlertTriangle className="h-4 w-4 text-red-500" />
           </div>
-          <p className="text-lg font-bold text-red-600">{stats.rechazadas}</p>
+          <p className="text-lg font-bold text-red-600">{stats.anuladas}</p>
         </div>
 
         <div className="bg-white border rounded-lg p-3">
@@ -258,10 +256,9 @@ export default function ListasEquipoPageContent() {
             <SelectItem value="borrador">Borrador</SelectItem>
             <SelectItem value="por_revisar">Por Revisar</SelectItem>
             <SelectItem value="por_cotizar">Por Cotizar</SelectItem>
-            <SelectItem value="por_validar">Por Validar</SelectItem>
             <SelectItem value="por_aprobar">Por Aprobar</SelectItem>
-            <SelectItem value="aprobado">Aprobado</SelectItem>
-            <SelectItem value="rechazado">Rechazado</SelectItem>
+            <SelectItem value="aprobada">Aprobada</SelectItem>
+            <SelectItem value="anulada">Anulada</SelectItem>
           </SelectContent>
         </Select>
         <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleSearch}>

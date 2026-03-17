@@ -703,7 +703,8 @@ model ListaEquipo {
   fechaFinCotizacion      DateTime?
   fechaInicioCotizacion   DateTime?
   fechaNecesaria          DateTime?
-  fechaValidacion         DateTime?
+  fechaAnulacion          DateTime?
+  motivoAnulacion         String?
   cotizaciones            CotizacionProveedorItem[]
   proyecto                Proyecto                  @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
   responsable             User                      @relation(fields: [responsableId], references: [id])
@@ -1419,10 +1420,8 @@ enum EstadoListaItem {
   borrador
   por_revisar
   por_cotizar
-  por_validar
   por_aprobar
   aprobado
-  rechazado
 }
 
 enum OrigenListaItem {
@@ -1435,10 +1434,9 @@ enum EstadoListaEquipo {
   borrador
   por_revisar
   por_cotizar
-  por_validar
   por_aprobar
-  aprobado
-  rechazado
+  aprobada
+  anulada
 }
 
 enum EstadoPedido {

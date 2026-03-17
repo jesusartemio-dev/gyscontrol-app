@@ -123,7 +123,7 @@ export async function GET(req: NextRequest) {
       let costoAprobado = 0
       let itemsVerificados = 0
       let itemsAprobados = 0
-      let itemsRechazados = 0
+      // itemsRechazados removed (rechazado state no longer exists)
 
       // 📦 Calculate order statistics
       let itemsConPedido = 0
@@ -190,7 +190,6 @@ export async function GET(req: NextRequest) {
           totalItems,
           itemsVerificados,
           itemsAprobados,
-          itemsRechazados,
           costoTotal,
           costoAprobado,
           // 📦 Estadísticas de pedidos

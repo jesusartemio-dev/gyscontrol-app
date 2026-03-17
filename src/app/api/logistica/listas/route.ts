@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     const listas = await prisma.listaEquipo.findMany({
       where: {
         estado: {
-          in: ['por_cotizar', 'por_validar', 'por_aprobar', 'aprobada', 'completada'],
+          in: ['por_cotizar', 'por_aprobar', 'aprobada'],
         },
         ...(proyectoId && { proyectoId }),
       },

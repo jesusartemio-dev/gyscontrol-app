@@ -751,15 +751,14 @@ export const utilidadesService = {
    */
   obtenerColorPorEstado(estado: string, tipo: 'lista' | 'pedido') {
     if (tipo === 'lista') {
-      // Estados válidos: borrador, por_revisar, por_cotizar, por_validar, por_aprobar, aprobado, rechazado
+      // Estados válidos: borrador, por_revisar, por_cotizar, por_aprobar, aprobada, anulada
       switch (estado) {
         case 'borrador': return '#6b7280'
         case 'por_revisar': return '#f59e0b'
         case 'por_cotizar': return '#f97316'
-        case 'por_validar': return '#eab308'
         case 'por_aprobar': return '#3b82f6'
-        case 'aprobado': return '#10b981'
-        case 'rechazado': return '#ef4444'
+        case 'aprobada': return '#10b981'
+        case 'anulada': return '#ef4444'
         default: return '#6b7280'
       }
     } else {

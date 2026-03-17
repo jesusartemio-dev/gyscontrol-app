@@ -76,12 +76,6 @@ const statusConfig: Record<EstadoListaEquipo, { variant: 'default' | 'secondary'
     color: 'text-gray-500',
     bgColor: 'bg-gray-50'
   },
-  enviada: {
-    variant: 'outline' as const,
-    icon: AlertCircle,
-    color: 'text-indigo-600',
-    bgColor: 'bg-indigo-50'
-  },
   por_revisar: {
     variant: 'outline' as const,
     icon: AlertCircle,
@@ -93,12 +87,6 @@ const statusConfig: Record<EstadoListaEquipo, { variant: 'default' | 'secondary'
     icon: DollarSign,
     color: 'text-blue-600',
     bgColor: 'bg-blue-50'
-  },
-  por_validar: {
-    variant: 'outline' as const,
-    icon: TrendingUp,
-    color: 'text-purple-600',
-    bgColor: 'bg-purple-50'
   },
   por_aprobar: {
     variant: 'outline' as const,
@@ -112,18 +100,12 @@ const statusConfig: Record<EstadoListaEquipo, { variant: 'default' | 'secondary'
     color: 'text-green-600',
     bgColor: 'bg-green-50'
   },
-  rechazada: {
+  anulada: {
     variant: 'destructive' as const,
     icon: AlertCircle,
     color: 'text-red-600',
     bgColor: 'bg-red-50'
   },
-  completada: {
-    variant: 'default' as const,
-    icon: CheckCircle2,
-    color: 'text-emerald-600',
-    bgColor: 'bg-emerald-50'
-  }
 };
 
 // ✅ Animation variants

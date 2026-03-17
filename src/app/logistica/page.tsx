@@ -22,7 +22,7 @@ import { getCotizacionesProveedor } from '@/lib/services/cotizacionProveedor'
 import { getProveedores } from '@/lib/services/proveedor'
 
 interface DashboardStats {
-  listas: { total: number; porCotizar: number; porValidar: number; porAprobar: number }
+  listas: { total: number; porCotizar: number; porAprobar: number }
   cotizaciones: { total: number; pendientes: number; cotizados: number; seleccionados: number }
   pedidos: { total: number; enProgreso: number; entregados: number; retrasados: number }
   recepciones: { pendientes: number; enAlmacen: number }
@@ -56,7 +56,6 @@ export default function LogisticaPage() {
           listas: {
             total: listasArr.length,
             porCotizar: listasArr.filter((l: any) => l.estado === 'por_cotizar').length,
-            porValidar: listasArr.filter((l: any) => l.estado === 'por_validar').length,
             porAprobar: listasArr.filter((l: any) => l.estado === 'por_aprobar').length,
           },
           cotizaciones: {
@@ -108,7 +107,6 @@ export default function LogisticaPage() {
       borderColor: 'border-l-blue-400',
       badges: stats ? [
         stats.listas.porCotizar > 0 && { label: `${stats.listas.porCotizar} por cotizar`, color: 'bg-amber-100 text-amber-700' },
-        stats.listas.porValidar > 0 && { label: `${stats.listas.porValidar} por validar`, color: 'bg-blue-100 text-blue-700' },
         stats.listas.porAprobar > 0 && { label: `${stats.listas.porAprobar} por aprobar`, color: 'bg-purple-100 text-purple-700' },
       ].filter(Boolean) : [],
       stat: stats?.listas.total || 0,

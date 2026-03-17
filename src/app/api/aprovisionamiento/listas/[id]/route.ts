@@ -14,7 +14,7 @@ import { canDelete } from '@/lib/utils/deleteValidation'
 const ActualizarListaSchema = z.object({
   nombre: z.string().min(1).optional(),
   fechaNecesaria: z.string().datetime().optional(),
-  estado: z.enum(['borrador', 'por_revisar', 'por_cotizar', 'por_validar', 'por_aprobar', 'aprobada', 'rechazada']).optional()
+  estado: z.enum(['borrador', 'por_revisar', 'por_cotizar', 'por_aprobar', 'aprobada', 'anulada']).optional()
 })
 
 // 🔁 Función para recalcular datos de Gantt
@@ -249,7 +249,7 @@ export async function PUT(
     }
 
     // 📡 Validar permisos de edición según estado
-    const estadosEditables = ['borrador', 'por_revisar', 'rechazado']
+    const estadosEditables = ['borrador', 'por_revisar']
     if (!estadosEditables.includes(listaExistente.estado)) {
       return NextResponse.json(
         { error: 'No se puede editar una lista en estado ' + listaExistente.estado },
@@ -258,10 +258,12 @@ export async function PUT(
     }
 
     // 📡 Actualizar lista
+    const { fechaNecesaria, ...restoDatos } = datosValidados
     const listaActualizada = await prisma.listaEquipo.update({
       where: { id },
       data: {
-        ...datosValidados,
+        ...restoDatos,
+        ...(fechaNecesaria ? { fechaNecesaria: new Date(fechaNecesaria) } : {}),
         updatedAt: new Date()
       },
       include: {

@@ -53,14 +53,11 @@ interface ListaEquipoDetailViewProps {
 
 const statusConfig: Record<EstadoListaEquipo, { label: string; className: string; icon: typeof Clock }> = {
   borrador: { label: 'Borrador', className: 'bg-gray-100 text-gray-700', icon: Clock },
-  enviada: { label: 'Enviada', className: 'bg-indigo-100 text-indigo-700', icon: FileText },
   por_revisar: { label: 'Por Revisar', className: 'bg-yellow-100 text-yellow-700', icon: AlertCircle },
   por_cotizar: { label: 'Por Cotizar', className: 'bg-orange-100 text-orange-700', icon: DollarSign },
-  por_validar: { label: 'Por Validar', className: 'bg-purple-100 text-purple-700', icon: FileText },
   por_aprobar: { label: 'Por Aprobar', className: 'bg-amber-100 text-amber-700', icon: User },
   aprobada: { label: 'Aprobada', className: 'bg-green-100 text-green-700', icon: CheckCircle },
-  rechazada: { label: 'Rechazada', className: 'bg-red-100 text-red-700', icon: X },
-  completada: { label: 'Completada', className: 'bg-emerald-100 text-emerald-700', icon: CheckCircle }
+  anulada: { label: 'Anulada', className: 'bg-red-100 text-red-700', icon: X },
 };
 
 // Skeleton minimalista

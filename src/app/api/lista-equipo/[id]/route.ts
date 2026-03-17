@@ -134,13 +134,18 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
     }
 
     // ✅ Preparar datos de actualización
-    const { motivoRechazo, ...restBody } = body as any
+    const { motivoRechazo, motivoAnulacion, ...restBody } = body as any
     const updateData: any = { ...restBody }
 
     // 🔄 Si hay cambio de estado, actualizar fechas automáticamente
     if (body.estado && body.estado !== existe.estado) {
       const fechas = getFechasPorTransicion(body.estado as EstadoListaEquipo)
       Object.assign(updateData, fechas)
+
+      // 🔄 Si se anula, guardar motivo de anulación
+      if (body.estado === 'anulada' && motivoAnulacion) {
+        updateData.motivoAnulacion = motivoAnulacion
+      }
     }
 
     // 🔄 Convertir fechaNecesaria a Date si viene como string
@@ -156,8 +161,9 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
     // ✅ Registrar el cambio de estado en auditoría si hubo cambio de estado
     if (body.estado && body.estado !== existe.estado) {
       try {
-        const description = motivoRechazo
-          ? `Lista ${data.nombre || data.codigo || 'sin nombre'} - Motivo: ${motivoRechazo}`
+        const motivo = motivoAnulacion || motivoRechazo
+        const description = motivo
+          ? `Lista ${data.nombre || data.codigo || 'sin nombre'} - Motivo: ${motivo}`
           : `Lista ${data.nombre || data.codigo || 'sin nombre'}`
         await logStatusChange({
           userId: session.user.id,

@@ -79,7 +79,7 @@ import type { EstadoListaEquipo } from '@/types/modelos';
 const filtrosSchema = z.object({
   busqueda: z.string().optional(),
   proyectoId: z.string().optional(),
-  estado: z.enum(['all', 'borrador', 'enviada', 'por_revisar', 'por_cotizar', 'por_validar', 'por_aprobar', 'aprobada', 'rechazada', 'completada']).optional(),
+  estado: z.enum(['all', 'borrador', 'por_revisar', 'por_cotizar', 'por_aprobar', 'aprobada', 'anulada']).optional(),
   fechaCreacion: z.object({
     from: z.date().optional(),
     to: z.date().optional(),
@@ -435,10 +435,11 @@ export const ListaEquipoFilters: React.FC<ListaEquipoFiltersProps> = ({
                       <SelectContent>
                         <SelectItem value="all">Todos los estados</SelectItem>
                         <SelectItem value="borrador">Borrador</SelectItem>
-                        <SelectItem value="pendiente">Pendiente</SelectItem>
+                        <SelectItem value="por_revisar">Por Revisar</SelectItem>
+                        <SelectItem value="por_cotizar">Por Cotizar</SelectItem>
+                        <SelectItem value="por_aprobar">Por Aprobar</SelectItem>
                         <SelectItem value="aprobada">Aprobada</SelectItem>
-                        <SelectItem value="rechazada">Rechazada</SelectItem>
-                        <SelectItem value="vencida">Vencida</SelectItem>
+                        <SelectItem value="anulada">Anulada</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />

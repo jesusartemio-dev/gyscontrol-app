@@ -28,10 +28,9 @@ const ESTADOS_LISTA: { value: EstadoListaEquipo | 'all'; label: string }[] = [
   { value: 'borrador', label: 'Borrador' },
   { value: 'por_revisar', label: 'Por Revisar' },
   { value: 'por_cotizar', label: 'Por Cotizar' },
-  { value: 'por_validar', label: 'Por Validar' },
   { value: 'por_aprobar', label: 'Por Aprobar' },
   { value: 'aprobada', label: 'Aprobada' },
-  { value: 'rechazada', label: 'Rechazada' },
+  { value: 'anulada', label: 'Anulada' },
 ]
 
 export default function LogisticaListasPage() {

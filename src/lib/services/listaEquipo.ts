@@ -29,7 +29,6 @@ export interface ListaEquipoMaster {
     totalItems: number
     itemsVerificados: number
     itemsAprobados: number
-    itemsRechazados: number
     costoTotal: number
     costoAprobado: number
     // 📦 Estadísticas de pedidos
@@ -243,10 +242,10 @@ export async function enviarListaARevision(listaId: string): Promise<boolean> {
 
 // ✅ Cambiar estado de la lista técnica (solo estado, no todo el objeto)
 // 🔄 Las fechas se actualizan automáticamente en el backend según el cambio de estado
-export async function updateListaEstado(id: string, nuevoEstado: string, motivoRechazo?: string): Promise<ListaEquipo | null> {
+export async function updateListaEstado(id: string, nuevoEstado: string, motivoAnulacion?: string): Promise<ListaEquipo | null> {
   try {
     const payload: Record<string, string> = { estado: nuevoEstado }
-    if (motivoRechazo) payload.motivoRechazo = motivoRechazo
+    if (motivoAnulacion) payload.motivoAnulacion = motivoAnulacion
 
     const res = await fetch(`${BASE_URL}/${id}`, {
       method: 'PUT',

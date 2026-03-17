@@ -12,7 +12,7 @@ import { z } from 'zod'
 // 🔁 Schema de validación para filtros
 const FiltrosListasSchema = z.object({
   proyectoId: z.string().optional(),
-  estado: z.enum(['borrador', 'enviada', 'por_revisar', 'por_cotizar', 'por_validar', 'por_aprobar', 'aprobada', 'rechazada', 'completada']).optional(),
+  estado: z.enum(['borrador', 'por_revisar', 'por_cotizar', 'por_aprobar', 'aprobada', 'anulada']).optional(),
   responsable: z.string().optional(),
   fechaDesde: z.string().optional(),
   fechaHasta: z.string().optional(),

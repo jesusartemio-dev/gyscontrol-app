@@ -76,26 +76,20 @@ async function fetchProyectos() {
 
 const estadoColors: Record<EstadoListaEquipo, string> = {
   borrador: 'bg-gray-100 text-gray-700 border-gray-200',
-  enviada: 'bg-indigo-50 text-indigo-700 border-indigo-200',
   por_revisar: 'bg-yellow-50 text-yellow-700 border-yellow-200',
   por_cotizar: 'bg-blue-50 text-blue-700 border-blue-200',
-  por_validar: 'bg-orange-50 text-orange-700 border-orange-200',
   por_aprobar: 'bg-purple-50 text-purple-700 border-purple-200',
   aprobada: 'bg-green-50 text-green-700 border-green-200',
-  rechazada: 'bg-red-50 text-red-700 border-red-200',
-  completada: 'bg-emerald-50 text-emerald-700 border-emerald-200'
+  anulada: 'bg-red-50 text-red-700 border-red-200',
 }
 
 const estadoLabels: Record<EstadoListaEquipo, string> = {
   borrador: 'Borrador',
-  enviada: 'Enviada',
   por_revisar: 'Por Revisar',
   por_cotizar: 'Por Cotizar',
-  por_validar: 'Por Validar',
   por_aprobar: 'Por Aprobar',
   aprobada: 'Aprobada',
-  rechazada: 'Rechazada',
-  completada: 'Completada'
+  anulada: 'Anulada',
 }
 
 type ViewMode = 'table' | 'cards'
@@ -153,9 +147,9 @@ export function ListasEquipoView() {
   const stats = {
     total: filteredListas.length,
     borradores: filteredListas.filter(l => l.estado === 'borrador').length,
-    enRevision: filteredListas.filter(l => ['por_revisar', 'por_cotizar', 'por_validar', 'por_aprobar'].includes(l.estado)).length,
-    aprobadas: filteredListas.filter(l => ['aprobada', 'completada'].includes(l.estado)).length,
-    rechazadas: filteredListas.filter(l => l.estado === 'rechazada').length
+    enRevision: filteredListas.filter(l => ['por_revisar', 'por_cotizar', 'por_aprobar'].includes(l.estado)).length,
+    aprobadas: filteredListas.filter(l => l.estado === 'aprobada').length,
+    anuladas: filteredListas.filter(l => l.estado === 'anulada').length
   }
 
   const handleExportExcel = async () => {
@@ -239,10 +233,10 @@ export function ListasEquipoView() {
               <CheckCircle className="h-3.5 w-3.5" />
               <span className="font-medium">{stats.aprobadas}</span>
             </div>
-            {stats.rechazadas > 0 && (
-              <div className="flex items-center gap-1 text-red-600" title="Rechazadas">
+            {stats.anuladas > 0 && (
+              <div className="flex items-center gap-1 text-red-600" title="Anuladas">
                 <XCircle className="h-3.5 w-3.5" />
-                <span className="font-medium">{stats.rechazadas}</span>
+                <span className="font-medium">{stats.anuladas}</span>
               </div>
             )}
           </div>
@@ -309,8 +303,8 @@ export function ListasEquipoView() {
           <div className="text-[10px] text-green-700">Aprobadas</div>
         </div>
         <div className="bg-red-50 rounded-lg p-2 text-center">
-          <div className="text-lg font-bold text-red-600">{stats.rechazadas}</div>
-          <div className="text-[10px] text-red-700">Rechazadas</div>
+          <div className="text-lg font-bold text-red-600">{stats.anuladas}</div>
+          <div className="text-[10px] text-red-700">Anuladas</div>
         </div>
       </div>
 
@@ -348,14 +342,11 @@ export function ListasEquipoView() {
           <SelectContent>
             <SelectItem value="todos">Todos los estados</SelectItem>
             <SelectItem value="borrador">Borrador</SelectItem>
-            <SelectItem value="enviada">Enviada</SelectItem>
             <SelectItem value="por_revisar">Por Revisar</SelectItem>
             <SelectItem value="por_cotizar">Por Cotizar</SelectItem>
-            <SelectItem value="por_validar">Por Validar</SelectItem>
             <SelectItem value="por_aprobar">Por Aprobar</SelectItem>
             <SelectItem value="aprobada">Aprobada</SelectItem>
-            <SelectItem value="rechazada">Rechazada</SelectItem>
-            <SelectItem value="completada">Completada</SelectItem>
+            <SelectItem value="anulada">Anulada</SelectItem>
           </SelectContent>
         </Select>
       </div>

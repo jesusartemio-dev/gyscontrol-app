@@ -34,20 +34,16 @@ const estadoItemColors: Record<string, string> = {
   borrador: 'bg-gray-100 text-gray-700',
   por_revisar: 'bg-yellow-50 text-yellow-700',
   por_cotizar: 'bg-blue-50 text-blue-700',
-  por_validar: 'bg-orange-50 text-orange-700',
   por_aprobar: 'bg-purple-50 text-purple-700',
   aprobado: 'bg-green-50 text-green-700',
-  rechazado: 'bg-red-50 text-red-700',
 }
 
 const estadoItemLabels: Record<string, string> = {
   borrador: 'Borrador',
   por_revisar: 'Por Revisar',
   por_cotizar: 'Por Cotizar',
-  por_validar: 'Por Validar',
   por_aprobar: 'Por Aprobar',
   aprobado: 'Aprobado',
-  rechazado: 'Rechazado',
 }
 
 const origenLabels: Record<string, string> = {
@@ -58,26 +54,20 @@ const origenLabels: Record<string, string> = {
 
 const estadoListaColors: Record<string, string> = {
   borrador: 'bg-gray-100 text-gray-700',
-  enviada: 'bg-indigo-50 text-indigo-700',
   por_revisar: 'bg-yellow-50 text-yellow-700',
   por_cotizar: 'bg-blue-50 text-blue-700',
-  por_validar: 'bg-orange-50 text-orange-700',
   por_aprobar: 'bg-purple-50 text-purple-700',
   aprobada: 'bg-green-50 text-green-700',
-  rechazada: 'bg-red-50 text-red-700',
-  completada: 'bg-emerald-50 text-emerald-700',
+  anulada: 'bg-red-50 text-red-700',
 }
 
 const estadoListaLabels: Record<string, string> = {
   borrador: 'Borrador',
-  enviada: 'Enviada',
   por_revisar: 'Por Revisar',
   por_cotizar: 'Por Cotizar',
-  por_validar: 'Por Validar',
   por_aprobar: 'Por Aprobar',
   aprobada: 'Aprobada',
-  rechazada: 'Rechazada',
-  completada: 'Completada',
+  anulada: 'Anulada',
 }
 
 interface ListaGroup {
@@ -216,8 +206,7 @@ export function ListaItemsView() {
     totalCosto: filteredItems.reduce((sum, item) =>
       sum + ((item.precioElegido || item.presupuesto || 0) * (item.cantidad || 0)), 0),
     aprobados: filteredItems.filter(i => i.estado === 'aprobado').length,
-    pendientes: filteredItems.filter(i => ['borrador', 'por_revisar', 'por_cotizar', 'por_validar', 'por_aprobar'].includes(i.estado)).length,
-    rechazados: filteredItems.filter(i => i.estado === 'rechazado').length,
+    pendientes: filteredItems.filter(i => ['borrador', 'por_revisar', 'por_cotizar', 'por_aprobar'].includes(i.estado)).length,
     totalGroups: groups.length,
   }), [filteredItems, groups])
 
@@ -263,11 +252,6 @@ export function ListaItemsView() {
           <div className="flex items-center gap-1 text-yellow-600">
             <span className="font-medium">{stats.pendientes} pendientes</span>
           </div>
-          {stats.rechazados > 0 && (
-            <div className="flex items-center gap-1 text-red-600">
-              <span className="font-medium">{stats.rechazados} rechazados</span>
-            </div>
-          )}
           <div className="w-px h-4 bg-gray-200" />
           <div className="flex items-center gap-1 text-emerald-600">
             <DollarSign className="h-3.5 w-3.5" />

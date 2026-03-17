@@ -39,7 +39,6 @@ export const calculateMasterStats = (items: ListaEquipoItem[]): ListaEquipoMaste
     totalItems: items.length,
     itemsVerificados: 0,
     itemsAprobados: 0,
-    itemsRechazados: 0,
     costoTotal: 0,
     costoAprobado: 0,
     // 📦 Estadísticas de pedidos (inicializadas en 0, se calculan en otro lugar)
@@ -55,7 +54,6 @@ export const calculateMasterStats = (items: ListaEquipoItem[]): ListaEquipoMaste
     // ✅ Contadores por estado
     if (item.verificado) stats.itemsVerificados++;
     if (item.estado === 'aprobado') stats.itemsAprobados++;
-    if (item.estado === 'rechazado') stats.itemsRechazados++;
 
     // 💰 Cálculos de costos
     const costoItem = item.precioElegido || item.presupuesto || 0;
@@ -119,14 +117,11 @@ export const calculateMasterListStats = (listas: ListaEquipoMaster[]) => {
     costoAprobado: 0,
     listasPorEstado: {
       borrador: 0,
-      enviada: 0,
       por_revisar: 0,
       por_cotizar: 0,
-      por_validar: 0,
       por_aprobar: 0,
       aprobada: 0,
-      rechazada: 0,
-      completada: 0
+      anulada: 0
     },
     progresoPromedio: 0
   };
@@ -269,22 +264,16 @@ export const masterListUtils = {
     switch (estado) {
       case 'borrador':
         return 'secondary';
-      case 'enviada':
-        return 'outline';
       case 'por_revisar':
         return 'outline';
       case 'por_cotizar':
         return 'outline';
-      case 'por_validar':
-        return 'default';
       case 'por_aprobar':
         return 'default';
       case 'aprobada':
         return 'default';
-      case 'rechazada':
+      case 'anulada':
         return 'destructive';
-      case 'completada':
-        return 'default';
       default:
         return 'secondary';
     }

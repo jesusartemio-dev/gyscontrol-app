@@ -50,7 +50,6 @@ export interface ListaEquipoMaster {
     totalItems: number
     itemsVerificados: number
     itemsAprobados: number
-    itemsRechazados: number
     costoTotal: number
     costoAprobado: number
     // 📦 Estadísticas de pedidos
@@ -116,11 +115,9 @@ export interface ListaEquipoDetail extends ListaEquipo {
     totalItems: number
     itemsVerificados: number
     itemsAprobados: number
-    itemsRechazados: number
     itemsPendientes: number
     costoTotal: number
     costoAprobado: number
-    costoRechazado: number
     costoPendiente: number
     
     // 📈 Estadísticas por origen

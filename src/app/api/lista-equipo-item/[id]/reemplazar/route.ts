@@ -57,7 +57,7 @@ export async function PATCH(
     await prisma.listaEquipoItem.update({
       where: { id: originalId },
       data: {
-        estado: 'rechazado',
+        estado: 'borrador',
         proyectoEquipoItemId: null,
         reemplazaProyectoEquipoCotizadoItemId: null,
         cotizacionSeleccionadaId: null,

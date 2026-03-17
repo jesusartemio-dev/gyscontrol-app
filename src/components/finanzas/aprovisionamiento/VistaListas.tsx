@@ -84,7 +84,7 @@ interface ListasStats {
   total: number;
   aprobadas: number;
   pendientes: number;
-  rechazadas: number;
+  anuladas: number;
   montoTotal: number;
   montoPromedio: number;
   coherenciaPromedio: number;
@@ -116,8 +116,8 @@ export const VistaListas: React.FC<VistaListasProps> = ({
   const stats: ListasStats = useMemo(() => {
     const total = filteredListas.length;
     const aprobadas = filteredListas.filter(l => l.estado === 'aprobada').length;
-    const pendientes = filteredListas.filter(l => l.estado === 'por_revisar' || l.estado === 'por_cotizar' || l.estado === 'por_validar' || l.estado === 'por_aprobar').length;
-    const rechazadas = filteredListas.filter(l => l.estado === 'rechazada').length;
+    const pendientes = filteredListas.filter(l => l.estado === 'por_revisar' || l.estado === 'por_cotizar' || l.estado === 'por_aprobar').length;
+    const anuladas = filteredListas.filter(l => l.estado === 'anulada').length;
     
     // ✅ Calcular montoTotal desde los items de cada lista usando calcularCostoItem
     const montoTotal = filteredListas.reduce((sum, lista) => {
@@ -138,7 +138,7 @@ export const VistaListas: React.FC<VistaListasProps> = ({
       total,
       aprobadas,
       pendientes,
-      rechazadas,
+      anuladas,
       montoTotal,
       montoPromedio,
       coherenciaPromedio

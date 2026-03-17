@@ -64,7 +64,7 @@ interface ProyeccionMensualDetalle {
     borrador: number
     revision: number
     aprobada: number
-    rechazada: number
+    anulada: number
   }
   proyectosInvolucrados: string[]
 }
@@ -492,7 +492,7 @@ export default function ProyeccionMensualListas({
         borrador: listasDelMes.filter(l => l.estado === 'borrador').length,
         revision: listasDelMes.filter(l => l.estado === 'por_revisar').length,
         aprobada: listasDelMes.filter(l => l.estado === 'aprobada').length,
-        rechazada: listasDelMes.filter(l => l.estado === 'rechazada').length
+        anulada: listasDelMes.filter(l => l.estado === 'anulada').length
       }
       
       // Filtrar items del mes
@@ -687,7 +687,7 @@ export default function ProyeccionMensualListas({
       { value: 'borrador', label: 'Borrador' },
       { value: 'revision', label: 'En Revisión' },
       { value: 'aprobada', label: 'Aprobada' },
-      { value: 'rechazada', label: 'Rechazada' }
+      { value: 'anulada', label: 'Anulada' }
     ]},
     { key: 'montoEstimado', label: 'Monto Estimado', type: 'number' },
     { key: 'createdAt', label: 'Fecha de Creación', type: 'date' }
@@ -733,7 +733,7 @@ export default function ProyeccionMensualListas({
     switch (estado) {
       case 'aprobada': return 'bg-green-100 text-green-800'
       case 'revision': return 'bg-yellow-100 text-yellow-800'
-      case 'rechazada': return 'bg-red-100 text-red-800'
+      case 'anulada': return 'bg-red-100 text-red-800'
       case 'borrador': return 'bg-gray-100 text-gray-800'
       default: return 'bg-gray-100 text-gray-800'
     }

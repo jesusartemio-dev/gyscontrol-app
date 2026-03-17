@@ -265,7 +265,7 @@ export async function GET(request: NextRequest) {
         // 🧮 Calcular días de retraso para listas
         const hoy = new Date()
         let diasRetraso = 0
-        if (lista.fechaNecesaria && hoy > lista.fechaNecesaria && lista.estado !== 'aprobada') {
+        if (lista.fechaNecesaria && hoy > lista.fechaNecesaria && lista.estado !== 'aprobada' && lista.estado !== 'anulada') {
           diasRetraso = Math.ceil((hoy.getTime() - lista.fechaNecesaria.getTime()) / (1000 * 60 * 60 * 24))
         }
 
@@ -281,10 +281,10 @@ export async function GET(request: NextRequest) {
         switch (lista.estado) {
           case 'borrador': color = '#6b7280'; break
           case 'por_revisar': color = '#f59e0b'; break
-          case 'aprobada': color = '#10b981'; break
           case 'por_cotizar': color = '#3b82f6'; break
-          case 'por_validar': color = '#059669'; break
-          case 'rechazada': color = '#ef4444'; break
+          case 'por_aprobar': color = '#8b5cf6'; break
+          case 'aprobada': color = '#10b981'; break
+          case 'anulada': color = '#ef4444'; break
         }
 
         // 📊 Calcular coherencia per-item basada en estado de aprovisionamiento
@@ -316,8 +316,8 @@ export async function GET(request: NextRequest) {
           monto,
           estado: lista.estado,
           progreso: lista.estado === 'aprobada' ? 100 :
-                   lista.estado === 'por_validar' ? 75 :
-                   lista.estado === 'por_aprobar' ? 50 :
+                   lista.estado === 'por_aprobar' ? 75 :
+                   lista.estado === 'por_cotizar' ? 50 :
                    lista.estado === 'por_revisar' ? 25 : 0,
           coherencia,
           alertas,
@@ -527,7 +527,7 @@ export async function GET(request: NextRequest) {
       totalItems: itemsFiltrados.length,
       montoTotal: itemsFiltrados.reduce((sum, item) => sum + item.monto, 0),
       itemsVencidos: itemsFiltrados.filter(item =>
-        item.fechaFin < new Date() && !['aprobada', 'entregado', 'cancelado'].includes(item.estado)
+        item.fechaFin < new Date() && !['aprobada', 'anulada', 'entregado', 'cancelado'].includes(item.estado)
       ).length,
       itemsEnRiesgo: itemsFiltrados.filter(item => {
         const diasHastaVencimiento = Math.ceil((item.fechaFin.getTime() - Date.now()) / (1000 * 60 * 60 * 24))

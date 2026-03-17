@@ -5,12 +5,18 @@ import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
 import {
   ArrowRight,
-  X,
-  RotateCcw,
+  Ban,
   Loader2,
 } from 'lucide-react'
 import { updateListaEstado } from '@/lib/services/listaEquipo'
-import { flujoEstados, estadosList, type EstadoListaEquipo } from '@/lib/utils/flujoListaEquipo'
+import {
+  flujoEstados,
+  estadosFlujoPrincipal,
+  estadoLabels,
+  canAnular,
+  anulacionRoles,
+  type EstadoListaEquipo,
+} from '@/lib/utils/flujoListaEquipo'
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -27,37 +33,36 @@ import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { RollbackButton } from '@/components/RollbackButton'
 import { StepPill, StepLine, type StepStatus } from '@/components/ui/status-stepper'
-
-const estados = estadosList
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 interface Props {
   estado: EstadoListaEquipo
   listaId?: string
   totalItems?: number
   itemsVerificados?: number
+  motivoAnulacion?: string
   onUpdated?: (nuevoEstado: EstadoListaEquipo) => void
   className?: string
 }
 
-export default function ListaEstadoFlujoBanner({ estado, listaId, totalItems = 0, itemsVerificados = 0, onUpdated, className }: Props) {
+export default function ListaEstadoFlujoBanner({ estado, listaId, totalItems = 0, itemsVerificados = 0, motivoAnulacion, onUpdated, className }: Props) {
   const { data: session } = useSession()
   const rol = session?.user?.role || ''
-  const flujo = flujoEstados[estado] || {}
+  const flujo = flujoEstados[estado] || { roles: [] }
 
   const puedeAvanzar = !!listaId && !!flujo.siguiente && flujo.roles.includes(rol)
-  const puedeRechazar = !!listaId && !!flujo.rechazar && flujo.roles.includes(rol)
-  const puedeResetear = !!listaId && !!flujo.reset && flujo.roles.includes(rol)
+  const puedeRetroceder = !!listaId && !!flujo.retroceder && flujo.roles.includes(rol)
+  const puedeAnular = !!listaId && canAnular(estado, rol)
 
-  const [justificacion, setJustificacion] = useState('')
-  const [openRechazo, setOpenRechazo] = useState(false)
-  const [openReset, setOpenReset] = useState(false)
+  const [motivoAnulacionInput, setMotivoAnulacionInput] = useState('')
+  const [openAnulacion, setOpenAnulacion] = useState(false)
   const [openConfirmAvanzar, setOpenConfirmAvanzar] = useState(false)
   const [loading, setLoading] = useState(false)
 
   const faltanVerificar = totalItems > 0 && itemsVerificados < totalItems
-  const siguienteEstado = estados.find(e => e.key === flujo.siguiente)
-  const currentIndex = estados.findIndex(e => e.key === estado)
-  const isRechazada = estado === 'rechazada'
+  const siguienteLabel = flujo.siguiente ? (estadoLabels[flujo.siguiente] || flujo.siguiente) : ''
+  const currentIndex = estadosFlujoPrincipal.indexOf(estado)
+  const isAnulada = estado === 'anulada'
 
   const cambiarEstado = async (nuevoEstado: EstadoListaEquipo, mensaje: string, motivo?: string) => {
     if (!listaId || !session?.user?.id) return
@@ -77,14 +82,27 @@ export default function ListaEstadoFlujoBanner({ estado, listaId, totalItems = 0
     }
   }
 
-  // Build pill steps
-  const steps = estados.map((etapa, i) => {
+  // Anulada banner
+  if (isAnulada) {
+    return (
+      <Alert variant="destructive" className={cn('border-red-300 bg-red-50', className)}>
+        <Ban className="h-4 w-4" />
+        <AlertTitle>Lista Anulada</AlertTitle>
+        <AlertDescription>
+          {motivoAnulacion
+            ? <>Motivo: {motivoAnulacion}</>
+            : 'Esta lista ha sido anulada.'}
+        </AlertDescription>
+      </Alert>
+    )
+  }
+
+  // Build pill steps from the 5 main states
+  const steps = estadosFlujoPrincipal.map((key, i) => {
     let status: StepStatus = 'future'
-    if (!isRechazada) {
-      if (i < currentIndex) status = 'completed'
-      else if (etapa.key === estado) status = 'current'
-    }
-    return { key: etapa.key, label: etapa.label, status }
+    if (i < currentIndex) status = 'completed'
+    else if (key === estado) status = 'current'
+    return { key, label: estadoLabels[key] || key, status }
   })
 
   return (
@@ -102,14 +120,6 @@ export default function ListaEstadoFlujoBanner({ estado, listaId, totalItems = 0
             <StepPill label={step.label} status={step.status} />
           </React.Fragment>
         ))}
-
-        {/* Rechazada pill */}
-        {isRechazada && (
-          <>
-            <StepLine nextStatus="rejected" />
-            <StepPill label="Rechazada" status="rejected" />
-          </>
-        )}
       </div>
 
       {/* Action Buttons */}
@@ -127,14 +137,14 @@ export default function ListaEstadoFlujoBanner({ estado, listaId, totalItems = 0
         )}
 
         {/* Advance Button */}
-        {puedeAvanzar && flujo.siguiente && siguienteEstado && (
+        {puedeAvanzar && flujo.siguiente && (
           <>
             <Button
               onClick={() => {
                 if (faltanVerificar) {
                   setOpenConfirmAvanzar(true)
                 } else {
-                  cambiarEstado(flujo.siguiente!, `Estado actualizado a "${siguienteEstado.label}"`)
+                  cambiarEstado(flujo.siguiente!, `Estado actualizado a "${siguienteLabel}"`)
                 }
               }}
               size="sm"
@@ -158,7 +168,7 @@ export default function ListaEstadoFlujoBanner({ estado, listaId, totalItems = 0
                   <AlertDialogCancel disabled={loading}>Cancelar</AlertDialogCancel>
                   <AlertDialogAction
                     onClick={() => {
-                      cambiarEstado(flujo.siguiente!, `Estado actualizado a "${siguienteEstado.label}"`)
+                      cambiarEstado(flujo.siguiente!, `Estado actualizado a "${siguienteLabel}"`)
                       setOpenConfirmAvanzar(false)
                     }}
                     disabled={loading}
@@ -172,35 +182,47 @@ export default function ListaEstadoFlujoBanner({ estado, listaId, totalItems = 0
           </>
         )}
 
-        {/* Reject Button */}
-        {puedeRechazar && flujo.rechazar && (
-          <AlertDialog open={openRechazo} onOpenChange={setOpenRechazo}>
+        {/* Retroceder Button - uses RollbackButton with the retroceder target from flujoEstados */}
+        {puedeRetroceder && flujo.retroceder && listaId && (
+          <RollbackButton
+            entityType="listaEquipo"
+            entityId={listaId}
+            currentEstado={estado}
+            targetEstado={flujo.retroceder}
+            targetLabel={`Volver a ${estadoLabels[flujo.retroceder] || flujo.retroceder}`}
+            onSuccess={() => onUpdated?.(flujo.retroceder as EstadoListaEquipo)}
+          />
+        )}
+
+        {/* Anular Button */}
+        {puedeAnular && (
+          <AlertDialog open={openAnulacion} onOpenChange={setOpenAnulacion}>
             <AlertDialogTrigger asChild>
               <Button
                 variant="outline"
                 size="sm"
                 disabled={loading}
-                className="h-7 px-3 text-xs border-gray-300 text-gray-600 hover:bg-gray-100"
+                className="h-7 px-3 text-xs border-red-300 text-red-600 hover:bg-red-50"
               >
-                <X className="w-3 h-3 mr-1" />
-                Rechazar
+                <Ban className="w-3 h-3 mr-1" />
+                Anular
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent className="sm:max-w-md">
               <AlertDialogHeader>
-                <AlertDialogTitle>¿Rechazar esta lista?</AlertDialogTitle>
+                <AlertDialogTitle>¿Anular esta lista?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Indica la razón del rechazo para que el equipo pueda hacer correcciones.
+                  Esta acción anulará la lista de equipos. Indica el motivo de la anulación.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">
-                  Justificación *
+                  Motivo de anulación *
                 </label>
                 <Textarea
-                  placeholder="Describe las razones del rechazo..."
-                  value={justificacion}
-                  onChange={(e) => setJustificacion(e.target.value)}
+                  placeholder="Describe el motivo de la anulación (mínimo 10 caracteres)..."
+                  value={motivoAnulacionInput}
+                  onChange={(e) => setMotivoAnulacionInput(e.target.value)}
                   rows={3}
                   className="resize-none"
                 />
@@ -209,78 +231,18 @@ export default function ListaEstadoFlujoBanner({ estado, listaId, totalItems = 0
                 <AlertDialogCancel disabled={loading}>Cancelar</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={() => {
-                    if (justificacion.trim().length < 10) {
-                      toast.error('La justificación debe tener al menos 10 caracteres')
+                    if (motivoAnulacionInput.trim().length < 10) {
+                      toast.error('El motivo debe tener al menos 10 caracteres')
                       return
                     }
-                    cambiarEstado(flujo.rechazar!, 'Lista rechazada', justificacion.trim())
-                    setJustificacion('')
-                    setOpenRechazo(false)
+                    cambiarEstado('anulada' as EstadoListaEquipo, 'Lista anulada', motivoAnulacionInput.trim())
+                    setMotivoAnulacionInput('')
+                    setOpenAnulacion(false)
                   }}
-                  disabled={loading || justificacion.trim().length < 10}
+                  disabled={loading || motivoAnulacionInput.trim().length < 10}
                   className="bg-red-600 hover:bg-red-700"
                 >
-                  {loading ? 'Rechazando...' : 'Rechazar'}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        )}
-
-        {/* Rollback Buttons */}
-        {listaId && estado === 'por_aprobar' && (
-          <RollbackButton
-            entityType="listaEquipo"
-            entityId={listaId}
-            currentEstado={estado}
-            targetEstado="por_validar"
-            targetLabel="Volver a Por Validar"
-            onSuccess={() => onUpdated?.('por_validar' as EstadoListaEquipo)}
-          />
-        )}
-        {listaId && estado === 'por_validar' && (
-          <RollbackButton
-            entityType="listaEquipo"
-            entityId={listaId}
-            currentEstado={estado}
-            targetEstado="por_cotizar"
-            targetLabel="Volver a Por Cotizar"
-            onSuccess={() => onUpdated?.('por_cotizar' as EstadoListaEquipo)}
-          />
-        )}
-
-        {/* Reset Button */}
-        {puedeResetear && flujo.reset && (
-          <AlertDialog open={openReset} onOpenChange={setOpenReset}>
-            <AlertDialogTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={loading}
-                className="h-7 px-3 text-xs border-gray-300 text-gray-600 hover:bg-gray-100"
-              >
-                <RotateCcw className="w-3 h-3 mr-1" />
-                Restaurar
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent className="sm:max-w-md">
-              <AlertDialogHeader>
-                <AlertDialogTitle>¿Restaurar a Borrador?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Esta acción reiniciará el flujo de aprobación.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel disabled={loading}>Cancelar</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() => {
-                    cambiarEstado(flujo.reset!, 'Estado devuelto a Borrador')
-                    setOpenReset(false)
-                  }}
-                  disabled={loading}
-                  className="bg-amber-600 hover:bg-amber-700"
-                >
-                  {loading ? 'Restaurando...' : 'Restaurar'}
+                  {loading ? 'Anulando...' : 'Anular'}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>

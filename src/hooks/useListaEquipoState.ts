@@ -362,8 +362,8 @@ export function useListaEquipoState(listas: ListaEquipoDetail[] = []) {
             bValue = b.stats?.costoTotal || 0;
             break;
           case 'alertas':
-            aValue = a.stats?.itemsRechazados || 0;
-            bValue = b.stats?.itemsRechazados || 0;
+            aValue = 0;
+            bValue = 0;
             break;
           default:
             aValue = a[uiState.sortConfig!.key as keyof ListaEquipoDetail];

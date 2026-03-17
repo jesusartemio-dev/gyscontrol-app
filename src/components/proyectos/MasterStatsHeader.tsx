@@ -35,14 +35,11 @@ interface MasterStats {
   costoAprobado?: number;
   listasPorEstado?: {
     borrador?: number;
-    enviada?: number;
     por_revisar?: number;
     por_cotizar?: number;
-    por_validar?: number;
     por_aprobar?: number;
     aprobada?: number;
-    rechazada?: number;
-    completada?: number;
+    anulada?: number;
   };
 }
 

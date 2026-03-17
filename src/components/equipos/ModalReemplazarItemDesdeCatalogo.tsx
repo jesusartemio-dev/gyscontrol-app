@@ -175,9 +175,9 @@ export default function ModalReemplazarItemDesdeCatalogo({
       const proyectoEquipoItemId = item.proyectoEquipoItemId ?? undefined
 
       if (tieneCotizaciones) {
-        // ✅ Ítem tiene cotizaciones → solo se rechaza y desvincula
+        // ✅ Ítem tiene cotizaciones → se resetea a borrador y desvincula
         await updateListaEquipoItem(item.id, {
-          estado: 'rechazado',
+          estado: 'borrador',
           proyectoEquipoItemId: undefined,
         })
       } else {

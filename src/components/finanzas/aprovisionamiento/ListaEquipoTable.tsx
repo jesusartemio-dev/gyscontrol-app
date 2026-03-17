@@ -144,14 +144,11 @@ const DEFAULT_COLUMNS: ColumnConfig[] = [
 // 🎯 Memoized status variants - evita recreación
 const STATUS_VARIANTS: Record<EstadoListaEquipo, { variant: 'default' | 'secondary' | 'outline' | 'destructive', label: string }> = {
   borrador: { variant: 'secondary', label: 'Borrador' },
-  enviada: { variant: 'outline', label: 'Enviada' },
   por_revisar: { variant: 'outline', label: 'Por Revisar' },
   por_cotizar: { variant: 'outline', label: 'Por Cotizar' },
-  por_validar: { variant: 'outline', label: 'Por Validar' },
   por_aprobar: { variant: 'outline', label: 'Por Aprobar' },
   aprobada: { variant: 'default', label: 'Aprobada' },
-  rechazada: { variant: 'destructive', label: 'Rechazada' },
-  completada: { variant: 'default', label: 'Completada' },
+  anulada: { variant: 'destructive', label: 'Anulada' },
 };
 
 // 🚀 OPTIMIZED: Status badge component with React.memo
@@ -476,7 +473,7 @@ const ListaEquipoTableRow = memo<TableRowProps>(({
       
       {visibleColumns.includes('alertas') && (
         <TableCell className="text-center">
-          <AlertsIndicator alertas={lista.stats?.itemsRechazados || 0} />
+          <AlertsIndicator alertas={0} />
         </TableCell>
       )}
       
@@ -566,8 +563,8 @@ export const ListaEquipoTable = memo<ListaEquipoTableProps>(({
           bValue = b.stats?.costoTotal || 0;
           break;
         case 'alertas':
-          aValue = a.stats?.itemsRechazados || 0;
-          bValue = b.stats?.itemsRechazados || 0;
+          aValue = 0;
+          bValue = 0;
           break;
         default:
           aValue = a[sortConfig.key as keyof ListaEquipoDetail];

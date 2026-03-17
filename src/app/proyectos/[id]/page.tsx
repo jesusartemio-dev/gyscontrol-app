@@ -188,7 +188,7 @@ export default function ProyectoHubPage() {
   const totalListasPresupuesto = proyecto.listaEquipos?.reduce((acc, l) =>
     acc + (l.listaEquipoItem?.reduce((s, i) => s + (i.presupuesto || 0), 0) || 0), 0) || 0
   const listasAprobadas = proyecto.listaEquipos?.filter(l =>
-    l.estado === 'aprobada' || l.estado === 'completada').length || 0
+    l.estado === 'aprobada').length || 0
   const progresoListas = totalListas > 0
     ? { porcentaje: (listasAprobadas / totalListas) * 100, estado: 'ok' as const }
     : null

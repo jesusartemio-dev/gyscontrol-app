@@ -96,14 +96,11 @@ interface ListaEquipoMasterListProps {
 // ✅ Status icons mapping
 const statusIcons: Record<EstadoListaEquipo, typeof Clock> = {
   borrador: Clock,
-  enviada: AlertCircle,
   por_revisar: AlertCircle,
   por_cotizar: TrendingUp,
-  por_validar: AlertCircle,
   por_aprobar: Clock,
   aprobada: CheckCircle2,
-  rechazada: AlertCircle,
-  completada: CheckCircle2
+  anulada: AlertCircle,
 };
 
 // ✅ Using centralized animation variants from masterDetailAnimations.ts

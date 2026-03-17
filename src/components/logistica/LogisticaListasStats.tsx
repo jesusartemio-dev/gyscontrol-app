@@ -52,12 +52,6 @@ const ESTADOS_CONFIG: Record<EstadoListaEquipo, {
     bgColor: 'bg-gray-100',
     icon: FileText
   },
-  enviada: {
-    label: 'Enviada',
-    color: 'text-indigo-700',
-    bgColor: 'bg-indigo-100',
-    icon: FileText
-  },
   por_revisar: {
     label: 'Por Revisar',
     color: 'text-yellow-700',
@@ -69,12 +63,6 @@ const ESTADOS_CONFIG: Record<EstadoListaEquipo, {
     color: 'text-blue-700',
     bgColor: 'bg-blue-100',
     icon: Package
-  },
-  por_validar: {
-    label: 'Por Validar',
-    color: 'text-orange-700',
-    bgColor: 'bg-orange-100',
-    icon: AlertCircle
   },
   por_aprobar: {
     label: 'Por Aprobar',
@@ -88,17 +76,11 @@ const ESTADOS_CONFIG: Record<EstadoListaEquipo, {
     bgColor: 'bg-green-100',
     icon: CheckCircle
   },
-  rechazada: {
-    label: 'Rechazada',
+  anulada: {
+    label: 'Anulada',
     color: 'text-red-700',
     bgColor: 'bg-red-100',
     icon: XCircle
-  },
-  completada: {
-    label: 'Completada',
-    color: 'text-emerald-700',
-    bgColor: 'bg-emerald-100',
-    icon: CheckCircle
   },
 }
 
@@ -110,14 +92,11 @@ export default function LogisticaListasStats({ listas, proyectos, className }: L
         total: 0,
         porEstado: {
           borrador: 0,
-          enviada: 0,
           por_revisar: 0,
           por_cotizar: 0,
-          por_validar: 0,
           por_aprobar: 0,
           aprobada: 0,
-          rechazada: 0,
-          completada: 0
+          anulada: 0,
         },
         totalItems: 0,
         promedioItemsPorLista: 0,
@@ -268,7 +247,7 @@ export default function LogisticaListasStats({ listas, proyectos, className }: L
             </div>
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-yellow-500" />
-              <span className="text-gray-700">En Proceso: {stats.porEstado.por_revisar + stats.porEstado.por_cotizar + stats.porEstado.por_validar + stats.porEstado.por_aprobar}</span>
+              <span className="text-gray-700">En Proceso: {stats.porEstado.por_revisar + stats.porEstado.por_cotizar + stats.porEstado.por_aprobar}</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-blue-500" />
@@ -276,7 +255,7 @@ export default function LogisticaListasStats({ listas, proyectos, className }: L
             </div>
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-red-500" />
-              <span className="text-gray-700">Rechazadas: {stats.porEstado.rechazada}</span>
+              <span className="text-gray-700">Anuladas: {stats.porEstado.anulada}</span>
             </div>
           </div>
 

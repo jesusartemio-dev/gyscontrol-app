@@ -93,7 +93,6 @@ const labelOrigen: Record<string, string> = {
 const getStatusVariant = (estado: string): "default" | "secondary" | "destructive" | "outline" => {
   switch (estado?.toLowerCase()) {
     case 'aprobado': return 'default'
-    case 'rechazado': return 'destructive'
     case 'pendiente': return 'outline'
     default: return 'secondary'
   }
@@ -675,7 +674,6 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                    <td className={`${cellPadding} ${columnWidths.estado} text-center`}>
                       <span className={`text-[11px] ${
                         item.estado === 'aprobado' ? 'text-green-600' :
-                        item.estado === 'rechazado' ? 'text-red-500' :
                         'text-muted-foreground'
                       }`}>
                         {item.estado || 'sin estado'}
@@ -817,12 +815,10 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                               {item.cotizacionSeleccionadaId ? 'Cambiar cotización' : 'Elegir cotización'}
                             </DropdownMenuItem>
                           )}
-                          {item.estado !== 'rechazado' && (
-                            <DropdownMenuItem onSelect={() => setTimeout(() => setItemReemplazo(item), 0)}>
-                              <RotateCcw className="h-3.5 w-3.5 mr-2" />
-                              Reemplazar
-                            </DropdownMenuItem>
-                          )}
+                          <DropdownMenuItem onSelect={() => setTimeout(() => setItemReemplazo(item), 0)}>
+                            <RotateCcw className="h-3.5 w-3.5 mr-2" />
+                            Reemplazar
+                          </DropdownMenuItem>
                           <DropdownMenuItem onSelect={() => setTimeout(() => setEditingItem(item), 0)}>
                             <Pencil className="h-3.5 w-3.5 mr-2" />
                             Editar
@@ -869,7 +865,6 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                   className="h-full"
                 >
                   <Card className={`h-full transition-all hover:shadow-sm hover:border-orange-300 ${
-                    item.estado === 'rechazado' ? 'border-red-200 bg-red-50/30' :
                     item.estado === 'aprobado' ? 'border-green-200 bg-green-50/30' : ''
                   }`}>
                     <CardHeader className="pb-2 p-3">
@@ -1052,17 +1047,15 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                       {/* Actions */}
                       <div className="flex justify-between items-center pt-1 border-t">
                         <div className="flex gap-1">
-                          {item.estado !== 'rechazado' && (
-                            <Button
-                              size="sm"
-                              onClick={() => setItemReemplazo(item)}
-                              variant="ghost"
-                              disabled={!editable}
-                              className="h-6 px-2 text-xs"
-                            >
-                              <RotateCcw className="h-3 w-3" />
-                            </Button>
-                          )}
+                          <Button
+                            size="sm"
+                            onClick={() => setItemReemplazo(item)}
+                            variant="ghost"
+                            disabled={!editable}
+                            className="h-6 px-2 text-xs"
+                          >
+                            <RotateCcw className="h-3 w-3" />
+                          </Button>
                         </div>
 
                         <div className="flex gap-1">

@@ -43,14 +43,11 @@ interface LogisticaListasTableProps {
 
 const ESTADOS_CONFIG: Record<EstadoListaEquipo, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   borrador: { label: 'Borrador', variant: 'secondary' },
-  enviada: { label: 'Enviada', variant: 'default' },
   por_revisar: { label: 'Por Revisar', variant: 'outline' },
   por_cotizar: { label: 'Por Cotizar', variant: 'default' },
-  por_validar: { label: 'Por Validar', variant: 'outline' },
   por_aprobar: { label: 'Por Aprobar', variant: 'outline' },
   aprobada: { label: 'Aprobada', variant: 'default' },
-  rechazada: { label: 'Rechazada', variant: 'destructive' },
-  completada: { label: 'Completada', variant: 'default' },
+  anulada: { label: 'Anulada', variant: 'destructive' },
 }
 
 const ITEMS_PER_PAGE = 15

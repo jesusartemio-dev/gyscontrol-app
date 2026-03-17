@@ -114,10 +114,8 @@ export async function POST(request: Request) {
       'borrador',
       'por_revisar',
       'por_cotizar',
-      'por_validar',
       'por_aprobar',
       'aprobado',
-      'rechazado',
     ]
 
     const valoresOrigen = ['cotizado', 'nuevo', 'reemplazo']

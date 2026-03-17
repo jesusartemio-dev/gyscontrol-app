@@ -109,10 +109,9 @@ const statusOptions = [
   { value: 'borrador', label: 'Borrador', color: 'bg-gray-100 text-gray-800' },
   { value: 'por_revisar', label: 'Por Revisar', color: 'bg-yellow-100 text-yellow-800' },
   { value: 'por_cotizar', label: 'Por Cotizar', color: 'bg-blue-100 text-blue-800' },
-  { value: 'por_validar', label: 'Por Validar', color: 'bg-purple-100 text-purple-800' },
   { value: 'por_aprobar', label: 'Por Aprobar', color: 'bg-orange-100 text-orange-800' },
-  { value: 'aprobado', label: 'Aprobado', color: 'bg-green-100 text-green-800' },
-  { value: 'rechazado', label: 'Rechazado', color: 'bg-red-100 text-red-800' }
+  { value: 'aprobada', label: 'Aprobada', color: 'bg-green-100 text-green-800' },
+  { value: 'anulada', label: 'Anulada', color: 'bg-red-100 text-red-800' },
 ];
 
 // ✅ Progress options

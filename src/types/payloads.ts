@@ -593,6 +593,7 @@ export interface ListaEquipoPayload {
 
 export interface ListaEquipoUpdatePayload extends Partial<ListaEquipoPayload> {
   fechaNecesaria?: string                // ✅ permite actualizar fecha necesaria
+  motivoAnulacion?: string               // ✅ requerido al anular la lista
   // Las demás fechas se actualizan automáticamente por el backend según cambios de estado
 }
 
