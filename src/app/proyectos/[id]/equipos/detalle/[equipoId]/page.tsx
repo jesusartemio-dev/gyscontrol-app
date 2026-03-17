@@ -120,7 +120,7 @@ function LoadingSkeleton() {
   )
 }
 
-function ItemsTable({ items, proyectoId, onEstadoChange, onVincular, onDesglosar, onRevertirDesglose }: { items: ItemWithLista[], proyectoId: string, onEstadoChange: (itemId: string, estado: string) => Promise<void>, onVincular: (item: ItemWithLista) => void, onDesglosar: (item: ItemWithLista) => void, onRevertirDesglose: (itemId: string) => Promise<void> }) {
+function ItemsTable({ items, proyectoId, onEstadoChange, onVincular, onDesglosar, onRevertirDesglose, onDesvincular }: { items: ItemWithLista[], proyectoId: string, onEstadoChange: (itemId: string, estado: string) => Promise<void>, onVincular: (item: ItemWithLista) => void, onDesglosar: (item: ItemWithLista) => void, onRevertirDesglose: (itemId: string) => Promise<void>, onDesvincular: (itemId: string) => Promise<void> }) {
   const [search, setSearch] = useState('')
   const [categoriaFiltro, setCategoriaFiltro] = useState('__todas__')
   const [sortField, setSortField] = useState<string>('codigo')
@@ -396,14 +396,14 @@ function ItemsTable({ items, proyectoId, onEstadoChange, onVincular, onDesglosar
                       })()}
                     </td>
                     <td className="px-1 py-1.5 text-center">
-                      {(item.estado === 'pendiente' || item.estado === 'descartado' || item.estado === 'desglosado') && !item.listaId && !item.listaEquipoSeleccionado && (
+                      {(
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <button className="p-0.5 rounded hover:bg-gray-200 transition-colors" disabled={updatingId === item.id}>
                               <MoreHorizontal className="h-3.5 w-3.5 text-gray-400" />
                             </button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-40">
+                          <DropdownMenuContent align="end" className="w-44">
                             {item.estado === 'pendiente' && (
                               <>
                                 <DropdownMenuItem
@@ -432,6 +432,19 @@ function ItemsTable({ items, proyectoId, onEstadoChange, onVincular, onDesglosar
                                   Descartar
                                 </DropdownMenuItem>
                               </>
+                            )}
+                            {(item.estado === 'en_lista' || item.estado === 'reemplazado') && (
+                              <DropdownMenuItem
+                                className="text-xs"
+                                onClick={async () => {
+                                  setUpdatingId(item.id)
+                                  await onDesvincular(item.id)
+                                  setUpdatingId(null)
+                                }}
+                              >
+                                <Undo2 className="h-3.5 w-3.5 mr-2" />
+                                Desvincular
+                              </DropdownMenuItem>
                             )}
                             {item.estado === 'desglosado' && (
                               <>
@@ -606,6 +619,35 @@ export default function ProjectEquipmentDetailPage({ params }: PageProps) {
     }
   }
 
+  const handleDesvincular = async (itemId: string) => {
+    try {
+      const res = await fetch(`/api/proyecto-equipo-item/${itemId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          estado: 'pendiente',
+          listaEquipoSeleccionadoId: null,
+          listaId: null,
+          motivoCambio: null,
+        }),
+      })
+      if (!res.ok) throw new Error('Error al desvincular')
+      if (equipo) {
+        setEquipo({
+          ...equipo,
+          items: equipo.items.map(i =>
+            i.id === itemId
+              ? { ...i, estado: 'pendiente' as EstadoEquipoItem, listaId: null, listaEquipoSeleccionadoId: null, listaEquipo: null, listaEquipoSeleccionado: null }
+              : i
+          ),
+        })
+      }
+      toast({ title: 'Desvinculado', description: 'El ítem volvió a estado pendiente' })
+    } catch {
+      toast({ title: 'Error', description: 'No se pudo desvincular el ítem', variant: 'destructive' })
+    }
+  }
+
   const handleOpenDesglosar = async (item: ItemWithLista) => {
     setDesgloseItem(item)
     setDesgloseSelected(item.desgloses?.map(d => d.listaEquipo.id) || [])
@@ -773,7 +815,7 @@ export default function ProjectEquipmentDetailPage({ params }: PageProps) {
       )}
 
       {/* Items Table */}
-      <ItemsTable items={equipo.items || []} proyectoId={proyectoId} onEstadoChange={handleEstadoChange} onVincular={handleOpenVincular} onDesglosar={handleOpenDesglosar} onRevertirDesglose={handleRevertirDesglose} />
+      <ItemsTable items={equipo.items || []} proyectoId={proyectoId} onEstadoChange={handleEstadoChange} onVincular={handleOpenVincular} onDesglosar={handleOpenDesglosar} onRevertirDesglose={handleRevertirDesglose} onDesvincular={handleDesvincular} />
 
       {/* Dialog Vincular */}
       <Dialog open={!!vincularItem} onOpenChange={() => setVincularItem(null)}>
