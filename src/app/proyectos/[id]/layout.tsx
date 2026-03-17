@@ -175,22 +175,25 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
     'detalle': 'Detalle',
   }
 
-  // Build breadcrumb trail from path segments (e.g. equipos > listas for /listas/[id])
+  // Build breadcrumb trail from path segments (e.g. listas/[id] → Listas > Detalle)
   const getBreadcrumbTrail = (): { label: string; href?: string }[] => {
     if (isHubPage) return []
-    // Get segments after /proyectos/[id]/
     const base = `/proyectos/${id}`
     const subPath = pathname.slice(base.length + 1) // e.g. "listas/abc123"
     const segments = subPath.split('/')
     const trail: { label: string; href?: string }[] = []
     let accumulatedPath = base
 
-    for (const seg of segments) {
+    for (let i = 0; i < segments.length; i++) {
+      const seg = segments[i]
       if (subPageNames[seg]) {
         accumulatedPath += `/${seg}`
         trail.push({ label: subPageNames[seg], href: accumulatedPath })
+      } else if (trail.length > 0) {
+        // Unknown segment (likely an ID) after a known segment → add "Detalle"
+        trail.push({ label: 'Detalle' })
+        break
       }
-      // Skip IDs and unknown segments
     }
     // Last item in trail should not be clickable (current page)
     if (trail.length > 0) {
