@@ -200,7 +200,7 @@ export default function MobileSidebar() {
       title: 'Supervisión',
       icon: Users,
       color: 'text-red-400',
-      roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos'],
+      roles: ['admin', 'gerente', 'gestor', 'coordinador', 'coordinador_logistico', 'proyectos'],
       links: [
         { href: '/supervision/timesheet', label: 'Timesheet', icon: ClipboardList },
         { href: '/supervision/jornada-campo', label: 'Jornada Campo', icon: MapPin },
