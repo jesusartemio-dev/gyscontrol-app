@@ -3151,6 +3151,7 @@ enum Role {
   presupuestos
   proyectos
   coordinador
+  coordinador_logistico
   logistico
   gestor
   gerente

@@ -898,7 +898,7 @@ export default function ProjectEquipmentDetailPage({ params }: PageProps) {
               No hay listas en este proyecto.
             </div>
           ) : (
-            <ScrollArea className="max-h-[50vh] flex-1 min-h-0">
+            <ScrollArea className="h-[50vh]">
               <div className="space-y-1">
                 {desgloseListasProyecto.map((lista) => (
                   <label
