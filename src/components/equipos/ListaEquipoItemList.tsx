@@ -540,14 +540,12 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                 <th className={`${cellPadding} ${columnWidths.pedidosLinks} text-center font-semibold text-gray-700`}>
                   Pedidos
                 </th>
-                {listaEstado !== 'borrador' && (
                 <th className={`${cellPadding} ${columnWidths.verificadoComentario} text-left font-semibold text-gray-700`}>
                   <div className="flex items-center gap-1">
                     <CheckCircle className="h-3 w-3" />
-                    <span>{listaEstado === 'por_revisar' ? 'Rev.' : 'Rev.'}</span>
+                    <span>Rev.</span>
                   </div>
                 </th>
-                )}
                 <th className={`${cellPadding} ${columnWidths.acciones} text-center font-semibold text-gray-700`}></th>
               </tr>
             </thead>
@@ -723,10 +721,9 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                         })()}
                       </div>
                    </td>
-                   {listaEstado !== 'borrador' && (
                    <td className={`${cellPadding} ${columnWidths.verificadoComentario}`}>
-                      {listaEstado === 'por_revisar' ? (
-                        /* Por Revisar: checkbox interactivo + comentario */
+                      {(listaEstado === 'borrador' || listaEstado === 'por_revisar') ? (
+                        /* Borrador / Por Revisar: checkbox interactivo + comentario editable */
                         <div className="flex items-center gap-2">
                           <div className="flex-shrink-0">
                             <Checkbox
@@ -817,7 +814,6 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                         </div>
                       )}
                    </td>
-                   )}
                    <td className={`${cellPadding} ${columnWidths.acciones} text-center`}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
