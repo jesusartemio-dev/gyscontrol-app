@@ -841,7 +841,7 @@ export default function ProjectEquipmentDetailPage({ params }: PageProps) {
 
       {/* Dialog Desglosar */}
       <Dialog open={!!desgloseItem} onOpenChange={() => setDesgloseItem(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[85vh] flex flex-col overflow-hidden">
           <DialogTitle className="text-base font-semibold flex items-center gap-2">
             <Layers className="h-4 w-4 text-purple-600" />
             Desglosar ítem
@@ -855,7 +855,7 @@ export default function ProjectEquipmentDetailPage({ params }: PageProps) {
               No hay listas en este proyecto.
             </div>
           ) : (
-            <ScrollArea className="max-h-[300px]">
+            <ScrollArea className="max-h-[50vh] flex-1 min-h-0">
               <div className="space-y-1">
                 {desgloseListasProyecto.map((lista) => (
                   <label
