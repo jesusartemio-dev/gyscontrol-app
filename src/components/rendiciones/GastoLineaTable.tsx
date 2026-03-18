@@ -30,11 +30,13 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
-import { Plus, Loader2, Trash2, Edit, Receipt, ScanLine, ShieldCheck } from 'lucide-react'
+import { Plus, Loader2, Trash2, Edit, Receipt, ScanLine, ShieldCheck, FileSpreadsheet, Download } from 'lucide-react'
 import { createGastoLinea, updateGastoLinea, deleteGastoLinea } from '@/lib/services/gastoLinea'
 import GastoAdjuntoUpload from './GastoAdjuntoUpload'
 import CargaMasivaComprobantes from './CargaMasivaComprobantes'
 import GastoLineaPreviewDrawer from './GastoLineaPreviewDrawer'
+import GastoLineaImportExcelModal from './GastoLineaImportExcelModal'
+import { exportarGastoLineasAExcel } from '@/lib/utils/gastoLineaExcel'
 import type { GastoLinea, CategoriaGasto } from '@/types'
 
 const TIPOS_COMPROBANTE = [
@@ -67,6 +69,8 @@ export default function GastoLineaTable({
   const [deleteTarget, setDeleteTarget] = useState<GastoLinea | null>(null)
   const [loading, setLoading] = useState(false)
   const [showCargaMasiva, setShowCargaMasiva] = useState(false)
+  const [showImportExcel, setShowImportExcel] = useState(false)
+  const [exportingExcel, setExportingExcel] = useState(false)
   const [previewIndex, setPreviewIndex] = useState<number | null>(null)
 
   // Form fields
@@ -172,6 +176,18 @@ export default function GastoLineaTable({
   const formatDate = (date: string) =>
     new Date(date).toLocaleDateString('es-PE', { day: '2-digit', month: 'short' })
 
+  const handleExportExcel = async () => {
+    try {
+      setExportingExcel(true)
+      await exportarGastoLineasAExcel(lineas)
+      toast.success('Excel exportado')
+    } catch {
+      toast.error('Error al exportar')
+    } finally {
+      setExportingExcel(false)
+    }
+  }
+
   const total = lineas.reduce((sum, l) => sum + l.monto, 0)
 
   return (
@@ -182,18 +198,30 @@ export default function GastoLineaTable({
           Líneas de Gasto
           <span className="text-xs font-normal text-muted-foreground">({lineas.length})</span>
         </h3>
-        {editable && (
-          <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setShowCargaMasiva(true)}>
-              <ScanLine className="h-3 w-3 mr-1" />
-              Carga Masiva
+        <div className="flex items-center gap-2">
+          {lineas.length > 0 && (
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={handleExportExcel} disabled={exportingExcel}>
+              {exportingExcel ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Download className="h-3 w-3 mr-1" />}
+              Exportar
             </Button>
-            <Button size="sm" className="h-7 text-xs bg-orange-600 hover:bg-orange-700" onClick={openCreate}>
-              <Plus className="h-3 w-3 mr-1" />
-              Agregar Gasto
-            </Button>
-          </div>
-        )}
+          )}
+          {editable && (
+            <>
+              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setShowImportExcel(true)}>
+                <FileSpreadsheet className="h-3 w-3 mr-1" />
+                Importar Excel
+              </Button>
+              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setShowCargaMasiva(true)}>
+                <ScanLine className="h-3 w-3 mr-1" />
+                Carga Masiva
+              </Button>
+              <Button size="sm" className="h-7 text-xs bg-orange-600 hover:bg-orange-700" onClick={openCreate}>
+                <Plus className="h-3 w-3 mr-1" />
+                Agregar Gasto
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Table */}
@@ -441,6 +469,15 @@ export default function GastoLineaTable({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Import from Excel */}
+      <GastoLineaImportExcelModal
+        isOpen={showImportExcel}
+        onClose={() => setShowImportExcel(false)}
+        hojaDeGastosId={hojaDeGastosId}
+        categorias={categorias}
+        onSuccess={onChanged}
+      />
 
       {/* Bulk upload dialog */}
       <CargaMasivaComprobantes
