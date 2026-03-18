@@ -35,6 +35,9 @@ import {
   History,
   Undo2,
   Download,
+  FileSpreadsheet,
+  FileText,
+  ChevronDown,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -54,6 +57,12 @@ import ResumenFinanciero from '@/components/finanzas/ResumenFinanciero'
 import GastoLineaTable from '@/components/rendiciones/GastoLineaTable'
 import HojaEventosTimeline from '@/components/finanzas/HojaEventosTimeline'
 import { uploadHojaAdjunto, deleteHojaAdjunto } from '@/lib/services/hojaDeGastosAdjunto'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import type { HojaDeGastos, GastoLinea, CategoriaGasto, HojaDeGastosAdjunto } from '@/types'
 
 const formatDate = (date: string | null | undefined) =>
@@ -172,21 +181,172 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
 
   const handleRetroceder = () => executeAction(() => retrocederHoja(id), 'Estado retrocedido')
 
-  const handleDownload = async () => {
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleDownloadExcel = async () => {
     try {
       const res = await fetch(`/api/hoja-de-gastos/${id}/exportar`)
       if (!res.ok) throw new Error('Error al descargar')
       const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = res.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || `Requerimiento_${id}.xlsx`
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      URL.revokeObjectURL(url)
+      const filename = res.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || `Requerimiento_${hoja?.numero || id}.xlsx`
+      downloadBlob(blob, filename)
     } catch {
-      toast.error('Error al descargar requerimiento')
+      toast.error('Error al descargar Excel')
+    }
+  }
+
+  const handleDownloadPDF = async () => {
+    if (!hoja) return
+    try {
+      const { default: jsPDF } = await import('jspdf')
+      const { default: autoTable } = await import('jspdf-autotable')
+
+      const doc = new jsPDF()
+      const pageWidth = doc.internal.pageSize.getWidth()
+
+      // Colors
+      const primary: [number, number, number] = [31, 78, 121]
+      const darkText: [number, number, number] = [33, 33, 33]
+      const mutedText: [number, number, number] = [120, 120, 120]
+
+      const estadoLabels: Record<string, string> = {
+        borrador: 'Borrador', enviado: 'Enviado', aprobado: 'Aprobado',
+        depositado: 'Depositado', rendido: 'Rendido', validado: 'Validado',
+        cerrado: 'Cerrado', rechazado: 'Rechazado',
+      }
+
+      // Title
+      doc.setFontSize(16)
+      doc.setTextColor(...primary)
+      doc.text(`REQUERIMIENTO DE DINERO`, pageWidth / 2, 20, { align: 'center' })
+      doc.setFontSize(12)
+      doc.text(hoja.numero, pageWidth / 2, 28, { align: 'center' })
+
+      // Separator
+      doc.setDrawColor(...primary)
+      doc.setLineWidth(0.5)
+      doc.line(14, 32, pageWidth - 14, 32)
+
+      // Info section
+      let y = 40
+      const addInfoLine = (label: string, value: string, x = 14) => {
+        doc.setFontSize(9)
+        doc.setTextColor(...mutedText)
+        doc.text(label, x, y)
+        doc.setTextColor(...darkText)
+        doc.setFont('helvetica', 'normal')
+        doc.text(value, x + 35, y)
+      }
+
+      const asignacion = hoja.proyecto
+        ? `${hoja.proyecto.codigo} - ${hoja.proyecto.nombre}`
+        : hoja.centroCosto?.nombre || '-'
+
+      addInfoLine('Estado:', estadoLabels[hoja.estado] || hoja.estado)
+      addInfoLine('Creado:', formatDate(hoja.createdAt), pageWidth / 2)
+      y += 6
+      addInfoLine('Empleado:', hoja.empleado?.name || '-')
+      addInfoLine('Aprobador:', hoja.aprobador?.name || '-', pageWidth / 2)
+      y += 6
+      addInfoLine('Asignado a:', asignacion)
+      addInfoLine('Categoría:', hoja.categoriaCosto || 'gastos', pageWidth / 2)
+      y += 6
+      addInfoLine('Motivo:', hoja.motivo)
+      addInfoLine('Anticipo:', hoja.requiereAnticipo ? 'Sí' : 'No', pageWidth / 2)
+      y += 6
+
+      if (hoja.observaciones) {
+        addInfoLine('Observaciones:', hoja.observaciones)
+        y += 6
+      }
+
+      y += 4
+
+      // Financial summary
+      const fmtMoney = (v: number) => `S/ ${v.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+      const finData: string[][] = []
+      if (hoja.requiereAnticipo) {
+        finData.push(['Monto Anticipo', fmtMoney(hoja.montoAnticipo)])
+        finData.push(['Monto Depositado', fmtMoney(hoja.montoDepositado)])
+      }
+      finData.push(['Monto Gastado', fmtMoney(hoja.montoGastado)])
+      finData.push(['Saldo', fmtMoney(hoja.saldo)])
+
+      autoTable(doc, {
+        startY: y,
+        head: [['RESUMEN FINANCIERO', '']],
+        body: finData,
+        theme: 'grid',
+        headStyles: { fillColor: primary, textColor: [255, 255, 255], fontSize: 10, halign: 'center' },
+        columnStyles: { 0: { fontStyle: 'bold', cellWidth: 60 }, 1: { halign: 'right' } },
+        styles: { fontSize: 9, cellPadding: 3 },
+        margin: { left: 14, right: 14 },
+        tableWidth: pageWidth / 2 - 14,
+      })
+
+      y = (doc as any).lastAutoTable.finalY + 10
+
+      // Expense lines table
+      if (lineas.length > 0) {
+        const tableHead = [['Fecha', 'Descripción', 'Categoría', 'Comprobante', 'Proveedor', 'Monto']]
+        const tableBody = lineas.map(l => [
+          l.fecha ? new Date(l.fecha).toLocaleDateString('es-PE') : '-',
+          l.descripcion,
+          l.categoriaGasto?.nombre || '-',
+          [l.tipoComprobante, l.numeroComprobante].filter(Boolean).join(' ') || '-',
+          l.proveedorNombre || '-',
+          fmtMoney(l.monto),
+        ])
+
+        const total = lineas.reduce((s, l) => s + l.monto, 0)
+        tableBody.push(['', '', '', '', 'TOTAL', fmtMoney(total)])
+
+        autoTable(doc, {
+          startY: y,
+          head: tableHead,
+          body: tableBody,
+          theme: 'grid',
+          headStyles: { fillColor: [46, 117, 182], textColor: [255, 255, 255], fontSize: 9, halign: 'center' },
+          styles: { fontSize: 8, cellPadding: 2.5 },
+          columnStyles: { 5: { halign: 'right' } },
+          margin: { left: 14, right: 14 },
+          didParseCell: (data: any) => {
+            // Bold total row
+            if (data.section === 'body' && data.row.index === tableBody.length - 1) {
+              data.cell.styles.fontStyle = 'bold'
+            }
+          },
+        })
+      } else {
+        doc.setFontSize(9)
+        doc.setTextColor(...mutedText)
+        doc.text('Sin líneas de gasto registradas', 14, y)
+      }
+
+      // Footer
+      const pageCount = doc.getNumberOfPages()
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i)
+        doc.setFontSize(7)
+        doc.setTextColor(...mutedText)
+        doc.text(`GySControl - Generado el ${new Date().toLocaleDateString('es-PE')}`, 14, doc.internal.pageSize.getHeight() - 8)
+        doc.text(`Página ${i} de ${pageCount}`, pageWidth - 14, doc.internal.pageSize.getHeight() - 8, { align: 'right' })
+      }
+
+      doc.save(`Requerimiento_${hoja.numero.replace(/\//g, '-')}.pdf`)
+    } catch (err) {
+      console.error('Error generando PDF:', err)
+      toast.error('Error al generar PDF')
     }
   }
 
@@ -233,10 +393,25 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
         <span className="text-muted-foreground">/</span>
         <span className="font-mono font-semibold">{hoja.numero}</span>
         <div className="ml-auto flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleDownload} title="Descargar Excel">
-            <Download className="h-4 w-4 mr-1" />
-            Descargar
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Download className="h-4 w-4 mr-1" />
+                Descargar
+                <ChevronDown className="h-3 w-3 ml-1" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleDownloadExcel}>
+                <FileSpreadsheet className="h-4 w-4 mr-2 text-green-600" />
+                Excel (.xlsx)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleDownloadPDF}>
+                <FileText className="h-4 w-4 mr-2 text-red-600" />
+                PDF
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Badge className="capitalize text-xs" variant="outline">
           {hoja.proyecto
             ? `${hoja.proyecto.codigo} - ${hoja.proyecto.nombre}`
