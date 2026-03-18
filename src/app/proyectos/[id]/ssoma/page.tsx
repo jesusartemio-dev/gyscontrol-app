@@ -37,6 +37,10 @@ import {
   AlertTriangle,
   Clock,
   Sparkles,
+  Download,
+  Pencil,
+  Save,
+  X,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
@@ -552,6 +556,11 @@ function TabDocumentos({
                           {doc.parSubtipo.replace('_', ' ')}
                         </Badge>
                       )}
+                      {doc.contenidoTexto && (
+                        <span className="text-[11px] text-muted-foreground line-clamp-2 block mt-0.5 leading-tight">
+                          {doc.contenidoTexto.split('\n').filter(l => l.trim()).slice(0, 2).join(' — ')}
+                        </span>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell className="py-2">
@@ -598,38 +607,166 @@ function TabDocumentos({
         </Table>
       </div>
 
-      {/* View document modal */}
-      <Dialog open={!!viewDoc} onOpenChange={(open) => !open && setViewDoc(null)}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              {viewDoc?.codigoDocumento} — {viewDoc?.titulo}
-            </DialogTitle>
-          </DialogHeader>
-          {viewDoc && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Badge className={estadoConfig[viewDoc.estado]?.className}>
-                  {estadoConfig[viewDoc.estado]?.label}
-                </Badge>
-                {viewDoc.tipo === 'PAR' && viewDoc.parSubtipo && (
-                  <Badge variant="outline">{viewDoc.parSubtipo.replace('_', ' ')}</Badge>
-                )}
-                <span className="text-xs text-muted-foreground ml-auto">
-                  Rev. {viewDoc.revision} | {viewDoc.contenidoTexto?.length?.toLocaleString()} chars
-                </span>
-              </div>
-              <div className="border rounded-lg p-4 bg-muted/30 max-h-[60vh] overflow-y-auto">
-                <pre className="text-sm whitespace-pre-wrap font-sans leading-relaxed">
-                  {viewDoc.contenidoTexto || 'Sin contenido'}
-                </pre>
-              </div>
+      {/* View/Edit document modal */}
+      {viewDoc && (
+        <DocumentoModal
+          doc={viewDoc}
+          onClose={() => setViewDoc(null)}
+          onRefresh={onRefresh}
+        />
+      )}
+    </div>
+  )
+}
+
+// ====== DOCUMENT MODAL ======
+function DocumentoModal({
+  doc,
+  onClose,
+  onRefresh,
+}: {
+  doc: SsomaDocumento
+  onClose: () => void
+  onRefresh: () => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [editContent, setEditContent] = useState(doc.contenidoTexto || '')
+  const [saving, setSaving] = useState(false)
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/ssoma/documento/${doc.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contenidoTexto: editContent }),
+      })
+      if (!res.ok) throw new Error()
+      toast.success('Documento guardado')
+      setEditing(false)
+      onRefresh()
+    } catch {
+      toast.error('Error al guardar')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDownload = () => {
+    const content = doc.contenidoTexto || ''
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${doc.codigoDocumento.replace(/\u2013/g, '-')}.txt`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  // Parse content into sections
+  const renderSections = (text: string) => {
+    const lines = text.split('\n')
+    const sections: Array<{ heading: string | null; lines: string[] }> = []
+    let current: { heading: string | null; lines: string[] } = { heading: null, lines: [] }
+
+    for (const line of lines) {
+      // Match section headings: "1.", "2.", "6.1", "6.1.", "8.X", etc.
+      const headingMatch = line.match(/^(\d+\.[\d.]*\s*.+|[═]{3,}.*)$/)
+      if (headingMatch && line.trim().length > 3) {
+        if (current.heading || current.lines.length > 0) {
+          sections.push(current)
+        }
+        current = { heading: line, lines: [] }
+      } else {
+        current.lines.push(line)
+      }
+    }
+    if (current.heading || current.lines.length > 0) {
+      sections.push(current)
+    }
+
+    return sections.map((section, i) => (
+      <div key={i} className={section.heading ? 'mt-3' : ''}>
+        {section.heading && (
+          <div className="font-semibold text-sm text-gray-900 bg-gray-100 px-3 py-1.5 rounded -mx-1 mb-1">
+            {section.heading}
+          </div>
+        )}
+        {section.lines.length > 0 && (
+          <pre className="text-sm whitespace-pre-wrap font-mono leading-relaxed text-gray-700 pl-1">
+            {section.lines.join('\n')}
+          </pre>
+        )}
+      </div>
+    ))
+  }
+
+  const est = estadoConfig[doc.estado] || estadoConfig.borrador
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            {doc.codigoDocumento} — {doc.titulo}
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge className={est.className}>{est.label}</Badge>
+          {doc.tipo === 'PAR' && doc.parSubtipo && (
+            <Badge variant="outline">{doc.parSubtipo.replace('_', ' ')}</Badge>
+          )}
+          <span className="text-xs text-muted-foreground ml-auto">
+            Rev. {doc.revision} | {(editing ? editContent : doc.contenidoTexto)?.length?.toLocaleString() || 0} chars
+          </span>
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex items-center gap-2">
+          {editing ? (
+            <>
+              <Button size="sm" className="h-7 text-xs" onClick={handleSave} disabled={saving}>
+                {saving ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Save className="h-3 w-3 mr-1" />}
+                Guardar
+              </Button>
+              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setEditing(false); setEditContent(doc.contenidoTexto || '') }} disabled={saving}>
+                <X className="h-3 w-3 mr-1" />
+                Cancelar
+              </Button>
+            </>
+          ) : (
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setEditing(true)}>
+              <Pencil className="h-3 w-3 mr-1" />
+              Editar
+            </Button>
+          )}
+          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={handleDownload}>
+            <Download className="h-3 w-3 mr-1" />
+            Descargar .txt
+          </Button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 min-h-0 overflow-y-auto border rounded-lg bg-white">
+          {editing ? (
+            <Textarea
+              value={editContent}
+              onChange={(e) => setEditContent(e.target.value)}
+              className="min-h-[50vh] font-mono text-sm border-0 focus-visible:ring-0 resize-none"
+              disabled={saving}
+            />
+          ) : (
+            <div className="p-4">
+              {doc.contenidoTexto ? renderSections(doc.contenidoTexto) : (
+                <span className="text-muted-foreground text-sm">Sin contenido</span>
+              )}
             </div>
           )}
-        </DialogContent>
-      </Dialog>
-    </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
