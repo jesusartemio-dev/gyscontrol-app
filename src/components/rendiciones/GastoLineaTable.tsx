@@ -267,8 +267,11 @@ export default function GastoLineaTable({
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' }).format(amount)
 
-  const formatDate = (date: string) =>
-    new Date(date).toLocaleDateString('es-PE', { day: '2-digit', month: 'short' })
+  const formatDate = (date: string) => {
+    const d = date.split('T')[0]
+    const [y, m, day] = d.split('-').map(Number)
+    return new Date(y, m - 1, day).toLocaleDateString('es-PE', { day: '2-digit', month: 'short' })
+  }
 
   const handleExportExcel = async () => {
     try {

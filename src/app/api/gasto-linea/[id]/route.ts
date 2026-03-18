@@ -49,7 +49,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const updateData: any = { updatedAt: new Date() }
     if (payload.categoriaGastoId !== undefined) updateData.categoriaGastoId = payload.categoriaGastoId
     if (payload.descripcion !== undefined) updateData.descripcion = payload.descripcion
-    if (payload.fecha !== undefined) updateData.fecha = new Date(payload.fecha)
+    if (payload.fecha !== undefined) {
+      const [y, m, d] = payload.fecha.split('-').map(Number)
+      updateData.fecha = new Date(y, m - 1, d, 12, 0, 0)
+    }
     if (payload.monto !== undefined) updateData.monto = payload.monto
     if (payload.moneda !== undefined) updateData.moneda = payload.moneda
     if (payload.tipoComprobante !== undefined) updateData.tipoComprobante = payload.tipoComprobante

@@ -60,7 +60,7 @@ export async function POST(req: Request) {
         hojaDeGastosId: payload.hojaDeGastosId,
         categoriaGastoId: payload.categoriaGastoId || null,
         descripcion: payload.descripcion,
-        fecha: new Date(payload.fecha),
+        fecha: (() => { const [y, m, d] = payload.fecha.split('-').map(Number); return new Date(y, m - 1, d, 12, 0, 0); })(),
         monto: payload.monto,
         moneda: payload.moneda || 'PEN',
         tipoComprobante: payload.tipoComprobante || null,
