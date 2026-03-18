@@ -1,12 +1,12 @@
 'use client'
 
 /**
- * TimesheetSemanal - Vista semanal de timesheet como Odoo
+ * TimesheetSemanal - Vista semanal de timesheet
  *
  * Calendario interactivo semanal con:
  * - Vista semanal (LUN-DOM)
- * - Drag & drop para registro de horas
  * - Totales por día y semana
+ * - Edición y eliminación de registros inline
  * - Integración con wizard de registro completo
  */
 
@@ -14,13 +14,20 @@ import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import {
   ChevronLeft,
   ChevronRight,
   Calendar,
   Clock,
   Plus,
-  Loader2
+  Loader2,
+  Pencil,
+  Trash2,
+  Save
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { format, startOfWeek, endOfWeek, addDays, addWeeks, subWeeks } from 'date-fns'
@@ -49,7 +56,7 @@ interface RegistroHoras {
 
 interface ResumenDia {
   fecha: Date
-  fechaString: string // ✅ Fecha formateada sin problemas de timezone
+  fechaString: string
   totalHoras: number
   registros: RegistroHoras[]
 }
@@ -76,6 +83,14 @@ export function TimesheetSemanal({
   const [fechaWizard, setFechaWizard] = useState<string>('')
   const { toast } = useToast()
 
+  // Estado para edición inline
+  const [editingRegistro, setEditingRegistro] = useState<RegistroHoras | null>(null)
+  const [editHoras, setEditHoras] = useState('')
+  const [editDescripcion, setEditDescripcion] = useState('')
+  const [editFecha, setEditFecha] = useState('')
+  const [editLoading, setEditLoading] = useState(false)
+  const [deleteLoading, setDeleteLoading] = useState(false)
+
   // Sync with parent's semana prop (compare by timestamp to avoid infinite loops)
   useEffect(() => {
     if (semana.getTime() !== semanaActual.getTime()) {
@@ -100,8 +115,6 @@ export function TimesheetSemanal({
       }
 
       const data = await response.json()
-      
-      console.log('✅ Timesheet data received:', data)
 
       setResumenSemana(data.data.resumenSemana)
       setDiasSemana(data.data.diasSemana || [])
@@ -112,18 +125,17 @@ export function TimesheetSemanal({
         description: 'No se pudo cargar el timesheet semanal',
         variant: 'destructive'
       })
-      
-      // Datos por defecto en caso de error
+
       const defaultDias = Array.from({ length: 7 }, (_, i) => {
         const dia = addDays(startOfWeek(semanaActual, { weekStartsOn: 1 }), i)
         return {
           fecha: dia,
-          fechaString: format(dia, 'yyyy-MM-dd'), // ✅ Agregar fechaString
+          fechaString: format(dia, 'yyyy-MM-dd'),
           totalHoras: 0,
           registros: []
         }
       })
-      
+
       setDiasSemana(defaultDias)
       setResumenSemana({
         semana: semanaActual,
@@ -145,26 +157,85 @@ export function TimesheetSemanal({
     onSemanaChange?.(nuevaSemana)
   }
 
-  // ✅ Usar fechaString directamente para evitar problemas de timezone
   const abrirRegistroDia = (fechaString: string, fecha?: Date) => {
-    console.log('🎯 TIMESHEET: Abriendo registro para día:', fechaString)
-    setDiaSeleccionado(fecha || new Date(fechaString + 'T12:00:00')) // Usar mediodía para evitar desfase
+    setDiaSeleccionado(fecha || new Date(fechaString + 'T12:00:00'))
     setFechaWizard(fechaString)
-    console.log('🎯 TIMESHEET: fechaWizard establecido a:', fechaString)
     setShowWizard(true)
-    console.log('🎯 TIMESHEET: Modal abierto')
   }
 
-  const editarRegistro = (registro: RegistroHoras) => {
-    console.log('🎯 TIMESHEET: Editando registro:', registro)
-    // ✅ Parsear fecha como string ISO para evitar desfase de timezone con UTC
+  // Abrir modal de edición
+  const abrirEdicion = (registro: RegistroHoras) => {
     const fechaStr = String(registro.fecha)
     const fechaString = fechaStr.length >= 10 ? fechaStr.substring(0, 10) : format(new Date(fechaStr), 'yyyy-MM-dd')
-    const [y, m, d] = fechaString.split('-').map(Number)
-    const fechaRegistro = new Date(y, m - 1, d, 12, 0, 0)
-    setDiaSeleccionado(fechaRegistro)
-    setFechaWizard(fechaString)
-    setShowWizard(true)
+    setEditingRegistro(registro)
+    setEditHoras(String(registro.horas))
+    setEditDescripcion(registro.descripcion)
+    setEditFecha(fechaString)
+  }
+
+  // Guardar edición
+  const guardarEdicion = async () => {
+    if (!editingRegistro) return
+    try {
+      setEditLoading(true)
+      const response = await fetch('/api/horas-hombre/registrar-simple', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingRegistro.id,
+          fecha: editFecha,
+          horas: parseFloat(editHoras),
+          descripcion: editDescripcion
+        })
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Error al actualizar')
+      }
+
+      toast({ title: 'Registro actualizado', description: `${editHoras}h guardadas correctamente` })
+      setEditingRegistro(null)
+      loadTimesheetSemanal()
+      onHorasRegistradas?.()
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'No se pudo actualizar el registro',
+        variant: 'destructive'
+      })
+    } finally {
+      setEditLoading(false)
+    }
+  }
+
+  // Eliminar registro
+  const eliminarRegistro = async () => {
+    if (!editingRegistro) return
+    try {
+      setDeleteLoading(true)
+      const response = await fetch(`/api/registro-horas?id=${editingRegistro.id}`, {
+        method: 'DELETE'
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Error al eliminar')
+      }
+
+      toast({ title: 'Registro eliminado', description: 'El registro de horas fue eliminado' })
+      setEditingRegistro(null)
+      loadTimesheetSemanal()
+      onHorasRegistradas?.()
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'No se pudo eliminar el registro',
+        variant: 'destructive'
+      })
+    } finally {
+      setDeleteLoading(false)
+    }
   }
 
   const handleRegistroExitoso = () => {
@@ -173,7 +244,7 @@ export function TimesheetSemanal({
     setFechaWizard('')
     loadTimesheetSemanal()
     onHorasRegistradas?.()
-    
+
     toast({
       title: 'Horas registradas',
       description: 'El registro se ha guardado correctamente'
@@ -203,7 +274,6 @@ export function TimesheetSemanal({
     )
   }
 
-  // Función helper para construir texto jerárquico
   const getTextoJerarquico = (registro: RegistroHoras) => {
     const codigoProyecto = registro.proyectoNombre.split(' - ')[0] || registro.proyectoNombre
     let texto = codigoProyecto
@@ -221,6 +291,10 @@ export function TimesheetSemanal({
     }
 
     return texto
+  }
+
+  const esRegistroEditable = (registro: RegistroHoras) => {
+    return registro.origen !== 'campo' && !registro.aprobado
   }
 
   return (
@@ -296,11 +370,13 @@ export function TimesheetSemanal({
                 {dia.registros.slice(0, 3).map((registro) => (
                   <div
                     key={registro.id}
-                    className={`text-xs rounded px-2 py-1 truncate ${registro.origen === 'campo' ? 'bg-orange-100/80 border-l-2 border-orange-400' : 'bg-white/80'}`}
+                    className={`text-xs rounded px-2 py-1 truncate group relative ${registro.origen === 'campo' ? 'bg-orange-100/80 border-l-2 border-orange-400' : 'bg-white/80'} ${esRegistroEditable(registro) ? 'hover:bg-blue-50 hover:ring-1 hover:ring-blue-300' : ''}`}
                     title={`${getTextoJerarquico(registro)}: ${registro.descripcion}${registro.origen === 'campo' ? ' (Campo)' : ''}`}
                     onClick={(e) => {
                       e.stopPropagation()
-                      editarRegistro(registro)
+                      if (esRegistroEditable(registro)) {
+                        abrirEdicion(registro)
+                      }
                     }}
                   >
                     <div className="flex items-center justify-between">
@@ -314,6 +390,9 @@ export function TimesheetSemanal({
                           <Badge variant="outline" className="text-xs px-1 py-0 h-4">
                             ✓
                           </Badge>
+                        )}
+                        {esRegistroEditable(registro) && (
+                          <Pencil className="h-3 w-3 text-blue-500 hidden group-hover:block" />
                         )}
                       </div>
                     </div>
@@ -386,7 +465,11 @@ export function TimesheetSemanal({
                     <div
                       key={registro.id}
                       className={`px-4 py-2 flex items-center justify-between cursor-pointer hover:bg-gray-50 ${registro.origen === 'campo' ? 'border-l-3 border-orange-400 bg-orange-50/50' : ''}`}
-                      onClick={() => editarRegistro(registro)}
+                      onClick={() => {
+                        if (esRegistroEditable(registro)) {
+                          abrirEdicion(registro)
+                        }
+                      }}
                     >
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium text-gray-900 truncate">
@@ -412,6 +495,9 @@ export function TimesheetSemanal({
                             ✓
                           </Badge>
                         )}
+                        {esRegistroEditable(registro) && (
+                          <Pencil className="h-3.5 w-3.5 text-blue-400" />
+                        )}
                       </div>
                     </div>
                   ))}
@@ -422,13 +508,118 @@ export function TimesheetSemanal({
         })}
       </div>
 
-      {/* Wizard de registro de horas */}
+      {/* Wizard de registro de horas (crear nuevo) */}
       <RegistroHorasWizard
         open={showWizard}
         onOpenChange={setShowWizard}
         onSuccess={handleRegistroExitoso}
         fechaInicial={fechaWizard}
       />
+
+      {/* Dialog de edición/eliminación de registro */}
+      <Dialog open={!!editingRegistro} onOpenChange={(open) => { if (!open) setEditingRegistro(null) }}>
+        <DialogContent className="w-[95vw] max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-4 w-4" />
+              Editar Registro
+            </DialogTitle>
+          </DialogHeader>
+
+          {editingRegistro && (
+            <div className="space-y-4">
+              {/* Info del registro (no editable) */}
+              <div className="p-3 bg-gray-50 rounded-lg text-sm space-y-1">
+                <div><strong>Proyecto:</strong> {editingRegistro.proyectoNombre}</div>
+                <div><strong>EDT:</strong> {editingRegistro.edtNombre}</div>
+                {editingRegistro.actividadNombre && (
+                  <div><strong>Actividad:</strong> {editingRegistro.actividadNombre}</div>
+                )}
+                {editingRegistro.tareaNombre && (
+                  <div><strong>Tarea:</strong> {editingRegistro.tareaNombre}</div>
+                )}
+              </div>
+
+              {/* Campos editables */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="edit-fecha" className="text-sm">Fecha</Label>
+                  <Input
+                    id="edit-fecha"
+                    type="date"
+                    value={editFecha}
+                    onChange={(e) => setEditFecha(e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-horas" className="text-sm">Horas</Label>
+                  <Input
+                    id="edit-horas"
+                    type="number"
+                    step="0.5"
+                    min="0.5"
+                    max="24"
+                    value={editHoras}
+                    onChange={(e) => setEditHoras(e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="edit-descripcion" className="text-sm">Descripcion del trabajo</Label>
+                <Textarea
+                  id="edit-descripcion"
+                  value={editDescripcion}
+                  onChange={(e) => setEditDescripcion(e.target.value)}
+                  rows={3}
+                  className="mt-1"
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="flex-row justify-between sm:justify-between gap-2">
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={eliminarRegistro}
+              disabled={deleteLoading || editLoading}
+            >
+              {deleteLoading ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4 mr-1" />
+              )}
+              Eliminar
+            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setEditingRegistro(null)}
+                disabled={editLoading || deleteLoading}
+              >
+                Cancelar
+              </Button>
+              <Button
+                size="sm"
+                onClick={guardarEdicion}
+                disabled={editLoading || deleteLoading || !editHoras || !editDescripcion || !editFecha}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                {editLoading ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4 mr-1" />
+                )}
+                Guardar
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
