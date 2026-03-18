@@ -1038,6 +1038,7 @@ model Proyecto {
   proyectoExclusion        ProyectoExclusion[]
   // Documentos financieros imputados al proyecto
   hojasDeGastos            HojaDeGastos[]
+  gastoLineas              GastoLinea[]          @relation("GastoLineaProyecto")
   ordenesCompra            OrdenCompra[]
   cuentasPorCobrar         CuentaPorCobrar[]
   cuentasPorPagar          CuentaPorPagar[]
@@ -3270,6 +3271,7 @@ model CentroCosto {
 
   hojas         HojaDeGastos[]
   ordenesCompra OrdenCompra[]
+  gastoLineas   GastoLinea[]
 
   @@index([tipo, activo])
   @@map("centro_costo")
@@ -3355,13 +3357,13 @@ model HojaDeGastosAdjunto {
 }
 
 model GastoLinea {
-  id                    String    @id @default(cuid())
+  id                    String          @id @default(cuid())
   hojaDeGastosId        String
   categoriaGastoId      String?
   descripcion           String
   fecha                 DateTime
   monto                 Float
-  moneda                String    @default("PEN")
+  moneda                String          @default("PEN")
   tipoComprobante       String?
   numeroComprobante     String?
   proveedorNombre       String?
@@ -3371,11 +3373,17 @@ model GastoLinea {
   conformidad           String?
   comentarioConformidad String?
   conformadoEn          DateTime?
-  createdAt             DateTime  @default(now())
+  // Override de imputación (si null, hereda de la cabecera HojaDeGastos)
+  proyectoId            String?
+  centroCostoId         String?
+  categoriaCosto        CategoriaCosto?
+  createdAt             DateTime        @default(now())
   updatedAt             DateTime
 
   hojaDeGastos   HojaDeGastos    @relation(fields: [hojaDeGastosId], references: [id], onDelete: Cascade)
   categoriaGasto CategoriaGasto? @relation(fields: [categoriaGastoId], references: [id])
+  proyecto       Proyecto?       @relation("GastoLineaProyecto", fields: [proyectoId], references: [id])
+  centroCosto    CentroCosto?    @relation(fields: [centroCostoId], references: [id])
   adjuntos       GastoAdjunto[]
 
   @@index([hojaDeGastosId])

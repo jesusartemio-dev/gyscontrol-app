@@ -8,7 +8,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const { id } = await params
     const data = await prisma.gastoLinea.findUnique({
       where: { id },
-      include: { adjuntos: true, categoriaGasto: true },
+      include: {
+        adjuntos: true,
+        categoriaGasto: true,
+        proyecto: { select: { id: true, nombre: true, codigo: true } },
+        centroCosto: { select: { id: true, nombre: true } },
+      },
     })
     if (!data) {
       return NextResponse.json({ error: 'Línea de gasto no encontrada' }, { status: 404 })
@@ -52,11 +57,19 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (payload.proveedorNombre !== undefined) updateData.proveedorNombre = payload.proveedorNombre
     if (payload.proveedorRuc !== undefined) updateData.proveedorRuc = payload.proveedorRuc
     if (payload.observaciones !== undefined) updateData.observaciones = payload.observaciones
+    if (payload.proyectoId !== undefined) updateData.proyectoId = payload.proyectoId
+    if (payload.centroCostoId !== undefined) updateData.centroCostoId = payload.centroCostoId
+    if (payload.categoriaCosto !== undefined) updateData.categoriaCosto = payload.categoriaCosto
 
     const data = await prisma.gastoLinea.update({
       where: { id },
       data: updateData,
-      include: { adjuntos: true, categoriaGasto: true },
+      include: {
+        adjuntos: true,
+        categoriaGasto: true,
+        proyecto: { select: { id: true, nombre: true, codigo: true } },
+        centroCosto: { select: { id: true, nombre: true } },
+      },
     })
 
     // Recalcular montoGastado si cambió el monto

@@ -19,7 +19,12 @@ export async function GET(req: Request) {
 
     const data = await prisma.gastoLinea.findMany({
       where: { hojaDeGastosId },
-      include: { adjuntos: true, categoriaGasto: true },
+      include: {
+        adjuntos: true,
+        categoriaGasto: true,
+        proyecto: { select: { id: true, nombre: true, codigo: true } },
+        centroCosto: { select: { id: true, nombre: true } },
+      },
       orderBy: { fecha: 'asc' },
     })
 
@@ -63,9 +68,17 @@ export async function POST(req: Request) {
         proveedorNombre: payload.proveedorNombre || null,
         proveedorRuc: payload.proveedorRuc || null,
         observaciones: payload.observaciones || null,
+        proyectoId: payload.proyectoId || null,
+        centroCostoId: payload.centroCostoId || null,
+        categoriaCosto: payload.categoriaCosto || null,
         updatedAt: new Date(),
       },
-      include: { adjuntos: true, categoriaGasto: true },
+      include: {
+        adjuntos: true,
+        categoriaGasto: true,
+        proyecto: { select: { id: true, nombre: true, codigo: true } },
+        centroCosto: { select: { id: true, nombre: true } },
+      },
     })
 
     // Recalcular montoGastado de la hoja

@@ -2744,10 +2744,16 @@ export interface GastoLinea {
   conformidad?: string | null
   comentarioConformidad?: string | null
   conformadoEn?: string | null
+  // Override de imputación (si null, hereda de la cabecera)
+  proyectoId?: string | null
+  centroCostoId?: string | null
+  categoriaCosto?: 'equipos' | 'servicios' | 'gastos' | null
   createdAt: string
   updatedAt: string
   // Relations
   categoriaGasto?: CategoriaGasto | null
+  proyecto?: { id: string; nombre: string; codigo: string } | null
+  centroCosto?: { id: string; nombre: string } | null
   adjuntos?: GastoAdjunto[]
 }
 

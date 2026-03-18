@@ -590,6 +590,13 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
             editable={isEditable}
             onChanged={loadData}
             showConformidad={canValidarLineas}
+            hojaInfo={{
+              proyectoId: hoja.proyectoId,
+              proyectoNombre: hoja.proyecto ? `${hoja.proyecto.codigo} - ${hoja.proyecto.nombre}` : null,
+              centroCostoId: hoja.centroCostoId,
+              centroCostoNombre: hoja.centroCosto?.nombre,
+              categoriaCosto: hoja.categoriaCosto,
+            }}
           />
         </CardContent>
       </Card>

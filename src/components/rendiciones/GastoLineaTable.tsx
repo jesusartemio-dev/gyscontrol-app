@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
 import {
   Select,
   SelectContent,
@@ -30,7 +31,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
-import { Plus, Loader2, Trash2, Edit, Receipt, ScanLine, ShieldCheck, FileSpreadsheet, Download } from 'lucide-react'
+import { Plus, Loader2, Trash2, Edit, Receipt, ScanLine, ShieldCheck, FileSpreadsheet, Download, ArrowRightLeft } from 'lucide-react'
 import { createGastoLinea, updateGastoLinea, deleteGastoLinea } from '@/lib/services/gastoLinea'
 import GastoAdjuntoUpload from './GastoAdjuntoUpload'
 import CargaMasivaComprobantes from './CargaMasivaComprobantes'
@@ -47,6 +48,20 @@ const TIPOS_COMPROBANTE = [
   { value: 'sin_comprobante', label: 'Sin comprobante' },
 ]
 
+const CATEGORIAS_COSTO = [
+  { value: 'equipos', label: 'Equipos' },
+  { value: 'servicios', label: 'Servicios' },
+  { value: 'gastos', label: 'Gastos' },
+]
+
+interface HojaInfo {
+  proyectoId?: string | null
+  proyectoNombre?: string | null
+  centroCostoId?: string | null
+  centroCostoNombre?: string | null
+  categoriaCosto?: string | null
+}
+
 interface GastoLineaTableProps {
   hojaDeGastosId: string
   lineas: GastoLinea[]
@@ -54,6 +69,7 @@ interface GastoLineaTableProps {
   editable: boolean
   onChanged: () => void
   showConformidad?: boolean
+  hojaInfo?: HojaInfo
 }
 
 export default function GastoLineaTable({
@@ -63,6 +79,7 @@ export default function GastoLineaTable({
   editable,
   onChanged,
   showConformidad = false,
+  hojaInfo,
 }: GastoLineaTableProps) {
   const [showForm, setShowForm] = useState(false)
   const [editLinea, setEditLinea] = useState<GastoLinea | null>(null)
@@ -83,6 +100,47 @@ export default function GastoLineaTable({
   const [proveedorNombre, setProveedorNombre] = useState('')
   const [proveedorRuc, setProveedorRuc] = useState('')
 
+  // Override fields
+  const [showOverride, setShowOverride] = useState(false)
+  const [overrideType, setOverrideType] = useState<'proyecto' | 'centroCosto' | ''>('')
+  const [overrideProyectoId, setOverrideProyectoId] = useState('')
+  const [overrideCentroCostoId, setOverrideCentroCostoId] = useState('')
+  const [overrideCategoriaCosto, setOverrideCategoriaCosto] = useState('')
+
+  // Lists for override selectors
+  const [proyectos, setProyectos] = useState<{ id: string; nombre: string; codigo: string }[]>([])
+  const [centrosCosto, setCentrosCosto] = useState<{ id: string; nombre: string }[]>([])
+  const [loadingLists, setLoadingLists] = useState(false)
+
+  // Load projects and cost centers when override is shown
+  useEffect(() => {
+    if (showOverride && proyectos.length === 0 && centrosCosto.length === 0) {
+      loadOverrideLists()
+    }
+  }, [showOverride])
+
+  const loadOverrideLists = async () => {
+    try {
+      setLoadingLists(true)
+      const [proyRes, ccRes] = await Promise.all([
+        fetch('/api/proyectos'),
+        fetch('/api/centro-costo'),
+      ])
+      if (proyRes.ok) {
+        const pData = await proyRes.json()
+        setProyectos((pData.data || pData || []).map((p: any) => ({ id: p.id, nombre: p.nombre, codigo: p.codigo })))
+      }
+      if (ccRes.ok) {
+        const ccData = await ccRes.json()
+        setCentrosCosto((ccData.data || ccData || []).filter((cc: any) => cc.activo !== false).map((cc: any) => ({ id: cc.id, nombre: cc.nombre })))
+      }
+    } catch {
+      // Silently fail - override is optional
+    } finally {
+      setLoadingLists(false)
+    }
+  }
+
   const resetForm = () => {
     setDescripcion('')
     setFecha('')
@@ -92,6 +150,11 @@ export default function GastoLineaTable({
     setNumeroComprobante('')
     setProveedorNombre('')
     setProveedorRuc('')
+    setShowOverride(false)
+    setOverrideType('')
+    setOverrideProyectoId('')
+    setOverrideCentroCostoId('')
+    setOverrideCategoriaCosto('')
     setEditLinea(null)
   }
 
@@ -111,7 +174,34 @@ export default function GastoLineaTable({
     setNumeroComprobante(linea.numeroComprobante || '')
     setProveedorNombre(linea.proveedorNombre || '')
     setProveedorRuc(linea.proveedorRuc || '')
+
+    // Load override state
+    if (linea.proyectoId || linea.centroCostoId || linea.categoriaCosto) {
+      setShowOverride(true)
+      setOverrideType(linea.proyectoId ? 'proyecto' : linea.centroCostoId ? 'centroCosto' : '')
+      setOverrideProyectoId(linea.proyectoId || '')
+      setOverrideCentroCostoId(linea.centroCostoId || '')
+      setOverrideCategoriaCosto(linea.categoriaCosto || '')
+    } else {
+      setShowOverride(false)
+      setOverrideType('')
+      setOverrideProyectoId('')
+      setOverrideCentroCostoId('')
+      setOverrideCategoriaCosto('')
+    }
+
     setShowForm(true)
+  }
+
+  const getOverridePayload = (): { proyectoId: string | null; centroCostoId: string | null; categoriaCosto: 'equipos' | 'servicios' | 'gastos' | null } => {
+    if (!showOverride) {
+      return { proyectoId: null, centroCostoId: null, categoriaCosto: null }
+    }
+    return {
+      proyectoId: overrideType === 'proyecto' && overrideProyectoId ? overrideProyectoId : null,
+      centroCostoId: overrideType === 'centroCosto' && overrideCentroCostoId ? overrideCentroCostoId : null,
+      categoriaCosto: (overrideCategoriaCosto as 'equipos' | 'servicios' | 'gastos') || null,
+    }
   }
 
   const handleSave = async () => {
@@ -119,6 +209,8 @@ export default function GastoLineaTable({
       toast.error('Complete los campos obligatorios')
       return
     }
+
+    const overrideData = getOverridePayload()
 
     try {
       setLoading(true)
@@ -132,8 +224,9 @@ export default function GastoLineaTable({
           numeroComprobante: numeroComprobante || null,
           proveedorNombre: proveedorNombre || null,
           proveedorRuc: proveedorRuc || null,
+          ...overrideData,
         })
-        toast.success('Línea actualizada')
+        toast.success('Linea actualizada')
       } else {
         await createGastoLinea({
           hojaDeGastosId,
@@ -145,8 +238,9 @@ export default function GastoLineaTable({
           numeroComprobante: numeroComprobante || undefined,
           proveedorNombre: proveedorNombre || undefined,
           proveedorRuc: proveedorRuc || undefined,
+          ...overrideData,
         })
-        toast.success('Línea agregada')
+        toast.success('Linea agregada')
       }
       setShowForm(false)
       resetForm()
@@ -162,7 +256,7 @@ export default function GastoLineaTable({
     if (!deleteTarget) return
     try {
       await deleteGastoLinea(deleteTarget.id)
-      toast.success('Línea eliminada')
+      toast.success('Linea eliminada')
       setDeleteTarget(null)
       onChanged()
     } catch (error) {
@@ -188,6 +282,17 @@ export default function GastoLineaTable({
     }
   }
 
+  // Helper to get the effective destination display for a line
+  const getDestinoLinea = (linea: GastoLinea) => {
+    if (linea.proyecto) return linea.proyecto.codigo
+    if (linea.centroCosto) return linea.centroCosto.nombre
+    return null
+  }
+
+  const tieneOverride = (linea: GastoLinea) => {
+    return !!(linea.proyectoId || linea.centroCostoId || linea.categoriaCosto)
+  }
+
   const total = lineas.reduce((sum, l) => sum + l.monto, 0)
 
   return (
@@ -195,7 +300,7 @@ export default function GastoLineaTable({
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold flex items-center gap-1.5">
           <Receipt className="h-4 w-4 text-orange-600" />
-          Líneas de Gasto
+          Lineas de Gasto
           <span className="text-xs font-normal text-muted-foreground">({lineas.length})</span>
         </h3>
         <div className="flex items-center gap-2">
@@ -230,8 +335,8 @@ export default function GastoLineaTable({
           <thead>
             <tr className="bg-muted/50 text-xs">
               <th className="text-left p-2 font-medium">Fecha</th>
-              <th className="text-left p-2 font-medium">Descripción</th>
-              <th className="text-left p-2 font-medium">Categoría</th>
+              <th className="text-left p-2 font-medium">Descripcion</th>
+              <th className="text-left p-2 font-medium">Categoria</th>
               <th className="text-left p-2 font-medium">Comprobante</th>
               <th className="text-right p-2 font-medium">Monto</th>
               <th className="text-left p-2 font-medium">Adjuntos</th>
@@ -242,7 +347,7 @@ export default function GastoLineaTable({
             {lineas.length === 0 ? (
               <tr>
                 <td colSpan={editable ? 7 : 6} className="text-center py-6 text-muted-foreground text-xs">
-                  Sin líneas de gasto
+                  Sin lineas de gasto
                 </td>
               </tr>
             ) : (
@@ -259,6 +364,15 @@ export default function GastoLineaTable({
                     <span className="text-xs line-clamp-1">{linea.descripcion}</span>
                     {linea.proveedorNombre && (
                       <span className="text-[10px] text-muted-foreground block">{linea.proveedorNombre}</span>
+                    )}
+                    {tieneOverride(linea) && (
+                      <span className="inline-flex items-center gap-1 mt-0.5">
+                        <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 bg-blue-50 text-blue-700 border-blue-200">
+                          <ArrowRightLeft className="h-2.5 w-2.5 mr-0.5" />
+                          {getDestinoLinea(linea) || ''}
+                          {linea.categoriaCosto && ` (${linea.categoriaCosto})`}
+                        </Badge>
+                      </span>
                     )}
                   </td>
                   <td className="p-2 text-xs text-muted-foreground">
@@ -322,7 +436,7 @@ export default function GastoLineaTable({
 
       {/* Add/Edit Dialog */}
       <Dialog open={showForm} onOpenChange={(open) => { setShowForm(open); if (!open) resetForm() }}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <div className="p-1.5 rounded-md bg-orange-100">
@@ -361,7 +475,7 @@ export default function GastoLineaTable({
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-sm">Descripción <span className="text-red-500">*</span></Label>
+              <Label className="text-sm">Descripcion <span className="text-red-500">*</span></Label>
               <Input
                 value={descripcion}
                 onChange={(e) => setDescripcion(e.target.value)}
@@ -372,13 +486,13 @@ export default function GastoLineaTable({
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-sm">Categoría</Label>
+                <Label className="text-sm">Categoria</Label>
                 <Select value={categoriaGastoId || '__none__'} onValueChange={(v) => setCategoriaGastoId(v === '__none__' ? '' : v)}>
                   <SelectTrigger className="h-9 text-sm">
                     <SelectValue placeholder="Seleccionar..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__none__">Sin categoría</SelectItem>
+                    <SelectItem value="__none__">Sin categoria</SelectItem>
                     {categorias.map((cat) => (
                       <SelectItem key={cat.id} value={cat.id}>{cat.nombre}</SelectItem>
                     ))}
@@ -431,6 +545,125 @@ export default function GastoLineaTable({
                 disabled={loading}
               />
             </div>
+
+            {/* Override de imputacion */}
+            <div className="border-t pt-3">
+              <button
+                type="button"
+                className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 font-medium"
+                onClick={() => {
+                  setShowOverride(!showOverride)
+                  if (showOverride) {
+                    setOverrideType('')
+                    setOverrideProyectoId('')
+                    setOverrideCentroCostoId('')
+                    setOverrideCategoriaCosto('')
+                  }
+                }}
+              >
+                <ArrowRightLeft className="h-3.5 w-3.5" />
+                {showOverride ? 'Quitar destino diferente' : 'Asignar a otro proyecto / centro de costo'}
+              </button>
+
+              {showOverride && (
+                <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
+                  <p className="text-xs text-blue-700">
+                    Este gasto se imputara a un destino diferente al del requerimiento
+                    {hojaInfo?.proyectoNombre && ` (${hojaInfo.proyectoNombre})`}
+                    {hojaInfo?.centroCostoNombre && ` (${hojaInfo.centroCostoNombre})`}
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Tipo de destino</Label>
+                      <Select
+                        value={overrideType || '__none__'}
+                        onValueChange={(v) => {
+                          setOverrideType(v === '__none__' ? '' : v as 'proyecto' | 'centroCosto')
+                          setOverrideProyectoId('')
+                          setOverrideCentroCostoId('')
+                        }}
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="Seleccionar..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">Sin especificar</SelectItem>
+                          <SelectItem value="proyecto">Proyecto</SelectItem>
+                          <SelectItem value="centroCosto">Centro de Costo</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Tipo de costo</Label>
+                      <Select
+                        value={overrideCategoriaCosto || '__none__'}
+                        onValueChange={(v) => setOverrideCategoriaCosto(v === '__none__' ? '' : v)}
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="Heredar del req." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">Heredar del requerimiento</SelectItem>
+                          {CATEGORIAS_COSTO.map((c) => (
+                            <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {overrideType === 'proyecto' && (
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Proyecto</Label>
+                      {loadingLists ? (
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground p-2">
+                          <Loader2 className="h-3 w-3 animate-spin" /> Cargando...
+                        </div>
+                      ) : (
+                        <Select value={overrideProyectoId || '__none__'} onValueChange={(v) => setOverrideProyectoId(v === '__none__' ? '' : v)}>
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue placeholder="Seleccionar proyecto..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">Sin seleccionar</SelectItem>
+                            {proyectos.map((p) => (
+                              <SelectItem key={p.id} value={p.id}>
+                                {p.codigo} - {p.nombre}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
+                  )}
+
+                  {overrideType === 'centroCosto' && (
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Centro de Costo</Label>
+                      {loadingLists ? (
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground p-2">
+                          <Loader2 className="h-3 w-3 animate-spin" /> Cargando...
+                        </div>
+                      ) : (
+                        <Select value={overrideCentroCostoId || '__none__'} onValueChange={(v) => setOverrideCentroCostoId(v === '__none__' ? '' : v)}>
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue placeholder="Seleccionar centro de costo..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">Sin seleccionar</SelectItem>
+                            {centrosCosto.map((cc) => (
+                              <SelectItem key={cc.id} value={cc.id}>{cc.nombre}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           <DialogFooter className="pt-2">
@@ -455,10 +688,10 @@ export default function GastoLineaTable({
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <Trash2 className="h-5 w-5 text-red-600" />
-              Eliminar Línea de Gasto
+              Eliminar Linea de Gasto
             </AlertDialogTitle>
             <AlertDialogDescription>
-              ¿Eliminar &quot;{deleteTarget?.descripcion}&quot;? Esta acción no se puede deshacer.
+              ¿Eliminar &quot;{deleteTarget?.descripcion}&quot;? Esta accion no se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -1391,6 +1391,10 @@ export interface GastoLineaPayload {
   proveedorNombre?: string
   proveedorRuc?: string
   observaciones?: string
+  // Override de imputación por línea
+  proyectoId?: string | null
+  centroCostoId?: string | null
+  categoriaCosto?: 'equipos' | 'servicios' | 'gastos' | null
 }
 
 export interface GastoLineaUpdatePayload {
@@ -1404,6 +1408,10 @@ export interface GastoLineaUpdatePayload {
   proveedorNombre?: string | null
   proveedorRuc?: string | null
   observaciones?: string | null
+  // Override de imputación por línea
+  proyectoId?: string | null
+  centroCostoId?: string | null
+  categoriaCosto?: 'equipos' | 'servicios' | 'gastos' | null
 }
 
 // ======================
