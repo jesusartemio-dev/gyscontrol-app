@@ -28,7 +28,7 @@ const proveedorSchema = z.object({
     .min(1, 'El nombre es obligatorio')
     .min(2, 'El nombre debe tener al menos 2 caracteres')
     .max(100, 'El nombre no puede exceder 100 caracteres')
-    .regex(/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s\-\.]+$/, 'El nombre solo puede contener letras, espacios, guiones y puntos'),
+    .regex(/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s\-\.&\/\+0-9]+$/, 'El nombre solo puede contener letras, números, espacios, guiones, puntos, &, / y +'),
   ruc: z
     .string()
     .optional()
