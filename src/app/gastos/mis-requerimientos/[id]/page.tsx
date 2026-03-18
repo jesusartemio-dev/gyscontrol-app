@@ -215,8 +215,8 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
 
       // Colors
       const primary: [number, number, number] = [31, 78, 121]
-      const darkText: [number, number, number] = [33, 33, 33]
       const mutedText: [number, number, number] = [120, 120, 120]
+      const margin = 14
 
       const estadoLabels: Record<string, string> = {
         borrador: 'Borrador', enviado: 'Enviado', aprobado: 'Aprobado',
@@ -224,56 +224,52 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
         cerrado: 'Cerrado', rechazado: 'Rechazado',
       }
 
+      const fmtMoney = (v: number) => `S/ ${v.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
       // Title
       doc.setFontSize(16)
       doc.setTextColor(...primary)
-      doc.text(`REQUERIMIENTO DE DINERO`, pageWidth / 2, 20, { align: 'center' })
+      doc.text('REQUERIMIENTO DE DINERO', pageWidth / 2, 20, { align: 'center' })
       doc.setFontSize(12)
       doc.text(hoja.numero, pageWidth / 2, 28, { align: 'center' })
 
       // Separator
       doc.setDrawColor(...primary)
       doc.setLineWidth(0.5)
-      doc.line(14, 32, pageWidth - 14, 32)
+      doc.line(margin, 33, pageWidth - margin, 33)
 
-      // Info section
-      let y = 40
-      const addInfoLine = (label: string, value: string, x = 14) => {
-        doc.setFontSize(9)
-        doc.setTextColor(...mutedText)
-        doc.text(label, x, y)
-        doc.setTextColor(...darkText)
-        doc.setFont('helvetica', 'normal')
-        doc.text(value, x + 35, y)
-      }
-
+      // --- Info section using autoTable for proper text wrapping ---
       const asignacion = hoja.proyecto
         ? `${hoja.proyecto.codigo} - ${hoja.proyecto.nombre}`
         : hoja.centroCosto?.nombre || '-'
 
-      addInfoLine('Estado:', estadoLabels[hoja.estado] || hoja.estado)
-      addInfoLine('Creado:', formatDate(hoja.createdAt), pageWidth / 2)
-      y += 6
-      addInfoLine('Empleado:', hoja.empleado?.name || '-')
-      addInfoLine('Aprobador:', hoja.aprobador?.name || '-', pageWidth / 2)
-      y += 6
-      addInfoLine('Asignado a:', asignacion)
-      addInfoLine('Categoría:', hoja.categoriaCosto || 'gastos', pageWidth / 2)
-      y += 6
-      addInfoLine('Motivo:', hoja.motivo)
-      addInfoLine('Anticipo:', hoja.requiereAnticipo ? 'Sí' : 'No', pageWidth / 2)
-      y += 6
-
+      const infoRows: string[][] = [
+        ['Estado', estadoLabels[hoja.estado] || hoja.estado, 'Creado', formatDate(hoja.createdAt)],
+        ['Empleado', hoja.empleado?.name || '-', 'Aprobador', hoja.aprobador?.name || '-'],
+        ['Asignado a', asignacion, 'Categoría', hoja.categoriaCosto || 'gastos'],
+        ['Motivo', hoja.motivo, 'Anticipo', hoja.requiereAnticipo ? 'Sí' : 'No'],
+      ]
       if (hoja.observaciones) {
-        addInfoLine('Observaciones:', hoja.observaciones)
-        y += 6
+        infoRows.push(['Observaciones', hoja.observaciones, '', ''])
       }
 
-      y += 4
+      autoTable(doc, {
+        startY: 37,
+        body: infoRows,
+        theme: 'plain',
+        styles: { fontSize: 9, cellPadding: { top: 2, bottom: 2, left: 2, right: 2 }, overflow: 'linebreak' },
+        columnStyles: {
+          0: { fontStyle: 'bold', textColor: mutedText, cellWidth: 28 },
+          1: { cellWidth: 62 },
+          2: { fontStyle: 'bold', textColor: mutedText, cellWidth: 28 },
+          3: { cellWidth: 62 },
+        },
+        margin: { left: margin, right: margin },
+      })
 
-      // Financial summary
-      const fmtMoney = (v: number) => `S/ ${v.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      let y = (doc as any).lastAutoTable.finalY + 6
 
+      // --- Financial summary ---
       const finData: string[][] = []
       if (hoja.requiereAnticipo) {
         finData.push(['Monto Anticipo', fmtMoney(hoja.montoAnticipo)])
@@ -288,15 +284,15 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
         body: finData,
         theme: 'grid',
         headStyles: { fillColor: primary, textColor: [255, 255, 255], fontSize: 10, halign: 'center' },
-        columnStyles: { 0: { fontStyle: 'bold', cellWidth: 60 }, 1: { halign: 'right' } },
+        columnStyles: { 0: { fontStyle: 'bold', cellWidth: 55 }, 1: { halign: 'right' } },
         styles: { fontSize: 9, cellPadding: 3 },
-        margin: { left: 14, right: 14 },
-        tableWidth: pageWidth / 2 - 14,
+        margin: { left: margin, right: margin },
+        tableWidth: pageWidth / 2 - margin,
       })
 
-      y = (doc as any).lastAutoTable.finalY + 10
+      y = (doc as any).lastAutoTable.finalY + 8
 
-      // Expense lines table
+      // --- Expense lines table ---
       if (lineas.length > 0) {
         const tableHead = [['Fecha', 'Descripción', 'Categoría', 'Comprobante', 'Proveedor', 'Monto']]
         const tableBody = lineas.map(l => [
@@ -317,11 +313,14 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
           body: tableBody,
           theme: 'grid',
           headStyles: { fillColor: [46, 117, 182], textColor: [255, 255, 255], fontSize: 9, halign: 'center' },
-          styles: { fontSize: 8, cellPadding: 2.5 },
-          columnStyles: { 5: { halign: 'right' } },
-          margin: { left: 14, right: 14 },
+          styles: { fontSize: 8, cellPadding: 2.5, overflow: 'linebreak' },
+          columnStyles: {
+            0: { cellWidth: 22 },
+            1: { cellWidth: 'auto' },
+            5: { halign: 'right', cellWidth: 28 },
+          },
+          margin: { left: margin, right: margin },
           didParseCell: (data: any) => {
-            // Bold total row
             if (data.section === 'body' && data.row.index === tableBody.length - 1) {
               data.cell.styles.fontStyle = 'bold'
             }
@@ -330,7 +329,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
       } else {
         doc.setFontSize(9)
         doc.setTextColor(...mutedText)
-        doc.text('Sin líneas de gasto registradas', 14, y)
+        doc.text('Sin líneas de gasto registradas', margin, y)
       }
 
       // Footer
@@ -339,8 +338,8 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
         doc.setPage(i)
         doc.setFontSize(7)
         doc.setTextColor(...mutedText)
-        doc.text(`GySControl - Generado el ${new Date().toLocaleDateString('es-PE')}`, 14, doc.internal.pageSize.getHeight() - 8)
-        doc.text(`Página ${i} de ${pageCount}`, pageWidth - 14, doc.internal.pageSize.getHeight() - 8, { align: 'right' })
+        doc.text(`GySControl - Generado el ${new Date().toLocaleDateString('es-PE')}`, margin, doc.internal.pageSize.getHeight() - 8)
+        doc.text(`Página ${i} de ${pageCount}`, pageWidth - margin, doc.internal.pageSize.getHeight() - 8, { align: 'right' })
       }
 
       doc.save(`Requerimiento_${hoja.numero.replace(/\//g, '-')}.pdf`)
