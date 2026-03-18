@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
-const ROLES_ALLOWED = ['admin', 'gerente', 'logistico']
+const ROLES_ALLOWED = ['admin', 'gerente', 'logistico', 'coordinador_logistico']
 
 async function generarNumeroOC(): Promise<string> {
   const now = new Date()

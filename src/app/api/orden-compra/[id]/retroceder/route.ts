@@ -5,7 +5,7 @@ import { authOptions } from '@/lib/auth'
 import { canRollback, isValidRollback } from '@/lib/utils/rollbackValidation'
 import { crearEvento } from '@/lib/utils/trazabilidad'
 
-const ROLES_ALLOWED = ['admin', 'gerente', 'logistico']
+const ROLES_ALLOWED = ['admin', 'gerente', 'logistico', 'coordinador_logistico']
 
 // GET: pre-check sin ejecutar el rollback
 export async function GET(

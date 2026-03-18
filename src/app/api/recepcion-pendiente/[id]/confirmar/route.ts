@@ -21,7 +21,7 @@ export async function POST(
 
     // Validar permisos por paso
     const role = session.user.role
-    if (paso === 'almacen' && !['admin', 'gerente', 'logistico'].includes(role)) {
+    if (paso === 'almacen' && !['admin', 'gerente', 'logistico', 'coordinador_logistico'].includes(role)) {
       return NextResponse.json({ error: 'Sin permisos para confirmar llegada a almacén' }, { status: 403 })
     }
     if (paso === 'proyecto' && !['admin', 'gerente', 'gestor', 'coordinador'].includes(role)) {

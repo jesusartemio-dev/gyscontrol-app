@@ -74,7 +74,7 @@ export async function GET(req: Request) {
     }
 
     const role = session.user.role
-    if (!['admin', 'gerente', 'logistico'].includes(role)) {
+    if (!['admin', 'gerente', 'logistico', 'coordinador_logistico'].includes(role)) {
       where.solicitanteId = session.user.id
     }
 
@@ -99,7 +99,7 @@ export async function POST(req: Request) {
     }
 
     const role = session.user.role
-    if (!['admin', 'gerente', 'logistico'].includes(role)) {
+    if (!['admin', 'gerente', 'logistico', 'coordinador_logistico'].includes(role)) {
       return NextResponse.json({ error: 'Sin permisos para crear órdenes de compra' }, { status: 403 })
     }
 
