@@ -26,6 +26,7 @@ import {
   Loader2,
   Target,
   Clock,
+  ShieldCheck,
 } from 'lucide-react'
 
 import { Card, CardContent } from '@/components/ui/card'
@@ -445,6 +446,19 @@ export default function ProyectoHubPage() {
         ? { porcentaje: (cronogramaStats.tareasConResponsable / cronogramaStats.tareas) * 100, estado: 'ok' as const }
         : undefined,
       coberturaSecundariaLabel: `Responsables ${cronogramaStats.tareasConResponsable}/${cronogramaStats.tareas}`,
+    },
+    {
+      id: 'ssoma',
+      title: 'SSOMA',
+      description: 'Habilitaci\u00f3n \u00b7 Documentos \u00b7 Personal',
+      icon: ShieldCheck,
+      color: 'text-red-500',
+      bgColor: 'bg-red-50',
+      hoverBg: 'hover:bg-red-50',
+      borderColor: 'border-red-200',
+      href: `${baseUrl}/ssoma`,
+      stats: [],
+      badge: 'Seguridad'
     },
   ]
 

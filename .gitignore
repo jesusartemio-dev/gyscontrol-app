@@ -44,4 +44,6 @@ next-env.d.ts
 backups/
 nul
 scripts/fix-codes.ts
+scripts/test-ssoma.ts
+docs/
 .claude/settings.local.json

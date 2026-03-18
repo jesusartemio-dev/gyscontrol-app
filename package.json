@@ -73,7 +73,7 @@
     "db:prod:studio": "dotenv -e .env.production -- prisma studio",
     "db:prod:migrate": "dotenv -e .env.production -- prisma migrate deploy",
     "db:prod:push": "dotenv -e .env.production -- prisma db push",
-    "postinstall": "prisma generate",
+    "postinstall": "prisma generate && prisma migrate deploy",
     "prepare": "husky install"
   },
   "dependencies": {
@@ -117,6 +117,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
+    "docx": "^9.6.1",
     "exceljs": "^4.4.0",
     "framer-motion": "^12.23.12",
     "googleapis": "^171.4.0",

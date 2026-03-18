@@ -1044,6 +1044,7 @@ model Proyecto {
   cuentasPorPagar          CuentaPorPagar[]
   lineasHH                 LineaHH[]
   cartasFianza             CartaFianza[]
+  ssomaExpediente          SsomaExpediente?
 
   @@index([clienteId, estado, createdAt(sort: Desc)], map: "idx_proyecto_cliente_estado_fecha")
   @@index([comercialId, estado, fechaInicio], map: "idx_proyecto_comercial_estado_inicio")
@@ -1542,6 +1543,11 @@ model User {
   cxcAdjuntos                     CxCAdjunto[]                @relation("CxCAdjuntoSubidoPor")
   // Selección cotización ganadora
   seleccionesRealizadas           ListaEquipoItem[]           @relation("ListaEquipoItemSeleccionador")
+  // SSOMA
+  ssomaDocsGenerados              SsomaDocumento[]            @relation("SsomaDocGenerado")
+  ssomaDocsAprobados              SsomaDocumento[]            @relation("SsomaDocAprobado")
+  ssomaPersonal                   SsomaPersonalHabilitado[]   @relation("SsomaPersonalUser")
+  ssomaHabilitadosPor             SsomaPersonalHabilitado[]   @relation("SsomaPersonalHabilitador")
 
   @@map("user")
 }
@@ -3804,4 +3810,153 @@ model AgenteUsage {
   @@index([createdAt])
   @@index([tipo])
   @@map("agente_usage")
+}
+
+// =============================================
+// MÓDULO SSOMA
+// =============================================
+
+enum SsomaDocTipo {
+  PETS
+  IPERC
+  MATRIZ_EPP
+  PLAN_EMERGENCIA
+  PAR
+}
+
+enum SsomaParSubtipo {
+  ELECTRICO
+  ALTURA
+  ESPACIO_CONFINADO
+  TRABAJO_CALIENTE
+}
+
+enum SsomaDocEstado {
+  borrador
+  en_revision
+  aprobado_interno
+  enviado_cliente
+  aprobado_cliente
+  rechazado
+  vencido
+}
+
+enum SsomaHabEstado {
+  pendiente
+  habilitado
+  vencido
+  suspendido
+}
+
+model SsomaExpediente {
+  id         String @id @default(cuid())
+  proyectoId String @unique
+  codigoCod  String // "QRM15" — sigla para armar códigos de documentos
+
+  // Contexto para generación IA — lo que el Ing. de Seguridad ingresa
+  descripcionTrabajos String @db.Text
+
+  // Actividades de alto riesgo presentes — determinan qué PAR se generan
+  hayTrabajoElectrico Boolean @default(false)
+  nivelElectrico      String? // "baja" | "media_alta"
+  hayTrabajoAltura    Boolean @default(false)
+  hayEspacioConfinado Boolean @default(false)
+  hayTrabajoCaliente  Boolean @default(false)
+
+  // Estado general del expediente
+  estadoHabilitacion String @default("pendiente")
+
+  fechaInicioObra DateTime?
+
+  // Firmantes
+  ingSeguridad String?
+  gestorNombre String?
+  ggNombre     String?
+
+  // Carpeta en Drive para este expediente
+  driveFolderId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  proyecto   Proyecto                  @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  documentos SsomaDocumento[]
+  personal   SsomaPersonalHabilitado[]
+
+  @@index([proyectoId])
+  @@map("ssoma_expediente")
+}
+
+model SsomaDocumento {
+  id           String          @id @default(cuid())
+  expedienteId String
+  tipo         SsomaDocTipo
+  parSubtipo   SsomaParSubtipo?
+
+  estado SsomaDocEstado @default(borrador)
+
+  codigoDocumento String
+  revision        String  @default("01")
+  titulo          String
+
+  contenidoTexto String? @db.Text
+  promptUsado    String? @db.Text
+
+  driveFileId   String?
+  driveUrl      String?
+  nombreArchivo String?
+
+  generadoPorId     String?
+  aprobadoPorId     String?
+  fechaEnvioCliente DateTime?
+  fechaAprobacion   DateTime?
+  fechaVigencia     DateTime?
+  observaciones     String? @db.Text
+
+  agenteUsageId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  expediente  SsomaExpediente @relation(fields: [expedienteId], references: [id], onDelete: Cascade)
+  generadoPor User?           @relation("SsomaDocGenerado", fields: [generadoPorId], references: [id])
+  aprobadoPor User?           @relation("SsomaDocAprobado", fields: [aprobadoPorId], references: [id])
+
+  @@index([expedienteId, tipo])
+  @@index([expedienteId, estado])
+  @@index([estado, fechaVigencia])
+  @@map("ssoma_documento")
+}
+
+model SsomaPersonalHabilitado {
+  id           String @id @default(cuid())
+  expedienteId String
+  userId       String
+
+  cargo  String
+  estado SsomaHabEstado @default(pendiente)
+
+  firmaDifusion Boolean   @default(false)
+  fechaFirma    DateTime?
+  tokenDifusion String?   @unique
+
+  certAlturaVence    DateTime?
+  certElectricoVence DateTime?
+  certCalienteVence  DateTime?
+  aptitudMedicaVence DateTime?
+
+  habilitadoPorId   String?
+  fechaHabilitacion DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  expediente    SsomaExpediente @relation(fields: [expedienteId], references: [id], onDelete: Cascade)
+  user          User            @relation("SsomaPersonalUser", fields: [userId], references: [id])
+  habilitadoPor User?           @relation("SsomaPersonalHabilitador", fields: [habilitadoPorId], references: [id])
+
+  @@unique([expedienteId, userId])
+  @@index([expedienteId, estado])
+  @@index([tokenDifusion])
+  @@map("ssoma_personal_habilitado")
 }
