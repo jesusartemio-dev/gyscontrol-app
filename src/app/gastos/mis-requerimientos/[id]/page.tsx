@@ -34,6 +34,7 @@ import {
   X,
   History,
   Undo2,
+  Download,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -171,6 +172,24 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
 
   const handleRetroceder = () => executeAction(() => retrocederHoja(id), 'Estado retrocedido')
 
+  const handleDownload = async () => {
+    try {
+      const res = await fetch(`/api/hoja-de-gastos/${id}/exportar`)
+      if (!res.ok) throw new Error('Error al descargar')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = res.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || `Requerimiento_${id}.xlsx`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error('Error al descargar requerimiento')
+    }
+  }
+
   const handleRechazar = async () => {
     if (!comentarioRechazo.trim()) {
       toast.error('Ingrese un comentario de rechazo')
@@ -213,11 +232,17 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
         </Button>
         <span className="text-muted-foreground">/</span>
         <span className="font-mono font-semibold">{hoja.numero}</span>
-        <Badge className="capitalize ml-auto text-xs" variant="outline">
+        <div className="ml-auto flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleDownload} title="Descargar Excel">
+            <Download className="h-4 w-4 mr-1" />
+            Descargar
+          </Button>
+          <Badge className="capitalize text-xs" variant="outline">
           {hoja.proyecto
             ? `${hoja.proyecto.codigo} - ${hoja.proyecto.nombre}`
             : hoja.centroCosto?.nombre || 'Sin asignación'}
         </Badge>
+        </div>
       </div>
 
       {/* Stepper */}
