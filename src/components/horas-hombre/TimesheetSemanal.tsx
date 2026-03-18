@@ -157,9 +157,11 @@ export function TimesheetSemanal({
 
   const editarRegistro = (registro: RegistroHoras) => {
     console.log('🎯 TIMESHEET: Editando registro:', registro)
-    // ✅ Usar fecha con hora mediodía para evitar desfase de timezone
-    const fechaRegistro = new Date(registro.fecha)
-    const fechaString = format(fechaRegistro, 'yyyy-MM-dd')
+    // ✅ Parsear fecha como string ISO para evitar desfase de timezone con UTC
+    const fechaStr = String(registro.fecha)
+    const fechaString = fechaStr.length >= 10 ? fechaStr.substring(0, 10) : format(new Date(fechaStr), 'yyyy-MM-dd')
+    const [y, m, d] = fechaString.split('-').map(Number)
+    const fechaRegistro = new Date(y, m - 1, d, 12, 0, 0)
     setDiaSeleccionado(fechaRegistro)
     setFechaWizard(fechaString)
     setShowWizard(true)
@@ -332,7 +334,7 @@ export function TimesheetSemanal({
       {/* ===== VISTA MÓVIL: Lista vertical ===== */}
       <div className="md:hidden space-y-2">
         {diasSemana.map((dia, index) => {
-          const fechaDia = dia.fecha ? new Date(dia.fecha) : addDays(startOfWeek(semanaActual, { weekStartsOn: 1 }), index)
+          const fechaDia = addDays(startOfWeek(semanaActual, { weekStartsOn: 1 }), index)
           const esHoy = format(fechaDia, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
 
           return (
