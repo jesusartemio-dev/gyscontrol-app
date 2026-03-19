@@ -26,7 +26,7 @@ export async function POST(
       return NextResponse.json({ error: 'targetEstado inválido: debe ser "pendiente" o "en_almacen"' }, { status: 400 })
     }
 
-    const recepcion = await prisma.recepcionPendiente.findUnique({
+    const recepcion = await (prisma.recepcionPendiente as any).findUnique({
       where: { id },
       include: {
         pedidoEquipoItem: {
@@ -36,9 +36,12 @@ export async function POST(
             }
           }
         },
+        listaEquipoItem: {
+          select: { id: true, codigo: true, cantidad: true, cantidadEntregada: true, costoReal: true }
+        },
         ordenCompraItem: {
           include: {
-            ordenCompra: { select: { id: true, numero: true } }
+            ordenCompra: { select: { id: true, numero: true, proyectoId: true } }
           }
         },
         entregasItem: { select: { id: true } },
@@ -49,9 +52,12 @@ export async function POST(
       return NextResponse.json({ error: 'Recepción no encontrada' }, { status: 404 })
     }
 
-    const pedidoItem = recepcion.pedidoEquipoItem
-    const pedido = pedidoItem.pedidoEquipo
+    const pedidoItem = recepcion.pedidoEquipoItem || null
+    const pedido = pedidoItem?.pedidoEquipo || null
+    const listaItem = recepcion.listaEquipoItem || null
     const ocNumero = recepcion.ordenCompraItem.ordenCompra.numero
+    const proyectoId = pedido?.proyectoId || recepcion.ordenCompraItem.ordenCompra.proyectoId || null
+    const itemCodigo = pedidoItem?.codigo || listaItem?.codigo || recepcion.ordenCompraItem.codigo
 
     // ═══════════════════════════════════════
     // RETROCESO: en_almacen → pendiente
@@ -85,10 +91,10 @@ export async function POST(
         await tx.eventoTrazabilidad.create({
           data: {
             id: `evt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            proyectoId: pedido.proyectoId,
-            pedidoEquipoId: pedido.id,
+            proyectoId,
+            pedidoEquipoId: pedido?.id || null,
             tipo: 'recepcion_retrocedida',
-            descripcion: `Confirmación de almacén revertida: ${recepcion.cantidadRecibida} x ${pedidoItem.codigo} de OC ${ocNumero} vuelve a pendiente.${observaciones.trim() ? ` Motivo: ${observaciones.trim()}` : ''}`,
+            descripcion: `Confirmación de almacén revertida: ${recepcion.cantidadRecibida} x ${itemCodigo} de OC ${ocNumero} vuelve a pendiente.${observaciones.trim() ? ` Motivo: ${observaciones.trim()}` : ''}`,
             usuarioId: session.user.id,
             metadata: {
               recepcionPendienteId: id,
@@ -125,83 +131,99 @@ export async function POST(
         where: { recepcionPendienteId: id }
       })
 
-      // 2. Decrementar PedidoEquipoItem.cantidadAtendida y recalcular estados
-      const nuevaCantidadAtendida = Math.max(0, (pedidoItem.cantidadAtendida || 0) - recepcion.cantidadRecibida)
+      // 2. Si tiene pedido: decrementar cantidadAtendida y recalcular estados
+      if (pedidoItem && pedido) {
+        const nuevaCantidadAtendida = Math.max(0, (pedidoItem.cantidadAtendida || 0) - recepcion.cantidadRecibida)
 
-      let nuevoEstadoEntrega: string = 'pendiente'
-      if (nuevaCantidadAtendida >= pedidoItem.cantidadPedida) {
-        nuevoEstadoEntrega = 'entregado'
-      } else if (nuevaCantidadAtendida > 0) {
-        nuevoEstadoEntrega = 'parcial'
-      }
-
-      let estadoItem: string = 'atendido'
-      if (nuevoEstadoEntrega === 'entregado') estadoItem = 'entregado'
-      else if (nuevoEstadoEntrega === 'parcial') estadoItem = 'parcial'
-
-      await tx.pedidoEquipoItem.update({
-        where: { id: pedidoItem.id },
-        data: {
-          cantidadAtendida: nuevaCantidadAtendida,
-          estadoEntrega: nuevoEstadoEntrega as any,
-          estado: estadoItem as any,
-          updatedAt: new Date()
+        let nuevoEstadoEntrega: string = 'pendiente'
+        if (nuevaCantidadAtendida >= pedidoItem.cantidadPedida) {
+          nuevoEstadoEntrega = 'entregado'
+        } else if (nuevaCantidadAtendida > 0) {
+          nuevoEstadoEntrega = 'parcial'
         }
-      })
 
-      // 3. Recalcular ListaEquipoItem.cantidadEntregada y costoReal
-      if (pedidoItem.listaEquipoItemId) {
-        const sumResult = await tx.pedidoEquipoItem.aggregate({
-          where: { listaEquipoItemId: pedidoItem.listaEquipoItemId },
-          _sum: { cantidadAtendida: true }
+        let estadoItem: string = 'atendido'
+        if (nuevoEstadoEntrega === 'entregado') estadoItem = 'entregado'
+        else if (nuevoEstadoEntrega === 'parcial') estadoItem = 'parcial'
+
+        await tx.pedidoEquipoItem.update({
+          where: { id: pedidoItem.id },
+          data: {
+            cantidadAtendida: nuevaCantidadAtendida,
+            estadoEntrega: nuevoEstadoEntrega as any,
+            estado: estadoItem as any,
+            updatedAt: new Date()
+          }
         })
-        const allLinkedItems = await tx.pedidoEquipoItem.findMany({
-          where: { listaEquipoItemId: pedidoItem.listaEquipoItemId },
-          select: { precioUnitario: true, cantidadAtendida: true }
+
+        // Recalcular ListaEquipoItem vía pedido
+        if (pedidoItem.listaEquipoItemId) {
+          const sumResult = await tx.pedidoEquipoItem.aggregate({
+            where: { listaEquipoItemId: pedidoItem.listaEquipoItemId },
+            _sum: { cantidadAtendida: true }
+          })
+          const allLinkedItems = await tx.pedidoEquipoItem.findMany({
+            where: { listaEquipoItemId: pedidoItem.listaEquipoItemId },
+            select: { precioUnitario: true, cantidadAtendida: true }
+          })
+          const costoReal = allLinkedItems.reduce((sum, item) =>
+            sum + ((item.precioUnitario || 0) * (item.cantidadAtendida || 0)), 0)
+
+          await tx.listaEquipoItem.update({
+            where: { id: pedidoItem.listaEquipoItemId },
+            data: {
+              costoReal,
+              cantidadEntregada: sumResult._sum.cantidadAtendida || 0
+            }
+          })
+        }
+
+        // Recalcular PedidoEquipo.estado y costoRealTotal
+        const allPedidoItems = await tx.pedidoEquipoItem.findMany({
+          where: { pedidoId: pedido.id },
+          select: { estado: true, precioUnitario: true, cantidadAtendida: true }
         })
-        const costoReal = allLinkedItems.reduce((sum, item) =>
+
+        const costoRealTotal = allPedidoItems.reduce((sum, item) =>
           sum + ((item.precioUnitario || 0) * (item.cantidadAtendida || 0)), 0)
 
-        await tx.listaEquipoItem.update({
-          where: { id: pedidoItem.listaEquipoItemId },
+        const estados = allPedidoItems.map(i => i.estado)
+        let nuevoEstadoPedido: string | null = null
+        if (estados.every(e => e === 'cancelado')) {
+          nuevoEstadoPedido = 'cancelado'
+        } else if (estados.every(e => e === 'entregado' || e === 'cancelado')) {
+          nuevoEstadoPedido = 'entregado'
+        } else if (estados.some(e => e === 'entregado' || e === 'parcial')) {
+          nuevoEstadoPedido = 'parcial'
+        } else if (estados.some(e => e === 'atendido')) {
+          nuevoEstadoPedido = 'atendido'
+        }
+
+        await tx.pedidoEquipo.update({
+          where: { id: pedido.id },
           data: {
+            ...(nuevoEstadoPedido ? { estado: nuevoEstadoPedido as any } : {}),
+            costoRealTotal,
+            updatedAt: new Date()
+          }
+        })
+      }
+      // Si tiene lista directa (sin pedido): revertir cantidadEntregada
+      else if (listaItem && recepcion.listaEquipoItemId) {
+        const nuevaCantidadEntregada = Math.max(0, (listaItem.cantidadEntregada || 0) - recepcion.cantidadRecibida)
+        const ocPrecio = recepcion.ordenCompraItem.precioUnitario
+        const costoReal = Math.max(0, (listaItem.costoReal || 0) - (ocPrecio * recepcion.cantidadRecibida))
+
+        await tx.listaEquipoItem.update({
+          where: { id: recepcion.listaEquipoItemId },
+          data: {
+            cantidadEntregada: nuevaCantidadEntregada,
             costoReal,
-            cantidadEntregada: sumResult._sum.cantidadAtendida || 0
           }
         })
       }
 
-      // 4. Recalcular PedidoEquipo.estado y costoRealTotal
-      const allPedidoItems = await tx.pedidoEquipoItem.findMany({
-        where: { pedidoId: pedido.id },
-        select: { estado: true, precioUnitario: true, cantidadAtendida: true }
-      })
-
-      const costoRealTotal = allPedidoItems.reduce((sum, item) =>
-        sum + ((item.precioUnitario || 0) * (item.cantidadAtendida || 0)), 0)
-
-      const estados = allPedidoItems.map(i => i.estado)
-      let nuevoEstadoPedido: string | null = null
-      if (estados.every(e => e === 'cancelado')) {
-        nuevoEstadoPedido = 'cancelado'
-      } else if (estados.every(e => e === 'entregado' || e === 'cancelado')) {
-        nuevoEstadoPedido = 'entregado'
-      } else if (estados.some(e => e === 'entregado' || e === 'parcial')) {
-        nuevoEstadoPedido = 'parcial'
-      } else if (estados.some(e => e === 'atendido')) {
-        nuevoEstadoPedido = 'atendido'
-      }
-
-      await tx.pedidoEquipo.update({
-        where: { id: pedido.id },
-        data: {
-          ...(nuevoEstadoPedido ? { estado: nuevoEstadoPedido as any } : {}),
-          costoRealTotal,
-          updatedAt: new Date()
-        }
-      })
-
-      // 5. Retroceder RecepcionPendiente a en_almacen
+      // Retroceder RecepcionPendiente a en_almacen
       await tx.recepcionPendiente.update({
         where: { id },
         data: {
@@ -212,14 +234,14 @@ export async function POST(
         }
       })
 
-      // 6. EventoTrazabilidad
+      // EventoTrazabilidad
       await tx.eventoTrazabilidad.create({
         data: {
           id: `evt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          proyectoId: pedido.proyectoId,
-          pedidoEquipoId: pedido.id,
+          proyectoId,
+          pedidoEquipoId: pedido?.id || null,
           tipo: 'recepcion_retrocedida',
-          descripcion: `Entrega a proyecto revertida: ${recepcion.cantidadRecibida} x ${pedidoItem.codigo} de OC ${ocNumero} vuelve a almacén.${observaciones.trim() ? ` Motivo: ${observaciones.trim()}` : ''}`,
+          descripcion: `Entrega a proyecto revertida: ${recepcion.cantidadRecibida} x ${itemCodigo} de OC ${ocNumero} vuelve a almacén.${observaciones.trim() ? ` Motivo: ${observaciones.trim()}` : ''}`,
           usuarioId: session.user.id,
           metadata: {
             recepcionPendienteId: id,

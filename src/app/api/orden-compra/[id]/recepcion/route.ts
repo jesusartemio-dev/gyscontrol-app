@@ -47,11 +47,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         })
       }
 
-      // Crear RecepcionPendiente para items vinculados a pedidos
+      // Crear RecepcionPendiente para items de proyecto (con o sin pedido)
+      // No crear para OCs de centro de costo (sin proyectoId)
       let creadas = 0
       for (const rec of recepciones) {
         const item = existing.items.find(i => i.id === rec.itemId)
-        if (!item || !item.pedidoEquipoItemId) continue
+        if (!item) continue
+        if (!existing.proyectoId) continue
 
         const cantidadEfectiva = Math.min(rec.cantidadRecibida, item.cantidad)
         if (cantidadEfectiva <= 0) continue
@@ -65,13 +67,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         })
         if (existente) continue
 
-        await tx.recepcionPendiente.create({
-          data: {
-            pedidoEquipoItemId: item.pedidoEquipoItemId,
-            ordenCompraItemId: item.id,
-            cantidadRecibida: cantidadEfectiva,
-          }
-        })
+        const recData: any = {
+          ordenCompraItemId: item.id,
+          cantidadRecibida: cantidadEfectiva,
+        }
+        if (item.pedidoEquipoItemId) recData.pedidoEquipoItemId = item.pedidoEquipoItemId
+        if (item.listaEquipoItemId) recData.listaEquipoItemId = item.listaEquipoItemId
+        await tx.recepcionPendiente.create({ data: recData })
         creadas++
       }
 

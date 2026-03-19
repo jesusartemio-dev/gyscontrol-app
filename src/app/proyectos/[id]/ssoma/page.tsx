@@ -667,6 +667,7 @@ function DocumentoModal({
         doc.contenidoTexto ?? '',
         {
           ingSeguridad: expediente.ingSeguridad ?? '',
+          gestorNombre: expediente.gestorNombre ?? '',
           ggNombre: expediente.ggNombre ?? '',
           fecha: new Date().toLocaleDateString('es-PE'),
         }
