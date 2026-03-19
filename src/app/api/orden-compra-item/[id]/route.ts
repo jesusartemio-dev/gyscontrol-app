@@ -94,3 +94,56 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     return NextResponse.json({ error: 'Error al actualizar item' }, { status: 500 })
   }
 }
+
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    if (!['admin', 'gerente', 'logistico', 'coordinador_logistico'].includes(session.user.role)) {
+      return NextResponse.json({ error: 'Sin permisos para eliminar items de OC' }, { status: 403 })
+    }
+
+    const { id } = await params
+    const item = await prisma.ordenCompraItem.findUnique({
+      where: { id },
+      include: {
+        ordenCompra: { select: { id: true, estado: true, moneda: true } },
+      },
+    })
+
+    if (!item) {
+      return NextResponse.json({ error: 'Item no encontrado' }, { status: 404 })
+    }
+
+    if (item.ordenCompra.estado !== 'borrador') {
+      return NextResponse.json({ error: 'Solo se pueden eliminar items en OC borrador' }, { status: 400 })
+    }
+
+    const now = new Date()
+
+    await prisma.$transaction(async (tx) => {
+      await tx.ordenCompraItem.delete({ where: { id } })
+
+      const remainingItems = await tx.ordenCompraItem.findMany({
+        where: { ordenCompraId: item.ordenCompra.id },
+      })
+
+      const subtotal = remainingItems.reduce((sum, i) => sum + i.costoTotal, 0)
+      const igv = item.ordenCompra.moneda !== 'USD' ? subtotal * 0.18 : 0
+      const total = subtotal + igv
+
+      await tx.ordenCompra.update({
+        where: { id: item.ordenCompra.id },
+        data: { subtotal, igv, total, updatedAt: now },
+      })
+    })
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Error al eliminar item de OC:', error)
+    return NextResponse.json({ error: 'Error al eliminar item' }, { status: 500 })
+  }
+}

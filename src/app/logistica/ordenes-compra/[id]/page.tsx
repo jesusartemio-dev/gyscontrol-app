@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { ArrowLeft, Loader2, CheckCircle, Send, Package, XCircle, FileDown, Building2, CreditCard, MapPin, AlertTriangle, ShoppingCart, Pencil, Clock, Receipt } from 'lucide-react'
+import { ArrowLeft, Loader2, CheckCircle, Send, Package, XCircle, FileDown, Building2, CreditCard, MapPin, AlertTriangle, ShoppingCart, Pencil, Clock, Receipt, Trash2, Plus, Search } from 'lucide-react'
+import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -74,6 +75,17 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
   const [inlineEdit, setInlineEdit] = useState<{ itemId: string; field: 'precioUnitario' | 'cantidad'; value: string } | null>(null)
   const [savingInline, setSavingInline] = useState(false)
 
+  // Add/delete item state
+  const [catalogoOpen, setCatalogoOpen] = useState(false)
+  const [catalogoQuery, setCatalogoQuery] = useState('')
+  const [catalogoResults, setCatalogoResults] = useState<{ id: string; codigo: string; descripcion: string; marca: string; precioLogistica: number | null; precioReal: number | null; precioInterno: number; unidad: { nombre: string } }[]>([])
+  const [catalogoLoading, setCatalogoLoading] = useState(false)
+  const [catalogoSelectedIds, setCatalogoSelectedIds] = useState<Set<string>>(new Set())
+  const [catalogoCantidades, setCatalogoCantidades] = useState<Record<string, number>>({})
+  const [addingItems, setAddingItems] = useState(false)
+  const [showAddManual, setShowAddManual] = useState(false)
+  const [manualItem, setManualItem] = useState({ descripcion: '', unidad: 'UND', cantidad: 1, precioUnitario: 0 })
+
   const esBorrador = oc?.estado === 'borrador'
 
   useEffect(() => { loadData() }, [id])
@@ -123,6 +135,105 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
   }
 
   const cancelInlineEdit = () => setInlineEdit(null)
+
+  // ── Delete item ──────────────────────────────────────────
+  const handleDeleteItem = async (itemId: string) => {
+    try {
+      const res = await fetch(`/api/orden-compra-item/${itemId}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Error al eliminar')
+      }
+      toast.success('Item eliminado')
+      await loadData()
+    } catch (err: any) {
+      toast.error(err.message || 'Error al eliminar item')
+    }
+  }
+
+  // ── Catálogo search ──────────────────────────────────────
+  const catalogoTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const searchCatalogo = async (q: string) => {
+    if (q.length < 2) { setCatalogoResults([]); return }
+    setCatalogoLoading(true)
+    try {
+      const res = await fetch(`/api/catalogo-equipo/search?q=${encodeURIComponent(q)}&limit=30`)
+      const data = await res.json()
+      setCatalogoResults(data)
+    } catch {
+      setCatalogoResults([])
+    } finally {
+      setCatalogoLoading(false)
+    }
+  }
+
+  const handleCatalogoSearch = (val: string) => {
+    setCatalogoQuery(val)
+    if (catalogoTimerRef.current) clearTimeout(catalogoTimerRef.current)
+    catalogoTimerRef.current = setTimeout(() => searchCatalogo(val), 300)
+  }
+
+  const toggleCatalogoSelect = (id: string) => {
+    setCatalogoSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else { next.add(id); if (!catalogoCantidades[id]) setCatalogoCantidades(p => ({ ...p, [id]: 1 })) }
+      return next
+    })
+  }
+
+  const addCatalogoItems = async () => {
+    if (!oc || catalogoSelectedIds.size === 0) return
+    const toAdd = catalogoResults.filter(i => catalogoSelectedIds.has(i.id))
+    const items = toAdd.map(item => ({
+      codigo: item.codigo,
+      descripcion: item.descripcion,
+      unidad: item.unidad.nombre,
+      cantidad: catalogoCantidades[item.id] || 1,
+      precioUnitario: item.precioLogistica || item.precioReal || item.precioInterno || 0,
+    }))
+    setAddingItems(true)
+    try {
+      const res = await fetch('/api/orden-compra-item', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ordenCompraId: oc.id, items }),
+      })
+      if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Error') }
+      toast.success(`${items.length} item(s) agregados`)
+      setCatalogoOpen(false)
+      await loadData()
+    } catch (err: any) {
+      toast.error(err.message || 'Error al agregar items')
+    } finally {
+      setAddingItems(false)
+    }
+  }
+
+  const addManualItemToOC = async () => {
+    if (!oc) return
+    if (!manualItem.descripcion.trim()) return toast.error('La descripción es obligatoria')
+    if (manualItem.cantidad <= 0) return toast.error('La cantidad debe ser mayor a 0')
+    if (manualItem.precioUnitario <= 0) return toast.error('El precio debe ser mayor a 0')
+    setAddingItems(true)
+    try {
+      const res = await fetch('/api/orden-compra-item', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ordenCompraId: oc.id, items: [manualItem] }),
+      })
+      if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Error') }
+      toast.success('Item agregado')
+      setShowAddManual(false)
+      setManualItem({ descripcion: '', unidad: 'UND', cantidad: 1, precioUnitario: 0 })
+      await loadData()
+    } catch (err: any) {
+      toast.error(err.message || 'Error al agregar item')
+    } finally {
+      setAddingItems(false)
+    }
+  }
 
   const handleAction = async (action: string, fn: () => Promise<any>) => {
     try {
@@ -518,8 +629,18 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
 
       {/* Items Table */}
       <Card>
-        <CardHeader className="pb-2">
+        <CardHeader className="pb-2 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium">Items ({oc.items?.length || 0})</CardTitle>
+          {esBorrador && (
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => { setCatalogoOpen(true); setCatalogoQuery(''); setCatalogoResults([]); setCatalogoSelectedIds(new Set()); setCatalogoCantidades({}) }}>
+                <Search className="h-3.5 w-3.5 mr-1" /> Desde Catálogo
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setShowAddManual(true)}>
+                <Plus className="h-3.5 w-3.5 mr-1" /> Item Manual
+              </Button>
+            </div>
+          )}
         </CardHeader>
         <CardContent className="p-0">
           <Table>
@@ -535,6 +656,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
                 {['confirmada', 'parcial', 'completada'].includes(oc.estado) && (
                   <TableHead className="w-[100px] text-right">Recibido</TableHead>
                 )}
+                {esBorrador && <TableHead className="w-[40px]"></TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -610,6 +732,17 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
                           {item.cantidadRecibida} / {item.cantidad}
                         </span>
                       )}
+                    </TableCell>
+                  )}
+                  {esBorrador && (
+                    <TableCell>
+                      <button
+                        onClick={() => handleDeleteItem(item.id)}
+                        className="p-1 rounded hover:bg-red-50"
+                        title="Eliminar item"
+                      >
+                        <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                      </button>
                     </TableCell>
                   )}
                 </TableRow>
@@ -877,6 +1010,148 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ── Catálogo Selector Dialog ────────────────────────── */}
+      <Dialog open={catalogoOpen} onOpenChange={setCatalogoOpen}>
+        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Buscar en catálogo de equipos</DialogTitle>
+            <DialogDescription>Busca y selecciona items para agregar a la OC</DialogDescription>
+          </DialogHeader>
+
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={catalogoQuery}
+              onChange={e => handleCatalogoSearch(e.target.value)}
+              placeholder="Buscar por código o descripción... (mín. 2 caracteres)"
+              className="pl-9"
+              autoFocus
+            />
+          </div>
+
+          <div className="flex-1 overflow-auto min-h-0">
+            {catalogoLoading ? (
+              <div className="flex items-center justify-center py-10">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : catalogoQuery.length < 2 ? (
+              <div className="text-center py-10 text-muted-foreground text-sm">
+                Escribe al menos 2 caracteres para buscar
+              </div>
+            ) : catalogoResults.length === 0 ? (
+              <div className="text-center py-10 text-muted-foreground text-sm">
+                No se encontraron items para &quot;{catalogoQuery}&quot;
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[40px]"></TableHead>
+                    <TableHead className="w-[140px]">Código</TableHead>
+                    <TableHead>Descripción</TableHead>
+                    <TableHead className="w-[80px]">Marca</TableHead>
+                    <TableHead className="w-[60px]">Unid.</TableHead>
+                    <TableHead className="w-[100px] text-right">Precio</TableHead>
+                    <TableHead className="w-[80px] text-right">Cant.</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {catalogoResults.map(item => {
+                    const isSelected = catalogoSelectedIds.has(item.id)
+                    const precio = item.precioLogistica || item.precioReal || item.precioInterno || 0
+                    return (
+                      <TableRow
+                        key={item.id}
+                        className={isSelected ? 'bg-blue-50' : 'cursor-pointer hover:bg-muted/50'}
+                        onClick={() => toggleCatalogoSelect(item.id)}
+                      >
+                        <TableCell>
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleCatalogoSelect(item.id)}
+                          />
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">{item.codigo}</TableCell>
+                        <TableCell className="text-xs">{item.descripcion}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{item.marca || '-'}</TableCell>
+                        <TableCell className="text-xs">{item.unidad.nombre}</TableCell>
+                        <TableCell className="text-xs text-right font-mono">
+                          {precio > 0 ? `S/ ${precio.toFixed(2)}` : '-'}
+                        </TableCell>
+                        <TableCell className="text-right" onClick={e => e.stopPropagation()}>
+                          {isSelected && (
+                            <Input
+                              type="number"
+                              min={1}
+                              value={catalogoCantidades[item.id] || 1}
+                              onChange={e => setCatalogoCantidades(p => ({ ...p, [item.id]: parseInt(e.target.value) || 1 }))}
+                              className="h-7 w-16 text-xs text-right"
+                            />
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+
+          {catalogoSelectedIds.size > 0 && (
+            <div className="text-xs text-muted-foreground">{catalogoSelectedIds.size} item(s) seleccionado(s)</div>
+          )}
+
+          <DialogFooter className="mt-2">
+            <Button variant="outline" onClick={() => setCatalogoOpen(false)}>Cancelar</Button>
+            <Button
+              onClick={addCatalogoItems}
+              disabled={catalogoSelectedIds.size === 0 || addingItems}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              {addingItems && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+              Agregar {catalogoSelectedIds.size} item(s)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Add Manual Item Dialog ──────────────────────────── */}
+      <Dialog open={showAddManual} onOpenChange={setShowAddManual}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Agregar item manual</DialogTitle>
+            <DialogDescription>Item sin catálogo (ej: fabricación, servicio)</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs">Descripción <span className="text-red-500">*</span></Label>
+              <Input value={manualItem.descripcion} onChange={e => setManualItem(p => ({ ...p, descripcion: e.target.value }))} placeholder="Descripción del item" />
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <Label className="text-xs">Unidad</Label>
+                <Input value={manualItem.unidad} onChange={e => setManualItem(p => ({ ...p, unidad: e.target.value }))} />
+              </div>
+              <div>
+                <Label className="text-xs">Cantidad <span className="text-red-500">*</span></Label>
+                <Input type="number" min={1} value={manualItem.cantidad} onChange={e => setManualItem(p => ({ ...p, cantidad: parseFloat(e.target.value) || 0 }))} />
+              </div>
+              <div>
+                <Label className="text-xs">P. Unit. <span className="text-red-500">*</span></Label>
+                <Input type="number" min={0} step={0.01} value={manualItem.precioUnitario} onChange={e => setManualItem(p => ({ ...p, precioUnitario: parseFloat(e.target.value) || 0 }))} />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddManual(false)}>Cancelar</Button>
+            <Button onClick={addManualItemToOC} disabled={addingItems} className="bg-orange-600 hover:bg-orange-700">
+              {addingItems && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+              Agregar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
