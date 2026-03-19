@@ -43,8 +43,10 @@ import {
   X,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import ReactMarkdown from 'react-markdown'
 import Link from 'next/link'
 import { useProyectoContext } from '../ProyectoContext'
+import { generarDocx } from '@/lib/ssoma/exportDocx'
 
 // Types
 interface SsomaDocumento {
@@ -106,7 +108,7 @@ interface SsomaExpediente {
 // Estado badge config
 const estadoConfig: Record<string, { label: string; className: string }> = {
   borrador: { label: 'Borrador', className: 'bg-gray-100 text-gray-700' },
-  en_revision: { label: 'En Revisi\u00f3n', className: 'bg-blue-100 text-blue-700' },
+  en_revision: { label: 'En Revisión', className: 'bg-blue-100 text-blue-700' },
   aprobado_interno: { label: 'Aprobado Int.', className: 'bg-green-100 text-green-700' },
   enviado_cliente: { label: 'Enviado', className: 'bg-purple-100 text-purple-700' },
   aprobado_cliente: { label: 'Aprobado Cliente', className: 'bg-emerald-100 text-emerald-700' },
@@ -302,8 +304,8 @@ function CrearExpedienteForm({
           <div>
             <p className="text-sm font-medium text-amber-800">Generar expediente SSOMA con IA</p>
             <p className="text-xs text-amber-700 mt-1">
-              Se generar\u00e1n {docCount} documentos: PETS, IPERC, Matriz EPP, Plan de Emergencia
-              {hayElectrico && ', PAR El\u00e9ctrico'}
+              Se generarán {docCount} documentos: PETS, IPERC, Matriz EPP, Plan de Emergencia
+              {hayElectrico && ', PAR Eléctrico'}
               {hayAltura && ', PAR Altura'}
               {hayConfinado && ', PAR Espacio Confinado'}
               {hayCaliente && ', PAR Trabajo en Caliente'}
@@ -315,7 +317,7 @@ function CrearExpedienteForm({
       {/* Codigo + Descripcion */}
       <div className="space-y-3">
         <div className="space-y-1.5">
-          <Label className="text-sm">C\u00f3digo de servicio <span className="text-red-500">*</span></Label>
+          <Label className="text-sm">Código de servicio <span className="text-red-500">*</span></Label>
           <Input
             value={codigoCod}
             onChange={(e) => setCodigoCod(e.target.value.toUpperCase())}
@@ -325,11 +327,11 @@ function CrearExpedienteForm({
           />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-sm">Descripci\u00f3n de trabajos <span className="text-red-500">*</span></Label>
+          <Label className="text-sm">Descripción de trabajos <span className="text-red-500">*</span></Label>
           <Textarea
             value={descripcionTrabajos}
             onChange={(e) => setDescripcionTrabajos(e.target.value)}
-            placeholder="Ej: Instalaci\u00f3n de sistema de instrumentaci\u00f3n en tanques. Incluye tendido de tuber\u00edas conduit, cableado el\u00e9ctrico..."
+            placeholder="Ej: Instalación de sistema de instrumentación en tanques. Incluye tendido de tuberías conduit, cableado eléctrico..."
             rows={4}
             disabled={generating}
           />
@@ -348,7 +350,7 @@ function CrearExpedienteForm({
                 onCheckedChange={(v) => setHayElectrico(!!v)}
                 disabled={generating}
               />
-              <label htmlFor="electrico" className="text-sm">Trabajos el\u00e9ctricos</label>
+              <label htmlFor="electrico" className="text-sm">Trabajos eléctricos</label>
             </div>
             {hayElectrico && (
               <div className="ml-6">
@@ -357,8 +359,8 @@ function CrearExpedienteForm({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="baja">Baja tensi\u00f3n {'<'}1kV</SelectItem>
-                    <SelectItem value="media_alta">Media/Alta tensi\u00f3n {'>'}1kV</SelectItem>
+                    <SelectItem value="baja">Baja tensión {'<'}1kV</SelectItem>
+                    <SelectItem value="media_alta">Media/Alta tensión {'>'}1kV</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -486,7 +488,7 @@ function ExpedienteView({
 
       {/* Tab content */}
       {activeTab === 'documentos' && (
-        <TabDocumentos documentos={expediente.documentos} onRefresh={onRefresh} />
+        <TabDocumentos documentos={expediente.documentos} expediente={expediente} onRefresh={onRefresh} />
       )}
       {activeTab === 'personal' && (
         <TabPersonal expediente={expediente} onRefresh={onRefresh} />
@@ -501,9 +503,11 @@ function ExpedienteView({
 // ====== TAB 1: DOCUMENTOS ======
 function TabDocumentos({
   documentos,
+  expediente,
   onRefresh,
 }: {
   documentos: SsomaDocumento[]
+  expediente: SsomaExpediente
   onRefresh: () => void
 }) {
   const [viewDoc, setViewDoc] = useState<SsomaDocumento | null>(null)
@@ -533,7 +537,7 @@ function TabDocumentos({
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50 hover:bg-muted/50">
-              <TableHead className="text-xs font-medium">C\u00f3digo</TableHead>
+              <TableHead className="text-xs font-medium">Código</TableHead>
               <TableHead className="text-xs font-medium">Documento</TableHead>
               <TableHead className="text-xs font-medium w-[120px]">Estado</TableHead>
               <TableHead className="text-xs font-medium w-[80px] text-right">Chars</TableHead>
@@ -611,6 +615,7 @@ function TabDocumentos({
       {viewDoc && (
         <DocumentoModal
           doc={viewDoc}
+          expediente={expediente}
           onClose={() => setViewDoc(null)}
           onRefresh={onRefresh}
         />
@@ -622,10 +627,12 @@ function TabDocumentos({
 // ====== DOCUMENT MODAL ======
 function DocumentoModal({
   doc,
+  expediente,
   onClose,
   onRefresh,
 }: {
   doc: SsomaDocumento
+  expediente: SsomaExpediente
   onClose: () => void
   onRefresh: () => void
 }) {
@@ -652,53 +659,27 @@ function DocumentoModal({
     }
   }
 
-  const handleDownload = () => {
-    const content = doc.contenidoTexto || ''
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${doc.codigoDocumento.replace(/\u2013/g, '-')}.txt`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
-  // Parse content into sections
-  const renderSections = (text: string) => {
-    const lines = text.split('\n')
-    const sections: Array<{ heading: string | null; lines: string[] }> = []
-    let current: { heading: string | null; lines: string[] } = { heading: null, lines: [] }
-
-    for (const line of lines) {
-      // Match section headings: "1.", "2.", "6.1", "6.1.", "8.X", etc.
-      const headingMatch = line.match(/^(\d+\.[\d.]*\s*.+|[═]{3,}.*)$/)
-      if (headingMatch && line.trim().length > 3) {
-        if (current.heading || current.lines.length > 0) {
-          sections.push(current)
+  const handleDownload = async () => {
+    try {
+      const blob = await generarDocx(
+        doc.titulo,
+        doc.codigoDocumento,
+        doc.contenidoTexto ?? '',
+        {
+          ingSeguridad: expediente.ingSeguridad ?? '',
+          ggNombre: expediente.ggNombre ?? '',
+          fecha: new Date().toLocaleDateString('es-PE'),
         }
-        current = { heading: line, lines: [] }
-      } else {
-        current.lines.push(line)
-      }
+      )
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${doc.codigoDocumento.replace(/[\u2013\u2014]/g, '-')}.docx`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error('Error al generar el documento')
     }
-    if (current.heading || current.lines.length > 0) {
-      sections.push(current)
-    }
-
-    return sections.map((section, i) => (
-      <div key={i} className={section.heading ? 'mt-3' : ''}>
-        {section.heading && (
-          <div className="font-semibold text-sm text-gray-900 bg-gray-100 px-3 py-1.5 rounded -mx-1 mb-1">
-            {section.heading}
-          </div>
-        )}
-        {section.lines.length > 0 && (
-          <pre className="text-sm whitespace-pre-wrap font-mono leading-relaxed text-gray-700 pl-1">
-            {section.lines.join('\n')}
-          </pre>
-        )}
-      </div>
-    ))
   }
 
   const est = estadoConfig[doc.estado] || estadoConfig.borrador
@@ -744,7 +725,7 @@ function DocumentoModal({
           )}
           <Button size="sm" variant="outline" className="h-7 text-xs" onClick={handleDownload}>
             <Download className="h-3 w-3 mr-1" />
-            Descargar .txt
+            Descargar .docx
           </Button>
         </div>
 
@@ -758,8 +739,24 @@ function DocumentoModal({
               disabled={saving}
             />
           ) : (
-            <div className="p-4">
-              {doc.contenidoTexto ? renderSections(doc.contenidoTexto) : (
+            <div className="p-4 prose prose-sm max-w-none">
+              {doc.contenidoTexto ? (
+                <ReactMarkdown
+                  components={{
+                    h1: ({ children }) => <h2 className="text-base font-bold mt-4 mb-1">{children}</h2>,
+                    h2: ({ children }) => <h3 className="text-sm font-bold mt-3 mb-1">{children}</h3>,
+                    h3: ({ children }) => <h4 className="text-sm font-semibold mt-2 mb-1">{children}</h4>,
+                    strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                    p: ({ children }) => <p className="text-sm mb-2">{children}</p>,
+                    hr: () => <hr className="my-3 border-gray-200" />,
+                    ul: ({ children }) => <ul className="list-disc pl-5 text-sm mb-2">{children}</ul>,
+                    ol: ({ children }) => <ol className="list-decimal pl-5 text-sm mb-2">{children}</ol>,
+                    li: ({ children }) => <li className="mb-0.5">{children}</li>,
+                  }}
+                >
+                  {doc.contenidoTexto}
+                </ReactMarkdown>
+              ) : (
                 <span className="text-muted-foreground text-sm">Sin contenido</span>
               )}
             </div>
@@ -908,9 +905,9 @@ function TabPersonal({
                     <TableCell className="py-2">
                       <div className="flex flex-col gap-0.5">
                         {certVencimiento(p.certAlturaVence, 'Altura')}
-                        {certVencimiento(p.certElectricoVence, 'El\u00e9ctrico')}
+                        {certVencimiento(p.certElectricoVence, 'Eléctrico')}
                         {certVencimiento(p.certCalienteVence, 'Caliente')}
-                        {certVencimiento(p.aptitudMedicaVence, 'M\u00e9dica')}
+                        {certVencimiento(p.aptitudMedicaVence, 'Médica')}
                         {!p.certAlturaVence && !p.certElectricoVence && !p.certCalienteVence && !p.aptitudMedicaVence && (
                           <span className="text-[10px] text-muted-foreground">-</span>
                         )}
@@ -964,7 +961,7 @@ function TabPersonal({
               <Input
                 value={cargo}
                 onChange={(e) => setCargo(e.target.value)}
-                placeholder="Ej: T\u00e9cnico Electr\u00f3nico"
+                placeholder="Ej: Técnico Electrónico"
               />
             </div>
           </div>
@@ -991,7 +988,7 @@ function TabEstado({ expediente }: { expediente: SsomaExpediente }) {
   const totalPersonal = expediente.personal.length
 
   const actividadesPresentes = [
-    expediente.hayTrabajoElectrico && `El\u00e9ctrico (${expediente.nivelElectrico === 'media_alta' ? 'MT/AT' : 'BT'})`,
+    expediente.hayTrabajoElectrico && `Eléctrico (${expediente.nivelElectrico === 'media_alta' ? 'MT/AT' : 'BT'})`,
     expediente.hayTrabajoAltura && 'Altura',
     expediente.hayEspacioConfinado && 'Espacio confinado',
     expediente.hayTrabajoCaliente && 'Trabajo en caliente',
@@ -1007,13 +1004,13 @@ function TabEstado({ expediente }: { expediente: SsomaExpediente }) {
         </div>
         <div className="border rounded-lg p-3 text-center">
           <div className="text-2xl font-bold text-gray-900">{firmados}/{totalPersonal}</div>
-          <div className="text-xs text-muted-foreground">Firmas difusi\u00f3n</div>
+          <div className="text-xs text-muted-foreground">Firmas difusión</div>
         </div>
         <div className="border rounded-lg p-3 text-center">
           <Badge className={`text-sm ${habEstadoConfig[expediente.estadoHabilitacion]?.className || 'bg-gray-100'}`}>
             {habEstadoConfig[expediente.estadoHabilitacion]?.label || expediente.estadoHabilitacion}
           </Badge>
-          <div className="text-xs text-muted-foreground mt-1">Habilitaci\u00f3n</div>
+          <div className="text-xs text-muted-foreground mt-1">Habilitación</div>
         </div>
         <div className="border rounded-lg p-3 text-center">
           <div className="text-sm font-medium text-gray-900">
@@ -1026,11 +1023,11 @@ function TabEstado({ expediente }: { expediente: SsomaExpediente }) {
       {/* Detalles */}
       <div className="border rounded-lg divide-y">
         <div className="p-3">
-          <span className="text-xs font-medium text-muted-foreground">C\u00f3digo</span>
+          <span className="text-xs font-medium text-muted-foreground">Código</span>
           <span className="text-sm font-mono ml-2">{expediente.codigoCod}</span>
         </div>
         <div className="p-3">
-          <span className="text-xs font-medium text-muted-foreground">Descripci\u00f3n de trabajos</span>
+          <span className="text-xs font-medium text-muted-foreground">Descripción de trabajos</span>
           <p className="text-sm mt-1">{expediente.descripcionTrabajos}</p>
         </div>
         <div className="p-3">
