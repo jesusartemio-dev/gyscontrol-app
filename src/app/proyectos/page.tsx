@@ -608,6 +608,7 @@ export default function ProyectosPage() {
                     <th className="text-left p-2 font-medium hidden md:table-cell">Gestor</th>
                     <th className="text-left p-2 font-medium hidden xl:table-cell">Supervisor</th>
                     <th className="text-left p-2 font-medium hidden xl:table-cell">Líder</th>
+                    <th className="text-left p-2 font-medium hidden lg:table-cell w-24">Fechas</th>
                     <th className="text-left p-2 font-medium w-20">Estado</th>
                     <th className="text-right p-2 font-medium w-20">Total</th>
                     <th className="text-center p-2 font-medium w-14"></th>
@@ -616,7 +617,7 @@ export default function ProyectosPage() {
                 <tbody>
                   {filteredProyectos.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="text-center py-8 text-gray-500">
+                      <td colSpan={11} className="text-center py-8 text-gray-500">
                         <FolderOpen className="h-10 w-10 mx-auto text-gray-300 mb-2" />
                         <p>No se encontraron proyectos</p>
                       </td>
@@ -651,6 +652,16 @@ export default function ProyectosPage() {
                         </td>
                         <td className="p-2 text-gray-500 text-[10px] truncate max-w-[120px] hidden xl:table-cell" title={(proyecto as any).lider?.name}>
                           {(proyecto as any).lider?.name || '—'}
+                        </td>
+                        <td className="p-2 hidden lg:table-cell">
+                          <div className="text-[10px] leading-tight">
+                            <div className="text-gray-600">
+                              {proyecto.fechaInicio ? new Date(proyecto.fechaInicio).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: '2-digit' }) : '—'}
+                            </div>
+                            <div className="text-gray-400">
+                              {proyecto.createdAt ? new Date(proyecto.createdAt).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: '2-digit' }) : ''}
+                            </div>
+                          </div>
                         </td>
                         <td className="p-2">
                           <Badge
