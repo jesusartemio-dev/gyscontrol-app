@@ -7,27 +7,28 @@ function contextoBase(d: SsomaPromptData): string {
   return `
 EMPRESA: GYS CONTROL INDUSTRIAL SAC — automatización y proyectos electromecánicos, Perú
 PROYECTO: ${d.nombreProyecto}
-CLIENTE: ${d.cliente} — ${d.planta}
+CLIENTE: ${d.cliente}${d.ubicacionProyecto ? ` — ${d.ubicacionProyecto}` : d.planta ? ` — ${d.planta}` : ''}
+${d.alcanceTdr ? `ALCANCE: ${d.alcanceTdr.substring(0, 600)}` : ''}
 DESCRIPCIÓN DE TRABAJOS: ${d.descripcionTrabajos}
 ACTIVIDADES DE ALTO RIESGO PRESENTES:
   - Trabajos eléctricos: ${a.hayTrabajoElectrico ? `SÍ (${a.nivelElectrico === 'media_alta' ? 'media/alta tensión >1kV' : 'baja tensión <1kV'})` : 'No'}
   - Trabajo en altura >1.80m: ${a.hayTrabajoAltura ? 'SÍ (Manlift / andamios / escaleras)' : 'No'}
   - Espacio confinado: ${a.hayEspacioConfinado ? 'SÍ (tanques, cisternas, ductos)' : 'No'}
   - Trabajo en caliente: ${a.hayTrabajoCaliente ? 'SÍ (soldadura, esmerilado, oxicorte)' : 'No'}
+${d.equiposProyecto?.length ? `
+EQUIPOS A INSTALAR EN ESTE PROYECTO:
+${d.equiposProyecto.map((e, i) => `  ${i + 1}. ${e}`).join('\n')}
+` : ''}${d.serviciosProyecto?.length ? `
+SERVICIOS A EJECUTAR EN ESTE PROYECTO:
+${d.serviciosProyecto.map((s, i) => `  ${i + 1}. ${s}`).join('\n')}
+` : ''}${d.requerimientos?.length ? `
+REQUERIMIENTOS CRÍTICOS DEL CLIENTE:
+${d.requerimientos.map((r, i) => `  ${i + 1}. ${r}`).join('\n')}
+` : ''}
 PREPARADO POR: ${d.ingSeguridad} — Ing. de Seguridad
 GESTOR DE PROYECTO: ${d.gestorNombre}
 APROBADO POR: ${d.ggNombre} — Gerente General
-FECHA: ${d.fecha}
-${d.serviciosProyecto?.length ? `
-SERVICIOS A EJECUTAR EN ESTE PROYECTO:
-${d.serviciosProyecto.map((s, i) => `${i + 1}. ${s}`).join('\n')}
-` : ''}${d.equiposProyecto?.length ? `
-EQUIPOS A INSTALAR EN ESTE PROYECTO:
-${d.equiposProyecto.map((e, i) => `${i + 1}. ${e}`).join('\n')}
-` : ''}${d.alcanceTdr ? `
-ALCANCE SEGÚN TDR:
-${d.alcanceTdr.substring(0, 800)}
-` : ''}`.trim()
+`.trim()
 }
 
 export function buildPromptPETS(d: SsomaPromptData, codigo: string): string {
@@ -90,6 +91,9 @@ ESTRUCTURA OBLIGATORIA — respeta exactamente este orden:
    montaje de tableros, tendido de tuberías conduit, cableado, conexionado,
    montaje de instrumentos, comisionamiento.
    Cada paso con: QUÉ hacer | CÓMO hacerlo | QUIÉN es responsable
+   Describe los pasos técnicos específicos usando los equipos reales del proyecto.
+   Por ejemplo: "Montaje de transmisor [modelo específico] en [zona específica]"
+   en lugar de descripciones genéricas.
 
    ${d.actividades.hayTrabajoAltura ? `6.6 TRABAJO EN ALTURA
    - Verificar PETAR de altura firmado
@@ -132,17 +136,6 @@ export function buildPromptIPERC(d: SsomaPromptData, codigo: string): string {
 Genera una IPERC completa siguiendo el DS 024-2016-EM para este proyecto.
 
 ${contextoBase(d)}
-
-IMPORTANTE: Usa los equipos y servicios listados arriba para hacer el IPERC específico a este proyecto.
-En lugar de actividades genéricas, menciona los equipos reales.
-Por ejemplo: en lugar de 'montaje de tablero eléctrico' escribe 'montaje de tablero TTA-01 con PLC Siemens S7-1200'.
-Cada sub-actividad debe referenciar los equipos o servicios específicos del proyecto cuando sea posible.
-
-ACTIVIDADES DE ALTO RIESGO:
-  - Eléctrico: ${d.actividades.hayTrabajoElectrico ? 'SÍ' : 'No'}
-  - Altura: ${d.actividades.hayTrabajoAltura ? 'SÍ' : 'No'}
-  - Espacio confinado: ${d.actividades.hayEspacioConfinado ? 'SÍ' : 'No'}
-  - Trabajo en caliente: ${d.actividades.hayTrabajoCaliente ? 'SÍ' : 'No'}
 
 Responde ÚNICAMENTE con un JSON válido, sin texto adicional, sin markdown, sin explicaciones. Solo el JSON puro.
 
@@ -188,45 +181,56 @@ ALTO: 1A, 1B, 1C, 2A, 2B, 3A
 MEDIO: 1D, 2C, 2D, 3B, 3C, 4A, 4B
 BAJO: 1E, 2E, 3D, 3E, 4C, 4D, 5A, 5B, 5C, 5D, 5E
 
-Genera MÍNIMO 45 filas cubriendo TODAS estas actividades del proyecto.
-Incluye múltiples sub-actividades por cada actividad principal.
-Es crítico que el JSON tenga al menos 45 objetos en el array filas.
+ACTIVIDADES OBLIGATORIAS A INCLUIR — MÍNIMO 45 FILAS:
 
-ACTIVIDADES BASE (siempre incluir):
-1. Movilización de personal y materiales a planta
-2. Vigilancia COVID-19 / Dengue (todas las actividades)
-3. Sistema de bloqueo de energía LOTO
-4. Montaje de tableros eléctricos
-5. Tendido de tuberías conduit
-6. Cableado eléctrico de alimentación
-7. Cableado de instrumentación y comunicación
-8. Conexionado en tableros y borneras
-9. Montaje de instrumentos y sensores
-10. Comisionamiento y pruebas
-11. Orden y limpieza
-12. Exposición a radiación solar (todas las actividades al aire libre)
-13. Exposición a ruido durante montaje
-14. Trabajos prolongados de pie (ergonómico)
-15. Inhalación de partículas de polvo (químico)
-16. Exposición a virus dengue/COVID (biológico)
-17. Transporte de materiales en montacarga (mecánico)
-18. Trabajo en desniveles dentro de planta (locativo)
-19. Potencial derrame de sustancias químicas (químico)
-20. Radiación no ionizante de equipos
-21. Iluminación deficiente en zonas de trabajo
-22. Fatiga mental por trabajo repetitivo (psicosocial)
-23. Trabajos en días de calor extremo (físico)
-${d.actividades.hayTrabajoElectrico ? `24. Intervención en tableros energizados
-25. Pruebas eléctricas con tensión` : ''}
-${d.actividades.hayTrabajoAltura ? `26. Armado y desarmado de andamios
-27. Trabajo en plataforma Manlift
-28. Tendido de cables en altura` : ''}
-${d.actividades.hayEspacioConfinado ? `29. Medición de atmósfera en espacio confinado
-30. Ingreso y trabajo en espacio confinado` : ''}
-${d.actividades.hayTrabajoCaliente ? `31. Esmerilado de tuberías
-32. Soldadura eléctrica / oxicorte` : ''}
+INSTRUCCIÓN CRÍTICA: Usa los equipos y servicios listados en el contexto
+para hacer el IPERC específico a este proyecto real.
+- En lugar de "montaje de tablero eléctrico" → escribe el nombre exacto del tablero/equipo
+- En lugar de "instalación de instrumento" → escribe "instalación de [modelo específico]"
+- En lugar de "zona de trabajo" → escribe la zona específica (ZT3, ZPQR, ZRC, etc.) si aplica
+- Si hay equipos ATEX o zonas clasificadas → incluir actividades específicas de:
+    • Verificación de certificación ATEX de herramientas antes de ingresar a zona clasificada
+    • Control de fuentes de ignición en área ATEX (zona 0, 1 o 2)
+    • Uso de herramientas antichispa en área clasificada
+    • Medición de atmósfera explosiva con detector de gases antes de trabajar
 
-Sé específico y técnico. Usa terminología de automatización industrial.`
+Actividades base a cubrir (adaptar con los equipos/servicios reales del proyecto):
+1.  Movilización de personal y materiales a planta cliente
+2.  Vigilancia COVID-19 / Dengue (todas las actividades)
+3.  Exposición a radiación solar durante trabajos en exterior
+4.  Exposición a ruido de equipos de la planta en operación
+5.  Trabajos prolongados de pie / posturas forzadas (ergonómico)
+6.  Inhalación de partículas de polvo y vapores químicos
+7.  Sistema de bloqueo de energía LOTO previo a intervenciones
+8.  Traslado y montaje de tableros eléctricos del proyecto
+9.  Preparación, corte y roscado de tuberías conduit
+10. Tendido de bandejas portacables y tuberías por planta
+11. Cableado eléctrico de alimentación y fuerza
+12. Tendido de cables de instrumentación y comunicación (Profinet, Modbus)
+13. Conexionado en tableros: terminales, borneras, PLC
+14. Montaje e instalación de instrumentos de campo (transmisores, switches, sensores)
+15. Configuración y programación de PLC/SCADA (sala de control)
+16. Pruebas de continuidad, aislamiento y lazo (loop check)
+17. Comisionamiento y pruebas de funcionamiento con cliente
+18. Orden y limpieza del área de trabajo
+${d.actividades.hayTrabajoElectrico ? `19. Intervención en tableros energizados (verificación)
+20. Energización progresiva de tableros nuevos con supervisión` : ''}
+${d.actividades.hayTrabajoAltura ? `21. Armado y desarmado de andamios multidireccionales
+22. Trabajo en plataforma Manlift para tendido en altura
+23. Instalación de bandejas/conduit en zonas elevadas` : ''}
+${d.actividades.hayEspacioConfinado ? `24. Medición de atmósfera en espacio confinado antes de ingreso
+25. Ingreso y trabajo dentro de tanque o espacio confinado` : ''}
+${d.actividades.hayTrabajoCaliente ? `26. Esmerilado de estructuras metálicas y tuberías
+27. Soldadura de soportes y estructuras de soporte` : ''}
+28. Exposición a fatiga mental por trabajo técnico repetitivo (psicosocial)
+29. Transporte de equipos pesados con montacarga dentro de planta
+30. Trabajo en desniveles, rampas y escaleras fijas de la planta
+31. Potencial derrame de aceite dieléctrico o sustancias de equipos
+32. Iluminación deficiente en zonas de trabajo nocturno o interior
+33. Trabajos en días de calor extremo (>30°C) en exterior
+
+Genera EXACTAMENTE el JSON solicitado con mínimo 45 filas.
+No incluyas texto antes ni después del JSON.`
 }
 
 export function buildPromptMatrizEPP(d: SsomaPromptData, codigo: string): string {

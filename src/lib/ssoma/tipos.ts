@@ -25,6 +25,8 @@ export interface SsomaPromptData {
   equiposProyecto?: string[]
   serviciosProyecto?: string[]
   alcanceTdr?: string | null
+  ubicacionProyecto?: string | null
+  requerimientos?: string[]
 }
 
 // Qué documentos generar para un expediente

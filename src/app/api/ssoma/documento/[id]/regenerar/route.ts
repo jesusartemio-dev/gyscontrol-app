@@ -65,21 +65,56 @@ export async function POST(
         })
       : null
 
-    const servicios = cotizacion?.cotizacionServicio
-      .flatMap(cs => cs.cotizacionServicioItem)
+    const tdr = cotizacion?.cotizacionTdrAnalisis?.[0] ?? null
+
+    const equiposTdr: string[] = tdr?.equiposIdentificados
+      ? (tdr.equiposIdentificados as any[])
+          .slice(0, 20)
+          .map((e: any) => [
+            e.nombre ?? e.equipo ?? '',
+            e.especificacion ?? e.descripcion ?? '',
+            e.cantidad ? `(x${e.cantidad})` : '',
+          ].filter(Boolean).join(' — ').trim())
+          .filter(Boolean)
+      : []
+
+    const equiposCotizacion: string[] = cotizacion?.cotizacionEquipo
+      .flatMap(ce => ce.cotizacionEquipoItem)
       .slice(0, 20)
+      .map(item => `${item.descripcion ?? ''} ${item.marca ?? ''}`.trim())
+      .filter(Boolean) ?? []
+
+    const equiposFinales = equiposTdr.length > 0 ? equiposTdr : equiposCotizacion
+
+    const serviciosTdr: string[] = tdr?.serviciosIdentificados
+      ? (tdr.serviciosIdentificados as any[])
+          .slice(0, 15)
+          .map((s: any) => [
+            s.nombre ?? s.servicio ?? '',
+            s.descripcion ?? '',
+            s.horasEstimadas ? `(${s.horasEstimadas}h est.)` : '',
+          ].filter(Boolean).join(' — ').trim())
+          .filter(Boolean)
+      : []
+
+    const serviciosCotizacion: string[] = cotizacion?.cotizacionServicio
+      .flatMap(cs => cs.cotizacionServicioItem)
+      .slice(0, 15)
       .map(item => item.nombre || item.catalogoServicio?.nombre || item.descripcion || '')
       .filter(Boolean) ?? []
 
-    const equipos = cotizacion?.cotizacionEquipo
-      .flatMap(ce => ce.cotizacionEquipoItem)
-      .slice(0, 20)
-      .map(item => `${item.descripcion} ${item.marca ?? ''}`.trim())
-      .filter(Boolean) ?? []
+    const serviciosFinales = serviciosTdr.length > 0 ? serviciosTdr : serviciosCotizacion
 
-    const alcanceTdr = cotizacion?.cotizacionTdrAnalisis?.[0]?.alcanceDetectado
-      ?? cotizacion?.cotizacionTdrAnalisis?.[0]?.resumenTdr
-      ?? null
+    const requerimientos: string[] = tdr?.requerimientos
+      ? (tdr.requerimientos as any[])
+          .filter((r: any) => r.criticidad === 'alta' || r.prioridad === 'alta')
+          .slice(0, 10)
+          .map((r: any) => r.descripcion ?? r.titulo ?? r.requerimiento ?? '')
+          .filter(Boolean)
+      : []
+
+    const alcanceTdr = tdr?.alcanceDetectado ?? tdr?.resumenTdr ?? null
+    const ubicacionProyecto = tdr?.ubicacionDetectada ?? null
 
     // Build prompt data from expediente
     const actividades: SsomaActividadesAltoRiesgo = {
@@ -105,9 +140,11 @@ export async function POST(
         month: '2-digit',
         year: 'numeric',
       }),
-      equiposProyecto: equipos,
-      serviciosProyecto: servicios,
+      equiposProyecto: equiposFinales,
+      serviciosProyecto: serviciosFinales,
       alcanceTdr,
+      ubicacionProyecto,
+      requerimientos,
     }
 
     // Select prompt by doc type

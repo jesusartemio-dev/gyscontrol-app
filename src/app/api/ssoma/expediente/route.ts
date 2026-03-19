@@ -94,21 +94,60 @@ export async function POST(req: Request) {
         })
       : null
 
-    const servicios = cotizacion?.cotizacionServicio
-      .flatMap(cs => cs.cotizacionServicioItem)
+    const tdr = cotizacion?.cotizacionTdrAnalisis?.[0] ?? null
+
+    // Equipos: priorizar TDR (más detallado) sobre items de cotización
+    const equiposTdr: string[] = tdr?.equiposIdentificados
+      ? (tdr.equiposIdentificados as any[])
+          .slice(0, 20)
+          .map((e: any) => [
+            e.nombre ?? e.equipo ?? '',
+            e.especificacion ?? e.descripcion ?? '',
+            e.cantidad ? `(x${e.cantidad})` : '',
+          ].filter(Boolean).join(' — ').trim())
+          .filter(Boolean)
+      : []
+
+    const equiposCotizacion: string[] = cotizacion?.cotizacionEquipo
+      .flatMap(ce => ce.cotizacionEquipoItem)
       .slice(0, 20)
+      .map(item => `${item.descripcion ?? ''} ${item.marca ?? ''}`.trim())
+      .filter(Boolean) ?? []
+
+    const equiposFinales = equiposTdr.length > 0 ? equiposTdr : equiposCotizacion
+
+    // Servicios: priorizar TDR sobre items de cotización
+    const serviciosTdr: string[] = tdr?.serviciosIdentificados
+      ? (tdr.serviciosIdentificados as any[])
+          .slice(0, 15)
+          .map((s: any) => [
+            s.nombre ?? s.servicio ?? '',
+            s.descripcion ?? '',
+            s.horasEstimadas ? `(${s.horasEstimadas}h est.)` : '',
+          ].filter(Boolean).join(' — ').trim())
+          .filter(Boolean)
+      : []
+
+    const serviciosCotizacion: string[] = cotizacion?.cotizacionServicio
+      .flatMap(cs => cs.cotizacionServicioItem)
+      .slice(0, 15)
       .map(item => item.nombre || item.catalogoServicio?.nombre || item.descripcion || '')
       .filter(Boolean) ?? []
 
-    const equipos = cotizacion?.cotizacionEquipo
-      .flatMap(ce => ce.cotizacionEquipoItem)
-      .slice(0, 20)
-      .map(item => `${item.descripcion} ${item.marca ?? ''}`.trim())
-      .filter(Boolean) ?? []
+    const serviciosFinales = serviciosTdr.length > 0 ? serviciosTdr : serviciosCotizacion
 
-    const alcanceTdr = cotizacion?.cotizacionTdrAnalisis?.[0]?.alcanceDetectado
-      ?? cotizacion?.cotizacionTdrAnalisis?.[0]?.resumenTdr
-      ?? null
+    // Requerimientos críticos del TDR
+    const requerimientos: string[] = tdr?.requerimientos
+      ? (tdr.requerimientos as any[])
+          .filter((r: any) => r.criticidad === 'alta' || r.prioridad === 'alta')
+          .slice(0, 10)
+          .map((r: any) => r.descripcion ?? r.titulo ?? r.requerimiento ?? '')
+          .filter(Boolean)
+      : []
+
+    // Alcance y ubicación del TDR
+    const alcanceTdr = tdr?.alcanceDetectado ?? tdr?.resumenTdr ?? null
+    const ubicacionProyecto = tdr?.ubicacionDetectada ?? null
 
     // Crear el expediente
     const cod = (codigoCod as string).toUpperCase()
@@ -146,16 +185,18 @@ export async function POST(req: Request) {
       codigoCod: cod,
       nombreProyecto: proyecto.nombre,
       cliente: proyecto.cliente.nombre,
-      planta: proyecto.descripcion ?? proyecto.cliente.nombre,
+      planta: ubicacionProyecto ?? proyecto.descripcion ?? proyecto.cliente.nombre,
       descripcionTrabajos,
       actividades,
       ingSeguridad,
       gestorNombre,
       ggNombre,
       fecha,
-      equiposProyecto: equipos,
-      serviciosProyecto: servicios,
+      equiposProyecto: equiposFinales,
+      serviciosProyecto: serviciosFinales,
       alcanceTdr,
+      ubicacionProyecto,
+      requerimientos,
     }
 
     const specs = getDocSpecs(cod, actividades)
