@@ -38,10 +38,10 @@ export function getDocSpecs(
   actividades: SsomaActividadesAltoRiesgo
 ): SsomaDocSpec[] {
   const specs: SsomaDocSpec[] = [
-    { tipo: 'PETS',            codigoDocumento: `GYS\u2013${cod}\u2013P\u2013001`,   titulo: 'Procedimiento Escrito de Trabajo Seguro',                       revision: '02' },
-    { tipo: 'IPERC',           codigoDocumento: `GYS${cod}IPERC001`,                  titulo: 'Identificaci\u00f3n de Peligros, Evaluaci\u00f3n de Riesgos y Controles', revision: '01' },
-    { tipo: 'MATRIZ_EPP',      codigoDocumento: `GYS\u2013SST\u2013MEPP\u2013001`,   titulo: 'Matriz de Equipos de Protecci\u00f3n Personal',                  revision: '01' },
-    { tipo: 'PLAN_EMERGENCIA', codigoDocumento: `GYS\u2013${cod}\u2013PL\u2013002`,  titulo: 'Plan de Respuesta a Emergencias',                                revision: '01' },
+    { tipo: 'PETS',            codigoDocumento: `GYS-${cod}-P-001`,     titulo: 'Procedimiento Escrito de Trabajo Seguro',                       revision: '02' },
+    { tipo: 'IPERC',           codigoDocumento: `GYS-${cod}-IPERC-001`, titulo: 'Identificación de Peligros, Evaluación de Riesgos y Controles', revision: '01' },
+    { tipo: 'MATRIZ_EPP',      codigoDocumento: `GYS-${cod}-MEPP-001`,  titulo: 'Matriz de Equipos de Protección Personal',                      revision: '01' },
+    { tipo: 'PLAN_EMERGENCIA', codigoDocumento: `GYS-${cod}-PL-002`,    titulo: 'Plan de Respuesta a Emergencias',                               revision: '01' },
   ]
 
   // PAR — uno por actividad de alto riesgo presente, numerados 001, 002...
@@ -62,7 +62,7 @@ export function getDocSpecs(
     specs.push({
       tipo: 'PAR',
       parSubtipo: par.subtipo,
-      codigoDocumento: `GYS\u2013${cod}\u2013PAR\u201300${parIndex}`,
+      codigoDocumento: `GYS-${cod}-PAR-00${parIndex}`,
       titulo: par.titulo,
       revision: '01',
     })

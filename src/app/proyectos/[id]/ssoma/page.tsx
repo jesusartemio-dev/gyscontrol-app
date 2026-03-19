@@ -697,7 +697,7 @@ function DocumentoModal({
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `${doc.codigoDocumento.replace(/[\u2013\u2014]/g, '-')}.docx`
+      a.download = `${doc.codigoDocumento}.docx`
       a.click()
       URL.revokeObjectURL(url)
     } catch {
