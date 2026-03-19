@@ -213,23 +213,38 @@ Actividades base a cubrir (adaptar con los equipos/servicios reales del proyecto
 16. Pruebas de continuidad, aislamiento y lazo (loop check)
 17. Comisionamiento y pruebas de funcionamiento con cliente
 18. Orden y limpieza del área de trabajo
-${d.actividades.hayTrabajoElectrico ? `19. Intervención en tableros energizados (verificación)
-20. Energización progresiva de tableros nuevos con supervisión` : ''}
-${d.actividades.hayTrabajoAltura ? `21. Armado y desarmado de andamios multidireccionales
-22. Trabajo en plataforma Manlift para tendido en altura
-23. Instalación de bandejas/conduit en zonas elevadas` : ''}
-${d.actividades.hayEspacioConfinado ? `24. Medición de atmósfera en espacio confinado antes de ingreso
-25. Ingreso y trabajo dentro de tanque o espacio confinado` : ''}
-${d.actividades.hayTrabajoCaliente ? `26. Esmerilado de estructuras metálicas y tuberías
-27. Soldadura de soportes y estructuras de soporte` : ''}
-28. Exposición a fatiga mental por trabajo técnico repetitivo (psicosocial)
-29. Transporte de equipos pesados con montacarga dentro de planta
-30. Trabajo en desniveles, rampas y escaleras fijas de la planta
-31. Potencial derrame de aceite dieléctrico o sustancias de equipos
-32. Iluminación deficiente en zonas de trabajo nocturno o interior
-33. Trabajos en días de calor extremo (>30°C) en exterior
+19. Exposición a radiación no ionizante de equipos eléctricos en operación
+20. Esquirlas y proyección de partículas durante corte de conduit con esmeril
+21. Manipulación de herramientas manuales (cortes, golpes)
+22. Tránsito de montacargas y vehículos en planta cliente
+23. Transitar por áreas con desniveles, rampas y escaleras fijas de planta
+24. Exposición a sustancias químicas del proceso del cliente (vapores, derrames)
+25. Trabajos prolongados de pie en superficies de concreto (fatiga)
+26. Radiación no ionizante de pantallas HMI y equipos de programación
+27. Iluminación deficiente en zonas eléctricas y salas de control
+28. Potencial contacto con superficies calientes de tuberías de proceso
+29. Estrés térmico por trabajo en áreas con equipos de alta temperatura
+30. Caída de objetos desde niveles superiores durante trabajos simultáneos
+31. Interferencia con operaciones del cliente en planta en marcha
+${d.actividades.hayTrabajoElectrico ? `32. Intervención en tableros energizados (verificación)
+33. Energización progresiva de tableros nuevos con supervisión` : ''}
+${d.actividades.hayTrabajoAltura ? `34. Armado y desarmado de andamios multidireccionales
+35. Trabajo en plataforma Manlift para tendido en altura
+36. Instalación de bandejas/conduit en zonas elevadas` : ''}
+${d.actividades.hayEspacioConfinado ? `37. Medición de atmósfera en espacio confinado antes de ingreso
+38. Ingreso y trabajo dentro de tanque o espacio confinado` : ''}
+${d.actividades.hayTrabajoCaliente ? `39. Esmerilado de estructuras metálicas y tuberías
+40. Soldadura de soportes y estructuras de soporte` : ''}
+41. Exposición a fatiga mental por trabajo técnico repetitivo (psicosocial)
+42. Transporte de equipos pesados con montacarga dentro de planta
+43. Potencial derrame de aceite dieléctrico o sustancias de equipos
+44. Trabajos en días de calor extremo (>30°C) en exterior
+45. Exposición a ruido por zona: distinguir ruido de planta cliente vs ruido propio de obra
 
-Genera EXACTAMENTE el JSON solicitado con mínimo 45 filas.
+Genera EXACTAMENTE el JSON solicitado con MÍNIMO 55 filas.
+Cada actividad principal debe tener al menos 2 sub-actividades.
+Es crítico que el array filas tenga al menos 55 objetos.
+No repitas peligros — cada fila debe ser un riesgo distinto.
 No incluyas texto antes ni después del JSON.`
 }
 
