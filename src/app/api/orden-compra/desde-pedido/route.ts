@@ -132,7 +132,7 @@ export async function POST(req: Request) {
         }))
 
         const subtotal = ocItems.reduce((sum, i) => sum + i.costoTotal, 0)
-        const igv = moneda === 'USD' ? 0 : subtotal * 0.18
+        const igv = subtotal * 0.18
         const total = subtotal + igv
 
         // Usar fecha por proveedor si disponible, fallback a fecha global

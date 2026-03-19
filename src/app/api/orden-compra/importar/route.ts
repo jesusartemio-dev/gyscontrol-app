@@ -99,7 +99,7 @@ export async function POST(req: Request) {
         }))
 
         const subtotal = items.reduce((sum, it) => sum + it.costoTotal, 0)
-        const igv = oc.moneda === 'USD' ? 0 : subtotal * 0.18
+        const igv = subtotal * 0.18
         const total = subtotal + igv
 
         await prisma.ordenCompra.create({

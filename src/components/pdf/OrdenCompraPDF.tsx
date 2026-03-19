@@ -418,12 +418,10 @@ function OrdenCompraPDF({ oc }: Props) {
               <Text style={styles.totalsLabel}>Subtotal</Text>
               <Text style={styles.totalsValue}>{formatCurrency(oc.subtotal, oc.moneda)}</Text>
             </View>
-            {oc.moneda !== 'USD' && (
-              <View style={styles.totalsRow}>
-                <Text style={styles.totalsLabel}>IGV (18%)</Text>
-                <Text style={styles.totalsValue}>{formatCurrency(oc.igv, oc.moneda)}</Text>
-              </View>
-            )}
+            <View style={styles.totalsRow}>
+              <Text style={styles.totalsLabel}>IGV (18%)</Text>
+              <Text style={styles.totalsValue}>{formatCurrency(oc.igv, oc.moneda)}</Text>
+            </View>
             <View style={styles.totalsRowTotal}>
               <Text style={styles.totalsLabelBold}>TOTAL</Text>
               <Text style={styles.totalsValueBold}>{formatCurrency(oc.total, oc.moneda)}</Text>

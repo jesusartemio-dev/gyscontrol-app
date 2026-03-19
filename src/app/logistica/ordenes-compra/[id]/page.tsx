@@ -532,9 +532,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
           {/* Montos — compacto a la derecha */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs md:justify-end">
             <span className="text-muted-foreground">Subtotal: <span className="font-mono text-foreground">{formatCurrency(oc.subtotal, oc.moneda)}</span></span>
-            {oc.moneda !== 'USD' && (
-              <span className="text-muted-foreground">IGV: <span className="font-mono text-foreground">{formatCurrency(oc.igv, oc.moneda)}</span></span>
-            )}
+            <span className="text-muted-foreground">IGV: <span className="font-mono text-foreground">{formatCurrency(oc.igv, oc.moneda)}</span></span>
             <span className="font-semibold">Total: <span className="font-mono">{formatCurrency(oc.total, oc.moneda)}</span></span>
             <span className="text-muted-foreground border-l pl-4">{displayCondicionPago(oc.condicionPago, oc.diasCredito)} · {oc.moneda}</span>
             {oc.centroCosto && <span className="text-muted-foreground">CC: {oc.centroCosto.nombre}</span>}

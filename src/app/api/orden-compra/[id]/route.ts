@@ -103,7 +103,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
       const subtotal = newItems.reduce((sum: number, i: any) => sum + i.costoTotal, 0)
       const moneda = payload.moneda || existing.moneda
-      const igv = moneda === 'USD' ? 0 : subtotal * 0.18
+      const igv = subtotal * 0.18
       updateData.subtotal = subtotal
       updateData.igv = igv
       updateData.total = subtotal + igv

@@ -110,7 +110,7 @@ export default function NuevaOrdenCompraPage() {
   }
 
   const subtotal = items.reduce((sum, item) => sum + (item.cantidad * item.precioUnitario), 0)
-  const igv = moneda === 'USD' ? 0 : subtotal * 0.18
+  const igv = subtotal * 0.18
   const total = subtotal + igv
 
   const formatCurrency = (amount: number) =>
@@ -534,12 +534,10 @@ export default function NuevaOrdenCompraPage() {
             <span className="text-muted-foreground">Subtotal:</span>
             <span className="font-mono">{formatCurrency(subtotal)}</span>
           </div>
-          {moneda !== 'USD' && (
-            <div className="flex justify-between gap-8">
-              <span className="text-muted-foreground">IGV (18%):</span>
-              <span className="font-mono">{formatCurrency(igv)}</span>
-            </div>
-          )}
+          <div className="flex justify-between gap-8">
+            <span className="text-muted-foreground">IGV (18%):</span>
+            <span className="font-mono">{formatCurrency(igv)}</span>
+          </div>
           <div className="flex justify-between gap-8 font-bold text-base">
             <span>Total:</span>
             <span className="font-mono">{formatCurrency(total)}</span>

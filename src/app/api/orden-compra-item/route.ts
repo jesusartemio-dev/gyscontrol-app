@@ -60,7 +60,7 @@ export async function POST(req: Request) {
       })
 
       const subtotal = allItems.reduce((sum, i) => sum + i.costoTotal, 0)
-      const igv = oc.moneda !== 'USD' ? subtotal * 0.18 : 0
+      const igv = subtotal * 0.18
       const total = subtotal + igv
 
       await tx.ordenCompra.update({
