@@ -320,7 +320,8 @@ export async function POST(
       duracionMs,
     })
   } catch (error) {
-    console.error('Error regenerando documento SSOMA:', error)
-    return NextResponse.json({ error: 'Error al regenerar documento' }, { status: 500 })
+    const msg = error instanceof Error ? error.message : String(error)
+    console.error('Error regenerando documento SSOMA:', msg, error)
+    return NextResponse.json({ error: `Error al regenerar: ${msg.substring(0, 200)}` }, { status: 500 })
   }
 }
