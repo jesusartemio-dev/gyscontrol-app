@@ -603,10 +603,14 @@ export async function POST(request: NextRequest) {
   const maxTokens = needsExtendedTokens(messages) ? AGENT_MAX_TOKENS_TDR : AGENT_MAX_TOKENS
 
   // Context-based tool filtering: only send relevant tools
-  const lastUserContent = messages[messages.length - 1]?.content || ''
+  const lastMsg = messages[messages.length - 1]
+  const lastUserContent = lastMsg?.content || ''
+  const hasPdfAttachment = lastMsg?.attachments?.some((a: any) => a.mimeType === 'application/pdf')
+  // If user attached a PDF, always include analysis tools (for guardar_tdr_analisis)
+  const toolSelectionHint = hasPdfAttachment ? `${lastUserContent} pdf documento analiz tdr` : lastUserContent
   const disabledToolGroups = new Set<import('@/lib/agente/tools').ToolGroup>()
   if (iaFlags && !iaFlags.analisisTdr) disabledToolGroups.add('analysis')
-  const tools = selectToolsByContext(lastUserContent, disabledToolGroups)
+  const tools = selectToolsByContext(toolSelectionHint, disabledToolGroups)
 
   const encoder = new TextEncoder()
 

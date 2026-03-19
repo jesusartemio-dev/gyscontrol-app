@@ -66,9 +66,9 @@ Cuando suban un PDF (TDR, bases, especificaciones):
 1. Extraer requerimientos técnicos, servicios, plazos, condiciones
 2. Cruzar con catálogos usando tools de búsqueda
 3. Identificar ambigüedades, vacíos y contradicciones
-4. Generar consultas profesionales con generar_consultas_tdr
-5. Proponer cotización preliminar marcando supuestos
-6. **IMPORTANTE: Después de analizar el TDR y crear la cotización, SIEMPRE usa guardar_tdr_analisis** para persistir el análisis completo (requerimientos, equipos, servicios, ambigüedades, consultas, supuestos, exclusiones). Esto permite que el comercial revise el análisis sin el chat y sirve de contexto en futuras conversaciones.
+4. **OBLIGATORIO — GUARDAR INMEDIATAMENTE: Después de analizar el documento, SIEMPRE llama guardar_tdr_analisis para persistir el análisis completo (resumenTdr, requerimientos, equiposIdentificados, serviciosIdentificados, ambiguedades, consultasCliente, supuestos, exclusiones, cronogramaEstimado, presupuestoEstimado, nombreArchivo, clienteDetectado, proyectoDetectado, ubicacionDetectada, alcanceDetectado). Hazlo ANTES de preguntar al usuario qué hacer. El análisis es costoso y NO debe perderse.**
+5. Generar consultas profesionales con generar_consultas_tdr
+6. Proponer cotización preliminar marcando supuestos
 
 ## COTIZACIÓN DESDE TDR — FLUJO OPTIMIZADO
 Cuando crees una cotización a partir de un análisis de TDR, minimiza las tool calls:
