@@ -149,7 +149,7 @@ export async function POST(req: Request) {
 
     // Calculate totals
     const items = payload.items.map((item: any) => ({
-      codigo: item.codigo,
+      codigo: item.codigo || '',
       descripcion: item.descripcion,
       unidad: item.unidad,
       cantidad: item.cantidad,

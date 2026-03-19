@@ -1421,7 +1421,7 @@ export interface GastoLineaUpdatePayload {
 export interface OrdenCompraItemPayload {
   pedidoEquipoItemId?: string
   listaEquipoItemId?: string
-  codigo: string
+  codigo?: string
   descripcion: string
   unidad: string
   cantidad: number

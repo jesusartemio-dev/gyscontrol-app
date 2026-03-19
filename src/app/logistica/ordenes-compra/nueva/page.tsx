@@ -57,10 +57,11 @@ interface CatalogoResult {
   unidad: { nombre: string }
 }
 
-function CodigoAutocomplete({ value, onSelect, onChange }: {
+function CatalogoAutocomplete({ value, onSelect, onChange, placeholder }: {
   value: string
   onSelect: (item: CatalogoResult) => void
   onChange: (val: string) => void
+  placeholder?: string
 }) {
   const [query, setQuery] = useState(value)
   const [results, setResults] = useState<CatalogoResult[]>([])
@@ -88,7 +89,7 @@ function CodigoAutocomplete({ value, onSelect, onChange }: {
   }
 
   const handleSelect = (item: CatalogoResult) => {
-    setQuery(item.codigo)
+    setQuery(placeholder?.includes('escripci') ? item.descripcion : item.codigo)
     setOpen(false)
     onSelect(item)
   }
@@ -100,7 +101,7 @@ function CodigoAutocomplete({ value, onSelect, onChange }: {
         onChange={e => handleChange(e.target.value)}
         onFocus={() => { if (results.length > 0) setOpen(true) }}
         onBlur={() => setTimeout(() => setOpen(false), 200)}
-        placeholder="Buscar código..."
+        placeholder={placeholder || "Buscar código..."}
         className="h-8 text-xs"
       />
       {open && (
@@ -239,8 +240,18 @@ export default function NuevaOrdenCompraPage() {
   const handleSubmit = async () => {
     if (!proveedorId) return toast.error('Selecciona un proveedor')
     if (!hasAsignacion) return toast.error('Selecciona un proyecto o centro de costo')
-    const validItems = items.filter(i => i.codigo && i.descripcion && i.cantidad > 0 && i.precioUnitario > 0)
-    if (validItems.length === 0) return toast.error('Agrega al menos un item válido')
+    if (items.length === 0) return toast.error('Agrega al menos un item')
+
+    // Validate each item and show specific errors
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]
+      const n = i + 1
+      if (!item.descripcion.trim()) return toast.error(`Item ${n}: falta la descripción`)
+      if (item.cantidad <= 0) return toast.error(`Item ${n}: la cantidad debe ser mayor a 0`)
+      if (item.precioUnitario <= 0) return toast.error(`Item ${n}: el precio unitario debe ser mayor a 0`)
+    }
+
+    const validItems = items.filter(i => i.descripcion.trim() && i.cantidad > 0 && i.precioUnitario > 0)
 
     try {
       setSaving(true)
@@ -256,7 +267,7 @@ export default function NuevaOrdenCompraPage() {
         contactoEntrega: contactoEntrega || undefined,
         observaciones: observaciones || undefined,
         items: validItems.map((item): OrdenCompraItemPayload => ({
-          codigo: item.codigo,
+          codigo: item.codigo || undefined,
           descripcion: item.descripcion,
           unidad: item.unidad,
           cantidad: item.cantidad,
@@ -466,10 +477,11 @@ export default function NuevaOrdenCompraPage() {
                         {isLinked ? (
                           <span className="text-xs font-mono">{item.codigo}</span>
                         ) : (
-                          <CodigoAutocomplete
+                          <CatalogoAutocomplete
                             value={item.codigo}
                             onChange={val => updateItem(index, 'codigo', val)}
                             onSelect={cat => fillFromCatalogo(index, cat)}
+                            placeholder="Buscar código..."
                           />
                         )}
                       </TableCell>
@@ -477,7 +489,12 @@ export default function NuevaOrdenCompraPage() {
                         {isLinked ? (
                           <span className="text-xs">{item.descripcion}</span>
                         ) : (
-                          <Input value={item.descripcion} onChange={e => updateItem(index, 'descripcion', e.target.value)} placeholder="Descripción del item" className="h-8 text-xs" />
+                          <CatalogoAutocomplete
+                            value={item.descripcion}
+                            onChange={val => updateItem(index, 'descripcion', val)}
+                            onSelect={cat => fillFromCatalogo(index, cat)}
+                            placeholder="Buscar descripción..."
+                          />
                         )}
                       </TableCell>
                       <TableCell>
