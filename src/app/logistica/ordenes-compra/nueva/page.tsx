@@ -46,6 +46,89 @@ const emptyItem: ItemForm = {
   codigo: '', descripcion: '', unidad: 'UND', cantidad: 1, precioUnitario: 0, source: 'manual',
 }
 
+interface CatalogoResult {
+  id: string
+  codigo: string
+  descripcion: string
+  marca: string
+  precioLogistica: number | null
+  precioReal: number | null
+  precioInterno: number
+  unidad: { nombre: string }
+}
+
+function CodigoAutocomplete({ value, onSelect, onChange }: {
+  value: string
+  onSelect: (item: CatalogoResult) => void
+  onChange: (val: string) => void
+}) {
+  const [query, setQuery] = useState(value)
+  const [results, setResults] = useState<CatalogoResult[]>([])
+  const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => { setQuery(value) }, [value])
+
+  const doSearch = useCallback((q: string) => {
+    if (q.length < 2) { setResults([]); setOpen(false); return }
+    setLoading(true)
+    fetch(`/api/catalogo-equipo/search?q=${encodeURIComponent(q)}`)
+      .then(r => r.json())
+      .then((data: CatalogoResult[]) => { setResults(data); setOpen(data.length > 0) })
+      .catch(() => setResults([]))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const handleChange = (val: string) => {
+    setQuery(val)
+    onChange(val)
+    if (timerRef.current) clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(() => doSearch(val), 300)
+  }
+
+  const handleSelect = (item: CatalogoResult) => {
+    setQuery(item.codigo)
+    setOpen(false)
+    onSelect(item)
+  }
+
+  return (
+    <div className="relative">
+      <Input
+        value={query}
+        onChange={e => handleChange(e.target.value)}
+        onFocus={() => { if (results.length > 0) setOpen(true) }}
+        onBlur={() => setTimeout(() => setOpen(false), 200)}
+        placeholder="Buscar código..."
+        className="h-8 text-xs"
+      />
+      {open && (
+        <div className="absolute z-50 top-9 left-0 w-[350px] bg-white border rounded-md shadow-lg max-h-48 overflow-auto">
+          {loading && <div className="p-2 text-xs text-muted-foreground">Buscando...</div>}
+          {results.map(item => (
+            <button
+              key={item.id}
+              type="button"
+              className="w-full text-left px-3 py-2 hover:bg-muted/50 border-b last:border-0"
+              onMouseDown={() => handleSelect(item)}
+            >
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-xs font-medium">{item.codigo}</span>
+                {item.marca && <span className="text-[10px] text-muted-foreground">({item.marca})</span>}
+              </div>
+              <div className="text-xs text-muted-foreground truncate">{item.descripcion}</div>
+              <div className="text-[10px] text-muted-foreground">
+                {item.unidad.nombre} &middot; {item.precioLogistica ? `S/ ${item.precioLogistica.toFixed(2)}` : item.precioReal ? `S/ ${item.precioReal.toFixed(2)}` : '-'}
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function NuevaOrdenCompraPage() {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
@@ -82,6 +165,16 @@ export default function NuevaOrdenCompraPage() {
 
   const updateItem = (index: number, field: keyof ItemForm, value: string | number) => {
     setItems(prev => prev.map((item, i) => i === index ? { ...item, [field]: value } : item))
+  }
+
+  const fillFromCatalogo = (index: number, catalogo: CatalogoResult) => {
+    setItems(prev => prev.map((item, i) => i === index ? {
+      ...item,
+      codigo: catalogo.codigo,
+      descripcion: catalogo.descripcion,
+      unidad: catalogo.unidad.nombre,
+      precioUnitario: catalogo.precioLogistica || catalogo.precioReal || catalogo.precioInterno || 0,
+    } : item))
   }
 
   const addManualItem = () => setItems(prev => [...prev, { ...emptyItem }])
@@ -373,7 +466,11 @@ export default function NuevaOrdenCompraPage() {
                         {isLinked ? (
                           <span className="text-xs font-mono">{item.codigo}</span>
                         ) : (
-                          <Input value={item.codigo} onChange={e => updateItem(index, 'codigo', e.target.value)} placeholder="COD" className="h-8 text-xs" />
+                          <CodigoAutocomplete
+                            value={item.codigo}
+                            onChange={val => updateItem(index, 'codigo', val)}
+                            onSelect={cat => fillFromCatalogo(index, cat)}
+                          />
                         )}
                       </TableCell>
                       <TableCell>
