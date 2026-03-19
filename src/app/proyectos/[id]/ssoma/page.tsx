@@ -672,6 +672,7 @@ function DocumentoModal({
   const [saving, setSaving] = useState(false)
   const [regenerating, setRegenerating] = useState(false)
   const [showRegenerarConfirm, setShowRegenerarConfirm] = useState(false)
+  const [regenProgress, setRegenProgress] = useState(0)
 
   const handleSave = async () => {
     setSaving(true)
@@ -716,15 +717,29 @@ function DocumentoModal({
     }
   }
 
+  // Progreso simulado durante regeneración
+  useEffect(() => {
+    if (!regenerating) { setRegenProgress(0); return }
+    const duracionEstimada = doc.tipo === 'IPERC' ? 60000 : 25000
+    const intervalo = 500
+    const incremento = (intervalo / duracionEstimada) * 90 // llega hasta ~90%
+    const timer = setInterval(() => {
+      setRegenProgress(prev => prev >= 90 ? 90 : prev + incremento)
+    }, intervalo)
+    return () => clearInterval(timer)
+  }, [regenerating, doc.tipo])
+
   const handleRegenerar = async () => {
     setShowRegenerarConfirm(false)
     setRegenerating(true)
+    setRegenProgress(0)
     try {
       const res = await fetch(`/api/ssoma/documento/${doc.id}/regenerar`, { method: 'POST' })
       if (!res.ok) {
         const data = await res.json()
         throw new Error(data.error || 'Error al regenerar')
       }
+      setRegenProgress(100)
       toast.success('Documento regenerado con IA')
       onRefresh()
       onClose()
@@ -814,9 +829,27 @@ function DocumentoModal({
             ) : (
               <RefreshCw className="h-3 w-3 mr-1" />
             )}
-            {regenerating ? 'Regenerando...' : 'Regenerar IA'}
+            {regenerating ? `Regenerando... ${Math.round(regenProgress)}%` : 'Regenerar IA'}
           </Button>
         </div>
+
+        {/* Progress bar */}
+        {regenerating && (
+          <div className="space-y-1">
+            <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+              <div
+                className="h-full bg-amber-500 rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${regenProgress}%` }}
+              />
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              {regenProgress < 20 ? 'Analizando equipos y servicios del proyecto...' :
+               regenProgress < 50 ? 'Generando filas de peligros y controles con IA...' :
+               regenProgress < 80 ? 'Evaluando riesgos y controles residuales...' :
+               regenProgress < 100 ? 'Finalizando documento...' : 'Listo'}
+            </p>
+          </div>
+        )}
 
         {/* Content */}
         <div className="flex-1 min-h-0 overflow-y-auto border rounded-lg bg-white">
