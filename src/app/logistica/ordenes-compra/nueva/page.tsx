@@ -300,7 +300,7 @@ export default function NuevaOrdenCompraPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Proveedor</CardTitle>
+            <CardTitle className="text-sm font-medium">Proveedor <span className="text-red-500">*</span></CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <Select value={proveedorId} onValueChange={setProveedorId}>
@@ -443,10 +443,10 @@ export default function NuevaOrdenCompraPage() {
                 <TableRow>
                   <TableHead className="w-[70px]">Origen</TableHead>
                   <TableHead className="w-[100px]">Código</TableHead>
-                  <TableHead>Descripción</TableHead>
+                  <TableHead>Descripción <span className="text-red-500">*</span></TableHead>
                   <TableHead className="w-[80px]">Unidad</TableHead>
-                  <TableHead className="w-[80px] text-right">Cant.</TableHead>
-                  <TableHead className="w-[120px] text-right">P. Unit.</TableHead>
+                  <TableHead className="w-[80px] text-right">Cant. <span className="text-red-500">*</span></TableHead>
+                  <TableHead className="w-[120px] text-right">P. Unit. <span className="text-red-500">*</span></TableHead>
                   <TableHead className="w-[120px] text-right">Total</TableHead>
                   <TableHead className="w-[40px]"></TableHead>
                 </TableRow>
