@@ -502,6 +502,24 @@ function ExpedienteView({
   )
 }
 
+const getFormatoBadge = (tipo: string) => {
+  if (tipo === 'IPERC') return (
+    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700 border border-green-300 mr-1">
+      XLS
+    </span>
+  )
+  if (tipo === 'PLAN_EMERGENCIA') return (
+    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700 border border-red-300 mr-1">
+      PDF
+    </span>
+  )
+  return (
+    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700 border border-blue-300 mr-1">
+      DOC
+    </span>
+  )
+}
+
 // ====== TAB 1: DOCUMENTOS ======
 function TabDocumentos({
   documentos,
@@ -556,6 +574,7 @@ function TabDocumentos({
                   </TableCell>
                   <TableCell className="py-2">
                     <div>
+                      {getFormatoBadge(doc.tipo)}
                       <span className="text-sm">{doc.titulo}</span>
                       {doc.tipo === 'PAR' && doc.parSubtipo && (
                         <Badge variant="outline" className="ml-2 text-[10px] px-1 py-0">
@@ -714,6 +733,9 @@ function DocumentoModal({
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
             {doc.codigoDocumento} — {doc.titulo}
+            <span className="text-xs text-gray-400 font-mono">
+              {doc.tipo === 'IPERC' ? '📊 Excel' : '📄 Word'}
+            </span>
           </DialogTitle>
         </DialogHeader>
 
@@ -746,11 +768,7 @@ function DocumentoModal({
               Editar
             </Button>
           )}
-          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={handleDownload}>
-            <Download className="h-3 w-3 mr-1" />
-            Descargar .docx
-          </Button>
-          {doc.tipo === 'IPERC' && (
+          {doc.tipo === 'IPERC' ? (
             <Button
               size="sm"
               variant="outline"
@@ -759,6 +777,11 @@ function DocumentoModal({
             >
               <TableIcon className="h-3 w-3 mr-1" />
               Descargar .xlsx
+            </Button>
+          ) : (
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={handleDownload}>
+              <Download className="h-3 w-3 mr-1" />
+              Descargar .docx
             </Button>
           )}
           <Button
