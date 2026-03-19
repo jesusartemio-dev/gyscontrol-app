@@ -93,7 +93,7 @@ export async function POST(
     const startMs = Date.now()
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: doc.tipo === 'IPERC' ? 8000 : 4000,
+      max_tokens: doc.tipo === 'IPERC' ? 16000 : 4000,
       messages: [{ role: 'user', content: prompt }],
     })
 

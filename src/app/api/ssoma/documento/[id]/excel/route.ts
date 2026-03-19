@@ -60,7 +60,7 @@ export async function GET(
       filas: ipercData.filas,
     })
 
-    const filename = `${doc.codigoDocumento.replace(/[\u2013\u2014]/g, '-')}.xlsx`
+    const filename = `${doc.codigoDocumento}.xlsx`
     return new NextResponse(buffer, {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
