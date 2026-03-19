@@ -172,7 +172,11 @@ ALTO: 1A, 1B, 1C, 2A, 2B, 3A
 MEDIO: 1D, 2C, 2D, 3B, 3C, 4A, 4B
 BAJO: 1E, 2E, 3D, 3E, 4C, 4D, 5A, 5B, 5C, 5D, 5E
 
-Genera MÍNIMO 20 filas cubriendo estas actividades del proyecto:
+Genera MÍNIMO 45 filas cubriendo TODAS estas actividades del proyecto.
+Incluye múltiples sub-actividades por cada actividad principal.
+Es crítico que el JSON tenga al menos 45 objetos en el array filas.
+
+ACTIVIDADES BASE (siempre incluir):
 1. Movilización de personal y materiales a planta
 2. Vigilancia COVID-19 / Dengue (todas las actividades)
 3. Sistema de bloqueo de energía LOTO
@@ -184,15 +188,27 @@ Genera MÍNIMO 20 filas cubriendo estas actividades del proyecto:
 9. Montaje de instrumentos y sensores
 10. Comisionamiento y pruebas
 11. Orden y limpieza
-${d.actividades.hayTrabajoElectrico ? `12. Intervención en tableros energizados
-13. Pruebas eléctricas con tensión` : ''}
-${d.actividades.hayTrabajoAltura ? `14. Armado y desarmado de andamios
-15. Trabajo en plataforma Manlift
-16. Tendido de cables en altura` : ''}
-${d.actividades.hayEspacioConfinado ? `17. Medición de atmósfera en espacio confinado
-18. Ingreso y trabajo en espacio confinado` : ''}
-${d.actividades.hayTrabajoCaliente ? `19. Esmerilado de tuberías
-20. Soldadura eléctrica / oxicorte` : ''}
+12. Exposición a radiación solar (todas las actividades al aire libre)
+13. Exposición a ruido durante montaje
+14. Trabajos prolongados de pie (ergonómico)
+15. Inhalación de partículas de polvo (químico)
+16. Exposición a virus dengue/COVID (biológico)
+17. Transporte de materiales en montacarga (mecánico)
+18. Trabajo en desniveles dentro de planta (locativo)
+19. Potencial derrame de sustancias químicas (químico)
+20. Radiación no ionizante de equipos
+21. Iluminación deficiente en zonas de trabajo
+22. Fatiga mental por trabajo repetitivo (psicosocial)
+23. Trabajos en días de calor extremo (físico)
+${d.actividades.hayTrabajoElectrico ? `24. Intervención en tableros energizados
+25. Pruebas eléctricas con tensión` : ''}
+${d.actividades.hayTrabajoAltura ? `26. Armado y desarmado de andamios
+27. Trabajo en plataforma Manlift
+28. Tendido de cables en altura` : ''}
+${d.actividades.hayEspacioConfinado ? `29. Medición de atmósfera en espacio confinado
+30. Ingreso y trabajo en espacio confinado` : ''}
+${d.actividades.hayTrabajoCaliente ? `31. Esmerilado de tuberías
+32. Soldadura eléctrica / oxicorte` : ''}
 
 Sé específico y técnico. Usa terminología de automatización industrial.`
 }
