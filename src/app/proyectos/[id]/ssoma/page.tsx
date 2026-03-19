@@ -799,13 +799,29 @@ function DocumentoModal({
               size="sm"
               variant="outline"
               className="h-7 text-xs"
-              onClick={() => {
+              onClick={async () => {
                 const esJson = doc.contenidoTexto?.trim().startsWith('{') || doc.contenidoTexto?.trim().startsWith('[')
                 if (!esJson) {
                   toast.error('Este IPERC fue generado con el formato anterior. Haz clic en "Regenerar IA" primero y luego descarga el Excel.')
                   return
                 }
-                window.open(`/api/ssoma/documento/${doc.id}/excel`, '_blank')
+                try {
+                  const res = await fetch(`/api/ssoma/documento/${doc.id}/excel`)
+                  if (!res.ok) {
+                    const data = await res.json()
+                    toast.error(data.error || 'Error al generar Excel')
+                    return
+                  }
+                  const blob = await res.blob()
+                  const url = URL.createObjectURL(blob)
+                  const a = document.createElement('a')
+                  a.href = url
+                  a.download = `${doc.codigoDocumento}.xlsx`
+                  a.click()
+                  URL.revokeObjectURL(url)
+                } catch {
+                  toast.error('Error al descargar el Excel')
+                }
               }}
             >
               <TableIcon className="h-3 w-3 mr-1" />

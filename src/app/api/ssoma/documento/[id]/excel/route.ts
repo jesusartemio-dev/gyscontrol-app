@@ -26,18 +26,26 @@ export async function GET(
     if (doc.tipo !== 'IPERC') return NextResponse.json({ error: 'No es IPERC' }, { status: 400 })
     if (!doc.contenidoTexto) return NextResponse.json({ error: 'Sin contenido' }, { status: 400 })
 
-    // Parse JSON from AI content
+    // Parse JSON from AI content — clean markdown fences and any surrounding text
     let ipercData: { filas: any[] }
     try {
-      const clean = doc.contenidoTexto
-        .replace(/^```json\s*/i, '')
-        .replace(/^```\s*/i, '')
-        .replace(/\s*```$/i, '')
-        .trim()
+      let clean = doc.contenidoTexto.trim()
+      // Remove markdown code fences (```json ... ```)
+      clean = clean.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '')
+      // Extract JSON object if surrounded by text
+      const jsonStart = clean.indexOf('{')
+      const jsonEnd = clean.lastIndexOf('}')
+      if (jsonStart >= 0 && jsonEnd > jsonStart) {
+        clean = clean.substring(jsonStart, jsonEnd + 1)
+      }
       ipercData = JSON.parse(clean)
-    } catch {
+      if (!ipercData.filas || !Array.isArray(ipercData.filas)) {
+        throw new Error('JSON no contiene array "filas"')
+      }
+    } catch (e) {
+      console.error('IPERC JSON parse error:', e)
       return NextResponse.json(
-        { error: 'Este IPERC fue generado con un formato anterior (texto). Haz clic en "Regenerar IA" para actualizarlo y luego descarga el Excel.' },
+        { error: 'El contenido IPERC no se pudo parsear como JSON. Haz clic en "Regenerar IA" y luego descarga el Excel.' },
         { status: 422 }
       )
     }
