@@ -97,7 +97,7 @@ export async function POST(req: Request) {
     const servicios = cotizacion?.cotizacionServicio
       .flatMap(cs => cs.cotizacionServicioItem)
       .slice(0, 20)
-      .map(item => item.catalogoServicio?.nombre ?? item.descripcion ?? '')
+      .map(item => item.nombre || item.catalogoServicio?.nombre || item.descripcion || '')
       .filter(Boolean) ?? []
 
     const equipos = cotizacion?.cotizacionEquipo
