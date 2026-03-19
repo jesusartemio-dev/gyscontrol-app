@@ -740,9 +740,12 @@ function DocumentoModal({
         throw new Error(data.error || 'Error al regenerar')
       }
       setRegenProgress(100)
-      toast.success('Documento regenerado con IA')
+      const result = await res.json()
+      const secs = result.duracionMs ? `${(result.duracionMs / 1000).toFixed(0)}s` : ''
+      const chars = result.contenidoLength ? `${(result.contenidoLength / 1000).toFixed(0)}K chars` : ''
+      const tokens = result.tokensUsed ? `${(result.tokensUsed / 1000).toFixed(1)}K tokens` : ''
+      toast.success(`Documento regenerado — ${[chars, tokens, secs].filter(Boolean).join(' · ')}`)
       onRefresh()
-      onClose()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Error al regenerar')
     } finally {
