@@ -800,7 +800,8 @@ function DocumentoModal({
               variant="outline"
               className="h-7 text-xs"
               onClick={async () => {
-                const esJson = doc.contenidoTexto?.trim().startsWith('{') || doc.contenidoTexto?.trim().startsWith('[')
+                const txt = doc.contenidoTexto?.trim() ?? ''
+                const esJson = txt.startsWith('{') || txt.startsWith('[') || txt.startsWith('```json')
                 if (!esJson) {
                   toast.error('Este IPERC fue generado con el formato anterior. Haz clic en "Regenerar IA" primero y luego descarga el Excel.')
                   return
