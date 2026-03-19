@@ -37,7 +37,7 @@ export async function GET(
       ipercData = JSON.parse(clean)
     } catch {
       return NextResponse.json(
-        { error: 'El contenido no es JSON válido. Regenera el documento IPERC.' },
+        { error: 'Este IPERC fue generado con un formato anterior (texto). Haz clic en "Regenerar IA" para actualizarlo y luego descarga el Excel.' },
         { status: 422 }
       )
     }

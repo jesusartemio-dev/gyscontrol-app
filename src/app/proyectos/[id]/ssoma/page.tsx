@@ -784,7 +784,14 @@ function DocumentoModal({
               size="sm"
               variant="outline"
               className="h-7 text-xs"
-              onClick={() => window.open(`/api/ssoma/documento/${doc.id}/excel`, '_blank')}
+              onClick={() => {
+                const esJson = doc.contenidoTexto?.trim().startsWith('{') || doc.contenidoTexto?.trim().startsWith('[')
+                if (!esJson) {
+                  toast.error('Este IPERC fue generado con el formato anterior. Haz clic en "Regenerar IA" primero y luego descarga el Excel.')
+                  return
+                }
+                window.open(`/api/ssoma/documento/${doc.id}/excel`, '_blank')
+              }}
             >
               <TableIcon className="h-3 w-3 mr-1" />
               Descargar .xlsx
