@@ -19,6 +19,9 @@ export async function GET(req: NextRequest) {
       return NextResponse.json([])
     }
 
+    const limitParam = req.nextUrl.searchParams.get('limit')
+    const take = limitParam ? Math.min(parseInt(limitParam) || 10, 50) : 10
+
     const items = await prisma.catalogoEquipo.findMany({
       where: {
         OR: [
@@ -36,7 +39,7 @@ export async function GET(req: NextRequest) {
         precioInterno: true,
         unidad: { select: { nombre: true } },
       },
-      take: 10,
+      take,
       orderBy: { codigo: 'asc' },
     })
 

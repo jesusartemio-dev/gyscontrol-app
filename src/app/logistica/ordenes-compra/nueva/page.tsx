@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Plus, Trash2, Loader2, Save, PackageSearch, FileText } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Loader2, Save, PackageSearch, FileText, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { createOrdenCompra, fetchItemsDisponibles, type ItemDisponible } from '@/lib/services/ordenCompra'
 import { getProveedores } from '@/lib/services/proveedor'
@@ -36,7 +36,7 @@ interface ItemForm {
   unidad: string
   cantidad: number
   precioUnitario: number
-  source: 'manual' | 'pedido'
+  source: 'manual' | 'pedido' | 'catalogo'
   pedidoEquipoItemId?: string
   listaEquipoItemId?: string
   sourceLabel?: string
@@ -57,93 +57,6 @@ interface CatalogoResult {
   unidad: { nombre: string }
 }
 
-function CatalogoAutocomplete({ value, onSelect, onChange, placeholder }: {
-  value: string
-  onSelect: (item: CatalogoResult) => void
-  onChange: (val: string) => void
-  placeholder?: string
-}) {
-  const [query, setQuery] = useState(value)
-  const [results, setResults] = useState<CatalogoResult[]>([])
-  const [open, setOpen] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
-  const inputRef = React.useRef<HTMLInputElement>(null)
-  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 })
-
-  useEffect(() => { setQuery(value) }, [value])
-
-  const updatePosition = useCallback(() => {
-    if (inputRef.current) {
-      const rect = inputRef.current.getBoundingClientRect()
-      setDropdownPos({ top: rect.bottom + 2, left: rect.left })
-    }
-  }, [])
-
-  const doSearch = useCallback((q: string) => {
-    if (q.length < 2) { setResults([]); setOpen(false); return }
-    setLoading(true)
-    fetch(`/api/catalogo-equipo/search?q=${encodeURIComponent(q)}`)
-      .then(r => r.json())
-      .then((data: CatalogoResult[]) => { setResults(data); setOpen(data.length > 0) })
-      .catch(() => setResults([]))
-      .finally(() => setLoading(false))
-  }, [])
-
-  const handleChange = (val: string) => {
-    setQuery(val)
-    onChange(val)
-    updatePosition()
-    if (timerRef.current) clearTimeout(timerRef.current)
-    timerRef.current = setTimeout(() => doSearch(val), 300)
-  }
-
-  const handleSelect = (item: CatalogoResult) => {
-    setQuery(placeholder?.includes('escripci') ? item.descripcion : item.codigo)
-    setOpen(false)
-    onSelect(item)
-  }
-
-  return (
-    <div className="relative">
-      <Input
-        ref={inputRef}
-        value={query}
-        onChange={e => handleChange(e.target.value)}
-        onFocus={() => { updatePosition(); if (results.length > 0) setOpen(true) }}
-        onBlur={() => setTimeout(() => setOpen(false), 200)}
-        placeholder={placeholder || "Buscar código..."}
-        className="h-8 text-xs"
-      />
-      {open && (
-        <div
-          className="fixed z-[9999] w-[350px] bg-white border rounded-md shadow-lg max-h-48 overflow-auto"
-          style={{ top: dropdownPos.top, left: dropdownPos.left }}
-        >
-          {loading && <div className="p-2 text-xs text-muted-foreground">Buscando...</div>}
-          {results.map(item => (
-            <button
-              key={item.id}
-              type="button"
-              className="w-full text-left px-3 py-2 hover:bg-muted/50 border-b last:border-0"
-              onMouseDown={() => handleSelect(item)}
-            >
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-xs font-medium">{item.codigo}</span>
-                {item.marca && <span className="text-[10px] text-muted-foreground">({item.marca})</span>}
-              </div>
-              <div className="text-xs text-muted-foreground truncate">{item.descripcion}</div>
-              <div className="text-[10px] text-muted-foreground">
-                {item.unidad.nombre} &middot; {item.precioLogistica ? `S/ ${item.precioLogistica.toFixed(2)}` : item.precioReal ? `S/ ${item.precioReal.toFixed(2)}` : '-'}
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
 export default function NuevaOrdenCompraPage() {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
@@ -162,11 +75,19 @@ export default function NuevaOrdenCompraPage() {
   const [observaciones, setObservaciones] = useState('')
   const [items, setItems] = useState<ItemForm[]>([])
 
-  // Dialog state
+  // Pedido dialog state
   const [selectorOpen, setSelectorOpen] = useState(false)
   const [loadingItems, setLoadingItems] = useState(false)
   const [pedidoItemsDisp, setPedidoItemsDisp] = useState<ItemDisponible[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
+  // Catalogo dialog state
+  const [catalogoOpen, setCatalogoOpen] = useState(false)
+  const [catalogoQuery, setCatalogoQuery] = useState('')
+  const [catalogoResults, setCatalogoResults] = useState<CatalogoResult[]>([])
+  const [catalogoLoading, setCatalogoLoading] = useState(false)
+  const [catalogoSelectedIds, setCatalogoSelectedIds] = useState<Set<string>>(new Set())
+  const [catalogoCantidades, setCatalogoCantidades] = useState<Record<string, number>>({})
 
   const hasAsignacion = !!(asignacion.proyectoId || asignacion.centroCostoId)
   const isProyecto = !!asignacion.proyectoId
@@ -182,16 +103,6 @@ export default function NuevaOrdenCompraPage() {
     setItems(prev => prev.map((item, i) => i === index ? { ...item, [field]: value } : item))
   }
 
-  const fillFromCatalogo = (index: number, catalogo: CatalogoResult) => {
-    setItems(prev => prev.map((item, i) => i === index ? {
-      ...item,
-      codigo: catalogo.codigo,
-      descripcion: catalogo.descripcion,
-      unidad: catalogo.unidad.nombre,
-      precioUnitario: catalogo.precioLogistica || catalogo.precioReal || catalogo.precioInterno || 0,
-    } : item))
-  }
-
   const addManualItem = () => setItems(prev => [...prev, { ...emptyItem }])
 
   const removeItem = (index: number) => {
@@ -205,7 +116,7 @@ export default function NuevaOrdenCompraPage() {
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat('es-PE', { style: 'currency', currency: moneda }).format(amount)
 
-  // Load pedido items when opening the selector
+  // ── Pedido selector ──────────────────────────────────────
   const openSelector = useCallback(async () => {
     if (!asignacion.proyectoId) return
     setSelectorOpen(true)
@@ -213,7 +124,6 @@ export default function NuevaOrdenCompraPage() {
     setLoadingItems(true)
     try {
       const data = await fetchItemsDisponibles(asignacion.proyectoId, proveedorId || undefined)
-      // Filter out items already in the form
       const existingIds = new Set(items.filter(i => i.pedidoEquipoItemId).map(i => i.pedidoEquipoItemId))
       setPedidoItemsDisp(data.items.filter(i => !existingIds.has(i.id)))
     } catch (err) {
@@ -251,12 +161,78 @@ export default function NuevaOrdenCompraPage() {
     toast.success(`${newItems.length} item(s) agregados desde pedidos`)
   }
 
+  // ── Catálogo selector ────────────────────────────────────
+  const openCatalogo = () => {
+    setCatalogoOpen(true)
+    setCatalogoQuery('')
+    setCatalogoResults([])
+    setCatalogoSelectedIds(new Set())
+    setCatalogoCantidades({})
+  }
+
+  const searchCatalogo = useCallback(async (q: string) => {
+    if (q.length < 2) { setCatalogoResults([]); return }
+    setCatalogoLoading(true)
+    try {
+      const res = await fetch(`/api/catalogo-equipo/search?q=${encodeURIComponent(q)}&limit=30`)
+      const data: CatalogoResult[] = await res.json()
+      setCatalogoResults(data)
+    } catch {
+      setCatalogoResults([])
+    } finally {
+      setCatalogoLoading(false)
+    }
+  }, [])
+
+  const catalogoTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+  const handleCatalogoSearch = (val: string) => {
+    setCatalogoQuery(val)
+    if (catalogoTimerRef.current) clearTimeout(catalogoTimerRef.current)
+    catalogoTimerRef.current = setTimeout(() => searchCatalogo(val), 300)
+  }
+
+  const toggleCatalogoSelect = (id: string) => {
+    setCatalogoSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+        if (!catalogoCantidades[id]) {
+          setCatalogoCantidades(prev => ({ ...prev, [id]: 1 }))
+        }
+      }
+      return next
+    })
+  }
+
+  const updateCatalogoCantidad = (id: string, cant: number) => {
+    setCatalogoCantidades(prev => ({ ...prev, [id]: cant }))
+  }
+
+  const addCatalogoItems = () => {
+    const toAdd = catalogoResults.filter(i => catalogoSelectedIds.has(i.id))
+    const newItems: ItemForm[] = toAdd.map(item => ({
+      codigo: item.codigo,
+      descripcion: item.descripcion,
+      unidad: item.unidad.nombre,
+      cantidad: catalogoCantidades[item.id] || 1,
+      precioUnitario: item.precioLogistica || item.precioReal || item.precioInterno || 0,
+      source: 'catalogo' as const,
+      sourceLabel: 'Catálogo',
+    }))
+
+    setItems(prev => [...prev, ...newItems])
+    setCatalogoOpen(false)
+    toast.success(`${newItems.length} item(s) agregados desde catálogo`)
+  }
+
+  // ── Submit ───────────────────────────────────────────────
   const handleSubmit = async () => {
     if (!proveedorId) return toast.error('Selecciona un proveedor')
     if (!hasAsignacion) return toast.error('Selecciona un proyecto o centro de costo')
     if (items.length === 0) return toast.error('Agrega al menos un item')
 
-    // Validate each item and show specific errors
     for (let i = 0; i < items.length; i++) {
       const item = items[i]
       const n = i + 1
@@ -440,21 +416,24 @@ export default function NuevaOrdenCompraPage() {
                 <FileText className="h-3.5 w-3.5 mr-1" /> Desde Pedidos
               </Button>
             )}
+            <Button variant="outline" size="sm" onClick={openCatalogo}>
+              <Search className="h-3.5 w-3.5 mr-1" /> Desde Catálogo
+            </Button>
             <Button variant="outline" size="sm" onClick={addManualItem}>
               <Plus className="h-3.5 w-3.5 mr-1" /> Item Manual
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="p-0 overflow-visible">
+        <CardContent className="p-0">
           {items.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
               <PackageSearch className="h-8 w-8 mb-2" />
               <p className="text-sm">No hay items agregados</p>
               <p className="text-xs mt-1">
                 {isProyecto
-                  ? 'Agrega items desde pedidos existentes o manualmente'
+                  ? 'Agrega items desde pedidos, catálogo o manualmente'
                   : hasAsignacion
-                    ? 'Agrega items manualmente'
+                    ? 'Agrega items desde catálogo o manualmente'
                     : 'Selecciona un proyecto o centro de costo primero'}
               </p>
             </div>
@@ -474,12 +453,15 @@ export default function NuevaOrdenCompraPage() {
               </TableHeader>
               <TableBody>
                 {items.map((item, index) => {
-                  const isLinked = item.source === 'pedido'
+                  const isEditable = item.source === 'manual'
                   return (
                     <TableRow key={index}>
                       <TableCell>
-                        <Badge variant={isLinked ? 'default' : 'outline'} className="text-[10px] px-1.5 py-0">
-                          {isLinked ? 'Pedido' : 'Manual'}
+                        <Badge
+                          variant={item.source === 'pedido' ? 'default' : item.source === 'catalogo' ? 'secondary' : 'outline'}
+                          className="text-[10px] px-1.5 py-0"
+                        >
+                          {item.source === 'pedido' ? 'Pedido' : item.source === 'catalogo' ? 'Catálogo' : 'Manual'}
                         </Badge>
                         {item.sourceLabel && (
                           <div className="text-[10px] text-muted-foreground mt-0.5 truncate max-w-[70px]" title={item.sourceLabel}>
@@ -488,34 +470,24 @@ export default function NuevaOrdenCompraPage() {
                         )}
                       </TableCell>
                       <TableCell>
-                        {isLinked ? (
+                        {isEditable ? (
+                          <Input value={item.codigo} onChange={e => updateItem(index, 'codigo', e.target.value)} placeholder="Código" className="h-8 text-xs" />
+                        ) : (
                           <span className="text-xs font-mono">{item.codigo}</span>
-                        ) : (
-                          <CatalogoAutocomplete
-                            value={item.codigo}
-                            onChange={val => updateItem(index, 'codigo', val)}
-                            onSelect={cat => fillFromCatalogo(index, cat)}
-                            placeholder="Buscar código..."
-                          />
                         )}
                       </TableCell>
                       <TableCell>
-                        {isLinked ? (
+                        {isEditable ? (
+                          <Input value={item.descripcion} onChange={e => updateItem(index, 'descripcion', e.target.value)} placeholder="Descripción del item" className="h-8 text-xs" />
+                        ) : (
                           <span className="text-xs">{item.descripcion}</span>
-                        ) : (
-                          <CatalogoAutocomplete
-                            value={item.descripcion}
-                            onChange={val => updateItem(index, 'descripcion', val)}
-                            onSelect={cat => fillFromCatalogo(index, cat)}
-                            placeholder="Buscar descripción..."
-                          />
                         )}
                       </TableCell>
                       <TableCell>
-                        {isLinked ? (
-                          <span className="text-xs">{item.unidad}</span>
-                        ) : (
+                        {isEditable ? (
                           <Input value={item.unidad} onChange={e => updateItem(index, 'unidad', e.target.value)} className="h-8 text-xs" />
+                        ) : (
+                          <span className="text-xs">{item.unidad}</span>
                         )}
                       </TableCell>
                       <TableCell>
@@ -579,7 +551,7 @@ export default function NuevaOrdenCompraPage() {
         </Button>
       </div>
 
-      {/* Pedido Item Selector Dialog */}
+      {/* ── Pedido Item Selector Dialog ─────────────────────── */}
       <Dialog open={selectorOpen} onOpenChange={setSelectorOpen}>
         <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
           <DialogHeader>
@@ -651,6 +623,111 @@ export default function NuevaOrdenCompraPage() {
               className="bg-orange-600 hover:bg-orange-700"
             >
               Agregar {selectedIds.size} item(s)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Catálogo Selector Dialog ────────────────────────── */}
+      <Dialog open={catalogoOpen} onOpenChange={setCatalogoOpen}>
+        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Buscar en catálogo de equipos</DialogTitle>
+          </DialogHeader>
+
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={catalogoQuery}
+              onChange={e => handleCatalogoSearch(e.target.value)}
+              placeholder="Buscar por código o descripción... (mín. 2 caracteres)"
+              className="pl-9"
+              autoFocus
+            />
+          </div>
+
+          <div className="flex-1 overflow-auto min-h-0">
+            {catalogoLoading ? (
+              <div className="flex items-center justify-center py-10">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : catalogoQuery.length < 2 ? (
+              <div className="text-center py-10 text-muted-foreground text-sm">
+                Escribe al menos 2 caracteres para buscar
+              </div>
+            ) : catalogoResults.length === 0 ? (
+              <div className="text-center py-10 text-muted-foreground text-sm">
+                No se encontraron items para &quot;{catalogoQuery}&quot;
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[40px]"></TableHead>
+                    <TableHead className="w-[140px]">Código</TableHead>
+                    <TableHead>Descripción</TableHead>
+                    <TableHead className="w-[80px]">Marca</TableHead>
+                    <TableHead className="w-[60px]">Unid.</TableHead>
+                    <TableHead className="w-[100px] text-right">Precio</TableHead>
+                    <TableHead className="w-[80px] text-right">Cant.</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {catalogoResults.map(item => {
+                    const isSelected = catalogoSelectedIds.has(item.id)
+                    const precio = item.precioLogistica || item.precioReal || item.precioInterno || 0
+                    return (
+                      <TableRow
+                        key={item.id}
+                        className={isSelected ? 'bg-blue-50' : 'cursor-pointer hover:bg-muted/50'}
+                        onClick={() => toggleCatalogoSelect(item.id)}
+                      >
+                        <TableCell>
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleCatalogoSelect(item.id)}
+                          />
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">{item.codigo}</TableCell>
+                        <TableCell className="text-xs">{item.descripcion}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{item.marca || '-'}</TableCell>
+                        <TableCell className="text-xs">{item.unidad.nombre}</TableCell>
+                        <TableCell className="text-xs text-right font-mono">
+                          {precio > 0 ? `S/ ${precio.toFixed(2)}` : '-'}
+                        </TableCell>
+                        <TableCell className="text-right" onClick={e => e.stopPropagation()}>
+                          {isSelected && (
+                            <Input
+                              type="number"
+                              min={1}
+                              value={catalogoCantidades[item.id] || 1}
+                              onChange={e => updateCatalogoCantidad(item.id, parseInt(e.target.value) || 1)}
+                              className="h-7 w-16 text-xs text-right"
+                            />
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+
+          {catalogoSelectedIds.size > 0 && (
+            <div className="text-xs text-muted-foreground">
+              {catalogoSelectedIds.size} item(s) seleccionado(s)
+            </div>
+          )}
+
+          <DialogFooter className="mt-2">
+            <Button variant="outline" onClick={() => setCatalogoOpen(false)}>Cancelar</Button>
+            <Button
+              onClick={addCatalogoItems}
+              disabled={catalogoSelectedIds.size === 0}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              Agregar {catalogoSelectedIds.size} item(s)
             </Button>
           </DialogFooter>
         </DialogContent>
