@@ -69,6 +69,47 @@ export async function POST(req: Request) {
     })
     if (!proyecto) return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 })
 
+    // Obtener cotización del proyecto para contexto real
+    const cotizacion = proyecto.cotizacionId
+      ? await prisma.cotizacion.findUnique({
+          where: { id: proyecto.cotizacionId },
+          include: {
+            cotizacionServicio: {
+              include: {
+                cotizacionServicioItem: {
+                  include: { catalogoServicio: true },
+                  orderBy: { createdAt: 'asc' },
+                },
+              },
+            },
+            cotizacionEquipo: {
+              include: {
+                cotizacionEquipoItem: {
+                  orderBy: { createdAt: 'asc' },
+                },
+              },
+            },
+            cotizacionTdrAnalisis: true,
+          },
+        })
+      : null
+
+    const servicios = cotizacion?.cotizacionServicio
+      .flatMap(cs => cs.cotizacionServicioItem)
+      .slice(0, 20)
+      .map(item => item.catalogoServicio?.nombre ?? item.descripcion ?? '')
+      .filter(Boolean) ?? []
+
+    const equipos = cotizacion?.cotizacionEquipo
+      .flatMap(ce => ce.cotizacionEquipoItem)
+      .slice(0, 20)
+      .map(item => `${item.descripcion} ${item.marca ?? ''}`.trim())
+      .filter(Boolean) ?? []
+
+    const alcanceTdr = cotizacion?.cotizacionTdrAnalisis?.[0]?.alcanceDetectado
+      ?? cotizacion?.cotizacionTdrAnalisis?.[0]?.resumenTdr
+      ?? null
+
     // Crear el expediente
     const cod = (codigoCod as string).toUpperCase()
     const expediente = await prisma.ssomaExpediente.create({
@@ -112,6 +153,9 @@ export async function POST(req: Request) {
       gestorNombre,
       ggNombre,
       fecha,
+      equiposProyecto: equipos,
+      serviciosProyecto: servicios,
+      alcanceTdr,
     }
 
     const specs = getDocSpecs(cod, actividades)

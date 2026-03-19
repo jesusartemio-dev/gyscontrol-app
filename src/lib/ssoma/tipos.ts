@@ -21,6 +21,10 @@ export interface SsomaPromptData {
   gestorNombre: string
   ggNombre: string
   fecha: string // "DD/MM/YYYY"
+  // Contexto adicional del proyecto (opcional)
+  equiposProyecto?: string[]
+  serviciosProyecto?: string[]
+  alcanceTdr?: string | null
 }
 
 // Qué documentos generar para un expediente

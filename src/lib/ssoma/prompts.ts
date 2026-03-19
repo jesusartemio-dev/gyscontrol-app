@@ -18,7 +18,16 @@ PREPARADO POR: ${d.ingSeguridad} — Ing. de Seguridad
 GESTOR DE PROYECTO: ${d.gestorNombre}
 APROBADO POR: ${d.ggNombre} — Gerente General
 FECHA: ${d.fecha}
-`.trim()
+${d.serviciosProyecto?.length ? `
+SERVICIOS A EJECUTAR EN ESTE PROYECTO:
+${d.serviciosProyecto.map((s, i) => `${i + 1}. ${s}`).join('\n')}
+` : ''}${d.equiposProyecto?.length ? `
+EQUIPOS A INSTALAR EN ESTE PROYECTO:
+${d.equiposProyecto.map((e, i) => `${i + 1}. ${e}`).join('\n')}
+` : ''}${d.alcanceTdr ? `
+ALCANCE SEGÚN TDR:
+${d.alcanceTdr.substring(0, 800)}
+` : ''}`.trim()
 }
 
 export function buildPromptPETS(d: SsomaPromptData, codigo: string): string {
@@ -27,6 +36,9 @@ Genera un PETS (Procedimiento Escrito de Trabajo Seguro) completo y técnico.
 
 ${contextoBase(d)}
 CÓDIGO DOCUMENTO: ${codigo} | REVISIÓN: 02
+
+IMPORTANTE: Usa los equipos y servicios listados arriba para hacer el PETS específico a este proyecto.
+Menciona los equipos reales por modelo y marca cuando sea posible.
 
 ESTRUCTURA OBLIGATORIA — respeta exactamente este orden:
 
@@ -119,9 +131,13 @@ export function buildPromptIPERC(d: SsomaPromptData, codigo: string): string {
   return `Eres el Ingeniero de Seguridad de GYS CONTROL INDUSTRIAL SAC.
 Genera una IPERC completa siguiendo el DS 024-2016-EM para este proyecto.
 
-PROYECTO: ${d.nombreProyecto}
-CLIENTE: ${d.cliente} — ${d.planta}
-TRABAJOS: ${d.descripcionTrabajos}
+${contextoBase(d)}
+
+IMPORTANTE: Usa los equipos y servicios listados arriba para hacer el IPERC específico a este proyecto.
+En lugar de actividades genéricas, menciona los equipos reales.
+Por ejemplo: en lugar de 'montaje de tablero eléctrico' escribe 'montaje de tablero TTA-01 con PLC Siemens S7-1200'.
+Cada sub-actividad debe referenciar los equipos o servicios específicos del proyecto cuando sea posible.
+
 ACTIVIDADES DE ALTO RIESGO:
   - Eléctrico: ${d.actividades.hayTrabajoElectrico ? 'SÍ' : 'No'}
   - Altura: ${d.actividades.hayTrabajoAltura ? 'SÍ' : 'No'}
