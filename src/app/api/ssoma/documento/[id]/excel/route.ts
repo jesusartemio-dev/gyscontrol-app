@@ -26,7 +26,7 @@ export async function GET(
     if (doc.tipo !== 'IPERC') return NextResponse.json({ error: 'No es IPERC' }, { status: 400 })
     if (!doc.contenidoTexto) return NextResponse.json({ error: 'Sin contenido' }, { status: 400 })
 
-    // Parse JSON from AI content — clean markdown fences and any surrounding text
+    // Parse JSON from AI content — clean markdown fences and repair truncated JSON
     let ipercData: { filas: any[] }
     try {
       let clean = doc.contenidoTexto.trim()
@@ -34,11 +34,28 @@ export async function GET(
       clean = clean.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '')
       // Extract JSON object if surrounded by text
       const jsonStart = clean.indexOf('{')
-      const jsonEnd = clean.lastIndexOf('}')
-      if (jsonStart >= 0 && jsonEnd > jsonStart) {
-        clean = clean.substring(jsonStart, jsonEnd + 1)
+      if (jsonStart >= 0) {
+        clean = clean.substring(jsonStart)
       }
-      ipercData = JSON.parse(clean)
+
+      // Try direct parse first
+      try {
+        ipercData = JSON.parse(clean)
+      } catch {
+        // JSON truncated — try to repair by finding last complete object in filas array
+        const lastCompleteObj = clean.lastIndexOf('}')
+        if (lastCompleteObj > 0) {
+          let repaired = clean.substring(0, lastCompleteObj + 1)
+          // Close the array and root object
+          if (!repaired.trimEnd().endsWith(']}')) {
+            repaired = repaired + '\n  ]\n}'
+          }
+          ipercData = JSON.parse(repaired)
+        } else {
+          throw new Error('No se pudo reparar el JSON truncado')
+        }
+      }
+
       if (!ipercData.filas || !Array.isArray(ipercData.filas)) {
         throw new Error('JSON no contiene array "filas"')
       }
