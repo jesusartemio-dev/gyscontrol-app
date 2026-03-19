@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Plus, Trash2, Loader2, Save, PackageSearch, FileText, Search } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Loader2, Save, PackageSearch, FileText, Search, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import { createOrdenCompra, fetchItemsDisponibles, type ItemDisponible } from '@/lib/services/ordenCompra'
 import { getProveedores } from '@/lib/services/proveedor'
@@ -89,6 +89,11 @@ export default function NuevaOrdenCompraPage() {
   const [catalogoSelectedIds, setCatalogoSelectedIds] = useState<Set<string>>(new Set())
   const [catalogoCantidades, setCatalogoCantidades] = useState<Record<string, number>>({})
 
+  // Manual item modal state
+  const [manualModalOpen, setManualModalOpen] = useState(false)
+  const [manualEditIndex, setManualEditIndex] = useState<number | null>(null)
+  const [manualForm, setManualForm] = useState({ codigo: '', descripcion: '', unidad: 'UND', cantidad: 1, precioUnitario: 0 })
+
   const hasAsignacion = !!(asignacion.proyectoId || asignacion.centroCostoId)
   const isProyecto = !!asignacion.proyectoId
 
@@ -99,11 +104,31 @@ export default function NuevaOrdenCompraPage() {
       .finally(() => setLoadingData(false))
   }, [])
 
-  const updateItem = (index: number, field: keyof ItemForm, value: string | number) => {
-    setItems(prev => prev.map((item, i) => i === index ? { ...item, [field]: value } : item))
+  const openManualAdd = () => {
+    setManualEditIndex(null)
+    setManualForm({ codigo: '', descripcion: '', unidad: 'UND', cantidad: 1, precioUnitario: 0 })
+    setManualModalOpen(true)
   }
 
-  const addManualItem = () => setItems(prev => [...prev, { ...emptyItem }])
+  const openManualEdit = (index: number) => {
+    const item = items[index]
+    setManualEditIndex(index)
+    setManualForm({ codigo: item.codigo, descripcion: item.descripcion, unidad: item.unidad, cantidad: item.cantidad, precioUnitario: item.precioUnitario })
+    setManualModalOpen(true)
+  }
+
+  const saveManualItem = () => {
+    if (!manualForm.descripcion.trim()) return toast.error('La descripción es obligatoria')
+    if (manualForm.cantidad <= 0) return toast.error('La cantidad debe ser mayor a 0')
+    if (manualForm.precioUnitario <= 0) return toast.error('El precio debe ser mayor a 0')
+
+    if (manualEditIndex !== null) {
+      setItems(prev => prev.map((item, i) => i === manualEditIndex ? { ...item, ...manualForm } : item))
+    } else {
+      setItems(prev => [...prev, { ...manualForm, source: 'manual' as const }])
+    }
+    setManualModalOpen(false)
+  }
 
   const removeItem = (index: number) => {
     setItems(prev => prev.filter((_, i) => i !== index))
@@ -419,7 +444,7 @@ export default function NuevaOrdenCompraPage() {
             <Button variant="outline" size="sm" onClick={openCatalogo}>
               <Search className="h-3.5 w-3.5 mr-1" /> Desde Catálogo
             </Button>
-            <Button variant="outline" size="sm" onClick={addManualItem}>
+            <Button variant="outline" size="sm" onClick={openManualAdd}>
               <Plus className="h-3.5 w-3.5 mr-1" /> Item Manual
             </Button>
           </div>
@@ -448,79 +473,43 @@ export default function NuevaOrdenCompraPage() {
                   <TableHead className="w-[80px] text-right">Cant. <span className="text-red-500">*</span></TableHead>
                   <TableHead className="w-[120px] text-right">P. Unit. <span className="text-red-500">*</span></TableHead>
                   <TableHead className="w-[120px] text-right">Total</TableHead>
-                  <TableHead className="w-[40px]"></TableHead>
+                  <TableHead className="w-[60px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {items.map((item, index) => {
-                  const isEditable = item.source === 'manual'
-                  return (
-                    <TableRow key={index}>
-                      <TableCell>
-                        <Badge
-                          variant={item.source === 'pedido' ? 'default' : item.source === 'catalogo' ? 'secondary' : 'outline'}
-                          className="text-[10px] px-1.5 py-0"
-                        >
-                          {item.source === 'pedido' ? 'Pedido' : item.source === 'catalogo' ? 'Catálogo' : 'Manual'}
-                        </Badge>
-                        {item.sourceLabel && (
-                          <div className="text-[10px] text-muted-foreground mt-0.5 truncate max-w-[70px]" title={item.sourceLabel}>
-                            {item.sourceLabel}
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {isEditable ? (
-                          <Input value={item.codigo} onChange={e => updateItem(index, 'codigo', e.target.value)} placeholder="Código" className="h-8 text-xs" />
-                        ) : (
-                          <span className="text-xs font-mono">{item.codigo}</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {isEditable ? (
-                          <Input value={item.descripcion} onChange={e => updateItem(index, 'descripcion', e.target.value)} placeholder="Descripción del item" className="h-8 text-xs" />
-                        ) : (
-                          <span className="text-xs">{item.descripcion}</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {isEditable ? (
-                          <Input value={item.unidad} onChange={e => updateItem(index, 'unidad', e.target.value)} className="h-8 text-xs" />
-                        ) : (
-                          <span className="text-xs">{item.unidad}</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          value={item.cantidad}
-                          onChange={e => updateItem(index, 'cantidad', parseFloat(e.target.value) || 0)}
-                          className="h-8 text-xs text-right"
-                          min={0}
-                          step={1}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          value={item.precioUnitario}
-                          onChange={e => updateItem(index, 'precioUnitario', parseFloat(e.target.value) || 0)}
-                          className="h-8 text-xs text-right"
-                          min={0}
-                          step={0.01}
-                        />
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-xs">
-                        {formatCurrency(item.cantidad * item.precioUnitario)}
-                      </TableCell>
-                      <TableCell>
-                        <button onClick={() => removeItem(index)} className="p-1 rounded hover:bg-red-50">
+                {items.map((item, index) => (
+                  <TableRow key={index}>
+                    <TableCell>
+                      <Badge
+                        variant={item.source === 'pedido' ? 'default' : item.source === 'catalogo' ? 'secondary' : 'outline'}
+                        className="text-[10px] px-1.5 py-0"
+                      >
+                        {item.source === 'pedido' ? 'Pedido' : item.source === 'catalogo' ? 'Catálogo' : 'Manual'}
+                      </Badge>
+                      {item.sourceLabel && (
+                        <div className="text-[10px] text-muted-foreground mt-0.5 truncate max-w-[70px]" title={item.sourceLabel}>
+                          {item.sourceLabel}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-xs font-mono">{item.codigo || '—'}</TableCell>
+                    <TableCell className="text-xs">{item.descripcion}</TableCell>
+                    <TableCell className="text-xs">{item.unidad}</TableCell>
+                    <TableCell className="text-right font-mono text-xs">{item.cantidad}</TableCell>
+                    <TableCell className="text-right font-mono text-xs">{formatCurrency(item.precioUnitario)}</TableCell>
+                    <TableCell className="text-right font-mono text-xs">{formatCurrency(item.cantidad * item.precioUnitario)}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-0.5">
+                        <button onClick={() => openManualEdit(index)} className="p-1 rounded hover:bg-blue-50" title="Editar">
+                          <Pencil className="h-3.5 w-3.5 text-blue-500" />
+                        </button>
+                        <button onClick={() => removeItem(index)} className="p-1 rounded hover:bg-red-50" title="Eliminar">
                           <Trash2 className="h-3.5 w-3.5 text-red-500" />
                         </button>
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           )}
@@ -726,6 +715,45 @@ export default function NuevaOrdenCompraPage() {
               className="bg-orange-600 hover:bg-orange-700"
             >
               Agregar {catalogoSelectedIds.size} item(s)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Manual Item Modal (Add / Edit) ──────────────────── */}
+      <Dialog open={manualModalOpen} onOpenChange={setManualModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{manualEditIndex !== null ? 'Editar Item' : 'Agregar Item Manual'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs">Código</Label>
+              <Input value={manualForm.codigo} onChange={e => setManualForm(p => ({ ...p, codigo: e.target.value }))} placeholder="Código (opcional)" />
+            </div>
+            <div>
+              <Label className="text-xs">Descripción <span className="text-red-500">*</span></Label>
+              <Input value={manualForm.descripcion} onChange={e => setManualForm(p => ({ ...p, descripcion: e.target.value }))} placeholder="Descripción del item" autoFocus />
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <Label className="text-xs">Unidad</Label>
+                <Input value={manualForm.unidad} onChange={e => setManualForm(p => ({ ...p, unidad: e.target.value }))} />
+              </div>
+              <div>
+                <Label className="text-xs">Cantidad <span className="text-red-500">*</span></Label>
+                <Input type="number" min={1} value={manualForm.cantidad} onChange={e => setManualForm(p => ({ ...p, cantidad: parseFloat(e.target.value) || 0 }))} />
+              </div>
+              <div>
+                <Label className="text-xs">P. Unit. <span className="text-red-500">*</span></Label>
+                <Input type="number" min={0} step={0.01} value={manualForm.precioUnitario} onChange={e => setManualForm(p => ({ ...p, precioUnitario: parseFloat(e.target.value) || 0 }))} />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setManualModalOpen(false)}>Cancelar</Button>
+            <Button onClick={saveManualItem} className="bg-orange-600 hover:bg-orange-700">
+              {manualEditIndex !== null ? 'Guardar' : 'Agregar'}
             </Button>
           </DialogFooter>
         </DialogContent>

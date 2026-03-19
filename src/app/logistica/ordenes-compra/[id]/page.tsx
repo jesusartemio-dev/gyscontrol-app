@@ -72,8 +72,11 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
     observaciones: '',
   })
   const [savingFactura, setSavingFactura] = useState(false)
-  const [inlineEdit, setInlineEdit] = useState<{ itemId: string; field: 'precioUnitario' | 'cantidad'; value: string } | null>(null)
-  const [savingInline, setSavingInline] = useState(false)
+  // Edit item modal state
+  const [editModalOpen, setEditModalOpen] = useState(false)
+  const [editItemId, setEditItemId] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState({ cantidad: 1, precioUnitario: 0 })
+  const [savingEdit, setSavingEdit] = useState(false)
 
   // Add/delete item state
   const [catalogoOpen, setCatalogoOpen] = useState(false)
@@ -102,39 +105,36 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
     }
   }
 
-  const startInlineEdit = (itemId: string, field: 'precioUnitario' | 'cantidad', currentValue: number) => {
+  const openEditItem = (itemId: string, cantidad: number, precioUnitario: number) => {
     if (!esBorrador) return
-    setInlineEdit({ itemId, field, value: String(currentValue) })
+    setEditItemId(itemId)
+    setEditForm({ cantidad, precioUnitario })
+    setEditModalOpen(true)
   }
 
-  const saveInlineEdit = async () => {
-    if (!inlineEdit || !oc) return
-    const numVal = parseFloat(inlineEdit.value)
-    if (isNaN(numVal) || (inlineEdit.field === 'cantidad' && numVal <= 0) || (inlineEdit.field === 'precioUnitario' && numVal < 0)) {
-      toast.error(inlineEdit.field === 'cantidad' ? 'Cantidad debe ser mayor a 0' : 'Precio no puede ser negativo')
-      return
-    }
-    setSavingInline(true)
+  const saveEditItem = async () => {
+    if (!editItemId || !oc) return
+    if (editForm.cantidad <= 0) return toast.error('La cantidad debe ser mayor a 0')
+    if (editForm.precioUnitario < 0) return toast.error('El precio no puede ser negativo')
+    setSavingEdit(true)
     try {
-      const res = await fetch(`/api/orden-compra-item/${inlineEdit.itemId}`, {
+      const res = await fetch(`/api/orden-compra-item/${editItemId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ [inlineEdit.field]: numVal }),
+        body: JSON.stringify(editForm),
       })
       if (!res.ok) {
         const err = await res.json()
         throw new Error(err.error || 'Error al guardar')
       }
-      setInlineEdit(null)
+      setEditModalOpen(false)
       await loadData()
     } catch (err: any) {
       toast.error(err.message || 'Error al actualizar')
     } finally {
-      setSavingInline(false)
+      setSavingEdit(false)
     }
   }
-
-  const cancelInlineEdit = () => setInlineEdit(null)
 
   // ── Delete item ──────────────────────────────────────────
   const handleDeleteItem = async (itemId: string) => {
@@ -654,7 +654,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
                 {['confirmada', 'parcial', 'completada'].includes(oc.estado) && (
                   <TableHead className="w-[100px] text-right">Recibido</TableHead>
                 )}
-                {esBorrador && <TableHead className="w-[40px]"></TableHead>}
+                {esBorrador && <TableHead className="w-[60px]"></TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -664,54 +664,8 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
                   <TableCell className="font-mono text-xs">{item.codigo}</TableCell>
                   <TableCell className="text-sm">{item.descripcion}</TableCell>
                   <TableCell className="text-xs">{item.unidad}</TableCell>
-                  <TableCell className="text-right">
-                    {inlineEdit?.itemId === item.id && inlineEdit.field === 'cantidad' ? (
-                      <Input
-                        type="number"
-                        min={0.01}
-                        step="any"
-                        autoFocus
-                        value={inlineEdit.value}
-                        onChange={e => setInlineEdit(prev => prev ? { ...prev, value: e.target.value } : null)}
-                        onBlur={saveInlineEdit}
-                        onKeyDown={e => { if (e.key === 'Enter') saveInlineEdit(); if (e.key === 'Escape') cancelInlineEdit() }}
-                        disabled={savingInline}
-                        className="h-7 w-20 text-xs text-right font-mono ml-auto"
-                      />
-                    ) : (
-                      <span
-                        className={`font-mono text-sm ${esBorrador ? 'cursor-pointer hover:text-blue-600 group inline-flex items-center gap-1' : ''}`}
-                        onClick={() => startInlineEdit(item.id, 'cantidad', item.cantidad)}
-                      >
-                        {item.cantidad}
-                        {esBorrador && <Pencil className="h-2.5 w-2.5 text-gray-300 group-hover:text-blue-500" />}
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {inlineEdit?.itemId === item.id && inlineEdit.field === 'precioUnitario' ? (
-                      <Input
-                        type="number"
-                        min={0}
-                        step="any"
-                        autoFocus
-                        value={inlineEdit.value}
-                        onChange={e => setInlineEdit(prev => prev ? { ...prev, value: e.target.value } : null)}
-                        onBlur={saveInlineEdit}
-                        onKeyDown={e => { if (e.key === 'Enter') saveInlineEdit(); if (e.key === 'Escape') cancelInlineEdit() }}
-                        disabled={savingInline}
-                        className="h-7 w-24 text-xs text-right font-mono ml-auto"
-                      />
-                    ) : (
-                      <span
-                        className={`font-mono text-sm ${esBorrador ? 'cursor-pointer hover:text-blue-600 group inline-flex items-center gap-1' : ''}`}
-                        onClick={() => startInlineEdit(item.id, 'precioUnitario', item.precioUnitario)}
-                      >
-                        {formatCurrency(item.precioUnitario, oc.moneda)}
-                        {esBorrador && <Pencil className="h-2.5 w-2.5 text-gray-300 group-hover:text-blue-500" />}
-                      </span>
-                    )}
-                  </TableCell>
+                  <TableCell className="text-right font-mono text-sm">{item.cantidad}</TableCell>
+                  <TableCell className="text-right font-mono text-sm">{formatCurrency(item.precioUnitario, oc.moneda)}</TableCell>
                   <TableCell className="text-right font-mono text-sm">{formatCurrency(item.costoTotal, oc.moneda)}</TableCell>
                   {['confirmada', 'parcial', 'completada'].includes(oc.estado) && (
                     <TableCell className="text-right">
@@ -734,13 +688,22 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
                   )}
                   {esBorrador && (
                     <TableCell>
-                      <button
-                        onClick={() => handleDeleteItem(item.id)}
-                        className="p-1 rounded hover:bg-red-50"
-                        title="Eliminar item"
-                      >
-                        <Trash2 className="h-3.5 w-3.5 text-red-500" />
-                      </button>
+                      <div className="flex gap-0.5">
+                        <button
+                          onClick={() => openEditItem(item.id, item.cantidad, item.precioUnitario)}
+                          className="p-1 rounded hover:bg-blue-50"
+                          title="Editar item"
+                        >
+                          <Pencil className="h-3.5 w-3.5 text-blue-500" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteItem(item.id)}
+                          className="p-1 rounded hover:bg-red-50"
+                          title="Eliminar item"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                        </button>
+                      </div>
                     </TableCell>
                   )}
                 </TableRow>
@@ -751,7 +714,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
         {esBorrador && (
           <div className="px-4 py-2 border-t text-[11px] text-muted-foreground flex items-center gap-1.5">
             <Pencil className="h-3 w-3" />
-            Los precios y cantidades son editables mientras la OC esté en borrador. Al aprobar quedan fijos.
+            Usa los iconos de editar/eliminar mientras la OC esté en borrador. Al aprobar quedan fijos.
           </div>
         )}
       </Card>
@@ -1146,6 +1109,33 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
             <Button onClick={addManualItemToOC} disabled={addingItems} className="bg-orange-600 hover:bg-orange-700">
               {addingItems && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
               Agregar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Edit Item Modal ─────────────────────────────────── */}
+      <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Editar Item</DialogTitle>
+            <DialogDescription>Modifica cantidad y precio unitario</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs">Cantidad <span className="text-red-500">*</span></Label>
+              <Input type="number" min={0.01} step="any" value={editForm.cantidad} onChange={e => setEditForm(p => ({ ...p, cantidad: parseFloat(e.target.value) || 0 }))} autoFocus />
+            </div>
+            <div>
+              <Label className="text-xs">Precio Unitario <span className="text-red-500">*</span></Label>
+              <Input type="number" min={0} step={0.01} value={editForm.precioUnitario} onChange={e => setEditForm(p => ({ ...p, precioUnitario: parseFloat(e.target.value) || 0 }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditModalOpen(false)}>Cancelar</Button>
+            <Button onClick={saveEditItem} disabled={savingEdit} className="bg-orange-600 hover:bg-orange-700">
+              {savingEdit && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+              Guardar
             </Button>
           </DialogFooter>
         </DialogContent>
