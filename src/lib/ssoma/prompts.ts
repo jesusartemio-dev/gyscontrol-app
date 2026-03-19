@@ -256,7 +256,7 @@ Fila extra 11: proceso=RIESGOS PSICOSOCIALES | actividad=Fatiga mental | subActi
 Fila extra 12: proceso=RIESGOS FÍSICOS | actividad=Estrés térmico | subActividad=Trabajo en exterior o cerca de equipos calientes | peligro=Temperatura ambiente >30°C o calor radiante de equipos | riesgo=Estrés térmico | consecuencia=Golpe de calor, deshidratación | severidad=3 | probabilidad=C
 
 Incluye TODAS estas filas en el JSON además de las que ya generas.
-El total debe ser mínimo 57 filas.
+El total debe ser mínimo 45 filas.
 No repitas peligros — cada fila debe ser un riesgo distinto.
 No incluyas texto antes ni después del JSON.`
 }

@@ -78,11 +78,11 @@ export async function POST(
           .filter(Boolean)
       : []
 
-    const equiposCotizacion: string[] = cotizacion?.cotizacionEquipo
+    const equiposCotizacion: string[] = (cotizacion?.cotizacionEquipo ?? [])
       .flatMap(ce => ce.cotizacionEquipoItem)
       .slice(0, 20)
       .map(item => `${item.descripcion ?? ''} ${item.marca ?? ''}`.trim())
-      .filter(Boolean) ?? []
+      .filter(Boolean)
 
     const equiposFinales = equiposTdr.length > 0 ? equiposTdr : equiposCotizacion
 
@@ -97,11 +97,11 @@ export async function POST(
           .filter(Boolean)
       : []
 
-    const serviciosCotizacion: string[] = cotizacion?.cotizacionServicio
+    const serviciosCotizacion: string[] = (cotizacion?.cotizacionServicio ?? [])
       .flatMap(cs => cs.cotizacionServicioItem)
       .slice(0, 15)
       .map(item => item.nombre || item.catalogoServicio?.nombre || item.descripcion || '')
-      .filter(Boolean) ?? []
+      .filter(Boolean)
 
     const serviciosFinales = serviciosTdr.length > 0 ? serviciosTdr : serviciosCotizacion
 
@@ -174,7 +174,7 @@ export async function POST(
     const startMs = Date.now()
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: doc.tipo === 'IPERC' ? 32000 : 4000,
+      max_tokens: doc.tipo === 'IPERC' ? 16000 : 4000,
       messages: [{ role: 'user', content: prompt }],
     })
 
