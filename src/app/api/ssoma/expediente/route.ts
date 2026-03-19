@@ -198,11 +198,13 @@ export async function POST(req: Request) {
       alcanceTdr,
       ubicacionProyecto,
       requerimientos,
-      contactosCliente: (await prisma.crmContactoCliente.findMany({
-        where: { clienteId: proyecto.clienteId },
-        select: { nombre: true, cargo: true, telefono: true, email: true },
-        take: 6,
-      })).map(c => ({ nombre: c.nombre, cargo: c.cargo ?? '', telefono: c.telefono ?? '', correo: c.email ?? '' })),
+      contactosCliente: proyecto.clienteId
+        ? (await prisma.crmContactoCliente.findMany({
+            where: { clienteId: proyecto.clienteId },
+            select: { nombre: true, cargo: true, telefono: true, email: true },
+            take: 6,
+          })).map(c => ({ nombre: c.nombre, cargo: c.cargo ?? '', telefono: c.telefono ?? '', correo: c.email ?? '' }))
+        : [],
     }
 
     const specs = getDocSpecs(cod, actividades)

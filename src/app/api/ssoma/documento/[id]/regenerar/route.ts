@@ -147,11 +147,13 @@ export async function POST(
       alcanceTdr,
       ubicacionProyecto,
       requerimientos,
-      contactosCliente: (await prisma.crmContactoCliente.findMany({
-        where: { clienteId: proyecto.clienteId },
-        select: { nombre: true, cargo: true, telefono: true, email: true },
-        take: 6,
-      })).map(c => ({ nombre: c.nombre, cargo: c.cargo ?? '', telefono: c.telefono ?? '', correo: c.email ?? '' })),
+      contactosCliente: proyecto.clienteId
+        ? (await prisma.crmContactoCliente.findMany({
+            where: { clienteId: proyecto.clienteId },
+            select: { nombre: true, cargo: true, telefono: true, email: true },
+            take: 6,
+          })).map(c => ({ nombre: c.nombre, cargo: c.cargo ?? '', telefono: c.telefono ?? '', correo: c.email ?? '' }))
+        : [],
     }
 
     // Select prompt by doc type — IPERC uses 2 parallel calls
@@ -266,9 +268,10 @@ export async function POST(
     }
 
     const startMs = Date.now()
+    const maxTokens = doc.tipo === 'PLAN_EMERGENCIA' ? 8000 : 4000
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 4000,
+      max_tokens: maxTokens,
       messages: [{ role: 'user', content: prompt }],
     })
 
