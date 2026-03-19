@@ -146,7 +146,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
       return NextResponse.json({ error: 'Orden de compra no encontrada' }, { status: 404 })
     }
     const role = session.user.role
-    const rolesPermitidos = ['admin', 'gerente', 'logistico', 'coordinador_logistico']
+    const rolesPermitidos = ['admin', 'gerente', 'logistico', 'coordinador_logistico', 'administracion']
     if (existing.solicitanteId !== session.user.id && !rolesPermitidos.includes(role)) {
       return NextResponse.json({ error: 'Sin permisos para eliminar esta orden' }, { status: 403 })
     }

@@ -10,7 +10,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    if (!['admin', 'gerente', 'logistico', 'coordinador_logistico'].includes(session.user.role)) {
+    if (!['admin', 'gerente', 'logistico', 'coordinador_logistico', 'administracion'].includes(session.user.role)) {
       return NextResponse.json({ error: 'Sin permisos para enviar OC' }, { status: 403 })
     }
 

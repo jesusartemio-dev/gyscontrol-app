@@ -10,8 +10,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    if (!['admin', 'gerente'].includes(session.user.role)) {
-      return NextResponse.json({ error: 'Solo admin o gerente pueden aprobar' }, { status: 403 })
+    if (!['admin', 'gerente', 'coordinador_logistico', 'administracion'].includes(session.user.role)) {
+      return NextResponse.json({ error: 'Sin permisos para aprobar OC' }, { status: 403 })
     }
 
     const { id } = await params

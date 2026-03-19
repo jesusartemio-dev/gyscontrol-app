@@ -359,9 +359,8 @@ export async function generarExcelIPERC(data: IpercData): Promise<Buffer> {
         // Col 30: Verificación ctrl ingeniería / severidad
         // K=col11(sev), V=col22(sevRes), P=col16(eliminar)
         setFormula(30, `IF(AND(K${r}=V${r},P${r}="NA"),"ok",IF(AND(K${r}<V${r},P${r}<>"NA"),"OK","Verif Ctrl de ING ó la Severidad"))`)
-        // Col 31: Verificación acción mejora
-        // L=col12(prob), W=col23(probRes), Y=col25(valorRes), AA=col27(accionesMejora)
-        setFormula(31, `IF(L${r}<W${r},IF(AND(Y${r}>15,AA${r}="_"),"OK",IF(AND(Y${r}<16,AA${r}<>"_"),"ok")))`)
+        // Col 31: Verificación acción mejora — L=prob inicial, W=prob residual
+        setFormula(31, `IF(L${r}<W${r},"OK","Pendiente")`)
 
         currentRow++
       }

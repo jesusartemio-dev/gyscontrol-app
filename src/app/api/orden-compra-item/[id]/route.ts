@@ -10,7 +10,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    if (!['admin', 'gerente', 'logistico', 'coordinador_logistico'].includes(session.user.role)) {
+    if (!['admin', 'gerente', 'logistico', 'coordinador_logistico', 'administracion'].includes(session.user.role)) {
       return NextResponse.json({ error: 'Sin permisos para editar items de OC' }, { status: 403 })
     }
 
@@ -102,7 +102,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    if (!['admin', 'gerente', 'logistico', 'coordinador_logistico'].includes(session.user.role)) {
+    if (!['admin', 'gerente', 'logistico', 'coordinador_logistico', 'administracion'].includes(session.user.role)) {
       return NextResponse.json({ error: 'Sin permisos para eliminar items de OC' }, { status: 403 })
     }
 
