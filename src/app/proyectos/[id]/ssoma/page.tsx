@@ -831,6 +831,42 @@ function DocumentoModal({
               <TableIcon className="h-3 w-3 mr-1" />
               Descargar .xlsx
             </Button>
+          ) : doc.tipo === 'PLAN_EMERGENCIA' ? (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs"
+              onClick={async () => {
+                const txt = doc.contenidoTexto?.trim() ?? ''
+                const esJson = txt.startsWith('{') || txt.startsWith('[') || txt.startsWith('```json')
+                if (esJson) {
+                  // Nuevo formato JSON → endpoint /word con secciones fijas
+                  try {
+                    const res = await fetch(`/api/ssoma/documento/${doc.id}/word`)
+                    if (!res.ok) {
+                      const data = await res.json()
+                      toast.error(data.error || 'Error al generar documento')
+                      return
+                    }
+                    const blob = await res.blob()
+                    const url = URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = url
+                    a.download = `${doc.codigoDocumento}.docx`
+                    a.click()
+                    URL.revokeObjectURL(url)
+                  } catch {
+                    toast.error('Error al descargar el documento')
+                  }
+                } else {
+                  // Formato anterior markdown → export genérico
+                  handleDownload()
+                }
+              }}
+            >
+              <Download className="h-3 w-3 mr-1" />
+              Descargar .docx
+            </Button>
           ) : (
             <Button size="sm" variant="outline" className="h-7 text-xs" onClick={handleDownload}>
               <Download className="h-3 w-3 mr-1" />

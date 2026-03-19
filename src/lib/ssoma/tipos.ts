@@ -27,6 +27,12 @@ export interface SsomaPromptData {
   alcanceTdr?: string | null
   ubicacionProyecto?: string | null
   requerimientos?: string[]
+  contactosCliente?: Array<{
+    nombre: string
+    cargo: string
+    telefono?: string
+    correo?: string
+  }>
 }
 
 // Qué documentos generar para un expediente

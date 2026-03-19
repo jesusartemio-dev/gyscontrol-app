@@ -294,121 +294,51 @@ NORMAS TÉCNICAS A REFERENCIAR:
 - Traje Tyvek: para zonas con productos químicos`
 }
 
-export function buildPromptPlanEmergencia(d: SsomaPromptData, codigo: string): string {
+export function buildPromptPlanEmergencia(d: SsomaPromptData, _codigo: string): string {
   return `Eres el Ingeniero de Seguridad de GYS CONTROL INDUSTRIAL SAC.
-Genera el Plan de Respuesta a Emergencias completo y adaptado al proyecto.
+Genera el contenido variable del Plan de Respuesta a Emergencias para este proyecto específico.
 
 ${contextoBase(d)}
-CÓDIGO DOCUMENTO: ${codigo} | REVISIÓN: 01
 
-ESTRUCTURA OBLIGATORIA:
+Responde ÚNICAMENTE con un JSON válido, sin texto adicional, sin markdown, sin \`\`\`. Solo el JSON puro.
 
-1. INTRODUCCIÓN Y ALCANCE
-   Aplica a todos los proyectos en instalaciones del cliente ${d.cliente}.
+{
+  "identificacionEmergencias": [
+    {
+      "origen": "NATURAL|TECNOLÓGICO|POR TERCEROS",
+      "tipo": "descripción del tipo de emergencia",
+      "probabilidad": "Alta|Media|Baja",
+      "severidad": "Muy Alta|Alta|Media|Baja",
+      "riesgo": "ALTO|MEDIO|BAJO"
+    }
+  ],
+  "nivelesEmergencia": {
+    "tipoI": { "descripcion": "texto", "ejemplos": ["ej1", "ej2", "ej3"] },
+    "tipoII": { "descripcion": "texto", "ejemplos": ["ej1", "ej2", "ej3"] },
+    "tipoIII": { "descripcion": "texto", "ejemplos": ["ej1", "ej2", "ej3"] }
+  },
+  "protocolos": {
+    "primerosAuxilios": "protocolo completo de primeros auxilios: hemorragias, quemaduras, fracturas, RCP 30:2",
+    "electrocucion": "${d.actividades.hayTrabajoElectrico ? 'protocolo paso a paso: cortar energía, no tocar víctima, RCP, SCTR' : 'No aplica'}",
+    "caidaAltura": "${d.actividades.hayTrabajoAltura ? 'protocolo: síndrome de arnés max 15min, posición semi-sentado post-rescate' : 'No aplica'}",
+    "incendioCaliente": "${d.actividades.hayTrabajoCaliente ? 'protocolo: extintor PQS, vigía 30min post-trabajo, evacuar si no se controla en 30s' : 'No aplica'}",
+    "incendioGeneral": "técnica PASS, dirección del viento, reemplazo inmediato de extintor usado",
+    "sismo": "durante y después, específico para planta industrial y trabajo en altura",
+    "espacioConfinado": "${d.actividades.hayEspacioConfinado ? 'protocolo: vigía, trípode+cabrestante, SCBA, nunca ingresar sin medir atmósfera' : 'No aplica'}"
+  },
+  "programaSimulacros": [
+    { "tipo": "descripción", "frecuencia": "periodicidad" }
+  ]
+}
 
-2. OBJETIVOS
-   General + 4 objetivos específicos.
-
-3. REFERENCIAS LEGALES
-   - Ley N° 29783 — Ley de Seguridad y Salud en el Trabajo
-   - DS N° 005-2012-TR — Reglamento de la Ley SST
-   ${d.actividades.hayTrabajoElectrico ? '- RM N° 111-2013-MEM — Reglamento SST con Electricidad' : ''}
-   - Ley N° 28551 — Obligación de elaborar Planes de Contingencia
-   - Ley 29664 — SINAGERD
-
-4. IDENTIFICACIÓN DE EMERGENCIAS
-   Tabla por origen:
-   NATURAL: sismos (Alto en Lima), inundaciones/huaycos (Medio)
-   TECNOLÓGICO: accidentes personales (Alto en servicios), electrocución${d.actividades.hayTrabajoElectrico ? ' (Medio)' : ' (Bajo)'}, incendios (Medio)
-   ${d.actividades.hayTrabajoAltura ? 'Accidentes en altura (Alto)' : ''}
-   ${d.actividades.hayEspacioConfinado ? 'Accidentes en espacio confinado (Alto)' : ''}
-   ${d.actividades.hayTrabajoCaliente ? 'Incendio por trabajo en caliente (Medio)' : ''}
-   POR TERCEROS: actos delictivos (Medio en servicios)
-
-5. NIVELES DE EMERGENCIA
-   TIPO I: Controlada por el personal del área sin brigada.
-     Ejemplo: amago de incendio extinguido con extintor, herida leve
-   TIPO II: Requiere brigada de emergencia + posible apoyo externo.
-     Ejemplo: ${d.actividades.hayTrabajoAltura ? 'caída en altura con lesión,' : ''} accidente con atención médica
-   TIPO III: Capacidad superada, apoyo externo obligatorio.
-     Ejemplo: ${d.actividades.hayTrabajoAltura ? 'caída fatal en altura,' : ''} incendio descontrolado, víctima atrapada
-
-6. ORGANIZACIÓN ANTE EMERGENCIAS
-   Roles: Jefe de Brigada (Líder del Servicio), Brigada Evacuación/Rescate,
-   Brigada Lucha contra Incendio, Brigada Primeros Auxilios.
-   Tabla de responsabilidades por nivel I/II/III.
-
-7. SISTEMA DE COMUNICACIÓN
-   Nivel I: Personal controla + informa al Jefe de Brigada
-   Nivel II: Cualquier trabajador avisa al Jefe de Brigada → activa brigada
-   Nivel III: Jefe de Brigada solicita apoyo externo + activa Comité de Emergencias
-
-   DIRECTORIO GYS:
-   - ${d.ingSeguridad} (Ing. Seguridad)
-   - ${d.ggNombre} (Gerente General)
-
-   DIRECTORIO EMERGENCIAS EXTERNAS:
-   - Bomberos: 116
-   - SAMU: 106
-   - Defensa Civil: 115
-   - Cruz Roja: 01 266 0481
-   - Alerta Médica: 01 261 8783
-
-8. PROTOCOLOS DE RESPUESTA
-
-   8.1 PRIMEROS AUXILIOS GENERALES
-   Hemorragias (arterial/venosa/nasal), quemaduras (1°/2°/3° grado),
-   fracturas (inmovilización + traslado), RCP (30 compresiones : 2 respiraciones),
-   envenenamiento/intoxicación.
-
-   ${d.actividades.hayTrabajoElectrico ? `8.2 ELECTROCUCIÓN
-   1. Gritar "CORTE DE ENERGÍA" — no tocar a la víctima sin aislar
-   2. Cortar interruptor aguas arriba o usar elemento no conductor para separar
-   3. Si en altura: preparar colchón/manta antes de cortar corriente
-   4. Aplicar RCP si no hay pulso
-   5. Trasladar a centro médico — reportar a SCTR Pacífico` : ''}
-
-   ${d.actividades.hayTrabajoAltura ? `8.3 CAÍDA / SUSPENSIÓN EN ALTURA
-   1. Comunicar inmediatamente al Ing. de Seguridad
-   2. Hablar con la víctima para mantener calma — no improvisar rescate
-   3. Rescate dentro de los primeros 15 minutos (síndrome de arnés)
-   4. Post-rescate: NO acostar horizontal de inmediato
-      → posición semi-sentado con piernas hacia adelante
-   5. Monitorear signos vitales, trasladar a centro médico
-   6. Solo personal capacitado en rescate en altura puede ejecutar el rescate` : ''}
-
-   ${d.actividades.hayEspacioConfinado ? `8.4 EMERGENCIA EN ESPACIO CONFINADO
-   1. NUNCA ingresar sin medir atmósfera primero
-   2. El vigía llama al Jefe de Brigada — NO ingresar a rescatar sin equipo SCBA
-   3. Usar trípode + cabrestante para extracción
-   4. Post-rescate: posición semi-sentado, monitorear constantemente
-   5. Solicitar bomberos si el rescate supera la capacidad del equipo` : ''}
-
-   ${d.actividades.hayTrabajoCaliente ? `8.5 AMAGO DE INCENDIO POR TRABAJO EN CALIENTE
-   1. Gritar "FUEGO" — activar alarma
-   2. Si es controlable: usar extintor PQS (técnica PASS)
-      → siempre con el viento a favor, nunca en contra
-   3. Si no es controlable en 30 segundos: evacuar y llamar Bomberos 116
-   4. Vigía de fuego permanece 30min adicionales después del trabajo` : ''}
-
-   8.X SISMO
-   - Si está en altura: permanecer en posición fija, aferrado a la estructura
-   - Si está en el piso: alejarse de estantes y objetos que puedan caer
-   - Al cesar el sismo: dirigirse al punto de reunión del cliente
-   - No usar ascensores
-
-   8.X+1 INCENDIO GENERAL
-   Técnica PASS con extintor: Pull (jalar seguro), Aim (apuntar a la base),
-   Squeeze (presionar), Sweep (barrer de lado a lado).
-   Toda utilización parcial de extintor obliga a su reemplazo inmediato.
-
-9. EQUIPOS Y MATERIALES DE EMERGENCIA
-   Botiquín (según G050 Anexo B), extintores PQS 9kg, arnés de seguridad,
-   línea de vida con block retráctil, camilla rígida, teléfonos celulares con saldo.
-
-10. ENTRENAMIENTO Y SIMULACROS
-    Capacitación en primeros auxilios, uso de extintores, rescate en altura (si aplica).
-    Participación en simulacros INDECI.`
+REGLAS:
+- identificacionEmergencias: mínimo 8 filas específicas al proyecto
+- Si hay trabajo eléctrico: incluir "Electrocución" y "Arco eléctrico"
+- Si hay trabajo en altura: incluir "Caída en altura y síndrome de arnés"
+- Si hay trabajo en caliente: incluir "Incendio por trabajo en caliente"
+- protocolos: texto completo y técnico, paso a paso, no genérico
+- programaSimulacros: mínimo 4 actividades
+- No incluyas texto antes ni después del JSON`
 }
 
 export function buildPromptPAR(
