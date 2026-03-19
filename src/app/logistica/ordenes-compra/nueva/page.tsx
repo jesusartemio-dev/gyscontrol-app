@@ -68,8 +68,17 @@ function CatalogoAutocomplete({ value, onSelect, onChange, placeholder }: {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+  const inputRef = React.useRef<HTMLInputElement>(null)
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 })
 
   useEffect(() => { setQuery(value) }, [value])
+
+  const updatePosition = useCallback(() => {
+    if (inputRef.current) {
+      const rect = inputRef.current.getBoundingClientRect()
+      setDropdownPos({ top: rect.bottom + 2, left: rect.left })
+    }
+  }, [])
 
   const doSearch = useCallback((q: string) => {
     if (q.length < 2) { setResults([]); setOpen(false); return }
@@ -84,6 +93,7 @@ function CatalogoAutocomplete({ value, onSelect, onChange, placeholder }: {
   const handleChange = (val: string) => {
     setQuery(val)
     onChange(val)
+    updatePosition()
     if (timerRef.current) clearTimeout(timerRef.current)
     timerRef.current = setTimeout(() => doSearch(val), 300)
   }
@@ -97,15 +107,19 @@ function CatalogoAutocomplete({ value, onSelect, onChange, placeholder }: {
   return (
     <div className="relative">
       <Input
+        ref={inputRef}
         value={query}
         onChange={e => handleChange(e.target.value)}
-        onFocus={() => { if (results.length > 0) setOpen(true) }}
+        onFocus={() => { updatePosition(); if (results.length > 0) setOpen(true) }}
         onBlur={() => setTimeout(() => setOpen(false), 200)}
         placeholder={placeholder || "Buscar código..."}
         className="h-8 text-xs"
       />
       {open && (
-        <div className="absolute z-50 top-9 left-0 w-[350px] bg-white border rounded-md shadow-lg max-h-48 overflow-auto">
+        <div
+          className="fixed z-[9999] w-[350px] bg-white border rounded-md shadow-lg max-h-48 overflow-auto"
+          style={{ top: dropdownPos.top, left: dropdownPos.left }}
+        >
           {loading && <div className="p-2 text-xs text-muted-foreground">Buscando...</div>}
           {results.map(item => (
             <button
@@ -431,7 +445,7 @@ export default function NuevaOrdenCompraPage() {
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="p-0 overflow-visible">
           {items.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
               <PackageSearch className="h-8 w-8 mb-2" />
