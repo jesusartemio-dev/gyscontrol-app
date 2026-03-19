@@ -6,6 +6,8 @@ import Anthropic from '@anthropic-ai/sdk'
 import {
   buildPromptPETS,
   buildPromptIPERC,
+  buildPromptIPERC_Part1,
+  buildPromptIPERC_Part2,
   buildPromptMatrizEPP,
   buildPromptPlanEmergencia,
   buildPromptPAR,
@@ -147,14 +149,102 @@ export async function POST(
       requerimientos,
     }
 
-    // Select prompt by doc type
+    // Select prompt by doc type — IPERC uses 2 parallel calls
+    if (doc.tipo === 'IPERC') {
+      const prompt1 = buildPromptIPERC_Part1(promptData, doc.codigoDocumento)
+      const prompt2 = buildPromptIPERC_Part2(promptData, doc.codigoDocumento)
+
+      const startMs = Date.now()
+      const [res1, res2] = await Promise.all([
+        anthropic.messages.create({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 8000,
+          messages: [{ role: 'user', content: prompt1 }],
+        }),
+        anthropic.messages.create({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 8000,
+          messages: [{ role: 'user', content: prompt2 }],
+        }),
+      ])
+      const duracionMs = Date.now() - startMs
+
+      // Parse and merge filas from both parts
+      const text1 = res1.content[0].type === 'text' ? res1.content[0].text : ''
+      const text2 = res2.content[0].type === 'text' ? res2.content[0].text : ''
+
+      const parseFilas = (raw: string): any[] => {
+        let clean = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '')
+        const start = clean.indexOf('{')
+        const end = clean.lastIndexOf('}')
+        if (start >= 0 && end > start) clean = clean.substring(start, end + 1)
+        try {
+          return JSON.parse(clean).filas ?? []
+        } catch {
+          // Try repair truncated JSON
+          const lastObj = clean.lastIndexOf('}')
+          if (lastObj > 0) {
+            try { return JSON.parse(clean.substring(0, lastObj + 1) + ']}').filas ?? [] } catch { return [] }
+          }
+          return []
+        }
+      }
+
+      const filas1 = parseFilas(text1)
+      const filas2 = parseFilas(text2)
+      const merged = { filas: [...filas1, ...filas2] }
+      const contenido = JSON.stringify(merged, null, 2)
+
+      const totalInput = res1.usage.input_tokens + res2.usage.input_tokens
+      const totalOutput = res1.usage.output_tokens + res2.usage.output_tokens
+      const costoEstimado = totalInput * 0.000003 + totalOutput * 0.000015
+
+      const usage = await prisma.agenteUsage.create({
+        data: {
+          userId,
+          tipo: 'ssoma-documento-regenerar',
+          modelo: 'claude-sonnet-4-20250514',
+          tokensInput: totalInput,
+          tokensOutput: totalOutput,
+          costoEstimado,
+          duracionMs,
+          metadata: {
+            docTipo: 'IPERC',
+            expedienteId: exp.id,
+            proyectoId: proyecto.id,
+            regeneracion: true,
+            filasP1: filas1.length,
+            filasP2: filas2.length,
+          },
+        },
+      })
+
+      const updated = await prisma.ssomaDocumento.update({
+        where: { id },
+        data: {
+          contenidoTexto: contenido,
+          promptUsado: prompt1.substring(0, 500) + '\n---PART2---\n' + prompt2.substring(0, 500),
+          generadoPorId: userId,
+          agenteUsageId: usage.id,
+          estado: 'borrador',
+        },
+      })
+
+      return NextResponse.json({
+        id: updated.id,
+        tipo: updated.tipo,
+        contenidoLength: contenido.length,
+        tokensUsed: totalInput + totalOutput,
+        duracionMs,
+        filas: merged.filas.length,
+      })
+    }
+
+    // Non-IPERC documents — single call
     let prompt: string
     switch (doc.tipo) {
       case 'PETS':
         prompt = buildPromptPETS(promptData, doc.codigoDocumento)
-        break
-      case 'IPERC':
-        prompt = buildPromptIPERC(promptData, doc.codigoDocumento)
         break
       case 'MATRIZ_EPP':
         prompt = buildPromptMatrizEPP(promptData, doc.codigoDocumento)
@@ -170,11 +260,10 @@ export async function POST(
         return NextResponse.json({ error: 'Tipo de documento no soportado' }, { status: 400 })
     }
 
-    // Call Claude
     const startMs = Date.now()
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: doc.tipo === 'IPERC' ? 16000 : 4000,
+      max_tokens: 4000,
       messages: [{ role: 'user', content: prompt }],
     })
 
@@ -184,7 +273,6 @@ export async function POST(
       response.usage.input_tokens * 0.000003 +
       response.usage.output_tokens * 0.000015
 
-    // Record usage
     const usage = await prisma.agenteUsage.create({
       data: {
         userId,

@@ -131,13 +131,14 @@ ESTRUCTURA OBLIGATORIA — respeta exactamente este orden:
 Sé técnico y preciso. Usa terminología de automatización industrial. No texto genérico.`
 }
 
-export function buildPromptIPERC(d: SsomaPromptData, codigo: string): string {
+// Base del prompt IPERC (estructura JSON + reglas) — compartido entre parte 1 y 2
+function ipercBase(d: SsomaPromptData): string {
   return `Eres el Ingeniero de Seguridad de GYS CONTROL INDUSTRIAL SAC.
-Genera una IPERC completa siguiendo el DS 024-2016-EM para este proyecto.
+Genera filas IPERC siguiendo el DS 024-2016-EM para este proyecto.
 
 ${contextoBase(d)}
 
-Responde ÚNICAMENTE con un JSON válido, sin texto adicional, sin markdown, sin explicaciones. Solo el JSON puro.
+Responde ÚNICAMENTE con un JSON válido, sin texto adicional, sin markdown, sin \`\`\`. Solo el JSON puro.
 
 El JSON debe tener esta estructura exacta:
 {
@@ -167,98 +168,84 @@ El JSON debe tener esta estructura exacta:
   ]
 }
 
-REGLAS para los valores:
+REGLAS:
 - factorRiesgo: "FÍSICO" | "MECÁNICO" | "ELÉCTRICO" | "QUÍMICO" | "ERGONÓMICO" | "BIOLÓGICO" | "LOCATIVO" | "PSICOSOCIAL"
 - condicion: "Rutinaria" | "No Rutinaria" | "Emergencia"
-- severidad: número del 1 al 5 (1=insignificante, 5=catastrófico)
-- probabilidad: letra "A" | "B" | "C" | "D" | "E" (A=casi certeza, E=rara vez)
-- eliminar/sustituir: texto del control o "NA" si no aplica
-- severidadResidual y probabilidadResidual: después de aplicar controles
+- severidad: 1-5 (1=insignificante, 5=catastrófico)
+- probabilidad: "A"-"E" (A=casi certeza, E=rara vez)
+- eliminar/sustituir: texto del control o "NA"
+- Usa los equipos y servicios reales del proyecto. Menciona modelos específicos.`
+}
 
-TABLA DE VALORACIÓN (para referencia):
-La combinación Severidad+Probabilidad determina el nivel:
-ALTO: 1A, 1B, 1C, 2A, 2B, 3A
-MEDIO: 1D, 2C, 2D, 3B, 3C, 4A, 4B
-BAJO: 1E, 2E, 3D, 3E, 4C, 4D, 5A, 5B, 5C, 5D, 5E
+export function buildPromptIPERC_Part1(d: SsomaPromptData, _codigo: string): string {
+  const a = d.actividades
+  return `${ipercBase(d)}
 
-ACTIVIDADES OBLIGATORIAS A INCLUIR — MÍNIMO 45 FILAS:
+Genera EXACTAMENTE 25 filas para estas actividades (PARTE 1 de 2):
+1. Movilización de personal y materiales a planta cliente
+2. Vigilancia COVID-19 / Dengue
+3. Exposición a radiación solar durante trabajos en exterior
+4. Sistema de bloqueo de energía LOTO
+5. Traslado y montaje de tableros eléctricos del proyecto
+6. Preparación, corte y roscado de tuberías conduit
+7. Tendido de bandejas portacables y tuberías por planta
+8. Cableado eléctrico de alimentación y fuerza
+9. Tendido de cables de instrumentación y comunicación
+10. Conexionado en tableros: terminales, borneras, PLC
+11. Montaje e instalación de instrumentos de campo
+12. Configuración y programación de PLC/SCADA
+13. Pruebas de continuidad, aislamiento y lazo (loop check)
+14. Comisionamiento y pruebas con cliente
+15. Orden y limpieza del área de trabajo
+${a.hayTrabajoElectrico ? `16. Intervención en tableros energizados
+17. Energización progresiva de tableros nuevos` : ''}
+${a.hayTrabajoAltura ? `18. Armado y desarmado de andamios
+19. Trabajo en plataforma Manlift
+20. Instalación de bandejas/conduit en zonas elevadas` : ''}
+${a.hayEspacioConfinado ? `21. Medición de atmósfera en espacio confinado
+22. Ingreso y trabajo dentro de tanque` : ''}
+${a.hayTrabajoCaliente ? `23. Esmerilado de estructuras y tuberías
+24. Soldadura de soportes` : ''}
 
-INSTRUCCIÓN CRÍTICA: Usa los equipos y servicios listados en el contexto
-para hacer el IPERC específico a este proyecto real.
-- En lugar de "montaje de tablero eléctrico" → escribe el nombre exacto del tablero/equipo
-- En lugar de "instalación de instrumento" → escribe "instalación de [modelo específico]"
-- En lugar de "zona de trabajo" → escribe la zona específica (ZT3, ZPQR, ZRC, etc.) si aplica
-- Si hay equipos ATEX o zonas clasificadas → incluir actividades específicas de:
-    • Verificación de certificación ATEX de herramientas antes de ingresar a zona clasificada
-    • Control de fuentes de ignición en área ATEX (zona 0, 1 o 2)
-    • Uso de herramientas antichispa en área clasificada
-    • Medición de atmósfera explosiva con detector de gases antes de trabajar
+Genera exactamente 25 filas. No incluyas texto fuera del JSON.`
+}
 
-Actividades base a cubrir (adaptar con los equipos/servicios reales del proyecto):
-1.  Movilización de personal y materiales a planta cliente
-2.  Vigilancia COVID-19 / Dengue (todas las actividades)
-3.  Exposición a radiación solar durante trabajos en exterior
-4.  Exposición a ruido de equipos de la planta en operación
-5.  Trabajos prolongados de pie / posturas forzadas (ergonómico)
-6.  Inhalación de partículas de polvo y vapores químicos
-7.  Sistema de bloqueo de energía LOTO previo a intervenciones
-8.  Traslado y montaje de tableros eléctricos del proyecto
-9.  Preparación, corte y roscado de tuberías conduit
-10. Tendido de bandejas portacables y tuberías por planta
-11. Cableado eléctrico de alimentación y fuerza
-12. Tendido de cables de instrumentación y comunicación (Profinet, Modbus)
-13. Conexionado en tableros: terminales, borneras, PLC
-14. Montaje e instalación de instrumentos de campo (transmisores, switches, sensores)
-15. Configuración y programación de PLC/SCADA (sala de control)
-16. Pruebas de continuidad, aislamiento y lazo (loop check)
-17. Comisionamiento y pruebas de funcionamiento con cliente
-18. Orden y limpieza del área de trabajo
-19. Exposición a radiación no ionizante de equipos eléctricos en operación
-20. Esquirlas y proyección de partículas durante corte de conduit con esmeril
-21. Manipulación de herramientas manuales (cortes, golpes)
-22. Tránsito de montacargas y vehículos en planta cliente
-23. Transitar por áreas con desniveles, rampas y escaleras fijas de planta
-24. Exposición a sustancias químicas del proceso del cliente (vapores, derrames)
-25. Trabajos prolongados de pie en superficies de concreto (fatiga)
-26. Radiación no ionizante de pantallas HMI y equipos de programación
-27. Iluminación deficiente en zonas eléctricas y salas de control
-28. Potencial contacto con superficies calientes de tuberías de proceso
-29. Estrés térmico por trabajo en áreas con equipos de alta temperatura
-30. Caída de objetos desde niveles superiores durante trabajos simultáneos
-31. Interferencia con operaciones del cliente en planta en marcha
-${d.actividades.hayTrabajoElectrico ? `32. Intervención en tableros energizados (verificación)
-33. Energización progresiva de tableros nuevos con supervisión` : ''}
-${d.actividades.hayTrabajoAltura ? `34. Armado y desarmado de andamios multidireccionales
-35. Trabajo en plataforma Manlift para tendido en altura
-36. Instalación de bandejas/conduit en zonas elevadas` : ''}
-${d.actividades.hayEspacioConfinado ? `37. Medición de atmósfera en espacio confinado antes de ingreso
-38. Ingreso y trabajo dentro de tanque o espacio confinado` : ''}
-${d.actividades.hayTrabajoCaliente ? `39. Esmerilado de estructuras metálicas y tuberías
-40. Soldadura de soportes y estructuras de soporte` : ''}
-41. Exposición a fatiga mental por trabajo técnico repetitivo (psicosocial)
-42. Transporte de equipos pesados con montacarga dentro de planta
-43. Potencial derrame de aceite dieléctrico o sustancias de equipos
-44. Trabajos en días de calor extremo (>30°C) en exterior
-45. Exposición a ruido por zona: distinguir ruido de planta cliente vs ruido propio de obra
+export function buildPromptIPERC_Part2(d: SsomaPromptData, _codigo: string): string {
+  return `${ipercBase(d)}
 
-FILAS ADICIONALES OBLIGATORIAS — agrega estas si no las tienes ya:
-Fila extra 1:  proceso=RIESGOS FÍSICOS | actividad=Exposición a ruido planta | subActividad=Operación de equipos rotativos cliente | peligro=Ruido continuo >85dB | riesgo=Hipoacusia | consecuencia=Pérdida auditiva irreversible | severidad=3 | probabilidad=C
-Fila extra 2:  proceso=RIESGOS FÍSICOS | actividad=Radiación no ionizante | subActividad=Trabajo cerca de equipos eléctricos en operación | peligro=Campos electromagnéticos de variadores Siemens G120C | riesgo=Exposición a radiación no ionizante | consecuencia=Fatiga, cefalea, alteraciones | severidad=3 | probabilidad=D
-Fila extra 3:  proceso=RIESGOS MECÁNICOS | actividad=Proyección de partículas | subActividad=Corte conduit con esmeril angular | peligro=Esquirlas y chispas metálicas | riesgo=Impacto en ojos y piel | consecuencia=Lesiones oculares, quemaduras superficiales | severidad=3 | probabilidad=B
-Fila extra 4:  proceso=RIESGOS MECÁNICOS | actividad=Tránsito de vehículos | subActividad=Movilización interna en planta cliente | peligro=Montacargas y vehículos de planta en movimiento | riesgo=Atropello | consecuencia=Fracturas, politraumatismo, muerte | severidad=2 | probabilidad=C
-Fila extra 5:  proceso=RIESGOS MECÁNICOS | actividad=Caída de objetos | subActividad=Trabajos en niveles superiores simultáneos | peligro=Herramientas o materiales desde altura | riesgo=Golpe por objeto que cae | consecuencia=Traumatismo craneoencefálico, muerte | severidad=2 | probabilidad=C
-Fila extra 6:  proceso=RIESGOS QUÍMICOS | actividad=Exposición a químicos cliente | subActividad=Trabajo en Zona Tanques ZPQR | peligro=Vapores de Binato y solventes de proceso QROMA | riesgo=Inhalación de vapores tóxicos | consecuencia=Intoxicación, daño pulmonar | severidad=2 | probabilidad=C
-Fila extra 7:  proceso=RIESGOS ERGONÓMICOS | actividad=Trabajo prolongado de pie | subActividad=Jornadas de 8-10h en instalación | peligro=Postura estática prolongada en superficies duras | riesgo=Carga física de trabajo | consecuencia=Trastornos musculoesqueléticos | severidad=4 | probabilidad=C
-Fila extra 8:  proceso=RIESGOS ELÉCTRICOS | actividad=Trabajo cerca de equipos energizados cliente | subActividad=Instalación adyacente a tableros en operación | peligro=Tableros energizados de planta cliente en funcionamiento | riesgo=Contacto eléctrico indirecto | consecuencia=Electrocución, quemaduras | severidad=1 | probabilidad=D
-Fila extra 9:  proceso=RIESGOS LOCATIVOS | actividad=Tránsito en planta | subActividad=Desplazamiento entre zonas ZRC-ZT3-ZPQR | peligro=Desniveles, rampas y escaleras fijas de Planta Ñaña | riesgo=Caída a distinto nivel | consecuencia=Fracturas, contusiones | severidad=3 | probabilidad=C
-Fila extra 10: proceso=RIESGOS LOCATIVOS | actividad=Superficies resbalosas | subActividad=Trabajo en zona de tanques con derrames | peligro=Pisos contaminados con aceite o producto de proceso | riesgo=Caída al mismo nivel | consecuencia=Contusiones, fracturas | severidad=4 | probabilidad=C
-Fila extra 11: proceso=RIESGOS PSICOSOCIALES | actividad=Fatiga mental | subActividad=Programación PLC 200h y SCADA 160h | peligro=Trabajo técnico repetitivo y de alta concentración | riesgo=Fatiga mental y estrés | consecuencia=Error humano, accidentes por distracción | severidad=3 | probabilidad=C
-Fila extra 12: proceso=RIESGOS FÍSICOS | actividad=Estrés térmico | subActividad=Trabajo en exterior o cerca de equipos calientes | peligro=Temperatura ambiente >30°C o calor radiante de equipos | riesgo=Estrés térmico | consecuencia=Golpe de calor, deshidratación | severidad=3 | probabilidad=C
+Genera EXACTAMENTE 25 filas para estas actividades (PARTE 2 de 2 — riesgos ambientales, ergonómicos y del entorno):
+1. Exposición a ruido continuo >85dB de equipos rotativos del cliente
+2. Radiación no ionizante de variadores de frecuencia y equipos eléctricos
+3. Esquirlas y proyección de partículas durante corte de conduit con esmeril
+4. Manipulación de herramientas manuales (cortes, golpes, atrapamiento)
+5. Tránsito de montacargas y vehículos dentro de planta cliente
+6. Caída de objetos desde niveles superiores durante trabajos simultáneos
+7. Exposición a sustancias químicas del proceso del cliente (vapores, derrames)
+8. Trabajos prolongados de pie en superficies de concreto (fatiga muscular)
+9. Posturas forzadas durante conexionado en tableros bajos o en altura
+10. Radiación no ionizante de pantallas HMI y equipos de programación
+11. Iluminación deficiente en zonas eléctricas, salas de control y sótanos
+12. Potencial contacto con superficies calientes de tuberías de proceso
+13. Estrés térmico por trabajo en exterior >30°C o cerca de equipos calientes
+14. Transitar por desniveles, rampas y escaleras fijas de planta
+15. Superficies resbalosas por derrames de aceite o producto de proceso
+16. Potencial derrame de aceite dieléctrico o sustancias de equipos nuevos
+17. Interferencia con operaciones del cliente en planta en marcha
+18. Fatiga mental por trabajo técnico repetitivo (programación, configuración)
+19. Estrés laboral por presión de plazos y coordinación con cliente
+20. Exposición a virus dengue/COVID en zonas endémicas
+21. Inhalación de partículas de polvo durante perforaciones y montaje
+22. Contacto eléctrico indirecto por trabajar junto a tableros energizados del cliente
+23. Mordedura de insectos o animales en zonas exteriores de planta
+24. Transporte manual de cargas pesadas (herramientas, cables, conduit)
+25. Trabajo en turnos extendidos (jornadas >10h, fatiga acumulada)
 
-Incluye TODAS estas filas en el JSON además de las que ya generas.
-El total debe ser mínimo 45 filas.
-No repitas peligros — cada fila debe ser un riesgo distinto.
-No incluyas texto antes ni después del JSON.`
+Genera exactamente 25 filas. No incluyas texto fuera del JSON.`
+}
+
+// Wrapper de compatibilidad — genera un prompt único (para cuando no se usa split)
+export function buildPromptIPERC(d: SsomaPromptData, codigo: string): string {
+  return buildPromptIPERC_Part1(d, codigo)
 }
 
 export function buildPromptMatrizEPP(d: SsomaPromptData, codigo: string): string {

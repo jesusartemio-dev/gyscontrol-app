@@ -5,7 +5,8 @@ import { authOptions } from '@/lib/auth'
 import Anthropic from '@anthropic-ai/sdk'
 import {
   buildPromptPETS,
-  buildPromptIPERC,
+  buildPromptIPERC_Part1,
+  buildPromptIPERC_Part2,
   buildPromptMatrizEPP,
   buildPromptPlanEmergencia,
   buildPromptPAR,
@@ -201,11 +202,28 @@ export async function POST(req: Request) {
 
     const specs = getDocSpecs(cod, actividades)
 
+    // Helper to parse IPERC JSON from AI response
+    function parseIpercFilas(raw: string): any[] {
+      let clean = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '')
+      const start = clean.indexOf('{')
+      const end = clean.lastIndexOf('}')
+      if (start >= 0 && end > start) clean = clean.substring(start, end + 1)
+      try {
+        return JSON.parse(clean).filas ?? []
+      } catch {
+        const lastObj = clean.lastIndexOf('}')
+        if (lastObj > 0) {
+          try { return JSON.parse(clean.substring(0, lastObj + 1) + ']}').filas ?? [] } catch { return [] }
+        }
+        return []
+      }
+    }
+
     // Seleccionar el prompt correcto por tipo
     function getPrompt(spec: SsomaDocSpec): string {
       switch (spec.tipo) {
         case 'PETS':             return buildPromptPETS(promptData, spec.codigoDocumento)
-        case 'IPERC':            return buildPromptIPERC(promptData, spec.codigoDocumento)
+        case 'IPERC':            return buildPromptIPERC_Part1(promptData, spec.codigoDocumento)
         case 'MATRIZ_EPP':       return buildPromptMatrizEPP(promptData, spec.codigoDocumento)
         case 'PLAN_EMERGENCIA':  return buildPromptPlanEmergencia(promptData, spec.codigoDocumento)
         case 'PAR':              return buildPromptPAR(promptData, spec.parSubtipo!, spec.codigoDocumento)
@@ -216,12 +234,48 @@ export async function POST(req: Request) {
     // Generar todos los documentos en paralelo
     const results = await Promise.allSettled(
       specs.map(async (spec) => {
-        const prompt = getPrompt(spec)
         const startMs = Date.now()
 
+        // IPERC: 2 llamadas paralelas de 25 filas cada una
+        if (spec.tipo === 'IPERC') {
+          const p1 = buildPromptIPERC_Part1(promptData, spec.codigoDocumento)
+          const p2 = buildPromptIPERC_Part2(promptData, spec.codigoDocumento)
+          const [r1, r2] = await Promise.all([
+            anthropic.messages.create({ model: 'claude-sonnet-4-20250514', max_tokens: 8000, messages: [{ role: 'user', content: p1 }] }),
+            anthropic.messages.create({ model: 'claude-sonnet-4-20250514', max_tokens: 8000, messages: [{ role: 'user', content: p2 }] }),
+          ])
+          const t1 = r1.content[0].type === 'text' ? r1.content[0].text : ''
+          const t2 = r2.content[0].type === 'text' ? r2.content[0].text : ''
+          const merged = { filas: [...parseIpercFilas(t1), ...parseIpercFilas(t2)] }
+          const contenido = JSON.stringify(merged, null, 2)
+          const duracionMs = Date.now() - startMs
+          const totalInput = r1.usage.input_tokens + r2.usage.input_tokens
+          const totalOutput = r1.usage.output_tokens + r2.usage.output_tokens
+          const costoEstimado = totalInput * 0.000003 + totalOutput * 0.000015
+
+          const usage = await prisma.agenteUsage.create({
+            data: {
+              userId, tipo: 'ssoma-documento', modelo: 'claude-sonnet-4-20250514',
+              tokensInput: totalInput, tokensOutput: totalOutput, costoEstimado, duracionMs,
+              metadata: { docTipo: 'IPERC', expedienteId: expediente.id, proyectoId, filasTotal: merged.filas.length },
+            },
+          })
+
+          return prisma.ssomaDocumento.create({
+            data: {
+              expedienteId: expediente.id, tipo: spec.tipo, parSubtipo: null,
+              codigoDocumento: spec.codigoDocumento, titulo: spec.titulo, revision: spec.revision,
+              contenidoTexto: contenido, promptUsado: p1.substring(0, 300),
+              generadoPorId: userId, agenteUsageId: usage.id,
+            },
+          })
+        }
+
+        // Non-IPERC: single call
+        const prompt = getPrompt(spec)
         const response = await anthropic.messages.create({
           model: 'claude-sonnet-4-20250514',
-          max_tokens: spec.tipo === 'IPERC' ? 16000 : 4000,
+          max_tokens: 4000,
           messages: [{ role: 'user', content: prompt }],
         })
 
