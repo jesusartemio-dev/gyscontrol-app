@@ -117,47 +117,84 @@ Sé técnico y preciso. Usa terminología de automatización industrial. No text
 
 export function buildPromptIPERC(d: SsomaPromptData, codigo: string): string {
   return `Eres el Ingeniero de Seguridad de GYS CONTROL INDUSTRIAL SAC.
-Genera una IPERC (Identificación de Peligros, Evaluación de Riesgos y Controles) completa.
+Genera una IPERC completa siguiendo el DS 024-2016-EM para este proyecto.
 
-${contextoBase(d)}
-CÓDIGO DOCUMENTO: ${codigo}
+PROYECTO: ${d.nombreProyecto}
+CLIENTE: ${d.cliente} — ${d.planta}
+TRABAJOS: ${d.descripcionTrabajos}
+ACTIVIDADES DE ALTO RIESGO:
+  - Eléctrico: ${d.actividades.hayTrabajoElectrico ? 'SÍ' : 'No'}
+  - Altura: ${d.actividades.hayTrabajoAltura ? 'SÍ' : 'No'}
+  - Espacio confinado: ${d.actividades.hayEspacioConfinado ? 'SÍ' : 'No'}
+  - Trabajo en caliente: ${d.actividades.hayTrabajoCaliente ? 'SÍ' : 'No'}
 
-METODOLOGÍA: IPERC línea base — DS 024-2016-EM / Ley 29783
+Responde ÚNICAMENTE con un JSON válido, sin texto adicional, sin markdown, sin explicaciones. Solo el JSON puro.
 
-Genera MÍNIMO 15 actividades/tareas. Usa este formato de tabla separada por |:
+El JSON debe tener esta estructura exacta:
+{
+  "filas": [
+    {
+      "proceso": "ACTIVIDADES GENERALES",
+      "actividad": "Movilización de personal a planta",
+      "subActividad": "Traslado en camioneta",
+      "puestoTrabajo": "Todo el personal de GYS",
+      "factorRiesgo": "FÍSICO",
+      "condicion": "Rutinaria",
+      "peligro": "Transporte en camioneta",
+      "riesgo": "Atropello y Volcadura",
+      "consecuencia": "Lesiones graves, politraumatismo y muerte",
+      "severidad": 2,
+      "probabilidad": "C",
+      "eliminar": "NA",
+      "sustituir": "NA",
+      "controlIngenieria": "Mantenimiento preventivo de la camioneta",
+      "controlAdministrativo": "Capacitación en manejo defensivo. Check list pre-uso del vehículo",
+      "epp": "Cinturón de seguridad. Casco y barbiquejo",
+      "severidadResidual": 3,
+      "probabilidadResidual": "D",
+      "accionesMejora": "Seguimiento a check list pre-uso",
+      "responsable": "Gerente General"
+    }
+  ]
+}
 
-ACTIVIDAD | PELIGRO | TIPO RIESGO | CONSECUENCIA | P | S | NR | NIVEL | CONTROLES | RESPONSABLE
+REGLAS para los valores:
+- factorRiesgo: "FÍSICO" | "MECÁNICO" | "ELÉCTRICO" | "QUÍMICO" | "ERGONÓMICO" | "BIOLÓGICO" | "LOCATIVO" | "PSICOSOCIAL"
+- condicion: "Rutinaria" | "No Rutinaria" | "Emergencia"
+- severidad: número del 1 al 5 (1=insignificante, 5=catastrófico)
+- probabilidad: letra "A" | "B" | "C" | "D" | "E" (A=casi certeza, E=rara vez)
+- eliminar/sustituir: texto del control o "NA" si no aplica
+- severidadResidual y probabilidadResidual: después de aplicar controles
 
-Donde:
-- P = Probabilidad (1=Baja, 2=Media, 3=Alta)
-- S = Severidad (1=Leve, 2=Moderado, 3=Grave/Fatal)
-- NR = P × S
-- NIVEL: 1-2=Bajo (verde), 3-4=Medio (amarillo), 6=Alto (naranja), 9=Crítico (rojo)
+TABLA DE VALORACIÓN (para referencia):
+La combinación Severidad+Probabilidad determina el nivel:
+ALTO: 1A, 1B, 1C, 2A, 2B, 3A
+MEDIO: 1D, 2C, 2D, 3B, 3C, 4A, 4B
+BAJO: 1E, 2E, 3D, 3E, 4C, 4D, 5A, 5B, 5C, 5D, 5E
 
-ACTIVIDADES OBLIGATORIAS A INCLUIR:
-1. Traslado y movilización de equipos y herramientas
-2. Inspección de EPP y herramientas
-3. Señalización y delimitación del área
-4. Montaje de tableros eléctricos (perforación, anclaje)
-5. Preparación y corte de tuberías conduit
-6. Tendido de tuberías por bandeja a nivel de piso
-7. Cableado eléctrico de alimentación
-8. Tendido de cables de instrumentación y comunicación
-9. Conexionado en tableros (terminales, borneras)
-10. Montaje de instrumentos y sensores
-11. Comisionamiento y pruebas de funcionamiento
-12. Orden y limpieza del área de trabajo
-${d.actividades.hayTrabajoElectrico ? `13. Bloqueo y etiquetado LOTO de tableros
-14. Intervención en tableros eléctricos energizados (verificación)` : ''}
-${d.actividades.hayTrabajoAltura ? `15. Armado y desarmado de andamios
-16. Trabajo en plataforma Manlift
-17. Tendido de tubería/cable en altura` : ''}
-${d.actividades.hayEspacioConfinado ? `18. Medición de atmósfera en espacio confinado
-19. Ingreso y trabajo en espacio confinado` : ''}
-${d.actividades.hayTrabajoCaliente ? `20. Esmerilado de tuberías (generación de chispas)
-21. Trabajo de soldadura / oxicorte` : ''}
+Genera MÍNIMO 20 filas cubriendo estas actividades del proyecto:
+1. Movilización de personal y materiales a planta
+2. Vigilancia COVID-19 / Dengue (todas las actividades)
+3. Sistema de bloqueo de energía LOTO
+4. Montaje de tableros eléctricos
+5. Tendido de tuberías conduit
+6. Cableado eléctrico de alimentación
+7. Cableado de instrumentación y comunicación
+8. Conexionado en tableros y borneras
+9. Montaje de instrumentos y sensores
+10. Comisionamiento y pruebas
+11. Orden y limpieza
+${d.actividades.hayTrabajoElectrico ? `12. Intervención en tableros energizados
+13. Pruebas eléctricas con tensión` : ''}
+${d.actividades.hayTrabajoAltura ? `14. Armado y desarmado de andamios
+15. Trabajo en plataforma Manlift
+16. Tendido de cables en altura` : ''}
+${d.actividades.hayEspacioConfinado ? `17. Medición de atmósfera en espacio confinado
+18. Ingreso y trabajo en espacio confinado` : ''}
+${d.actividades.hayTrabajoCaliente ? `19. Esmerilado de tuberías
+20. Soldadura eléctrica / oxicorte` : ''}
 
-Para los controles usa la jerarquía: Eliminación > Sustitución > Control de ingeniería > Control administrativo > EPP`
+Sé específico y técnico. Usa terminología de automatización industrial.`
 }
 
 export function buildPromptMatrizEPP(d: SsomaPromptData, codigo: string): string {

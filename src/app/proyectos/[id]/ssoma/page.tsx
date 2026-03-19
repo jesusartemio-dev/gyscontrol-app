@@ -41,6 +41,8 @@ import {
   Pencil,
   Save,
   X,
+  RefreshCw,
+  TableIcon,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import ReactMarkdown from 'react-markdown'
@@ -639,6 +641,7 @@ function DocumentoModal({
   const [editing, setEditing] = useState(false)
   const [editContent, setEditContent] = useState(doc.contenidoTexto || '')
   const [saving, setSaving] = useState(false)
+  const [regenerating, setRegenerating] = useState(false)
 
   const handleSave = async () => {
     setSaving(true)
@@ -680,6 +683,25 @@ function DocumentoModal({
       URL.revokeObjectURL(url)
     } catch {
       toast.error('Error al generar el documento')
+    }
+  }
+
+  const handleRegenerar = async () => {
+    if (!confirm('¿Regenerar este documento? Se reemplazará el contenido actual.')) return
+    setRegenerating(true)
+    try {
+      const res = await fetch(`/api/ssoma/documento/${doc.id}/regenerar`, { method: 'POST' })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Error al regenerar')
+      }
+      toast.success('Documento regenerado con IA')
+      onRefresh()
+      onClose()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Error al regenerar')
+    } finally {
+      setRegenerating(false)
     }
   }
 
@@ -727,6 +749,31 @@ function DocumentoModal({
           <Button size="sm" variant="outline" className="h-7 text-xs" onClick={handleDownload}>
             <Download className="h-3 w-3 mr-1" />
             Descargar .docx
+          </Button>
+          {doc.tipo === 'IPERC' && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs"
+              onClick={() => window.open(`/api/ssoma/documento/${doc.id}/excel`, '_blank')}
+            >
+              <TableIcon className="h-3 w-3 mr-1" />
+              Descargar .xlsx
+            </Button>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs text-amber-700 hover:text-amber-800 hover:bg-amber-50"
+            onClick={handleRegenerar}
+            disabled={regenerating}
+          >
+            {regenerating ? (
+              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+            ) : (
+              <RefreshCw className="h-3 w-3 mr-1" />
+            )}
+            {regenerating ? 'Regenerando...' : 'Regenerar IA'}
           </Button>
         </div>
 

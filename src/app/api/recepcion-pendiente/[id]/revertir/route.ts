@@ -50,7 +50,7 @@ export async function POST(
       )
     }
 
-    const pedidoItem = recepcion.pedidoEquipoItem
+    const pedidoItem = recepcion.pedidoEquipoItem!
     const pedido = pedidoItem.pedidoEquipo
     const ocNumero = recepcion.ordenCompraItem.ordenCompra.numero
 
