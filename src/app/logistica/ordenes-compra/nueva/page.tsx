@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -9,9 +9,12 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { ArrowLeft, Plus, Trash2, Loader2, Save } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Badge } from '@/components/ui/badge'
+import { ArrowLeft, Plus, Trash2, Loader2, Save, PackageSearch, FileText } from 'lucide-react'
 import { toast } from 'sonner'
-import { createOrdenCompra } from '@/lib/services/ordenCompra'
+import { createOrdenCompra, fetchItemsDisponibles, type ItemDisponible } from '@/lib/services/ordenCompra'
 import { getProveedores } from '@/lib/services/proveedor'
 import SelectorAsignacion, { type AsignacionValue } from '@/components/shared/SelectorAsignacion'
 import type { Proveedor, OrdenCompraItemPayload } from '@/types'
@@ -33,9 +36,15 @@ interface ItemForm {
   unidad: string
   cantidad: number
   precioUnitario: number
+  source: 'manual' | 'pedido'
+  pedidoEquipoItemId?: string
+  listaEquipoItemId?: string
+  sourceLabel?: string
 }
 
-const emptyItem: ItemForm = { codigo: '', descripcion: '', unidad: 'UND', cantidad: 1, precioUnitario: 0 }
+const emptyItem: ItemForm = {
+  codigo: '', descripcion: '', unidad: 'UND', cantidad: 1, precioUnitario: 0, source: 'manual',
+}
 
 export default function NuevaOrdenCompraPage() {
   const router = useRouter()
@@ -53,9 +62,16 @@ export default function NuevaOrdenCompraPage() {
   const [lugarEntrega, setLugarEntrega] = useState('')
   const [contactoEntrega, setContactoEntrega] = useState('')
   const [observaciones, setObservaciones] = useState('')
-  const [items, setItems] = useState<ItemForm[]>([{ ...emptyItem }])
+  const [items, setItems] = useState<ItemForm[]>([])
+
+  // Dialog state
+  const [selectorOpen, setSelectorOpen] = useState(false)
+  const [loadingItems, setLoadingItems] = useState(false)
+  const [pedidoItemsDisp, setPedidoItemsDisp] = useState<ItemDisponible[]>([])
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   const hasAsignacion = !!(asignacion.proyectoId || asignacion.centroCostoId)
+  const isProyecto = !!asignacion.proyectoId
 
   useEffect(() => {
     getProveedores()
@@ -68,10 +84,9 @@ export default function NuevaOrdenCompraPage() {
     setItems(prev => prev.map((item, i) => i === index ? { ...item, [field]: value } : item))
   }
 
-  const addItem = () => setItems(prev => [...prev, { ...emptyItem }])
+  const addManualItem = () => setItems(prev => [...prev, { ...emptyItem }])
 
   const removeItem = (index: number) => {
-    if (items.length <= 1) return
     setItems(prev => prev.filter((_, i) => i !== index))
   }
 
@@ -81,6 +96,52 @@ export default function NuevaOrdenCompraPage() {
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat('es-PE', { style: 'currency', currency: moneda }).format(amount)
+
+  // Load pedido items when opening the selector
+  const openSelector = useCallback(async () => {
+    if (!asignacion.proyectoId) return
+    setSelectorOpen(true)
+    setSelectedIds(new Set())
+    setLoadingItems(true)
+    try {
+      const data = await fetchItemsDisponibles(asignacion.proyectoId, proveedorId || undefined)
+      // Filter out items already in the form
+      const existingIds = new Set(items.filter(i => i.pedidoEquipoItemId).map(i => i.pedidoEquipoItemId))
+      setPedidoItemsDisp(data.items.filter(i => !existingIds.has(i.id)))
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al cargar items')
+    } finally {
+      setLoadingItems(false)
+    }
+  }, [asignacion.proyectoId, proveedorId, items])
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const addSelectedItems = () => {
+    const toAdd = pedidoItemsDisp.filter(i => selectedIds.has(i.id))
+    const newItems: ItemForm[] = toAdd.map(i => ({
+      codigo: i.codigo,
+      descripcion: i.descripcion,
+      unidad: i.unidad,
+      cantidad: i.cantidad,
+      precioUnitario: i.precioUnitario,
+      source: 'pedido' as const,
+      pedidoEquipoItemId: i.id,
+      listaEquipoItemId: i.listaEquipoItemId,
+      sourceLabel: i.pedidoCodigo,
+    }))
+
+    setItems(prev => [...prev, ...newItems])
+    setSelectorOpen(false)
+    toast.success(`${newItems.length} item(s) agregados desde pedidos`)
+  }
 
   const handleSubmit = async () => {
     if (!proveedorId) return toast.error('Selecciona un proveedor')
@@ -107,6 +168,8 @@ export default function NuevaOrdenCompraPage() {
           unidad: item.unidad,
           cantidad: item.cantidad,
           precioUnitario: item.precioUnitario,
+          pedidoEquipoItemId: item.pedidoEquipoItemId,
+          listaEquipoItemId: item.listaEquipoItemId,
         })),
       }
       const created = await createOrdenCompra(payload)
@@ -135,7 +198,7 @@ export default function NuevaOrdenCompraPage() {
         </Button>
         <div>
           <h1 className="text-xl font-bold">Nueva Orden de Compra</h1>
-          <p className="text-sm text-muted-foreground">Crear OC manual para proveedor</p>
+          <p className="text-sm text-muted-foreground">Crear OC para proveedor</p>
         </div>
       </div>
 
@@ -168,7 +231,7 @@ export default function NuevaOrdenCompraPage() {
           <CardContent className="space-y-3">
             <SelectorAsignacion
               value={asignacion}
-              onChange={setAsignacion}
+              onChange={(val) => { setAsignacion(val); setItems([]) }}
               placeholder="Seleccionar proyecto o centro de costo"
             />
             <div>
@@ -252,56 +315,115 @@ export default function NuevaOrdenCompraPage() {
       {/* Items */}
       <Card>
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
-          <CardTitle className="text-sm font-medium">Items</CardTitle>
-          <Button variant="outline" size="sm" onClick={addItem}>
-            <Plus className="h-3.5 w-3.5 mr-1" /> Agregar Item
-          </Button>
+          <CardTitle className="text-sm font-medium">Items ({items.length})</CardTitle>
+          <div className="flex gap-2">
+            {isProyecto && (
+              <Button variant="outline" size="sm" onClick={openSelector}>
+                <FileText className="h-3.5 w-3.5 mr-1" /> Desde Pedidos
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={addManualItem}>
+              <Plus className="h-3.5 w-3.5 mr-1" /> Item Manual
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[100px]">Código</TableHead>
-                <TableHead>Descripción</TableHead>
-                <TableHead className="w-[80px]">Unidad</TableHead>
-                <TableHead className="w-[80px] text-right">Cant.</TableHead>
-                <TableHead className="w-[120px] text-right">P. Unit.</TableHead>
-                <TableHead className="w-[120px] text-right">Total</TableHead>
-                <TableHead className="w-[40px]"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {items.map((item, index) => (
-                <TableRow key={index}>
-                  <TableCell>
-                    <Input value={item.codigo} onChange={e => updateItem(index, 'codigo', e.target.value)} placeholder="COD" className="h-8 text-xs" />
-                  </TableCell>
-                  <TableCell>
-                    <Input value={item.descripcion} onChange={e => updateItem(index, 'descripcion', e.target.value)} placeholder="Descripción del item" className="h-8 text-xs" />
-                  </TableCell>
-                  <TableCell>
-                    <Input value={item.unidad} onChange={e => updateItem(index, 'unidad', e.target.value)} className="h-8 text-xs" />
-                  </TableCell>
-                  <TableCell>
-                    <Input type="number" value={item.cantidad} onChange={e => updateItem(index, 'cantidad', parseFloat(e.target.value) || 0)} className="h-8 text-xs text-right" min={0} step={1} />
-                  </TableCell>
-                  <TableCell>
-                    <Input type="number" value={item.precioUnitario} onChange={e => updateItem(index, 'precioUnitario', parseFloat(e.target.value) || 0)} className="h-8 text-xs text-right" min={0} step={0.01} />
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-xs">
-                    {formatCurrency(item.cantidad * item.precioUnitario)}
-                  </TableCell>
-                  <TableCell>
-                    {items.length > 1 && (
-                      <button onClick={() => removeItem(index)} className="p-1 rounded hover:bg-red-50">
-                        <Trash2 className="h-3.5 w-3.5 text-red-500" />
-                      </button>
-                    )}
-                  </TableCell>
+          {items.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+              <PackageSearch className="h-8 w-8 mb-2" />
+              <p className="text-sm">No hay items agregados</p>
+              <p className="text-xs mt-1">
+                {isProyecto
+                  ? 'Agrega items desde pedidos existentes o manualmente'
+                  : hasAsignacion
+                    ? 'Agrega items manualmente'
+                    : 'Selecciona un proyecto o centro de costo primero'}
+              </p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[70px]">Origen</TableHead>
+                  <TableHead className="w-[100px]">Código</TableHead>
+                  <TableHead>Descripción</TableHead>
+                  <TableHead className="w-[80px]">Unidad</TableHead>
+                  <TableHead className="w-[80px] text-right">Cant.</TableHead>
+                  <TableHead className="w-[120px] text-right">P. Unit.</TableHead>
+                  <TableHead className="w-[120px] text-right">Total</TableHead>
+                  <TableHead className="w-[40px]"></TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {items.map((item, index) => {
+                  const isLinked = item.source === 'pedido'
+                  return (
+                    <TableRow key={index}>
+                      <TableCell>
+                        <Badge variant={isLinked ? 'default' : 'outline'} className="text-[10px] px-1.5 py-0">
+                          {isLinked ? 'Pedido' : 'Manual'}
+                        </Badge>
+                        {item.sourceLabel && (
+                          <div className="text-[10px] text-muted-foreground mt-0.5 truncate max-w-[70px]" title={item.sourceLabel}>
+                            {item.sourceLabel}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {isLinked ? (
+                          <span className="text-xs font-mono">{item.codigo}</span>
+                        ) : (
+                          <Input value={item.codigo} onChange={e => updateItem(index, 'codigo', e.target.value)} placeholder="COD" className="h-8 text-xs" />
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {isLinked ? (
+                          <span className="text-xs">{item.descripcion}</span>
+                        ) : (
+                          <Input value={item.descripcion} onChange={e => updateItem(index, 'descripcion', e.target.value)} placeholder="Descripción del item" className="h-8 text-xs" />
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {isLinked ? (
+                          <span className="text-xs">{item.unidad}</span>
+                        ) : (
+                          <Input value={item.unidad} onChange={e => updateItem(index, 'unidad', e.target.value)} className="h-8 text-xs" />
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          value={item.cantidad}
+                          onChange={e => updateItem(index, 'cantidad', parseFloat(e.target.value) || 0)}
+                          className="h-8 text-xs text-right"
+                          min={0}
+                          step={1}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          value={item.precioUnitario}
+                          onChange={e => updateItem(index, 'precioUnitario', parseFloat(e.target.value) || 0)}
+                          className="h-8 text-xs text-right"
+                          min={0}
+                          step={0.01}
+                        />
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-xs">
+                        {formatCurrency(item.cantidad * item.precioUnitario)}
+                      </TableCell>
+                      <TableCell>
+                        <button onClick={() => removeItem(index)} className="p-1 rounded hover:bg-red-50">
+                          <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                        </button>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 
@@ -323,11 +445,88 @@ export default function NuevaOrdenCompraPage() {
             <span className="font-mono">{formatCurrency(total)}</span>
           </div>
         </div>
-        <Button onClick={handleSubmit} disabled={saving} className="bg-orange-600 hover:bg-orange-700">
+        <Button onClick={handleSubmit} disabled={saving || items.length === 0} className="bg-orange-600 hover:bg-orange-700">
           {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
           Crear Orden de Compra
         </Button>
       </div>
+
+      {/* Pedido Item Selector Dialog */}
+      <Dialog open={selectorOpen} onOpenChange={setSelectorOpen}>
+        <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Agregar items desde pedidos</DialogTitle>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-auto">
+            {loadingItems ? (
+              <div className="flex items-center justify-center py-10">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : pedidoItemsDisp.length === 0 ? (
+              <div className="text-center py-10 text-muted-foreground text-sm">
+                No hay items de pedidos disponibles para este proyecto
+                {proveedorId && <span className="block text-xs mt-1">Filtrado por proveedor seleccionado. Cambia el proveedor para ver más items.</span>}
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[40px]"></TableHead>
+                    <TableHead className="w-[100px]">Código</TableHead>
+                    <TableHead>Descripción</TableHead>
+                    <TableHead className="w-[60px]">Unid.</TableHead>
+                    <TableHead className="w-[60px] text-right">Cant.</TableHead>
+                    <TableHead className="w-[90px] text-right">P.Unit.</TableHead>
+                    <TableHead className="w-[120px]">Proveedor</TableHead>
+                    <TableHead className="w-[100px]">Pedido</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pedidoItemsDisp.map(item => (
+                    <TableRow
+                      key={item.id}
+                      className={selectedIds.has(item.id) ? 'bg-orange-50' : 'cursor-pointer hover:bg-muted/50'}
+                      onClick={() => toggleSelect(item.id)}
+                    >
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedIds.has(item.id)}
+                          onCheckedChange={() => toggleSelect(item.id)}
+                        />
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">{item.codigo}</TableCell>
+                      <TableCell className="text-xs">{item.descripcion}</TableCell>
+                      <TableCell className="text-xs">{item.unidad}</TableCell>
+                      <TableCell className="text-xs text-right">{item.cantidad}</TableCell>
+                      <TableCell className="text-xs text-right font-mono">
+                        {item.precioUnitario > 0 ? item.precioUnitario.toFixed(2) : '-'}
+                      </TableCell>
+                      <TableCell className="text-xs truncate max-w-[120px]" title={item.proveedorNombre || ''}>
+                        {item.proveedorNombre || <span className="text-muted-foreground italic">Sin proveedor</span>}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {item.pedidoCodigo}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+
+          <DialogFooter className="mt-2">
+            <Button variant="outline" onClick={() => setSelectorOpen(false)}>Cancelar</Button>
+            <Button
+              onClick={addSelectedItems}
+              disabled={selectedIds.size === 0}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              Agregar {selectedIds.size} item(s)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

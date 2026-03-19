@@ -40,7 +40,7 @@ export async function POST(
         },
         ordenCompraItem: {
           include: {
-            ordenCompra: { select: { numero: true } }
+            ordenCompra: { select: { numero: true, proyectoId: true, proyecto: { select: { nombre: true, gestorId: true } } } }
           }
         },
         confirmadoPor: { select: { name: true } },
@@ -65,17 +65,21 @@ export async function POST(
       )
     }
 
-    const pedidoItem = recepcion.pedidoEquipoItem
-    const pedido = pedidoItem.pedidoEquipo
-    const proyectoId = pedido.proyectoId
-    const ocNumero = recepcion.ordenCompraItem.ordenCompra.numero
+    // Extraer datos con null safety (pedidoEquipoItemId ahora es opcional)
+    const pedidoItem = recepcion.pedidoEquipoItem || null
+    const pedido = pedidoItem?.pedidoEquipo || null
+    const ocItem = recepcion.ordenCompraItem
+    const ocNumero = ocItem.ordenCompra.numero
+    const proyectoId = pedido?.proyectoId || ocItem.ordenCompra.proyectoId || null
+    const proyectoNombre = pedido?.proyecto?.nombre || ocItem.ordenCompra.proyecto?.nombre || null
+    const gestorId = pedido?.proyecto?.gestorId || ocItem.ordenCompra.proyecto?.gestorId || null
+    const itemCodigo = pedidoItem?.codigo || ocItem.codigo
 
     // ═══════════════════════════════════════
     // PASO 1: Confirmar llegada a almacén
     // ═══════════════════════════════════════
     if (paso === 'almacen') {
       const result = await prisma.$transaction(async (tx) => {
-        // 1. Actualizar RecepcionPendiente → en_almacen
         await tx.recepcionPendiente.update({
           where: { id },
           data: {
@@ -86,43 +90,37 @@ export async function POST(
           }
         })
 
-        // 2. Crear EventoTrazabilidad
         await tx.eventoTrazabilidad.create({
           data: {
             id: `evt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             proyectoId,
-            pedidoEquipoId: pedido.id,
+            pedidoEquipoId: pedido?.id || null,
             tipo: 'recepcion_en_almacen',
-            descripcion: `Recepción en almacén: ${recepcion.cantidadRecibida} x ${pedidoItem.codigo} desde OC ${ocNumero}`,
+            descripcion: `Recepción en almacén: ${recepcion.cantidadRecibida} x ${itemCodigo} desde OC ${ocNumero}`,
             usuarioId: session.user.id,
             metadata: {
               recepcionPendienteId: id,
               ordenCompraNumero: ocNumero,
               cantidadRecibida: recepcion.cantidadRecibida,
-              pedidoCodigo: pedido.codigo,
-              itemCodigo: pedidoItem.codigo,
+              pedidoCodigo: pedido?.codigo || null,
+              itemCodigo,
             },
             updatedAt: new Date(),
           }
         })
 
-        return {
-          recepcionId: id,
-          paso: 'almacen',
-          nuevoEstado: 'en_almacen',
-        }
+        return { recepcionId: id, paso: 'almacen', nuevoEstado: 'en_almacen' }
       })
 
-      // Notificar al gestor: material llegó a almacén
-      if (pedido.proyecto?.gestorId) {
+      if (gestorId) {
         crearNotificacion(prisma, {
-          usuarioId: pedido.proyecto.gestorId,
+          usuarioId: gestorId,
           titulo: 'Material recibido en almacén',
-          mensaje: `${recepcion.cantidadRecibida} x ${pedidoItem.codigo} (OC ${ocNumero}) para ${pedido.proyecto?.nombre || pedido.codigo}`,
+          mensaje: `${recepcion.cantidadRecibida} x ${itemCodigo} (OC ${ocNumero}) para ${proyectoNombre || 'proyecto'}`,
           tipo: 'info',
           prioridad: 'media',
-          entidadTipo: 'PedidoEquipo',
-          entidadId: pedido.id,
+          entidadTipo: pedido ? 'PedidoEquipo' : 'OrdenCompra',
+          entidadId: pedido?.id || ocItem.ordenCompraId,
           accionUrl: '/logistica/recepciones',
           accionTexto: 'Ver recepciones',
         })
@@ -146,148 +144,153 @@ export async function POST(
         }
       })
 
-      // 2. Actualizar PedidoEquipoItem.cantidadAtendida
-      const nuevaCantidadAtendida = (pedidoItem.cantidadAtendida || 0) + recepcion.cantidadRecibida
-      let nuevoEstadoEntrega: 'pendiente' | 'parcial' | 'entregado' = 'pendiente'
-      if (nuevaCantidadAtendida >= pedidoItem.cantidadPedida) {
-        nuevoEstadoEntrega = 'entregado'
-      } else if (nuevaCantidadAtendida > 0) {
-        nuevoEstadoEntrega = 'parcial'
+      let entregaItemId: string | null = null
+      let nuevoEstadoEntrega: string | null = null
+      let nuevoEstadoPedido: string | null = null
+
+      // ─── Path A: Item vinculado a Pedido (flujo completo) ───
+      if (pedidoItem && pedido) {
+        const nuevaCantidadAtendida = (pedidoItem.cantidadAtendida || 0) + recepcion.cantidadRecibida
+        nuevoEstadoEntrega = 'pendiente'
+        if (nuevaCantidadAtendida >= pedidoItem.cantidadPedida) {
+          nuevoEstadoEntrega = 'entregado'
+        } else if (nuevaCantidadAtendida > 0) {
+          nuevoEstadoEntrega = 'parcial'
+        }
+
+        let estadoDerivado: string | undefined = undefined
+        if (nuevoEstadoEntrega === 'entregado') estadoDerivado = 'entregado'
+        else if (nuevoEstadoEntrega === 'parcial') estadoDerivado = 'parcial'
+
+        await tx.pedidoEquipoItem.update({
+          where: { id: pedidoItem.id },
+          data: {
+            cantidadAtendida: nuevaCantidadAtendida,
+            estadoEntrega: nuevoEstadoEntrega as any,
+            fechaEntregaReal: new Date(),
+            ...(estadoDerivado ? { estado: estadoDerivado as any } : {}),
+            updatedAt: new Date()
+          }
+        })
+
+        // Crear EntregaItem
+        entregaItemId = `ent-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        await tx.entregaItem.create({
+          data: {
+            id: entregaItemId,
+            pedidoEquipoItemId: pedidoItem.id,
+            listaEquipoItemId: pedidoItem.listaEquipoItemId || null,
+            recepcionPendienteId: id,
+            proyectoId: pedido.proyectoId,
+            fechaEntrega: new Date(),
+            estado: nuevoEstadoEntrega as any,
+            cantidad: pedidoItem.cantidadPedida,
+            cantidadEntregada: recepcion.cantidadRecibida,
+            observaciones: observaciones || `Entrega a proyecto desde OC ${ocNumero}`,
+            usuarioId: session.user.id,
+          }
+        })
+
+        // Actualizar ListaEquipoItem si existe (vía pedido)
+        if (pedidoItem.listaEquipoItemId) {
+          const sumResult = await tx.pedidoEquipoItem.aggregate({
+            where: { listaEquipoItemId: pedidoItem.listaEquipoItemId },
+            _sum: { cantidadAtendida: true }
+          })
+          const allLinkedItems = await tx.pedidoEquipoItem.findMany({
+            where: { listaEquipoItemId: pedidoItem.listaEquipoItemId },
+            select: { precioUnitario: true, cantidadAtendida: true }
+          })
+          const costoReal = allLinkedItems.reduce((sum, item) =>
+            sum + ((item.precioUnitario || 0) * (item.cantidadAtendida || 0)), 0)
+
+          await tx.listaEquipoItem.update({
+            where: { id: pedidoItem.listaEquipoItemId },
+            data: {
+              costoReal,
+              cantidadEntregada: sumResult._sum.cantidadAtendida || 0
+            }
+          })
+        }
+
+        // Recalcular PedidoEquipo.estado
+        const allPedidoItems = await tx.pedidoEquipoItem.findMany({
+          where: { pedidoId: pedido.id },
+          select: { estado: true, precioUnitario: true, cantidadAtendida: true }
+        })
+
+        const costoRealTotal = allPedidoItems.reduce((sum, item) =>
+          sum + ((item.precioUnitario || 0) * (item.cantidadAtendida || 0)), 0)
+
+        const estados = allPedidoItems.map(i => i.estado)
+        if (estados.every(e => e === 'cancelado')) {
+          nuevoEstadoPedido = 'cancelado'
+        } else if (estados.every(e => e === 'entregado' || e === 'cancelado')) {
+          nuevoEstadoPedido = 'entregado'
+        } else if (estados.some(e => e !== 'pendiente' && e !== 'cancelado')) {
+          nuevoEstadoPedido = 'parcial'
+        }
+
+        if (nuevoEstadoPedido || costoRealTotal > 0) {
+          await tx.pedidoEquipo.update({
+            where: { id: pedido.id },
+            data: {
+              ...(nuevoEstadoPedido ? { estado: nuevoEstadoPedido as any } : {}),
+              costoRealTotal,
+              updatedAt: new Date()
+            }
+          })
+        }
       }
+      // ─── Path C: Item manual (sin pedido) ───
+      // Solo se marca entregado_proyecto en RecepcionPendiente (ya hecho arriba)
 
-      // Derivar estado del item desde estadoEntrega
-      let estadoDerivado: 'pendiente' | 'atendido' | 'parcial' | 'entregado' | undefined = undefined
-      if (nuevoEstadoEntrega === 'entregado') estadoDerivado = 'entregado'
-      else if (nuevoEstadoEntrega === 'parcial') estadoDerivado = 'parcial'
-
-      await tx.pedidoEquipoItem.update({
-        where: { id: pedidoItem.id },
-        data: {
-          cantidadAtendida: nuevaCantidadAtendida,
-          estadoEntrega: nuevoEstadoEntrega,
-          fechaEntregaReal: new Date(),
-          ...(estadoDerivado ? { estado: estadoDerivado } : {}),
-          updatedAt: new Date()
-        }
-      })
-
-      // 3. Crear EntregaItem
-      const entregaItemId = `ent-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-      await tx.entregaItem.create({
-        data: {
-          id: entregaItemId,
-          pedidoEquipoItemId: pedidoItem.id,
-          listaEquipoItemId: pedidoItem.listaEquipoItemId || null,
-          recepcionPendienteId: id,
-          proyectoId,
-          fechaEntrega: new Date(),
-          estado: nuevoEstadoEntrega as any,
-          cantidad: pedidoItem.cantidadPedida,
-          cantidadEntregada: recepcion.cantidadRecibida,
-          observaciones: observaciones || `Entrega a proyecto desde OC ${ocNumero}`,
-          usuarioId: session.user.id,
-        }
-      })
-
-      // 4. Crear EventoTrazabilidad
+      // Crear EventoTrazabilidad
       await tx.eventoTrazabilidad.create({
         data: {
           id: `evt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           entregaItemId,
           proyectoId,
-          pedidoEquipoId: pedido.id,
+          pedidoEquipoId: pedido?.id || null,
           tipo: 'entrega_a_proyecto',
-          descripcion: `Entrega a proyecto: ${recepcion.cantidadRecibida} x ${pedidoItem.codigo} desde almacén (OC ${ocNumero})`,
-          estadoAnterior: pedidoItem.estadoEntrega as any,
-          estadoNuevo: nuevoEstadoEntrega as any,
+          descripcion: `Entrega a proyecto: ${recepcion.cantidadRecibida} x ${itemCodigo} desde almacén (OC ${ocNumero})`,
+          estadoAnterior: pedidoItem?.estadoEntrega as any || null,
+          estadoNuevo: nuevoEstadoEntrega as any || null,
           usuarioId: session.user.id,
           metadata: {
             recepcionPendienteId: id,
             ordenCompraNumero: ocNumero,
             cantidadRecibida: recepcion.cantidadRecibida,
-            pedidoCodigo: pedido.codigo,
-            itemCodigo: pedidoItem.codigo,
+            pedidoCodigo: pedido?.codigo || null,
+            itemCodigo,
+            origen: pedidoItem ? 'pedido' : 'manual',
           },
           updatedAt: new Date()
         }
       })
 
-      // 5. Actualizar ListaEquipoItem.cantidadEntregada si existe
-      if (pedidoItem.listaEquipoItemId) {
-        const sumResult = await tx.pedidoEquipoItem.aggregate({
-          where: { listaEquipoItemId: pedidoItem.listaEquipoItemId },
-          _sum: { cantidadAtendida: true }
-        })
-        const allLinkedItems = await tx.pedidoEquipoItem.findMany({
-          where: { listaEquipoItemId: pedidoItem.listaEquipoItemId },
-          select: { precioUnitario: true, cantidadAtendida: true }
-        })
-        const costoReal = allLinkedItems.reduce((sum, item) =>
-          sum + ((item.precioUnitario || 0) * (item.cantidadAtendida || 0)), 0)
-
-        await tx.listaEquipoItem.update({
-          where: { id: pedidoItem.listaEquipoItemId },
-          data: {
-            costoReal,
-            cantidadEntregada: sumResult._sum.cantidadAtendida || 0
-          }
-        })
-      }
-
-      // 6. Recalcular PedidoEquipo.estado
-      const allPedidoItems = await tx.pedidoEquipoItem.findMany({
-        where: { pedidoId: pedido.id },
-        select: { estado: true, precioUnitario: true, cantidadAtendida: true }
-      })
-
-      const costoRealTotal = allPedidoItems.reduce((sum, item) =>
-        sum + ((item.precioUnitario || 0) * (item.cantidadAtendida || 0)), 0)
-
-      const estados = allPedidoItems.map(i => i.estado)
-      let nuevoEstadoPedido: 'borrador' | 'enviado' | 'atendido' | 'parcial' | 'entregado' | 'cancelado' | null = null
-      if (estados.every(e => e === 'cancelado')) {
-        nuevoEstadoPedido = 'cancelado'
-      } else if (estados.every(e => e === 'entregado' || e === 'cancelado')) {
-        nuevoEstadoPedido = 'entregado'
-      } else if (estados.some(e => e !== 'pendiente' && e !== 'cancelado')) {
-        nuevoEstadoPedido = 'parcial'
-      }
-
-      if (nuevoEstadoPedido || costoRealTotal > 0) {
-        await tx.pedidoEquipo.update({
-          where: { id: pedido.id },
-          data: {
-            ...(nuevoEstadoPedido ? { estado: nuevoEstadoPedido } : {}),
-            costoRealTotal,
-            updatedAt: new Date()
-          }
-        })
-      }
-
       return {
         recepcionId: id,
         paso: 'proyecto',
         entregaItemId,
-        pedidoItemId: pedidoItem.id,
+        pedidoItemId: pedidoItem?.id || null,
         cantidadRecibida: recepcion.cantidadRecibida,
-        nuevaCantidadAtendida,
         nuevoEstadoEntrega,
         nuevoEstadoPedido,
       }
     })
 
-    // Notificar al gestor: material entregado a proyecto
-    if (pedido.proyecto?.gestorId) {
+    if (gestorId) {
       crearNotificacion(prisma, {
-        usuarioId: pedido.proyecto.gestorId,
+        usuarioId: gestorId,
         titulo: 'Material entregado a proyecto',
-        mensaje: `${recepcion.cantidadRecibida} x ${pedidoItem.codigo} (OC ${ocNumero}) entregado a ${pedido.proyecto?.nombre || pedido.codigo}`,
+        mensaje: `${recepcion.cantidadRecibida} x ${itemCodigo} (OC ${ocNumero}) entregado a ${proyectoNombre || 'proyecto'}`,
         tipo: 'success',
         prioridad: 'media',
-        entidadTipo: 'PedidoEquipo',
-        entidadId: pedido.id,
-        accionUrl: `/proyectos/${proyectoId}`,
-        accionTexto: 'Ver proyecto',
+        entidadTipo: pedido ? 'PedidoEquipo' : 'OrdenCompra',
+        entidadId: pedido?.id || ocItem.ordenCompraId,
+        accionUrl: proyectoId ? `/proyectos/${proyectoId}` : '/logistica/recepciones',
+        accionTexto: pedido ? 'Ver proyecto' : 'Ver recepciones',
       })
     }
 

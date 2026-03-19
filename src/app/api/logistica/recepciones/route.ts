@@ -24,17 +24,28 @@ export async function GET(request: NextRequest) {
     }
 
     if (proyectoId) {
-      where.pedidoEquipoItem = {
-        pedidoEquipo: { proyectoId }
-      }
+      where.AND = [
+        ...(where.AND || []),
+        {
+          OR: [
+            { pedidoEquipoItem: { pedidoEquipo: { proyectoId } } },
+            { ordenCompraItem: { ordenCompra: { proyectoId } } },
+          ]
+        }
+      ]
     }
 
     if (search) {
-      where.OR = [
-        { ordenCompraItem: { codigo: { contains: search, mode: 'insensitive' } } },
-        { ordenCompraItem: { descripcion: { contains: search, mode: 'insensitive' } } },
-        { ordenCompraItem: { ordenCompra: { numero: { contains: search, mode: 'insensitive' } } } },
-        { pedidoEquipoItem: { codigo: { contains: search, mode: 'insensitive' } } },
+      where.AND = [
+        ...(where.AND || []),
+        {
+          OR: [
+            { ordenCompraItem: { codigo: { contains: search, mode: 'insensitive' } } },
+            { ordenCompraItem: { descripcion: { contains: search, mode: 'insensitive' } } },
+            { ordenCompraItem: { ordenCompra: { numero: { contains: search, mode: 'insensitive' } } } },
+            { pedidoEquipoItem: { codigo: { contains: search, mode: 'insensitive' } } },
+          ]
+        }
       ]
     }
 

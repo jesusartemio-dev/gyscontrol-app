@@ -5,7 +5,7 @@ import { authOptions } from '@/lib/auth'
 
 /**
  * GET /api/orden-compra/items-disponibles?proyectoId=X&proveedorId=Y
- * Returns items available for OC creation from pedidos and listas of a project.
+ * Returns pedido items available for OC creation (without existing OC).
  */
 export async function GET(req: Request) {
   try {
@@ -24,7 +24,7 @@ export async function GET(req: Request) {
     }
     const proveedorId = searchParams.get('proveedorId') || undefined
 
-    // 1. Items de pedidos elegibles (enviado/atendido/parcial) sin OC existente
+    // Items de pedidos elegibles (enviado/atendido/parcial) sin OC existente
     const pedidoItems = await prisma.pedidoEquipoItem.findMany({
       where: {
         pedidoEquipo: {
@@ -55,45 +55,8 @@ export async function GET(req: Request) {
       orderBy: { createdAt: 'desc' },
     })
 
-    // 2. Items de listas del proyecto que NO tienen pedido activo ni OC directa
-    const listaItems = await prisma.listaEquipoItem.findMany({
-      where: {
-        listaEquipo: {
-          proyectoId,
-          estado: { notIn: ['borrador', 'cancelada'] as any },
-        },
-        // Excluir items que ya tienen pedido activo (no cancelado)
-        pedidoEquipoItem: {
-          none: {
-            pedidoEquipo: { estado: { notIn: ['cancelado'] } },
-            estado: { notIn: ['cancelado'] },
-          },
-        },
-        // Excluir items que ya tienen OC directa
-        ordenCompraItems: { none: {} },
-        estado: { notIn: ['completada'] as any },
-        ...(proveedorId ? { proveedorId } : {}),
-      },
-      select: {
-        id: true,
-        codigo: true,
-        descripcion: true,
-        unidad: true,
-        cantidad: true,
-        precioElegido: true,
-        proveedorId: true,
-        listaEquipo: {
-          select: { id: true, nombre: true },
-        },
-        proveedor: {
-          select: { id: true, nombre: true },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    }) as any[]
-
     return NextResponse.json({
-      pedidoItems: pedidoItems.map((item: any) => ({
+      items: pedidoItems.map(item => ({
         id: item.id,
         codigo: item.codigo,
         descripcion: item.descripcion,
@@ -105,20 +68,6 @@ export async function GET(req: Request) {
         listaEquipoItemId: item.listaEquipoItemId,
         pedidoCodigo: item.pedidoEquipo.codigo,
         pedidoId: item.pedidoEquipo.id,
-        source: 'pedido' as const,
-      })),
-      listaItems: listaItems.map(item => ({
-        id: item.id,
-        codigo: item.codigo,
-        descripcion: item.descripcion,
-        unidad: item.unidad,
-        cantidad: item.cantidad,
-        precioUnitario: item.precioElegido || 0,
-        proveedorId: item.proveedorId,
-        proveedorNombre: item.proveedor?.nombre || null,
-        listaNombre: item.listaEquipo.nombre,
-        listaId: item.listaEquipo.id,
-        source: 'lista' as const,
       })),
     })
   } catch (error) {

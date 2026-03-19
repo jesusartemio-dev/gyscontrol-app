@@ -36,9 +36,6 @@ export async function POST(
             }
           }
         },
-        listaEquipoItem: {
-          select: { id: true, codigo: true, cantidad: true, cantidadEntregada: true, costoReal: true }
-        },
         ordenCompraItem: {
           include: {
             ordenCompra: { select: { id: true, numero: true, proyectoId: true } }
@@ -54,10 +51,9 @@ export async function POST(
 
     const pedidoItem = recepcion.pedidoEquipoItem || null
     const pedido = pedidoItem?.pedidoEquipo || null
-    const listaItem = recepcion.listaEquipoItem || null
     const ocNumero = recepcion.ordenCompraItem.ordenCompra.numero
     const proyectoId = pedido?.proyectoId || recepcion.ordenCompraItem.ordenCompra.proyectoId || null
-    const itemCodigo = pedidoItem?.codigo || listaItem?.codigo || recepcion.ordenCompraItem.codigo
+    const itemCodigo = pedidoItem?.codigo || recepcion.ordenCompraItem.codigo
 
     // ═══════════════════════════════════════
     // RETROCESO: en_almacen → pendiente
@@ -208,20 +204,7 @@ export async function POST(
           }
         })
       }
-      // Si tiene lista directa (sin pedido): revertir cantidadEntregada
-      else if (listaItem && recepcion.listaEquipoItemId) {
-        const nuevaCantidadEntregada = Math.max(0, (listaItem.cantidadEntregada || 0) - recepcion.cantidadRecibida)
-        const ocPrecio = recepcion.ordenCompraItem.precioUnitario
-        const costoReal = Math.max(0, (listaItem.costoReal || 0) - (ocPrecio * recepcion.cantidadRecibida))
-
-        await tx.listaEquipoItem.update({
-          where: { id: recepcion.listaEquipoItemId },
-          data: {
-            cantidadEntregada: nuevaCantidadEntregada,
-            costoReal,
-          }
-        })
-      }
+      // Path C: Item manual (sin pedido) — no hay nada adicional que revertir
 
       // Retroceder RecepcionPendiente a en_almacen
       await tx.recepcionPendiente.update({

@@ -3505,7 +3505,7 @@ model OrdenCompraItem {
 
 model RecepcionPendiente {
   id                   String           @id @default(cuid())
-  pedidoEquipoItemId   String
+  pedidoEquipoItemId   String?
   ordenCompraItemId    String
   cantidadRecibida     Float
   fechaRecepcion       DateTime         @default(now())
@@ -3521,11 +3521,11 @@ model RecepcionPendiente {
   createdAt            DateTime         @default(now())
   updatedAt            DateTime         @updatedAt
 
-  pedidoEquipoItem PedidoEquipoItem @relation(fields: [pedidoEquipoItemId], references: [id], onDelete: Cascade)
-  ordenCompraItem  OrdenCompraItem  @relation(fields: [ordenCompraItemId], references: [id], onDelete: Cascade)
-  confirmadoPor    User?            @relation("RecepcionConfirmador", fields: [confirmadoPorId], references: [id])
-  entregadoPor     User?            @relation("RecepcionEntregador", fields: [entregadoPorId], references: [id])
-  rechazadoPor     User?            @relation("RecepcionRechazador", fields: [rechazadoPorId], references: [id])
+  pedidoEquipoItem PedidoEquipoItem? @relation(fields: [pedidoEquipoItemId], references: [id], onDelete: Cascade)
+  ordenCompraItem  OrdenCompraItem   @relation(fields: [ordenCompraItemId], references: [id], onDelete: Cascade)
+  confirmadoPor    User?             @relation("RecepcionConfirmador", fields: [confirmadoPorId], references: [id])
+  entregadoPor     User?             @relation("RecepcionEntregador", fields: [entregadoPorId], references: [id])
+  rechazadoPor     User?             @relation("RecepcionRechazador", fields: [rechazadoPorId], references: [id])
   entregasItem     EntregaItem[]
 
   @@index([pedidoEquipoItemId])

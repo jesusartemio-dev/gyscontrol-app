@@ -91,6 +91,33 @@ export const registrarRecepcionOC = (id: string, items: { itemId: string; cantid
 export const retrocederOC = (id: string, targetEstado: string, motivo?: string) =>
   postAction(id, 'retroceder', { targetEstado, motivo })
 
+export interface ItemDisponible {
+  id: string
+  codigo: string
+  descripcion: string
+  unidad: string
+  cantidad: number
+  precioUnitario: number
+  proveedorId: string | null
+  proveedorNombre: string | null
+  listaEquipoItemId?: string
+  pedidoCodigo: string
+  pedidoId: string
+}
+
+export async function fetchItemsDisponibles(proyectoId: string, proveedorId?: string): Promise<{
+  items: ItemDisponible[]
+}> {
+  const params = new URLSearchParams({ proyectoId })
+  if (proveedorId) params.set('proveedorId', proveedorId)
+  const res = await fetch(`${BASE_URL}/items-disponibles?${params}`)
+  if (!res.ok) {
+    const err = await res.json()
+    throw new Error(err.error || 'Error al obtener items disponibles')
+  }
+  return res.json()
+}
+
 export async function generarOCsDesdePedido(payload: {
   pedidoId: string
   itemIds?: string[]

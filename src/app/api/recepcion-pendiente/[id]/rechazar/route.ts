@@ -40,7 +40,7 @@ export async function POST(
         },
         ordenCompraItem: {
           include: {
-            ordenCompra: { select: { id: true, numero: true } }
+            ordenCompra: { select: { id: true, numero: true, proyectoId: true } }
           }
         }
       }
@@ -57,9 +57,10 @@ export async function POST(
       )
     }
 
-    const pedidoItem = recepcion.pedidoEquipoItem
-    const pedido = pedidoItem.pedidoEquipo
+    const pedidoItem = recepcion.pedidoEquipoItem || null
+    const pedido = pedidoItem?.pedidoEquipo || null
     const ocNumero = recepcion.ordenCompraItem.ordenCompra.numero
+    const itemCodigo = pedidoItem?.codigo || recepcion.ordenCompraItem.codigo
     const motivo = observaciones.trim()
 
     await prisma.$transaction(async (tx) => {
@@ -105,17 +106,17 @@ export async function POST(
       await tx.eventoTrazabilidad.create({
         data: {
           id: `evt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          proyectoId: pedido.proyectoId,
-          pedidoEquipoId: pedido.id,
+          proyectoId: pedido?.proyectoId || recepcion.ordenCompraItem.ordenCompra.proyectoId || null,
+          pedidoEquipoId: pedido?.id || null,
           tipo: 'rechazo_recepcion',
-          descripcion: `Item rechazado en recepción: ${motivo}. ${recepcion.cantidadRecibida} x ${pedidoItem.codigo} de OC ${ocNumero} no aceptados.`,
+          descripcion: `Item rechazado en recepción: ${motivo}. ${recepcion.cantidadRecibida} x ${itemCodigo} de OC ${ocNumero} no aceptados.`,
           usuarioId: session.user.id,
           metadata: {
             recepcionPendienteId: id,
             ordenCompraNumero: ocNumero,
             cantidadRecibida: recepcion.cantidadRecibida,
-            pedidoCodigo: pedido.codigo,
-            itemCodigo: pedidoItem.codigo,
+            pedidoCodigo: pedido?.codigo || null,
+            itemCodigo,
             motivoRechazo: motivo,
           },
           updatedAt: new Date(),
