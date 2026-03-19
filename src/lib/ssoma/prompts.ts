@@ -241,9 +241,22 @@ ${d.actividades.hayTrabajoCaliente ? `39. Esmerilado de estructuras metálicas y
 44. Trabajos en días de calor extremo (>30°C) en exterior
 45. Exposición a ruido por zona: distinguir ruido de planta cliente vs ruido propio de obra
 
-Genera EXACTAMENTE el JSON solicitado con MÍNIMO 55 filas.
-Cada actividad principal debe tener al menos 2 sub-actividades.
-Es crítico que el array filas tenga al menos 55 objetos.
+FILAS ADICIONALES OBLIGATORIAS — agrega estas si no las tienes ya:
+Fila extra 1:  proceso=RIESGOS FÍSICOS | actividad=Exposición a ruido planta | subActividad=Operación de equipos rotativos cliente | peligro=Ruido continuo >85dB | riesgo=Hipoacusia | consecuencia=Pérdida auditiva irreversible | severidad=3 | probabilidad=C
+Fila extra 2:  proceso=RIESGOS FÍSICOS | actividad=Radiación no ionizante | subActividad=Trabajo cerca de equipos eléctricos en operación | peligro=Campos electromagnéticos de variadores Siemens G120C | riesgo=Exposición a radiación no ionizante | consecuencia=Fatiga, cefalea, alteraciones | severidad=3 | probabilidad=D
+Fila extra 3:  proceso=RIESGOS MECÁNICOS | actividad=Proyección de partículas | subActividad=Corte conduit con esmeril angular | peligro=Esquirlas y chispas metálicas | riesgo=Impacto en ojos y piel | consecuencia=Lesiones oculares, quemaduras superficiales | severidad=3 | probabilidad=B
+Fila extra 4:  proceso=RIESGOS MECÁNICOS | actividad=Tránsito de vehículos | subActividad=Movilización interna en planta cliente | peligro=Montacargas y vehículos de planta en movimiento | riesgo=Atropello | consecuencia=Fracturas, politraumatismo, muerte | severidad=2 | probabilidad=C
+Fila extra 5:  proceso=RIESGOS MECÁNICOS | actividad=Caída de objetos | subActividad=Trabajos en niveles superiores simultáneos | peligro=Herramientas o materiales desde altura | riesgo=Golpe por objeto que cae | consecuencia=Traumatismo craneoencefálico, muerte | severidad=2 | probabilidad=C
+Fila extra 6:  proceso=RIESGOS QUÍMICOS | actividad=Exposición a químicos cliente | subActividad=Trabajo en Zona Tanques ZPQR | peligro=Vapores de Binato y solventes de proceso QROMA | riesgo=Inhalación de vapores tóxicos | consecuencia=Intoxicación, daño pulmonar | severidad=2 | probabilidad=C
+Fila extra 7:  proceso=RIESGOS ERGONÓMICOS | actividad=Trabajo prolongado de pie | subActividad=Jornadas de 8-10h en instalación | peligro=Postura estática prolongada en superficies duras | riesgo=Carga física de trabajo | consecuencia=Trastornos musculoesqueléticos | severidad=4 | probabilidad=C
+Fila extra 8:  proceso=RIESGOS ELÉCTRICOS | actividad=Trabajo cerca de equipos energizados cliente | subActividad=Instalación adyacente a tableros en operación | peligro=Tableros energizados de planta cliente en funcionamiento | riesgo=Contacto eléctrico indirecto | consecuencia=Electrocución, quemaduras | severidad=1 | probabilidad=D
+Fila extra 9:  proceso=RIESGOS LOCATIVOS | actividad=Tránsito en planta | subActividad=Desplazamiento entre zonas ZRC-ZT3-ZPQR | peligro=Desniveles, rampas y escaleras fijas de Planta Ñaña | riesgo=Caída a distinto nivel | consecuencia=Fracturas, contusiones | severidad=3 | probabilidad=C
+Fila extra 10: proceso=RIESGOS LOCATIVOS | actividad=Superficies resbalosas | subActividad=Trabajo en zona de tanques con derrames | peligro=Pisos contaminados con aceite o producto de proceso | riesgo=Caída al mismo nivel | consecuencia=Contusiones, fracturas | severidad=4 | probabilidad=C
+Fila extra 11: proceso=RIESGOS PSICOSOCIALES | actividad=Fatiga mental | subActividad=Programación PLC 200h y SCADA 160h | peligro=Trabajo técnico repetitivo y de alta concentración | riesgo=Fatiga mental y estrés | consecuencia=Error humano, accidentes por distracción | severidad=3 | probabilidad=C
+Fila extra 12: proceso=RIESGOS FÍSICOS | actividad=Estrés térmico | subActividad=Trabajo en exterior o cerca de equipos calientes | peligro=Temperatura ambiente >30°C o calor radiante de equipos | riesgo=Estrés térmico | consecuencia=Golpe de calor, deshidratación | severidad=3 | probabilidad=C
+
+Incluye TODAS estas filas en el JSON además de las que ya generas.
+El total debe ser mínimo 57 filas.
 No repitas peligros — cada fila debe ser un riesgo distinto.
 No incluyas texto antes ni después del JSON.`
 }

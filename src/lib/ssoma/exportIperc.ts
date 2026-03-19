@@ -125,12 +125,14 @@ const COLUMNAS = [
   { header: 'RESPONSABLES',            col: 28, width: 16 },
   // SEPARADOR VISUAL (col 29)
   { header: '',                         col: 29, width: 3  },
-  // VERIFICACIONES (cols 30-31) → AD6:AE6
+  // VERIFICACIONES (cols 30-33) → AD6:AG6
   { header: 'Verif. Eval. Severidad ó ctrl ing', col: 30, width: 18 },
   { header: 'Verif. Eval. Acción de mejora',     col: 31, width: 18 },
+  { header: 'Verif. la Eval. de Severidad ó el ctrl de ing', col: 32, width: 20 },
+  { header: 'Verif. La Eval. De la Acción de mejora',        col: 33, width: 20 },
 ]
 
-const TOTAL_COLS = 31
+const TOTAL_COLS = 33
 
 export async function generarExcelIPERC(data: IpercData): Promise<Buffer> {
   const wb = new ExcelJS.Workbook()
@@ -361,6 +363,10 @@ export async function generarExcelIPERC(data: IpercData): Promise<Buffer> {
         setFormula(30, `IF(AND(K${r}=V${r},P${r}="NA"),"ok",IF(AND(K${r}<V${r},P${r}<>"NA"),"OK","Verif Ctrl de ING ó la Severidad"))`)
         // Col 31: Verificación acción mejora — L=prob inicial, W=prob residual
         setFormula(31, `IF(L${r}<W${r},"OK","Pendiente")`)
+        // Col 32: Verif severidad / ctrl ingeniería (R=col18=ctrl ingeniería)
+        setFormula(32, `IF(AND(K${r}=V${r},R${r}="NA"),"ok",IF(AND(K${r}<V${r},R${r}<>"NA"),"OK","Verif Ctrl de ING ó la Severidad"))`)
+        // Col 33: Verif acción mejora detallada (Y=col25=valor residual, AA=col27=acciones mejora)
+        setFormula(33, `IF(L${r}<W${r},IF(AND(Y${r}>15,AA${r}="_"),"OK",IF(AND(Y${r}<16,AA${r}<>"_"),"ok","")),"")`)
 
         currentRow++
       }
