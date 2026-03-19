@@ -22,6 +22,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import {
   ShieldCheck,
@@ -661,6 +671,7 @@ function DocumentoModal({
   const [editContent, setEditContent] = useState(doc.contenidoTexto || '')
   const [saving, setSaving] = useState(false)
   const [regenerating, setRegenerating] = useState(false)
+  const [showRegenerarConfirm, setShowRegenerarConfirm] = useState(false)
 
   const handleSave = async () => {
     setSaving(true)
@@ -706,7 +717,7 @@ function DocumentoModal({
   }
 
   const handleRegenerar = async () => {
-    if (!confirm('¿Regenerar este documento? Se reemplazará el contenido actual.')) return
+    setShowRegenerarConfirm(false)
     setRegenerating(true)
     try {
       const res = await fetch(`/api/ssoma/documento/${doc.id}/regenerar`, { method: 'POST' })
@@ -788,7 +799,7 @@ function DocumentoModal({
             size="sm"
             variant="outline"
             className="h-7 text-xs text-amber-700 hover:text-amber-800 hover:bg-amber-50"
-            onClick={handleRegenerar}
+            onClick={() => setShowRegenerarConfirm(true)}
             disabled={regenerating}
           >
             {regenerating ? (
@@ -834,6 +845,27 @@ function DocumentoModal({
           )}
         </div>
       </DialogContent>
+
+      <AlertDialog open={showRegenerarConfirm} onOpenChange={setShowRegenerarConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Regenerar documento</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se reemplazará el contenido actual de <strong>{doc.codigoDocumento}</strong> con una nueva versión generada por IA. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleRegenerar}
+              className="bg-amber-600 hover:bg-amber-700"
+            >
+              <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+              Regenerar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   )
 }
