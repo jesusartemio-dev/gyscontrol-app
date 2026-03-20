@@ -395,7 +395,7 @@ export default function RecepcionesPage() {
                           {/* En almacén: confirmar proyecto, retroceder, rechazar */}
                           {r.estado === 'en_almacen' && (
                             <>
-                              {['admin', 'gerente', 'gestor', 'coordinador'].includes(role) && (
+                              {['admin', 'gerente', 'logistico', 'coordinador_logistico', 'gestor', 'coordinador'].includes(role) && (
                                 <Button
                                   size="sm"
                                   variant="outline"
