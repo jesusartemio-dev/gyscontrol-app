@@ -32,6 +32,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       return NextResponse.json({ error: 'Solo se pueden editar items en OC borrador' }, { status: 400 })
     }
 
+    const codigo = body.codigo !== undefined ? body.codigo : item.codigo
+    const descripcion = body.descripcion !== undefined ? body.descripcion : item.descripcion
+    const unidad = body.unidad !== undefined ? body.unidad : item.unidad
     const precioUnitario = body.precioUnitario !== undefined ? Number(body.precioUnitario) : item.precioUnitario
     const cantidad = body.cantidad !== undefined ? Number(body.cantidad) : item.cantidad
 
@@ -52,6 +55,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       const updatedItem = await tx.ordenCompraItem.update({
         where: { id },
         data: {
+          codigo,
+          descripcion,
+          unidad,
           precioUnitario,
           cantidad,
           costoTotal,

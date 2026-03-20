@@ -75,7 +75,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
   // Edit item modal state
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [editItemId, setEditItemId] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState({ cantidad: 1, precioUnitario: 0 })
+  const [editForm, setEditForm] = useState({ codigo: '', descripcion: '', unidad: '', cantidad: 1, precioUnitario: 0 })
   const [savingEdit, setSavingEdit] = useState(false)
 
   // Add/delete item state
@@ -105,15 +105,16 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
     }
   }
 
-  const openEditItem = (itemId: string, cantidad: number, precioUnitario: number) => {
+  const openEditItem = (item: { id: string; codigo: string; descripcion: string; unidad: string; cantidad: number; precioUnitario: number }) => {
     if (!esBorrador) return
-    setEditItemId(itemId)
-    setEditForm({ cantidad, precioUnitario })
+    setEditItemId(item.id)
+    setEditForm({ codigo: item.codigo, descripcion: item.descripcion, unidad: item.unidad, cantidad: item.cantidad, precioUnitario: item.precioUnitario })
     setEditModalOpen(true)
   }
 
   const saveEditItem = async () => {
     if (!editItemId || !oc) return
+    if (!editForm.descripcion.trim()) return toast.error('La descripción es obligatoria')
     if (editForm.cantidad <= 0) return toast.error('La cantidad debe ser mayor a 0')
     if (editForm.precioUnitario < 0) return toast.error('El precio no puede ser negativo')
     setSavingEdit(true)
@@ -690,7 +691,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
                     <TableCell>
                       <div className="flex gap-0.5">
                         <button
-                          onClick={() => openEditItem(item.id, item.cantidad, item.precioUnitario)}
+                          onClick={() => openEditItem(item)}
                           className="p-1 rounded hover:bg-blue-50"
                           title="Editar item"
                         >
@@ -1116,19 +1117,33 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
 
       {/* ── Edit Item Modal ─────────────────────────────────── */}
       <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Editar Item</DialogTitle>
-            <DialogDescription>Modifica cantidad y precio unitario</DialogDescription>
+            <DialogDescription>Modifica los datos del item</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label className="text-xs">Cantidad <span className="text-red-500">*</span></Label>
-              <Input type="number" min={0.01} step="any" value={editForm.cantidad} onChange={e => setEditForm(p => ({ ...p, cantidad: parseFloat(e.target.value) || 0 }))} autoFocus />
+              <Label className="text-xs">Código</Label>
+              <Input value={editForm.codigo} onChange={e => setEditForm(p => ({ ...p, codigo: e.target.value }))} placeholder="Código (opcional)" />
             </div>
             <div>
-              <Label className="text-xs">Precio Unitario <span className="text-red-500">*</span></Label>
-              <Input type="number" min={0} step={0.01} value={editForm.precioUnitario} onChange={e => setEditForm(p => ({ ...p, precioUnitario: parseFloat(e.target.value) || 0 }))} />
+              <Label className="text-xs">Descripción <span className="text-red-500">*</span></Label>
+              <Input value={editForm.descripcion} onChange={e => setEditForm(p => ({ ...p, descripcion: e.target.value }))} placeholder="Descripción del item" autoFocus />
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <Label className="text-xs">Unidad</Label>
+                <Input value={editForm.unidad} onChange={e => setEditForm(p => ({ ...p, unidad: e.target.value }))} />
+              </div>
+              <div>
+                <Label className="text-xs">Cantidad <span className="text-red-500">*</span></Label>
+                <Input type="number" min={0.01} step="any" value={editForm.cantidad} onChange={e => setEditForm(p => ({ ...p, cantidad: parseFloat(e.target.value) || 0 }))} />
+              </div>
+              <div>
+                <Label className="text-xs">P. Unit. <span className="text-red-500">*</span></Label>
+                <Input type="number" min={0} step={0.01} value={editForm.precioUnitario} onChange={e => setEditForm(p => ({ ...p, precioUnitario: parseFloat(e.target.value) || 0 }))} />
+              </div>
             </div>
           </div>
           <DialogFooter>
