@@ -341,8 +341,21 @@ export async function POST(req: Request) {
       totalDocumentos: specs.length,
       errores: errores.length > 0 ? errores : undefined,
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error('POST /api/ssoma/expediente:', error)
-    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
+    const rawMsg = error?.message ?? String(error)
+    let userMsg = 'Error al generar documentos'
+
+    if (rawMsg.includes('credit balance') || rawMsg.includes('billing')) {
+      userMsg = 'Sin créditos en la API de Anthropic. Contacta al administrador para recargar créditos.'
+    } else if (rawMsg.includes('rate_limit') || rawMsg.includes('overloaded')) {
+      userMsg = 'La API de IA está saturada. Intenta de nuevo en 1 minuto.'
+    } else if (rawMsg.includes('authentication') || rawMsg.includes('api_key')) {
+      userMsg = 'Error de autenticación con la API de IA. Contacta al administrador.'
+    } else {
+      userMsg = `Error al generar: ${rawMsg.substring(0, 150)}`
+    }
+
+    return NextResponse.json({ error: userMsg }, { status: 500 })
   }
 }

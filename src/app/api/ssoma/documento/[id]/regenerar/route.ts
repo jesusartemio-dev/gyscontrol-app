@@ -319,9 +319,25 @@ export async function POST(
       tokensUsed: response.usage.input_tokens + response.usage.output_tokens,
       duracionMs,
     })
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error)
-    console.error('Error regenerando documento SSOMA:', msg, error)
-    return NextResponse.json({ error: `Error al regenerar: ${msg.substring(0, 200)}` }, { status: 500 })
+  } catch (error: any) {
+    console.error('Error regenerando documento SSOMA:', error)
+
+    // Detectar errores específicos de Anthropic API
+    const rawMsg = error?.message ?? String(error)
+    let userMsg = 'Error al regenerar documento'
+
+    if (rawMsg.includes('credit balance') || rawMsg.includes('billing')) {
+      userMsg = 'Sin créditos en la API de Anthropic. Contacta al administrador para recargar créditos.'
+    } else if (rawMsg.includes('rate_limit') || rawMsg.includes('overloaded')) {
+      userMsg = 'La API de IA está saturada. Intenta de nuevo en 1 minuto.'
+    } else if (rawMsg.includes('authentication') || rawMsg.includes('api_key')) {
+      userMsg = 'Error de autenticación con la API de IA. Contacta al administrador.'
+    } else if (rawMsg.includes('timeout') || rawMsg.includes('ETIMEDOUT')) {
+      userMsg = 'La generación tardó demasiado. Intenta de nuevo.'
+    } else {
+      userMsg = `Error al regenerar: ${rawMsg.substring(0, 150)}`
+    }
+
+    return NextResponse.json({ error: userMsg }, { status: 500 })
   }
 }
