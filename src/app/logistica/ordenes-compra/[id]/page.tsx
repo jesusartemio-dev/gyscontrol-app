@@ -961,6 +961,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
         }
 
         if (!['confirmada', 'completada'].includes(oc.estado)) return null
+        const puedeRegistrarFactura = ['admin', 'gerente', 'administracion'].includes(userRole)
         return (
           <Card className="border-amber-200">
             <CardContent className="p-4 flex items-center justify-between">
@@ -968,7 +969,19 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
                 <AlertTriangle className="h-4 w-4" />
                 Esta OC no tiene factura registrada.
               </div>
-              <Button size="sm" onClick={abrirModalFactura}>
+              <Button
+                size="sm"
+                disabled={!puedeRegistrarFactura}
+                variant={puedeRegistrarFactura ? 'default' : 'secondary'}
+                onClick={() => {
+                  if (!puedeRegistrarFactura) {
+                    toast.error('Solo Administración puede registrar facturas')
+                    return
+                  }
+                  abrirModalFactura()
+                }}
+                title={!puedeRegistrarFactura ? 'Solo Administración puede registrar facturas' : undefined}
+              >
                 Registrar factura
               </Button>
             </CardContent>
