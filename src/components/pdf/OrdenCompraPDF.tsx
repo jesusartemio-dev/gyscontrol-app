@@ -147,28 +147,29 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     paddingHorizontal: 8,
     borderBottom: `1px solid ${colors.borderLight}`,
+    flexWrap: 'nowrap' as const,
   },
   tableRowAlt: {
     backgroundColor: colors.light,
   },
   tableCell: {
-    fontSize: 9,
+    fontSize: 8.5,
     color: colors.dark,
   },
   tableCellRight: {
-    fontSize: 9,
+    fontSize: 8.5,
     color: colors.dark,
     textAlign: 'right',
     width: '100%',
   },
-  // Columns widths
-  colNum: { width: '6%' },
-  colCodigo: { width: '12%' },
-  colDesc: { width: '32%' },
-  colUnd: { width: '8%' },
-  colCant: { width: '10%', textAlign: 'right' as const },
-  colPrecio: { width: '16%', textAlign: 'right' as const },
-  colTotal: { width: '16%', textAlign: 'right' as const },
+  // Columns widths — each View acts as a fixed container so text wraps inside
+  colNum: { width: '5%', flexShrink: 0, overflow: 'hidden' as const },
+  colCodigo: { width: '15%', flexShrink: 0, overflow: 'hidden' as const },
+  colDesc: { width: '34%', flexShrink: 0, overflow: 'hidden' as const },
+  colUnd: { width: '7%', flexShrink: 0, overflow: 'hidden' as const },
+  colCant: { width: '8%', flexShrink: 0, overflow: 'hidden' as const, textAlign: 'right' as const },
+  colPrecio: { width: '15%', flexShrink: 0, overflow: 'hidden' as const, textAlign: 'right' as const },
+  colTotal: { width: '16%', flexShrink: 0, overflow: 'hidden' as const, textAlign: 'right' as const },
   // Totals
   totalsContainer: {
     alignItems: 'flex-end',
