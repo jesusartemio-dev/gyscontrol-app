@@ -28,6 +28,7 @@ const VALID_ROLLBACKS: Record<RollbackEntity, Record<string, string[]>> = {
     parcial: ['enviada'],
     enviada: ['aprobada'],
     aprobada: ['borrador'],
+    cancelada: ['borrador'],
   },
   listaEquipo: {
     por_revisar: ['borrador'],
@@ -107,7 +108,7 @@ async function checkOrdenCompraRollback(id: string, targetEstado: string): Promi
 
   const blockers: RollbackBlocker[] = []
 
-  if (oc.estado === 'aprobada' && targetEstado === 'borrador') {
+  if (['aprobada', 'cancelada'].includes(oc.estado) && targetEstado === 'borrador') {
     // Verificar recepciones activas
     const recepcionCount = await prisma.recepcionPendiente.count({
       where: {
