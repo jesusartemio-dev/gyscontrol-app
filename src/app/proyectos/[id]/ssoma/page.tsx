@@ -747,7 +747,8 @@ function DocumentoModal({
       toast.success(`Documento regenerado — ${[chars, tokens, secs].filter(Boolean).join(' · ')}`)
       onRefresh()
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Error al regenerar')
+      const msg = error instanceof Error ? error.message : 'Error al regenerar'
+      toast.error(msg, { duration: 10000 })
     } finally {
       setRegenerating(false)
     }
