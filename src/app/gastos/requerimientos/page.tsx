@@ -42,6 +42,17 @@ function getAsignadoA(hoja: HojaDeGastos): string {
   return '-'
 }
 
+function getCCExtras(hoja: HojaDeGastos): number {
+  if (!hoja.lineas?.length) return 0
+  const headerCC = hoja.proyectoId || hoja.centroCostoId || ''
+  const extras = new Set<string>()
+  for (const l of hoja.lineas) {
+    const lineaCC = l.proyectoId || l.centroCostoId
+    if (lineaCC && lineaCC !== headerCC) extras.add(lineaCC)
+  }
+  return extras.size
+}
+
 export default function AprobarRequerimientosPage() {
   const router = useRouter()
   const { data: session, status } = useSession()
@@ -215,8 +226,13 @@ export default function AprobarRequerimientosPage() {
                   >
                     <TableCell className="font-mono text-sm font-medium">{hoja.numero}</TableCell>
                     <TableCell className="text-sm">{hoja.empleado?.name || '-'}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
-                      {getAsignadoA(hoja)}
+                    <TableCell className="text-sm text-muted-foreground max-w-[220px]">
+                      <span className="truncate block">{getAsignadoA(hoja)}</span>
+                      {getCCExtras(hoja) > 0 && (
+                        <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 mt-0.5 bg-amber-50 text-amber-700 border-amber-200">
+                          +{getCCExtras(hoja)} CC
+                        </Badge>
+                      )}
                     </TableCell>
                     <TableCell className="text-sm max-w-[180px] truncate">{hoja.motivo}</TableCell>
                     <TableCell className="text-right font-mono text-sm">

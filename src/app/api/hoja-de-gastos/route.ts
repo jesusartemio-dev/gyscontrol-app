@@ -30,7 +30,12 @@ const includeRelations = {
   empleado: { select: { id: true, name: true, email: true } },
   aprobador: { select: { id: true, name: true, email: true } },
   lineas: {
-    include: { adjuntos: true, categoriaGasto: true },
+    include: {
+      adjuntos: true,
+      categoriaGasto: true,
+      proyecto: { select: { id: true, codigo: true, nombre: true } },
+      centroCosto: { select: { id: true, nombre: true } },
+    },
     orderBy: { fecha: 'asc' as const },
   },
 }

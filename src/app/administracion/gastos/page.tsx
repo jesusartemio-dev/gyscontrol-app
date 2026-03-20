@@ -68,6 +68,17 @@ function getAsignadoA(hoja: HojaDeGastos): string {
   return '-'
 }
 
+function getCCExtras(hoja: HojaDeGastos): number {
+  if (!hoja.lineas?.length) return 0
+  const headerCC = hoja.proyectoId || hoja.centroCostoId || ''
+  const extras = new Set<string>()
+  for (const l of hoja.lineas) {
+    const lineaCC = l.proyectoId || l.centroCostoId
+    if (lineaCC && lineaCC !== headerCC) extras.add(lineaCC)
+  }
+  return extras.size
+}
+
 export default function GestionGastosPage() {
   return (
     <Suspense fallback={
@@ -350,8 +361,13 @@ function GestionGastosContent() {
           <div className="text-[10px] text-muted-foreground">{formatDate(hoja.createdAt)}</div>
         </div>
       </div>
-      <div className="text-xs text-muted-foreground truncate mb-2">
-        {getAsignadoA(hoja)} — {hoja.motivo}
+      <div className="text-xs text-muted-foreground truncate mb-2 flex items-center gap-1">
+        <span className="truncate">{getAsignadoA(hoja)} — {hoja.motivo}</span>
+        {getCCExtras(hoja) > 0 && (
+          <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 flex-shrink-0 bg-amber-50 text-amber-700 border-amber-200">
+            +{getCCExtras(hoja)} CC
+          </Badge>
+        )}
       </div>
       {renderActions(hoja)}
     </div>
@@ -476,8 +492,13 @@ function GestionGastosContent() {
                         <TableCell className="text-sm max-w-[130px] truncate">
                           {hoja.empleado?.name || hoja.empleado?.email || '-'}
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground max-w-[180px] truncate">
-                          {getAsignadoA(hoja)}
+                        <TableCell className="text-sm text-muted-foreground max-w-[220px]">
+                          <span className="truncate block">{getAsignadoA(hoja)}</span>
+                          {getCCExtras(hoja) > 0 && (
+                            <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 mt-0.5 bg-amber-50 text-amber-700 border-amber-200">
+                              +{getCCExtras(hoja)} CC
+                            </Badge>
+                          )}
                         </TableCell>
                         <TableCell className="max-w-[160px] truncate text-sm">{hoja.motivo}</TableCell>
                         <TableCell>
