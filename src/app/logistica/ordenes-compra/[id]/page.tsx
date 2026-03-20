@@ -42,6 +42,49 @@ function displayCondicionPago(condicionPago: string, diasCredito?: number | null
   return condicionPago
 }
 
+const FORMAS_PAGO = [
+  { value: 'contado', label: 'Contado' },
+  { value: 'factura', label: 'Factura' },
+  { value: 'cheque', label: 'Cheque' },
+  { value: 'letra', label: 'Letra' },
+  { value: 'adelanto', label: 'Adelanto' },
+  { value: 'otro', label: 'Otro...' },
+]
+
+const DIAS_PAGO = [
+  { value: '7', label: '7 días' },
+  { value: '15', label: '15 días' },
+  { value: '30', label: '30 días' },
+  { value: '45', label: '45 días' },
+  { value: '60', label: '60 días' },
+  { value: 'otro', label: 'Otro...' },
+]
+
+function parseCondicionPago(condicionPago: string): { formaPago: string; diasPago: string; formaPagoCustom: string; diasPagoCustom: string } {
+  const lower = condicionPago.toLowerCase()
+  // Legacy formats
+  if (lower === 'contado') return { formaPago: 'contado', diasPago: '', formaPagoCustom: '', diasPagoCustom: '' }
+  if (lower === 'adelanto' || lower.startsWith('adelanto')) return { formaPago: 'adelanto', diasPago: '', formaPagoCustom: '', diasPagoCustom: '' }
+  if (lower === 'credito' || lower.startsWith('credito_')) return { formaPago: 'factura', diasPago: '', formaPagoCustom: '', diasPagoCustom: '' }
+
+  // Parse "Forma X días" pattern
+  const match = condicionPago.match(/^(Factura|Cheque|Letra)\s+(\d+)\s+días?$/i)
+  if (match) {
+    const forma = match[1].toLowerCase()
+    const dias = match[2]
+    const knownDias = DIAS_PAGO.find(d => d.value === dias)
+    return {
+      formaPago: forma,
+      diasPago: knownDias ? dias : 'otro',
+      formaPagoCustom: '',
+      diasPagoCustom: knownDias ? '' : dias,
+    }
+  }
+
+  // Fallback: treat as custom
+  return { formaPago: 'otro', diasPago: '', formaPagoCustom: condicionPago, diasPagoCustom: '' }
+}
+
 
 export default function OrdenCompraDetallePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -88,7 +131,10 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
   // Header edit modal state
   const [headerEditOpen, setHeaderEditOpen] = useState(false)
   const [headerForm, setHeaderForm] = useState({
-    condicionPago: '',
+    formaPago: 'contado',
+    diasPago: '',
+    diasPagoCustom: '',
+    formaPagoCustom: '',
     moneda: 'PEN',
     lugarEntrega: '',
     contactoEntrega: '',
@@ -115,8 +161,9 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
 
   const openHeaderEdit = () => {
     if (!oc || !esBorrador) return
+    const parsed = parseCondicionPago(oc.condicionPago || 'contado')
     setHeaderForm({
-      condicionPago: oc.condicionPago || '',
+      ...parsed,
       moneda: oc.moneda,
       lugarEntrega: oc.lugarEntrega || '',
       contactoEntrega: oc.contactoEntrega || '',
@@ -134,7 +181,15 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          condicionPago: headerForm.condicionPago || null,
+          condicionPago: (() => {
+            const { formaPago, diasPago, diasPagoCustom, formaPagoCustom } = headerForm
+            if (formaPago === 'otro') return formaPagoCustom || null
+            if (formaPago === 'contado') return 'Contado'
+            if (formaPago === 'adelanto') return 'Adelanto'
+            const forma = FORMAS_PAGO.find(f => f.value === formaPago)?.label || formaPago
+            const dias = diasPago === 'otro' ? diasPagoCustom : diasPago
+            return dias ? `${forma} ${dias} días` : forma
+          })(),
           moneda: headerForm.moneda,
           lugarEntrega: headerForm.lugarEntrega || null,
           contactoEntrega: headerForm.contactoEntrega || null,
@@ -1209,14 +1264,37 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs">Condición de Pago</Label>
-                <Input
-                  value={headerForm.condicionPago}
-                  onChange={(e) => setHeaderForm(f => ({ ...f, condicionPago: e.target.value }))}
-                  placeholder="Ej: Factura, Cheque, Letra"
-                  className="h-9"
-                />
+                <Label className="text-xs">Forma de Pago</Label>
+                <Select value={headerForm.formaPago} onValueChange={v => setHeaderForm(f => ({ ...f, formaPago: v, diasPago: '', diasPagoCustom: '', formaPagoCustom: '' }))}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {FORMAS_PAGO.map(f => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
+              {headerForm.formaPago === 'otro' && (
+                <div>
+                  <Label className="text-xs">Especificar</Label>
+                  <Input value={headerForm.formaPagoCustom} onChange={e => setHeaderForm(f => ({ ...f, formaPagoCustom: e.target.value }))} placeholder="Ej: Transferencia 15 días" className="h-9" />
+                </div>
+              )}
+              {['factura', 'cheque', 'letra'].includes(headerForm.formaPago) && (
+                <div>
+                  <Label className="text-xs">Días</Label>
+                  <Select value={headerForm.diasPago} onValueChange={v => setHeaderForm(f => ({ ...f, diasPago: v, diasPagoCustom: v !== 'otro' ? '' : f.diasPagoCustom }))}>
+                    <SelectTrigger className="h-9"><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                    <SelectContent>
+                      {DIAS_PAGO.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {['factura', 'cheque', 'letra'].includes(headerForm.formaPago) && headerForm.diasPago === 'otro' && (
+                <div>
+                  <Label className="text-xs">Días (personalizado)</Label>
+                  <Input type="number" min={1} value={headerForm.diasPagoCustom} onChange={e => setHeaderForm(f => ({ ...f, diasPagoCustom: e.target.value }))} placeholder="Ej: 90" className="h-9" />
+                </div>
+              )}
               <div>
                 <Label className="text-xs">Moneda</Label>
                 <Select value={headerForm.moneda} onValueChange={v => setHeaderForm(f => ({ ...f, moneda: v }))}>

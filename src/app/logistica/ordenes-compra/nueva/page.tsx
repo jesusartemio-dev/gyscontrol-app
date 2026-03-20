@@ -25,6 +25,24 @@ const MONEDAS = [
   { value: 'USD', label: 'Dólares (USD)' },
 ]
 
+const FORMAS_PAGO = [
+  { value: 'contado', label: 'Contado' },
+  { value: 'factura', label: 'Factura' },
+  { value: 'cheque', label: 'Cheque' },
+  { value: 'letra', label: 'Letra' },
+  { value: 'adelanto', label: 'Adelanto' },
+  { value: 'otro', label: 'Otro...' },
+]
+
+const DIAS_PAGO = [
+  { value: '7', label: '7 días' },
+  { value: '15', label: '15 días' },
+  { value: '30', label: '30 días' },
+  { value: '45', label: '45 días' },
+  { value: '60', label: '60 días' },
+  { value: 'otro', label: 'Otro...' },
+]
+
 const CATEGORIAS = [
   { value: 'equipos', label: 'Equipos' },
   { value: 'servicios', label: 'Servicios' },
@@ -68,7 +86,10 @@ export default function NuevaOrdenCompraPage() {
   const [proveedorId, setProveedorId] = useState('')
   const [asignacion, setAsignacion] = useState<AsignacionValue>({ proyectoId: null, centroCostoId: null })
   const [categoriaCosto, setCategoriaCosto] = useState('equipos')
-  const [condicionPago, setCondicionPago] = useState('')
+  const [formaPago, setFormaPago] = useState('contado')
+  const [diasPago, setDiasPago] = useState('')
+  const [diasPagoCustom, setDiasPagoCustom] = useState('')
+  const [formaPagoCustom, setFormaPagoCustom] = useState('')
   const [moneda, setMoneda] = useState('PEN')
   const [lugarEntrega, setLugarEntrega] = useState('')
   const [contactoEntrega, setContactoEntrega] = useState('')
@@ -133,6 +154,16 @@ export default function NuevaOrdenCompraPage() {
 
   const removeItem = (index: number) => {
     setItems(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const needsDias = ['factura', 'cheque', 'letra'].includes(formaPago)
+  const buildCondicionPago = (): string => {
+    if (formaPago === 'otro') return formaPagoCustom
+    if (formaPago === 'contado') return 'Contado'
+    if (formaPago === 'adelanto') return 'Adelanto'
+    const forma = FORMAS_PAGO.find(f => f.value === formaPago)?.label || formaPago
+    const dias = diasPago === 'otro' ? diasPagoCustom : diasPago
+    return dias ? `${forma} ${dias} días` : forma
   }
 
   const subtotal = items.reduce((sum, item) => sum + (item.cantidad * item.precioUnitario), 0)
@@ -277,7 +308,7 @@ export default function NuevaOrdenCompraPage() {
         centroCostoId: asignacion.centroCostoId || undefined,
         categoriaCosto: categoriaCosto as 'equipos' | 'servicios' | 'gastos',
         requiereRecepcion,
-        condicionPago: condicionPago || undefined,
+        condicionPago: buildCondicionPago() || undefined,
         moneda,
         lugarEntrega: lugarEntrega || undefined,
         contactoEntrega: contactoEntrega || undefined,
@@ -379,14 +410,45 @@ export default function NuevaOrdenCompraPage() {
         <CardContent>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
             <div>
-              <Label className="text-xs">Condición de Pago</Label>
-              <Input
-                value={condicionPago}
-                onChange={(e) => setCondicionPago(e.target.value)}
-                placeholder="Ej: Factura, Cheque, Letra, Adelanto 50%"
-                className="h-9"
-              />
+              <Label className="text-xs">Forma de Pago</Label>
+              <Select value={formaPago} onValueChange={(v) => { setFormaPago(v); setDiasPago(''); setDiasPagoCustom(''); setFormaPagoCustom('') }}>
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {FORMAS_PAGO.map(f => (
+                    <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
+            {formaPago === 'otro' && (
+              <div>
+                <Label className="text-xs">Especificar</Label>
+                <Input value={formaPagoCustom} onChange={e => setFormaPagoCustom(e.target.value)} placeholder="Ej: Transferencia 15 días" className="h-9" />
+              </div>
+            )}
+            {needsDias && (
+              <div>
+                <Label className="text-xs">Días</Label>
+                <Select value={diasPago} onValueChange={(v) => { setDiasPago(v); if (v !== 'otro') setDiasPagoCustom('') }}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Seleccionar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DIAS_PAGO.map(d => (
+                      <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {needsDias && diasPago === 'otro' && (
+              <div>
+                <Label className="text-xs">Días (personalizado)</Label>
+                <Input type="number" min={1} value={diasPagoCustom} onChange={e => setDiasPagoCustom(e.target.value)} placeholder="Ej: 90" className="h-9" />
+              </div>
+            )}
             <div>
               <Label className="text-xs">Moneda</Label>
               <Select value={moneda} onValueChange={setMoneda}>
