@@ -268,7 +268,7 @@ export async function POST(
     }
 
     const startMs = Date.now()
-    const maxTokens = doc.tipo === 'PLAN_EMERGENCIA' ? 8000 : 4000
+    const maxTokens = doc.tipo === 'PLAN_EMERGENCIA' ? 4096 : 4000
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: maxTokens,
