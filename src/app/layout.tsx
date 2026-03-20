@@ -4,6 +4,7 @@ import Sidebar from '@/components/Sidebar'
 import MobileNav from '@/components/MobileNav'
 import MobileSidebar from '@/components/MobileSidebar'
 import { Toaster } from 'react-hot-toast'
+import { Toaster as SonnerToaster } from 'sonner'
 import Providers from '@/components/Providers'
 import { ChatButton } from '@/components/agente/ChatButton'
 
@@ -74,6 +75,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               }
             }}
           />
+          <SonnerToaster position="top-right" richColors closeButton duration={6000} />
         </Providers>
       </body>
     </html>
