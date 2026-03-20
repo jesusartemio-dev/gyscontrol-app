@@ -1390,6 +1390,7 @@ export interface GastoLineaPayload {
   numeroComprobante?: string
   proveedorNombre?: string
   proveedorRuc?: string
+  sunatVerificado?: boolean
   observaciones?: string
   // Override de imputación por línea
   proyectoId?: string | null
@@ -1407,6 +1408,7 @@ export interface GastoLineaUpdatePayload {
   numeroComprobante?: string | null
   proveedorNombre?: string | null
   proveedorRuc?: string | null
+  sunatVerificado?: boolean | null
   observaciones?: string | null
   // Override de imputación por línea
   proyectoId?: string | null

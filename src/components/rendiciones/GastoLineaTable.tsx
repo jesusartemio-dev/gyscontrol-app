@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -31,7 +31,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
-import { Plus, Loader2, Trash2, Edit, Receipt, ScanLine, ShieldCheck, FileSpreadsheet, Download, ArrowRightLeft } from 'lucide-react'
+import { Plus, Loader2, Trash2, Edit, Receipt, ScanLine, ShieldCheck, FileSpreadsheet, Download, ArrowRightLeft, Search, AlertTriangle } from 'lucide-react'
 import { createGastoLinea, updateGastoLinea, deleteGastoLinea } from '@/lib/services/gastoLinea'
 import GastoAdjuntoUpload from './GastoAdjuntoUpload'
 import CargaMasivaComprobantes from './CargaMasivaComprobantes'
@@ -99,6 +99,12 @@ export default function GastoLineaTable({
   const [numeroComprobante, setNumeroComprobante] = useState('')
   const [proveedorNombre, setProveedorNombre] = useState('')
   const [proveedorRuc, setProveedorRuc] = useState('')
+  const [rucLookupLoading, setRucLookupLoading] = useState(false)
+  const [rucSource, setRucSource] = useState<'local' | 'sunat' | null>(null)
+  const [rucAlerta, setRucAlerta] = useState<string | null>(null)
+  const [rucAlertaTipo, setRucAlertaTipo] = useState<'warning' | 'info' | null>(null)
+  const [sunatVerificado, setSunatVerificado] = useState(false)
+  const rucTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Override fields
   const [showOverride, setShowOverride] = useState(false)
@@ -150,12 +156,59 @@ export default function GastoLineaTable({
     setNumeroComprobante('')
     setProveedorNombre('')
     setProveedorRuc('')
+    setRucLookupLoading(false)
+    setRucSource(null)
+    setRucAlerta(null)
+    setRucAlertaTipo(null)
+    setSunatVerificado(false)
     setShowOverride(false)
     setOverrideType('')
     setOverrideProyectoId('')
     setOverrideCentroCostoId('')
     setOverrideCategoriaCosto('')
     setEditLinea(null)
+  }
+
+  const lookupRuc = useCallback(async (ruc: string) => {
+    if (!/^\d{11}$/.test(ruc)) {
+      setRucSource(null)
+      setRucAlerta(null)
+      setRucAlertaTipo(null)
+      setSunatVerificado(false)
+      return
+    }
+    setRucLookupLoading(true)
+    try {
+      const res = await fetch(`/api/consulta-ruc?ruc=${ruc}`)
+      if (!res.ok) throw new Error()
+      const data = await res.json()
+      if (data.nombre) {
+        setProveedorNombre(data.nombre)
+      }
+      setRucSource(data.source)
+      setRucAlerta(data.alerta)
+      setRucAlertaTipo(data.alertaTipo)
+      setSunatVerificado(data.sunatVerificado)
+    } catch {
+      setRucAlerta('Error al consultar RUC')
+      setRucAlertaTipo('info')
+    } finally {
+      setRucLookupLoading(false)
+    }
+  }, [])
+
+  const handleRucChange = (value: string) => {
+    // Solo permitir dígitos
+    const cleaned = value.replace(/\D/g, '').slice(0, 11)
+    setProveedorRuc(cleaned)
+    setRucSource(null)
+    setRucAlerta(null)
+    setSunatVerificado(false)
+
+    if (rucTimeoutRef.current) clearTimeout(rucTimeoutRef.current)
+    if (cleaned.length === 11) {
+      rucTimeoutRef.current = setTimeout(() => lookupRuc(cleaned), 400)
+    }
   }
 
   const openCreate = () => {
@@ -224,6 +277,7 @@ export default function GastoLineaTable({
           numeroComprobante: numeroComprobante || null,
           proveedorNombre: proveedorNombre || null,
           proveedorRuc: proveedorRuc || null,
+          sunatVerificado: sunatVerificado || null,
           ...overrideData,
         })
         toast.success('Linea actualizada')
@@ -238,6 +292,7 @@ export default function GastoLineaTable({
           numeroComprobante: numeroComprobante || undefined,
           proveedorNombre: proveedorNombre || undefined,
           proveedorRuc: proveedorRuc || undefined,
+          sunatVerificado: sunatVerificado || undefined,
           ...overrideData,
         })
         toast.success('Linea agregada')
@@ -530,12 +585,35 @@ export default function GastoLineaTable({
               </div>
               <div className="space-y-1.5">
                 <Label className="text-sm">RUC proveedor</Label>
-                <Input
-                  value={proveedorRuc}
-                  onChange={(e) => setProveedorRuc(e.target.value)}
-                  placeholder="20123456789"
-                  disabled={loading}
-                />
+                <div className="relative">
+                  <Input
+                    value={proveedorRuc}
+                    onChange={(e) => handleRucChange(e.target.value)}
+                    placeholder="20123456789"
+                    disabled={loading}
+                    maxLength={11}
+                  />
+                  {rucLookupLoading && (
+                    <Loader2 className="absolute right-2.5 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
+                  )}
+                  {!rucLookupLoading && rucSource === 'sunat' && (
+                    <ShieldCheck className="absolute right-2.5 top-2.5 h-4 w-4 text-green-600" />
+                  )}
+                  {!rucLookupLoading && rucSource === 'local' && (
+                    <Search className="absolute right-2.5 top-2.5 h-4 w-4 text-blue-500" />
+                  )}
+                </div>
+                {rucAlerta && (
+                  <p className={`text-xs mt-1 flex items-center gap-1 ${rucAlertaTipo === 'warning' ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                    {rucAlertaTipo === 'warning' && <AlertTriangle className="h-3 w-3" />}
+                    {rucAlerta}
+                  </p>
+                )}
+                {rucSource && !rucAlerta && (
+                  <p className="text-xs mt-1 text-muted-foreground">
+                    {rucSource === 'local' ? 'Proveedor encontrado en el sistema' : 'Verificado en SUNAT'}
+                  </p>
+                )}
               </div>
             </div>
 

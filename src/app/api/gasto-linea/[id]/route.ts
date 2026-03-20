@@ -59,6 +59,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (payload.numeroComprobante !== undefined) updateData.numeroComprobante = payload.numeroComprobante
     if (payload.proveedorNombre !== undefined) updateData.proveedorNombre = payload.proveedorNombre
     if (payload.proveedorRuc !== undefined) updateData.proveedorRuc = payload.proveedorRuc
+    if (payload.sunatVerificado !== undefined) updateData.sunatVerificado = payload.sunatVerificado
     if (payload.observaciones !== undefined) updateData.observaciones = payload.observaciones
     if (payload.proyectoId !== undefined) updateData.proyectoId = payload.proyectoId
     if (payload.centroCostoId !== undefined) updateData.centroCostoId = payload.centroCostoId

@@ -5,6 +5,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { getModelForTask } from '@/lib/agente/models'
 import { trackUsage } from '@/lib/agente/usageTracker'
 import { isIAFeatureEnabled } from '@/lib/agente/featureFlags'
+import { consultarSunat, type SunatInfo } from '@/lib/utils/consultaSunat'
 
 // ── Tipos ────────────────────────────────────────────────
 
@@ -20,13 +21,6 @@ interface OcrResult {
   descripcion: string
   confianza: 'alta' | 'media' | 'baja'
   observaciones: string | null
-}
-
-interface SunatInfo {
-  razonSocial: string
-  estado: string
-  condicion: string
-  direccion: string
 }
 
 export interface ComprobanteOcrResponse {
@@ -94,70 +88,6 @@ function getAnthropicClient(): Anthropic {
 
 function getOcrModel(): string {
   return getModelForTask('ocr')
-}
-
-type SunatResult = {
-  sunat: SunatInfo | null
-  sunatAlerta: string | null
-  sunatAlertaTipo: 'warning' | 'info' | null
-}
-
-// ── Consulta SUNAT vía Decolecta (apis.net.pe) ─────────
-// Bearer token en header — sin restricción de IP, ideal para Vercel serverless.
-
-async function consultarSunat(ruc: string): Promise<SunatResult> {
-  const token = process.env.DECOLECTA_API_TOKEN
-  if (!token) {
-    return { sunat: null, sunatAlerta: 'No se pudo verificar RUC en SUNAT', sunatAlertaTipo: 'info' }
-  }
-
-  try {
-    const res = await fetch(
-      `https://api.decolecta.com/v1/sunat/ruc?numero=${ruc}`,
-      {
-        headers: {
-          Accept: 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        signal: AbortSignal.timeout(10000),
-      }
-    )
-
-    if (!res.ok) {
-      console.warn(`Decolecta SUNAT error: HTTP ${res.status} for RUC ${ruc}`)
-      return { sunat: null, sunatAlerta: 'No se pudo verificar RUC en SUNAT', sunatAlertaTipo: 'info' }
-    }
-
-    const data = await res.json()
-
-    if (!data.razon_social) {
-      return { sunat: null, sunatAlerta: 'RUC no encontrado en SUNAT', sunatAlertaTipo: 'info' }
-    }
-
-    const sunat: SunatInfo = {
-      razonSocial: data.razon_social,
-      estado: data.estado || '',
-      condicion: data.condicion || '',
-      direccion: data.direccion || '',
-    }
-
-    let sunatAlerta: string | null = null
-    let sunatAlertaTipo: 'warning' | 'info' | null = null
-
-    if (sunat.condicion && sunat.condicion !== 'HABIDO') {
-      sunatAlerta = `Proveedor NO HABIDO (condición: ${sunat.condicion})`
-      sunatAlertaTipo = 'warning'
-    }
-    if (sunat.estado && sunat.estado !== 'ACTIVO') {
-      sunatAlerta = `Proveedor NO ACTIVO (estado: ${sunat.estado})${sunatAlerta ? `. ${sunatAlerta}` : ''}`
-      sunatAlertaTipo = 'warning'
-    }
-
-    return { sunat, sunatAlerta, sunatAlertaTipo }
-  } catch (error) {
-    console.warn(`Decolecta SUNAT error for RUC ${ruc}:`, error instanceof Error ? error.message : error)
-    return { sunat: null, sunatAlerta: 'No se pudo verificar RUC en SUNAT', sunatAlertaTipo: 'info' }
-  }
 }
 
 function parseOcrResponse(text: string): OcrResult {

@@ -36,7 +36,9 @@ import {
   RotateCcw,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   Circle,
+  Search,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { isImage, isPdf } from '@/types/drive'
@@ -195,6 +197,13 @@ export default function GastoLineaPreviewDrawer({
   const [showObservacionInput, setShowObservacionInput] = useState(false)
   const [observacionText, setObservacionText] = useState('')
 
+  // RUC lookup state
+  const [rucLookupLoading, setRucLookupLoading] = useState(false)
+  const [rucSource, setRucSource] = useState<'local' | 'sunat' | null>(null)
+  const [rucAlerta, setRucAlerta] = useState<string | null>(null)
+  const [rucAlertaTipo, setRucAlertaTipo] = useState<'warning' | 'info' | null>(null)
+  const rucTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   // Edit form state
   const [editForm, setEditForm] = useState({
     descripcion: '',
@@ -257,6 +266,41 @@ export default function GastoLineaPreviewDrawer({
 
   const cancelEditing = () => {
     setIsEditing(false)
+    setRucSource(null)
+    setRucAlerta(null)
+    setRucAlertaTipo(null)
+  }
+
+  const lookupRuc = useCallback(async (ruc: string) => {
+    if (!/^\d{11}$/.test(ruc)) return
+    setRucLookupLoading(true)
+    try {
+      const res = await fetch(`/api/consulta-ruc?ruc=${ruc}`)
+      if (!res.ok) throw new Error()
+      const data = await res.json()
+      if (data.nombre) {
+        setEditForm(f => ({ ...f, proveedorNombre: data.nombre }))
+      }
+      setRucSource(data.source)
+      setRucAlerta(data.alerta)
+      setRucAlertaTipo(data.alertaTipo)
+    } catch {
+      setRucAlerta('Error al consultar RUC')
+      setRucAlertaTipo('info')
+    } finally {
+      setRucLookupLoading(false)
+    }
+  }, [])
+
+  const handleDrawerRucChange = (value: string) => {
+    const cleaned = value.replace(/\D/g, '').slice(0, 11)
+    setEditForm(f => ({ ...f, proveedorRuc: cleaned }))
+    setRucSource(null)
+    setRucAlerta(null)
+    if (rucTimeoutRef.current) clearTimeout(rucTimeoutRef.current)
+    if (cleaned.length === 11) {
+      rucTimeoutRef.current = setTimeout(() => lookupRuc(cleaned), 400)
+    }
   }
 
   const handleSave = async () => {
@@ -528,13 +572,36 @@ export default function GastoLineaPreviewDrawer({
                       </div>
                       <div>
                         <label className="text-[10px] text-muted-foreground block mb-1">RUC</label>
-                        <Input
-                          value={editForm.proveedorRuc}
-                          onChange={(e) => updateField('proveedorRuc', e.target.value)}
-                          className="h-8 text-sm"
-                          placeholder="20123456789"
-                          disabled={saving}
-                        />
+                        <div className="relative">
+                          <Input
+                            value={editForm.proveedorRuc}
+                            onChange={(e) => handleDrawerRucChange(e.target.value)}
+                            className="h-8 text-sm"
+                            placeholder="20123456789"
+                            disabled={saving}
+                            maxLength={11}
+                          />
+                          {rucLookupLoading && (
+                            <Loader2 className="absolute right-2 top-2 h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                          )}
+                          {!rucLookupLoading && rucSource === 'sunat' && (
+                            <ShieldCheck className="absolute right-2 top-2 h-3.5 w-3.5 text-green-600" />
+                          )}
+                          {!rucLookupLoading && rucSource === 'local' && (
+                            <Search className="absolute right-2 top-2 h-3.5 w-3.5 text-blue-500" />
+                          )}
+                        </div>
+                        {rucAlerta && (
+                          <p className={`text-[10px] mt-0.5 flex items-center gap-1 ${rucAlertaTipo === 'warning' ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                            {rucAlertaTipo === 'warning' && <AlertTriangle className="h-3 w-3" />}
+                            {rucAlerta}
+                          </p>
+                        )}
+                        {rucSource && !rucAlerta && (
+                          <p className="text-[10px] mt-0.5 text-muted-foreground">
+                            {rucSource === 'local' ? 'Proveedor del sistema' : 'Verificado SUNAT'}
+                          </p>
+                        )}
                       </div>
                       <div className="border-t pt-3">
                         <label className="text-[10px] text-muted-foreground block mb-1">

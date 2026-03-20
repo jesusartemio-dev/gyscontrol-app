@@ -67,6 +67,7 @@ export async function POST(req: Request) {
         numeroComprobante: payload.numeroComprobante || null,
         proveedorNombre: payload.proveedorNombre || null,
         proveedorRuc: payload.proveedorRuc || null,
+        sunatVerificado: payload.sunatVerificado ?? null,
         observaciones: payload.observaciones || null,
         proyectoId: payload.proyectoId || null,
         centroCostoId: payload.centroCostoId || null,
