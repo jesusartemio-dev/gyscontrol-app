@@ -7,7 +7,9 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { ArrowLeft, Loader2, CheckCircle, CheckCircle2, Send, Package, XCircle, FileDown, Building2, CreditCard, MapPin, AlertTriangle, ShoppingCart, Pencil, Clock, Receipt, Trash2, Plus, Search, Info } from 'lucide-react'
+import { ArrowLeft, Loader2, CheckCircle, CheckCircle2, Send, Package, XCircle, FileDown, Building2, CreditCard, MapPin, AlertTriangle, ShoppingCart, Pencil, Clock, Receipt, Trash2, Plus, Search, Info, Settings2 } from 'lucide-react'
+import { Textarea } from '@/components/ui/textarea'
+import { Switch } from '@/components/ui/switch'
 import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
@@ -89,6 +91,19 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
   const [showAddManual, setShowAddManual] = useState(false)
   const [manualItem, setManualItem] = useState({ descripcion: '', unidad: 'UND', cantidad: 1, precioUnitario: 0 })
 
+  // Header edit modal state
+  const [headerEditOpen, setHeaderEditOpen] = useState(false)
+  const [headerForm, setHeaderForm] = useState({
+    condicionPago: 'contado',
+    diasCredito: '' as number | '',
+    moneda: 'PEN',
+    lugarEntrega: '',
+    contactoEntrega: '',
+    observaciones: '',
+    requiereRecepcion: true,
+  })
+  const [savingHeader, setSavingHeader] = useState(false)
+
   const esBorrador = oc?.estado === 'borrador'
 
   useEffect(() => { loadData() }, [id])
@@ -102,6 +117,51 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
       toast.error('Error al cargar la orden de compra')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const openHeaderEdit = () => {
+    if (!oc || !esBorrador) return
+    setHeaderForm({
+      condicionPago: oc.condicionPago?.startsWith('credito') ? 'credito' : oc.condicionPago,
+      diasCredito: oc.diasCredito || '',
+      moneda: oc.moneda,
+      lugarEntrega: oc.lugarEntrega || '',
+      contactoEntrega: oc.contactoEntrega || '',
+      observaciones: oc.observaciones || '',
+      requiereRecepcion: oc.requiereRecepcion,
+    })
+    setHeaderEditOpen(true)
+  }
+
+  const saveHeaderEdit = async () => {
+    if (!oc) return
+    setSavingHeader(true)
+    try {
+      const res = await fetch(`/api/orden-compra/${oc.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          condicionPago: headerForm.condicionPago === 'credito' ? 'credito' : headerForm.condicionPago,
+          diasCredito: headerForm.condicionPago === 'credito' && headerForm.diasCredito ? Number(headerForm.diasCredito) : null,
+          moneda: headerForm.moneda,
+          lugarEntrega: headerForm.lugarEntrega || null,
+          contactoEntrega: headerForm.contactoEntrega || null,
+          observaciones: headerForm.observaciones || null,
+          requiereRecepcion: headerForm.requiereRecepcion,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Error al guardar')
+      }
+      toast.success('Condiciones actualizadas')
+      setHeaderEditOpen(false)
+      loadData()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Error al guardar')
+    } finally {
+      setSavingHeader(false)
     }
   }
 
@@ -560,6 +620,11 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
             <span className="text-muted-foreground border-l pl-4">{displayCondicionPago(oc.condicionPago, oc.diasCredito)} · {oc.moneda}</span>
             {oc.centroCosto && <span className="text-muted-foreground">CC: {oc.centroCosto.nombre}</span>}
             {oc.proyecto && <span className="text-muted-foreground">{oc.proyecto.codigo}</span>}
+            {esBorrador && (
+              <button onClick={openHeaderEdit} className="p-1 rounded hover:bg-blue-50 ml-1" title="Editar condiciones">
+                <Settings2 className="h-3.5 w-3.5 text-blue-500" />
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -1138,6 +1203,89 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
             <Button onClick={addManualItemToOC} disabled={addingItems} className="bg-orange-600 hover:bg-orange-700">
               {addingItems && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
               Agregar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Edit Header Modal ────────────────────────────────── */}
+      <Dialog open={headerEditOpen} onOpenChange={setHeaderEditOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Editar Condiciones</DialogTitle>
+            <DialogDescription>Modifica las condiciones de la OC mientras está en borrador</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Condición de Pago</Label>
+                <Select value={headerForm.condicionPago} onValueChange={(v) => { setHeaderForm(f => ({ ...f, condicionPago: v })); if (v === 'contado') setHeaderForm(f => ({ ...f, diasCredito: '' })) }}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="contado">Contado</SelectItem>
+                    <SelectItem value="credito">Crédito</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {headerForm.condicionPago === 'credito' && (
+                <div>
+                  <Label className="text-xs">Días de crédito</Label>
+                  <Input type="number" min={1} className="h-9" placeholder="Ej: 30" value={headerForm.diasCredito} onChange={e => setHeaderForm(f => ({ ...f, diasCredito: e.target.value ? Number(e.target.value) : '' }))} />
+                </div>
+              )}
+              <div>
+                <Label className="text-xs">Moneda</Label>
+                <Select value={headerForm.moneda} onValueChange={v => setHeaderForm(f => ({ ...f, moneda: v }))}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="PEN">Soles (PEN)</SelectItem>
+                    <SelectItem value="USD">Dólares (USD)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Lugar de Entrega</Label>
+                <Input value={headerForm.lugarEntrega} onChange={e => setHeaderForm(f => ({ ...f, lugarEntrega: e.target.value }))} placeholder="Dirección" className="h-9" />
+              </div>
+              <div>
+                <Label className="text-xs">Contacto de Entrega</Label>
+                <Input value={headerForm.contactoEntrega} onChange={e => setHeaderForm(f => ({ ...f, contactoEntrega: e.target.value }))} placeholder="Nombre / teléfono" className="h-9" />
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">Observaciones</Label>
+              <Textarea value={headerForm.observaciones} onChange={e => setHeaderForm(f => ({ ...f, observaciones: e.target.value }))} placeholder="Notas adicionales..." rows={2} />
+            </div>
+            <div className="flex items-start gap-3 p-3 rounded-md border bg-muted/30">
+              <Switch
+                id="headerRequiereRecepcion"
+                checked={headerForm.requiereRecepcion}
+                onCheckedChange={v => setHeaderForm(f => ({ ...f, requiereRecepcion: v }))}
+              />
+              <div className="space-y-0.5">
+                <Label htmlFor="headerRequiereRecepcion" className="text-sm font-medium cursor-pointer">
+                  Requiere recepción física
+                </Label>
+                <p className="text-xs text-muted-foreground flex items-start gap-1">
+                  <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                  {headerForm.requiereRecepcion
+                    ? 'Se registrará la recepción de materiales o entregables antes de completar la OC.'
+                    : 'Para servicios sin entregable físico (transporte, alquiler, etc.). La OC se completa directamente al confirmar.'}
+                </p>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setHeaderEditOpen(false)}>Cancelar</Button>
+            <Button onClick={saveHeaderEdit} disabled={savingHeader} className="bg-orange-600 hover:bg-orange-700">
+              {savingHeader && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+              Guardar
             </Button>
           </DialogFooter>
         </DialogContent>
