@@ -23,7 +23,15 @@ import {
   Truck,
   Clock,
   Trash2,
+  MoreHorizontal,
 } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { DataPagination, usePagination } from '@/components/ui/data-pagination'
@@ -373,7 +381,7 @@ export default function RecepcionesPage() {
                   <TableHead className="text-right w-[120px]">Cantidad</TableHead>
                   <TableHead className="w-[100px]">Fecha</TableHead>
                   <TableHead className="w-[160px]">Estado</TableHead>
-                  <TableHead className="w-[200px]">Acciones</TableHead>
+                  <TableHead className="w-[80px]">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -402,136 +410,130 @@ export default function RecepcionesPage() {
                         <RecepcionMiniStepper estado={r.estado} />
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-1">
-                          {/* Pendiente: confirmar almacén, rechazar, eliminar */}
-                          {r.estado === 'pendiente' && ['admin', 'gerente', 'logistico', 'coordinador_logistico'].includes(role) && (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 px-2 text-xs text-blue-600 border-blue-200 hover:bg-blue-50"
-                                onClick={() => setActionDialog({ type: 'confirmar_almacen', recepcion: r })}
-                              >
-                                <CheckCircle className="h-3 w-3 mr-1" />
-                                Almacén
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 px-2 text-xs text-red-600 border-red-200 hover:bg-red-50"
-                                onClick={() => setActionDialog({ type: 'rechazar', recepcion: r })}
-                              >
-                                <XCircle className="h-3 w-3 mr-1" />
-                                Rechazar
-                              </Button>
-                            </>
-                          )}
-                          {r.estado === 'pendiente' && role === 'admin' && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-7 px-2 text-xs text-red-600 border-red-200 hover:bg-red-50"
-                              onClick={() => setActionDialog({ type: 'eliminar', recepcion: r })}
-                            >
-                              <Trash2 className="h-3 w-3 mr-1" />
-                              Eliminar
-                            </Button>
-                          )}
+                        {(() => {
+                          const items: { label: string; icon: React.ReactNode; onClick: () => void; className?: string; separator?: boolean }[] = []
 
-                          {/* En almacén: confirmar proyecto, retroceder, rechazar */}
-                          {r.estado === 'en_almacen' && (
-                            <>
-                              {['admin', 'gerente', 'logistico', 'coordinador_logistico', 'gestor', 'coordinador'].includes(role) && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 px-2 text-xs text-green-600 border-green-200 hover:bg-green-50"
-                                  onClick={() => setActionDialog({ type: 'confirmar_proyecto', recepcion: r })}
-                                >
-                                  <Truck className="h-3 w-3 mr-1" />
-                                  Entregar
-                                </Button>
-                              )}
-                              {['admin', 'gerente'].includes(role) && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 px-2 text-xs text-orange-600 border-orange-200 hover:bg-orange-50"
-                                  onClick={() => setActionDialog({ type: 'retroceder', recepcion: r })}
-                                >
-                                  <RotateCcw className="h-3 w-3 mr-1" />
-                                  Retroceder
-                                </Button>
-                              )}
-                              {['admin', 'gerente', 'logistico', 'coordinador_logistico', 'gestor'].includes(role) && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 px-2 text-xs text-red-600 border-red-200 hover:bg-red-50"
-                                  onClick={() => setActionDialog({ type: 'rechazar', recepcion: r })}
-                                >
-                                  <XCircle className="h-3 w-3 mr-1" />
-                                  Rechazar
-                                </Button>
-                              )}
-                              {role === 'admin' && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 px-2 text-xs text-red-600 border-red-200 hover:bg-red-50"
-                                  onClick={() => setActionDialog({ type: 'eliminar', recepcion: r })}
-                                >
-                                  <Trash2 className="h-3 w-3 mr-1" />
-                                  Eliminar
-                                </Button>
-                              )}
-                            </>
-                          )}
+                          if (r.estado === 'pendiente') {
+                            if (['admin', 'gerente', 'logistico', 'coordinador_logistico'].includes(role)) {
+                              items.push({
+                                label: 'Confirmar almacén',
+                                icon: <CheckCircle className="h-3.5 w-3.5" />,
+                                onClick: () => setActionDialog({ type: 'confirmar_almacen', recepcion: r }),
+                                className: 'text-blue-600',
+                              })
+                              items.push({
+                                label: 'Rechazar',
+                                icon: <XCircle className="h-3.5 w-3.5" />,
+                                onClick: () => setActionDialog({ type: 'rechazar', recepcion: r }),
+                                className: 'text-red-600',
+                              })
+                            }
+                            if (role === 'admin') {
+                              items.push({
+                                label: 'Eliminar',
+                                icon: <Trash2 className="h-3.5 w-3.5" />,
+                                onClick: () => setActionDialog({ type: 'eliminar', recepcion: r }),
+                                className: 'text-red-600',
+                                separator: true,
+                              })
+                            }
+                          }
 
-                          {/* Rechazado: revertir, eliminar */}
-                          {r.estado === 'rechazado' && ['admin', 'gerente'].includes(role) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-7 px-2 text-xs text-amber-600 border-amber-200 hover:bg-amber-50"
-                              onClick={() => setActionDialog({ type: 'revertir', recepcion: r })}
-                            >
-                              <RotateCcw className="h-3 w-3 mr-1" />
-                              Revertir
-                            </Button>
-                          )}
-                          {r.estado === 'rechazado' && role === 'admin' && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-7 px-2 text-xs text-red-600 border-red-200 hover:bg-red-50"
-                              onClick={() => setActionDialog({ type: 'eliminar', recepcion: r })}
-                            >
-                              <Trash2 className="h-3 w-3 mr-1" />
-                              Eliminar
-                            </Button>
-                          )}
+                          if (r.estado === 'en_almacen') {
+                            if (['admin', 'gerente', 'logistico', 'coordinador_logistico', 'gestor', 'coordinador'].includes(role)) {
+                              items.push({
+                                label: 'Entregar a proyecto',
+                                icon: <Truck className="h-3.5 w-3.5" />,
+                                onClick: () => setActionDialog({ type: 'confirmar_proyecto', recepcion: r }),
+                                className: 'text-green-600',
+                              })
+                            }
+                            if (['admin', 'gerente', 'logistico', 'coordinador_logistico', 'gestor'].includes(role)) {
+                              items.push({
+                                label: 'Rechazar',
+                                icon: <XCircle className="h-3.5 w-3.5" />,
+                                onClick: () => setActionDialog({ type: 'rechazar', recepcion: r }),
+                                className: 'text-red-600',
+                              })
+                            }
+                            if (['admin', 'gerente'].includes(role)) {
+                              items.push({
+                                label: 'Retroceder a pendiente',
+                                icon: <RotateCcw className="h-3.5 w-3.5" />,
+                                onClick: () => setActionDialog({ type: 'retroceder', recepcion: r }),
+                                className: 'text-orange-600',
+                              })
+                            }
+                            if (role === 'admin') {
+                              items.push({
+                                label: 'Eliminar',
+                                icon: <Trash2 className="h-3.5 w-3.5" />,
+                                onClick: () => setActionDialog({ type: 'eliminar', recepcion: r }),
+                                className: 'text-red-600',
+                                separator: true,
+                              })
+                            }
+                          }
 
-                          {/* Entregado: retroceder (admin/gerente) + info */}
-                          {r.estado === 'entregado_proyecto' && (
-                            <>
-                              {['admin', 'gerente'].includes(role) && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 px-2 text-xs text-orange-600 border-orange-200 hover:bg-orange-50"
-                                  onClick={() => setActionDialog({ type: 'retroceder_entrega', recepcion: r })}
-                                >
-                                  <RotateCcw className="h-3 w-3 mr-1" />
-                                  Retroceder
+                          if (r.estado === 'rechazado') {
+                            if (['admin', 'gerente'].includes(role)) {
+                              items.push({
+                                label: 'Revertir (reactivar)',
+                                icon: <RotateCcw className="h-3.5 w-3.5" />,
+                                onClick: () => setActionDialog({ type: 'revertir', recepcion: r }),
+                                className: 'text-amber-600',
+                              })
+                            }
+                            if (role === 'admin') {
+                              items.push({
+                                label: 'Eliminar',
+                                icon: <Trash2 className="h-3.5 w-3.5" />,
+                                onClick: () => setActionDialog({ type: 'eliminar', recepcion: r }),
+                                className: 'text-red-600',
+                                separator: true,
+                              })
+                            }
+                          }
+
+                          if (r.estado === 'entregado_proyecto') {
+                            if (['admin', 'gerente'].includes(role)) {
+                              items.push({
+                                label: 'Retroceder a almacén',
+                                icon: <RotateCcw className="h-3.5 w-3.5" />,
+                                onClick: () => setActionDialog({ type: 'retroceder_entrega', recepcion: r }),
+                                className: 'text-orange-600',
+                              })
+                            }
+                          }
+
+                          if (items.length === 0) {
+                            return <span className="text-[10px] text-muted-foreground">—</span>
+                          }
+
+                          return (
+                            <DropdownMenu modal={false}>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                                  <MoreHorizontal className="h-4 w-4" />
                                 </Button>
-                              )}
-                              <span className="text-[10px] text-muted-foreground">
-                                {r.entregadoPor?.name ? `por ${r.entregadoPor.name}` : ''}
-                              </span>
-                            </>
-                          )}
-                        </div>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-48">
+                                {items.map((item, i) => (
+                                  <div key={i}>
+                                    {item.separator && <DropdownMenuSeparator />}
+                                    <DropdownMenuItem
+                                      onClick={item.onClick}
+                                      className={cn('text-xs gap-2 cursor-pointer', item.className)}
+                                    >
+                                      {item.icon}
+                                      {item.label}
+                                    </DropdownMenuItem>
+                                  </div>
+                                ))}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )
+                        })()}
                       </TableCell>
                     </TableRow>
                   )
