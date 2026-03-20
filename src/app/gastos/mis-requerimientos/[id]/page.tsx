@@ -302,7 +302,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
         }
 
         const tableHead = hayOverrides
-          ? [['Fecha', 'Descripción', 'Categoría', 'Comprobante', 'Proveedor', 'Destino', 'Monto']]
+          ? [['Fecha', 'Descripción', 'Categoría', 'Comprobante', 'Proveedor', 'Centro de Costo', 'Monto']]
           : [['Fecha', 'Descripción', 'Categoría', 'Comprobante', 'Proveedor', 'Monto']]
 
         const tableBody = lineas.map(l => {
