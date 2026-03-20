@@ -286,11 +286,11 @@ const formatDate = (date: string | null | undefined) => {
   return new Date(date).toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' })
 }
 
-const condicionLabel: Record<string, string> = {
-  contado: 'Contado',
-  credito_15: 'Crédito 15 días',
-  credito_30: 'Crédito 30 días',
-  credito_60: 'Crédito 60 días',
+function displayCondicionPago(condicionPago: string, diasCredito?: number | null): string {
+  if (condicionPago === 'contado') return 'Contado'
+  if (condicionPago === 'credito' && diasCredito) return `Crédito ${diasCredito} días`
+  if (condicionPago.startsWith('credito_')) return `Crédito ${condicionPago.split('_')[1]} días`
+  return condicionPago
 }
 
 function OrdenCompraPDF({ oc }: Props) {
@@ -316,7 +316,7 @@ function OrdenCompraPDF({ oc }: Props) {
             <Text style={styles.titleNumber}>{oc.numero}</Text>
           </View>
           <Text style={styles.titleDate}>
-            Fecha de emisión: {formatDate(oc.fechaEmision)} | Moneda: {oc.moneda} | Condición: {condicionLabel[oc.condicionPago] || oc.condicionPago}
+            Fecha de emisión: {formatDate(oc.fechaEmision)} | Moneda: {oc.moneda} | Condición: {displayCondicionPago(oc.condicionPago, oc.diasCredito)}
           </Text>
         </View>
 
@@ -438,22 +438,6 @@ function OrdenCompraPDF({ oc }: Props) {
             <Text style={styles.observationsText}>{oc.observaciones}</Text>
           </View>
         )}
-
-        {/* Signatures */}
-        <View style={styles.signatureRow}>
-          <View style={styles.signatureBlock}>
-            <View style={styles.signatureLine} />
-            <Text style={styles.signatureName}>{safeText(oc.solicitante?.name)}</Text>
-            <Text style={styles.signatureRole}>Solicitante</Text>
-          </View>
-          {oc.aprobador && (
-            <View style={styles.signatureBlock}>
-              <View style={styles.signatureLine} />
-              <Text style={styles.signatureName}>{safeText(oc.aprobador.name)}</Text>
-              <Text style={styles.signatureRole}>Aprobado por</Text>
-            </View>
-          )}
-        </View>
 
         {/* Footer */}
         <View style={styles.footer} fixed>
