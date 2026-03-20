@@ -83,11 +83,60 @@ const TABS: { key: TabEstado; label: string; icon: any; color: string }[] = [
   { key: 'rechazado', label: 'Rechazadas', icon: XCircle, color: 'text-red-600' },
 ]
 
-const ESTADO_BADGE: Record<string, { label: string; className: string }> = {
-  pendiente: { label: 'Pendiente', className: 'bg-amber-100 text-amber-700 border-amber-200' },
-  en_almacen: { label: 'En almacén', className: 'bg-blue-100 text-blue-700 border-blue-200' },
-  entregado_proyecto: { label: 'Entregado', className: 'bg-green-100 text-green-700 border-green-200' },
-  rechazado: { label: 'Rechazado', className: 'bg-red-100 text-red-700 border-red-200' },
+
+const STEPPER_STEPS = [
+  { key: 'pendiente', label: 'Pendiente' },
+  { key: 'en_almacen', label: 'Almacén' },
+  { key: 'entregado_proyecto', label: 'Entregado' },
+]
+
+function RecepcionMiniStepper({ estado }: { estado: string }) {
+  if (estado === 'rechazado') {
+    return (
+      <div className="flex items-center gap-1">
+        <XCircle className="h-3.5 w-3.5 text-red-500" />
+        <span className="text-[10px] font-medium text-red-600">Rechazado</span>
+      </div>
+    )
+  }
+
+  const currentIdx = STEPPER_STEPS.findIndex(s => s.key === estado)
+
+  return (
+    <div className="flex items-center gap-0.5">
+      {STEPPER_STEPS.map((step, i) => {
+        const isCompleted = i < currentIdx
+        const isCurrent = i === currentIdx
+        return (
+          <div key={step.key} className="flex items-center gap-0.5">
+            {i > 0 && (
+              <div className={cn('w-3 h-[1.5px]', isCompleted || isCurrent ? 'bg-emerald-400' : 'bg-gray-200')} />
+            )}
+            <div className="flex flex-col items-center">
+              <div className={cn(
+                'w-3.5 h-3.5 rounded-full flex items-center justify-center',
+                isCompleted ? 'bg-emerald-500' : isCurrent ? 'bg-emerald-500 ring-2 ring-emerald-200' : 'bg-gray-200'
+              )}>
+                {isCompleted ? (
+                  <CheckCircle className="h-2.5 w-2.5 text-white" />
+                ) : isCurrent ? (
+                  <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                ) : (
+                  <div className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+                )}
+              </div>
+              <span className={cn(
+                'text-[8px] mt-0.5 leading-tight',
+                isCurrent ? 'font-semibold text-emerald-700' : isCompleted ? 'text-emerald-600' : 'text-gray-400'
+              )}>
+                {step.label}
+              </span>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
 }
 
 function formatFecha(fecha: string | null): string {
@@ -323,13 +372,12 @@ export default function RecepcionesPage() {
                   <TableHead>Ítem</TableHead>
                   <TableHead className="text-right w-[120px]">Cantidad</TableHead>
                   <TableHead className="w-[100px]">Fecha</TableHead>
-                  <TableHead className="w-[110px]">Estado</TableHead>
+                  <TableHead className="w-[160px]">Estado</TableHead>
                   <TableHead className="w-[200px]">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {recepciones.map(r => {
-                  const badge = ESTADO_BADGE[r.estado] || { label: r.estado, className: '' }
                   return (
                     <TableRow key={r.id}>
                       <TableCell className="font-mono text-xs">
@@ -351,9 +399,7 @@ export default function RecepcionesPage() {
                         {formatFecha(r.fechaRecepcion)}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={cn('text-[10px]', badge.className)}>
-                          {badge.label}
-                        </Badge>
+                        <RecepcionMiniStepper estado={r.estado} />
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
