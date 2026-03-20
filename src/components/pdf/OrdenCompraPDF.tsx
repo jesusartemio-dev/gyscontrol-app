@@ -159,6 +159,7 @@ const styles = StyleSheet.create({
     fontSize: 9,
     color: colors.dark,
     textAlign: 'right',
+    width: '100%',
   },
   // Columns widths
   colNum: { width: '6%' },
@@ -365,23 +366,23 @@ function OrdenCompraPDF({ oc }: Props) {
                     <Text style={{ fontSize: 9, fontWeight: 700, marginBottom: 4, color: colors.primary }}>Equipos y Materiales</Text>
                   )}
                   <View style={styles.tableHeader}>
-                    <Text style={[styles.tableHeaderText, styles.colNum]}>N°</Text>
-                    <Text style={[styles.tableHeaderText, styles.colCodigo]}>Código</Text>
-                    <Text style={[styles.tableHeaderText, styles.colDesc]}>Descripción</Text>
-                    <Text style={[styles.tableHeaderText, styles.colUnd]}>Und.</Text>
-                    <Text style={[styles.tableHeaderText, styles.colCant]}>Cant.</Text>
-                    <Text style={[styles.tableHeaderText, styles.colPrecio]}>P. Unit.</Text>
-                    <Text style={[styles.tableHeaderText, styles.colTotal]}>Total</Text>
+                    <View style={styles.colNum}><Text style={styles.tableHeaderText}>N°</Text></View>
+                    <View style={styles.colCodigo}><Text style={styles.tableHeaderText}>Código</Text></View>
+                    <View style={styles.colDesc}><Text style={styles.tableHeaderText}>Descripción</Text></View>
+                    <View style={styles.colUnd}><Text style={styles.tableHeaderText}>Und.</Text></View>
+                    <View style={styles.colCant}><Text style={styles.tableHeaderText}>Cant.</Text></View>
+                    <View style={styles.colPrecio}><Text style={styles.tableHeaderText}>P. Unit.</Text></View>
+                    <View style={styles.colTotal}><Text style={styles.tableHeaderText}>Total</Text></View>
                   </View>
                   {equiposYMateriales.map((item, i) => (
-                    <View key={item.id} style={[styles.tableRow, i % 2 === 1 ? styles.tableRowAlt : {}]}>
-                      <Text style={[styles.tableCell, styles.colNum]}>{i + 1}</Text>
-                      <Text style={[styles.tableCell, styles.colCodigo]}>{item.codigo}</Text>
-                      <Text style={[styles.tableCell, styles.colDesc]}>{item.descripcion}</Text>
-                      <Text style={[styles.tableCell, styles.colUnd]}>{item.unidad}</Text>
-                      <Text style={[styles.tableCellRight, styles.colCant]}>{item.cantidad}</Text>
-                      <Text style={[styles.tableCellRight, styles.colPrecio]}>{formatCurrency(item.precioUnitario, oc.moneda)}</Text>
-                      <Text style={[styles.tableCellRight, styles.colTotal]}>{formatCurrency(item.costoTotal, oc.moneda)}</Text>
+                    <View key={item.id} style={[styles.tableRow, i % 2 === 1 ? styles.tableRowAlt : {}]} wrap={false}>
+                      <View style={styles.colNum}><Text style={styles.tableCell}>{i + 1}</Text></View>
+                      <View style={styles.colCodigo}><Text style={styles.tableCell}>{item.codigo}</Text></View>
+                      <View style={styles.colDesc}><Text style={styles.tableCell}>{item.descripcion}</Text></View>
+                      <View style={styles.colUnd}><Text style={styles.tableCell}>{item.unidad}</Text></View>
+                      <View style={styles.colCant}><Text style={styles.tableCellRight}>{item.cantidad}</Text></View>
+                      <View style={styles.colPrecio}><Text style={styles.tableCellRight}>{formatCurrency(item.precioUnitario, oc.moneda)}</Text></View>
+                      <View style={styles.colTotal}><Text style={styles.tableCellRight}>{formatCurrency(item.costoTotal, oc.moneda)}</Text></View>
                     </View>
                   ))}
                 </View>
@@ -390,19 +391,19 @@ function OrdenCompraPDF({ oc }: Props) {
                 <View style={styles.table}>
                   <Text style={{ fontSize: 9, fontWeight: 700, marginBottom: 4, color: '#7c3aed' }}>Servicios</Text>
                   <View style={styles.tableHeader}>
-                    <Text style={[styles.tableHeaderText, styles.colNum]}>N°</Text>
-                    <Text style={[styles.tableHeaderText, styles.colCodigo]}>Código</Text>
-                    <Text style={[styles.tableHeaderText, { width: '48%' }]}>Descripción</Text>
-                    <Text style={[styles.tableHeaderText, styles.colPrecio]}>P. Unit.</Text>
-                    <Text style={[styles.tableHeaderText, styles.colTotal]}>Total</Text>
+                    <View style={styles.colNum}><Text style={styles.tableHeaderText}>N°</Text></View>
+                    <View style={styles.colCodigo}><Text style={styles.tableHeaderText}>Código</Text></View>
+                    <View style={{ width: '48%' }}><Text style={styles.tableHeaderText}>Descripción</Text></View>
+                    <View style={styles.colPrecio}><Text style={styles.tableHeaderText}>P. Unit.</Text></View>
+                    <View style={styles.colTotal}><Text style={styles.tableHeaderText}>Total</Text></View>
                   </View>
                   {servicios.map((item, i) => (
-                    <View key={item.id} style={[styles.tableRow, i % 2 === 1 ? styles.tableRowAlt : {}]}>
-                      <Text style={[styles.tableCell, styles.colNum]}>{i + 1}</Text>
-                      <Text style={[styles.tableCell, styles.colCodigo]}>{item.codigo}</Text>
-                      <Text style={[styles.tableCell, { width: '48%' }]}>{item.descripcion}</Text>
-                      <Text style={[styles.tableCellRight, styles.colPrecio]}>{formatCurrency(item.precioUnitario, oc.moneda)}</Text>
-                      <Text style={[styles.tableCellRight, styles.colTotal]}>{formatCurrency(item.costoTotal, oc.moneda)}</Text>
+                    <View key={item.id} style={[styles.tableRow, i % 2 === 1 ? styles.tableRowAlt : {}]} wrap={false}>
+                      <View style={styles.colNum}><Text style={styles.tableCell}>{i + 1}</Text></View>
+                      <View style={styles.colCodigo}><Text style={styles.tableCell}>{item.codigo}</Text></View>
+                      <View style={{ width: '48%' }}><Text style={styles.tableCell}>{item.descripcion}</Text></View>
+                      <View style={styles.colPrecio}><Text style={styles.tableCellRight}>{formatCurrency(item.precioUnitario, oc.moneda)}</Text></View>
+                      <View style={styles.colTotal}><Text style={styles.tableCellRight}>{formatCurrency(item.costoTotal, oc.moneda)}</Text></View>
                     </View>
                   ))}
                 </View>
