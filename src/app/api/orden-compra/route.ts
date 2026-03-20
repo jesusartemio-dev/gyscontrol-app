@@ -172,6 +172,7 @@ export async function POST(req: Request) {
         pedidoEquipoId: payload.pedidoEquipoId || null,
         proyectoId: payload.proyectoId || null,
         categoriaCosto: payload.categoriaCosto || 'equipos',
+        requiereRecepcion: payload.requiereRecepcion ?? true,
         solicitanteId: session.user.id,
         condicionPago: payload.condicionPago || 'contado',
         diasCredito: payload.diasCredito ? Number(payload.diasCredito) : null,

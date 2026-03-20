@@ -71,6 +71,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const payload = await req.json()
     const updateData: any = { updatedAt: new Date() }
 
+    if (payload.requiereRecepcion !== undefined) updateData.requiereRecepcion = payload.requiereRecepcion
     if (payload.condicionPago !== undefined) updateData.condicionPago = payload.condicionPago
     if (payload.diasCredito !== undefined) updateData.diasCredito = payload.diasCredito ? Number(payload.diasCredito) : null
     if (payload.moneda !== undefined) updateData.moneda = payload.moneda

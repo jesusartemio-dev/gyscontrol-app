@@ -3444,6 +3444,7 @@ model OrdenCompra {
   solicitanteId        String
   aprobadorId          String?
   categoriaCosto       CategoriaCosto    @default(equipos)
+  requiereRecepcion    Boolean           @default(true)
   estado               EstadoOrdenCompra @default(borrador)
   condicionPago        String            @default("contado")
   diasCredito          Int?

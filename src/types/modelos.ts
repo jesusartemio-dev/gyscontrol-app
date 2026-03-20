@@ -2791,6 +2791,7 @@ export interface OrdenCompra {
   solicitanteId: string
   aprobadorId?: string | null
   categoriaCosto: CategoriaCosto
+  requiereRecepcion: boolean
   estado: EstadoOrdenCompra
   condicionPago: string
   diasCredito?: number | null

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { ArrowLeft, Loader2, CheckCircle, Send, Package, XCircle, FileDown, Building2, CreditCard, MapPin, AlertTriangle, ShoppingCart, Pencil, Clock, Receipt, Trash2, Plus, Search } from 'lucide-react'
+import { ArrowLeft, Loader2, CheckCircle, CheckCircle2, Send, Package, XCircle, FileDown, Building2, CreditCard, MapPin, AlertTriangle, ShoppingCart, Pencil, Clock, Receipt, Trash2, Plus, Search, Info } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
-import { getOrdenCompraById, aprobarOC, enviarOC, confirmarOC, cancelarOC, deleteOrdenCompra, registrarRecepcionOC } from '@/lib/services/ordenCompra'
+import { getOrdenCompraById, aprobarOC, enviarOC, confirmarOC, cancelarOC, deleteOrdenCompra, registrarRecepcionOC, completarOC } from '@/lib/services/ordenCompra'
 import OCEstadoStepper from '@/components/logistica/OCEstadoStepper'
 import { RollbackButton } from '@/components/RollbackButton'
 import dynamic from 'next/dynamic'
@@ -485,19 +485,31 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
         )}
         {['confirmada', 'parcial'].includes(oc.estado) && !editingRecepcion && (
           <>
-            <Button
-              size="sm"
-              onClick={() => {
-                const initial: Record<string, number> = {}
-                oc.items?.forEach(item => { initial[item.id] = item.cantidadRecibida })
-                setRecepcion(initial)
-                setEditingRecepcion(true)
-              }}
-              className="bg-teal-600 hover:bg-teal-700"
-            >
-              <Package className="h-4 w-4 mr-1" />
-              Registrar Recepción
-            </Button>
+            {oc.requiereRecepcion ? (
+              <Button
+                size="sm"
+                onClick={() => {
+                  const initial: Record<string, number> = {}
+                  oc.items?.forEach(item => { initial[item.id] = item.cantidadRecibida })
+                  setRecepcion(initial)
+                  setEditingRecepcion(true)
+                }}
+                className="bg-teal-600 hover:bg-teal-700"
+              >
+                <Package className="h-4 w-4 mr-1" />
+                Registrar Recepción
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                onClick={() => handleAction('completada', () => completarOC(oc.id))}
+                disabled={!!actionLoading}
+                className="bg-emerald-600 hover:bg-emerald-700"
+              >
+                {actionLoading === 'completada' ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-1" />}
+                Completar OC
+              </Button>
+            )}
             {['admin', 'gerente'].includes(userRole) && (
               <RollbackButton
                 entityType="ordenCompra"
@@ -569,6 +581,12 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
           </>
         ) : (
           <span className="text-muted-foreground">OC manual — sin pedido vinculado</span>
+        )}
+        {!oc.requiereRecepcion && (
+          <span className="flex items-center gap-1 text-blue-600">
+            <Info className="h-3 w-3" />
+            Sin recepción física (servicio)
+          </span>
         )}
         {/* Estado de facturación */}
         {(() => {

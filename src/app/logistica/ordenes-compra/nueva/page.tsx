@@ -12,7 +12,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Plus, Trash2, Loader2, Save, PackageSearch, FileText, Search, Pencil } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Loader2, Save, PackageSearch, FileText, Search, Pencil, Info } from 'lucide-react'
+import { Switch } from '@/components/ui/switch'
 import { toast } from 'sonner'
 import { createOrdenCompra, fetchItemsDisponibles, type ItemDisponible } from '@/lib/services/ordenCompra'
 import { getProveedores } from '@/lib/services/proveedor'
@@ -73,6 +74,7 @@ export default function NuevaOrdenCompraPage() {
   const [lugarEntrega, setLugarEntrega] = useState('')
   const [contactoEntrega, setContactoEntrega] = useState('')
   const [observaciones, setObservaciones] = useState('')
+  const [requiereRecepcion, setRequiereRecepcion] = useState(true)
   const [items, setItems] = useState<ItemForm[]>([])
 
   // Pedido dialog state
@@ -275,6 +277,7 @@ export default function NuevaOrdenCompraPage() {
         proyectoId: asignacion.proyectoId || undefined,
         centroCostoId: asignacion.centroCostoId || undefined,
         categoriaCosto: categoriaCosto as 'equipos' | 'servicios' | 'gastos',
+        requiereRecepcion,
         condicionPago,
         diasCredito: condicionPago === 'credito' && diasCredito ? Number(diasCredito) : undefined,
         moneda,
@@ -355,7 +358,7 @@ export default function NuevaOrdenCompraPage() {
             />
             <div>
               <Label className="text-xs">Categoría</Label>
-              <Select value={categoriaCosto} onValueChange={setCategoriaCosto}>
+              <Select value={categoriaCosto} onValueChange={(v) => { setCategoriaCosto(v); setRequiereRecepcion(v === 'equipos') }}>
                 <SelectTrigger className="h-9">
                   <SelectValue />
                 </SelectTrigger>
@@ -427,6 +430,24 @@ export default function NuevaOrdenCompraPage() {
           <div className="mt-3">
             <Label className="text-xs">Observaciones</Label>
             <Textarea value={observaciones} onChange={e => setObservaciones(e.target.value)} placeholder="Notas adicionales..." rows={2} />
+          </div>
+          <div className="mt-3 flex items-start gap-3 p-3 rounded-md border bg-muted/30">
+            <Switch
+              id="requiereRecepcion"
+              checked={requiereRecepcion}
+              onCheckedChange={setRequiereRecepcion}
+            />
+            <div className="space-y-0.5">
+              <Label htmlFor="requiereRecepcion" className="text-sm font-medium cursor-pointer">
+                Requiere recepción física
+              </Label>
+              <p className="text-xs text-muted-foreground flex items-start gap-1">
+                <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                {requiereRecepcion
+                  ? 'Se registrará la recepción de materiales o entregables antes de completar la OC.'
+                  : 'Para servicios sin entregable físico (transporte, alquiler, etc.). La OC se completa directamente al confirmar.'}
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>

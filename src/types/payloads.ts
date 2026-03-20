@@ -1434,6 +1434,7 @@ export interface OrdenCompraPayload {
   pedidoEquipoId?: string
   proyectoId?: string
   categoriaCosto?: 'equipos' | 'servicios' | 'gastos'
+  requiereRecepcion?: boolean
   condicionPago?: string
   moneda?: string
   lugarEntrega?: string
@@ -1444,6 +1445,7 @@ export interface OrdenCompraPayload {
 }
 
 export interface OrdenCompraUpdatePayload {
+  requiereRecepcion?: boolean
   condicionPago?: string
   moneda?: string
   lugarEntrega?: string | null
