@@ -570,7 +570,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
                 Completar OC
               </Button>
             )}
-            {['admin', 'gerente'].includes(userRole) && (
+            {['admin', 'gerente', 'coordinador_logistico'].includes(userRole) && (
               <RollbackButton
                 entityType="ordenCompra"
                 entityId={oc.id}
