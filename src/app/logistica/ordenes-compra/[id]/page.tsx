@@ -42,12 +42,6 @@ function displayCondicionPago(condicionPago: string, diasCredito?: number | null
   return condicionPago
 }
 
-const condicionLabel: Record<string, string> = {
-  contado: 'Contado',
-  credito_15: 'Crédito 15 días',
-  credito_30: 'Crédito 30 días',
-  credito_60: 'Crédito 60 días',
-}
 
 export default function OrdenCompraDetallePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -94,8 +88,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
   // Header edit modal state
   const [headerEditOpen, setHeaderEditOpen] = useState(false)
   const [headerForm, setHeaderForm] = useState({
-    condicionPago: 'contado',
-    diasCredito: '' as number | '',
+    condicionPago: '',
     moneda: 'PEN',
     lugarEntrega: '',
     contactoEntrega: '',
@@ -123,8 +116,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
   const openHeaderEdit = () => {
     if (!oc || !esBorrador) return
     setHeaderForm({
-      condicionPago: oc.condicionPago?.startsWith('credito') ? 'credito' : oc.condicionPago,
-      diasCredito: oc.diasCredito || '',
+      condicionPago: oc.condicionPago || '',
       moneda: oc.moneda,
       lugarEntrega: oc.lugarEntrega || '',
       contactoEntrega: oc.contactoEntrega || '',
@@ -142,8 +134,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          condicionPago: headerForm.condicionPago === 'credito' ? 'credito' : headerForm.condicionPago,
-          diasCredito: headerForm.condicionPago === 'credito' && headerForm.diasCredito ? Number(headerForm.diasCredito) : null,
+          condicionPago: headerForm.condicionPago || null,
           moneda: headerForm.moneda,
           lugarEntrega: headerForm.lugarEntrega || null,
           contactoEntrega: headerForm.contactoEntrega || null,
@@ -1219,22 +1210,13 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-xs">Condición de Pago</Label>
-                <Select value={headerForm.condicionPago} onValueChange={(v) => { setHeaderForm(f => ({ ...f, condicionPago: v })); if (v === 'contado') setHeaderForm(f => ({ ...f, diasCredito: '' })) }}>
-                  <SelectTrigger className="h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="contado">Contado</SelectItem>
-                    <SelectItem value="credito">Crédito</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Input
+                  value={headerForm.condicionPago}
+                  onChange={(e) => setHeaderForm(f => ({ ...f, condicionPago: e.target.value }))}
+                  placeholder="Ej: Factura, Cheque, Letra"
+                  className="h-9"
+                />
               </div>
-              {headerForm.condicionPago === 'credito' && (
-                <div>
-                  <Label className="text-xs">Días de crédito</Label>
-                  <Input type="number" min={1} className="h-9" placeholder="Ej: 30" value={headerForm.diasCredito} onChange={e => setHeaderForm(f => ({ ...f, diasCredito: e.target.value ? Number(e.target.value) : '' }))} />
-                </div>
-              )}
               <div>
                 <Label className="text-xs">Moneda</Label>
                 <Select value={headerForm.moneda} onValueChange={v => setHeaderForm(f => ({ ...f, moneda: v }))}>

@@ -68,8 +68,7 @@ export default function NuevaOrdenCompraPage() {
   const [proveedorId, setProveedorId] = useState('')
   const [asignacion, setAsignacion] = useState<AsignacionValue>({ proyectoId: null, centroCostoId: null })
   const [categoriaCosto, setCategoriaCosto] = useState('equipos')
-  const [condicionPago, setCondicionPago] = useState('contado')
-  const [diasCredito, setDiasCredito] = useState<number | ''>('')
+  const [condicionPago, setCondicionPago] = useState('')
   const [moneda, setMoneda] = useState('PEN')
   const [lugarEntrega, setLugarEntrega] = useState('')
   const [contactoEntrega, setContactoEntrega] = useState('')
@@ -278,8 +277,7 @@ export default function NuevaOrdenCompraPage() {
         centroCostoId: asignacion.centroCostoId || undefined,
         categoriaCosto: categoriaCosto as 'equipos' | 'servicios' | 'gastos',
         requiereRecepcion,
-        condicionPago,
-        diasCredito: condicionPago === 'credito' && diasCredito ? Number(diasCredito) : undefined,
+        condicionPago: condicionPago || undefined,
         moneda,
         lugarEntrega: lugarEntrega || undefined,
         contactoEntrega: contactoEntrega || undefined,
@@ -382,29 +380,13 @@ export default function NuevaOrdenCompraPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
             <div>
               <Label className="text-xs">Condición de Pago</Label>
-              <Select value={condicionPago} onValueChange={(v) => { setCondicionPago(v); if (v === 'contado') setDiasCredito('') }}>
-                <SelectTrigger className="h-9">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="contado">Contado</SelectItem>
-                  <SelectItem value="credito">Crédito</SelectItem>
-                </SelectContent>
-              </Select>
+              <Input
+                value={condicionPago}
+                onChange={(e) => setCondicionPago(e.target.value)}
+                placeholder="Ej: Factura, Cheque, Letra, Adelanto 50%"
+                className="h-9"
+              />
             </div>
-            {condicionPago === 'credito' && (
-              <div>
-                <Label className="text-xs">Días de crédito</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  className="h-9"
-                  placeholder="Ej: 30"
-                  value={diasCredito}
-                  onChange={(e) => setDiasCredito(e.target.value ? Number(e.target.value) : '')}
-                />
-              </div>
-            )}
             <div>
               <Label className="text-xs">Moneda</Label>
               <Select value={moneda} onValueChange={setMoneda}>
