@@ -106,8 +106,10 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
     moneda: 'PEN',
     fechaRecepcion: new Date().toISOString().split('T')[0],
     fechaVencimiento: '',
-    condicionPago: 'contado',
-    diasCredito: '',
+    formaPago: 'contado',
+    diasPago: '',
+    diasPagoCustom: '',
+    formaPagoCustom: '',
     observaciones: '',
   })
   const [savingFactura, setSavingFactura] = useState(false)
@@ -366,13 +368,11 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
     }
   }
 
-  const calcularFechaVencimiento = (fechaRecepcion: string, condicionPago: string, diasCredito: string): string => {
+  const calcularFechaVencimientoFromForm = (fechaRecepcion: string, formaPago: string, diasPago: string, diasPagoCustom: string): string => {
     if (!fechaRecepcion) return ''
-    if (condicionPago === 'contado') return fechaRecepcion
-    let dias = parseInt(diasCredito)
-    if (isNaN(dias) && condicionPago.startsWith('credito_')) {
-      dias = parseInt(condicionPago.split('_')[1])
-    }
+    if (formaPago === 'contado' || formaPago === 'adelanto') return fechaRecepcion
+    const diasStr = diasPago === 'otro' ? diasPagoCustom : diasPago
+    const dias = parseInt(diasStr)
     if (isNaN(dias) || dias <= 0) return ''
     const fecha = new Date(fechaRecepcion + 'T00:00:00')
     fecha.setDate(fecha.getDate() + dias)
@@ -381,17 +381,15 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
 
   const abrirModalFactura = () => {
     if (!oc) return
-    const dias = oc.diasCredito ? String(oc.diasCredito) :
-      oc.condicionPago?.startsWith('credito_') ? oc.condicionPago.split('_')[1] : ''
+    const parsed = parseCondicionPago(oc.condicionPago || 'contado')
     const fechaRec = new Date().toISOString().split('T')[0]
     setFacturaForm({
       numeroFactura: '',
       monto: oc.total.toFixed(2),
       moneda: oc.moneda,
       fechaRecepcion: fechaRec,
-      fechaVencimiento: calcularFechaVencimiento(fechaRec, oc.condicionPago, dias),
-      condicionPago: oc.condicionPago,
-      diasCredito: dias,
+      fechaVencimiento: calcularFechaVencimientoFromForm(fechaRec, parsed.formaPago, parsed.diasPago, parsed.diasPagoCustom),
+      ...parsed,
       observaciones: '',
     })
     setShowFacturaModal(true)
@@ -426,8 +424,20 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
           moneda: facturaForm.moneda,
           fechaRecepcion: facturaForm.fechaRecepcion,
           fechaVencimiento: facturaForm.fechaVencimiento,
-          condicionPago: facturaForm.condicionPago,
-          diasCredito: facturaForm.diasCredito ? parseInt(facturaForm.diasCredito) : null,
+          condicionPago: (() => {
+            const { formaPago, diasPago, diasPagoCustom, formaPagoCustom } = facturaForm
+            if (formaPago === 'otro') return formaPagoCustom || 'Otro'
+            if (formaPago === 'contado') return 'Contado'
+            if (formaPago === 'adelanto') return 'Adelanto'
+            const forma = FORMAS_PAGO.find(f => f.value === formaPago)?.label || formaPago
+            const dias = diasPago === 'otro' ? diasPagoCustom : diasPago
+            return dias ? `${forma} ${dias} días` : forma
+          })(),
+          diasCredito: (() => {
+            const diasStr = facturaForm.diasPago === 'otro' ? facturaForm.diasPagoCustom : facturaForm.diasPago
+            const dias = parseInt(diasStr)
+            return isNaN(dias) ? null : dias
+          })(),
           descripcion: `OC ${oc.numero}`,
           observaciones: facturaForm.observaciones || null,
         }),
@@ -456,14 +466,6 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
     return colors[estado] || 'bg-gray-100 text-gray-700'
   }
 
-  const CONDICIONES_PAGO = [
-    { value: 'contado', label: 'Contado' },
-    { value: 'credito_15', label: 'Crédito 15 días' },
-    { value: 'credito_30', label: 'Crédito 30 días' },
-    { value: 'credito_45', label: 'Crédito 45 días' },
-    { value: 'credito_60', label: 'Crédito 60 días' },
-    { value: 'credito_90', label: 'Crédito 90 días' },
-  ]
 
   if (loading) {
     return (
@@ -1021,38 +1023,58 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
                 <Label>Monto *</Label>
                 <Input type="number" step="0.01" value={facturaForm.monto} onChange={e => setFacturaForm(f => ({ ...f, monto: e.target.value }))} />
               </div>
-              <div>
-                <Label>Condición de Pago</Label>
-                <Select value={facturaForm.condicionPago} onValueChange={v => {
-                  const diasFromCondicion = v.startsWith('credito_') ? v.split('_')[1] : ''
-                  setFacturaForm(f => ({
-                    ...f,
-                    condicionPago: v,
-                    diasCredito: diasFromCondicion || f.diasCredito,
-                    fechaVencimiento: calcularFechaVencimiento(f.fechaRecepcion, v, diasFromCondicion || f.diasCredito),
-                  }))
-                }}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {CONDICIONES_PAGO.map(c => (
-                      <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {facturaForm.condicionPago !== 'contado' && (
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label>Días de crédito</Label>
-                  <Input type="number" placeholder="30" value={facturaForm.diasCredito} onChange={e => {
-                    const dias = e.target.value
-                    setFacturaForm(f => ({
-                      ...f,
-                      diasCredito: dias,
-                      fechaVencimiento: calcularFechaVencimiento(f.fechaRecepcion, f.condicionPago, dias),
-                    }))
-                  }} />
+                  <Label>Forma de Pago</Label>
+                  <Select value={facturaForm.formaPago} onValueChange={v => {
+                    setFacturaForm(f => {
+                      const updated = { ...f, formaPago: v, diasPago: '', diasPagoCustom: '', formaPagoCustom: '' }
+                      return { ...updated, fechaVencimiento: calcularFechaVencimientoFromForm(f.fechaRecepcion, v, '', '') }
+                    })
+                  }}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {FORMAS_PAGO.map(f => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
-              )}
+                {facturaForm.formaPago === 'otro' && (
+                  <div>
+                    <Label>Especificar</Label>
+                    <Input value={facturaForm.formaPagoCustom} onChange={e => setFacturaForm(f => ({ ...f, formaPagoCustom: e.target.value }))} placeholder="Ej: Transferencia 15 días" />
+                  </div>
+                )}
+                {['factura', 'cheque', 'letra'].includes(facturaForm.formaPago) && (
+                  <div>
+                    <Label>Días</Label>
+                    <Select value={facturaForm.diasPago} onValueChange={v => {
+                      setFacturaForm(f => {
+                        const updated = { ...f, diasPago: v, diasPagoCustom: v !== 'otro' ? '' : f.diasPagoCustom }
+                        const dias = v === 'otro' ? f.diasPagoCustom : v
+                        return { ...updated, fechaVencimiento: calcularFechaVencimientoFromForm(f.fechaRecepcion, f.formaPago, v, f.diasPagoCustom) }
+                      })
+                    }}>
+                      <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                      <SelectContent>
+                        {DIAS_PAGO.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                {['factura', 'cheque', 'letra'].includes(facturaForm.formaPago) && facturaForm.diasPago === 'otro' && (
+                  <div>
+                    <Label>Días (personalizado)</Label>
+                    <Input type="number" min={1} value={facturaForm.diasPagoCustom} onChange={e => {
+                      const dias = e.target.value
+                      setFacturaForm(f => ({
+                        ...f,
+                        diasPagoCustom: dias,
+                        fechaVencimiento: calcularFechaVencimientoFromForm(f.fechaRecepcion, f.formaPago, 'otro', dias),
+                      }))
+                    }} placeholder="Ej: 90" />
+                  </div>
+                )}
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Fecha Recepción *</Label>
@@ -1061,7 +1083,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
                     setFacturaForm(f => ({
                       ...f,
                       fechaRecepcion: fecha,
-                      fechaVencimiento: calcularFechaVencimiento(fecha, f.condicionPago, f.diasCredito),
+                      fechaVencimiento: calcularFechaVencimientoFromForm(fecha, f.formaPago, f.diasPago, f.diasPagoCustom),
                     }))
                   }} />
                 </div>
