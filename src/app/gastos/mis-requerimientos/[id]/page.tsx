@@ -294,18 +294,39 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
 
       // --- Expense lines table ---
       if (lineas.length > 0) {
-        const tableHead = [['Fecha', 'Descripción', 'Categoría', 'Comprobante', 'Proveedor', 'Monto']]
-        const tableBody = lineas.map(l => [
-          l.fecha ? new Date(l.fecha).toLocaleDateString('es-PE') : '-',
-          l.descripcion,
-          l.categoriaGasto?.nombre || '-',
-          [l.tipoComprobante, l.numeroComprobante].filter(Boolean).join(' ') || '-',
-          l.proveedorNombre || '-',
-          fmtMoney(l.monto),
-        ])
+        const hayOverrides = lineas.some(l => l.proyectoId || l.centroCostoId)
+        const getDestino = (l: GastoLinea) => {
+          if (l.proyecto) return l.proyecto.codigo
+          if (l.centroCosto) return l.centroCosto.nombre
+          return asignacion.split(' - ')[0] || '-'
+        }
+
+        const tableHead = hayOverrides
+          ? [['Fecha', 'Descripción', 'Categoría', 'Comprobante', 'Proveedor', 'Destino', 'Monto']]
+          : [['Fecha', 'Descripción', 'Categoría', 'Comprobante', 'Proveedor', 'Monto']]
+
+        const tableBody = lineas.map(l => {
+          const row = [
+            l.fecha ? new Date(l.fecha).toLocaleDateString('es-PE') : '-',
+            l.descripcion,
+            l.categoriaGasto?.nombre || '-',
+            [l.tipoComprobante, l.numeroComprobante].filter(Boolean).join(' ') || '-',
+            l.proveedorNombre || '-',
+          ]
+          if (hayOverrides) {
+            row.push(getDestino(l) + (l.categoriaCosto ? ` (${l.categoriaCosto})` : ''))
+          }
+          row.push(fmtMoney(l.monto))
+          return row
+        })
 
         const total = lineas.reduce((s, l) => s + l.monto, 0)
-        tableBody.push(['', '', '', '', 'TOTAL', fmtMoney(total)])
+        const totalRow = hayOverrides
+          ? ['', '', '', '', '', 'TOTAL', fmtMoney(total)]
+          : ['', '', '', '', 'TOTAL', fmtMoney(total)]
+        tableBody.push(totalRow)
+
+        const montoColIdx = hayOverrides ? 6 : 5
 
         autoTable(doc, {
           startY: y,
@@ -317,7 +338,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
           columnStyles: {
             0: { cellWidth: 22 },
             1: { cellWidth: 'auto' },
-            5: { halign: 'right', cellWidth: 28 },
+            [montoColIdx]: { halign: 'right', cellWidth: 28 },
           },
           margin: { left: margin, right: margin },
           didParseCell: (data: any) => {
