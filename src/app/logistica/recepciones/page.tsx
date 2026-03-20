@@ -358,7 +358,7 @@ export default function RecepcionesPage() {
                       <TableCell>
                         <div className="flex items-center gap-1">
                           {/* Pendiente: confirmar almacén, rechazar, eliminar */}
-                          {r.estado === 'pendiente' && ['admin', 'gerente', 'logistico'].includes(role) && (
+                          {r.estado === 'pendiente' && ['admin', 'gerente', 'logistico', 'coordinador_logistico'].includes(role) && (
                             <>
                               <Button
                                 size="sm"
@@ -417,7 +417,7 @@ export default function RecepcionesPage() {
                                   Retroceder
                                 </Button>
                               )}
-                              {['admin', 'gerente', 'logistico', 'gestor'].includes(role) && (
+                              {['admin', 'gerente', 'logistico', 'coordinador_logistico', 'gestor'].includes(role) && (
                                 <Button
                                   size="sm"
                                   variant="outline"
