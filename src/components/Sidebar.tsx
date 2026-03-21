@@ -195,7 +195,7 @@ export default function Sidebar() {
       title: 'Documentos',
       icon: HardDrive,
       color: 'text-indigo-400',
-      roles: ['admin', 'gerente', 'proyectos', 'coordinador', 'gestor', 'logistico', 'comercial', 'administracion'],
+      roles: ['admin', 'gerente', 'proyectos', 'coordinador', 'gestor', 'logistico', 'coordinador_logistico', 'comercial', 'administracion'],
       links: [
         { href: '/documentos', label: 'GYS.PROYECTOS', icon: FolderOpen },
         { href: '/documentos/administracion', label: 'GYS.ADMINISTRACION', icon: Building2 },
@@ -207,7 +207,7 @@ export default function Sidebar() {
       title: 'Mi Trabajo',
       icon: Clock,
       color: 'text-emerald-400',
-      roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos', 'colaborador', 'comercial', 'seguridad', 'presupuestos', 'logistico'],
+      roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos', 'colaborador', 'comercial', 'seguridad', 'presupuestos', 'logistico', 'coordinador_logistico'],
       links: [
         { href: '/mi-trabajo/timesheet', label: 'Mi Timesheet', icon: Calendar },
         { href: '/mi-trabajo/mi-jornada', label: 'Mi Jornada', icon: HardHat },
