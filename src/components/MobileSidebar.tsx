@@ -176,7 +176,7 @@ export default function MobileSidebar() {
       title: 'Documentos',
       icon: HardDrive,
       color: 'text-indigo-400',
-      roles: ['admin', 'gerente', 'proyectos', 'coordinador', 'gestor', 'logistico', 'comercial', 'administracion'],
+      roles: ['admin', 'gerente', 'proyectos', 'coordinador', 'gestor', 'logistico', 'coordinador_logistico', 'comercial', 'administracion'],
       links: [
         { href: '/documentos', label: 'GYS.PROYECTOS', icon: FolderOpen },
         { href: '/documentos/administracion', label: 'GYS.ADMINISTRACION', icon: Building2 },
@@ -187,7 +187,7 @@ export default function MobileSidebar() {
       title: 'Mi Trabajo',
       icon: Clock,
       color: 'text-emerald-400',
-      roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos', 'colaborador', 'comercial', 'seguridad', 'presupuestos', 'logistico'],
+      roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos', 'colaborador', 'comercial', 'seguridad', 'presupuestos', 'logistico', 'coordinador_logistico'],
       links: [
         { href: '/mi-trabajo/timesheet', label: 'Mi Timesheet', icon: Calendar },
         { href: '/mi-trabajo/mi-jornada', label: 'Mi Jornada', icon: HardHat },
@@ -217,11 +217,12 @@ export default function MobileSidebar() {
       title: 'Logística',
       icon: Truck,
       color: 'text-orange-400',
-      roles: ['admin', 'gerente', 'logistico'],
+      roles: ['admin', 'gerente', 'logistico', 'coordinador_logistico'],
       links: [
         { href: '/logistica/listas', label: 'Listas Técnicas', icon: FileText },
         { href: '/logistica/pedidos', label: 'Gestión de Pedidos', icon: Package, badge: 'pedidos-pendientes' as NotificationBadgeType },
         { href: '/logistica/ordenes-compra', label: 'Órdenes de Compra', icon: FileText },
+        { href: '/logistica/recepciones', label: 'Recepciones', icon: Package },
         { href: '/logistica/proveedores', label: 'Proveedores', icon: Building2 },
         { href: '/logistica/cotizaciones', label: 'Cotizaciones Proveedor', icon: Calculator },
         { href: '/logistica/catalogo', label: 'Catálogo Equipos', icon: Wrench },
