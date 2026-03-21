@@ -240,7 +240,7 @@ export default function Sidebar() {
       title: 'Logística',
       icon: Truck,
       color: 'text-orange-400',
-      roles: ['admin', 'gerente', 'logistico'],
+      roles: ['admin', 'gerente', 'logistico', 'coordinador_logistico'],
       links: [
         { href: '/logistica/listas', label: 'Listas Técnicas', icon: FileText, badge: 'listas-por-cotizar' as NotificationBadgeType },
         { href: '/logistica/pedidos', label: 'Gestión de Pedidos', icon: Package, badge: 'pedidos-pendientes' as NotificationBadgeType },
