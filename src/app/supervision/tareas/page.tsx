@@ -1183,7 +1183,7 @@ export default function SupervisionTareasPage() {
                     <SelectItem value="__none__">Seleccionar...</SelectItem>
                     {proyectosInternos.map(p => (
                       <SelectItem key={p.id} value={p.id}>
-                        {p.nombre}{p.centroCosto ? ` — ${p.centroCosto.nombre}` : ''}
+                        {p.codigo} — {p.nombre}
                       </SelectItem>
                     ))}
                   </SelectContent>

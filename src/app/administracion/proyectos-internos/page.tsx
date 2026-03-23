@@ -56,7 +56,7 @@ export default function ProyectosInternosPage() {
   const [showModal, setShowModal] = useState(false)
   const [editando, setEditando] = useState<ProyectoInterno | null>(null)
   const [guardando, setGuardando] = useState(false)
-  const [form, setForm] = useState({ nombre: '', centroCostoId: '', gestorId: '', fechaInicio: '' })
+  const [form, setForm] = useState({ nombre: '', codigo: '', centroCostoId: '', gestorId: '', fechaInicio: '' })
 
   const cargarDatos = async () => {
     try {
@@ -77,13 +77,13 @@ export default function ProyectosInternosPage() {
 
   const abrirCrear = () => {
     setEditando(null)
-    setForm({ nombre: '', centroCostoId: '', gestorId: '', fechaInicio: format(new Date(), 'yyyy-MM-dd') })
+    setForm({ nombre: '', codigo: '', centroCostoId: '', gestorId: '', fechaInicio: format(new Date(), 'yyyy-MM-dd') })
     setShowModal(true)
   }
 
   const abrirEditar = (p: ProyectoInterno) => {
     setEditando(p)
-    setForm({ nombre: p.nombre, centroCostoId: p.centroCosto?.id || '', gestorId: p.gestor?.id || '', fechaInicio: '' })
+    setForm({ nombre: p.nombre, codigo: '', centroCostoId: p.centroCosto?.id || '', gestorId: p.gestor?.id || '', fechaInicio: '' })
     setShowModal(true)
   }
 
@@ -102,7 +102,7 @@ export default function ProyectosInternosPage() {
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, codigoPersonalizado: form.codigo }),
       })
 
       if (!res.ok) {
@@ -248,6 +248,18 @@ export default function ProyectosInternosPage() {
                 className="h-9"
               />
             </div>
+
+            {!editando && (
+              <div>
+                <Label className="text-xs text-gray-500">Código <span className="text-gray-400">(opcional — se auto-genera si se deja vacío)</span></Label>
+                <Input
+                  placeholder="Ej: GYS.PRY o INT-001"
+                  value={form.codigo}
+                  onChange={e => setForm({ ...form, codigo: e.target.value.toUpperCase() })}
+                  className="h-9 font-mono"
+                />
+              </div>
+            )}
 
             <div>
               <Label className="text-xs text-gray-500">Centro de Costos *</Label>

@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { nombre, centroCostoId, gestorId, fechaInicio } = body
+    const { nombre, centroCostoId, gestorId, fechaInicio, codigoPersonalizado } = body
 
     if (!nombre?.trim()) return NextResponse.json({ error: 'El nombre es requerido' }, { status: 400 })
     if (!centroCostoId) return NextResponse.json({ error: 'El Centro de Costos es requerido' }, { status: 400 })
@@ -57,9 +57,16 @@ export async function POST(req: NextRequest) {
     const cc = await prisma.centroCosto.findUnique({ where: { id: centroCostoId }, select: { nombre: true } })
     if (!cc) return NextResponse.json({ error: 'Centro de Costos no encontrado' }, { status: 404 })
 
-    // Generar código automático: INT-001, INT-002, ...
-    const count = await prisma.proyecto.count({ where: { esInterno: true } })
-    const codigo = `INT-${String(count + 1).padStart(3, '0')}`
+    // Usar código personalizado o auto-generar: INT-001, INT-002, ...
+    let codigo: string
+    if (codigoPersonalizado?.trim()) {
+      const existe = await prisma.proyecto.findFirst({ where: { codigo: codigoPersonalizado.trim().toUpperCase() } })
+      if (existe) return NextResponse.json({ error: `El código ${codigoPersonalizado.trim().toUpperCase()} ya existe` }, { status: 400 })
+      codigo = codigoPersonalizado.trim().toUpperCase()
+    } else {
+      const count = await prisma.proyecto.count({ where: { esInterno: true } })
+      codigo = `INT-${String(count + 1).padStart(3, '0')}`
+    }
 
     const proyectoId = randomUUID()
 
