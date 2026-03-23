@@ -958,7 +958,7 @@ export default function SupervisionTareasPage() {
                                   {tarea.personasEstimadas > 1 && (
                                     <span className="inline-flex items-center gap-0.5 text-[10px] text-blue-600 bg-blue-50 border border-blue-200 rounded px-1 py-0">
                                       <Users className="h-2.5 w-2.5" />
-                                      {horasPorPersona}h/pers
+                                      {tarea.personasEstimadas} × {horasPorPersona}h
                                     </span>
                                   )}
                                   {tarea.estado !== 'completada' && tarea.horasPlan > 0 && (
