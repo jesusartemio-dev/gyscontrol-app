@@ -206,7 +206,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
           await prisma.cuentaPorCobrar.create({
             data: {
               proyectoId,
-              clienteId: proyecto.clienteId,
+              clienteId: proyecto.clienteId!,
               valorizacionId: valId,
               numeroDocumento: body.numeroDocumento || null,
               descripcion: `Valorización ${existing.codigo}`,

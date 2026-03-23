@@ -50,7 +50,7 @@ export async function GET(
       firmaDifusion: personal.firmaDifusion,
       fechaFirma: personal.fechaFirma,
       proyecto: personal.expediente.proyecto.nombre,
-      cliente: personal.expediente.proyecto.cliente.nombre,
+      cliente: personal.expediente.proyecto.cliente?.nombre ?? '',
       codigoCod: personal.expediente.codigoCod,
       documentos: personal.expediente.documentos,
     })

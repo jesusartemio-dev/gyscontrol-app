@@ -48,7 +48,7 @@ export async function GET(
 
     // Obtener contactos del cliente
     const contactosCliente = await prisma.crmContactoCliente.findMany({
-      where: { clienteId: exp.proyecto.clienteId },
+      where: { clienteId: exp.proyecto.clienteId ?? undefined },
       select: { nombre: true, cargo: true, telefono: true, email: true },
       take: 6,
     })

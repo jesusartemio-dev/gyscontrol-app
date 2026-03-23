@@ -89,6 +89,7 @@ export async function GET(req: NextRequest) {
     // Group projects by clienteId for frequency calculation
     const proyectosMap = new Map<string, Date[]>()
     for (const p of proyectosPorCliente) {
+      if (!p.clienteId) continue
       if (!proyectosMap.has(p.clienteId)) {
         proyectosMap.set(p.clienteId, [])
       }

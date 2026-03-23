@@ -150,7 +150,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
             await prisma.cuentaPorCobrar.create({
               data: {
                 proyectoId: id,
-                clienteId: proyectoActual.clienteId,
+                clienteId: proyectoActual.clienteId!,
                 descripcion: `Fondo de Garantía — ${proyectoActual.codigo}`,
                 monto: totalFondoGarantia,
                 saldoPendiente: totalFondoGarantia,

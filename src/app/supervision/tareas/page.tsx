@@ -53,13 +53,13 @@ import { es } from 'date-fns/locale'
 
 interface Tarea {
   id: string
-  tipo: 'proyecto_tarea' | 'tarea' | 'tarea_cc'
+  tipo: 'proyecto_tarea' | 'tarea'
   nombre: string
   descripcion?: string
   proyectoId: string | null
   proyectoCodigo: string
   proyectoNombre: string
-  centroCostoId?: string | null
+  esInterno: boolean
   centroCostoNombre?: string | null
   edtNombre: string
   actividadNombre: string | null
@@ -80,10 +80,9 @@ interface Tarea {
 }
 
 interface NuevaTarea {
-  modo: 'proyecto' | 'centro_costo'
+  modo: 'proyecto' | 'interno'
   proyectoId: string
   proyectoEdtId: string
-  centroCostoId: string
   nombre: string
   descripcion: string
   fechaInicio: string
@@ -94,10 +93,11 @@ interface NuevaTarea {
   personasEstimadas: string
 }
 
-interface CentroCosto {
+interface ProyectoInterno {
   id: string
+  codigo: string
   nombre: string
-  tipo: string
+  centroCosto?: { nombre: string } | null
 }
 
 interface ProyectoEdt {
@@ -134,7 +134,7 @@ export default function SupervisionTareasPage() {
   const [tareas, setTareas] = useState<Tarea[]>([])
   const [tareasFiltradas, setTareasFiltradas] = useState<Tarea[]>([])
   const [proyectos, setProyectos] = useState<Proyecto[]>([])
-  const [centrosCosto, setCentrosCosto] = useState<CentroCosto[]>([])
+  const [proyectosInternos, setProyectosInternos] = useState<ProyectoInterno[]>([])
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [metricas, setMetricas] = useState<Metricas | null>(null)
   const [loading, setLoading] = useState(true)
@@ -167,7 +167,6 @@ export default function SupervisionTareasPage() {
     modo: 'proyecto',
     proyectoId: '',
     proyectoEdtId: '',
-    centroCostoId: '',
     nombre: '',
     descripcion: '',
     fechaInicio: '',
@@ -217,7 +216,7 @@ export default function SupervisionTareasPage() {
         setTareas(data.data.tareas)
         setTareasFiltradas(data.data.tareas)
         setProyectos(data.data.proyectos)
-        setCentrosCosto(data.data.centrosCosto || [])
+        setProyectosInternos(data.data.proyectosInternos || [])
         setUsuarios(data.data.usuarios)
         setMetricas(data.data.metricas)
       }
@@ -533,7 +532,6 @@ export default function SupervisionTareasPage() {
       modo: 'proyecto',
       proyectoId: proyectoIdInicial,
       proyectoEdtId: '',
-      centroCostoId: '',
       nombre: '',
       descripcion: '',
       fechaInicio: format(new Date(), 'yyyy-MM-dd'),
@@ -553,22 +551,14 @@ export default function SupervisionTareasPage() {
 
   // Crear tarea extra
   const crearTarea = async () => {
-    if (nuevaTarea.modo === 'centro_costo') {
-      if (!nuevaTarea.centroCostoId) {
-        toast({ title: 'Error', description: 'Debe seleccionar un Centro de Costos', variant: 'destructive' })
-        return
-      }
-    } else {
-      if (!nuevaTarea.proyectoId) {
-        toast({ title: 'Error', description: 'Debe seleccionar un proyecto', variant: 'destructive' })
-        return
-      }
-      if (!nuevaTarea.proyectoEdtId) {
-        toast({ title: 'Error', description: 'Debe seleccionar un EDT', variant: 'destructive' })
-        return
-      }
+    if (!nuevaTarea.proyectoId) {
+      toast({ title: 'Error', description: 'Debe seleccionar un proyecto', variant: 'destructive' })
+      return
     }
-
+    if (nuevaTarea.modo === 'proyecto' && !nuevaTarea.proyectoEdtId) {
+      toast({ title: 'Error', description: 'Debe seleccionar un EDT', variant: 'destructive' })
+      return
+    }
     if (!nuevaTarea.nombre.trim()) {
       toast({ title: 'Error', description: 'El nombre de la tarea es requerido', variant: 'destructive' })
       return
@@ -580,31 +570,19 @@ export default function SupervisionTareasPage() {
 
       const personas = parseInt(nuevaTarea.personasEstimadas) || 1
       const horasPP = parseFloat(nuevaTarea.horasEstimadas) || 0
-
-      const payload = nuevaTarea.modo === 'centro_costo'
-        ? {
-            centroCostoId: nuevaTarea.centroCostoId,
-            nombre: nuevaTarea.nombre,
-            descripcion: nuevaTarea.descripcion,
-            fechaInicio: nuevaTarea.fechaInicio,
-            fechaFin: nuevaTarea.fechaFin,
-            responsableId: nuevaTarea.responsableId || null,
-            prioridad: nuevaTarea.prioridad,
-            horasEstimadas: horasPP > 0 ? horasPP : null,
-            personasEstimadas: personas
-          }
-        : {
-            proyectoId: nuevaTarea.proyectoId,
-            proyectoEdtId: nuevaTarea.proyectoEdtId,
-            nombre: nuevaTarea.nombre,
-            descripcion: nuevaTarea.descripcion,
-            fechaInicio: nuevaTarea.fechaInicio,
-            fechaFin: nuevaTarea.fechaFin,
-            responsableId: nuevaTarea.responsableId || null,
-            prioridad: nuevaTarea.prioridad,
-            horasEstimadas: horasPP > 0 ? horasPP * personas : null,
-            personasEstimadas: personas
-          }
+      const payload: any = {
+        proyectoId: nuevaTarea.proyectoId,
+        nombre: nuevaTarea.nombre,
+        descripcion: nuevaTarea.descripcion,
+        fechaInicio: nuevaTarea.fechaInicio,
+        fechaFin: nuevaTarea.fechaFin,
+        responsableId: nuevaTarea.responsableId || null,
+        prioridad: nuevaTarea.prioridad,
+        horasEstimadas: horasPP > 0 ? horasPP * personas : null,
+        personasEstimadas: personas
+      }
+      // Para proyectos regulares se requiere EDT; para internos el API lo resuelve solo
+      if (nuevaTarea.modo === 'proyecto') payload.proyectoEdtId = nuevaTarea.proyectoEdtId
 
       const response = await fetch('/api/supervision/tareas', {
         method: 'POST',
@@ -862,10 +840,10 @@ export default function SupervisionTareasPage() {
                       <TableRow key={`${tarea.tipo}-${tarea.id}`}>
                         <TableCell>
                           <div>
-                            {tarea.tipo === 'tarea_cc' ? (
+                            {tarea.esInterno ? (
                               <>
-                                <p className="font-medium text-emerald-700">{tarea.centroCostoNombre}</p>
-                                <p className="text-xs text-emerald-600 bg-emerald-50 rounded px-1 inline-block mt-0.5">CC</p>
+                                <p className="font-medium text-emerald-700">{tarea.centroCostoNombre || tarea.proyectoNombre}</p>
+                                <p className="text-xs text-emerald-600 bg-emerald-50 rounded px-1 inline-block mt-0.5">Interno</p>
                               </>
                             ) : (
                               <>
@@ -1078,7 +1056,7 @@ export default function SupervisionTareasPage() {
       <Dialog open={showCrearModal} onOpenChange={setShowCrearModal}>
         <DialogContent className="max-w-md">
           <DialogHeader className="pb-2">
-            <DialogTitle className={`flex items-center gap-2 ${nuevaTarea.modo === 'centro_costo' ? 'text-emerald-700' : 'text-purple-700'}`}>
+            <DialogTitle className={`flex items-center gap-2 ${nuevaTarea.modo === 'interno' ? 'text-emerald-700' : 'text-purple-700'}`}>
               <Zap className="h-5 w-5" />
               Nueva Tarea Extra
             </DialogTitle>
@@ -1095,25 +1073,25 @@ export default function SupervisionTareasPage() {
               </div>
             )}
 
-            {/* Toggle Proyecto / Centro de Costos */}
+            {/* Toggle Proyecto / Proyecto Interno */}
             <div className="flex rounded-md border overflow-hidden text-sm">
               <button
                 type="button"
                 className={`flex-1 py-1.5 transition-colors ${nuevaTarea.modo === 'proyecto' ? 'bg-purple-600 text-white font-medium' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-                onClick={() => setNuevaTarea({ ...nuevaTarea, modo: 'proyecto', centroCostoId: '' })}
+                onClick={() => { setNuevaTarea({ ...nuevaTarea, modo: 'proyecto', proyectoId: '', proyectoEdtId: '' }); setEdtsProyecto([]) }}
               >
                 Proyecto
               </button>
               <button
                 type="button"
-                className={`flex-1 py-1.5 transition-colors ${nuevaTarea.modo === 'centro_costo' ? 'bg-emerald-600 text-white font-medium' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-                onClick={() => setNuevaTarea({ ...nuevaTarea, modo: 'centro_costo', proyectoId: '', proyectoEdtId: '' })}
+                className={`flex-1 py-1.5 transition-colors ${nuevaTarea.modo === 'interno' ? 'bg-emerald-600 text-white font-medium' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                onClick={() => setNuevaTarea({ ...nuevaTarea, modo: 'interno', proyectoId: '', proyectoEdtId: '' })}
               >
-                Centro de Costos
+                Interno (CC)
               </button>
             </div>
 
-            {/* Proyecto y EDT ó Centro de Costos */}
+            {/* Proyecto y EDT ó Proyecto Interno */}
             {nuevaTarea.modo === 'proyecto' ? (
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -1128,9 +1106,7 @@ export default function SupervisionTareasPage() {
                     <SelectContent>
                       <SelectItem value="__none__">Seleccionar...</SelectItem>
                       {proyectos.map(p => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.codigo}
-                        </SelectItem>
+                        <SelectItem key={p.id} value={p.id}>{p.codigo}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -1148,9 +1124,7 @@ export default function SupervisionTareasPage() {
                     <SelectContent>
                       <SelectItem value="__none__">Seleccionar...</SelectItem>
                       {edtsProyecto.map(edt => (
-                        <SelectItem key={edt.id} value={edt.id}>
-                          {edt.nombre}
-                        </SelectItem>
+                        <SelectItem key={edt.id} value={edt.id}>{edt.nombre}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -1158,23 +1132,26 @@ export default function SupervisionTareasPage() {
               </div>
             ) : (
               <div>
-                <Label className="text-xs text-gray-500">Centro de Costos *</Label>
+                <Label className="text-xs text-gray-500">Proyecto Interno *</Label>
                 <Select
-                  value={nuevaTarea.centroCostoId || '__none__'}
-                  onValueChange={(v) => setNuevaTarea({ ...nuevaTarea, centroCostoId: v === '__none__' ? '' : v })}
+                  value={nuevaTarea.proyectoId || '__none__'}
+                  onValueChange={(v) => setNuevaTarea({ ...nuevaTarea, proyectoId: v === '__none__' ? '' : v })}
                 >
                   <SelectTrigger className="h-9">
                     <SelectValue placeholder="Seleccionar..." />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">Seleccionar...</SelectItem>
-                    {centrosCosto.map(cc => (
-                      <SelectItem key={cc.id} value={cc.id}>
-                        {cc.nombre}
+                    {proyectosInternos.map(p => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.nombre}{p.centroCosto ? ` — ${p.centroCosto.nombre}` : ''}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                {proyectosInternos.length === 0 && (
+                  <p className="text-xs text-amber-600 mt-1">No hay proyectos internos creados. Ve a Administración → Proyectos Internos.</p>
+                )}
               </div>
             )}
 
@@ -1309,8 +1286,8 @@ export default function SupervisionTareasPage() {
             <Button
               size="sm"
               onClick={crearTarea}
-              disabled={creandoTarea || (nuevaTarea.modo === 'proyecto' ? !nuevaTarea.proyectoEdtId : !nuevaTarea.centroCostoId)}
-              className={nuevaTarea.modo === 'centro_costo' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-purple-600 hover:bg-purple-700'}
+              disabled={creandoTarea || !nuevaTarea.proyectoId || (nuevaTarea.modo === 'proyecto' && !nuevaTarea.proyectoEdtId)}
+              className={nuevaTarea.modo === 'interno' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-purple-600 hover:bg-purple-700'}
             >
               {creandoTarea ? (
                 <RefreshCw className="h-4 w-4 mr-1 animate-spin" />

@@ -14,20 +14,13 @@ export async function GET(request: NextRequest) {
     const session = await getServerSession(authOptions)
 
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    // Solo supervisores pueden ver todas las tareas
     const userRole = session.user.role
     const allowedRoles = ['admin', 'coordinador', 'gestor', 'proyectos']
     if (!allowedRoles.includes(userRole || '')) {
-      return NextResponse.json(
-        { error: 'No tiene permisos para gestionar tareas' },
-        { status: 403 }
-      )
+      return NextResponse.json({ error: 'No tiene permisos para gestionar tareas' }, { status: 403 })
     }
 
     const { searchParams } = new URL(request.url)
@@ -37,186 +30,80 @@ export async function GET(request: NextRequest) {
     const soloSinAsignar = searchParams.get('sinAsignar') === 'true'
 
     // Obtener ProyectoTareas (tareas del cronograma de EJECUCIÓN únicamente)
-    // Los cronogramas comercial y planificación son solo para comparación/línea base
     const whereProyectoTarea: any = {
-      proyectoEdt: {
-        proyectoCronograma: {
-          tipo: 'ejecucion'
-        }
-      }
+      proyectoEdt: { proyectoCronograma: { tipo: 'ejecucion' } }
     }
-
-    if (proyectoId) {
-      whereProyectoTarea.proyectoEdt.proyectoId = proyectoId
-    }
-
-    if (responsableId) {
-      whereProyectoTarea.responsableId = responsableId
-    } else if (soloSinAsignar) {
-      whereProyectoTarea.responsableId = null
-    }
-
-    if (estado) {
-      whereProyectoTarea.estado = estado
-    }
+    if (proyectoId) whereProyectoTarea.proyectoEdt.proyectoId = proyectoId
+    if (responsableId) whereProyectoTarea.responsableId = responsableId
+    else if (soloSinAsignar) whereProyectoTarea.responsableId = null
+    if (estado) whereProyectoTarea.estado = estado
 
     const proyectoTareas = await prisma.proyectoTarea.findMany({
       where: whereProyectoTarea,
       include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true
-          }
-        },
-        creadoPor: {
-          select: {
-            id: true,
-            name: true
-          }
-        },
+        user: { select: { id: true, name: true, email: true, role: true } },
+        creadoPor: { select: { id: true, name: true } },
         proyectoEdt: {
           include: {
-            proyecto: {
-              select: {
-                id: true,
-                codigo: true,
-                nombre: true,
-                estado: true
-              }
-            }
+            proyecto: { select: { id: true, codigo: true, nombre: true, estado: true, esInterno: true, centroCosto: { select: { nombre: true } } } }
           }
         },
-        proyectoActividad: {
-          select: {
-            id: true,
-            nombre: true
-          }
-        }
-      },
-      orderBy: [
-        { fechaFin: 'asc' },
-        { prioridad: 'desc' }
-      ]
-    })
-
-    // Obtener Tareas simples
-    const whereTarea: any = {
-      estado: { not: 'cancelada' }
-    }
-
-    if (proyectoId) {
-      whereTarea.proyectoServicioCotizado = {
-        proyectoId: proyectoId
-      }
-    }
-
-    if (responsableId) {
-      whereTarea.responsableId = responsableId
-    } else if (soloSinAsignar) {
-      whereTarea.responsableId = null
-    }
-
-    if (estado) {
-      whereTarea.estado = estado
-    }
-
-    const tareasSimples = await prisma.tarea.findMany({
-      where: whereTarea,
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true
-          }
-        },
-        proyectoServicioCotizado: {
-          include: {
-            proyecto: {
-              select: {
-                id: true,
-                codigo: true,
-                nombre: true,
-                estado: true
-              }
-            }
-          }
-        }
-      },
-      orderBy: [
-        { fechaFin: 'asc' },
-        { prioridad: 'desc' }
-      ]
-    })
-
-    // Obtener TareaCC (tareas de centro de costo)
-    const whereTareaCC: any = { estado: { not: 'cancelada' } }
-    if (responsableId) {
-      whereTareaCC.responsableId = responsableId
-    } else if (soloSinAsignar) {
-      whereTareaCC.responsableId = null
-    }
-    if (estado) whereTareaCC.estado = estado
-
-    const tareasCc = await prisma.tareaCC.findMany({
-      where: whereTareaCC,
-      include: {
-        centroCosto: { select: { id: true, nombre: true, tipo: true } },
-        responsable: { select: { id: true, name: true, email: true, role: true } },
-        creadoPor: { select: { id: true, name: true } },
+        proyectoActividad: { select: { id: true, nombre: true } }
       },
       orderBy: [{ fechaFin: 'asc' }, { prioridad: 'desc' }]
     })
 
-    // Obtener lista de centros de costo para el formulario
-    const centrosCosto = await prisma.centroCosto.findMany({
-      where: { activo: true },
-      select: { id: true, nombre: true, tipo: true },
-      orderBy: { nombre: 'asc' }
-    })
+    // Obtener Tareas simples
+    const whereTarea: any = { estado: { not: 'cancelada' } }
+    if (proyectoId) whereTarea.proyectoServicioCotizado = { proyectoId }
+    if (responsableId) whereTarea.responsableId = responsableId
+    else if (soloSinAsignar) whereTarea.responsableId = null
+    if (estado) whereTarea.estado = estado
 
-    // Obtener lista de proyectos para el filtro
-    const proyectos = await prisma.proyecto.findMany({
-      where: {
-        estado: {
-          in: ['creado', 'en_ejecucion', 'en_planificacion', 'listas_pendientes', 'listas_aprobadas', 'pedidos_creados']
+    const tareasSimples = await prisma.tarea.findMany({
+      where: whereTarea,
+      include: {
+        user: { select: { id: true, name: true, email: true, role: true } },
+        proyectoServicioCotizado: {
+          include: { proyecto: { select: { id: true, codigo: true, nombre: true, estado: true } } }
         }
       },
-      select: {
-        id: true,
-        codigo: true,
-        nombre: true,
-        estado: true
+      orderBy: [{ fechaFin: 'asc' }, { prioridad: 'desc' }]
+    })
+
+    // Obtener lista de proyectos regulares (activos)
+    const proyectos = await prisma.proyecto.findMany({
+      where: {
+        esInterno: false,
+        estado: { in: ['creado', 'en_ejecucion', 'en_planificacion', 'listas_pendientes', 'listas_aprobadas', 'pedidos_creados'] }
       },
+      select: { id: true, codigo: true, nombre: true, estado: true },
       orderBy: { codigo: 'asc' }
     })
 
-    // Obtener lista de usuarios para asignacion
-    const usuarios = await prisma.user.findMany({
+    // Obtener proyectos internos (activos)
+    const proyectosInternos = await prisma.proyecto.findMany({
       where: {
-        role: {
-          in: ['colaborador', 'proyectos', 'coordinador', 'gestor', 'admin']
-        }
+        esInterno: true,
+        estado: { notIn: ['cerrado', 'cancelado'] }
       },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true
-      },
+      select: { id: true, codigo: true, nombre: true, centroCosto: { select: { nombre: true } } },
+      orderBy: { nombre: 'asc' }
+    })
+
+    // Obtener usuarios para asignación
+    const usuarios = await prisma.user.findMany({
+      where: { role: { in: ['colaborador', 'proyectos', 'coordinador', 'gestor', 'admin'] } },
+      select: { id: true, name: true, email: true, role: true },
       orderBy: { name: 'asc' }
     })
 
     // Formatear tareas de ProyectoTarea
-    // Una tarea es "Extra" si su descripcion contiene el marcador [EXTRA]
     const tareasFormateadas = proyectoTareas.map(t => {
       const edtNombre = t.proyectoEdt?.nombre || 'Sin EDT'
       const esExtra = t.descripcion?.startsWith('[EXTRA]') || false
       const descripcionLimpia = esExtra ? t.descripcion?.replace('[EXTRA]', '').trim() : t.descripcion
+      const esInterno = t.proyectoEdt?.proyecto?.esInterno || false
       return {
         id: t.id,
         tipo: 'proyecto_tarea' as const,
@@ -225,6 +112,8 @@ export async function GET(request: NextRequest) {
         proyectoId: t.proyectoEdt?.proyecto?.id || null,
         proyectoCodigo: t.proyectoEdt?.proyecto?.codigo || 'Sin proyecto',
         proyectoNombre: t.proyectoEdt?.proyecto?.nombre || 'Sin proyecto',
+        esInterno,
+        centroCostoNombre: esInterno ? (t.proyectoEdt?.proyecto?.centroCosto?.nombre || null) : null,
         edtNombre,
         actividadNombre: t.proyectoActividad?.nombre || null,
         esExtra,
@@ -244,35 +133,6 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    // Formatear TareaCC
-    const tareasCcFormateadas = tareasCc.map(t => ({
-      id: t.id,
-      tipo: 'tarea_cc' as const,
-      nombre: t.nombre,
-      descripcion: t.descripcion,
-      proyectoId: null,
-      proyectoCodigo: t.centroCosto?.nombre || 'Sin CC',
-      proyectoNombre: t.centroCosto?.nombre || 'Sin CC',
-      centroCostoId: t.centroCostoId,
-      centroCostoNombre: t.centroCosto?.nombre || null,
-      edtNombre: 'Centro de Costos',
-      actividadNombre: null as string | null,
-      esExtra: true,
-      responsableId: t.responsableId,
-      responsableNombre: t.responsable?.name || null,
-      responsableEmail: t.responsable?.email || null,
-      creadoPorId: t.creadoPorId || null,
-      creadoPorNombre: t.creadoPor?.name || null,
-      fechaInicio: t.fechaInicio,
-      fechaFin: t.fechaFin,
-      horasPlan: (t.horasEstimadas ? Number(t.horasEstimadas) : 0) * t.personasEstimadas,
-      horasReales: t.horasReales ? Number(t.horasReales) : 0,
-      personasEstimadas: t.personasEstimadas,
-      progreso: t.porcentajeCompletado,
-      estado: t.estado,
-      prioridad: t.prioridad
-    }))
-
     // Formatear Tareas simples
     const tareasFormateadasSimples = tareasSimples.map(t => ({
       id: t.id,
@@ -282,6 +142,8 @@ export async function GET(request: NextRequest) {
       proyectoId: t.proyectoServicioCotizado?.proyecto?.id || null,
       proyectoCodigo: t.proyectoServicioCotizado?.proyecto?.codigo || 'Sin proyecto',
       proyectoNombre: t.proyectoServicioCotizado?.proyecto?.nombre || 'Sin proyecto',
+      esInterno: false,
+      centroCostoNombre: null as string | null,
       edtNombre: 'Tarea simple',
       actividadNombre: null as string | null,
       esExtra: false,
@@ -294,39 +156,28 @@ export async function GET(request: NextRequest) {
       fechaFin: t.fechaFin,
       horasPlan: t.horasEstimadas ? Number(t.horasEstimadas) : 0,
       horasReales: t.horasReales ? Number(t.horasReales) : 0,
+      personasEstimadas: 1,
       progreso: t.porcentajeCompletado || 0,
       estado: t.estado,
       prioridad: t.prioridad || 'media'
     }))
 
-    // Combinar todas las tareas
-    const todasLasTareas = [...tareasFormateadas, ...tareasFormateadasSimples, ...tareasCcFormateadas]
-      .sort((a, b) => {
-        // Primero por fecha de fin
-        const fechaA = new Date(a.fechaFin).getTime()
-        const fechaB = new Date(b.fechaFin).getTime()
-        return fechaA - fechaB
-      })
+    const todasLasTareas = [...tareasFormateadas, ...tareasFormateadasSimples]
+      .sort((a, b) => new Date(a.fechaFin).getTime() - new Date(b.fechaFin).getTime())
 
-    // Calcular metricas
     const totalTareas = todasLasTareas.length
     const tareasCompletadas = todasLasTareas.filter(t => t.estado === 'completada').length
     const tareasEnProgreso = todasLasTareas.filter(t => t.estado === 'en_progreso').length
     const tareasPendientes = todasLasTareas.filter(t => t.estado === 'pendiente').length
     const tareasSinAsignar = todasLasTareas.filter(t => !t.responsableId).length
-
     const ahora = new Date()
     const tareasVencidas = todasLasTareas.filter(t =>
-      t.estado !== 'completada' &&
-      t.estado !== 'cancelada' &&
-      new Date(t.fechaFin) < ahora
+      t.estado !== 'completada' && t.estado !== 'cancelada' && new Date(t.fechaFin) < ahora
     ).length
-
     const tareasProximasVencer = todasLasTareas.filter(t => {
       if (t.estado === 'completada' || t.estado === 'cancelada') return false
-      const fechaFin = new Date(t.fechaFin)
-      const diasRestantes = Math.ceil((fechaFin.getTime() - ahora.getTime()) / (1000 * 60 * 60 * 24))
-      return diasRestantes >= 0 && diasRestantes <= 7
+      const dias = Math.ceil((new Date(t.fechaFin).getTime() - ahora.getTime()) / (1000 * 60 * 60 * 24))
+      return dias >= 0 && dias <= 7
     }).length
 
     return NextResponse.json({
@@ -334,159 +185,61 @@ export async function GET(request: NextRequest) {
       data: {
         tareas: todasLasTareas,
         proyectos,
-        centrosCosto,
+        proyectosInternos,
         usuarios,
-        metricas: {
-          totalTareas,
-          tareasCompletadas,
-          tareasEnProgreso,
-          tareasPendientes,
-          tareasSinAsignar,
-          tareasVencidas,
-          tareasProximasVencer
-        }
+        metricas: { totalTareas, tareasCompletadas, tareasEnProgreso, tareasPendientes, tareasSinAsignar, tareasVencidas, tareasProximasVencer }
       }
     })
 
   } catch (error) {
     console.error('Error obteniendo tareas de supervision:', error)
-    return NextResponse.json(
-      {
-        error: 'Error interno del servidor',
-        details: error instanceof Error ? error.message : 'Error desconocido',
-        success: false
-      },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error interno del servidor', details: error instanceof Error ? error.message : 'Error desconocido', success: false }, { status: 500 })
   }
 }
 
-// PATCH - Asignar tarea a un usuario
+// PATCH - Asignar o actualizar tarea
 export async function PATCH(request: NextRequest) {
   try {
     const { getServerSession } = await import('next-auth')
     const { authOptions } = await import('@/lib/auth')
     const session = await getServerSession(authOptions)
 
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 401 }
-      )
-    }
+    if (!session?.user?.id) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
     const userRole = session.user.role
-    const allowedRoles = ['admin', 'coordinador', 'gestor', 'proyectos']
-    if (!allowedRoles.includes(userRole || '')) {
-      return NextResponse.json(
-        { error: 'No tiene permisos para asignar tareas' },
-        { status: 403 }
-      )
+    if (!['admin', 'coordinador', 'gestor', 'proyectos'].includes(userRole || '')) {
+      return NextResponse.json({ error: 'No tiene permisos para asignar tareas' }, { status: 403 })
     }
 
     const body = await request.json()
     const { tareaId, tipo, responsableId, estado, prioridad, porcentajeCompletado, personasEstimadas } = body
 
-    if (!tareaId || !tipo) {
-      return NextResponse.json(
-        { error: 'Se requiere tareaId y tipo' },
-        { status: 400 }
-      )
-    }
+    if (!tareaId || !tipo) return NextResponse.json({ error: 'Se requiere tareaId y tipo' }, { status: 400 })
 
     let tareaActualizada
 
     if (tipo === 'proyecto_tarea') {
       const updateData: any = { updatedAt: new Date() }
       if (responsableId !== undefined) updateData.responsableId = responsableId || null
-      if (estado) {
-        updateData.estado = estado
-        // Si se marca como completada, automáticamente poner 100%
-        if (estado === 'completada') {
-          updateData.porcentajeCompletado = 100
-        }
-      }
+      if (estado) { updateData.estado = estado; if (estado === 'completada') updateData.porcentajeCompletado = 100 }
       if (prioridad) updateData.prioridad = prioridad
-      // Permitir actualizar porcentaje manualmente (solo si no se está completando)
-      if (porcentajeCompletado !== undefined && estado !== 'completada') {
-        updateData.porcentajeCompletado = Math.min(100, Math.max(0, porcentajeCompletado))
-      }
-      if (personasEstimadas !== undefined) {
-        updateData.personasEstimadas = Math.max(1, parseInt(personasEstimadas) || 1)
-      }
-
-      tareaActualizada = await prisma.proyectoTarea.update({
-        where: { id: tareaId },
-        data: updateData,
-        include: {
-          user: {
-            select: { id: true, name: true, email: true }
-          }
-        }
-      })
-    } else if (tipo === 'tarea_cc') {
-      const updateData: any = { updatedAt: new Date() }
-      if (responsableId !== undefined) updateData.responsableId = responsableId || null
-      if (estado) {
-        updateData.estado = estado
-        if (estado === 'completada') updateData.porcentajeCompletado = 100
-      }
-      if (prioridad) updateData.prioridad = prioridad
-      if (porcentajeCompletado !== undefined && estado !== 'completada') {
-        updateData.porcentajeCompletado = Math.min(100, Math.max(0, porcentajeCompletado))
-      }
-      if (personasEstimadas !== undefined) {
-        updateData.personasEstimadas = Math.max(1, parseInt(personasEstimadas) || 1)
-      }
-
-      tareaActualizada = await prisma.tareaCC.update({
-        where: { id: tareaId },
-        data: updateData,
-        include: {
-          responsable: { select: { id: true, name: true, email: true } }
-        }
-      })
+      if (porcentajeCompletado !== undefined && estado !== 'completada') updateData.porcentajeCompletado = Math.min(100, Math.max(0, porcentajeCompletado))
+      if (personasEstimadas !== undefined) updateData.personasEstimadas = Math.max(1, parseInt(personasEstimadas) || 1)
+      tareaActualizada = await prisma.proyectoTarea.update({ where: { id: tareaId }, data: updateData, include: { user: { select: { id: true, name: true, email: true } } } })
     } else {
       const updateData: any = { updatedAt: new Date() }
       if (responsableId !== undefined) updateData.responsableId = responsableId || null
-      if (estado) {
-        updateData.estado = estado
-        if (estado === 'completada') {
-          updateData.porcentajeCompletado = 100
-        }
-      }
+      if (estado) { updateData.estado = estado; if (estado === 'completada') updateData.porcentajeCompletado = 100 }
       if (prioridad) updateData.prioridad = prioridad
-      if (porcentajeCompletado !== undefined && estado !== 'completada') {
-        updateData.porcentajeCompletado = Math.min(100, Math.max(0, porcentajeCompletado))
-      }
-
-      tareaActualizada = await prisma.tarea.update({
-        where: { id: tareaId },
-        data: updateData,
-        include: {
-          user: {
-            select: { id: true, name: true, email: true }
-          }
-        }
-      })
+      if (porcentajeCompletado !== undefined && estado !== 'completada') updateData.porcentajeCompletado = Math.min(100, Math.max(0, porcentajeCompletado))
+      tareaActualizada = await prisma.tarea.update({ where: { id: tareaId }, data: updateData, include: { user: { select: { id: true, name: true, email: true } } } })
     }
 
-    return NextResponse.json({
-      success: true,
-      data: tareaActualizada,
-      message: 'Tarea actualizada correctamente'
-    })
+    return NextResponse.json({ success: true, data: tareaActualizada, message: 'Tarea actualizada correctamente' })
 
   } catch (error) {
     console.error('Error actualizando tarea:', error)
-    return NextResponse.json(
-      {
-        error: 'Error al actualizar tarea',
-        details: error instanceof Error ? error.message : 'Error desconocido',
-        success: false
-      },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al actualizar tarea', details: error instanceof Error ? error.message : 'Error desconocido', success: false }, { status: 500 })
   }
 }
 
@@ -497,227 +250,93 @@ export async function POST(request: NextRequest) {
     const { authOptions } = await import('@/lib/auth')
     const session = await getServerSession(authOptions)
 
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 401 }
-      )
-    }
+    if (!session?.user?.id) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
     const userRole = session.user.role
-    const allowedRoles = ['admin', 'coordinador', 'gestor', 'proyectos']
-    if (!allowedRoles.includes(userRole || '')) {
-      return NextResponse.json(
-        { error: 'No tiene permisos para crear tareas' },
-        { status: 403 }
-      )
+    if (!['admin', 'coordinador', 'gestor', 'proyectos'].includes(userRole || '')) {
+      return NextResponse.json({ error: 'No tiene permisos para crear tareas' }, { status: 403 })
     }
 
     const body = await request.json()
-    const {
-      centroCostoId,
-      proyectoId,
-      proyectoEdtId,
-      nombre,
-      descripcion,
-      fechaInicio,
-      fechaFin,
-      responsableId,
-      prioridad = 'media',
-      horasEstimadas,
-      personasEstimadas
-    } = body
+    const { proyectoId, proyectoEdtId, nombre, descripcion, fechaInicio, fechaFin, responsableId, prioridad = 'media', horasEstimadas, personasEstimadas } = body
 
-    // --- Crear tarea de Centro de Costos ---
-    if (centroCostoId) {
-      if (!nombre?.trim()) {
-        return NextResponse.json({ error: 'El nombre de la tarea es requerido' }, { status: 400 })
-      }
-      if (!fechaInicio || !fechaFin) {
-        return NextResponse.json({ error: 'Las fechas de inicio y fin son requeridas' }, { status: 400 })
-      }
+    if (!proyectoId) return NextResponse.json({ error: 'El proyecto es requerido' }, { status: 400 })
+    if (!nombre?.trim()) return NextResponse.json({ error: 'El nombre de la tarea es requerido' }, { status: 400 })
+    if (!fechaInicio || !fechaFin) return NextResponse.json({ error: 'Las fechas de inicio y fin son requeridas' }, { status: 400 })
 
-      const cc = await prisma.centroCosto.findUnique({ where: { id: centroCostoId }, select: { id: true, nombre: true } })
-      if (!cc) {
-        return NextResponse.json({ error: 'Centro de Costos no encontrado' }, { status: 404 })
-      }
-
-      const personas = personasEstimadas && parseInt(personasEstimadas) > 0 ? parseInt(personasEstimadas) : 1
-      const nuevaTareaCC = await prisma.tareaCC.create({
-        data: {
-          centroCostoId,
-          nombre: nombre.trim(),
-          descripcion: descripcion?.trim() || null,
-          fechaInicio: new Date(fechaInicio),
-          fechaFin: new Date(fechaFin),
-          responsableId: responsableId || null,
-          creadoPorId: session.user.id,
-          prioridad,
-          horasEstimadas: horasEstimadas ? parseFloat(horasEstimadas) : null,
-          personasEstimadas: personas,
-          estado: 'pendiente',
-          updatedAt: new Date()
-        },
-        include: {
-          centroCosto: { select: { id: true, nombre: true } },
-          responsable: { select: { id: true, name: true, email: true } }
-        }
-      })
-
-      return NextResponse.json({
-        success: true,
-        data: {
-          id: nuevaTareaCC.id,
-          tipo: 'tarea_cc',
-          nombre: nuevaTareaCC.nombre,
-          descripcion: descripcion?.trim() || null,
-          proyectoId: null,
-          proyectoCodigo: cc.nombre,
-          proyectoNombre: cc.nombre,
-          centroCostoId: cc.id,
-          centroCostoNombre: cc.nombre,
-          edtNombre: 'Centro de Costos',
-          esExtra: true,
-          responsableId: nuevaTareaCC.responsableId,
-          responsableNombre: nuevaTareaCC.responsable?.name || null,
-          creadoPorId: session.user.id,
-          creadoPorNombre: session.user.name || null,
-          fechaInicio: nuevaTareaCC.fechaInicio,
-          fechaFin: nuevaTareaCC.fechaFin,
-          horasPlan: nuevaTareaCC.horasEstimadas ? Number(nuevaTareaCC.horasEstimadas) * personas : 0,
-          progreso: 0,
-          estado: nuevaTareaCC.estado,
-          prioridad: nuevaTareaCC.prioridad
-        },
-        message: 'Tarea de Centro de Costos creada correctamente'
-      })
-    }
-
-    // Validaciones para tarea de proyecto
-    if (!proyectoId) {
-      return NextResponse.json(
-        { error: 'El proyecto es requerido' },
-        { status: 400 }
-      )
-    }
-
-    if (!proyectoEdtId) {
-      return NextResponse.json(
-        { error: 'El EDT es requerido' },
-        { status: 400 }
-      )
-    }
-
-    if (!nombre?.trim()) {
-      return NextResponse.json(
-        { error: 'El nombre de la tarea es requerido' },
-        { status: 400 }
-      )
-    }
-
-    if (!fechaInicio || !fechaFin) {
-      return NextResponse.json(
-        { error: 'Las fechas de inicio y fin son requeridas' },
-        { status: 400 }
-      )
-    }
-
-    // Verificar que el proyecto existe
     const proyecto = await prisma.proyecto.findUnique({
       where: { id: proyectoId },
-      select: { id: true, codigo: true, nombre: true }
+      select: { id: true, codigo: true, nombre: true, esInterno: true }
     })
+    if (!proyecto) return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 })
 
-    if (!proyecto) {
-      return NextResponse.json(
-        { error: 'Proyecto no encontrado' },
-        { status: 404 }
-      )
-    }
+    // Para proyectos internos: el EDT es automático ("General"), no se requiere del usuario
+    let edtIdFinal: string
+    let cronogramaId: string
 
-    // Verificar que el ProyectoEdt existe y pertenece al proyecto
-    const proyectoEdtOriginal = await prisma.proyectoEdt.findFirst({
-      where: {
-        id: proyectoEdtId,
-        proyectoId: proyectoId
-      },
-      include: {
-        proyectoCronograma: true
+    if (proyecto.esInterno) {
+      // Buscar el cronograma de ejecución auto-creado del proyecto interno
+      const cronograma = await prisma.proyectoCronograma.findFirst({
+        where: { proyectoId, tipo: 'ejecucion' }
+      })
+      if (!cronograma) {
+        return NextResponse.json({ error: 'El proyecto interno no tiene cronograma de ejecución. Contacte al administrador.' }, { status: 400 })
       }
-    })
-
-    if (!proyectoEdtOriginal) {
-      return NextResponse.json(
-        { error: 'El EDT no existe o no pertenece al proyecto' },
-        { status: 400 }
-      )
-    }
-
-    // Buscar el cronograma de EJECUCIÓN del proyecto
-    let cronogramaEjecucion = await prisma.proyectoCronograma.findFirst({
-      where: {
-        proyectoId: proyectoId,
-        tipo: 'ejecucion'
+      const edtGeneral = await prisma.proyectoEdt.findFirst({
+        where: { proyectoId, proyectoCronogramaId: cronograma.id }
+      })
+      if (!edtGeneral) {
+        return NextResponse.json({ error: 'El proyecto interno no tiene EDT configurado. Contacte al administrador.' }, { status: 400 })
       }
-    })
+      edtIdFinal = edtGeneral.id
+      cronogramaId = cronograma.id
+    } else {
+      // Proyecto regular: EDT requerido
+      if (!proyectoEdtId) return NextResponse.json({ error: 'El EDT es requerido' }, { status: 400 })
 
-    if (!cronogramaEjecucion) {
-      return NextResponse.json(
-        {
-          error: 'El proyecto no tiene un Cronograma de Ejecución. Debe crear el cronograma de ejecución en la sección de Cronograma del proyecto antes de poder agregar tareas extra.',
+      const proyectoEdtOriginal = await prisma.proyectoEdt.findFirst({
+        where: { id: proyectoEdtId, proyectoId },
+        include: { proyectoCronograma: true }
+      })
+      if (!proyectoEdtOriginal) return NextResponse.json({ error: 'El EDT no existe o no pertenece al proyecto' }, { status: 400 })
+
+      const cronogramaEjecucion = await prisma.proyectoCronograma.findFirst({ where: { proyectoId, tipo: 'ejecucion' } })
+      if (!cronogramaEjecucion) {
+        return NextResponse.json({
+          error: 'El proyecto no tiene un Cronograma de Ejecución. Debe crearlo primero en la sección de Cronograma del proyecto.',
           code: 'MISSING_EXECUTION_SCHEDULE'
-        },
-        { status: 400 }
-      )
-    }
-
-    // Buscar un EDT en el cronograma de ejecución con el mismo nombre
-    let proyectoEdt = await prisma.proyectoEdt.findFirst({
-      where: {
-        proyectoId: proyectoId,
-        proyectoCronogramaId: cronogramaEjecucion.id,
-        nombre: proyectoEdtOriginal.nombre
+        }, { status: 400 })
       }
-    })
 
-    // Si no existe un EDT con ese nombre en ejecución, usar el EDT original pero vincular al cronograma de ejecución
-    if (!proyectoEdt) {
-      proyectoEdt = proyectoEdtOriginal
+      const edtEnEjecucion = await prisma.proyectoEdt.findFirst({
+        where: { proyectoId, proyectoCronogramaId: cronogramaEjecucion.id, nombre: proyectoEdtOriginal.nombre }
+      })
+      edtIdFinal = (edtEnEjecucion || proyectoEdtOriginal).id
+      cronogramaId = cronogramaEjecucion.id
     }
 
-    // Crear la tarea con marcador [EXTRA] en la descripcion
-    // IMPORTANTE: Siempre vincular al cronograma de EJECUCIÓN para que aparezca en la lista
-    const descripcionConMarcador = `[EXTRA]${descripcion?.trim() || ''}`
-
+    const personas = personasEstimadas && parseInt(personasEstimadas) > 0 ? parseInt(personasEstimadas) : 1
     const nuevaTarea = await prisma.proyectoTarea.create({
       data: {
         id: randomUUID(),
-        proyectoEdtId: proyectoEdt.id,
-        proyectoCronogramaId: cronogramaEjecucion.id,
+        proyectoEdtId: edtIdFinal,
+        proyectoCronogramaId: cronogramaId,
         nombre: nombre.trim(),
-        descripcion: descripcionConMarcador,
+        descripcion: `[EXTRA]${descripcion?.trim() || ''}`,
         fechaInicio: new Date(fechaInicio),
         fechaFin: new Date(fechaFin),
         responsableId: responsableId || null,
         creadoPorId: session.user.id,
         prioridad,
         horasEstimadas: horasEstimadas ? parseFloat(horasEstimadas) : null,
-        personasEstimadas: personasEstimadas && parseInt(personasEstimadas) > 0 ? parseInt(personasEstimadas) : 1,
+        personasEstimadas: personas,
         estado: 'pendiente',
         orden: 0,
         updatedAt: new Date()
       },
       include: {
-        user: {
-          select: { id: true, name: true, email: true }
-        },
-        proyectoEdt: {
-          include: {
-            proyecto: {
-              select: { id: true, codigo: true, nombre: true }
-            }
-          }
-        }
+        user: { select: { id: true, name: true, email: true } },
+        proyectoEdt: { include: { proyecto: { select: { id: true, codigo: true, nombre: true, esInterno: true, centroCosto: { select: { nombre: true } } } } } }
       }
     })
 
@@ -731,7 +350,8 @@ export async function POST(request: NextRequest) {
         proyectoId: proyecto.id,
         proyectoCodigo: proyecto.codigo,
         proyectoNombre: proyecto.nombre,
-        edtNombre: proyectoEdt.nombre,
+        esInterno: proyecto.esInterno,
+        edtNombre: nuevaTarea.proyectoEdt?.nombre || 'General',
         esExtra: true,
         responsableId: nuevaTarea.responsableId,
         responsableNombre: nuevaTarea.user?.name || null,
@@ -739,23 +359,16 @@ export async function POST(request: NextRequest) {
         creadoPorNombre: session.user.name || null,
         fechaInicio: nuevaTarea.fechaInicio,
         fechaFin: nuevaTarea.fechaFin,
-        horasPlan: nuevaTarea.horasEstimadas ? Number(nuevaTarea.horasEstimadas) : 0,
+        horasPlan: nuevaTarea.horasEstimadas ? Number(nuevaTarea.horasEstimadas) * personas : 0,
         progreso: 0,
         estado: nuevaTarea.estado,
         prioridad: nuevaTarea.prioridad
       },
-      message: 'Tarea extra creada correctamente'
+      message: 'Tarea creada correctamente'
     })
 
   } catch (error) {
     console.error('Error creando tarea extra:', error)
-    return NextResponse.json(
-      {
-        error: 'Error al crear tarea',
-        details: error instanceof Error ? error.message : 'Error desconocido',
-        success: false
-      },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al crear tarea', details: error instanceof Error ? error.message : 'Error desconocido', success: false }, { status: 500 })
   }
 }

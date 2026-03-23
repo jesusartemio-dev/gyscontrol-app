@@ -185,8 +185,8 @@ export async function POST(req: Request) {
     const promptData: SsomaPromptData = {
       codigoCod: cod,
       nombreProyecto: proyecto.nombre,
-      cliente: proyecto.cliente.nombre,
-      planta: ubicacionProyecto ?? proyecto.descripcion ?? proyecto.cliente.nombre,
+      cliente: proyecto.cliente?.nombre ?? '',
+      planta: ubicacionProyecto ?? proyecto.descripcion ?? proyecto.cliente?.nombre ?? '',
       descripcionTrabajos,
       actividades,
       ingSeguridad,
