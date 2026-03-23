@@ -703,6 +703,15 @@ export default function GastoLineaPreviewDrawer({
                           value={linea.centroCosto.nombre}
                         />
                       )}
+                      {(linea.proyecto || linea.categoriaCosto) && (
+                        <DataField
+                          label="Destino"
+                          value={[
+                            linea.proyecto?.codigo,
+                            linea.categoriaCosto,
+                          ].filter(Boolean).join(' · ')}
+                        />
+                      )}
                       <DataField label="Descripcion" value={linea.descripcion} />
                       {linea.observaciones && (
                         <div className="border-t pt-3">
