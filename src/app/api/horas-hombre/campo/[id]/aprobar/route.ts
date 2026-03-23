@@ -14,7 +14,6 @@ import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { randomUUID } from 'crypto'
-import { ProgresoService } from '@/lib/services/progresoService'
 import { obtenerCostosHoraPENBatch } from '@/lib/utils/costoHoraSnapshot'
 
 interface RouteParams {
@@ -224,18 +223,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       }
     })
 
-    // Auto-actualizar progreso de tareas afectadas (no-blocking)
-    for (const [tareaId] of Array.from(new Map(
-      registro.tareas
-        .filter(t => t.proyectoTareaId)
-        .map(t => [t.proyectoTareaId!, true] as [string, boolean])
-    ))) {
-      try {
-        await ProgresoService.actualizarProgresoTarea(tareaId)
-      } catch (err) {
-        console.error(`⚠️ Error actualizando progreso de tarea ${tareaId}:`, err)
-      }
-    }
+    // NOTA: El porcentajeCompletado de cada tarea lo define el supervisor al cerrar la jornada.
+    // La aprobación NO sobreescribe ese valor — solo registra las horas trabajadas.
 
     console.log(`✅ APROBAR CAMPO: Aprobado registro ${id}, creados ${resultado.registrosHorasCreados.length} registros de horas, ${resultado.tareasActualizadas} tareas actualizadas`)
 
