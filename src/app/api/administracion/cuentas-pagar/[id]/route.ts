@@ -45,6 +45,15 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       return NextResponse.json(updated)
     }
 
+    // Editar observaciones
+    if ('observaciones' in body) {
+      const updated = await prisma.cuentaPorPagar.update({
+        where: { id },
+        data: { observaciones: body.observaciones || null, updatedAt: new Date() },
+      })
+      return NextResponse.json(updated)
+    }
+
     return NextResponse.json({ error: 'Operación no soportada' }, { status: 400 })
   } catch (error) {
     console.error('Error al actualizar CxP:', error)

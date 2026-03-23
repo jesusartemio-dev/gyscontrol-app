@@ -10,7 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Loader2, Search, ArrowUpCircle, AlertTriangle, DollarSign, Clock, CheckCircle, Plus, Ban, Package, ChevronRight, FileSpreadsheet, Upload, Download, Trash2 } from 'lucide-react'
+import { Loader2, Search, ArrowUpCircle, AlertTriangle, DollarSign, Clock, CheckCircle, Plus, Ban, Package, ChevronRight, FileSpreadsheet, Upload, Download, Trash2, Pencil } from 'lucide-react'
 import toast from 'react-hot-toast'
 import CxPImportExcelModal from '@/components/administracion/CxPImportExcelModal'
 import { exportarCxPAExcel } from '@/lib/utils/cuentasPagarExcel'
@@ -175,6 +175,7 @@ export default function CuentasPagarPage() {
 
   // Detail dialog
   const [showDetail, setShowDetail] = useState<CuentaPorPagar | null>(null)
+  const [editingObs, setEditingObs] = useState<string | null>(null)
 
   // Confirm dialog (anular/eliminar)
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -340,6 +341,25 @@ export default function CuentasPagarPage() {
       toast.error(e.message || 'Error al crear cuenta')
     } finally {
       setSaving(false)
+    }
+  }
+
+  // --- Guardar observaciones ---
+  const saveObservaciones = async () => {
+    if (!showDetail || editingObs === null) return
+    try {
+      const res = await fetch(`/api/administracion/cuentas-pagar/${showDetail.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ observaciones: editingObs }),
+      })
+      if (!res.ok) throw new Error('Error al guardar')
+      setShowDetail(prev => prev ? { ...prev, observaciones: editingObs || null } : prev)
+      setItems(prev => prev.map(i => i.id === showDetail.id ? { ...i, observaciones: editingObs || null } : i))
+      setEditingObs(null)
+      toast.success('Observaciones guardadas')
+    } catch {
+      toast.error('Error al guardar observaciones')
     }
   }
 
@@ -1035,7 +1055,7 @@ export default function CuentasPagarPage() {
       />
 
       {/* Dialog detalle */}
-      <Dialog open={!!showDetail} onOpenChange={open => { if (!open) setShowDetail(null) }}>
+      <Dialog open={!!showDetail} onOpenChange={open => { if (!open) { setShowDetail(null); setEditingObs(null) } }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Detalle CxP</DialogTitle>
@@ -1064,7 +1084,23 @@ export default function CuentasPagarPage() {
                   {showDetail.tipoOrigen && <div className="flex justify-between"><span>Tipo origen</span><Badge variant="outline" className="text-xs">{showDetail.tipoOrigen === 'importacion_gerencia' ? 'Importación Gerencia' : showDetail.tipoOrigen === 'atencion_directa' ? 'Atención Directa' : showDetail.tipoOrigen}</Badge></div>}
                   {showDetail.descripcion && <div className="flex justify-between"><span>Descripción</span><span className="text-right max-w-[200px] truncate">{showDetail.descripcion}</span></div>}
                   <div className="flex justify-between"><span>Emisión</span><span>{formatDate(showDetail.fechaRecepcion)}</span></div>
-                  {showDetail.observaciones && <div className="flex justify-between"><span>Observaciones</span><span className="text-right max-w-[200px] text-sm text-muted-foreground">{showDetail.observaciones}</span></div>}
+                  <div className="flex justify-between items-start gap-2">
+                    <span className="shrink-0">Observaciones</span>
+                    {editingObs !== null ? (
+                      <div className="flex flex-col gap-1 items-end flex-1">
+                        <Input className="h-7 text-xs" value={editingObs} onChange={e => setEditingObs(e.target.value)} placeholder="Notas adicionales" autoFocus />
+                        <div className="flex gap-1">
+                          <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setEditingObs(null)}>Cancelar</Button>
+                          <Button size="sm" className="h-6 px-2 text-xs" onClick={saveObservaciones}>Guardar</Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <span className="text-right text-sm text-muted-foreground">{showDetail.observaciones || <span className="italic text-xs text-muted-foreground/60">Sin observaciones</span>}</span>
+                        <Button size="sm" variant="ghost" className="h-5 w-5 p-0 shrink-0" onClick={() => setEditingObs(showDetail.observaciones || '')}><Pencil className="h-3 w-3" /></Button>
+                      </div>
+                    )}
+                  </div>
                   <div className="flex justify-between"><span>Vencimiento</span><span className={isVencida(showDetail.fechaVencimiento, showDetail.estado) ? 'text-red-600 font-bold' : ''}>{formatDate(showDetail.fechaVencimiento)}</span></div>
                   <div className="flex justify-between border-t pt-1"><span>Monto Total</span><span className="font-mono font-bold">{formatCurrency(showDetail.monto, showDetail.moneda)}</span></div>
                   <div className="flex justify-between text-green-600"><span>Pagado</span><span className="font-mono">{formatCurrency(showDetail.montoPagado, showDetail.moneda)}</span></div>
