@@ -241,6 +241,7 @@ export default function GastoLineaPreviewDrawer({
       setShowObservacionInput(false)
       setObservacionText('')
       onChanged()
+      goToNext()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Error al marcar conformidad')
     } finally {
@@ -697,6 +698,12 @@ export default function GastoLineaPreviewDrawer({
                           value={linea.categoriaGasto?.nombre || '-'}
                         />
                       </div>
+                      {linea.centroCosto && (
+                        <DataField
+                          label="Centro de costo"
+                          value={linea.centroCosto.nombre}
+                        />
+                      )}
                       <DataField label="Descripcion" value={linea.descripcion} />
                       {linea.observaciones && (
                         <div className="border-t pt-3">
