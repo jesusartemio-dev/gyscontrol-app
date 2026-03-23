@@ -1185,7 +1185,7 @@ export default function CuentasPagarPage() {
 
       {/* Dialog detalle */}
       <Dialog open={!!showDetail} onOpenChange={open => { if (!open) { setShowDetail(null); setEditingObs(null) } }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg" onCloseAutoFocus={e => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>Detalle CxP</DialogTitle>
             <DialogDescription>
