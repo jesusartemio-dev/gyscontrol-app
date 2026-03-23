@@ -665,6 +665,7 @@ export default function CuentasPagarPage() {
                 <TableHead className="text-right">Monto</TableHead>
                 <TableHead className="text-right">Pagado</TableHead>
                 <TableHead className="text-right">Saldo</TableHead>
+                <TableHead>Emisión</TableHead>
                 <TableHead>Vencimiento</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
@@ -673,7 +674,7 @@ export default function CuentasPagarPage() {
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                     <DollarSign className="h-8 w-8 mx-auto mb-2 opacity-40" />
                     No hay cuentas por pagar
                   </TableCell>
@@ -699,6 +700,7 @@ export default function CuentasPagarPage() {
                       <TableCell className="text-right font-mono text-sm font-semibold">
                         {formatCurrency(item.saldoPendiente, item.moneda)}
                       </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{formatDate(item.fechaRecepcion)}</TableCell>
                       <TableCell className={`text-sm ${vencida ? 'text-red-600 font-semibold' : ''}`}>
                         {formatDate(item.fechaVencimiento)}
                         {vencida && <AlertTriangle className="inline h-3 w-3 ml-1" />}
