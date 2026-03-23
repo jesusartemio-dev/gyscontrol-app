@@ -118,8 +118,11 @@ const getEstadoColor = (estado: string) =>
 const formatCurrency = (amount: number, moneda = 'PEN') =>
   new Intl.NumberFormat('es-PE', { style: 'currency', currency: moneda }).format(amount)
 
-const formatDate = (date: string) =>
-  new Date(date).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })
+const formatDate = (date: string) => {
+  const d = new Date(date)
+  return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
+    .toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })
+}
 
 const isVencida = (fecha: string, estado: string) => {
   if (estado === 'pagada' || estado === 'anulada') return false
@@ -868,7 +871,7 @@ export default function CuentasPagarPage() {
             )}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Fecha Recepción *</Label>
+                <Label>Fecha Emisión *</Label>
                 <Input type="date" value={createForm.fechaRecepcion} onChange={e => {
                   const fecha = e.target.value
                   setCreateForm(f => ({
@@ -1060,7 +1063,8 @@ export default function CuentasPagarPage() {
                   {showDetail.pedidoEquipo && <div className="flex justify-between"><span>Pedido origen</span><a href={`/logistica/pedidos/${showDetail.pedidoEquipo.id}`} className="text-blue-600 hover:underline font-mono">{showDetail.pedidoEquipo.codigo}</a></div>}
                   {showDetail.tipoOrigen && <div className="flex justify-between"><span>Tipo origen</span><Badge variant="outline" className="text-xs">{showDetail.tipoOrigen === 'importacion_gerencia' ? 'Importación Gerencia' : showDetail.tipoOrigen === 'atencion_directa' ? 'Atención Directa' : showDetail.tipoOrigen}</Badge></div>}
                   {showDetail.descripcion && <div className="flex justify-between"><span>Descripción</span><span className="text-right max-w-[200px] truncate">{showDetail.descripcion}</span></div>}
-                  <div className="flex justify-between"><span>Recepción</span><span>{formatDate(showDetail.fechaRecepcion)}</span></div>
+                  <div className="flex justify-between"><span>Emisión</span><span>{formatDate(showDetail.fechaRecepcion)}</span></div>
+                  {showDetail.observaciones && <div className="flex justify-between"><span>Observaciones</span><span className="text-right max-w-[200px] text-sm text-muted-foreground">{showDetail.observaciones}</span></div>}
                   <div className="flex justify-between"><span>Vencimiento</span><span className={isVencida(showDetail.fechaVencimiento, showDetail.estado) ? 'text-red-600 font-bold' : ''}>{formatDate(showDetail.fechaVencimiento)}</span></div>
                   <div className="flex justify-between border-t pt-1"><span>Monto Total</span><span className="font-mono font-bold">{formatCurrency(showDetail.monto, showDetail.moneda)}</span></div>
                   <div className="flex justify-between text-green-600"><span>Pagado</span><span className="font-mono">{formatCurrency(showDetail.montoPagado, showDetail.moneda)}</span></div>
