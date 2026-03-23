@@ -130,6 +130,15 @@ const isVencida = (fecha: string, estado: string) => {
   return new Date(fecha) < new Date()
 }
 
+const diasParaVencer = (fecha: string, estado: string): number | null => {
+  if (estado === 'pagada' || estado === 'anulada') return null
+  const d = new Date(fecha)
+  const hoy = new Date()
+  hoy.setHours(0, 0, 0, 0)
+  d.setHours(0, 0, 0, 0)
+  return Math.round((d.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24))
+}
+
 export default function CuentasPagarPage() {
   const [items, setItems] = useState<CuentaPorPagar[]>([])
   const [cuentasBancarias, setCuentasBancarias] = useState<CuentaBancaria[]>([])
@@ -181,6 +190,12 @@ export default function CuentasPagarPage() {
   // OCs sin factura panel
   const [ocsSinFacturaExpanded, setOcsSinFacturaExpanded] = useState(false)
 
+  const [filterProyectoId, setFilterProyectoId] = useState<string>('all')
+  const [filterFechaDesde, setFilterFechaDesde] = useState<string>('')
+  const [filterFechaHasta, setFilterFechaHasta] = useState<string>('')
+  const [sortField, setSortField] = useState<string>('fechaVencimiento')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+
   // Confirm dialog (anular/eliminar)
   const [confirmDialog, setConfirmDialog] = useState<{
     tipo: 'anular' | 'eliminar'
@@ -189,6 +204,11 @@ export default function CuentasPagarPage() {
 
   // Import dialog
   const [showImportDialog, setShowImportDialog] = useState(false)
+
+  const toggleSort = (field: string) => {
+    if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortField(field); setSortDir('asc') }
+  }
 
   useEffect(() => { loadData() }, [])
 
@@ -251,6 +271,9 @@ export default function CuentasPagarPage() {
   const filtered = useMemo(() => {
     let result = items
     if (filterEstado !== 'all') result = result.filter(i => i.estado === filterEstado)
+    if (filterProyectoId !== 'all') result = result.filter(i => i.proyectoId === filterProyectoId)
+    if (filterFechaDesde) result = result.filter(i => i.fechaVencimiento >= filterFechaDesde)
+    if (filterFechaHasta) result = result.filter(i => i.fechaVencimiento <= filterFechaHasta + 'T23:59:59')
     if (searchTerm) {
       const term = searchTerm.toLowerCase()
       result = result.filter(i =>
@@ -261,8 +284,34 @@ export default function CuentasPagarPage() {
         i.descripcion?.toLowerCase().includes(term)
       )
     }
+    result = [...result].sort((a, b) => {
+      let va: any, vb: any
+      if (sortField === 'fechaVencimiento') { va = a.fechaVencimiento; vb = b.fechaVencimiento }
+      else if (sortField === 'fechaRecepcion') { va = a.fechaRecepcion; vb = b.fechaRecepcion }
+      else if (sortField === 'monto') { va = a.monto; vb = b.monto }
+      else if (sortField === 'saldo') { va = a.saldoPendiente; vb = b.saldoPendiente }
+      else if (sortField === 'proveedor') { va = a.proveedor?.nombre || ''; vb = b.proveedor?.nombre || '' }
+      else if (sortField === 'estado') { va = a.estado; vb = b.estado }
+      else { va = a.fechaVencimiento; vb = b.fechaVencimiento }
+      if (va < vb) return sortDir === 'asc' ? -1 : 1
+      if (va > vb) return sortDir === 'asc' ? 1 : -1
+      return 0
+    })
     return result
-  }, [items, filterEstado, searchTerm])
+  }, [items, filterEstado, filterProyectoId, filterFechaDesde, filterFechaHasta, searchTerm, sortField, sortDir])
+
+  const filteredTotals = useMemo(() => {
+    const active = filtered.filter(i => i.estado !== 'anulada')
+    const pen = active.filter(i => i.moneda === 'PEN')
+    const usd = active.filter(i => i.moneda === 'USD')
+    return {
+      montoPEN: pen.reduce((s, i) => s + i.monto, 0),
+      saldoPEN: pen.reduce((s, i) => s + i.saldoPendiente, 0),
+      montoUSD: usd.reduce((s, i) => s + i.monto, 0),
+      saldoUSD: usd.reduce((s, i) => s + i.saldoPendiente, 0),
+      count: active.length,
+    }
+  }, [filtered])
 
   // --- Create ---
   const resetCreateForm = () => {
@@ -588,7 +637,8 @@ export default function CuentasPagarPage() {
             </button>
             {ocsSinFacturaExpanded && (
               <div className="px-4 pb-3 space-y-1.5">
-                {ocsSinFactura.slice(0, 8).map(oc => (
+            <div className="max-h-64 overflow-y-auto space-y-1.5">
+            {ocsSinFactura.map(oc => (
                   <div key={oc.id} className="flex items-center justify-between bg-white rounded-md px-3 py-2 border border-orange-100">
                     <div className="flex items-center gap-2 text-sm min-w-0">
                       <span className="font-mono font-medium text-xs shrink-0">{oc.numero}</span>
@@ -625,9 +675,7 @@ export default function CuentasPagarPage() {
                     </div>
                   </div>
                 ))}
-                {ocsSinFactura.length > 8 && (
-                  <p className="text-xs text-orange-600 text-center py-1">y {ocsSinFactura.length - 8} más...</p>
-                )}
+            </div>
               </div>
             )}
           </CardContent>
@@ -648,22 +696,46 @@ export default function CuentasPagarPage() {
       )}
 
       {/* Filtros */}
-      <div className="flex gap-3 items-center flex-wrap">
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Buscar proveedor, RUC, factura..." className="pl-9" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+      <div className="space-y-2">
+        <div className="flex gap-2 items-center flex-wrap">
+          <div className="relative flex-1 min-w-[200px] max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input placeholder="Buscar proveedor, RUC, factura, proyecto..." className="pl-9" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+          </div>
+          <Select value={filterEstado} onValueChange={setFilterEstado}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Estado" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los estados</SelectItem>
+              {ESTADOS_CXP.map(e => (
+                <SelectItem key={e.value} value={e.value}>{e.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={filterProyectoId} onValueChange={setFilterProyectoId}>
+            <SelectTrigger className="w-36">
+              <SelectValue placeholder="Proyecto" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los proyectos</SelectItem>
+              {proyectos.map(p => (
+                <SelectItem key={p.id} value={p.id}>{p.codigo}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <div className="flex items-center gap-1">
+            <Input type="date" className="w-36 h-9" value={filterFechaDesde} onChange={e => setFilterFechaDesde(e.target.value)} title="Vencimiento desde" />
+            <span className="text-muted-foreground text-xs">—</span>
+            <Input type="date" className="w-36 h-9" value={filterFechaHasta} onChange={e => setFilterFechaHasta(e.target.value)} title="Vencimiento hasta" />
+          </div>
+          {(filterEstado !== 'all' || filterProyectoId !== 'all' || filterFechaDesde || filterFechaHasta || searchTerm) && (
+            <Button variant="ghost" size="sm" className="text-muted-foreground h-9" onClick={() => { setFilterEstado('all'); setFilterProyectoId('all'); setFilterFechaDesde(''); setFilterFechaHasta(''); setSearchTerm('') }}>
+              Limpiar filtros
+            </Button>
+          )}
         </div>
-        <Select value={filterEstado} onValueChange={setFilterEstado}>
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="Estado" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            {ESTADOS_CXP.map(e => (
-              <SelectItem key={e.value} value={e.value}>{e.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="text-xs text-muted-foreground">{filtered.length} resultado{filtered.length !== 1 ? 's' : ''}</div>
       </div>
 
       {/* Tabla */}
@@ -672,13 +744,23 @@ export default function CuentasPagarPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Factura</TableHead>
-                <TableHead>Proveedor</TableHead>
+                <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('numeroFactura')}>Factura</TableHead>
+                <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('proveedor')}>
+                  Proveedor {sortField === 'proveedor' && (sortDir === 'asc' ? '↑' : '↓')}
+                </TableHead>
                 <TableHead>OC</TableHead>
-                <TableHead className="text-right">Monto</TableHead>
-                <TableHead className="text-right">Saldo</TableHead>
-                <TableHead>Fechas</TableHead>
-                <TableHead>Estado</TableHead>
+                <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort('monto')}>
+                  Monto {sortField === 'monto' && (sortDir === 'asc' ? '↑' : '↓')}
+                </TableHead>
+                <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort('saldo')}>
+                  Saldo {sortField === 'saldo' && (sortDir === 'asc' ? '↑' : '↓')}
+                </TableHead>
+                <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('fechaVencimiento')}>
+                  Fechas {sortField === 'fechaVencimiento' || sortField === 'fechaRecepcion' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                </TableHead>
+                <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('estado')}>
+                  Estado {sortField === 'estado' && (sortDir === 'asc' ? '↑' : '↓')}
+                </TableHead>
                 <TableHead className="text-right w-10"></TableHead>
               </TableRow>
             </TableHeader>
@@ -717,6 +799,15 @@ export default function CuentasPagarPage() {
                           {formatDate(item.fechaVencimiento)}
                           {vencida && <AlertTriangle className="inline h-3 w-3 ml-1" />}
                         </div>
+                        {(() => {
+                          const dias = diasParaVencer(item.fechaVencimiento, item.estado)
+                          if (dias === null) return null
+                          if (dias < 0) return <div className="text-red-500 font-medium">vencida hace {Math.abs(dias)}d</div>
+                          if (dias === 0) return <div className="text-orange-500 font-medium">vence hoy</div>
+                          if (dias <= 7) return <div className="text-orange-400">en {dias}d</div>
+                          if (dias <= 30) return <div className="text-muted-foreground">en {dias}d</div>
+                          return null
+                        })()}
                       </TableCell>
                       <TableCell>
                         <Badge className={`${getEstadoColor(item.estado)} text-xs`}>
@@ -753,6 +844,22 @@ export default function CuentasPagarPage() {
                 })
               )}
             </TableBody>
+            {filtered.length > 0 && (
+              <tfoot>
+                <tr className="border-t bg-muted/30 text-xs font-medium">
+                  <td colSpan={3} className="px-4 py-2 text-muted-foreground">{filteredTotals.count} registros</td>
+                  <td className="px-4 py-2 text-right font-mono">
+                    {filteredTotals.montoPEN > 0 && <div>S/ {filteredTotals.montoPEN.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</div>}
+                    {filteredTotals.montoUSD > 0 && <div>$ {filteredTotals.montoUSD.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</div>}
+                  </td>
+                  <td className="px-4 py-2 text-right font-mono font-bold">
+                    {filteredTotals.saldoPEN > 0 && <div>S/ {filteredTotals.saldoPEN.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</div>}
+                    {filteredTotals.saldoUSD > 0 && <div>$ {filteredTotals.saldoUSD.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</div>}
+                  </td>
+                  <td colSpan={3}></td>
+                </tr>
+              </tfoot>
+            )}
           </Table>
         </CardContent>
       </Card>
