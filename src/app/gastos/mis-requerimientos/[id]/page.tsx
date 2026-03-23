@@ -440,14 +440,74 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
         </div>
       </div>
 
-      {/* Stepper */}
+      {/* Stepper + acciones */}
       <Card>
-        <CardContent className="p-3">
+        <CardContent className="p-3 space-y-3">
           <EstadoStepper
             estado={hoja.estado}
             requiereAnticipo={hoja.requiereAnticipo}
             rechazadoEn={hoja.rechazadoEn}
           />
+          {(canEnviar || canAprobar || canDepositar || canRendir || canValidarLineas || canCerrar || canRechazar || canRetroceder) && (
+            <div className="flex flex-wrap gap-2 border-t pt-3">
+              {canEnviar && (
+                <Button size="sm" onClick={handleEnviar} disabled={actionLoading} className="bg-blue-600 hover:bg-blue-700">
+                  <Send className="h-3.5 w-3.5 mr-1" />
+                  Enviar para aprobación
+                </Button>
+              )}
+              {canAprobar && (
+                <Button size="sm" onClick={handleAprobar} disabled={actionLoading} className="bg-emerald-600 hover:bg-emerald-700">
+                  <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                  Aprobar
+                </Button>
+              )}
+              {canDepositar && (
+                <Button size="sm" onClick={() => { setMontoDeposito(String(hoja.montoAnticipo || '')); setShowDeposito(true) }} disabled={actionLoading} className="bg-purple-600 hover:bg-purple-700">
+                  <Banknote className="h-3.5 w-3.5 mr-1" />
+                  Registrar depósito
+                </Button>
+              )}
+              {canRendir && (
+                <Button size="sm" onClick={handleRendir} disabled={actionLoading || lineas.length === 0} className="bg-orange-600 hover:bg-orange-700">
+                  <FileCheck className="h-3.5 w-3.5 mr-1" />
+                  Rendir gastos
+                </Button>
+              )}
+              {canValidarLineas && (
+                <div className="flex items-center gap-1.5">
+                  <Button size="sm" onClick={handleValidar} disabled={actionLoading || !allLineasConforme} className="bg-teal-600 hover:bg-teal-700" title={!allLineasConforme ? 'Todas las líneas deben estar conformes para validar' : undefined}>
+                    <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                    Validar rendición
+                  </Button>
+                  {!allLineasConforme && (
+                    <span className="text-xs text-amber-600">
+                      {lineas.filter(l => l.conformidad !== 'conforme').length} línea{lineas.filter(l => l.conformidad !== 'conforme').length !== 1 ? 's' : ''} pendiente{lineas.filter(l => l.conformidad !== 'conforme').length !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
+              )}
+              {canCerrar && (
+                <Button size="sm" onClick={handleCerrar} disabled={actionLoading} className="bg-green-700 hover:bg-green-800">
+                  <Lock className="h-3.5 w-3.5 mr-1" />
+                  Cerrar
+                </Button>
+              )}
+              {canRechazar && (
+                <Button size="sm" variant="destructive" onClick={() => setShowRechazo(true)} disabled={actionLoading}>
+                  <XCircle className="h-3.5 w-3.5 mr-1" />
+                  Rechazar
+                </Button>
+              )}
+              {canRetroceder && (
+                <Button size="sm" variant="outline" onClick={handleRetroceder} disabled={actionLoading} className="border-amber-400 text-amber-700 hover:bg-amber-50">
+                  <Undo2 className="h-3.5 w-3.5 mr-1" />
+                  Retroceder estado
+                </Button>
+              )}
+              {actionLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -536,70 +596,6 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
           )}
         </CardContent>
       </Card>
-
-      {/* Actions */}
-      {(canEnviar || canAprobar || canDepositar || canRendir || canValidarLineas || canCerrar || canRechazar || canRetroceder) && (
-        <Card>
-          <CardContent className="p-3 flex flex-wrap gap-2">
-            {canEnviar && (
-              <Button size="sm" onClick={handleEnviar} disabled={actionLoading} className="bg-blue-600 hover:bg-blue-700">
-                <Send className="h-3.5 w-3.5 mr-1" />
-                Enviar para aprobación
-              </Button>
-            )}
-            {canAprobar && (
-              <Button size="sm" onClick={handleAprobar} disabled={actionLoading} className="bg-emerald-600 hover:bg-emerald-700">
-                <CheckCircle className="h-3.5 w-3.5 mr-1" />
-                Aprobar
-              </Button>
-            )}
-            {canDepositar && (
-              <Button size="sm" onClick={() => { setMontoDeposito(String(hoja.montoAnticipo || '')); setShowDeposito(true) }} disabled={actionLoading} className="bg-purple-600 hover:bg-purple-700">
-                <Banknote className="h-3.5 w-3.5 mr-1" />
-                Registrar depósito
-              </Button>
-            )}
-            {canRendir && (
-              <Button size="sm" onClick={handleRendir} disabled={actionLoading || lineas.length === 0} className="bg-orange-600 hover:bg-orange-700">
-                <FileCheck className="h-3.5 w-3.5 mr-1" />
-                Rendir gastos
-              </Button>
-            )}
-            {canValidarLineas && (
-              <div className="flex items-center gap-1.5">
-                <Button size="sm" onClick={handleValidar} disabled={actionLoading || !allLineasConforme} className="bg-teal-600 hover:bg-teal-700" title={!allLineasConforme ? 'Todas las líneas deben estar conformes para validar' : undefined}>
-                  <CheckCircle className="h-3.5 w-3.5 mr-1" />
-                  Validar rendición
-                </Button>
-                {!allLineasConforme && (
-                  <span className="text-xs text-amber-600">
-                    {lineas.filter(l => l.conformidad !== 'conforme').length} línea{lineas.filter(l => l.conformidad !== 'conforme').length !== 1 ? 's' : ''} pendiente{lineas.filter(l => l.conformidad !== 'conforme').length !== 1 ? 's' : ''}
-                  </span>
-                )}
-              </div>
-            )}
-            {canCerrar && (
-              <Button size="sm" onClick={handleCerrar} disabled={actionLoading} className="bg-green-700 hover:bg-green-800">
-                <Lock className="h-3.5 w-3.5 mr-1" />
-                Cerrar
-              </Button>
-            )}
-            {canRechazar && (
-              <Button size="sm" variant="destructive" onClick={() => setShowRechazo(true)} disabled={actionLoading}>
-                <XCircle className="h-3.5 w-3.5 mr-1" />
-                Rechazar
-              </Button>
-            )}
-            {canRetroceder && (
-              <Button size="sm" variant="outline" onClick={handleRetroceder} disabled={actionLoading} className="border-amber-400 text-amber-700 hover:bg-amber-50">
-                <Undo2 className="h-3.5 w-3.5 mr-1" />
-                Retroceder estado
-              </Button>
-            )}
-            {actionLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
-          </CardContent>
-        </Card>
-      )}
 
       {/* Líneas de gasto */}
       <Card>
