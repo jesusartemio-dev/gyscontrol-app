@@ -436,7 +436,7 @@ export default function GastoLineaTable({
                   <td className="p-2 text-xs text-muted-foreground">
                     {linea.categoriaGasto?.nombre || '-'}
                   </td>
-                  <td className="p-2 text-xs text-muted-foreground">
+                  <td className="p-2 text-xs text-muted-foreground whitespace-nowrap">
                     <span className="flex items-center gap-1">
                       {linea.sunatVerificado === true && (
                         <ShieldCheck className="h-3.5 w-3.5 text-green-600 shrink-0" />
