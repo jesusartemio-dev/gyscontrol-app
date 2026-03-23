@@ -241,7 +241,6 @@ export default function GastoLineaPreviewDrawer({
       setShowObservacionInput(false)
       setObservacionText('')
       onChanged()
-      goToNext()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Error al marcar conformidad')
     } finally {
