@@ -822,16 +822,16 @@ export default function CuentasPagarPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => setShowDetail(item)}>
+                            <DropdownMenuItem onClick={() => setTimeout(() => setShowDetail(item), 0)}>
                               <Eye className="h-4 w-4 mr-2" /> Ver detalle
                             </DropdownMenuItem>
                             {(item.estado === 'pendiente' || item.estado === 'parcial') && (
                               <>
-                                <DropdownMenuItem onClick={() => openPago(item)}>
+                                <DropdownMenuItem onClick={() => setTimeout(() => openPago(item), 0)}>
                                   <ArrowUpCircle className="h-4 w-4 mr-2" /> Registrar pago
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={() => handleAnular(item)}>
+                                <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={() => setTimeout(() => handleAnular(item), 0)}>
                                   <Ban className="h-4 w-4 mr-2" /> Anular
                                 </DropdownMenuItem>
                               </>
@@ -866,7 +866,7 @@ export default function CuentasPagarPage() {
 
       {/* Dialog crear cuenta por pagar */}
       <Dialog open={showCreateDialog} onOpenChange={open => { if (!open) setShowCreateDialog(false) }}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" onCloseAutoFocus={e => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>Nueva Cuenta por Pagar</DialogTitle>
             <DialogDescription>Registrar una factura o cuenta pendiente de pago a proveedor</DialogDescription>
@@ -1058,7 +1058,7 @@ export default function CuentasPagarPage() {
 
       {/* Dialog registrar pago */}
       <Dialog open={showPagoDialog} onOpenChange={open => { if (!open) setShowPagoDialog(false) }}>
-        <DialogContent>
+        <DialogContent onCloseAutoFocus={e => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>Registrar Pago</DialogTitle>
             <DialogDescription>
@@ -1361,7 +1361,7 @@ export default function CuentasPagarPage() {
 
       {/* Dialog confirmación anular/eliminar */}
       <Dialog open={!!confirmDialog} onOpenChange={open => { if (!open) setConfirmDialog(null) }}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md" onCloseAutoFocus={e => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangle className={`h-5 w-5 ${confirmDialog?.tipo === 'eliminar' ? 'text-red-600' : 'text-amber-600'}`} />
