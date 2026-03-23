@@ -32,7 +32,8 @@ interface FlatRow {
   level: number        // 0=proyecto, 1=fase, 2=edt, 3=actividad, 4=tarea
   nombre: string
   descripcion: string
-  horasEstimadas: number // raw hours (Work)
+  horasEstimadas: number // raw hours per person (Work)
+  personasEstimadas: number
   duracionDias: number   // business days between fechaInicio and fechaFin
   fechaInicio: string
   fechaFin: string
@@ -92,6 +93,7 @@ function flattenTree(node: any): FlatRow[] {
     nombre: node.nombre || '',
     descripcion: data.descripcion || '',
     horasEstimadas: horas,
+    personasEstimadas: Number(data.personasEstimadas || 1),
     duracionDias: calcBusinessDays(fechaInicio, fechaFin),
     fechaInicio: fechaInicio ? formatDate(fechaInicio) : '',
     fechaFin: fechaFin ? formatDate(fechaFin) : '',
@@ -253,6 +255,28 @@ export function CronogramaTableView({ proyectoId, cronogramaId, refreshKey, hora
       minWidth: 80,
       editable: (params) => params.data?.tipo === 'tarea',
       valueFormatter: (params: ValueFormatterParams) => formatHoras(params.value),
+    },
+    {
+      headerName: 'Work Total',
+      width: 95,
+      minWidth: 85,
+      editable: false,
+      valueGetter: (params) => {
+        if (params.data?.tipo !== 'tarea') return null
+        const personas = params.data.personasEstimadas || 1
+        if (personas <= 1) return null
+        return (params.data.horasEstimadas || 0) * personas
+      },
+      valueFormatter: (params: ValueFormatterParams) => {
+        if (params.value == null) return '—'
+        return formatHoras(params.value)
+      },
+      tooltipValueGetter: (params) => {
+        if (params.data?.tipo !== 'tarea') return ''
+        const personas = params.data.personasEstimadas || 1
+        if (personas <= 1) return ''
+        return `${params.data.horasEstimadas}h × ${personas} personas`
+      },
     },
     {
       field: 'horasReales',

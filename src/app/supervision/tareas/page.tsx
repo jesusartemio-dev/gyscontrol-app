@@ -919,18 +919,57 @@ export default function SupervisionTareasPage() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="text-sm" title={tarea.personasEstimadas > 1 ? `${Math.round(tarea.horasPlan / tarea.personasEstimadas)}h × ${tarea.personasEstimadas} personas = ${tarea.horasPlan}h total` : undefined}>
-                            <span className={tarea.horasReales > 0 ? 'font-medium' : 'text-gray-400'}>
-                              {tarea.horasReales}h
-                            </span>
-                            <span className="text-gray-400">/{tarea.horasPlan}h</span>
-                            {tarea.personasEstimadas > 1 && (
-                              <span className="inline-flex items-center gap-0.5 ml-1 text-[10px] text-blue-600 bg-blue-50 border border-blue-200 rounded px-1 py-0">
-                                <Users className="h-2.5 w-2.5" />
-                                {tarea.personasEstimadas}
-                              </span>
-                            )}
-                          </div>
+                          {(() => {
+                            const horasPorPersona = tarea.personasEstimadas > 1
+                              ? Math.round(tarea.horasPlan / tarea.personasEstimadas)
+                              : tarea.horasPlan
+                            const restantes = Math.max(0, tarea.horasPlan - tarea.horasReales)
+                            const consumoPct = tarea.horasPlan > 0 ? (tarea.horasReales / tarea.horasPlan) * 100 : 0
+                            const progresoPct = tarea.progreso || 0
+                            // Rhythm: compare hours consumed % vs progress %
+                            let rhythmColor = ''
+                            let rhythmLabel = ''
+                            if (tarea.horasPlan > 0 && progresoPct < 100) {
+                              if (consumoPct <= progresoPct) {
+                                rhythmColor = 'bg-green-100 text-green-700 border-green-300'
+                                rhythmLabel = '🟢'
+                              } else if (consumoPct <= progresoPct + 20) {
+                                rhythmColor = 'bg-yellow-100 text-yellow-700 border-yellow-300'
+                                rhythmLabel = '🟡'
+                              } else {
+                                rhythmColor = 'bg-red-100 text-red-700 border-red-300'
+                                rhythmLabel = '🔴'
+                              }
+                            }
+                            return (
+                              <div className="text-sm space-y-0.5" title={tarea.personasEstimadas > 1 ? `${horasPorPersona}h × ${tarea.personasEstimadas} personas = ${tarea.horasPlan}h total` : undefined}>
+                                <div>
+                                  <span className={tarea.horasReales > 0 ? 'font-medium' : 'text-gray-400'}>
+                                    {tarea.horasReales}h
+                                  </span>
+                                  <span className="text-gray-400">/{tarea.horasPlan}h</span>
+                                  {rhythmLabel && (
+                                    <span className={`inline-flex items-center ml-1 text-[10px] border rounded px-1 py-0 ${rhythmColor}`}>
+                                      {rhythmLabel}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-1 flex-wrap">
+                                  {tarea.personasEstimadas > 1 && (
+                                    <span className="inline-flex items-center gap-0.5 text-[10px] text-blue-600 bg-blue-50 border border-blue-200 rounded px-1 py-0">
+                                      <Users className="h-2.5 w-2.5" />
+                                      {horasPorPersona}h/pers
+                                    </span>
+                                  )}
+                                  {tarea.estado !== 'completada' && tarea.horasPlan > 0 && (
+                                    <span className="text-[10px] text-gray-500">
+                                      {restantes}h rest.
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          })()}
                         </TableCell>
                         <TableCell>
                           {(() => {
