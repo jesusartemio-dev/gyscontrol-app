@@ -9,7 +9,11 @@ const includeRelations = {
   empleado: { select: { id: true, name: true, email: true } },
   aprobador: { select: { id: true, name: true, email: true } },
   lineas: {
-    include: { adjuntos: true, categoriaGasto: true },
+    include: {
+      adjuntos: true,
+      categoriaGasto: true,
+      centroCosto: { select: { id: true, nombre: true } },
+    },
     orderBy: { fecha: 'asc' as const },
   },
   adjuntos: { orderBy: { createdAt: 'asc' as const } },

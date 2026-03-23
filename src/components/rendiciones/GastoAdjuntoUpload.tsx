@@ -12,6 +12,7 @@ interface GastoAdjuntoUploadProps {
   adjuntos: GastoAdjunto[]
   editable: boolean
   onChanged: () => void
+  compact?: boolean
 }
 
 export default function GastoAdjuntoUpload({
@@ -19,6 +20,7 @@ export default function GastoAdjuntoUpload({
   adjuntos,
   editable,
   onChanged,
+  compact = false,
 }: GastoAdjuntoUploadProps) {
   const [uploading, setUploading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -62,6 +64,55 @@ export default function GastoAdjuntoUpload({
     if (bytes < 1024) return `${bytes} B`
     if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`
     return `${(bytes / 1048576).toFixed(1)} MB`
+  }
+
+  if (compact) {
+    return (
+      <div className="flex items-center gap-1">
+        {adjuntos.length > 0 ? (
+          adjuntos.map((adj) => (
+            <a
+              key={adj.id}
+              href={adj.urlArchivo}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={adj.nombreArchivo}
+              className="flex items-center gap-1 text-xs text-blue-700 hover:underline bg-blue-50 rounded px-1.5 py-0.5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {getIcon(adj.tipoArchivo)}
+            </a>
+          ))
+        ) : (
+          editable ? (
+            <>
+              <input ref={inputRef} type="file" accept="image/*,.pdf,.jpg,.jpeg,.png" multiple onChange={handleUpload} className="hidden" />
+              <button
+                type="button"
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                onClick={(e) => { e.stopPropagation(); inputRef.current?.click() }}
+                disabled={uploading}
+              >
+                {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+              </button>
+            </>
+          ) : <span className="text-xs text-muted-foreground">—</span>
+        )}
+        {editable && adjuntos.length > 0 && (
+          <>
+            <input ref={inputRef} type="file" accept="image/*,.pdf,.jpg,.jpeg,.png" multiple onChange={handleUpload} className="hidden" />
+            <button
+              type="button"
+              className="text-muted-foreground hover:text-foreground"
+              onClick={(e) => { e.stopPropagation(); inputRef.current?.click() }}
+              disabled={uploading}
+            >
+              {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+            </button>
+          </>
+        )}
+      </div>
+    )
   }
 
   return (

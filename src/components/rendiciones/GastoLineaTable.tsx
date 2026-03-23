@@ -458,6 +458,7 @@ export default function GastoLineaTable({
                       adjuntos={linea.adjuntos || []}
                       editable={editable}
                       onChanged={onChanged}
+                      compact
                     />
                   </td>
                   {editable && (
