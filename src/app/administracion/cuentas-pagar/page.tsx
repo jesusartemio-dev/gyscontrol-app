@@ -10,7 +10,8 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Loader2, Search, ArrowUpCircle, AlertTriangle, DollarSign, Clock, CheckCircle, Plus, Ban, Package, ChevronRight, FileSpreadsheet, Upload, Download, Trash2, Pencil } from 'lucide-react'
+import { Loader2, Search, ArrowUpCircle, AlertTriangle, DollarSign, Clock, CheckCircle, Plus, Ban, Package, ChevronRight, ChevronDown, FileSpreadsheet, Upload, Download, Trash2, Pencil, MoreHorizontal, Eye } from 'lucide-react'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import toast from 'react-hot-toast'
 import CxPImportExcelModal from '@/components/administracion/CxPImportExcelModal'
 import { exportarCxPAExcel } from '@/lib/utils/cuentasPagarExcel'
@@ -176,6 +177,9 @@ export default function CuentasPagarPage() {
   // Detail dialog
   const [showDetail, setShowDetail] = useState<CuentaPorPagar | null>(null)
   const [editingObs, setEditingObs] = useState<string | null>(null)
+
+  // OCs sin factura panel
+  const [ocsSinFacturaExpanded, setOcsSinFacturaExpanded] = useState(false)
 
   // Confirm dialog (anular/eliminar)
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -568,54 +572,64 @@ export default function CuentasPagarPage() {
       {/* OCs sin factura registrada */}
       {ocsSinFactura.length > 0 && (
         <Card className="border-orange-200 bg-orange-50/50">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Package className="h-5 w-5 text-orange-600" />
-              <span className="font-medium text-orange-800">OCs sin factura registrada ({ocsSinFactura.length})</span>
-            </div>
-            <div className="space-y-2">
-              {ocsSinFactura.slice(0, 5).map(oc => (
-                <div key={oc.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-orange-100">
-                  <div className="flex items-center gap-3 text-sm">
-                    <span className="font-mono font-medium">{oc.numero}</span>
-                    <span className="text-muted-foreground">{oc.proveedor?.nombre}</span>
-                    {oc.proyecto && <Badge variant="outline" className="text-xs">{oc.proyecto.codigo}</Badge>}
+          <CardContent className="p-0">
+            <button
+              className="w-full flex items-center justify-between px-4 py-3 hover:bg-orange-100/50 transition-colors rounded-lg"
+              onClick={() => setOcsSinFacturaExpanded(v => !v)}
+            >
+              <div className="flex items-center gap-2">
+                <Package className="h-4 w-4 text-orange-600" />
+                <span className="font-medium text-orange-800 text-sm">
+                  {ocsSinFactura.length} OC{ocsSinFactura.length > 1 ? 's' : ''} sin factura registrada
+                </span>
+                <Badge className="bg-orange-200 text-orange-800 text-xs">{ocsSinFactura.length}</Badge>
+              </div>
+              <ChevronDown className={`h-4 w-4 text-orange-600 transition-transform ${ocsSinFacturaExpanded ? 'rotate-180' : ''}`} />
+            </button>
+            {ocsSinFacturaExpanded && (
+              <div className="px-4 pb-3 space-y-1.5">
+                {ocsSinFactura.slice(0, 8).map(oc => (
+                  <div key={oc.id} className="flex items-center justify-between bg-white rounded-md px-3 py-2 border border-orange-100">
+                    <div className="flex items-center gap-2 text-sm min-w-0">
+                      <span className="font-mono font-medium text-xs shrink-0">{oc.numero}</span>
+                      <span className="text-muted-foreground truncate max-w-[180px]">{oc.proveedor?.nombre}</span>
+                      {oc.proyecto && <Badge variant="outline" className="text-xs shrink-0">{oc.proyecto.codigo}</Badge>}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="font-mono text-xs font-medium">{formatCurrency(oc.total, oc.moneda)}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs text-orange-700 hover:text-orange-900 hover:bg-orange-100 px-2"
+                        onClick={() => {
+                          resetCreateForm()
+                          const diasStr = oc.diasCredito ? String(oc.diasCredito) : ''
+                          const fechaRec = new Date().toISOString().split('T')[0]
+                          setCreateForm(f => ({
+                            ...f,
+                            ordenCompraId: oc.id,
+                            proveedorId: oc.proveedorId,
+                            monto: oc.total.toFixed(2),
+                            moneda: oc.moneda,
+                            proyectoId: oc.proyectoId || '',
+                            condicionPago: oc.condicionPago || 'contado',
+                            diasCredito: diasStr,
+                            descripcion: `OC ${oc.numero}`,
+                            fechaVencimiento: calcularFechaVencimiento(fechaRec, oc.condicionPago || 'contado', diasStr),
+                          }))
+                          setShowCreateDialog(true)
+                        }}
+                      >
+                        Registrar <ChevronRight className="h-3 w-3 ml-0.5" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-sm font-medium">{formatCurrency(oc.total, oc.moneda)}</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-orange-700 hover:text-orange-900 hover:bg-orange-100"
-                      onClick={() => {
-                        resetCreateForm()
-                        const diasStr = oc.diasCredito ? String(oc.diasCredito) : ''
-                        const fechaRec = new Date().toISOString().split('T')[0]
-                        setCreateForm(f => ({
-                          ...f,
-                          ordenCompraId: oc.id,
-                          proveedorId: oc.proveedorId,
-                          monto: oc.total.toFixed(2),
-                          moneda: oc.moneda,
-                          proyectoId: oc.proyectoId || '',
-                          condicionPago: oc.condicionPago || 'contado',
-                          diasCredito: diasStr,
-                          descripcion: `OC ${oc.numero}`,
-                          fechaVencimiento: calcularFechaVencimiento(fechaRec, oc.condicionPago || 'contado', diasStr),
-                        }))
-                        setShowCreateDialog(true)
-                      }}
-                    >
-                      Registrar factura
-                      <ChevronRight className="h-4 w-4 ml-1" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-              {ocsSinFactura.length > 5 && (
-                <p className="text-xs text-orange-600 text-center">y {ocsSinFactura.length - 5} más...</p>
-              )}
-            </div>
+                ))}
+                {ocsSinFactura.length > 8 && (
+                  <p className="text-xs text-orange-600 text-center py-1">y {ocsSinFactura.length - 8} más...</p>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -660,21 +674,18 @@ export default function CuentasPagarPage() {
               <TableRow>
                 <TableHead>Factura</TableHead>
                 <TableHead>Proveedor</TableHead>
-                <TableHead>Proyecto</TableHead>
                 <TableHead>OC</TableHead>
                 <TableHead className="text-right">Monto</TableHead>
-                <TableHead className="text-right">Pagado</TableHead>
                 <TableHead className="text-right">Saldo</TableHead>
-                <TableHead>Emisión</TableHead>
-                <TableHead>Vencimiento</TableHead>
+                <TableHead>Fechas</TableHead>
                 <TableHead>Estado</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
+                <TableHead className="text-right w-10"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     <DollarSign className="h-8 w-8 mx-auto mb-2 opacity-40" />
                     No hay cuentas por pagar
                   </TableCell>
@@ -684,49 +695,58 @@ export default function CuentasPagarPage() {
                   const vencida = isVencida(item.fechaVencimiento, item.estado)
                   return (
                     <TableRow key={item.id} className={`${item.estado === 'anulada' ? 'opacity-50' : ''} ${vencida ? 'bg-red-50/50' : ''}`}>
-                      <TableCell className="font-mono text-sm">{item.numeroFactura || '—'}</TableCell>
-                      <TableCell className="text-sm">
-                        <div className="font-medium">{item.proveedor?.nombre}</div>
+                      <TableCell className="font-mono text-sm">
+                        <div>{item.numeroFactura || <span className="text-muted-foreground italic text-xs">Sin factura</span>}</div>
+                        {item.proyecto && <div className="text-xs text-muted-foreground font-sans">{item.proyecto.codigo}</div>}
+                      </TableCell>
+                      <TableCell className="text-sm max-w-[180px]">
+                        <div className="font-medium truncate">{item.proveedor?.nombre}</div>
                         {item.proveedor?.ruc && <div className="text-xs text-muted-foreground">{item.proveedor.ruc}</div>}
                       </TableCell>
-                      <TableCell className="text-sm font-mono">{item.proyecto?.codigo || '—'}</TableCell>
-                      <TableCell className="text-xs font-mono text-muted-foreground">{item.ordenCompra?.numero || <span className="text-gray-400">Manual</span>}</TableCell>
+                      <TableCell className="text-xs font-mono text-muted-foreground">{item.ordenCompra?.numero || <span className="text-gray-300">—</span>}</TableCell>
                       <TableCell className="text-right font-mono text-sm">
-                        {formatCurrency(item.monto, item.moneda)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-sm text-green-600">
-                        {item.montoPagado > 0 ? formatCurrency(item.montoPagado, item.moneda) : '—'}
+                        <div>{formatCurrency(item.monto, item.moneda)}</div>
+                        {item.montoPagado > 0 && <div className="text-xs text-green-600">-{formatCurrency(item.montoPagado, item.moneda)}</div>}
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm font-semibold">
                         {formatCurrency(item.saldoPendiente, item.moneda)}
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{formatDate(item.fechaRecepcion)}</TableCell>
-                      <TableCell className={`text-sm ${vencida ? 'text-red-600 font-semibold' : ''}`}>
-                        {formatDate(item.fechaVencimiento)}
-                        {vencida && <AlertTriangle className="inline h-3 w-3 ml-1" />}
+                      <TableCell className="text-xs">
+                        <div className="text-muted-foreground">{formatDate(item.fechaRecepcion)}</div>
+                        <div className={`font-medium ${vencida ? 'text-red-600' : ''}`}>
+                          {formatDate(item.fechaVencimiento)}
+                          {vencida && <AlertTriangle className="inline h-3 w-3 ml-1" />}
+                        </div>
                       </TableCell>
                       <TableCell>
-                        <Badge className={getEstadoColor(item.estado)}>
+                        <Badge className={`${getEstadoColor(item.estado)} text-xs`}>
                           {ESTADOS_CXP.find(e => e.value === item.estado)?.label || item.estado}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button variant="ghost" size="sm" onClick={() => setShowDetail(item)}>
-                            Ver
-                          </Button>
-                          {(item.estado === 'pendiente' || item.estado === 'parcial') && (
-                            <>
-                              <Button variant="outline" size="sm" onClick={() => openPago(item)}>
-                                <ArrowUpCircle className="h-3 w-3 mr-1" />
-                                Pago
-                              </Button>
-                              <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700" onClick={() => handleAnular(item)}>
-                                <Ban className="h-3 w-3" />
-                              </Button>
-                            </>
-                          )}
-                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => setShowDetail(item)}>
+                              <Eye className="h-4 w-4 mr-2" /> Ver detalle
+                            </DropdownMenuItem>
+                            {(item.estado === 'pendiente' || item.estado === 'parcial') && (
+                              <>
+                                <DropdownMenuItem onClick={() => openPago(item)}>
+                                  <ArrowUpCircle className="h-4 w-4 mr-2" /> Registrar pago
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={() => handleAnular(item)}>
+                                  <Ban className="h-4 w-4 mr-2" /> Anular
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   )
