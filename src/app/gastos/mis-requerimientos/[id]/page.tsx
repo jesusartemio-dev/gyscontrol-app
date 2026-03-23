@@ -302,8 +302,8 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
         }
 
         const tableHead = hayOverrides
-          ? [['Fecha', 'Descripción', 'Categoría', 'Comprobante', 'Proveedor', 'Centro de Costo', 'Monto']]
-          : [['Fecha', 'Descripción', 'Categoría', 'Comprobante', 'Proveedor', 'Monto']]
+          ? [['Fecha', 'Descripción', 'Categoría', 'Comprobante', 'Proveedor', 'RUC', 'Centro de Costo', 'Monto']]
+          : [['Fecha', 'Descripción', 'Categoría', 'Comprobante', 'Proveedor', 'RUC', 'Monto']]
 
         const tableBody = lineas.map(l => {
           const row = [
@@ -312,6 +312,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
             l.categoriaGasto?.nombre || '-',
             [l.tipoComprobante, l.numeroComprobante].filter(Boolean).join(' ') || '-',
             l.proveedorNombre || '-',
+            l.proveedorRuc || '-',
           ]
           if (hayOverrides) {
             row.push(getDestino(l) + (l.categoriaCosto ? ` (${l.categoriaCosto})` : ''))
@@ -322,11 +323,11 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
 
         const total = lineas.reduce((s, l) => s + l.monto, 0)
         const totalRow = hayOverrides
-          ? ['', '', '', '', '', 'TOTAL', fmtMoney(total)]
-          : ['', '', '', '', 'TOTAL', fmtMoney(total)]
+          ? ['', '', '', '', '', '', 'TOTAL', fmtMoney(total)]
+          : ['', '', '', '', '', 'TOTAL', fmtMoney(total)]
         tableBody.push(totalRow)
 
-        const montoColIdx = hayOverrides ? 6 : 5
+        const montoColIdx = hayOverrides ? 7 : 6
 
         autoTable(doc, {
           startY: y,
@@ -336,9 +337,10 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
           headStyles: { fillColor: [46, 117, 182], textColor: [255, 255, 255], fontSize: 9, halign: 'center' },
           styles: { fontSize: 8, cellPadding: 2.5, overflow: 'linebreak' },
           columnStyles: {
-            0: { cellWidth: 22 },
+            0: { cellWidth: 20 },
             1: { cellWidth: 'auto' },
-            [montoColIdx]: { halign: 'right', cellWidth: 28 },
+            5: { cellWidth: 24 },
+            [montoColIdx]: { halign: 'right', cellWidth: 26 },
           },
           margin: { left: margin, right: margin },
           didParseCell: (data: any) => {
