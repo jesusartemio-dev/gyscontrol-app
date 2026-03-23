@@ -83,7 +83,7 @@ export default function ProyectosInternosPage() {
 
   const abrirEditar = (p: ProyectoInterno) => {
     setEditando(p)
-    setForm({ nombre: p.nombre, codigo: '', centroCostoId: p.centroCosto?.id || '', gestorId: p.gestor?.id || '', fechaInicio: '' })
+    setForm({ nombre: p.nombre, codigo: p.codigo, centroCostoId: p.centroCosto?.id || '', gestorId: p.gestor?.id || '', fechaInicio: '' })
     setShowModal(true)
   }
 
@@ -102,7 +102,7 @@ export default function ProyectosInternosPage() {
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, codigoPersonalizado: form.codigo }),
+        body: JSON.stringify({ ...form, codigoPersonalizado: form.codigo, codigo: form.codigo }),
       })
 
       if (!res.ok) {
@@ -249,17 +249,17 @@ export default function ProyectosInternosPage() {
               />
             </div>
 
-            {!editando && (
-              <div>
-                <Label className="text-xs text-gray-500">Código <span className="text-gray-400">(opcional — se auto-genera si se deja vacío)</span></Label>
-                <Input
-                  placeholder="Ej: GYS.PRY o INT-001"
-                  value={form.codigo}
-                  onChange={e => setForm({ ...form, codigo: e.target.value.toUpperCase() })}
-                  className="h-9 font-mono"
-                />
-              </div>
-            )}
+            <div>
+              <Label className="text-xs text-gray-500">
+                Código {!editando && <span className="text-gray-400">(opcional — se auto-genera si se deja vacío)</span>}
+              </Label>
+              <Input
+                placeholder="Ej: GYS.PRY o INT-001"
+                value={form.codigo}
+                onChange={e => setForm({ ...form, codigo: e.target.value.toUpperCase() })}
+                className="h-9 font-mono"
+              />
+            </div>
 
             <div>
               <Label className="text-xs text-gray-500">Centro de Costos *</Label>

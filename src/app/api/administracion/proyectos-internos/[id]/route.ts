@@ -13,7 +13,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     const { id } = await params
     const body = await req.json()
-    const { nombre, centroCostoId, gestorId, estado } = body
+    const { nombre, codigo, centroCostoId, gestorId, estado } = body
 
     const existing = await prisma.proyecto.findFirst({ where: { id, esInterno: true } })
     if (!existing) return NextResponse.json({ error: 'Proyecto interno no encontrado' }, { status: 404 })
@@ -23,6 +23,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (centroCostoId !== undefined) updateData.centroCostoId = centroCostoId
     if (gestorId !== undefined) updateData.gestorId = gestorId
     if (estado !== undefined) updateData.estado = estado
+    if (codigo?.trim()) {
+      const codigoNuevo = codigo.trim().toUpperCase()
+      if (codigoNuevo !== existing.codigo) {
+        const existe = await prisma.proyecto.findFirst({ where: { codigo: codigoNuevo, id: { not: id } } })
+        if (existe) return NextResponse.json({ error: `El código ${codigoNuevo} ya existe` }, { status: 400 })
+        updateData.codigo = codigoNuevo
+      }
+    }
 
     const updated = await prisma.proyecto.update({
       where: { id },
