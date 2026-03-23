@@ -21,7 +21,7 @@ export async function GET() {
         orderBy: { createdAt: 'desc' }
       }),
       prisma.centroCosto.findMany({
-        where: { activo: true },
+        where: { activo: { not: false } },
         select: { id: true, nombre: true, tipo: true },
         orderBy: { nombre: 'asc' }
       }),
