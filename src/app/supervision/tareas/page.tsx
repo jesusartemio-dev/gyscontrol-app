@@ -53,12 +53,14 @@ import { es } from 'date-fns/locale'
 
 interface Tarea {
   id: string
-  tipo: 'proyecto_tarea' | 'tarea'
+  tipo: 'proyecto_tarea' | 'tarea' | 'tarea_cc'
   nombre: string
   descripcion?: string
   proyectoId: string | null
   proyectoCodigo: string
   proyectoNombre: string
+  centroCostoId?: string | null
+  centroCostoNombre?: string | null
   edtNombre: string
   actividadNombre: string | null
   esExtra: boolean
@@ -78,8 +80,10 @@ interface Tarea {
 }
 
 interface NuevaTarea {
+  modo: 'proyecto' | 'centro_costo'
   proyectoId: string
   proyectoEdtId: string
+  centroCostoId: string
   nombre: string
   descripcion: string
   fechaInicio: string
@@ -88,6 +92,12 @@ interface NuevaTarea {
   prioridad: string
   horasEstimadas: string
   personasEstimadas: string
+}
+
+interface CentroCosto {
+  id: string
+  nombre: string
+  tipo: string
 }
 
 interface ProyectoEdt {
@@ -124,6 +134,7 @@ export default function SupervisionTareasPage() {
   const [tareas, setTareas] = useState<Tarea[]>([])
   const [tareasFiltradas, setTareasFiltradas] = useState<Tarea[]>([])
   const [proyectos, setProyectos] = useState<Proyecto[]>([])
+  const [centrosCosto, setCentrosCosto] = useState<CentroCosto[]>([])
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [metricas, setMetricas] = useState<Metricas | null>(null)
   const [loading, setLoading] = useState(true)
@@ -153,8 +164,10 @@ export default function SupervisionTareasPage() {
   const [edtsProyecto, setEdtsProyecto] = useState<ProyectoEdt[]>([])
   const [cargandoEdts, setCargandoEdts] = useState(false)
   const [nuevaTarea, setNuevaTarea] = useState<NuevaTarea>({
+    modo: 'proyecto',
     proyectoId: '',
     proyectoEdtId: '',
+    centroCostoId: '',
     nombre: '',
     descripcion: '',
     fechaInicio: '',
@@ -204,6 +217,7 @@ export default function SupervisionTareasPage() {
         setTareas(data.data.tareas)
         setTareasFiltradas(data.data.tareas)
         setProyectos(data.data.proyectos)
+        setCentrosCosto(data.data.centrosCosto || [])
         setUsuarios(data.data.usuarios)
         setMetricas(data.data.metricas)
       }
@@ -516,8 +530,10 @@ export default function SupervisionTareasPage() {
     const proyectoIdInicial = filtroProyecto || ''
     setErrorCrearTarea(null)
     setNuevaTarea({
+      modo: 'proyecto',
       proyectoId: proyectoIdInicial,
       proyectoEdtId: '',
+      centroCostoId: '',
       nombre: '',
       descripcion: '',
       fechaInicio: format(new Date(), 'yyyy-MM-dd'),
@@ -527,7 +543,6 @@ export default function SupervisionTareasPage() {
       horasEstimadas: '',
       personasEstimadas: '1'
     })
-    // Cargar EDTs si ya hay proyecto seleccionado
     if (proyectoIdInicial) {
       cargarEdtsProyecto(proyectoIdInicial)
     } else {
@@ -538,30 +553,24 @@ export default function SupervisionTareasPage() {
 
   // Crear tarea extra
   const crearTarea = async () => {
-    if (!nuevaTarea.proyectoId) {
-      toast({
-        title: 'Error',
-        description: 'Debe seleccionar un proyecto',
-        variant: 'destructive'
-      })
-      return
-    }
-
-    if (!nuevaTarea.proyectoEdtId) {
-      toast({
-        title: 'Error',
-        description: 'Debe seleccionar un EDT',
-        variant: 'destructive'
-      })
-      return
+    if (nuevaTarea.modo === 'centro_costo') {
+      if (!nuevaTarea.centroCostoId) {
+        toast({ title: 'Error', description: 'Debe seleccionar un Centro de Costos', variant: 'destructive' })
+        return
+      }
+    } else {
+      if (!nuevaTarea.proyectoId) {
+        toast({ title: 'Error', description: 'Debe seleccionar un proyecto', variant: 'destructive' })
+        return
+      }
+      if (!nuevaTarea.proyectoEdtId) {
+        toast({ title: 'Error', description: 'Debe seleccionar un EDT', variant: 'destructive' })
+        return
+      }
     }
 
     if (!nuevaTarea.nombre.trim()) {
-      toast({
-        title: 'Error',
-        description: 'El nombre de la tarea es requerido',
-        variant: 'destructive'
-      })
+      toast({ title: 'Error', description: 'El nombre de la tarea es requerido', variant: 'destructive' })
       return
     }
 
@@ -571,20 +580,31 @@ export default function SupervisionTareasPage() {
 
       const personas = parseInt(nuevaTarea.personasEstimadas) || 1
       const horasPP = parseFloat(nuevaTarea.horasEstimadas) || 0
-      const payload = {
-        proyectoId: nuevaTarea.proyectoId,
-        proyectoEdtId: nuevaTarea.proyectoEdtId,
-        nombre: nuevaTarea.nombre,
-        descripcion: nuevaTarea.descripcion,
-        fechaInicio: nuevaTarea.fechaInicio,
-        fechaFin: nuevaTarea.fechaFin,
-        responsableId: nuevaTarea.responsableId || null,
-        prioridad: nuevaTarea.prioridad,
-        horasEstimadas: horasPP > 0 ? horasPP * personas : null,
-        personasEstimadas: personas
-      }
 
-      console.log('📤 CREAR TAREA - Payload:', payload)
+      const payload = nuevaTarea.modo === 'centro_costo'
+        ? {
+            centroCostoId: nuevaTarea.centroCostoId,
+            nombre: nuevaTarea.nombre,
+            descripcion: nuevaTarea.descripcion,
+            fechaInicio: nuevaTarea.fechaInicio,
+            fechaFin: nuevaTarea.fechaFin,
+            responsableId: nuevaTarea.responsableId || null,
+            prioridad: nuevaTarea.prioridad,
+            horasEstimadas: horasPP > 0 ? horasPP : null,
+            personasEstimadas: personas
+          }
+        : {
+            proyectoId: nuevaTarea.proyectoId,
+            proyectoEdtId: nuevaTarea.proyectoEdtId,
+            nombre: nuevaTarea.nombre,
+            descripcion: nuevaTarea.descripcion,
+            fechaInicio: nuevaTarea.fechaInicio,
+            fechaFin: nuevaTarea.fechaFin,
+            responsableId: nuevaTarea.responsableId || null,
+            prioridad: nuevaTarea.prioridad,
+            horasEstimadas: horasPP > 0 ? horasPP * personas : null,
+            personasEstimadas: personas
+          }
 
       const response = await fetch('/api/supervision/tareas', {
         method: 'POST',
@@ -594,17 +614,13 @@ export default function SupervisionTareasPage() {
 
       if (!response.ok) {
         const errorData = await response.json()
-        console.error('❌ CREAR TAREA - Error:', errorData)
         setErrorCrearTarea(errorData.error || 'Error al crear tarea')
         return
       }
 
       const data = await response.json()
       if (data.success) {
-        toast({
-          title: 'Tarea creada',
-          description: 'La tarea extra ha sido creada correctamente'
-        })
+        toast({ title: 'Tarea creada', description: 'La tarea ha sido creada correctamente' })
         setShowCrearModal(false)
         cargarDatos()
       }
@@ -846,10 +862,19 @@ export default function SupervisionTareasPage() {
                       <TableRow key={`${tarea.tipo}-${tarea.id}`}>
                         <TableCell>
                           <div>
-                            <p className="font-medium">{tarea.proyectoCodigo}</p>
-                            <p className="text-xs text-gray-500">{tarea.edtNombre}</p>
-                            {tarea.actividadNombre && (
-                              <p className="text-xs text-purple-500 truncate max-w-[150px]" title={tarea.actividadNombre}>{tarea.actividadNombre}</p>
+                            {tarea.tipo === 'tarea_cc' ? (
+                              <>
+                                <p className="font-medium text-emerald-700">{tarea.centroCostoNombre}</p>
+                                <p className="text-xs text-emerald-600 bg-emerald-50 rounded px-1 inline-block mt-0.5">CC</p>
+                              </>
+                            ) : (
+                              <>
+                                <p className="font-medium">{tarea.proyectoCodigo}</p>
+                                <p className="text-xs text-gray-500">{tarea.edtNombre}</p>
+                                {tarea.actividadNombre && (
+                                  <p className="text-xs text-purple-500 truncate max-w-[150px]" title={tarea.actividadNombre}>{tarea.actividadNombre}</p>
+                                )}
+                              </>
                             )}
                           </div>
                         </TableCell>
@@ -1053,7 +1078,7 @@ export default function SupervisionTareasPage() {
       <Dialog open={showCrearModal} onOpenChange={setShowCrearModal}>
         <DialogContent className="max-w-md">
           <DialogHeader className="pb-2">
-            <DialogTitle className="flex items-center gap-2 text-purple-700">
+            <DialogTitle className={`flex items-center gap-2 ${nuevaTarea.modo === 'centro_costo' ? 'text-emerald-700' : 'text-purple-700'}`}>
               <Zap className="h-5 w-5" />
               Nueva Tarea Extra
             </DialogTitle>
@@ -1070,48 +1095,88 @@ export default function SupervisionTareasPage() {
               </div>
             )}
 
-            {/* Proyecto y EDT en una fila */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs text-gray-500">Proyecto *</Label>
-                <Select
-                  value={nuevaTarea.proyectoId || '__none__'}
-                  onValueChange={(v) => handleProyectoChange(v === '__none__' ? '' : v)}
-                >
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder="Proyecto..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Seleccionar...</SelectItem>
-                    {proyectos.map(p => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.codigo}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-xs text-gray-500">EDT *</Label>
-                <Select
-                  value={nuevaTarea.proyectoEdtId || '__none__'}
-                  onValueChange={(v) => setNuevaTarea({ ...nuevaTarea, proyectoEdtId: v === '__none__' ? '' : v })}
-                  disabled={!nuevaTarea.proyectoId || cargandoEdts}
-                >
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder={cargandoEdts ? 'Cargando...' : 'EDT...'} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Seleccionar...</SelectItem>
-                    {edtsProyecto.map(edt => (
-                      <SelectItem key={edt.id} value={edt.id}>
-                        {edt.nombre}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            {/* Toggle Proyecto / Centro de Costos */}
+            <div className="flex rounded-md border overflow-hidden text-sm">
+              <button
+                type="button"
+                className={`flex-1 py-1.5 transition-colors ${nuevaTarea.modo === 'proyecto' ? 'bg-purple-600 text-white font-medium' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                onClick={() => setNuevaTarea({ ...nuevaTarea, modo: 'proyecto', centroCostoId: '' })}
+              >
+                Proyecto
+              </button>
+              <button
+                type="button"
+                className={`flex-1 py-1.5 transition-colors ${nuevaTarea.modo === 'centro_costo' ? 'bg-emerald-600 text-white font-medium' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                onClick={() => setNuevaTarea({ ...nuevaTarea, modo: 'centro_costo', proyectoId: '', proyectoEdtId: '' })}
+              >
+                Centro de Costos
+              </button>
             </div>
+
+            {/* Proyecto y EDT ó Centro de Costos */}
+            {nuevaTarea.modo === 'proyecto' ? (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs text-gray-500">Proyecto *</Label>
+                  <Select
+                    value={nuevaTarea.proyectoId || '__none__'}
+                    onValueChange={(v) => handleProyectoChange(v === '__none__' ? '' : v)}
+                  >
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Proyecto..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Seleccionar...</SelectItem>
+                      {proyectos.map(p => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.codigo}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">EDT *</Label>
+                  <Select
+                    value={nuevaTarea.proyectoEdtId || '__none__'}
+                    onValueChange={(v) => setNuevaTarea({ ...nuevaTarea, proyectoEdtId: v === '__none__' ? '' : v })}
+                    disabled={!nuevaTarea.proyectoId || cargandoEdts}
+                  >
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder={cargandoEdts ? 'Cargando...' : 'EDT...'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Seleccionar...</SelectItem>
+                      {edtsProyecto.map(edt => (
+                        <SelectItem key={edt.id} value={edt.id}>
+                          {edt.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <Label className="text-xs text-gray-500">Centro de Costos *</Label>
+                <Select
+                  value={nuevaTarea.centroCostoId || '__none__'}
+                  onValueChange={(v) => setNuevaTarea({ ...nuevaTarea, centroCostoId: v === '__none__' ? '' : v })}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Seleccionar..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Seleccionar...</SelectItem>
+                    {centrosCosto.map(cc => (
+                      <SelectItem key={cc.id} value={cc.id}>
+                        {cc.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {/* Nombre de la tarea */}
             <div>
@@ -1241,7 +1306,12 @@ export default function SupervisionTareasPage() {
             <Button variant="outline" size="sm" onClick={() => setShowCrearModal(false)} disabled={creandoTarea}>
               Cancelar
             </Button>
-            <Button size="sm" onClick={crearTarea} disabled={creandoTarea || !nuevaTarea.proyectoEdtId} className="bg-purple-600 hover:bg-purple-700">
+            <Button
+              size="sm"
+              onClick={crearTarea}
+              disabled={creandoTarea || (nuevaTarea.modo === 'proyecto' ? !nuevaTarea.proyectoEdtId : !nuevaTarea.centroCostoId)}
+              className={nuevaTarea.modo === 'centro_costo' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-purple-600 hover:bg-purple-700'}
+            >
               {creandoTarea ? (
                 <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
               ) : (

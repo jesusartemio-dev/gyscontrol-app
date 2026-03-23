@@ -153,6 +153,32 @@ export async function GET(request: NextRequest) {
       ]
     })
 
+    // Obtener TareaCC (tareas de centro de costo)
+    const whereTareaCC: any = { estado: { not: 'cancelada' } }
+    if (responsableId) {
+      whereTareaCC.responsableId = responsableId
+    } else if (soloSinAsignar) {
+      whereTareaCC.responsableId = null
+    }
+    if (estado) whereTareaCC.estado = estado
+
+    const tareasCc = await prisma.tareaCC.findMany({
+      where: whereTareaCC,
+      include: {
+        centroCosto: { select: { id: true, nombre: true, tipo: true } },
+        responsable: { select: { id: true, name: true, email: true, role: true } },
+        creadoPor: { select: { id: true, name: true } },
+      },
+      orderBy: [{ fechaFin: 'asc' }, { prioridad: 'desc' }]
+    })
+
+    // Obtener lista de centros de costo para el formulario
+    const centrosCosto = await prisma.centroCosto.findMany({
+      where: { activo: true },
+      select: { id: true, nombre: true, tipo: true },
+      orderBy: { nombre: 'asc' }
+    })
+
     // Obtener lista de proyectos para el filtro
     const proyectos = await prisma.proyecto.findMany({
       where: {
@@ -218,6 +244,35 @@ export async function GET(request: NextRequest) {
       }
     })
 
+    // Formatear TareaCC
+    const tareasCcFormateadas = tareasCc.map(t => ({
+      id: t.id,
+      tipo: 'tarea_cc' as const,
+      nombre: t.nombre,
+      descripcion: t.descripcion,
+      proyectoId: null,
+      proyectoCodigo: t.centroCosto?.nombre || 'Sin CC',
+      proyectoNombre: t.centroCosto?.nombre || 'Sin CC',
+      centroCostoId: t.centroCostoId,
+      centroCostoNombre: t.centroCosto?.nombre || null,
+      edtNombre: 'Centro de Costos',
+      actividadNombre: null as string | null,
+      esExtra: true,
+      responsableId: t.responsableId,
+      responsableNombre: t.responsable?.name || null,
+      responsableEmail: t.responsable?.email || null,
+      creadoPorId: t.creadoPorId || null,
+      creadoPorNombre: t.creadoPor?.name || null,
+      fechaInicio: t.fechaInicio,
+      fechaFin: t.fechaFin,
+      horasPlan: (t.horasEstimadas ? Number(t.horasEstimadas) : 0) * t.personasEstimadas,
+      horasReales: t.horasReales ? Number(t.horasReales) : 0,
+      personasEstimadas: t.personasEstimadas,
+      progreso: t.porcentajeCompletado,
+      estado: t.estado,
+      prioridad: t.prioridad
+    }))
+
     // Formatear Tareas simples
     const tareasFormateadasSimples = tareasSimples.map(t => ({
       id: t.id,
@@ -245,7 +300,7 @@ export async function GET(request: NextRequest) {
     }))
 
     // Combinar todas las tareas
-    const todasLasTareas = [...tareasFormateadas, ...tareasFormateadasSimples]
+    const todasLasTareas = [...tareasFormateadas, ...tareasFormateadasSimples, ...tareasCcFormateadas]
       .sort((a, b) => {
         // Primero por fecha de fin
         const fechaA = new Date(a.fechaFin).getTime()
@@ -279,6 +334,7 @@ export async function GET(request: NextRequest) {
       data: {
         tareas: todasLasTareas,
         proyectos,
+        centrosCosto,
         usuarios,
         metricas: {
           totalTareas,
@@ -368,6 +424,28 @@ export async function PATCH(request: NextRequest) {
           }
         }
       })
+    } else if (tipo === 'tarea_cc') {
+      const updateData: any = { updatedAt: new Date() }
+      if (responsableId !== undefined) updateData.responsableId = responsableId || null
+      if (estado) {
+        updateData.estado = estado
+        if (estado === 'completada') updateData.porcentajeCompletado = 100
+      }
+      if (prioridad) updateData.prioridad = prioridad
+      if (porcentajeCompletado !== undefined && estado !== 'completada') {
+        updateData.porcentajeCompletado = Math.min(100, Math.max(0, porcentajeCompletado))
+      }
+      if (personasEstimadas !== undefined) {
+        updateData.personasEstimadas = Math.max(1, parseInt(personasEstimadas) || 1)
+      }
+
+      tareaActualizada = await prisma.tareaCC.update({
+        where: { id: tareaId },
+        data: updateData,
+        include: {
+          responsable: { select: { id: true, name: true, email: true } }
+        }
+      })
     } else {
       const updateData: any = { updatedAt: new Date() }
       if (responsableId !== undefined) updateData.responsableId = responsableId || null
@@ -437,6 +515,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const {
+      centroCostoId,
       proyectoId,
       proyectoEdtId,
       nombre,
@@ -449,7 +528,72 @@ export async function POST(request: NextRequest) {
       personasEstimadas
     } = body
 
-    // Validaciones
+    // --- Crear tarea de Centro de Costos ---
+    if (centroCostoId) {
+      if (!nombre?.trim()) {
+        return NextResponse.json({ error: 'El nombre de la tarea es requerido' }, { status: 400 })
+      }
+      if (!fechaInicio || !fechaFin) {
+        return NextResponse.json({ error: 'Las fechas de inicio y fin son requeridas' }, { status: 400 })
+      }
+
+      const cc = await prisma.centroCosto.findUnique({ where: { id: centroCostoId }, select: { id: true, nombre: true } })
+      if (!cc) {
+        return NextResponse.json({ error: 'Centro de Costos no encontrado' }, { status: 404 })
+      }
+
+      const personas = personasEstimadas && parseInt(personasEstimadas) > 0 ? parseInt(personasEstimadas) : 1
+      const nuevaTareaCC = await prisma.tareaCC.create({
+        data: {
+          centroCostoId,
+          nombre: nombre.trim(),
+          descripcion: descripcion?.trim() || null,
+          fechaInicio: new Date(fechaInicio),
+          fechaFin: new Date(fechaFin),
+          responsableId: responsableId || null,
+          creadoPorId: session.user.id,
+          prioridad,
+          horasEstimadas: horasEstimadas ? parseFloat(horasEstimadas) : null,
+          personasEstimadas: personas,
+          estado: 'pendiente',
+          updatedAt: new Date()
+        },
+        include: {
+          centroCosto: { select: { id: true, nombre: true } },
+          responsable: { select: { id: true, name: true, email: true } }
+        }
+      })
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          id: nuevaTareaCC.id,
+          tipo: 'tarea_cc',
+          nombre: nuevaTareaCC.nombre,
+          descripcion: descripcion?.trim() || null,
+          proyectoId: null,
+          proyectoCodigo: cc.nombre,
+          proyectoNombre: cc.nombre,
+          centroCostoId: cc.id,
+          centroCostoNombre: cc.nombre,
+          edtNombre: 'Centro de Costos',
+          esExtra: true,
+          responsableId: nuevaTareaCC.responsableId,
+          responsableNombre: nuevaTareaCC.responsable?.name || null,
+          creadoPorId: session.user.id,
+          creadoPorNombre: session.user.name || null,
+          fechaInicio: nuevaTareaCC.fechaInicio,
+          fechaFin: nuevaTareaCC.fechaFin,
+          horasPlan: nuevaTareaCC.horasEstimadas ? Number(nuevaTareaCC.horasEstimadas) * personas : 0,
+          progreso: 0,
+          estado: nuevaTareaCC.estado,
+          prioridad: nuevaTareaCC.prioridad
+        },
+        message: 'Tarea de Centro de Costos creada correctamente'
+      })
+    }
+
+    // Validaciones para tarea de proyecto
     if (!proyectoId) {
       return NextResponse.json(
         { error: 'El proyecto es requerido' },

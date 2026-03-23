@@ -1501,6 +1501,8 @@ model User {
   proyectoSubtarea                ProyectoSubtarea[]
   tareasAsignadas                 ProyectoTarea[]             @relation("TareaResponsable")
   tareasCreadas                   ProyectoTarea[]             @relation("TareaCreadaPor")
+  tareasCcAsignadas               TareaCC[]                   @relation("TareaCCResponsable")
+  tareasCcCreadas                 TareaCC[]                   @relation("TareaCCCreadaPor")
   registrosProgreso               RegistroProgreso[]
   subtareas                       Subtarea[]
   tareas                          Tarea[]
@@ -3278,9 +3280,39 @@ model CentroCosto {
   hojas         HojaDeGastos[]
   ordenesCompra OrdenCompra[]
   gastoLineas   GastoLinea[]
+  tareasCc      TareaCC[]
 
   @@index([tipo, activo])
   @@map("centro_costo")
+}
+
+model TareaCC {
+  id                   String         @id @default(cuid())
+  centroCostoId        String
+  nombre               String
+  descripcion          String?
+  fechaInicio          DateTime
+  fechaFin             DateTime
+  fechaInicioReal      DateTime?
+  fechaFinReal         DateTime?
+  estado               EstadoTarea    @default(pendiente)
+  prioridad            PrioridadTarea @default(media)
+  porcentajeCompletado Int            @default(0)
+  horasEstimadas       Decimal?       @db.Decimal(10, 2)
+  horasReales          Decimal        @default(0) @db.Decimal(10, 2)
+  personasEstimadas    Int            @default(1)
+  responsableId        String?
+  creadoPorId          String?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime
+
+  centroCosto CentroCosto @relation(fields: [centroCostoId], references: [id])
+  responsable User?       @relation("TareaCCResponsable", fields: [responsableId], references: [id])
+  creadoPor   User?       @relation("TareaCCCreadaPor", fields: [creadoPorId], references: [id])
+
+  @@index([centroCostoId])
+  @@index([responsableId])
+  @@map("tarea_cc")
 }
 
 // Imputación: proyectoId y centroCostoId son mutuamente excluyentes.
