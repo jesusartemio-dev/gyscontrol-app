@@ -921,7 +921,7 @@ export default function SupervisionTareasPage() {
                         <TableCell>
                           {(() => {
                             const horasPorPersona = tarea.personasEstimadas > 1
-                              ? Math.round(tarea.horasPlan / tarea.personasEstimadas)
+                              ? parseFloat((tarea.horasPlan / tarea.personasEstimadas).toFixed(1))
                               : tarea.horasPlan
                             const restantes = Math.max(0, tarea.horasPlan - tarea.horasReales)
                             const consumoPct = tarea.horasPlan > 0 ? (tarea.horasReales / tarea.horasPlan) * 100 : 0
