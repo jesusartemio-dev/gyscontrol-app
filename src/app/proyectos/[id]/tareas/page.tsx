@@ -46,6 +46,7 @@ interface TareaData {
   fechaInicioReal: string | null
   fechaFinReal: string | null
   horasEstimadas: number | null
+  personasEstimadas: number
   horasReales: number
   responsableId: string | null
   proyectoActividadId: string | null
@@ -195,7 +196,7 @@ export default function ProyectoTareasPage() {
     const completadas = tareas.filter(t => t.estado === 'completada').length
     const enProgreso = tareas.filter(t => t.estado === 'en_progreso').length
     const pendientes = tareas.filter(t => t.estado === 'pendiente').length
-    const horasPlan = tareas.reduce((s, t) => s + (Number(t.horasEstimadas) || 0), 0)
+    const horasPlan = tareas.reduce((s, t) => s + (Number(t.horasEstimadas) || 0) * (t.personasEstimadas || 1), 0)
     const horasReales = tareas.reduce((s, t) => s + (Number(t.horasReales) || 0), 0)
     return { total, cronograma, extras, completadas, enProgreso, pendientes, horasPlan, horasReales }
   }, [tareas])
@@ -470,7 +471,7 @@ export default function ProyectoTareasPage() {
                         <span className="text-muted-foreground">
                           {Number(tarea.horasReales || 0).toFixed(0)}h
                           <span className="text-muted-foreground/60">
-                            /{Number(tarea.horasEstimadas || 0).toFixed(0)}h
+                            /{Number((tarea.horasEstimadas || 0) * (tarea.personasEstimadas || 1)).toFixed(0)}h
                           </span>
                         </span>
                       </div>
