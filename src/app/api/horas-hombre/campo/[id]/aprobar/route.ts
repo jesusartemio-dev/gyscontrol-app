@@ -64,7 +64,6 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
               select: {
                 id: true,
                 nombre: true,
-                porcentajeCompletado: true,
                 proyectoActividad: { select: { id: true, nombre: true } }
               }
             },
@@ -206,24 +205,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         })
       }
 
-      // Sincronizar porcentajeFinal → ProyectoTarea.porcentajeCompletado
-      // (en caso de que el cerrar no haya enviado progresoTareas)
-      for (const tarea of registro.tareas) {
-        if (tarea.proyectoTareaId && tarea.porcentajeFinal != null && tarea.porcentajeFinal > 0) {
-          const actual = tarea.proyectoTarea?.porcentajeCompletado ?? 0
-          const nuevo = Math.max(actual, tarea.porcentajeFinal)
-          if (nuevo > actual) {
-            await tx.proyectoTarea.update({
-              where: { id: tarea.proyectoTareaId },
-              data: {
-                porcentajeCompletado: nuevo,
-                ...(nuevo >= 100 ? { estado: 'completada', fechaFinReal: new Date() } : {}),
-                updatedAt: new Date()
-              }
-            })
-          }
-        }
-      }
+      // El progreso de las tareas se actualiza al CERRAR la jornada, no al aprobar.
 
       // Actualizar estado del registro de campo
       const registroActualizado = await tx.registroHorasCampo.update({

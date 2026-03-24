@@ -189,54 +189,47 @@ export async function PUT(request: NextRequest, context: RouteContext) {
       }
     }
 
-    // Actualizar progreso y horas de tareas del cronograma
-    const tareasActualizadas = new Set<string>()
-
-    // Primero: actualizar progreso (si se envió)
+    // Construir mapa de progreso: progresoTareas enviado por el supervisor
+    const progresoMap = new Map<string, number>()
     if (progresoTareas && progresoTareas.length > 0) {
       for (const { proyectoTareaId, porcentaje } of progresoTareas) {
         if (proyectoTareaId && porcentaje >= 0 && porcentaje <= 100) {
-          const horasIncremento = horasPorTarea[proyectoTareaId] || 0
-          await prisma.proyectoTarea.update({
-            where: { id: proyectoTareaId },
-            data: {
-              porcentajeCompletado: Math.round(porcentaje),
-              ...(horasIncremento > 0 ? { horasReales: { increment: horasIncremento } } : {}),
-              ...(porcentaje >= 100 ? { estado: 'completada', fechaFinReal: new Date() } : {})
-            }
-          })
-          tareasActualizadas.add(proyectoTareaId)
+          progresoMap.set(proyectoTareaId, Math.round(porcentaje))
         }
       }
     }
 
-    // Segundo: incrementar horas para tareas que no tenían progreso enviado
+    // Guardar porcentajeFinal en RegistroHorasCampoTarea para todos los que tengan progreso
+    for (const [proyectoTareaId, porcentaje] of progresoMap.entries()) {
+      await prisma.registroHorasCampoTarea.updateMany({
+        where: { registroCampoId: jornadaId, proyectoTareaId },
+        data: { porcentajeFinal: porcentaje }
+      })
+    }
+
+    // Actualizar ProyectoTarea: progreso + horas (siempre al cerrar, no al aprobar)
+    const tareasConProgreso = new Set<string>()
+    for (const [proyectoTareaId, porcentaje] of progresoMap.entries()) {
+      const horasIncremento = horasPorTarea[proyectoTareaId] || 0
+      await prisma.proyectoTarea.update({
+        where: { id: proyectoTareaId },
+        data: {
+          porcentajeCompletado: porcentaje,
+          ...(horasIncremento > 0 ? { horasReales: { increment: horasIncremento } } : {}),
+          ...(porcentaje >= 100 ? { estado: 'completada', fechaFinReal: new Date() } : { estado: 'en_progreso' }),
+          updatedAt: new Date()
+        }
+      })
+      tareasConProgreso.add(proyectoTareaId)
+    }
+
+    // Incrementar horas para tareas sin progreso enviado (solo horas, sin tocar porcentaje)
     for (const [proyectoTareaId, horas] of Object.entries(horasPorTarea)) {
-      if (!tareasActualizadas.has(proyectoTareaId) && horas > 0) {
+      if (!tareasConProgreso.has(proyectoTareaId) && horas > 0) {
         await prisma.proyectoTarea.update({
           where: { id: proyectoTareaId },
-          data: {
-            horasReales: { increment: horas }
-          }
+          data: { horasReales: { increment: horas }, updatedAt: new Date() }
         })
-      }
-    }
-
-    // Guardar porcentajeFinal en cada tarea de campo que tenga progreso
-    if (progresoTareas && progresoTareas.length > 0) {
-      for (const { proyectoTareaId, porcentaje } of progresoTareas) {
-        if (proyectoTareaId && porcentaje >= 0 && porcentaje <= 100) {
-          // Actualizar todas las tareas de campo de esta jornada que apunten a esa tarea del cronograma
-          await prisma.registroHorasCampoTarea.updateMany({
-            where: {
-              registroCampoId: jornadaId,
-              proyectoTareaId: proyectoTareaId
-            },
-            data: {
-              porcentajeFinal: Math.round(porcentaje)
-            }
-          })
-        }
       }
     }
 
