@@ -194,18 +194,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         }
       }
 
-      // Actualizar horasReales de cada tarea del cronograma afectada
-      for (const [tareaId, horas] of tareasActualizadas.entries()) {
-        await tx.proyectoTarea.update({
-          where: { id: tareaId },
-          data: {
-            horasReales: { increment: horas },
-            updatedAt: new Date()
-          }
-        })
-      }
-
-      // El progreso de las tareas se actualiza al CERRAR la jornada, no al aprobar.
+      // horasReales se actualiza al CERRAR la jornada (no aquí), para evitar doble conteo.
+      // El progreso de las tareas también se actualiza al CERRAR, no al aprobar.
 
       // Actualizar estado del registro de campo
       const registroActualizado = await tx.registroHorasCampo.update({
