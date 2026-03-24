@@ -232,7 +232,7 @@ export default function SupervisionTareasPage() {
     }
   }
 
-  // Cargar al iniciar
+  // Cargar al iniciar (solo cuando cambia el userId o el status, no en cada re-render de session)
   useEffect(() => {
     if (status === 'loading') return
     if (!session?.user) {
@@ -240,7 +240,8 @@ export default function SupervisionTareasPage() {
       return
     }
     cargarDatos()
-  }, [status, session])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, session?.user?.id])
 
   // Aplicar filtros locales
   useEffect(() => {
@@ -1093,14 +1094,15 @@ export default function SupervisionTareasPage() {
 
       {/* Modal de crear tarea extra */}
       <Dialog open={showCrearModal} onOpenChange={setShowCrearModal}>
-        <DialogContent className="max-w-md">
-          <DialogHeader className="pb-2">
+        <DialogContent className="max-w-md max-h-[90vh] flex flex-col">
+          <DialogHeader className="pb-2 flex-shrink-0">
             <DialogTitle className={`flex items-center gap-2 ${nuevaTarea.modo === 'interno' ? 'text-emerald-700' : 'text-purple-700'}`}>
               <Zap className="h-5 w-5" />
               Nueva Tarea Extra
             </DialogTitle>
           </DialogHeader>
 
+          <div className="overflow-y-auto flex-1 pr-1">
           <div className="space-y-3">
             {/* Error message */}
             {errorCrearTarea && (
@@ -1317,8 +1319,9 @@ export default function SupervisionTareasPage() {
               </div>
             </div>
           </div>
+          </div>
 
-          <DialogFooter className="pt-3 gap-2">
+          <DialogFooter className="pt-3 gap-2 flex-shrink-0">
             <Button variant="outline" size="sm" onClick={() => setShowCrearModal(false)} disabled={creandoTarea}>
               Cancelar
             </Button>
