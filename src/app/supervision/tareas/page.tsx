@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -131,6 +131,7 @@ interface Metricas {
 }
 
 export default function SupervisionTareasPage() {
+  const hasFetchedRef = useRef(false)
   const [tareas, setTareas] = useState<Tarea[]>([])
   const [tareasFiltradas, setTareasFiltradas] = useState<Tarea[]>([])
   const [proyectos, setProyectos] = useState<Proyecto[]>([])
@@ -232,13 +233,15 @@ export default function SupervisionTareasPage() {
     }
   }
 
-  // Cargar al iniciar (solo cuando cambia el userId o el status, no en cada re-render de session)
+  // Cargar solo una vez al montar (cuando la sesión esté lista)
   useEffect(() => {
     if (status === 'loading') return
     if (!session?.user) {
       setLoading(false)
       return
     }
+    if (hasFetchedRef.current) return
+    hasFetchedRef.current = true
     cargarDatos()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, session?.user?.id])
