@@ -90,10 +90,11 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    // Obtener tareas del EDT
+    // Obtener tareas del EDT (solo ejecucion — planificacion es línea base intocable)
     const tareas = await prisma.proyectoTarea.findMany({
       where: {
-        proyectoEdtId: edtId
+        proyectoEdtId: edtId,
+        proyectoEdt: { proyectoCronograma: { tipo: 'ejecucion' } }
       },
       select: {
         id: true,
