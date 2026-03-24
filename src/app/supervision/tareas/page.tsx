@@ -723,6 +723,16 @@ export default function SupervisionTareasPage() {
                 {p.codigo}
               </SelectItem>
             ))}
+            {proyectosInternos.length > 0 && (
+              <>
+                <div className="px-2 py-1 text-xs text-gray-400 font-medium border-t mt-1 pt-2">Internos (CC)</div>
+                {proyectosInternos.map(p => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.codigo} — {p.nombre}
+                  </SelectItem>
+                ))}
+              </>
+            )}
           </SelectContent>
         </Select>
 
