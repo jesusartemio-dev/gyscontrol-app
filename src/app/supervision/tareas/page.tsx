@@ -439,12 +439,14 @@ export default function SupervisionTareasPage() {
     }
   }
 
-  // Calcular eficiencia (solo si está completada)
-  const calcularEficiencia = (horasPlan: number, horasReales: number, estado: string): number | null => {
-    // Solo mostrar eficiencia cuando la tarea está completada
-    if (estado !== 'completada') return null
-    if (horasPlan <= 0 || horasReales <= 0) return null
-    return Math.round((horasPlan / horasReales) * 100)
+  // CPI (Cost Performance Index) — Earned Value Management (PMI/ISO 21508)
+  // CPI = EV / AC = (horasPlan × progreso%) / horasReales
+  // CPI > 1.0: eficiente (genera más avance del que consume)
+  // CPI < 1.0: ineficiente (quema más horas de las que produce avance)
+  const calcularCPI = (horasPlan: number, horasReales: number, progreso: number): number | null => {
+    if (horasPlan <= 0 || horasReales <= 0 || progreso <= 0) return null
+    const ev = horasPlan * (progreso / 100) // Earned Value
+    return Math.round((ev / horasReales) * 100) / 100 // 2 decimales
   }
 
   // Obtener color de estado
@@ -842,7 +844,12 @@ export default function SupervisionTareasPage() {
                     <TableHead>Estado</TableHead>
                     <TableHead>Vencimiento</TableHead>
                     <TableHead>Horas</TableHead>
-                    <TableHead>Eficiencia</TableHead>
+                    <TableHead>
+                      <div className="flex flex-col">
+                        <span>Eficiencia</span>
+                        <span className="text-[9px] font-normal text-gray-400">CPI (EVM)</span>
+                      </div>
+                    </TableHead>
                     <TableHead>Progreso</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
@@ -987,13 +994,19 @@ export default function SupervisionTareasPage() {
                         </TableCell>
                         <TableCell>
                           {(() => {
-                            const eficiencia = calcularEficiencia(tarea.horasPlan, tarea.horasReales, tarea.estado)
-                            if (eficiencia === null) return <span className="text-gray-300 text-xs">-</span>
-                            const color = eficiencia >= 100 ? 'text-green-600 bg-green-50' : eficiencia >= 80 ? 'text-yellow-600 bg-yellow-50' : 'text-red-600 bg-red-50'
+                            const cpi = calcularCPI(tarea.horasPlan, tarea.horasReales, tarea.progreso)
+                            if (cpi === null) return <span className="text-gray-300 text-xs">-</span>
+                            const color = cpi >= 1.0 ? 'text-green-600 bg-green-50' : cpi >= 0.8 ? 'text-yellow-600 bg-yellow-50' : 'text-red-600 bg-red-50'
+                            const label = cpi >= 1.0 ? '↑' : cpi >= 0.8 ? '~' : '↓'
                             return (
-                              <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${color}`}>
-                                {eficiencia}%
-                              </span>
+                              <div className="flex flex-col items-start gap-0.5">
+                                <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${color}`}>
+                                  {label} {cpi.toFixed(2)}
+                                </span>
+                                <span className="text-[9px] text-gray-400">
+                                  {cpi >= 1.0 ? 'eficiente' : cpi >= 0.8 ? 'atención' : 'crítico'}
+                                </span>
+                              </div>
                             )
                           })()}
                         </TableCell>
