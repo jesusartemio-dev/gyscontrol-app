@@ -2,17 +2,31 @@
  * Script: sync-progreso-campo.ts
  *
  * Sincroniza porcentajeFinal de RegistroHorasCampoTarea → ProyectoTarea.porcentajeCompletado
- * para todas las jornadas aprobadas que no propagaron su progreso.
+ * para todas las jornadas aprobadas. Si la tarea está en cronograma "planificacion",
+ * también actualiza su espejo en el cronograma "ejecucion" (que es lo que ve supervision/tareas).
  *
- * Uso: npx tsx scripts/sync-progreso-campo.ts
+ * Uso: npx dotenv -e .env.production -- npx tsx scripts/sync-progreso-campo.ts
  */
 
 import { prisma } from '@/lib/prisma'
 
-async function main() {
-  console.log('🔍 Buscando jornadas aprobadas con porcentajeFinal pendiente de sincronizar...\n')
+async function findEjecucionMirror(tareaId: string, nombre: string, proyectoId: string): Promise<string | null> {
+  const mirror = await prisma.proyectoTarea.findFirst({
+    where: {
+      nombre,
+      proyectoEdt: {
+        proyectoId,
+        proyectoCronograma: { tipo: 'ejecucion' }
+      }
+    },
+    select: { id: true }
+  })
+  return mirror?.id ?? null
+}
 
-  // Traer todas las tareas de campo aprobadas que tienen porcentajeFinal > 0
+async function main() {
+  console.log('🔍 Buscando jornadas aprobadas con porcentajeFinal > 0...\n')
+
   const tareasCampo = await prisma.registroHorasCampoTarea.findMany({
     where: {
       porcentajeFinal: { gt: 0 },
@@ -20,13 +34,22 @@ async function main() {
       registroCampo: { estado: 'aprobado' }
     },
     include: {
-      proyectoTarea: { select: { id: true, nombre: true, porcentajeCompletado: true, estado: true } },
-      registroCampo: { select: { id: true, fechaTrabajo: true, proyecto: { select: { codigo: true } } } }
+      proyectoTarea: {
+        include: {
+          proyectoEdt: {
+            include: {
+              proyectoCronograma: { select: { tipo: true } },
+              proyecto: { select: { id: true, codigo: true } }
+            }
+          }
+        }
+      },
+      registroCampo: { select: { id: true, fechaTrabajo: true } }
     },
     orderBy: { registroCampo: { fechaTrabajo: 'asc' } }
   })
 
-  console.log(`📋 Tareas de campo con porcentajeFinal > 0: ${tareasCampo.length}\n`)
+  console.log(`📋 Registros de campo con porcentajeFinal > 0: ${tareasCampo.length}\n`)
 
   if (tareasCampo.length === 0) {
     console.log('✅ Nada que actualizar.')
@@ -34,8 +57,15 @@ async function main() {
     return
   }
 
-  // Agrupar por proyectoTareaId: tomar el porcentajeFinal más alto (última jornada cronológica)
-  const mapaMaxProgreso = new Map<string, { porcentajeFinal: number; nombre: string; actual: number; codigoProyecto: string }>()
+  // Agrupar por proyectoTareaId tomando el máximo porcentajeFinal
+  const mapaMaxProgreso = new Map<string, {
+    porcentajeFinal: number
+    nombre: string
+    actual: number
+    proyectoId: string
+    codigoProyecto: string
+    cronograma: string
+  }>()
 
   for (const t of tareasCampo) {
     if (!t.proyectoTareaId || !t.proyectoTarea) continue
@@ -46,47 +76,55 @@ async function main() {
         porcentajeFinal: pFinal,
         nombre: t.proyectoTarea.nombre,
         actual: t.proyectoTarea.porcentajeCompletado ?? 0,
-        codigoProyecto: t.registroCampo.proyecto?.codigo ?? '?'
+        proyectoId: t.proyectoTarea.proyectoEdt?.proyecto?.id ?? '',
+        codigoProyecto: t.proyectoTarea.proyectoEdt?.proyecto?.codigo ?? '?',
+        cronograma: t.proyectoTarea.proyectoEdt?.proyectoCronograma?.tipo ?? '?'
       })
     }
   }
 
-  console.log(`🗂️  Tareas únicas del cronograma a evaluar: ${mapaMaxProgreso.size}\n`)
-
   let actualizadas = 0
   let omitidas = 0
 
-  for (const [tareaId, { porcentajeFinal, nombre, actual, codigoProyecto }] of mapaMaxProgreso.entries()) {
+  for (const [tareaId, { porcentajeFinal, nombre, actual, proyectoId, codigoProyecto, cronograma }] of mapaMaxProgreso.entries()) {
     const nuevo = Math.max(actual, porcentajeFinal)
-
-    if (nuevo <= actual) {
-      console.log(`  ⏭️  [${codigoProyecto}] "${nombre}" — ya tiene ${actual}% (campo: ${porcentajeFinal}%), sin cambio`)
-      omitidas++
-      continue
+    const updateData = {
+      porcentajeCompletado: nuevo,
+      ...(nuevo >= 100 ? { estado: 'completada' as const, fechaFinReal: new Date() } : {}),
+      updatedAt: new Date()
     }
 
-    await prisma.proyectoTarea.update({
-      where: { id: tareaId },
-      data: {
-        porcentajeCompletado: nuevo,
-        ...(nuevo >= 100 ? { estado: 'completada', fechaFinReal: new Date() } : {}),
-        updatedAt: new Date()
-      }
-    })
+    if (nuevo > actual) {
+      await prisma.proyectoTarea.update({ where: { id: tareaId }, data: updateData })
+      console.log(`  ✅ [${codigoProyecto}/${cronograma}] "${nombre}" — ${actual}% → ${nuevo}%`)
+      actualizadas++
+    } else {
+      console.log(`  ⏭️  [${codigoProyecto}/${cronograma}] "${nombre}" — ya tiene ${actual}% (campo: ${porcentajeFinal}%)`)
+      omitidas++
+    }
 
-    console.log(`  ✅ [${codigoProyecto}] "${nombre}" — ${actual}% → ${nuevo}%${nuevo >= 100 ? ' (marcada completada)' : ''}`)
-    actualizadas++
+    // Si la tarea está en planificacion, sincronizar también la de ejecucion
+    if (cronograma !== 'ejecucion' && proyectoId) {
+      const mirrorId = await findEjecucionMirror(tareaId, nombre, proyectoId)
+      if (mirrorId) {
+        const mirror = await prisma.proyectoTarea.findUnique({ where: { id: mirrorId }, select: { porcentajeCompletado: true } })
+        const actualMirror = mirror?.porcentajeCompletado ?? 0
+        const nuevoMirror = Math.max(actualMirror, porcentajeFinal)
+        if (nuevoMirror > actualMirror) {
+          await prisma.proyectoTarea.update({ where: { id: mirrorId }, data: { ...updateData, porcentajeCompletado: nuevoMirror } })
+          console.log(`     🔄 espejo ejecucion: ${actualMirror}% → ${nuevoMirror}%`)
+          actualizadas++
+        } else {
+          console.log(`     ⏭️  espejo ejecucion: ya tiene ${actualMirror}%`)
+        }
+      } else {
+        console.log(`     ℹ️  sin espejo ejecucion encontrado`)
+      }
+    }
   }
 
-  console.log(`\n📊 Resumen:`)
-  console.log(`   Actualizadas: ${actualizadas}`)
-  console.log(`   Sin cambio:   ${omitidas}`)
-  console.log(`   Total:        ${mapaMaxProgreso.size}`)
-
+  console.log(`\n📊 Resumen: ${actualizadas} actualizadas, ${omitidas} sin cambio`)
   await prisma.$disconnect()
 }
 
-main().catch(e => {
-  console.error('❌ Error:', e)
-  process.exit(1)
-})
+main().catch(e => { console.error('❌ Error:', e); process.exit(1) })

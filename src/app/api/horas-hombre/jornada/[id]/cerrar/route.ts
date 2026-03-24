@@ -207,20 +207,55 @@ export async function PUT(request: NextRequest, context: RouteContext) {
       })
     }
 
+    // Helper: dada una ProyectoTarea, buscar su contraparte en cronograma ejecucion
+    async function findEjecucionMirror(tareaId: string): Promise<string | null> {
+      const tarea = await prisma.proyectoTarea.findUnique({
+        where: { id: tareaId },
+        include: {
+          proyectoEdt: {
+            include: {
+              proyectoCronograma: { select: { tipo: true } },
+              proyecto: { select: { id: true } }
+            }
+          }
+        }
+      })
+      if (!tarea || tarea.proyectoEdt?.proyectoCronograma?.tipo === 'ejecucion') return null
+      // Buscar tarea con mismo nombre en cronograma ejecucion del mismo proyecto
+      const mirror = await prisma.proyectoTarea.findFirst({
+        where: {
+          nombre: tarea.nombre,
+          proyectoEdt: {
+            proyectoId: tarea.proyectoEdt?.proyecto?.id,
+            proyectoCronograma: { tipo: 'ejecucion' }
+          }
+        },
+        select: { id: true }
+      })
+      return mirror?.id ?? null
+    }
+
     // Actualizar ProyectoTarea: progreso + horas (siempre al cerrar, no al aprobar)
+    // Si la tarea está en planificacion, también actualiza su espejo en ejecucion
     const tareasConProgreso = new Set<string>()
     for (const [proyectoTareaId, porcentaje] of progresoMap.entries()) {
       const horasIncremento = horasPorTarea[proyectoTareaId] || 0
-      await prisma.proyectoTarea.update({
-        where: { id: proyectoTareaId },
-        data: {
-          porcentajeCompletado: porcentaje,
-          ...(horasIncremento > 0 ? { horasReales: { increment: horasIncremento } } : {}),
-          ...(porcentaje >= 100 ? { estado: 'completada', fechaFinReal: new Date() } : { estado: 'en_progreso' }),
-          updatedAt: new Date()
-        }
-      })
+      const updateData: Record<string, any> = {
+        porcentajeCompletado: porcentaje,
+        estado: porcentaje >= 100 ? 'completada' : 'en_progreso',
+        updatedAt: new Date()
+      }
+      if (porcentaje >= 100) updateData.fechaFinReal = new Date()
+      if (horasIncremento > 0) updateData.horasReales = { increment: horasIncremento }
+
+      await prisma.proyectoTarea.update({ where: { id: proyectoTareaId }, data: updateData })
       tareasConProgreso.add(proyectoTareaId)
+
+      // Sincronizar con tarea espejo en ejecucion si existe
+      const mirrorId = await findEjecucionMirror(proyectoTareaId)
+      if (mirrorId) {
+        await prisma.proyectoTarea.update({ where: { id: mirrorId }, data: updateData })
+      }
     }
 
     // Incrementar horas para tareas sin progreso enviado (solo horas, sin tocar porcentaje)
@@ -230,6 +265,13 @@ export async function PUT(request: NextRequest, context: RouteContext) {
           where: { id: proyectoTareaId },
           data: { horasReales: { increment: horas }, updatedAt: new Date() }
         })
+        const mirrorId = await findEjecucionMirror(proyectoTareaId)
+        if (mirrorId) {
+          await prisma.proyectoTarea.update({
+            where: { id: mirrorId },
+            data: { horasReales: { increment: horas }, updatedAt: new Date() }
+          })
+        }
       }
     }
 
