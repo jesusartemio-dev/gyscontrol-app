@@ -29,9 +29,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       orderBy: { orden: 'asc' }
     });
 
-    // Obtener tareas del EDT
+    // Obtener tareas del EDT (solo cronograma ejecucion — planificacion es línea base intocable)
     const tareas = await prisma.proyectoTarea.findMany({
-      where: { proyectoEdtId: edtId },
+      where: { proyectoEdtId: edtId, proyectoEdt: { proyectoCronograma: { tipo: 'ejecucion' } } },
       include: {
         user: {
           select: { id: true, name: true }

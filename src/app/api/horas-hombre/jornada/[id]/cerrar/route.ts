@@ -207,36 +207,8 @@ export async function PUT(request: NextRequest, context: RouteContext) {
       })
     }
 
-    // Helper: dada una ProyectoTarea, buscar su contraparte en cronograma ejecucion
-    async function findEjecucionMirror(tareaId: string): Promise<string | null> {
-      const tarea = await prisma.proyectoTarea.findUnique({
-        where: { id: tareaId },
-        include: {
-          proyectoEdt: {
-            include: {
-              proyectoCronograma: { select: { tipo: true } },
-              proyecto: { select: { id: true } }
-            }
-          }
-        }
-      })
-      if (!tarea || tarea.proyectoEdt?.proyectoCronograma?.tipo === 'ejecucion') return null
-      // Buscar tarea con mismo nombre en cronograma ejecucion del mismo proyecto
-      const mirror = await prisma.proyectoTarea.findFirst({
-        where: {
-          nombre: tarea.nombre,
-          proyectoEdt: {
-            proyectoId: tarea.proyectoEdt?.proyecto?.id,
-            proyectoCronograma: { tipo: 'ejecucion' }
-          }
-        },
-        select: { id: true }
-      })
-      return mirror?.id ?? null
-    }
-
-    // Actualizar ProyectoTarea: progreso + horas (siempre al cerrar, no al aprobar)
-    // Si la tarea está en planificacion, también actualiza su espejo en ejecucion
+    // Actualizar ProyectoTarea: progreso + horas al cerrar
+    // Las APIs de listado ya solo devuelven tareas de ejecucion, así que siempre es ejecucion
     const tareasConProgreso = new Set<string>()
     for (const [proyectoTareaId, porcentaje] of progresoMap.entries()) {
       const horasIncremento = horasPorTarea[proyectoTareaId] || 0
@@ -250,12 +222,6 @@ export async function PUT(request: NextRequest, context: RouteContext) {
 
       await prisma.proyectoTarea.update({ where: { id: proyectoTareaId }, data: updateData })
       tareasConProgreso.add(proyectoTareaId)
-
-      // Sincronizar con tarea espejo en ejecucion si existe
-      const mirrorId = await findEjecucionMirror(proyectoTareaId)
-      if (mirrorId) {
-        await prisma.proyectoTarea.update({ where: { id: mirrorId }, data: updateData })
-      }
     }
 
     // Incrementar horas para tareas sin progreso enviado (solo horas, sin tocar porcentaje)
@@ -265,13 +231,6 @@ export async function PUT(request: NextRequest, context: RouteContext) {
           where: { id: proyectoTareaId },
           data: { horasReales: { increment: horas }, updatedAt: new Date() }
         })
-        const mirrorId = await findEjecucionMirror(proyectoTareaId)
-        if (mirrorId) {
-          await prisma.proyectoTarea.update({
-            where: { id: mirrorId },
-            data: { horasReales: { increment: horas }, updatedAt: new Date() }
-          })
-        }
       }
     }
 

@@ -18,11 +18,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     console.log('🎯 TAREAS DIRECTAS EDT: Consultando tareas directas para EDT:', edtId);
 
-    // Obtener tareas directas del EDT (sin proyectoActividadId)
+    // Obtener tareas directas del EDT (sin proyectoActividadId, solo ejecucion)
     const tareasDirectas = await prisma.proyectoTarea.findMany({
-      where: { 
+      where: {
         proyectoEdtId: edtId,
-        proyectoActividadId: null // Tareas que no pertenecen a una actividad específica
+        proyectoActividadId: null,
+        proyectoEdt: { proyectoCronograma: { tipo: 'ejecucion' } }
       },
       include: {
         user: {

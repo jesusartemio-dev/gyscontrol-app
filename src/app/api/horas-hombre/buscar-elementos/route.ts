@@ -111,13 +111,11 @@ export async function GET(request: NextRequest) {
       })
     })
 
-    // Buscar Tareas
+    // Buscar Tareas (solo ejecucion — planificacion es línea base intocable)
     const tareas = await prisma.proyectoTarea.findMany({
       where: {
-        nombre: {
-          contains: query,
-          mode: 'insensitive'
-        }
+        nombre: { contains: query, mode: 'insensitive' },
+        proyectoEdt: { proyectoCronograma: { tipo: 'ejecucion' } }
       },
       include: {
         user: {

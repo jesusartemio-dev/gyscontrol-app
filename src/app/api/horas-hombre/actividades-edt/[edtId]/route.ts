@@ -18,9 +18,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     console.log('🏗️ ACTIVIDADES EDT: Consultando actividades para EDT:', edtId);
 
-    // Obtener actividades del EDT con sus tareas relacionadas
+    // Obtener actividades del EDT con sus tareas (solo ejecucion — planificacion es línea base)
     const actividades = await prisma.proyectoActividad.findMany({
-      where: { proyectoEdtId: edtId },
+      where: { proyectoEdtId: edtId, proyectoEdt: { proyectoCronograma: { tipo: 'ejecucion' } } },
       include: {
         user: {
           select: { id: true, name: true }
