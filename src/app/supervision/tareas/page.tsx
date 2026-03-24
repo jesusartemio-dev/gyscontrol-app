@@ -44,6 +44,8 @@ import {
   Zap,
   CalendarClock
 } from 'lucide-react'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Info } from 'lucide-react'
 import { Label } from '@/components/ui/label'
 import { Textarea as TextareaComponent } from '@/components/ui/textarea'
 import { useSession } from 'next-auth/react'
@@ -845,10 +847,33 @@ export default function SupervisionTareasPage() {
                     <TableHead>Vencimiento</TableHead>
                     <TableHead>Horas</TableHead>
                     <TableHead>
-                      <div className="flex flex-col">
-                        <span>Eficiencia</span>
-                        <span className="text-[9px] font-normal text-gray-400">CPI (EVM)</span>
-                      </div>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex flex-col cursor-help w-fit">
+                              <span className="flex items-center gap-1">
+                                Eficiencia
+                                <Info className="h-3 w-3 text-gray-400" />
+                              </span>
+                              <span className="text-[9px] font-normal text-gray-400">CPI (EVM)</span>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="max-w-xs text-xs">
+                            <p className="font-semibold mb-1">CPI — Cost Performance Index</p>
+                            <p className="mb-2 text-gray-300">Estándar PMI / ISO 21508 (Earned Value Management)</p>
+                            <p className="mb-1"><span className="font-medium">Fórmula:</span> EV ÷ AC</p>
+                            <ul className="space-y-1 text-gray-300">
+                              <li><span className="text-white">EV</span> = Horas plan × % avance (horas "ganadas")</li>
+                              <li><span className="text-white">AC</span> = Horas reales consumidas</li>
+                            </ul>
+                            <div className="mt-2 space-y-0.5 border-t border-gray-600 pt-2">
+                              <p className="text-green-400">↑ ≥ 1.00 — Eficiente: produce más avance del que consume</p>
+                              <p className="text-yellow-400">~ 0.80–0.99 — Atención: ligero sobrecosto</p>
+                              <p className="text-red-400">↓ &lt; 0.80 — Crítico: quema horas sin avance proporcional</p>
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </TableHead>
                     <TableHead>Progreso</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
