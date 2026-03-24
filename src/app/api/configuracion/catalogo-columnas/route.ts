@@ -32,10 +32,10 @@ const DEFAULTS: Record<Vista, { columnas: string[], permisos: Record<string, any
     }
   },
   proyectos: {
-    columnas: ['codigo', 'descripcion', 'categoria', 'unidad', 'marca', 'precioInterno', 'uso', 'estado', 'updatedAt'],
+    columnas: ['codigo', 'descripcion', 'categoria', 'unidad', 'marca', 'uso', 'precioLogistica', 'precioReal', 'precioLista', 'factorCosto', 'factorVenta', 'precioInterno', 'precioVenta', 'estado', 'updatedAt'],
     permisos: {
-      canCreate: false, canEdit: false, canDelete: false, canImport: false, canExport: true,
-      camposEditables: []
+      canCreate: true, canEdit: true, canDelete: true, canImport: true, canExport: true,
+      camposEditables: ['codigo', 'descripcion', 'marca', 'categoriaId', 'unidadId', 'estado', 'precioLista', 'factorCosto', 'factorVenta', 'precioLogistica', 'precioReal']
     }
   }
 }
@@ -61,18 +61,22 @@ async function ensureDefaults() {
       const missing = defaultCols.filter(c => !currentCols.includes(c))
 
       const currentPermisos = (record?.permisos as Record<string, any>) || {}
-      const needsCamposEditables = !('camposEditables' in currentPermisos)
+      const defaultPermisos = DEFAULTS[vista].permisos
+      // Always sync permisos from defaults (source of truth for permissions)
+      const permisosChanged =
+        currentPermisos.canCreate !== defaultPermisos.canCreate ||
+        currentPermisos.canEdit !== defaultPermisos.canEdit ||
+        currentPermisos.canDelete !== defaultPermisos.canDelete ||
+        currentPermisos.canImport !== defaultPermisos.canImport ||
+        currentPermisos.canExport !== defaultPermisos.canExport
 
-      if (missing.length > 0 || needsCamposEditables) {
+      if (missing.length > 0 || permisosChanged) {
         const updateData: Record<string, any> = {}
         if (missing.length > 0) {
           updateData.columnas = [...currentCols, ...missing]
         }
-        if (needsCamposEditables) {
-          updateData.permisos = {
-            ...currentPermisos,
-            camposEditables: DEFAULTS[vista].permisos.camposEditables
-          }
+        if (permisosChanged) {
+          updateData.permisos = { ...currentPermisos, ...defaultPermisos }
         }
         await prisma.configuracionCatalogoColumnas.update({
           where: { id: vista },
