@@ -145,6 +145,7 @@ export default function PedidoLogisticaDetailPage() {
   const [condicionPagoOC, setCondicionPagoOC] = useState('contado')
   const [ocFechaGlobal, setOcFechaGlobal] = useState('')
   const [ocItemsState, setOcItemsState] = useState<Record<string, { selected: boolean; proveedorId: string; proveedorNombre: string }>>({})
+  const [ocProveedorFiltro, setOcProveedorFiltro] = useState('__all__')
 
   // Inicializar items del modal al abrirlo
   useEffect(() => {
@@ -159,7 +160,7 @@ export default function PedidoLogisticaDetailPage() {
         }
       }
       setOcItemsState(initial)
-      cargarProveedores()
+      setOcProveedorFiltro('__all__')
     }
   }, [showGenerarOC])
 
@@ -1138,28 +1139,9 @@ export default function PedidoLogisticaDetailPage() {
                           return (
                             <>
                               {tieneProveedor ? (
-                                <div className="truncate">{provNombre}</div>
-                              ) : !tieneOC && !atendido ? (
-                                <Select
-                                  value=""
-                                  onValueChange={(provId) => handleAsignarProveedor(item.id, provId, item.cantidadPedida)}
-                                  onOpenChange={(open) => { if (open) cargarProveedores() }}
-                                  disabled={savingProveedor === item.id}
-                                >
-                                  <SelectTrigger className="h-6 text-[10px] w-full border-dashed border-gray-300 text-gray-400">
-                                    <SelectValue placeholder={savingProveedor === item.id ? 'Guardando...' : 'Asignar proveedor'} />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {proveedores.map(p => (
-                                      <SelectItem key={p.id} value={p.id} className="text-xs">{p.nombre}</SelectItem>
-                                    ))}
-                                    {proveedores.length === 0 && (
-                                      <div className="px-2 py-1.5 text-xs text-gray-400">Cargando...</div>
-                                    )}
-                                  </SelectContent>
-                                </Select>
+                                <div className="truncate text-xs">{provNombre}</div>
                               ) : (
-                                <div className="truncate text-gray-400">—</div>
+                                <div className="truncate text-gray-400 text-xs">—</div>
                               )}
                               {tieneOC && (
                                 <Link
@@ -1914,75 +1896,143 @@ export default function PedidoLogisticaDetailPage() {
               Crear Orden de Compra desde Pedido
             </DialogTitle>
             <p className="text-[11px] text-muted-foreground pt-1">
-              Selecciona los items a incluir. Podrás completar proveedor, moneda y condiciones en la siguiente pantalla.
+              Filtra por proveedor para seleccionar rápido. Completa proveedor, moneda y condiciones en la siguiente pantalla.
             </p>
           </DialogHeader>
           {(() => {
             const itemsSinOC = Object.entries(ocItemsState)
             const seleccionados = itemsSinOC.filter(([, v]) => v.selected)
-            const todosSeleccionados = itemsSinOC.length > 0 && itemsSinOC.every(([, v]) => v.selected)
             const conOC = (pedido?.items || []).filter((i: any) => (i.ordenCompraItems?.length ?? 0) > 0).length
 
+            // Construir pills de proveedores desde los items
+            const provMap = new Map<string, { nombre: string; count: number }>()
+            for (const [itemId] of itemsSinOC) {
+              const item = pedido?.items?.find((i: any) => i.id === itemId) as any
+              if (!item) continue
+              const provNombre = item.proveedor?.nombre || item.proveedorNombre || item.listaEquipoItem?.proveedor?.nombre || ''
+              const key = provNombre || '__sin__'
+              const label = provNombre || 'Sin proveedor'
+              provMap.set(key, { nombre: label, count: (provMap.get(key)?.count || 0) + 1 })
+            }
+            const provPills = [
+              { key: '__all__', nombre: 'Todos', count: itemsSinOC.length },
+              ...Array.from(provMap.entries()).map(([key, v]) => ({ key, ...v }))
+            ]
+
+            // Filtrar items visibles según pill activo
+            const itemsFiltrados = ocProveedorFiltro === '__all__'
+              ? itemsSinOC
+              : itemsSinOC.filter(([itemId]) => {
+                  const item = pedido?.items?.find((i: any) => i.id === itemId) as any
+                  if (!item) return false
+                  const provNombre = item.proveedor?.nombre || item.proveedorNombre || item.listaEquipoItem?.proveedor?.nombre || ''
+                  return ocProveedorFiltro === '__sin__' ? !provNombre : provNombre === ocProveedorFiltro
+                })
+
+            const todosFiltradosSeleccionados = itemsFiltrados.length > 0 && itemsFiltrados.every(([, v]) => v.selected)
+
             return (
-              <div className="flex flex-col gap-3 overflow-hidden min-h-0">
+              <div className="flex flex-col gap-2.5 overflow-hidden min-h-0">
                 {itemsSinOC.length === 0 ? (
                   <div className="text-center py-8">
                     <CheckCircle2 className="h-8 w-8 text-emerald-400 mx-auto mb-2" />
                     <p className="text-xs font-medium text-gray-700">Todos los items ya tienen OC vinculada</p>
                   </div>
                 ) : (
-                  <div className="flex-1 overflow-y-auto border rounded-lg min-h-0">
-                    <table className="w-full text-xs">
-                      <thead className="bg-gray-50 sticky top-0 z-10">
-                        <tr>
-                          <th className="px-3 py-2 text-left w-8">
-                            <Checkbox
-                              checked={todosSeleccionados}
-                              onCheckedChange={(checked) => {
-                                setOcItemsState(prev => {
-                                  const next = { ...prev }
-                                  Object.keys(next).forEach(id => { next[id] = { ...next[id], selected: !!checked } })
-                                  return next
-                                })
-                              }}
-                              className="h-3.5 w-3.5"
-                            />
-                          </th>
-                          <th className="px-3 py-2 text-left font-medium text-gray-600">Código</th>
-                          <th className="px-3 py-2 text-left font-medium text-gray-600">Descripción</th>
-                          <th className="px-3 py-2 text-center font-medium text-gray-600">Cant.</th>
-                          <th className="px-3 py-2 text-left font-medium text-gray-600">Unidad</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y">
-                        {itemsSinOC.map(([itemId, state]) => {
-                          const item = pedido?.items?.find((i: any) => i.id === itemId) as any
-                          if (!item) return null
-                          return (
-                            <tr
-                              key={itemId}
-                              className={cn('cursor-pointer transition-colors', state.selected ? 'bg-blue-50/40' : 'hover:bg-gray-50')}
-                              onClick={() => setOcItemsState(prev => ({ ...prev, [itemId]: { ...prev[itemId], selected: !prev[itemId].selected } }))}
-                            >
-                              <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
-                                <Checkbox
-                                  checked={state.selected}
-                                  onCheckedChange={(checked) => setOcItemsState(prev => ({ ...prev, [itemId]: { ...prev[itemId], selected: !!checked } }))}
-                                  className="h-3.5 w-3.5"
-                                />
-                              </td>
-                              <td className="px-3 py-2 font-mono text-[11px] text-gray-500">{item.codigo}</td>
-                              <td className="px-3 py-2 max-w-[280px]">
-                                <span className="truncate block" title={item.descripcion}>{item.descripcion}</span>
-                              </td>
-                              <td className="px-3 py-2 text-center font-medium">{item.cantidadPedida}</td>
-                              <td className="px-3 py-2 text-gray-500">{item.unidad}</td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                  <>
+                    {/* Pills de proveedor */}
+                    <div className="flex flex-wrap gap-1.5 flex-shrink-0">
+                      {provPills.map(pill => (
+                        <button
+                          key={pill.key}
+                          onClick={() => {
+                            setOcProveedorFiltro(pill.key)
+                            // Seleccionar todos los items de ese proveedor automáticamente
+                            if (pill.key !== '__all__') {
+                              setOcItemsState(prev => {
+                                const next = { ...prev }
+                                for (const [itemId] of itemsSinOC) {
+                                  const item = pedido?.items?.find((i: any) => i.id === itemId) as any
+                                  if (!item) continue
+                                  const provNombre = item.proveedor?.nombre || item.proveedorNombre || item.listaEquipoItem?.proveedor?.nombre || ''
+                                  const matchKey = provNombre || '__sin__'
+                                  if (matchKey === pill.key) next[itemId] = { ...next[itemId], selected: true }
+                                }
+                                return next
+                              })
+                            }
+                          }}
+                          className={cn(
+                            'px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors',
+                            ocProveedorFiltro === pill.key
+                              ? 'bg-blue-600 text-white border-blue-600'
+                              : pill.key === '__sin__'
+                                ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
+                                : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                          )}
+                        >
+                          {pill.nombre} <span className="opacity-70">({pill.count})</span>
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Tabla */}
+                    <div className="flex-1 overflow-y-auto border rounded-lg min-h-0">
+                      <table className="w-full text-xs">
+                        <thead className="bg-gray-50 sticky top-0 z-10">
+                          <tr>
+                            <th className="px-3 py-2 text-left w-8">
+                              <Checkbox
+                                checked={todosFiltradosSeleccionados}
+                                onCheckedChange={(checked) => {
+                                  setOcItemsState(prev => {
+                                    const next = { ...prev }
+                                    itemsFiltrados.forEach(([id]) => { next[id] = { ...next[id], selected: !!checked } })
+                                    return next
+                                  })
+                                }}
+                                className="h-3.5 w-3.5"
+                              />
+                            </th>
+                            <th className="px-3 py-2 text-left font-medium text-gray-600">Código</th>
+                            <th className="px-3 py-2 text-left font-medium text-gray-600">Descripción</th>
+                            <th className="px-3 py-2 text-center font-medium text-gray-600">Cant.</th>
+                            <th className="px-3 py-2 text-left font-medium text-gray-600">Proveedor</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {itemsFiltrados.map(([itemId, state]) => {
+                            const item = pedido?.items?.find((i: any) => i.id === itemId) as any
+                            if (!item) return null
+                            const provNombre = item.proveedor?.nombre || item.proveedorNombre || item.listaEquipoItem?.proveedor?.nombre || ''
+                            return (
+                              <tr
+                                key={itemId}
+                                className={cn('cursor-pointer transition-colors', state.selected ? 'bg-blue-50/40' : 'hover:bg-gray-50')}
+                                onClick={() => setOcItemsState(prev => ({ ...prev, [itemId]: { ...prev[itemId], selected: !prev[itemId].selected } }))}
+                              >
+                                <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
+                                  <Checkbox
+                                    checked={state.selected}
+                                    onCheckedChange={(checked) => setOcItemsState(prev => ({ ...prev, [itemId]: { ...prev[itemId], selected: !!checked } }))}
+                                    className="h-3.5 w-3.5"
+                                  />
+                                </td>
+                                <td className="px-3 py-2 font-mono text-[11px] text-gray-500">{item.codigo}</td>
+                                <td className="px-3 py-2 max-w-[220px]">
+                                  <span className="truncate block" title={item.descripcion}>{item.descripcion}</span>
+                                </td>
+                                <td className="px-3 py-2 text-center font-medium">{item.cantidadPedida} <span className="text-gray-400">{item.unidad}</span></td>
+                                <td className="px-3 py-2 text-gray-500 max-w-[120px] truncate">
+                                  {provNombre || <span className="text-amber-500 italic">Sin proveedor</span>}
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
                 )}
 
                 {conOC > 0 && (
