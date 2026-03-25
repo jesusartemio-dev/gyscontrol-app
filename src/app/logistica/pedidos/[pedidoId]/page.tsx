@@ -566,7 +566,7 @@ export default function PedidoLogisticaDetailPage() {
 
   // Permisos para generar OCs
   const userRole = session?.user?.role || ''
-  const puedeGenerarOC = ['admin', 'gerente', 'logistico'].includes(userRole)
+  const puedeGenerarOC = ['admin', 'gerente', 'logistico', 'coordinador_logistico'].includes(userRole)
     && pedido !== null
     && ['enviado', 'atendido', 'parcial'].includes(pedido?.estado || '')
   const puedeConfirmarRecepcion = ['admin', 'gerente', 'logistico', 'gestor'].includes(userRole)
