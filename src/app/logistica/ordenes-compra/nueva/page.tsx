@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -76,7 +76,7 @@ interface CatalogoResult {
   unidad: { nombre: string }
 }
 
-export default function NuevaOrdenCompraPage() {
+function NuevaOrdenCompraContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [saving, setSaving] = useState(false)
@@ -866,5 +866,13 @@ export default function NuevaOrdenCompraPage() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+export default function NuevaOrdenCompraPage() {
+  return (
+    <Suspense>
+      <NuevaOrdenCompraContent />
+    </Suspense>
   )
 }
