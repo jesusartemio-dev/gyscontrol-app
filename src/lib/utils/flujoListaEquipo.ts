@@ -20,14 +20,14 @@ export interface FlujoEstado {
 export const flujoEstados: Record<EstadoListaEquipo, FlujoEstado> = {
   borrador:    { siguiente: 'por_revisar',                                roles: ['proyectos', 'admin'] },
   por_revisar: { siguiente: 'por_cotizar',  retroceder: 'borrador',      roles: ['coordinador', 'admin'] },
-  por_cotizar: { siguiente: 'por_aprobar',  retroceder: 'por_revisar',   roles: ['logistico', 'admin'] },
+  por_cotizar: { siguiente: 'por_aprobar',  retroceder: 'por_revisar',   roles: ['logistico', 'coordinador_logistico', 'admin'] },
   por_aprobar: { siguiente: 'aprobada',     retroceder: 'por_cotizar',   roles: ['gestor', 'admin'] },
   aprobada:    {                                                          roles: [] },
   anulada:     {                                                          roles: [] },
 }
 
 // Roles que pueden anular una lista (desde cualquier estado excepto aprobada)
-export const anulacionRoles = ['coordinador', 'admin']
+export const anulacionRoles = ['coordinador', 'coordinador_logistico', 'admin']
 
 export const estadosList: { key: EstadoListaEquipo; label: string }[] = [
   { key: 'borrador',    label: 'Borrador' },

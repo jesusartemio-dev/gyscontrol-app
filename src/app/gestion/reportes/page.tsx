@@ -31,7 +31,7 @@ const reportes = [
     icono: Package,
     href: '/gestion/reportes/pedidos',
     color: 'bg-blue-100 text-blue-600',
-    roles: ['admin', 'gerente', 'comercial', 'proyectos', 'logistica', 'logistico', 'gestor'],
+    roles: ['admin', 'gerente', 'comercial', 'proyectos', 'logistica', 'logistico', 'coordinador_logistico', 'gestor'],
   },
   {
     titulo: 'Rentabilidad por Proyecto',
@@ -79,7 +79,7 @@ const reportes = [
     icono: PieChart,
     href: '/gestion',
     color: 'bg-cyan-100 text-cyan-600',
-    roles: ['admin', 'gerente', 'gestor', 'comercial', 'proyectos', 'logistico', 'coordinador'],
+    roles: ['admin', 'gerente', 'gestor', 'comercial', 'proyectos', 'logistico', 'coordinador_logistico', 'coordinador'],
   },
 ]
 
@@ -88,7 +88,7 @@ export default async function ReportesPage() {
   if (!session) notFound()
 
   const userRole = (session.user?.role as string) || ''
-  const allowedRoles = ['admin', 'gerente', 'gestor', 'comercial', 'proyectos', 'logistica', 'logistico', 'coordinador', 'administracion']
+  const allowedRoles = ['admin', 'gerente', 'gestor', 'comercial', 'proyectos', 'logistica', 'logistico', 'coordinador_logistico', 'coordinador', 'administracion']
   if (!allowedRoles.includes(userRole)) notFound()
 
   const reportesVisibles = reportes.filter(r => r.roles.includes(userRole))

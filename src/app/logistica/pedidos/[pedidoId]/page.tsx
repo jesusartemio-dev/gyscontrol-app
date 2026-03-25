@@ -521,7 +521,7 @@ export default function PedidoLogisticaDetailPage() {
   const puedeGenerarOC = ['admin', 'gerente', 'logistico', 'coordinador_logistico'].includes(userRole)
     && pedido !== null
     && ['enviado', 'atendido', 'parcial'].includes(pedido?.estado || '')
-  const puedeConfirmarRecepcion = ['admin', 'gerente', 'logistico', 'gestor'].includes(userRole)
+  const puedeConfirmarRecepcion = ['admin', 'gerente', 'logistico', 'coordinador_logistico', 'gestor'].includes(userRole)
 
   // 🔄 Loading state
   if (loading) {

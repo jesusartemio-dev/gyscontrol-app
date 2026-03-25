@@ -182,7 +182,7 @@ const SIDEBAR_ACCESS_MAP: SidebarAccessSection[] = [
     title: 'Mi Trabajo',
     icon: Clock,
     color: 'text-emerald-500',
-    roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos', 'colaborador', 'comercial', 'seguridad', 'presupuestos', 'logistico'],
+    roles: ['admin', 'gerente', 'gestor', 'coordinador', 'coordinador_logistico', 'proyectos', 'colaborador', 'comercial', 'seguridad', 'presupuestos', 'logistico'],
     links: [
       { label: 'Mi Timesheet', href: '/mi-trabajo/timesheet' },
       { label: 'Mis Tareas', href: '/mi-trabajo/tareas' },
@@ -210,7 +210,7 @@ const SIDEBAR_ACCESS_MAP: SidebarAccessSection[] = [
     title: 'Logística',
     icon: Truck,
     color: 'text-orange-500',
-    roles: ['admin', 'gerente', 'logistico'],
+    roles: ['admin', 'gerente', 'logistico', 'coordinador_logistico'],
     links: [
       { label: 'Listas Técnicas', href: '/logistica/listas' },
       { label: 'Gestión de Pedidos', href: '/logistica/pedidos' },
@@ -237,7 +237,7 @@ const SIDEBAR_ACCESS_MAP: SidebarAccessSection[] = [
     title: 'Gastos',
     icon: Receipt,
     color: 'text-amber-500',
-    roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos', 'colaborador', 'logistico', 'administracion'],
+    roles: ['admin', 'gerente', 'gestor', 'coordinador', 'coordinador_logistico', 'proyectos', 'colaborador', 'logistico', 'administracion'],
     links: [
       { label: 'Mis Requerimientos', href: '/gastos/mis-requerimientos' },
     ],

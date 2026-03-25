@@ -28,7 +28,7 @@ export async function PATCH(
     const userRole = (session.user as any)?.role as string
 
     // Validar roles permitidos para seleccionar cotización
-    const rolesPermitidos = ['admin', 'gerente', 'logistico', 'gestor', 'coordinador']
+    const rolesPermitidos = ['admin', 'gerente', 'logistico', 'coordinador_logistico', 'gestor', 'coordinador']
     if (!rolesPermitidos.includes(userRole)) {
       return NextResponse.json({ error: 'Sin permiso para seleccionar cotización' }, { status: 403 })
     }

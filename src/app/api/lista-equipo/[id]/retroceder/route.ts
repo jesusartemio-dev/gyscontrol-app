@@ -6,7 +6,7 @@ import { canRollback, isValidRollback } from '@/lib/utils/rollbackValidation'
 import { crearEvento } from '@/lib/utils/trazabilidad'
 
 // Roles que pueden retroceder: los mismos que aprueban/validan
-const ROLES_ALLOWED = ['admin', 'gerente', 'gestor', 'logistico', 'coordinador']
+const ROLES_ALLOWED = ['admin', 'gerente', 'gestor', 'logistico', 'coordinador_logistico', 'coordinador']
 
 // GET: pre-check sin ejecutar
 export async function GET(

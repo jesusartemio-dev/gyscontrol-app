@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
 
     // Verificar permisos (solo admin puede crear calendarios)
     const userRole = session.user.role
-    if (!['admin', 'gerente', 'comercial', 'presupuestos', 'proyectos', 'coordinador', 'logistico', 'gestor'].includes(userRole)) {
+    if (!['admin', 'gerente', 'comercial', 'presupuestos', 'proyectos', 'coordinador', 'coordinador_logistico', 'logistico', 'gestor'].includes(userRole)) {
       return NextResponse.json({ error: `No tiene permisos para crear calendarios. Rol actual: ${userRole}` }, { status: 403 })
     }
 

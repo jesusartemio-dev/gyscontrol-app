@@ -34,7 +34,7 @@ const DashboardSkeleton = () => (
 
 // Validación de permisos
 const ValidarPermisos = ({ session, children }: { session: any; children: React.ReactNode }) => {
-  const rolesPermitidos = ['admin', 'gerente', 'comercial', 'proyectos', 'logistica', 'logistico', 'gestor']
+  const rolesPermitidos = ['admin', 'gerente', 'comercial', 'proyectos', 'logistica', 'logistico', 'coordinador_logistico', 'gestor']
   const tienePermiso = session?.user?.role && rolesPermitidos.includes(session.user.role)
 
   if (!tienePermiso) {

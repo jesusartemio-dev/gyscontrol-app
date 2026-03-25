@@ -208,7 +208,7 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
   }, [rechazarDialog.recepcionId, rechazarObservaciones, reloadPedido])
 
   const userRole = session?.user?.role || ''
-  const puedeConfirmarRecepcion = ['admin', 'gerente', 'logistico', 'gestor', 'coordinador'].includes(userRole)
+  const puedeConfirmarRecepcion = ['admin', 'gerente', 'logistico', 'coordinador_logistico', 'gestor', 'coordinador'].includes(userRole)
 
   if (loading) return <LoadingSkeleton />
   if (!proyecto || !pedido) notFound()

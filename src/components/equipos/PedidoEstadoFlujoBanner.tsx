@@ -167,7 +167,7 @@ const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
               onSuccess={() => onUpdated?.('borrador')}
             />
           )}
-          {contexto === 'logistica' && estado === 'atendido' && ['admin', 'gerente', 'logistico'].includes(userRole) && (
+          {contexto === 'logistica' && estado === 'atendido' && ['admin', 'gerente', 'logistico', 'coordinador_logistico'].includes(userRole) && (
             <RollbackButton
               entityType="pedidoEquipo"
               entityId={pedidoId}
@@ -177,7 +177,7 @@ const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
               onSuccess={() => onUpdated?.('enviado')}
             />
           )}
-          {contexto === 'logistica' && estado === 'parcial' && ['admin', 'gerente', 'logistico'].includes(userRole) && (
+          {contexto === 'logistica' && estado === 'parcial' && ['admin', 'gerente', 'logistico', 'coordinador_logistico'].includes(userRole) && (
             <RollbackButton
               entityType="pedidoEquipo"
               entityId={pedidoId}

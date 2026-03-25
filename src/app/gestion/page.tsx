@@ -17,7 +17,7 @@ export default async function GestionPage() {
   const session = await getServerSession(authOptions)
   if (!session) notFound()
 
-  const allowedRoles = ['admin', 'gerente', 'gestor', 'comercial', 'proyectos', 'logistico', 'coordinador']
+  const allowedRoles = ['admin', 'gerente', 'gestor', 'comercial', 'proyectos', 'logistico', 'coordinador_logistico', 'coordinador']
   const userRole = (session.user?.role as string) || ''
 
   if (!allowedRoles.includes(userRole)) notFound()
