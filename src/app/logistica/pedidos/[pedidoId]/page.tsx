@@ -143,8 +143,25 @@ export default function PedidoLogisticaDetailPage() {
   const [generandoOC, setGenerandoOC] = useState(false)
   const [monedaOC, setMonedaOC] = useState('USD')
   const [condicionPagoOC, setCondicionPagoOC] = useState('contado')
-  const [fechasEntregaOC, setFechasEntregaOC] = useState<Record<string, string>>({})
-  const [proveedoresSeleccionados, setProveedoresSeleccionados] = useState<Set<string>>(new Set())
+  const [ocFechaGlobal, setOcFechaGlobal] = useState('')
+  const [ocItemsState, setOcItemsState] = useState<Record<string, { selected: boolean; proveedorId: string; proveedorNombre: string }>>({})
+
+  // Inicializar items del modal al abrirlo
+  useEffect(() => {
+    if (showGenerarOC && pedido?.items) {
+      const initial: Record<string, { selected: boolean; proveedorId: string; proveedorNombre: string }> = {}
+      for (const item of pedido.items) {
+        const tieneOC = ((item as any).ordenCompraItems?.length ?? 0) > 0
+        if (!tieneOC) {
+          const provId = (item as any).proveedorId || (item as any).listaEquipoItem?.proveedorId || ''
+          const provNombre = (item as any).proveedor?.nombre || (item as any).proveedorNombre || (item as any).listaEquipoItem?.proveedor?.nombre || ''
+          initial[item.id] = { selected: !!provId, proveedorId: provId, proveedorNombre: provNombre }
+        }
+      }
+      setOcItemsState(initial)
+      cargarProveedores()
+    }
+  }, [showGenerarOC])
 
   // 📦 Estado para edición de items
   const [editingItem, setEditingItem] = useState<{
@@ -429,70 +446,45 @@ export default function PedidoLogisticaDetailPage() {
 
   const { progreso, itemsEntregados, totalItems } = calcularProgreso()
 
-  // 🛒 Calcular agrupación por proveedor para el dialog de OCs
-  const calcularGruposProveedor = () => {
-    if (!pedido?.items) return { grupos: [], sinProveedor: 0, conOC: 0 }
-
-    const sinProveedor: any[] = []
-    const conOC: any[] = []
-    const elegibles: any[] = []
-
-    for (const item of pedido.items) {
-      // proveedorId directo o fallback desde listaEquipoItem
-      const provId = (item as any).proveedorId || (item as any).listaEquipoItem?.proveedorId
-      const ocItems = (item as any).ordenCompraItems || []
-
-      if (!provId) {
-        sinProveedor.push(item)
-      } else if (ocItems.length > 0) {
-        conOC.push(item)
-      } else {
-        elegibles.push(item)
-      }
-    }
-
-    // Agrupar elegibles por proveedor
-    const mapaProveedores = new Map<string, { nombre: string; items: any[]; monto: number; maxTiempoEntregaDias: number }>()
-    for (const item of elegibles) {
-      const provId = (item as any).proveedorId || (item as any).listaEquipoItem?.proveedorId
-      const provNombre = (item as any).proveedor?.nombre || (item as any).proveedorNombre || (item as any).listaEquipoItem?.proveedor?.nombre || 'Sin nombre'
-      if (!mapaProveedores.has(provId)) {
-        mapaProveedores.set(provId, { nombre: provNombre, items: [], monto: 0, maxTiempoEntregaDias: 0 })
-      }
-      const grupo = mapaProveedores.get(provId)!
-      grupo.items.push(item)
-      grupo.monto += item.costoTotal || (item.cantidadPedida * (item.precioUnitario || 0))
-      const ted = (item as any).tiempoEntregaDias || 0
-      if (ted > grupo.maxTiempoEntregaDias) grupo.maxTiempoEntregaDias = ted
-    }
-
-    return {
-      grupos: Array.from(mapaProveedores.entries()).map(([id, g]) => ({ id, ...g })),
-      sinProveedor: sinProveedor.length,
-      conOC: conOC.length,
-    }
-  }
-
   const handleGenerarOCs = async () => {
     if (!pedido) return
+    const seleccionados = Object.entries(ocItemsState).filter(([, v]) => v.selected)
+    if (seleccionados.length === 0) { toast.error('Selecciona al menos un item'); return }
+    if (seleccionados.some(([, v]) => !v.proveedorId)) { toast.error('Todos los items seleccionados deben tener proveedor asignado'); return }
+    if (!ocFechaGlobal) { toast.error('Indica la fecha de entrega estimada'); return }
+
     try {
       setGenerandoOC(true)
-      // Solo enviar items y fechas de proveedores seleccionados
-      const { grupos } = calcularGruposProveedor()
-      const gruposActivos = grupos.filter(g => proveedoresSeleccionados.has(g.id))
-      const itemIds = gruposActivos.flatMap(g => g.items.map((i: any) => i.id))
-      const fechasFiltradas: Record<string, string> = {}
-      for (const g of gruposActivos) {
-        if (fechasEntregaOC[g.id]) fechasFiltradas[g.id] = fechasEntregaOC[g.id]
-      }
+      // 1. Actualizar proveedores en items que cambiaron
+      const updatePromises = seleccionados.map(([itemId, v]) => {
+        const itemOriginal = pedido.items?.find((i: any) => i.id === itemId) as any
+        const provIdOriginal = itemOriginal?.proveedorId || itemOriginal?.listaEquipoItem?.proveedorId || ''
+        if (provIdOriginal !== v.proveedorId) {
+          return updatePedidoEquipoItem(itemId, {
+            cantidadPedida: itemOriginal?.cantidadPedida || 1,
+            proveedorId: v.proveedorId,
+            proveedorNombre: v.proveedorNombre,
+          })
+        }
+        return Promise.resolve()
+      })
+      await Promise.all(updatePromises)
+
+      // 2. Generar OCs agrupadas por proveedor
+      const itemIds = seleccionados.map(([id]) => id)
+      // Construir fechas por proveedor (misma fecha global para todos)
+      const proveedoresUnicos = [...new Set(seleccionados.map(([, v]) => v.proveedorId))]
+      const fechasPorProveedor: Record<string, string> = {}
+      proveedoresUnicos.forEach(pid => { fechasPorProveedor[pid] = ocFechaGlobal })
+
       const resultado = await generarOCsDesdePedido({
         pedidoId: pedido.id,
         itemIds,
         moneda: monedaOC,
         condicionPago: condicionPagoOC,
-        fechasEntregaPorProveedor: fechasFiltradas,
+        fechasEntregaPorProveedor: fechasPorProveedor,
       })
-      toast.success(`Se generaron ${resultado.resumen.totalOCs} orden(es) de compra con ${resultado.resumen.totalItems} items`)
+      toast.success(`Se generaron ${resultado.resumen.totalOCs} OC(s) con ${resultado.resumen.totalItems} items`)
       setShowGenerarOC(false)
       await cargarDatos()
     } catch (err: any) {
@@ -652,19 +644,7 @@ export default function PedidoLogisticaDetailPage() {
                 <Button
                   variant="default"
                   size="sm"
-                  onClick={() => {
-                    const fn = pedido?.fechaNecesaria
-                      ? new Date(pedido.fechaNecesaria).toISOString().split('T')[0]
-                      : ''
-                    const { grupos } = calcularGruposProveedor()
-                    const fechasIniciales: Record<string, string> = {}
-                    for (const g of grupos) {
-                      fechasIniciales[g.id] = fn
-                    }
-                    setFechasEntregaOC(fechasIniciales)
-                    setProveedoresSeleccionados(new Set(grupos.map(g => g.id)))
-                    setShowGenerarOC(true)
-                  }}
+                  onClick={() => setShowGenerarOC(true)}
                   className="h-7 text-xs"
                 >
                   <ShoppingCart className="h-3 w-3 mr-1" />
@@ -912,19 +892,7 @@ export default function PedidoLogisticaDetailPage() {
                               variant="outline"
                               size="sm"
                               className="h-6 text-[10px] mt-1.5 border-amber-300 text-amber-700 hover:bg-amber-100"
-                              onClick={() => {
-                                const fn = pedido?.fechaNecesaria
-                                  ? new Date(pedido.fechaNecesaria).toISOString().split('T')[0]
-                                  : ''
-                                const { grupos } = calcularGruposProveedor()
-                                const fechasIniciales: Record<string, string> = {}
-                                for (const g of grupos) {
-                                  fechasIniciales[g.id] = fn
-                                }
-                                setFechasEntregaOC(fechasIniciales)
-                                setProveedoresSeleccionados(new Set(grupos.map(g => g.id)))
-                                setShowGenerarOC(true)
-                              }}
+                              onClick={() => setShowGenerarOC(true)}
                             >
                               <ShoppingCart className="h-3 w-3 mr-1" />
                               Generar OCs pendientes
@@ -1527,19 +1495,7 @@ export default function PedidoLogisticaDetailPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => {
-                    const fn = pedido?.fechaNecesaria
-                      ? new Date(pedido.fechaNecesaria).toISOString().split('T')[0]
-                      : ''
-                    const { grupos } = calcularGruposProveedor()
-                    const fechasIniciales: Record<string, string> = {}
-                    for (const g of grupos) {
-                      fechasIniciales[g.id] = fn
-                    }
-                    setFechasEntregaOC(fechasIniciales)
-                    setProveedoresSeleccionados(new Set(grupos.map(g => g.id)))
-                    setShowGenerarOC(true)
-                  }}
+                  onClick={() => setShowGenerarOC(true)}
                   className="h-7 text-xs"
                 >
                   <ShoppingCart className="h-3 w-3 mr-1" />
@@ -1992,220 +1948,194 @@ export default function PedidoLogisticaDetailPage() {
 
       {/* Dialog para Generar OCs */}
       <Dialog open={showGenerarOC} onOpenChange={setShowGenerarOC}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle className="text-sm font-medium flex items-center gap-2">
               <ShoppingCart className="h-4 w-4 text-blue-600" />
               Generar Órdenes de Compra
             </DialogTitle>
           </DialogHeader>
           {(() => {
-            const { grupos, sinProveedor, conOC } = calcularGruposProveedor()
-            const gruposActivos = grupos.filter(g => proveedoresSeleccionados.has(g.id))
-            const totalItems = gruposActivos.reduce((s, g) => s + g.items.length, 0)
-            const totalMonto = gruposActivos.reduce((s, g) => s + g.monto, 0)
-            const cantidadOCs = gruposActivos.length
+            const itemsSinOC = Object.entries(ocItemsState)
+            const seleccionados = itemsSinOC.filter(([, v]) => v.selected)
+            const sinProveedor = seleccionados.filter(([, v]) => !v.proveedorId).length
+            const proveedoresUnicos = [...new Set(seleccionados.filter(([, v]) => v.proveedorId).map(([, v]) => v.proveedorId))]
+            const cantidadOCs = proveedoresUnicos.length
+            const todosSeleccionados = itemsSinOC.length > 0 && itemsSinOC.every(([, v]) => v.selected)
+            const algunoSeleccionado = itemsSinOC.some(([, v]) => v.selected)
+
+            const conOC = (pedido?.items || []).filter((i: any) => (i.ordenCompraItems?.length ?? 0) > 0).length
 
             return (
-              <div className="space-y-4">
-                {/* Resumen */}
-                <div className="bg-blue-50 rounded-lg p-3 text-xs">
-                  <p className="font-medium text-blue-800 mb-1">
-                    Se crearán {cantidadOCs} OC{cantidadOCs !== 1 ? 's' : ''} con {totalItems} items
-                  </p>
-                  <p className="text-blue-600">
-                    Cada OC se genera por proveedor en estado borrador
-                  </p>
-                </div>
-
-                {/* Fecha necesaria informativa */}
-                {grupos.length > 0 && pedido?.fechaNecesaria && (
-                  <div className="flex items-center gap-1.5 text-[10px] text-gray-500 bg-gray-50 rounded px-2.5 py-1.5">
+              <div className="flex flex-col gap-3 overflow-hidden">
+                {/* Info fecha necesaria */}
+                {pedido?.fechaNecesaria && (
+                  <div className="flex items-center gap-1.5 text-[10px] text-gray-500 bg-gray-50 rounded px-2.5 py-1.5 flex-shrink-0">
                     <Calendar className="h-3 w-3" />
-                    <span>El proyecto necesita este pedido para: <strong className="text-gray-700">
-                      {new Date(pedido.fechaNecesaria).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                    <span>Fecha necesaria del proyecto: <strong className="text-gray-700">
+                      {new Date(pedido.fechaNecesaria + 'T12:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}
                     </strong></span>
                   </div>
                 )}
 
-                {/* Grupos por proveedor con fecha individual */}
-                {grupos.length > 0 ? (
-                  <div className="space-y-2.5 max-h-[340px] overflow-y-auto">
-                    {grupos.map(grupo => {
-                      const isChecked = proveedoresSeleccionados.has(grupo.id)
-                      const fechaNecStr = pedido?.fechaNecesaria
-                        ? new Date(pedido.fechaNecesaria).toISOString().split('T')[0]
-                        : ''
-                      const fechaProv = fechasEntregaOC[grupo.id] || ''
-                      const superaFecha = fechaProv && fechaNecStr && fechaProv > fechaNecStr
-                      const fechaSugerida = grupo.maxTiempoEntregaDias > 0
-                        ? new Date(Date.now() + grupo.maxTiempoEntregaDias * 86400000).toISOString().split('T')[0]
-                        : null
-
-                      return (
-                        <div key={grupo.id} className={cn(
-                          'border rounded-lg px-3 py-2.5 space-y-2 transition-opacity',
-                          isChecked ? 'bg-white' : 'bg-gray-50 opacity-60'
-                        )}>
-                          <div className="flex items-center gap-2.5">
-                            <Checkbox
-                              checked={isChecked}
-                              onCheckedChange={(checked) => {
-                                setProveedoresSeleccionados(prev => {
-                                  const next = new Set(prev)
-                                  if (checked) next.add(grupo.id)
-                                  else next.delete(grupo.id)
-                                  return next
-                                })
-                              }}
-                              className="h-4 w-4 flex-shrink-0"
-                            />
-                            <div className="flex items-center gap-2 min-w-0 flex-1">
-                              <Building2 className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
-                              <div className="min-w-0">
-                                <p className="text-xs font-medium truncate">{grupo.nombre}</p>
-                                <p className="text-[10px] text-muted-foreground">
-                                  {grupo.items.length} item{grupo.items.length !== 1 ? 's' : ''} — {monedaOC} {formatCurrency(grupo.monto).replace('US$', '').trim()}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                          {isChecked && (
-                            <div className="pl-6">
-                              <label className="text-[10px] font-medium text-muted-foreground mb-0.5 block">
-                                Fecha entrega estimada <span className="text-red-500">*</span>
-                              </label>
-                              <Input
-                                type="date"
-                                value={fechaProv}
-                                onChange={(e) => setFechasEntregaOC(prev => ({ ...prev, [grupo.id]: e.target.value }))}
-                                className="h-7 text-xs"
-                              />
-                              {!fechaProv && (
-                                <p className="text-[9px] text-red-500 mt-0.5">Requerido</p>
-                              )}
-                              {superaFecha && (
-                                <div className="flex items-center gap-1 text-[9px] text-amber-700 mt-0.5">
-                                  <AlertTriangle className="h-2.5 w-2.5 flex-shrink-0" />
-                                  <span>Supera la fecha necesaria del proyecto</span>
-                                </div>
-                              )}
-                              {fechaSugerida && (
-                                <p className="text-[9px] text-blue-600 mt-0.5">
-                                  Sugerido por tiempo de entrega ({grupo.maxTiempoEntregaDias}d): {new Date(fechaSugerida).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                                </p>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
-
-                    {/* Info text */}
-                    {grupos.length > 1 && (
-                      <p className="text-[10px] text-muted-foreground italic px-1">
-                        Los proveedores no seleccionados podrán generar su OC más adelante desde este mismo pedido.
-                      </p>
-                    )}
+                {itemsSinOC.length === 0 ? (
+                  <div className="text-center py-8">
+                    <CheckCircle2 className="h-8 w-8 text-emerald-400 mx-auto mb-2" />
+                    <p className="text-xs font-medium text-gray-700">Todos los items ya tienen OC vinculada</p>
                   </div>
                 ) : (
-                  <div className="text-center py-6 space-y-3">
-                    <AlertTriangle className="h-8 w-8 text-amber-400 mx-auto" />
-                    <div>
-                      <p className="text-xs font-medium text-gray-700">No hay items elegibles para generar OCs</p>
-                      {sinProveedor > 0 && conOC === 0 && (
-                        <p className="text-[11px] text-muted-foreground mt-2 max-w-xs mx-auto">
-                          {(pedido as any).listaId
-                            ? 'Los items de este pedido no tienen proveedor asignado. Para generar OCs, primero seleccione un proveedor en la cotización de cada item desde la Lista de Equipo.'
-                            : 'Los items de este pedido no tienen proveedor asignado. Asigne proveedor directamente en cada item desde la tabla de abajo.'}
-                        </p>
-                      )}
-                      {conOC > 0 && sinProveedor === 0 && (
-                        <p className="text-[11px] text-muted-foreground mt-2">
-                          Todos los items ya tienen una Orden de Compra vinculada.
-                        </p>
-                      )}
+                  <>
+                    {/* Tabla de items */}
+                    <div className="flex-1 overflow-y-auto border rounded-lg">
+                      <table className="w-full text-xs">
+                        <thead className="bg-gray-50 sticky top-0">
+                          <tr>
+                            <th className="px-3 py-2 text-left w-8">
+                              <Checkbox
+                                checked={todosSeleccionados}
+                                onCheckedChange={(checked) => {
+                                  setOcItemsState(prev => {
+                                    const next = { ...prev }
+                                    Object.keys(next).forEach(id => { next[id] = { ...next[id], selected: !!checked } })
+                                    return next
+                                  })
+                                }}
+                                className="h-3.5 w-3.5"
+                              />
+                            </th>
+                            <th className="px-3 py-2 text-left font-medium text-gray-600">Código</th>
+                            <th className="px-3 py-2 text-left font-medium text-gray-600">Descripción</th>
+                            <th className="px-3 py-2 text-center font-medium text-gray-600">Cant.</th>
+                            <th className="px-3 py-2 text-left font-medium text-gray-600">Proveedor <span className="text-red-500">*</span></th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {itemsSinOC.map(([itemId, state]) => {
+                            const item = pedido?.items?.find((i: any) => i.id === itemId) as any
+                            if (!item) return null
+                            return (
+                              <tr key={itemId} className={cn('transition-colors', state.selected ? 'bg-white' : 'bg-gray-50 opacity-60')}>
+                                <td className="px-3 py-2">
+                                  <Checkbox
+                                    checked={state.selected}
+                                    onCheckedChange={(checked) => {
+                                      setOcItemsState(prev => ({ ...prev, [itemId]: { ...prev[itemId], selected: !!checked } }))
+                                    }}
+                                    className="h-3.5 w-3.5"
+                                  />
+                                </td>
+                                <td className="px-3 py-2 font-mono text-[11px] text-gray-600">{item.codigo}</td>
+                                <td className="px-3 py-2 max-w-[200px]">
+                                  <span className="truncate block" title={item.descripcion}>{item.descripcion}</span>
+                                </td>
+                                <td className="px-3 py-2 text-center text-gray-600">{item.cantidadPedida} {item.unidad}</td>
+                                <td className="px-3 py-2 min-w-[180px]">
+                                  <select
+                                    value={state.proveedorId}
+                                    onChange={(e) => {
+                                      const prov = proveedores.find(p => p.id === e.target.value)
+                                      setOcItemsState(prev => ({
+                                        ...prev,
+                                        [itemId]: {
+                                          ...prev[itemId],
+                                          proveedorId: e.target.value,
+                                          proveedorNombre: prov?.nombre || '',
+                                          selected: true,
+                                        }
+                                      }))
+                                    }}
+                                    className={cn(
+                                      'w-full h-7 rounded border bg-background px-2 text-xs',
+                                      state.selected && !state.proveedorId ? 'border-red-400' : 'border-input'
+                                    )}
+                                  >
+                                    <option value="">— Seleccionar —</option>
+                                    {proveedores.map(p => (
+                                      <option key={p.id} value={p.id}>{p.nombre}</option>
+                                    ))}
+                                  </select>
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
                     </div>
-                  </div>
-                )}
 
-                {/* Warnings */}
-                {(sinProveedor > 0 || conOC > 0) && (
-                  <div className="space-y-1.5">
-                    {sinProveedor > 0 && (
-                      <div className="flex items-start gap-2 text-[10px] text-amber-700 bg-amber-50 rounded px-2.5 py-1.5">
-                        <AlertTriangle className="h-3 w-3 flex-shrink-0 mt-0.5" />
-                        <span>
-                          <strong>{sinProveedor} item{sinProveedor !== 1 ? 's' : ''} sin proveedor</strong> — {(pedido as any).listaId
-                            ? 'para incluirlos, asigne proveedor desde la Lista de Equipo (seleccionar cotización)'
-                            : 'asigne proveedor directamente en cada item desde la tabla del pedido'}
-                        </span>
+                    {/* Resumen de OCs a generar */}
+                    {algunoSeleccionado && (
+                      <div className="bg-blue-50 rounded-lg px-3 py-2 text-xs flex-shrink-0">
+                        <p className="font-medium text-blue-800">
+                          {seleccionados.length} item{seleccionados.length !== 1 ? 's' : ''} seleccionado{seleccionados.length !== 1 ? 's' : ''} → {cantidadOCs} OC{cantidadOCs !== 1 ? 's' : ''} (una por proveedor)
+                        </p>
+                        {sinProveedor > 0 && (
+                          <p className="text-amber-600 mt-0.5">{sinProveedor} item{sinProveedor !== 1 ? 's' : ''} seleccionado{sinProveedor !== 1 ? 's' : ''} sin proveedor</p>
+                        )}
                       </div>
                     )}
+
                     {conOC > 0 && (
-                      <div className="flex items-center gap-2 text-[10px] text-blue-600 bg-blue-50 rounded px-2.5 py-1.5">
+                      <div className="flex items-center gap-2 text-[10px] text-blue-600 bg-blue-50/60 rounded px-2.5 py-1.5 flex-shrink-0">
                         <CheckCircle2 className="h-3 w-3 flex-shrink-0" />
-                        {conOC} item{conOC !== 1 ? 's' : ''} ya tienen OC vinculada
+                        {conOC} item{conOC !== 1 ? 's' : ''} ya tienen OC — no aparecen en la lista
                       </div>
                     )}
-                  </div>
-                )}
 
-                {/* Opciones globales */}
-                {grupos.length > 0 && (
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Moneda</label>
-                      <select
-                        value={monedaOC}
-                        onChange={(e) => setMonedaOC(e.target.value)}
-                        className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs"
-                      >
-                        <option value="USD">USD</option>
-                        <option value="PEN">PEN</option>
-                      </select>
+                    {/* Opciones globales */}
+                    <div className="grid grid-cols-3 gap-3 flex-shrink-0">
+                      <div>
+                        <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Moneda</label>
+                        <select
+                          value={monedaOC}
+                          onChange={(e) => setMonedaOC(e.target.value)}
+                          className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs"
+                        >
+                          <option value="USD">USD</option>
+                          <option value="PEN">PEN</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Condición de Pago</label>
+                        <select
+                          value={condicionPagoOC}
+                          onChange={(e) => setCondicionPagoOC(e.target.value)}
+                          className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs"
+                        >
+                          <option value="contado">Contado</option>
+                          <option value="credito">Crédito</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
+                          F. Entrega estimada <span className="text-red-500">*</span>
+                        </label>
+                        <Input
+                          type="date"
+                          value={ocFechaGlobal}
+                          onChange={(e) => setOcFechaGlobal(e.target.value)}
+                          className="h-8 text-xs"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Condición de Pago</label>
-                      <select
-                        value={condicionPagoOC}
-                        onChange={(e) => setCondicionPagoOC(e.target.value)}
-                        className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs"
-                      >
-                        <option value="contado">Contado</option>
-                        <option value="credito">Crédito</option>
-                      </select>
-                    </div>
-                  </div>
-                )}
-
-                {/* Total */}
-                {grupos.length > 0 && (
-                  <div className="flex items-center justify-between border-t pt-3">
-                    <span className="text-xs text-muted-foreground">Total estimado</span>
-                    <span className="text-sm font-bold text-emerald-600">{formatCurrency(totalMonto)}</span>
-                  </div>
+                  </>
                 )}
 
                 {/* Actions */}
-                <div className="flex justify-end gap-2 pt-1">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowGenerarOC(false)}
-                    className="h-8 text-xs"
-                  >
+                <div className="flex justify-end gap-2 pt-1 flex-shrink-0">
+                  <Button variant="outline" size="sm" onClick={() => setShowGenerarOC(false)} className="h-8 text-xs">
                     Cancelar
                   </Button>
-                  <Button
-                    size="sm"
-                    onClick={handleGenerarOCs}
-                    disabled={generandoOC || cantidadOCs === 0 || gruposActivos.some(g => !fechasEntregaOC[g.id])}
-                    className="h-8 text-xs"
-                  >
-                    <ShoppingCart className="h-3 w-3 mr-1" />
-                    {generandoOC ? 'Generando...' : `Generar ${cantidadOCs} OC${cantidadOCs !== 1 ? 's' : ''}`}
-                  </Button>
+                  {itemsSinOC.length > 0 && (
+                    <Button
+                      size="sm"
+                      onClick={handleGenerarOCs}
+                      disabled={generandoOC || seleccionados.length === 0 || sinProveedor > 0 || !ocFechaGlobal}
+                      className="h-8 text-xs"
+                    >
+                      <ShoppingCart className="h-3 w-3 mr-1" />
+                      {generandoOC ? 'Generando...' : `Generar ${cantidadOCs > 0 ? cantidadOCs : ''} OC${cantidadOCs !== 1 ? 's' : ''}`}
+                    </Button>
+                  )}
                 </div>
               </div>
             )
