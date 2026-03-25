@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -78,6 +78,7 @@ interface CatalogoResult {
 
 export default function NuevaOrdenCompraPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [saving, setSaving] = useState(false)
   const [proveedores, setProveedores] = useState<Proveedor[]>([])
   const [loadingData, setLoadingData] = useState(true)
@@ -125,6 +126,43 @@ export default function NuevaOrdenCompraPage() {
       .catch(() => toast.error('Error al cargar proveedores'))
       .finally(() => setLoadingData(false))
   }, [])
+
+  // Leer query params: proyectoId + pedidoItems (IDs separados por coma)
+  useEffect(() => {
+    const proyectoIdParam = searchParams.get('proyectoId')
+    const pedidoItemsParam = searchParams.get('pedidoItems')
+    if (proyectoIdParam) {
+      setAsignacion({ proyectoId: proyectoIdParam, centroCostoId: null })
+    }
+    if (pedidoItemsParam && proyectoIdParam) {
+      const ids = pedidoItemsParam.split(',').filter(Boolean)
+      if (ids.length > 0) {
+        // Cargar items del pedido y pre-seleccionarlos
+        setLoadingItems(true)
+        fetchItemsDisponibles(proyectoIdParam)
+          .then(data => {
+            const preselected = data.items.filter(i => ids.includes(i.id))
+            const newItems: ItemForm[] = preselected.map(i => ({
+              codigo: i.codigo,
+              descripcion: i.descripcion,
+              unidad: i.unidad,
+              cantidad: i.cantidad,
+              precioUnitario: i.precioUnitario,
+              source: 'pedido' as const,
+              pedidoEquipoItemId: i.id,
+              listaEquipoItemId: i.listaEquipoItemId,
+              sourceLabel: i.pedidoCodigo,
+            }))
+            if (newItems.length > 0) {
+              setItems(newItems)
+              toast.success(`${newItems.length} item(s) cargados desde el pedido`)
+            }
+          })
+          .catch(() => toast.error('Error al cargar items del pedido'))
+          .finally(() => setLoadingItems(false))
+      }
+    }
+  }, [searchParams])
 
   const openManualAdd = () => {
     setManualEditIndex(null)
@@ -501,11 +539,15 @@ export default function NuevaOrdenCompraPage() {
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium">Items ({items.length})</CardTitle>
           <div className="flex gap-2">
-            {isProyecto && (
-              <Button variant="outline" size="sm" onClick={openSelector}>
-                <FileText className="h-3.5 w-3.5 mr-1" /> Desde Pedidos
-              </Button>
-            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={openSelector}
+              disabled={!isProyecto}
+              title={!isProyecto ? 'Selecciona un proyecto primero' : undefined}
+            >
+              <FileText className="h-3.5 w-3.5 mr-1" /> Desde Pedidos
+            </Button>
             <Button variant="outline" size="sm" onClick={openCatalogo}>
               <Search className="h-3.5 w-3.5 mr-1" /> Desde Catálogo
             </Button>

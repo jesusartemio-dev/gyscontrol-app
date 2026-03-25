@@ -446,53 +446,12 @@ export default function PedidoLogisticaDetailPage() {
 
   const { progreso, itemsEntregados, totalItems } = calcularProgreso()
 
-  const handleGenerarOCs = async () => {
-    if (!pedido) return
+  const handleIrACrearOC = () => {
     const seleccionados = Object.entries(ocItemsState).filter(([, v]) => v.selected)
     if (seleccionados.length === 0) { toast.error('Selecciona al menos un item'); return }
-    if (seleccionados.some(([, v]) => !v.proveedorId)) { toast.error('Todos los items seleccionados deben tener proveedor asignado'); return }
-    if (!ocFechaGlobal) { toast.error('Indica la fecha de entrega estimada'); return }
-
-    try {
-      setGenerandoOC(true)
-      // 1. Actualizar proveedores en items que cambiaron
-      const updatePromises = seleccionados.map(([itemId, v]) => {
-        const itemOriginal = pedido.items?.find((i: any) => i.id === itemId) as any
-        const provIdOriginal = itemOriginal?.proveedorId || itemOriginal?.listaEquipoItem?.proveedorId || ''
-        if (provIdOriginal !== v.proveedorId) {
-          return updatePedidoEquipoItem(itemId, {
-            cantidadPedida: itemOriginal?.cantidadPedida || 1,
-            proveedorId: v.proveedorId,
-            proveedorNombre: v.proveedorNombre,
-          })
-        }
-        return Promise.resolve()
-      })
-      await Promise.all(updatePromises)
-
-      // 2. Generar OCs agrupadas por proveedor
-      const itemIds = seleccionados.map(([id]) => id)
-      // Construir fechas por proveedor (misma fecha global para todos)
-      const proveedoresUnicos = [...new Set(seleccionados.map(([, v]) => v.proveedorId))]
-      const fechasPorProveedor: Record<string, string> = {}
-      proveedoresUnicos.forEach(pid => { fechasPorProveedor[pid] = ocFechaGlobal })
-
-      const resultado = await generarOCsDesdePedido({
-        pedidoId: pedido.id,
-        itemIds,
-        moneda: monedaOC,
-        condicionPago: condicionPagoOC,
-        fechasEntregaPorProveedor: fechasPorProveedor,
-      })
-      toast.success(`Se generaron ${resultado.resumen.totalOCs} OC(s) con ${resultado.resumen.totalItems} items`)
-      setShowGenerarOC(false)
-      await cargarDatos()
-    } catch (err: any) {
-      console.error('Error generando OCs:', err)
-      toast.error(err.message || 'Error al generar órdenes de compra')
-    } finally {
-      setGenerandoOC(false)
-    }
+    const itemIds = seleccionados.map(([id]) => id).join(',')
+    const proyectoId = (pedido as any)?.proyecto?.id || ''
+    router.push(`/logistica/ordenes-compra/nueva?proyectoId=${proyectoId}&pedidoItems=${itemIds}`)
   }
 
   // Estado para rechazo de recepción
@@ -1946,196 +1905,113 @@ export default function PedidoLogisticaDetailPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog para Generar OCs */}
+      {/* Dialog para Crear OC desde Pedido */}
       <Dialog open={showGenerarOC} onOpenChange={setShowGenerarOC}>
-        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
           <DialogHeader className="flex-shrink-0">
             <DialogTitle className="text-sm font-medium flex items-center gap-2">
               <ShoppingCart className="h-4 w-4 text-blue-600" />
-              Generar Órdenes de Compra
+              Crear Orden de Compra desde Pedido
             </DialogTitle>
+            <p className="text-[11px] text-muted-foreground pt-1">
+              Selecciona los items a incluir. Podrás completar proveedor, moneda y condiciones en la siguiente pantalla.
+            </p>
           </DialogHeader>
           {(() => {
             const itemsSinOC = Object.entries(ocItemsState)
             const seleccionados = itemsSinOC.filter(([, v]) => v.selected)
-            const sinProveedor = seleccionados.filter(([, v]) => !v.proveedorId).length
-            const proveedoresUnicos = [...new Set(seleccionados.filter(([, v]) => v.proveedorId).map(([, v]) => v.proveedorId))]
-            const cantidadOCs = proveedoresUnicos.length
             const todosSeleccionados = itemsSinOC.length > 0 && itemsSinOC.every(([, v]) => v.selected)
-            const algunoSeleccionado = itemsSinOC.some(([, v]) => v.selected)
-
             const conOC = (pedido?.items || []).filter((i: any) => (i.ordenCompraItems?.length ?? 0) > 0).length
 
             return (
-              <div className="flex flex-col gap-3 overflow-hidden">
-                {/* Info fecha necesaria */}
-                {pedido?.fechaNecesaria && (
-                  <div className="flex items-center gap-1.5 text-[10px] text-gray-500 bg-gray-50 rounded px-2.5 py-1.5 flex-shrink-0">
-                    <Calendar className="h-3 w-3" />
-                    <span>Fecha necesaria del proyecto: <strong className="text-gray-700">
-                      {new Date(pedido.fechaNecesaria + 'T12:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                    </strong></span>
-                  </div>
-                )}
-
+              <div className="flex flex-col gap-3 overflow-hidden min-h-0">
                 {itemsSinOC.length === 0 ? (
                   <div className="text-center py-8">
                     <CheckCircle2 className="h-8 w-8 text-emerald-400 mx-auto mb-2" />
                     <p className="text-xs font-medium text-gray-700">Todos los items ya tienen OC vinculada</p>
                   </div>
                 ) : (
-                  <>
-                    {/* Tabla de items */}
-                    <div className="flex-1 overflow-y-auto border rounded-lg">
-                      <table className="w-full text-xs">
-                        <thead className="bg-gray-50 sticky top-0">
-                          <tr>
-                            <th className="px-3 py-2 text-left w-8">
-                              <Checkbox
-                                checked={todosSeleccionados}
-                                onCheckedChange={(checked) => {
-                                  setOcItemsState(prev => {
-                                    const next = { ...prev }
-                                    Object.keys(next).forEach(id => { next[id] = { ...next[id], selected: !!checked } })
-                                    return next
-                                  })
-                                }}
-                                className="h-3.5 w-3.5"
-                              />
-                            </th>
-                            <th className="px-3 py-2 text-left font-medium text-gray-600">Código</th>
-                            <th className="px-3 py-2 text-left font-medium text-gray-600">Descripción</th>
-                            <th className="px-3 py-2 text-center font-medium text-gray-600">Cant.</th>
-                            <th className="px-3 py-2 text-left font-medium text-gray-600">Proveedor <span className="text-red-500">*</span></th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                          {itemsSinOC.map(([itemId, state]) => {
-                            const item = pedido?.items?.find((i: any) => i.id === itemId) as any
-                            if (!item) return null
-                            return (
-                              <tr key={itemId} className={cn('transition-colors', state.selected ? 'bg-white' : 'bg-gray-50 opacity-60')}>
-                                <td className="px-3 py-2">
-                                  <Checkbox
-                                    checked={state.selected}
-                                    onCheckedChange={(checked) => {
-                                      setOcItemsState(prev => ({ ...prev, [itemId]: { ...prev[itemId], selected: !!checked } }))
-                                    }}
-                                    className="h-3.5 w-3.5"
-                                  />
-                                </td>
-                                <td className="px-3 py-2 font-mono text-[11px] text-gray-600">{item.codigo}</td>
-                                <td className="px-3 py-2 max-w-[200px]">
-                                  <span className="truncate block" title={item.descripcion}>{item.descripcion}</span>
-                                </td>
-                                <td className="px-3 py-2 text-center text-gray-600">{item.cantidadPedida} {item.unidad}</td>
-                                <td className="px-3 py-2 min-w-[180px]">
-                                  <select
-                                    value={state.proveedorId}
-                                    onChange={(e) => {
-                                      const prov = proveedores.find(p => p.id === e.target.value)
-                                      setOcItemsState(prev => ({
-                                        ...prev,
-                                        [itemId]: {
-                                          ...prev[itemId],
-                                          proveedorId: e.target.value,
-                                          proveedorNombre: prov?.nombre || '',
-                                          selected: true,
-                                        }
-                                      }))
-                                    }}
-                                    className={cn(
-                                      'w-full h-7 rounded border bg-background px-2 text-xs',
-                                      state.selected && !state.proveedorId ? 'border-red-400' : 'border-input'
-                                    )}
-                                  >
-                                    <option value="">— Seleccionar —</option>
-                                    {proveedores.map(p => (
-                                      <option key={p.id} value={p.id}>{p.nombre}</option>
-                                    ))}
-                                  </select>
-                                </td>
-                              </tr>
-                            )
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {/* Resumen de OCs a generar */}
-                    {algunoSeleccionado && (
-                      <div className="bg-blue-50 rounded-lg px-3 py-2 text-xs flex-shrink-0">
-                        <p className="font-medium text-blue-800">
-                          {seleccionados.length} item{seleccionados.length !== 1 ? 's' : ''} seleccionado{seleccionados.length !== 1 ? 's' : ''} → {cantidadOCs} OC{cantidadOCs !== 1 ? 's' : ''} (una por proveedor)
-                        </p>
-                        {sinProveedor > 0 && (
-                          <p className="text-amber-600 mt-0.5">{sinProveedor} item{sinProveedor !== 1 ? 's' : ''} seleccionado{sinProveedor !== 1 ? 's' : ''} sin proveedor</p>
-                        )}
-                      </div>
-                    )}
-
-                    {conOC > 0 && (
-                      <div className="flex items-center gap-2 text-[10px] text-blue-600 bg-blue-50/60 rounded px-2.5 py-1.5 flex-shrink-0">
-                        <CheckCircle2 className="h-3 w-3 flex-shrink-0" />
-                        {conOC} item{conOC !== 1 ? 's' : ''} ya tienen OC — no aparecen en la lista
-                      </div>
-                    )}
-
-                    {/* Opciones globales */}
-                    <div className="grid grid-cols-3 gap-3 flex-shrink-0">
-                      <div>
-                        <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Moneda</label>
-                        <select
-                          value={monedaOC}
-                          onChange={(e) => setMonedaOC(e.target.value)}
-                          className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs"
-                        >
-                          <option value="USD">USD</option>
-                          <option value="PEN">PEN</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Condición de Pago</label>
-                        <select
-                          value={condicionPagoOC}
-                          onChange={(e) => setCondicionPagoOC(e.target.value)}
-                          className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs"
-                        >
-                          <option value="contado">Contado</option>
-                          <option value="credito">Crédito</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
-                          F. Entrega estimada <span className="text-red-500">*</span>
-                        </label>
-                        <Input
-                          type="date"
-                          value={ocFechaGlobal}
-                          onChange={(e) => setOcFechaGlobal(e.target.value)}
-                          className="h-8 text-xs"
-                        />
-                      </div>
-                    </div>
-                  </>
+                  <div className="flex-1 overflow-y-auto border rounded-lg min-h-0">
+                    <table className="w-full text-xs">
+                      <thead className="bg-gray-50 sticky top-0 z-10">
+                        <tr>
+                          <th className="px-3 py-2 text-left w-8">
+                            <Checkbox
+                              checked={todosSeleccionados}
+                              onCheckedChange={(checked) => {
+                                setOcItemsState(prev => {
+                                  const next = { ...prev }
+                                  Object.keys(next).forEach(id => { next[id] = { ...next[id], selected: !!checked } })
+                                  return next
+                                })
+                              }}
+                              className="h-3.5 w-3.5"
+                            />
+                          </th>
+                          <th className="px-3 py-2 text-left font-medium text-gray-600">Código</th>
+                          <th className="px-3 py-2 text-left font-medium text-gray-600">Descripción</th>
+                          <th className="px-3 py-2 text-center font-medium text-gray-600">Cant.</th>
+                          <th className="px-3 py-2 text-left font-medium text-gray-600">Unidad</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {itemsSinOC.map(([itemId, state]) => {
+                          const item = pedido?.items?.find((i: any) => i.id === itemId) as any
+                          if (!item) return null
+                          return (
+                            <tr
+                              key={itemId}
+                              className={cn('cursor-pointer transition-colors', state.selected ? 'bg-blue-50/40' : 'hover:bg-gray-50')}
+                              onClick={() => setOcItemsState(prev => ({ ...prev, [itemId]: { ...prev[itemId], selected: !prev[itemId].selected } }))}
+                            >
+                              <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
+                                <Checkbox
+                                  checked={state.selected}
+                                  onCheckedChange={(checked) => setOcItemsState(prev => ({ ...prev, [itemId]: { ...prev[itemId], selected: !!checked } }))}
+                                  className="h-3.5 w-3.5"
+                                />
+                              </td>
+                              <td className="px-3 py-2 font-mono text-[11px] text-gray-500">{item.codigo}</td>
+                              <td className="px-3 py-2 max-w-[280px]">
+                                <span className="truncate block" title={item.descripcion}>{item.descripcion}</span>
+                              </td>
+                              <td className="px-3 py-2 text-center font-medium">{item.cantidadPedida}</td>
+                              <td className="px-3 py-2 text-gray-500">{item.unidad}</td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
 
-                {/* Actions */}
-                <div className="flex justify-end gap-2 pt-1 flex-shrink-0">
-                  <Button variant="outline" size="sm" onClick={() => setShowGenerarOC(false)} className="h-8 text-xs">
-                    Cancelar
-                  </Button>
-                  {itemsSinOC.length > 0 && (
-                    <Button
-                      size="sm"
-                      onClick={handleGenerarOCs}
-                      disabled={generandoOC || seleccionados.length === 0 || sinProveedor > 0 || !ocFechaGlobal}
-                      className="h-8 text-xs"
-                    >
-                      <ShoppingCart className="h-3 w-3 mr-1" />
-                      {generandoOC ? 'Generando...' : `Generar ${cantidadOCs > 0 ? cantidadOCs : ''} OC${cantidadOCs !== 1 ? 's' : ''}`}
+                {conOC > 0 && (
+                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground bg-gray-50 rounded px-2.5 py-1.5 flex-shrink-0">
+                    <CheckCircle2 className="h-3 w-3 flex-shrink-0 text-emerald-500" />
+                    {conOC} item{conOC !== 1 ? 's' : ''} ya tienen OC — no aparecen en la lista
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center pt-1 flex-shrink-0">
+                  <span className="text-xs text-muted-foreground">
+                    {seleccionados.length} de {itemsSinOC.length} items seleccionados
+                  </span>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setShowGenerarOC(false)} className="h-8 text-xs">
+                      Cancelar
                     </Button>
-                  )}
+                    {itemsSinOC.length > 0 && (
+                      <Button
+                        size="sm"
+                        onClick={handleIrACrearOC}
+                        disabled={seleccionados.length === 0}
+                        className="h-8 text-xs"
+                      >
+                        <ShoppingCart className="h-3 w-3 mr-1" />
+                        Crear OC con {seleccionados.length > 0 ? seleccionados.length : ''} item{seleccionados.length !== 1 ? 's' : ''} →
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             )
