@@ -243,7 +243,7 @@ export default function PedidoDesdeListaModal({
         )}
       </DialogTrigger>
       <DialogContent className="max-w-lg p-0 gap-0 overflow-hidden flex flex-col max-h-[90vh]">
-        <DialogHeader className="px-4 pt-4 pb-3 border-b bg-gradient-to-r from-green-50 to-white flex-shrink-0">
+        <DialogHeader className="px-4 pt-4 pb-3 border-b bg-gradient-to-r from-green-50 to-white flex-shrink-0 pr-10">
           <div className="flex items-start justify-between">
             <div>
               <DialogTitle className="flex items-center gap-2 text-base font-semibold">
@@ -333,7 +333,7 @@ export default function PedidoDesdeListaModal({
                               {item.codigo}
                             </span>
                           </div>
-                          <p className="text-[10px] text-gray-500 truncate">{item.descripcion}</p>
+                          <p className="text-[10px] text-gray-500 truncate" title={item.descripcion}>{item.descripcion}</p>
                         </div>
 
                         <div className="flex items-center gap-2 shrink-0">
@@ -342,25 +342,26 @@ export default function PedidoDesdeListaModal({
                             <p className="text-[10px] text-gray-500">Disp: {selection.cantidadDisponible}</p>
                           </div>
 
-                          {selection.selected && (
-                            <Input
-                              type="number"
-                              min="1"
-                              max={selection.cantidadDisponible}
-                              value={selection.cantidadPedida}
-                              onChange={(e) => {
-                                e.stopPropagation()
-                                handleItemSelectionChange(
-                                  item.id,
-                                  'cantidadPedida',
-                                  Math.min(Math.max(1, parseInt(e.target.value) || 1), selection.cantidadDisponible)
-                                )
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                              disabled={loading}
-                              className="w-14 h-7 text-xs text-center"
-                            />
-                          )}
+                          <Input
+                            type="number"
+                            min="1"
+                            max={selection.cantidadDisponible}
+                            value={selection.cantidadPedida}
+                            onChange={(e) => {
+                              e.stopPropagation()
+                              handleItemSelectionChange(
+                                item.id,
+                                'cantidadPedida',
+                                Math.min(Math.max(1, parseInt(e.target.value) || 1), selection.cantidadDisponible)
+                              )
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            disabled={loading || !selection.selected}
+                            className={cn(
+                              'w-14 h-7 text-xs text-center',
+                              !selection.selected && 'opacity-40'
+                            )}
+                          />
                         </div>
                       </div>
                     )
