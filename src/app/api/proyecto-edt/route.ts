@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
       responsableId: searchParams.get('responsableId') || undefined,
       fechaDesde: searchParams.get('fechaDesde') ? new Date(searchParams.get('fechaDesde')!) : undefined,
       fechaHasta: searchParams.get('fechaHasta') ? new Date(searchParams.get('fechaHasta')!) : undefined,
+      tipoCronograma: searchParams.get('tipoCronograma') || undefined,
     };
 
     const edts = await ProyectoEdtService.obtenerEdtsPorProyecto(proyectoId, filtros);

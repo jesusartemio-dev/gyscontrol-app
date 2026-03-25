@@ -2380,6 +2380,7 @@ export interface FiltrosCronogramaData {
   fechaHasta?: Date
   soloConRetrasos?: boolean
   soloSinProgreso?: boolean
+  tipoCronograma?: string
 }
 
 // 🏗️ Interface para datos de creación EDT
@@ -2706,6 +2707,9 @@ export interface HojaDeGastos {
   fechaCierre?: string | null
   createdAt: string
   updatedAt: string
+  // Tipo de requerimiento
+  tipoPropósito?: 'gastos_viaticos' | 'compra_materiales' | string | null
+  justificacionMateriales?: string | null
   // Relations
   proyecto?: Pick<Proyecto, 'id' | 'codigo' | 'nombre'> | null
   centroCosto?: CentroCosto | null
@@ -2713,6 +2717,23 @@ export interface HojaDeGastos {
   aprobador?: { id: string; name: string | null; email: string } | null
   lineas?: GastoLinea[]
   adjuntos?: HojaDeGastosAdjunto[]
+  itemsMateriales?: Array<{
+    id: string
+    codigo: string
+    descripcion: string
+    unidad: string
+    cantidadSolicitada: number
+    precioEstimado?: number | null
+    precioReal?: number | null
+    totalEstimado?: number | null
+    totalReal?: number | null
+    proyectoId: string
+    pedidoEquipoItemId: string
+    pedidoId: string
+    pedidoEquipo?: { id: string; codigo: string }
+    pedidoEquipoItem?: { id: string; codigo: string; descripcion: string }
+    proyecto?: Pick<Proyecto, 'id' | 'codigo' | 'nombre'>
+  }>
 }
 
 export interface HojaDeGastosAdjunto {

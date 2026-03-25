@@ -53,6 +53,9 @@ export class ProyectoEdtService {
             fechaFinPlan: {
               lte: filtros.fechaHasta
             }
+          }),
+          ...(filtros.tipoCronograma && {
+            proyectoCronograma: { tipo: filtros.tipoCronograma }
           })
         },
         select: {

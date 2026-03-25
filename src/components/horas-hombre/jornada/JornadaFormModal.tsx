@@ -177,7 +177,7 @@ export function JornadaFormModal({
 
   const cargarEdts = async () => {
     try {
-      const response = await fetch(`/api/proyecto-edt?proyectoId=${proyectoId}`)
+      const response = await fetch(`/api/proyecto-edt?proyectoId=${proyectoId}&tipoCronograma=ejecucion`)
       if (response.ok) {
         const data = await response.json()
         const allEdts = Array.isArray(data) ? data : []
