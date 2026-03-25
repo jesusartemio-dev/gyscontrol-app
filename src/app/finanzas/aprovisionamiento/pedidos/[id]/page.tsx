@@ -598,6 +598,21 @@ export default async function PedidoEquipoDetallePage({ params, searchParams }: 
                                     {item.descripcion}
                                   </p>
                                 )}
+                                {item.requerimientoMaterialItems?.length > 0 && (
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {item.requerimientoMaterialItems.map((req: any) => (
+                                      <a
+                                        key={req.id}
+                                        href={`/gastos/mis-requerimientos/${req.hojaDeGastosId}`}
+                                        className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors"
+                                        title={`Requerimiento ${req.hojaDeGastos?.numero} — ${req.cantidadSolicitada} und`}
+                                      >
+                                        <Package2 className="h-3 w-3" />
+                                        {req.hojaDeGastos?.numero || 'REQ'}
+                                      </a>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             </td>
                             <td className="p-4 text-right font-mono">
@@ -648,6 +663,113 @@ export default async function PedidoEquipoDetallePage({ params, searchParams }: 
               </div>
             </CardContent>
           </Card>
+
+          {/* Atenciones vía Requerimiento de Materiales */}
+          {(() => {
+            // Recolectar todos los requerimientos únicos referenciados por los items
+            const reqMap = new Map<string, {
+              hojaDeGastosId: string
+              numero: string
+              estado: string
+              items: Array<{ itemCodigo: string; itemDesc: string; cantidad: number; precioReal: number | null }>
+            }>()
+            for (const item of itemsData.items) {
+              for (const req of (item.requerimientoMaterialItems || [])) {
+                const key = req.hojaDeGastosId
+                if (!reqMap.has(key)) {
+                  reqMap.set(key, {
+                    hojaDeGastosId: key,
+                    numero: req.hojaDeGastos?.numero || 'REQ',
+                    estado: req.hojaDeGastos?.estado || '',
+                    items: [],
+                  })
+                }
+                reqMap.get(key)!.items.push({
+                  itemCodigo: item.codigo,
+                  itemDesc: item.nombre,
+                  cantidad: req.cantidadSolicitada,
+                  precioReal: req.precioReal,
+                })
+              }
+            }
+            const reqs = Array.from(reqMap.values())
+            if (reqs.length === 0) return null
+
+            const estadoColor: Record<string, string> = {
+              borrador: 'bg-gray-100 text-gray-700',
+              enviado: 'bg-blue-100 text-blue-700',
+              aprobado: 'bg-emerald-100 text-emerald-700',
+              depositado: 'bg-purple-100 text-purple-700',
+              rendido: 'bg-orange-100 text-orange-700',
+              validado: 'bg-teal-100 text-teal-700',
+              cerrado: 'bg-green-100 text-green-800',
+              rechazado: 'bg-red-100 text-red-700',
+            }
+
+            return (
+              <Card className="border-blue-200">
+                <CardHeader className="py-3 px-4">
+                  <CardTitle className="text-sm font-medium flex items-center gap-2">
+                    <Package2 className="h-4 w-4 text-blue-600" />
+                    Atenciones vía Requerimiento de Materiales
+                    <Badge variant="secondary" className="text-xs">{reqs.length}</Badge>
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Items de este pedido que están siendo atendidos a través de un requerimiento de compra de logística
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="px-4 pb-4 space-y-3">
+                  {reqs.map(req => (
+                    <div key={req.hojaDeGastosId} className="border rounded-lg overflow-hidden">
+                      <div className="flex items-center justify-between px-3 py-2 bg-blue-50 dark:bg-blue-950/20">
+                        <div className="flex items-center gap-2">
+                          <a
+                            href={`/gastos/mis-requerimientos/${req.hojaDeGastosId}`}
+                            className="font-mono text-sm font-semibold text-blue-700 hover:underline"
+                          >
+                            {req.numero}
+                          </a>
+                          <Badge className={`text-xs border-0 ${estadoColor[req.estado] || 'bg-gray-100 text-gray-700'}`}>
+                            {req.estado}
+                          </Badge>
+                        </div>
+                        <a
+                          href={`/gastos/mis-requerimientos/${req.hojaDeGastosId}`}
+                          className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                        >
+                          Ver requerimiento →
+                        </a>
+                      </div>
+                      <table className="w-full text-sm">
+                        <thead className="border-b">
+                          <tr className="text-xs text-muted-foreground">
+                            <th className="text-left px-3 py-1.5 font-medium">Código</th>
+                            <th className="text-left px-3 py-1.5 font-medium">Descripción</th>
+                            <th className="text-right px-3 py-1.5 font-medium">Cantidad</th>
+                            <th className="text-right px-3 py-1.5 font-medium">P.U. Real</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {req.items.map((ri, i) => (
+                            <tr key={i} className="hover:bg-muted/30">
+                              <td className="px-3 py-2 font-mono text-xs">{ri.itemCodigo}</td>
+                              <td className="px-3 py-2 text-xs max-w-[200px] truncate">{ri.itemDesc}</td>
+                              <td className="px-3 py-2 text-right font-mono text-xs">{ri.cantidad}</td>
+                              <td className="px-3 py-2 text-right font-mono text-xs">
+                                {ri.precioReal != null
+                                  ? <span className="text-green-700">S/ {ri.precioReal.toFixed(2)}</span>
+                                  : <span className="text-muted-foreground/50">—</span>}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )
+          })()}
         </TabsContent>
 
         {/* 🚚 Tracking Tab */}

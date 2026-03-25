@@ -50,9 +50,11 @@ export async function POST(
       )
     }
 
-    const pedidoItem = recepcion.pedidoEquipoItem!
-    const pedido = pedidoItem.pedidoEquipo
-    const ocNumero = recepcion.ordenCompraItem.ordenCompra.numero
+    const pedidoItem = recepcion.pedidoEquipoItem || null
+    const pedido = pedidoItem?.pedidoEquipo || null
+    const ocItem = recepcion.ordenCompraItem || null
+    const ocNumero = ocItem?.ordenCompra.numero || 'REQ'
+    const itemCodigo = pedidoItem?.codigo || ocItem?.codigo || 'item'
 
     await prisma.$transaction(async (tx) => {
       // 1. Revertir estado a pendiente, limpiar campos de rechazo
@@ -67,47 +69,44 @@ export async function POST(
         }
       })
 
-      // 2. Re-incrementar cantidadRecibida en OCI (rechazar lo decrementó)
-      await tx.ordenCompraItem.update({
-        where: { id: recepcion.ordenCompraItemId },
-        data: {
-          cantidadRecibida: { increment: recepcion.cantidadRecibida },
-          updatedAt: new Date(),
-        }
-      })
+      // 2. Si viene de OC: re-incrementar cantidadRecibida (rechazar lo decrementó)
+      if (ocItem && recepcion.ordenCompraItemId) {
+        await tx.ordenCompraItem.update({
+          where: { id: recepcion.ordenCompraItemId },
+          data: {
+            cantidadRecibida: { increment: recepcion.cantidadRecibida },
+            updatedAt: new Date(),
+          }
+        })
 
-      // 3. Recalcular estado de la OC
-      const ocId = recepcion.ordenCompraItem.ordenCompraId
-      const allItems = await tx.ordenCompraItem.findMany({
-        where: { ordenCompraId: ocId },
-      })
-      const todosCompletos = allItems.every(i => i.cantidadRecibida >= i.cantidad)
-      const algunoRecibido = allItems.some(i => i.cantidadRecibida > 0)
+        const ocId = ocItem.ordenCompraId
+        const allItems = await tx.ordenCompraItem.findMany({ where: { ordenCompraId: ocId } })
+        const todosCompletos = allItems.every(i => i.cantidadRecibida >= i.cantidad)
+        const algunoRecibido = allItems.some(i => i.cantidadRecibida > 0)
+        let nuevoEstadoOC = 'confirmada'
+        if (todosCompletos) nuevoEstadoOC = 'completada'
+        else if (algunoRecibido) nuevoEstadoOC = 'parcial'
+        await tx.ordenCompra.update({
+          where: { id: ocId },
+          data: { estado: nuevoEstadoOC as any, updatedAt: new Date() },
+        })
+      }
 
-      let nuevoEstadoOC = 'confirmada'
-      if (todosCompletos) nuevoEstadoOC = 'completada'
-      else if (algunoRecibido) nuevoEstadoOC = 'parcial'
-
-      await tx.ordenCompra.update({
-        where: { id: ocId },
-        data: { estado: nuevoEstadoOC as any, updatedAt: new Date() },
-      })
-
-      // 4. Crear EventoTrazabilidad
+      // 3. Crear EventoTrazabilidad
       await tx.eventoTrazabilidad.create({
         data: {
           id: `evt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          proyectoId: pedido.proyectoId,
-          pedidoEquipoId: pedido.id,
+          proyectoId: pedido?.proyectoId || null,
+          pedidoEquipoId: pedido?.id || null,
           tipo: 'rechazo_revertido',
-          descripcion: `Rechazo revertido: ${recepcion.cantidadRecibida} x ${pedidoItem.codigo} de OC ${ocNumero} vuelve a pendiente.${observaciones.trim() ? ` Motivo: ${observaciones.trim()}` : ''}`,
+          descripcion: `Rechazo revertido: ${recepcion.cantidadRecibida} x ${itemCodigo} de ${ocNumero} vuelve a pendiente.${observaciones.trim() ? ` Motivo: ${observaciones.trim()}` : ''}`,
           usuarioId: session.user.id,
           metadata: {
             recepcionPendienteId: id,
             ordenCompraNumero: ocNumero,
             cantidadRecibida: recepcion.cantidadRecibida,
-            pedidoCodigo: pedido.codigo,
-            itemCodigo: pedidoItem.codigo,
+            pedidoCodigo: pedido?.codigo || null,
+            itemCodigo,
             motivoRechazoOriginal: recepcion.motivoRechazo,
           },
           updatedAt: new Date(),

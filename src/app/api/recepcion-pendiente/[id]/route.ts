@@ -51,56 +51,44 @@ export async function DELETE(
       return NextResponse.json({ error: validation.message }, { status: 409 })
     }
 
-    const oci = recepcion.ordenCompraItem
-    const oc = oci.ordenCompra
+    const oci = recepcion.ordenCompraItem || null
+    const oc = oci?.ordenCompra
 
     await prisma.$transaction(async (tx) => {
-      // 1. Decrementar cantidadRecibida en el OrdenCompraItem
-      await tx.ordenCompraItem.update({
-        where: { id: oci.id },
-        data: {
-          cantidadRecibida: { decrement: recepcion.cantidadRecibida },
-        },
-      })
+      // 1. Si viene de OC: decrementar cantidadRecibida y recalcular estado OC
+      if (oci && oc) {
+        await tx.ordenCompraItem.update({
+          where: { id: oci.id },
+          data: { cantidadRecibida: { decrement: recepcion.cantidadRecibida } },
+        })
 
-      // 2. Recalcular estado de la OC
-      const allOCItems = await tx.ordenCompraItem.findMany({
-        where: { ordenCompraId: oc.id },
-        select: { cantidad: true, cantidadRecibida: true },
-      })
-
-      let nuevoEstadoOC: string
-      const todosCompletos = allOCItems.every(i => (i.cantidadRecibida || 0) >= i.cantidad)
-      const algunoRecibido = allOCItems.some(i => (i.cantidadRecibida || 0) > 0)
-
-      if (todosCompletos) {
-        nuevoEstadoOC = 'completada'
-      } else if (algunoRecibido) {
-        nuevoEstadoOC = 'parcial'
-      } else {
-        nuevoEstadoOC = 'confirmada'
+        const allOCItems = await tx.ordenCompraItem.findMany({
+          where: { ordenCompraId: oc.id },
+          select: { cantidad: true, cantidadRecibida: true },
+        })
+        const todosCompletos = allOCItems.every(i => (i.cantidadRecibida || 0) >= i.cantidad)
+        const algunoRecibido = allOCItems.some(i => (i.cantidadRecibida || 0) > 0)
+        const nuevoEstadoOC = todosCompletos ? 'completada' : algunoRecibido ? 'parcial' : 'confirmada'
+        await tx.ordenCompra.update({
+          where: { id: oc.id },
+          data: { estado: nuevoEstadoOC as any, updatedAt: new Date() },
+        })
       }
 
-      await tx.ordenCompra.update({
-        where: { id: oc.id },
-        data: { estado: nuevoEstadoOC as any, updatedAt: new Date() },
-      })
-
-      // 3. Eliminar la recepción
+      // 2. Eliminar la recepción
       await tx.recepcionPendiente.delete({ where: { id } })
     })
 
     // Auditoría fire-and-forget
     crearEvento(prisma, {
       tipo: 'recepcion_eliminada',
-      descripcion: `Recepción eliminada — ${recepcion.cantidadRecibida} x ${recepcion.pedidoEquipoItem?.codigo || 'item'} de OC ${oc.numero}`,
+      descripcion: `Recepción eliminada — ${recepcion.cantidadRecibida} x ${recepcion.pedidoEquipoItem?.codigo || 'item'}${oc ? ` de OC ${oc.numero}` : ''}`,
       usuarioId: session.user.id,
       proyectoId: recepcion.pedidoEquipoItem?.pedidoEquipo?.proyectoId || null,
       pedidoEquipoId: recepcion.pedidoEquipoItem?.pedidoEquipo?.id || null,
       metadata: {
         recepcionPendienteId: id,
-        ordenCompraId: oc.id,
-        ordenCompraNumero: oc.numero,
+        ...(oc ? { ordenCompraId: oci!.ordenCompraId, ordenCompraNumero: oc.numero } : {}),
         cantidadRecibida: recepcion.cantidadRecibida,
         estadoAlEliminar: recepcion.estado,
       },

@@ -729,10 +729,11 @@ model PedidoEquipo {
   listaEquipo          ListaEquipo?         @relation(fields: [listaId], references: [id])
   proyecto             Proyecto             @relation(fields: [proyectoId], references: [id])
   user                 User                 @relation(fields: [responsableId], references: [id])
-  pedidoEquipoItem     PedidoEquipoItem[]
-  ordenesCompra        OrdenCompra[]
-  eventosTrazabilidad  EventoTrazabilidad[]
-  cuentasPorPagar      CuentaPorPagar[]
+  pedidoEquipoItem            PedidoEquipoItem[]
+  ordenesCompra               OrdenCompra[]
+  eventosTrazabilidad         EventoTrazabilidad[]
+  cuentasPorPagar             CuentaPorPagar[]
+  requerimientoMaterialItems  RequerimientoMaterialItem[]
 
   @@index([estado, prioridad, createdAt(sort: Desc)], map: "idx_pedido_estado_prioridad_fecha")
   @@index([proyectoId, estado, createdAt(sort: Desc)], map: "idx_pedido_proyecto_estado_fecha")
@@ -784,9 +785,10 @@ model PedidoEquipoItem {
   catalogoEquipo              CatalogoEquipo?      @relation(fields: [catalogoEquipoId], references: [id], onDelete: SetNull)
   user                        User                 @relation(fields: [responsableId], references: [id])
   comentarioLogisticaPor      User?                @relation("PedidoEquipoItemComentarioLogistica", fields: [comentarioLogisticaPorId], references: [id])
-  ordenCompraItems            OrdenCompraItem[]
-  recepcionesPendientes       RecepcionPendiente[]
-  cuentasPorPagar             CuentaPorPagar[]
+  ordenCompraItems             OrdenCompraItem[]
+  recepcionesPendientes        RecepcionPendiente[]
+  cuentasPorPagar              CuentaPorPagar[]
+  requerimientoMaterialItems   RequerimientoMaterialItem[]
 
   @@map("pedido_equipo_item")
 }
@@ -1040,11 +1042,12 @@ model Proyecto {
   proyectoCondicion        ProyectoCondicion[]
   proyectoExclusion        ProyectoExclusion[]
   // Documentos financieros imputados al proyecto
-  hojasDeGastos            HojaDeGastos[]
-  gastoLineas              GastoLinea[]          @relation("GastoLineaProyecto")
-  ordenesCompra            OrdenCompra[]
-  cuentasPorCobrar         CuentaPorCobrar[]
-  cuentasPorPagar          CuentaPorPagar[]
+  hojasDeGastos               HojaDeGastos[]
+  gastoLineas                 GastoLinea[]          @relation("GastoLineaProyecto")
+  ordenesCompra               OrdenCompra[]
+  cuentasPorCobrar            CuentaPorCobrar[]
+  cuentasPorPagar             CuentaPorPagar[]
+  requerimientoMaterialItems  RequerimientoMaterialItem[]
   lineasHH                 LineaHH[]
   cartasFianza             CartaFianza[]
   ssomaExpediente          SsomaExpediente?
@@ -2939,7 +2942,8 @@ model ConfiguracionGeneral {
   semanasxMes            Int      @default(4) // Semanas por mes para cálculo
   horasMensuales         Int      @default(192) // Calculado: horasSemanales * semanasxMes
   agenteLimiteMensualUsd Float    @default(25) // Limite mensual de gasto del agente IA (USD)
-  iaFeatures             Json?   // Feature flags IA: { chatGeneral, chatCotizacion, analisisTdr, importacionExcel, ocrComprobantes }
+  iaFeatures             Json?    // Feature flags IA: { chatGeneral, chatCotizacion, analisisTdr, importacionExcel, ocrComprobantes }
+  limiteMateriales       Float    @default(500) // Monto máx para compra materiales sin pedido vinculado
   updatedAt              DateTime @updatedAt
   updatedBy              String?
   user                   User?    @relation(fields: [updatedBy], references: [id])
@@ -3316,18 +3320,25 @@ model HojaDeGastos {
   fechaCierre       DateTime?
   createdAt         DateTime       @default(now())
   updatedAt         DateTime
+  // Tipo de requerimiento
+  tipoPropósito              String   @default("gastos_viaticos") @map("tipo_proposito")
+  // "gastos_viaticos" | "compra_materiales"
+  justificacionMateriales    String?  @map("justificacion_materiales")
 
-  proyecto    Proyecto?             @relation(fields: [proyectoId], references: [id])
-  centroCosto CentroCosto?          @relation(fields: [centroCostoId], references: [id])
-  empleado    User                  @relation("HojaEmpleado", fields: [empleadoId], references: [id])
-  aprobador   User?                 @relation("HojaAprobador", fields: [aprobadorId], references: [id])
-  lineas      GastoLinea[]
-  adjuntos    HojaDeGastosAdjunto[]
-  eventos     HojaDeGastosEvento[]
+  proyecto          Proyecto?                  @relation(fields: [proyectoId], references: [id])
+  centroCosto       CentroCosto?               @relation(fields: [centroCostoId], references: [id])
+  empleado          User                       @relation("HojaEmpleado", fields: [empleadoId], references: [id])
+  aprobador         User?                      @relation("HojaAprobador", fields: [aprobadorId], references: [id])
+  lineas            GastoLinea[]
+  adjuntos          HojaDeGastosAdjunto[]
+  eventos           HojaDeGastosEvento[]
+  itemsMateriales   RequerimientoMaterialItem[]
+  comprobantes      GastoComprobante[]
 
   @@index([proyectoId, estado])
   @@index([centroCostoId, estado])
   @@index([empleadoId, estado])
+  @@index([tipoPropósito, estado])
   @@map("hoja_de_gastos")
 }
 
@@ -3387,33 +3398,98 @@ model GastoLinea {
   proyectoId            String?
   centroCostoId         String?
   categoriaCosto        CategoriaCosto?
+  // Factura dividida: si pertenece a un comprobante compartido
+  gastoComprobanteId    String?
   createdAt             DateTime        @default(now())
   updatedAt             DateTime
 
-  hojaDeGastos   HojaDeGastos    @relation(fields: [hojaDeGastosId], references: [id], onDelete: Cascade)
-  categoriaGasto CategoriaGasto? @relation(fields: [categoriaGastoId], references: [id])
-  proyecto       Proyecto?       @relation("GastoLineaProyecto", fields: [proyectoId], references: [id])
-  centroCosto    CentroCosto?    @relation(fields: [centroCostoId], references: [id])
-  adjuntos       GastoAdjunto[]
+  hojaDeGastos    HojaDeGastos     @relation(fields: [hojaDeGastosId], references: [id], onDelete: Cascade)
+  categoriaGasto  CategoriaGasto?  @relation(fields: [categoriaGastoId], references: [id])
+  proyecto        Proyecto?        @relation("GastoLineaProyecto", fields: [proyectoId], references: [id])
+  centroCosto     CentroCosto?     @relation(fields: [centroCostoId], references: [id])
+  gastoComprobante GastoComprobante? @relation(fields: [gastoComprobanteId], references: [id])
+  adjuntos        GastoAdjunto[]
 
   @@index([hojaDeGastosId])
+  @@index([gastoComprobanteId])
   @@map("gasto_linea")
 }
 
 model GastoAdjunto {
-  id            String   @id @default(cuid())
-  gastoLineaId  String
-  nombreArchivo String
-  urlArchivo    String
-  driveFileId   String?
-  tipoArchivo   String?
-  tamano        Int?
-  createdAt     DateTime @default(now())
+  id                  String   @id @default(cuid())
+  gastoLineaId        String?
+  gastoComprobanteId  String?
+  nombreArchivo       String
+  urlArchivo          String
+  driveFileId         String?
+  tipoArchivo         String?
+  tamano              Int?
+  createdAt           DateTime @default(now())
 
-  gastoLinea GastoLinea @relation(fields: [gastoLineaId], references: [id], onDelete: Cascade)
+  gastoLinea       GastoLinea?       @relation(fields: [gastoLineaId], references: [id], onDelete: Cascade)
+  gastoComprobante GastoComprobante? @relation(fields: [gastoComprobanteId], references: [id], onDelete: Cascade)
 
   @@index([gastoLineaId])
+  @@index([gastoComprobanteId])
   @@map("gasto_adjunto")
+}
+
+// Comprobante compartido: un PDF que se distribuye entre múltiples líneas/proyectos
+model GastoComprobante {
+  id                String   @id @default(cuid())
+  hojaDeGastosId    String
+  tipoComprobante   String   // factura | boleta | recibo | ticket
+  numeroComprobante String
+  proveedorNombre   String?
+  proveedorRuc      String?
+  montoTotal        Float
+  fecha             DateTime
+  observaciones     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime
+
+  hojaDeGastos HojaDeGastos @relation(fields: [hojaDeGastosId], references: [id], onDelete: Cascade)
+  lineas       GastoLinea[]
+  adjuntos     GastoAdjunto[]
+
+  @@index([hojaDeGastosId])
+  @@map("gasto_comprobante")
+}
+
+// Items del requerimiento de materiales: vincula HojaDeGastos con PedidoEquipoItems
+model RequerimientoMaterialItem {
+  id                  String   @id @default(cuid())
+  hojaDeGastosId      String
+  pedidoEquipoItemId  String
+  pedidoId            String
+  proyectoId          String
+
+  // Snapshot del item al momento de crear el requerimiento
+  codigo              String
+  descripcion         String
+  unidad              String
+  categoriaCosto      String   @default("equipos")
+
+  // Cantidades y precios
+  cantidadSolicitada  Float
+  precioEstimado      Float?
+  precioReal          Float?
+  totalEstimado       Float?
+  totalReal           Float?
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime
+
+  hojaDeGastos      HojaDeGastos      @relation(fields: [hojaDeGastosId], references: [id], onDelete: Cascade)
+  pedidoEquipoItem  PedidoEquipoItem  @relation(fields: [pedidoEquipoItemId], references: [id])
+  pedidoEquipo      PedidoEquipo      @relation(fields: [pedidoId], references: [id])
+  proyecto          Proyecto          @relation(fields: [proyectoId], references: [id])
+  recepciones       RecepcionPendiente[]
+
+  @@index([hojaDeGastosId])
+  @@index([pedidoEquipoItemId])
+  @@index([pedidoId])
+  @@map("requerimiento_material_item")
 }
 
 // ======================
@@ -3509,32 +3585,35 @@ model OrdenCompraItem {
 }
 
 model RecepcionPendiente {
-  id                   String           @id @default(cuid())
-  pedidoEquipoItemId   String?
-  ordenCompraItemId    String
-  cantidadRecibida     Float
-  fechaRecepcion       DateTime         @default(now())
-  estado               EstadoRecepcion  @default(pendiente)
-  confirmadoPorId      String?
-  fechaConfirmacion    DateTime?
-  entregadoPorId       String?
-  fechaEntregaProyecto DateTime?
-  rechazadoPorId       String?
-  fechaRechazo         DateTime?
-  motivoRechazo        String?
-  observaciones        String?
-  createdAt            DateTime         @default(now())
-  updatedAt            DateTime         @updatedAt
+  id                          String           @id @default(cuid())
+  pedidoEquipoItemId          String?
+  ordenCompraItemId           String?
+  requerimientoMaterialItemId String?
+  cantidadRecibida            Float
+  fechaRecepcion              DateTime         @default(now())
+  estado                      EstadoRecepcion  @default(pendiente)
+  confirmadoPorId             String?
+  fechaConfirmacion           DateTime?
+  entregadoPorId              String?
+  fechaEntregaProyecto        DateTime?
+  rechazadoPorId              String?
+  fechaRechazo                DateTime?
+  motivoRechazo               String?
+  observaciones               String?
+  createdAt                   DateTime         @default(now())
+  updatedAt                   DateTime         @updatedAt
 
-  pedidoEquipoItem PedidoEquipoItem? @relation(fields: [pedidoEquipoItemId], references: [id], onDelete: Cascade)
-  ordenCompraItem  OrdenCompraItem   @relation(fields: [ordenCompraItemId], references: [id], onDelete: Cascade)
-  confirmadoPor    User?             @relation("RecepcionConfirmador", fields: [confirmadoPorId], references: [id])
-  entregadoPor     User?             @relation("RecepcionEntregador", fields: [entregadoPorId], references: [id])
-  rechazadoPor     User?             @relation("RecepcionRechazador", fields: [rechazadoPorId], references: [id])
-  entregasItem     EntregaItem[]
+  pedidoEquipoItem          PedidoEquipoItem?          @relation(fields: [pedidoEquipoItemId], references: [id], onDelete: Cascade)
+  ordenCompraItem           OrdenCompraItem?           @relation(fields: [ordenCompraItemId], references: [id], onDelete: Cascade)
+  requerimientoMaterialItem RequerimientoMaterialItem? @relation(fields: [requerimientoMaterialItemId], references: [id], onDelete: Cascade)
+  confirmadoPor             User?                      @relation("RecepcionConfirmador", fields: [confirmadoPorId], references: [id])
+  entregadoPor              User?                      @relation("RecepcionEntregador", fields: [entregadoPorId], references: [id])
+  rechazadoPor              User?                      @relation("RecepcionRechazador", fields: [rechazadoPorId], references: [id])
+  entregasItem              EntregaItem[]
 
   @@index([pedidoEquipoItemId])
   @@index([ordenCompraItemId])
+  @@index([requerimientoMaterialItemId])
   @@index([estado])
   @@map("recepcion_pendiente")
 }

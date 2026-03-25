@@ -8,6 +8,7 @@ export async function getHojasDeGastos(params?: {
   estado?: string
   empleadoId?: string
   scope?: string
+  tipoProposito?: string
 }): Promise<HojaDeGastos[]> {
   const searchParams = new URLSearchParams()
   if (params?.centroCostoId) searchParams.set('centroCostoId', params.centroCostoId)
@@ -15,6 +16,7 @@ export async function getHojasDeGastos(params?: {
   if (params?.estado) searchParams.set('estado', params.estado)
   if (params?.empleadoId) searchParams.set('empleadoId', params.empleadoId)
   if (params?.scope) searchParams.set('scope', params.scope)
+  if (params?.tipoProposito) searchParams.set('tipoProposito', params.tipoProposito)
   const query = searchParams.toString()
   const res = await fetch(`${BASE_URL}${query ? `?${query}` : ''}`)
   if (!res.ok) {
@@ -77,6 +79,55 @@ async function postAction(id: string, action: string, body?: any): Promise<HojaD
   if (!res.ok) {
     const err = await res.json()
     throw new Error(err.error || `Error al ${action}`)
+  }
+  return res.json()
+}
+
+// Items de pedidos elegibles para requerimiento de materiales
+export interface ItemParaRequerimiento {
+  id: string
+  codigo: string
+  descripcion: string
+  unidad: string
+  tipoItem: string
+  cantidadPedida: number
+  cantidadAtendida: number | null
+  cantidadDisponible: number
+  precioUnitario: number | null
+  estadoEntrega: string
+  pedidoId: string
+  pedidoEquipo: {
+    id: string
+    codigo: string
+    estado: string
+    fechaNecesaria: string
+    proyectoId: string
+    proyecto: { id: string; codigo: string; nombre: string; estado: string }
+  }
+}
+
+export interface PedidoParaRequerimiento {
+  id: string
+  codigo: string
+  estado: string
+  fechaNecesaria: string
+  items: ItemParaRequerimiento[]
+}
+
+export interface ProyectoParaRequerimiento {
+  id: string
+  codigo: string
+  nombre: string
+  estado: string
+  pedidos: PedidoParaRequerimiento[]
+}
+
+export async function getItemsParaRequerimiento(q?: string): Promise<ProyectoParaRequerimiento[]> {
+  const params = q ? `?q=${encodeURIComponent(q)}` : ''
+  const res = await fetch(`/api/pedidos/items-para-requerimiento${params}`)
+  if (!res.ok) {
+    const err = await res.json()
+    throw new Error(err.error || 'Error al obtener items')
   }
   return res.json()
 }

@@ -24,7 +24,8 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
       return NextResponse.json({ error: 'Adjunto no encontrado' }, { status: 404 })
     }
 
-    if (!['borrador', 'rechazado', 'aprobado', 'depositado'].includes(existing.gastoLinea.hojaDeGastos.estado)) {
+    const hoja = existing.gastoLinea?.hojaDeGastos
+    if (!hoja || !['borrador', 'rechazado', 'aprobado', 'depositado'].includes(hoja.estado)) {
       return NextResponse.json({ error: 'No se pueden eliminar adjuntos en este estado' }, { status: 400 })
     }
 

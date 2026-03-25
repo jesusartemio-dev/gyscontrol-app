@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { Plus, Search, X, Loader2, CreditCard, ChevronRight, Edit, Trash2 } from 'lucide-react'
+import { Plus, Search, X, Loader2, CreditCard, ChevronRight, Edit, Trash2, Package } from 'lucide-react'
 import { toast } from 'sonner'
 import { getHojasDeGastos, deleteHojaDeGastos } from '@/lib/services/hojaDeGastos'
 import type { HojaDeGastos } from '@/types'
@@ -205,14 +205,23 @@ export default function MisRequerimientosPage() {
                     className="cursor-pointer hover:bg-muted/50"
                     onClick={() => router.push(`/gastos/mis-requerimientos/${hoja.id}`)}
                   >
-                    <TableCell className="font-mono text-sm font-medium">{hoja.numero}</TableCell>
+                    <TableCell className="font-mono text-sm font-medium whitespace-nowrap">
+                      <div className="flex items-center gap-1.5">
+                        {hoja.tipoPropósito === 'compra_materiales'
+                          ? <Package className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                          : <CreditCard className="h-3.5 w-3.5 text-amber-500 shrink-0" />}
+                        {hoja.numero}
+                      </div>
+                    </TableCell>
                     <TableCell className="max-w-[180px] truncate">{hoja.motivo}</TableCell>
                     <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
                       {getAsignadoA(hoja)}
                     </TableCell>
                     <TableCell>
                       <span className="text-xs text-muted-foreground capitalize">
-                        {categoriaLabel[hoja.categoriaCosto] || hoja.categoriaCosto}
+                        {hoja.tipoPropósito === 'compra_materiales'
+                          ? <Badge className="text-xs bg-blue-100 text-blue-700 border-0">Materiales</Badge>
+                          : categoriaLabel[hoja.categoriaCosto] || hoja.categoriaCosto}
                       </span>
                     </TableCell>
                     <TableCell>

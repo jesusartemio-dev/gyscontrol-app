@@ -216,7 +216,19 @@ export async function GET(
             precioUnitario: true,
             costoTotal: true,
             estado: true,
-            listaEquipoItemId: true
+            listaEquipoItemId: true,
+            requerimientoMaterialItems: {
+              select: {
+                id: true,
+                cantidadSolicitada: true,
+                precioEstimado: true,
+                precioReal: true,
+                hojaDeGastosId: true,
+                hojaDeGastos: {
+                  select: { numero: true, estado: true }
+                }
+              }
+            }
           }
         }
       }

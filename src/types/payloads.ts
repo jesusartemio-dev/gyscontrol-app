@@ -1361,6 +1361,17 @@ export interface CentroCostoUpdatePayload {
 // Hoja de Gastos
 // ======================
 
+export interface RequerimientoMaterialItemPayload {
+  pedidoEquipoItemId: string
+  pedidoId: string
+  proyectoId: string
+  codigo: string
+  descripcion: string
+  unidad: string
+  cantidadSolicitada: number
+  precioEstimado?: number | null
+}
+
 export interface HojaDeGastosPayload {
   proyectoId?: string
   centroCostoId?: string
@@ -1370,6 +1381,10 @@ export interface HojaDeGastosPayload {
   observaciones?: string
   requiereAnticipo?: boolean
   montoAnticipo?: number
+  // Requerimiento de materiales
+  tipoProposito?: 'gastos_viaticos' | 'compra_materiales'
+  justificacionMateriales?: string
+  items?: RequerimientoMaterialItemPayload[]
 }
 
 export interface HojaDeGastosUpdatePayload {

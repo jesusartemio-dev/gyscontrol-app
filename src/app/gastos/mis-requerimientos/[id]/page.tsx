@@ -38,6 +38,7 @@ import {
   FileSpreadsheet,
   FileText,
   ChevronDown,
+  Package,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -63,6 +64,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import RequerimientoItemsCard from '@/components/rendiciones/RequerimientoItemsCard'
 import type { HojaDeGastos, GastoLinea, CategoriaGasto, HojaDeGastosAdjunto } from '@/types'
 
 const formatDate = (date: string | null | undefined) =>
@@ -557,13 +559,18 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
         <CardContent className="p-4 space-y-2">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
             <div className="flex items-center gap-2">
-              <CreditCard className="h-4 w-4 text-muted-foreground" />
+              {hoja.tipoPropósito === 'compra_materiales'
+                ? <Package className="h-4 w-4 text-blue-500" />
+                : <CreditCard className="h-4 w-4 text-muted-foreground" />}
               <span className="text-muted-foreground">Asignado a:</span>
               <span className="font-medium">
                 {hoja.proyecto
                   ? `${hoja.proyecto.codigo} - ${hoja.proyecto.nombre}`
                   : hoja.centroCosto?.nombre || '-'}
               </span>
+              {hoja.tipoPropósito === 'compra_materiales' && (
+                <Badge className="text-xs bg-blue-100 text-blue-700 border-0 ml-1">Materiales</Badge>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <MessageSquare className="h-4 w-4 text-muted-foreground" />
@@ -596,12 +603,36 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
           {hoja.observaciones && (
             <p className="text-sm text-muted-foreground border-t pt-2 mt-2">{hoja.observaciones}</p>
           )}
+          {hoja.justificacionMateriales && (
+            <p className="text-sm text-blue-800 dark:text-blue-300 border-t pt-2 mt-2">
+              <span className="font-medium">Justificación: </span>{hoja.justificacionMateriales}
+            </p>
+          )}
         </CardContent>
       </Card>
 
-      {/* Líneas de gasto */}
+      {/* Items del requerimiento de materiales */}
+      {hoja.tipoPropósito === 'compra_materiales' && (
+        <RequerimientoItemsCard
+          hoja={hoja}
+          onChanged={loadData}
+          canAddComprobante={canRendir || hoja.estado === 'rendido'}
+        />
+      )}
+
+      {/* Líneas de gasto / comprobantes */}
       <Card>
         <CardContent className="p-4">
+          {hoja.tipoPropósito === 'compra_materiales' && isEditable && (
+            <div className="flex items-start gap-2 text-xs text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/20 rounded-lg p-2.5 mb-3 border border-blue-200 dark:border-blue-900">
+              <Package className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+              <span>
+                <strong>Rendición de materiales:</strong> Agrega una línea por cada item de la factura.
+                Usa el campo &quot;Proyecto&quot; en cada línea para imputar al proyecto correcto.
+                Para una factura que cubre varios items, usa el botón &quot;Registrar Comprobante&quot; de arriba.
+              </span>
+            </div>
+          )}
           <GastoLineaTable
             hojaDeGastosId={hoja.id}
             lineas={lineas}

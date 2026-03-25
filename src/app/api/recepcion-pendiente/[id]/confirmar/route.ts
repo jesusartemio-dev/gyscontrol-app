@@ -43,6 +43,12 @@ export async function POST(
             ordenCompra: { select: { numero: true, proyectoId: true, proyecto: { select: { nombre: true, gestorId: true } } } }
           }
         },
+        requerimientoMaterialItem: {
+          include: {
+            hojaDeGastos: { select: { numero: true } },
+            proyecto: { select: { nombre: true, gestorId: true } },
+          }
+        },
         confirmadoPor: { select: { name: true } },
       }
     })
@@ -65,15 +71,16 @@ export async function POST(
       )
     }
 
-    // Extraer datos con null safety (pedidoEquipoItemId ahora es opcional)
+    // Extraer datos con null safety — puede ser OC o requerimiento de materiales
     const pedidoItem = recepcion.pedidoEquipoItem || null
     const pedido = pedidoItem?.pedidoEquipo || null
-    const ocItem = recepcion.ordenCompraItem
-    const ocNumero = ocItem.ordenCompra.numero
-    const proyectoId = pedido?.proyectoId || ocItem.ordenCompra.proyectoId || null
-    const proyectoNombre = pedido?.proyecto?.nombre || ocItem.ordenCompra.proyecto?.nombre || null
-    const gestorId = pedido?.proyecto?.gestorId || ocItem.ordenCompra.proyecto?.gestorId || null
-    const itemCodigo = pedidoItem?.codigo || ocItem.codigo
+    const ocItem = recepcion.ordenCompraItem || null
+    const reqItem = recepcion.requerimientoMaterialItem || null
+    const ocNumero = ocItem?.ordenCompra.numero || reqItem?.hojaDeGastos.numero || 'REQ'
+    const proyectoId = pedido?.proyectoId || ocItem?.ordenCompra.proyectoId || reqItem?.proyectoId || null
+    const proyectoNombre = pedido?.proyecto?.nombre || ocItem?.ordenCompra.proyecto?.nombre || reqItem?.proyecto?.nombre || null
+    const gestorId = pedido?.proyecto?.gestorId || ocItem?.ordenCompra.proyecto?.gestorId || reqItem?.proyecto?.gestorId || null
+    const itemCodigo = pedidoItem?.codigo || ocItem?.codigo || reqItem?.codigo || 'item'
 
     // ═══════════════════════════════════════
     // PASO 1: Confirmar llegada a almacén
@@ -120,7 +127,7 @@ export async function POST(
           tipo: 'info',
           prioridad: 'media',
           entidadTipo: pedido ? 'PedidoEquipo' : 'OrdenCompra',
-          entidadId: pedido?.id || ocItem.ordenCompraId,
+          entidadId: pedido?.id || ocItem?.ordenCompraId || reqItem?.hojaDeGastosId || id,
           accionUrl: '/logistica/recepciones',
           accionTexto: 'Ver recepciones',
         })
@@ -288,7 +295,7 @@ export async function POST(
         tipo: 'success',
         prioridad: 'media',
         entidadTipo: pedido ? 'PedidoEquipo' : 'OrdenCompra',
-        entidadId: pedido?.id || ocItem.ordenCompraId,
+        entidadId: pedido?.id || ocItem?.ordenCompraId || reqItem?.hojaDeGastosId || id,
         accionUrl: proyectoId ? `/proyectos/${proyectoId}` : '/logistica/recepciones',
         accionTexto: pedido ? 'Ver proyecto' : 'Ver recepciones',
       })

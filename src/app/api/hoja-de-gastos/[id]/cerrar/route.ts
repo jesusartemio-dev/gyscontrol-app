@@ -15,13 +15,26 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
 
     const { id } = await params
-    const hoja = await prisma.hojaDeGastos.findUnique({ where: { id } })
+    const hoja = await prisma.hojaDeGastos.findUnique({
+      where: { id },
+      include: {
+        itemsMateriales: {
+          include: {
+            pedidoEquipoItem: {
+              select: { id: true, codigo: true, descripcion: true }
+            }
+          }
+        }
+      }
+    })
     if (!hoja) {
       return NextResponse.json({ error: 'Hoja de gastos no encontrada' }, { status: 404 })
     }
     if (hoja.estado !== 'validado') {
       return NextResponse.json({ error: 'Solo se puede cerrar desde estado validado' }, { status: 400 })
     }
+
+    const esCompra = (hoja as any).tipoPropósito === 'compra_materiales'
 
     const data = await prisma.$transaction(async (tx) => {
       const updated = await tx.hojaDeGastos.update({
@@ -44,8 +57,48 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         },
       })
 
-      // Recalcular totalRealGastos del proyecto si aplica
-      if (hoja.proyectoId) {
+      // ─── Requerimiento de materiales: crear RecepcionPendiente por item ───
+      if (esCompra && hoja.itemsMateriales.length > 0) {
+        for (const reqItem of hoja.itemsMateriales) {
+          // Solo crear si no tiene ya una recepción activa
+          const recepcionExistente = await tx.recepcionPendiente.findFirst({
+            where: {
+              requerimientoMaterialItemId: reqItem.id,
+              estado: { notIn: ['rechazado'] },
+            },
+          })
+          if (recepcionExistente) continue
+
+          await tx.recepcionPendiente.create({
+            data: {
+              pedidoEquipoItemId: reqItem.pedidoEquipoItemId,
+              requerimientoMaterialItemId: reqItem.id,
+              cantidadRecibida: reqItem.cantidadSolicitada,
+              estado: 'pendiente',
+              observaciones: `Compra por ${hoja.numero} — ${reqItem.descripcion}`,
+            },
+          })
+        }
+
+        // Registrar evento de trazabilidad
+        await tx.eventoTrazabilidad.create({
+          data: {
+            id: `evt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            tipo: 'recepcion_creada_desde_requerimiento',
+            descripcion: `${hoja.itemsMateriales.length} recepcion(es) creadas desde requerimiento ${hoja.numero}`,
+            usuarioId: session.user.id,
+            metadata: {
+              hojaDeGastosId: id,
+              hojaNumero: hoja.numero,
+              itemCount: hoja.itemsMateriales.length,
+            },
+            updatedAt: new Date(),
+          }
+        })
+      }
+
+      // ─── Gastos viáticos: recalcular totalRealGastos del proyecto ─────────
+      if (!esCompra && hoja.proyectoId) {
         const agg = await tx.hojaDeGastos.aggregate({
           where: {
             proyectoId: hoja.proyectoId,
