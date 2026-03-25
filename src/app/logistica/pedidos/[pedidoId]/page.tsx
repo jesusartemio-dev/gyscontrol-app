@@ -1994,17 +1994,14 @@ export default function PedidoLogisticaDetailPage() {
                                 className="h-3.5 w-3.5"
                               />
                             </th>
-                            <th className="px-3 py-2 text-left font-medium text-gray-600">Código</th>
-                            <th className="px-3 py-2 text-left font-medium text-gray-600">Descripción</th>
-                            <th className="px-3 py-2 text-center font-medium text-gray-600">Cant.</th>
-                            <th className="px-3 py-2 text-left font-medium text-gray-600">Proveedor</th>
+                            <th className="px-3 py-2 text-left font-medium text-gray-600">Item</th>
+                            <th className="px-3 py-2 text-right font-medium text-gray-600 w-20">Cant.</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y">
                           {itemsFiltrados.map(([itemId, state]) => {
                             const item = pedido?.items?.find((i: any) => i.id === itemId) as any
                             if (!item) return null
-                            const provNombre = item.proveedor?.nombre || item.proveedorNombre || item.listaEquipoItem?.proveedor?.nombre || ''
                             return (
                               <tr
                                 key={itemId}
@@ -2018,14 +2015,11 @@ export default function PedidoLogisticaDetailPage() {
                                     className="h-3.5 w-3.5"
                                   />
                                 </td>
-                                <td className="px-3 py-2 font-mono text-[11px] text-gray-500">{item.codigo}</td>
-                                <td className="px-3 py-2 max-w-[220px]">
-                                  <span className="truncate block" title={item.descripcion}>{item.descripcion}</span>
+                                <td className="px-3 py-2">
+                                  <div className="font-medium truncate" title={item.descripcion}>{item.descripcion}</div>
+                                  <div className="text-[11px] text-gray-400 font-mono">{item.codigo}</div>
                                 </td>
-                                <td className="px-3 py-2 text-center font-medium">{item.cantidadPedida} <span className="text-gray-400">{item.unidad}</span></td>
-                                <td className="px-3 py-2 text-gray-500 max-w-[120px] truncate">
-                                  {provNombre || <span className="text-amber-500 italic">Sin proveedor</span>}
-                                </td>
+                                <td className="px-3 py-2 text-right font-medium whitespace-nowrap">{item.cantidadPedida} <span className="text-gray-400 font-normal">{item.unidad}</span></td>
                               </tr>
                             )
                           })}
