@@ -13,7 +13,15 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
-  ArrowLeft, Loader2, CreditCard, Package, Search, ChevronDown, ChevronRight, AlertCircle
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import {
+  ArrowLeft, Loader2, CreditCard, Package, Search, ChevronDown, ChevronRight,
+  AlertCircle, Plus, Trash2, X,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { createHojaDeGastos } from '@/lib/services/hojaDeGastos'
@@ -24,8 +32,8 @@ import {
 } from '@/lib/services/hojaDeGastos'
 import SelectorAsignacion, { type AsignacionValue } from '@/components/shared/SelectorAsignacion'
 
-// ─── Tipo de requerimiento ───────────────────────────────────────────────────
 type TipoRequerimiento = 'gastos_viaticos' | 'compra_materiales'
+type AgrupacionModal = 'proyecto' | 'pedido'
 
 const CATEGORIAS = [
   { value: 'gastos', label: 'Gastos' },
@@ -33,45 +41,301 @@ const CATEGORIAS = [
   { value: 'servicios', label: 'Servicios' },
 ]
 
-// ─── Estado por item seleccionado ────────────────────────────────────────────
 interface ItemSeleccionado {
   item: ItemParaRequerimiento
   cantidad: number
   precioEstimado: number | null
 }
 
-// ─── Formateo ────────────────────────────────────────────────────────────────
 const fmt = (n: number | null | undefined) =>
   n != null ? new Intl.NumberFormat('es-PE', { minimumFractionDigits: 2 }).format(n) : '—'
 
+// ─── Modal de selección de items ─────────────────────────────────────────────
+interface ModalSelectorProps {
+  open: boolean
+  onClose: () => void
+  proyectos: ProyectoParaRequerimiento[]
+  loading: boolean
+  busqueda: string
+  onBusqueda: (q: string) => void
+  seleccionados: Map<string, ItemSeleccionado>
+  onToggle: (item: ItemParaRequerimiento, checked: boolean) => void
+}
+
+function ModalSelectorItems({
+  open, onClose, proyectos, loading, busqueda, onBusqueda, seleccionados, onToggle,
+}: ModalSelectorProps) {
+  const [expandidos, setExpandidos] = useState<Set<string>>(new Set())
+  const [agrupacion, setAgrupacion] = useState<AgrupacionModal>('pedido')
+
+  // Expandir todo al abrir o cambiar datos
+  useEffect(() => {
+    if (!open) return
+    const ids = new Set<string>()
+    proyectos.forEach(p => {
+      ids.add(p.id)
+      p.pedidos.forEach(ped => ids.add(ped.id))
+    })
+    setExpandidos(ids)
+  }, [open, proyectos])
+
+  const toggle = (id: string) => {
+    setExpandidos(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  const totalItems = proyectos.reduce((s, p) => s + p.pedidos.reduce((ss, ped) => ss + ped.items.length, 0), 0)
+
+  // Para agrupación por Pedido: aplanar proyecto y listar solo pedidos
+  const pedidosFlat = proyectos.flatMap(p =>
+    p.pedidos.map(ped => ({ ...ped, proyectoCodigo: p.codigo, proyectoNombre: p.nombre }))
+  )
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="sm:max-w-2xl flex flex-col max-h-[85vh] p-0 gap-0">
+        <DialogHeader className="px-5 pt-5 pb-3 border-b shrink-0">
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <Package className="h-4 w-4 text-blue-600" />
+            Seleccionar Items a Comprar
+          </DialogTitle>
+
+          {/* Barra de búsqueda + agrupación */}
+          <div className="flex gap-2 mt-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                className="pl-8 h-9"
+                placeholder="Buscar código, descripción, proyecto, pedido..."
+                value={busqueda}
+                onChange={e => onBusqueda(e.target.value)}
+              />
+              {busqueda && (
+                <button onClick={() => onBusqueda('')} className="absolute right-2 top-2.5">
+                  <X className="h-4 w-4 text-muted-foreground" />
+                </button>
+              )}
+            </div>
+            <Select value={agrupacion} onValueChange={v => setAgrupacion(v as AgrupacionModal)}>
+              <SelectTrigger className="w-[130px] h-9 shrink-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="proyecto">Por Proyecto</SelectItem>
+                <SelectItem value="pedido">Por Pedido</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <p className="text-xs text-muted-foreground mt-1">
+            {totalItems} item(s) disponible(s) · {seleccionados.size} seleccionado(s)
+          </p>
+        </DialogHeader>
+
+        {/* Lista scrollable */}
+        <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
+          {loading ? (
+            <div className="flex items-center justify-center py-12 text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin mr-2" />
+              Cargando...
+            </div>
+          ) : totalItems === 0 ? (
+            <div className="text-center py-10 text-sm text-muted-foreground">
+              No hay items disponibles.
+              <br />
+              <span className="text-xs">Pedidos deben estar en estado &quot;enviado&quot; o &quot;parcial&quot; y sin OC activa.</span>
+            </div>
+          ) : agrupacion === 'proyecto' ? (
+            // ── Agrupar por Proyecto → Pedido ──
+            proyectos.map(proyecto => (
+              <div key={proyecto.id} className="border rounded-lg overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => toggle(proyecto.id)}
+                  className="w-full flex items-center gap-2 px-3 py-2 bg-muted/50 hover:bg-muted/80 text-left transition-colors"
+                >
+                  {expandidos.has(proyecto.id)
+                    ? <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+                    : <ChevronRight className="h-3.5 w-3.5 shrink-0" />}
+                  <span className="font-semibold text-sm">{proyecto.codigo}</span>
+                  <span className="text-sm text-muted-foreground truncate">— {proyecto.nombre}</span>
+                  <Badge variant="secondary" className="ml-auto text-xs py-0 h-4 shrink-0">
+                    {proyecto.pedidos.reduce((s, p) => s + p.items.length, 0)}
+                  </Badge>
+                </button>
+                {expandidos.has(proyecto.id) && proyecto.pedidos.map(pedido => (
+                  <PedidoGroup
+                    key={pedido.id}
+                    pedido={pedido}
+                    expandidos={expandidos}
+                    onToggleExpand={toggle}
+                    seleccionados={seleccionados}
+                    onToggleItem={onToggle}
+                    indent
+                  />
+                ))}
+              </div>
+            ))
+          ) : (
+            // ── Agrupar solo por Pedido ──
+            pedidosFlat.map(pedido => (
+              <div key={pedido.id} className="border rounded-lg overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => toggle(pedido.id)}
+                  className="w-full flex items-center gap-2 px-3 py-2 bg-muted/50 hover:bg-muted/80 text-left transition-colors"
+                >
+                  {expandidos.has(pedido.id)
+                    ? <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+                    : <ChevronRight className="h-3.5 w-3.5 shrink-0" />}
+                  <span className="font-semibold text-sm">{pedido.codigo}</span>
+                  <Badge variant="outline" className="text-xs py-0 px-1.5 h-4">{pedido.estado}</Badge>
+                  <span className="text-xs text-muted-foreground truncate">
+                    {pedido.proyectoCodigo} — {pedido.proyectoNombre}
+                  </span>
+                  <Badge variant="secondary" className="ml-auto text-xs py-0 h-4 shrink-0">
+                    {pedido.items.length}
+                  </Badge>
+                </button>
+                {expandidos.has(pedido.id) && (
+                  <div className="divide-y">
+                    {pedido.items.map(item => (
+                      <ItemRow
+                        key={item.id}
+                        item={item}
+                        checked={seleccionados.has(item.id)}
+                        onToggle={onToggle}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+
+        <DialogFooter className="px-5 py-3 border-t shrink-0 flex items-center justify-between sm:justify-between">
+          <span className="text-sm text-muted-foreground">
+            {seleccionados.size > 0
+              ? <><span className="font-medium text-foreground">{seleccionados.size}</span> item(s) seleccionado(s)</>
+              : 'Ningún item seleccionado'}
+          </span>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={onClose}>Cancelar</Button>
+            <Button size="sm" className="bg-blue-600 hover:bg-blue-700" onClick={onClose} disabled={seleccionados.size === 0}>
+              Confirmar selección
+            </Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ─── Sub-componentes del modal ────────────────────────────────────────────────
+interface PedidoGroupProps {
+  pedido: ProyectoParaRequerimiento['pedidos'][number]
+  expandidos: Set<string>
+  onToggleExpand: (id: string) => void
+  seleccionados: Map<string, ItemSeleccionado>
+  onToggleItem: (item: ItemParaRequerimiento, checked: boolean) => void
+  indent?: boolean
+}
+function PedidoGroup({ pedido, expandidos, onToggleExpand, seleccionados, onToggleItem, indent }: PedidoGroupProps) {
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => onToggleExpand(pedido.id)}
+        className={`w-full flex items-center gap-2 px-3 py-1.5 bg-muted/20 hover:bg-muted/40 border-t text-left transition-colors ${indent ? 'pl-6' : ''}`}
+      >
+        {expandidos.has(pedido.id)
+          ? <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
+          : <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />}
+        <span className="text-xs font-medium">{pedido.codigo}</span>
+        <Badge variant="outline" className="text-xs py-0 px-1 h-3.5 font-normal">{pedido.estado}</Badge>
+        <span className="ml-auto text-xs text-muted-foreground">{pedido.items.length} item(s)</span>
+      </button>
+      {expandidos.has(pedido.id) && (
+        <div className="divide-y">
+          {pedido.items.map(item => (
+            <ItemRow
+              key={item.id}
+              item={item}
+              checked={seleccionados.has(item.id)}
+              onToggle={onToggleItem}
+              indent={indent}
+            />
+          ))}
+        </div>
+      )}
+    </>
+  )
+}
+
+interface ItemRowProps {
+  item: ItemParaRequerimiento
+  checked: boolean
+  onToggle: (item: ItemParaRequerimiento, checked: boolean) => void
+  indent?: boolean
+}
+function ItemRow({ item, checked, onToggle, indent }: ItemRowProps) {
+  return (
+    <label
+      className={`flex items-start gap-3 px-4 py-2 cursor-pointer transition-colors select-none ${
+        checked ? 'bg-blue-50 dark:bg-blue-950/10' : 'hover:bg-muted/20'
+      } ${indent ? 'pl-8' : ''}`}
+    >
+      <Checkbox
+        checked={checked}
+        onCheckedChange={v => onToggle(item, !!v)}
+        className="mt-0.5 shrink-0"
+      />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-baseline gap-2 flex-wrap">
+          <span className="text-xs font-mono text-muted-foreground">{item.codigo}</span>
+          <span className="text-sm font-medium truncate">{item.descripcion}</span>
+          <span className="text-xs text-muted-foreground shrink-0">{item.unidad}</span>
+        </div>
+        <div className="flex gap-3 mt-0.5 text-xs text-muted-foreground">
+          <span>Disp: <strong className="text-foreground">{item.cantidadDisponible}</strong></span>
+          {item.precioUnitario != null && <span>P.U.: S/ {fmt(item.precioUnitario)}</span>}
+        </div>
+      </div>
+    </label>
+  )
+}
+
+// ─── Página principal ─────────────────────────────────────────────────────────
 export default function NuevoRequerimientoPage() {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const [tipo, setTipo] = useState<TipoRequerimiento>('gastos_viaticos')
+  const [showModal, setShowModal] = useState(false)
 
-  // ── Campos comunes ──
+  // Campos comunes
   const [motivo, setMotivo] = useState('')
   const [observaciones, setObservaciones] = useState('')
   const [requiereAnticipo, setRequiereAnticipo] = useState(false)
   const [montoAnticipo, setMontoAnticipo] = useState('')
 
-  // ── Campos gastos/viáticos ──
+  // Campos gastos/viáticos
   const [asignacion, setAsignacion] = useState<AsignacionValue>({ proyectoId: null, centroCostoId: null })
   const [categoriaCosto, setCategoriaCosto] = useState('gastos')
 
-  // ── Campos materiales ──
+  // Campos materiales
   const [justificacion, setJustificacion] = useState('')
   const [proyectos, setProyectos] = useState<ProyectoParaRequerimiento[]>([])
   const [loadingItems, setLoadingItems] = useState(false)
   const [busqueda, setBusqueda] = useState('')
-  const [expandidos, setExpandidos] = useState<Set<string>>(new Set())
   const [seleccionados, setSeleccionados] = useState<Map<string, ItemSeleccionado>>(new Map())
 
   // Cargar items al cambiar a materiales
   useEffect(() => {
-    if (tipo === 'compra_materiales') {
-      loadItems()
-    }
+    if (tipo === 'compra_materiales') loadItems()
   }, [tipo])
 
   const loadItems = useCallback(async (q?: string) => {
@@ -79,8 +343,6 @@ export default function NuevoRequerimientoPage() {
     try {
       const data = await getItemsParaRequerimiento(q)
       setProyectos(data)
-      // Expandir todos los proyectos por defecto
-      setExpandidos(new Set(data.map(p => p.id)))
     } catch {
       toast.error('Error al cargar items de pedidos')
     } finally {
@@ -91,17 +353,9 @@ export default function NuevoRequerimientoPage() {
   // Búsqueda con debounce
   useEffect(() => {
     if (tipo !== 'compra_materiales') return
-    const t = setTimeout(() => loadItems(busqueda || undefined), 300)
+    const t = setTimeout(() => loadItems(busqueda || undefined), 350)
     return () => clearTimeout(t)
   }, [busqueda, tipo, loadItems])
-
-  const toggleExpansion = (id: string) => {
-    setExpandidos(prev => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
-  }
 
   const toggleItem = (item: ItemParaRequerimiento, checked: boolean) => {
     setSeleccionados(prev => {
@@ -137,12 +391,19 @@ export default function NuevoRequerimientoPage() {
     })
   }
 
-  // Total estimado
-  const totalEstimado = Array.from(seleccionados.values()).reduce((sum, s) => {
-    return sum + s.cantidad * (s.precioEstimado ?? 0)
-  }, 0)
+  const removeItem = (itemId: string) => {
+    setSeleccionados(prev => {
+      const next = new Map(prev)
+      next.delete(itemId)
+      return next
+    })
+  }
 
-  // ── Submit ──
+  const totalEstimado = Array.from(seleccionados.values()).reduce(
+    (sum, s) => sum + s.cantidad * (s.precioEstimado ?? 0), 0
+  )
+
+  // Submit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -152,8 +413,7 @@ export default function NuevoRequerimientoPage() {
     }
 
     if (tipo === 'gastos_viaticos') {
-      const hasAsignacion = !!(asignacion.proyectoId || asignacion.centroCostoId)
-      if (!hasAsignacion) {
+      if (!asignacion.proyectoId && !asignacion.centroCostoId) {
         toast.error('Selecciona un proyecto o centro de costo')
         return
       }
@@ -183,7 +443,6 @@ export default function NuevoRequerimientoPage() {
       toast.error('Selecciona al menos un item del pedido')
       return
     }
-
     try {
       setSaving(true)
       const items = Array.from(seleccionados.values()).map(s => ({
@@ -196,7 +455,6 @@ export default function NuevoRequerimientoPage() {
         cantidadSolicitada: s.cantidad,
         precioEstimado: s.precioEstimado,
       }))
-
       const hoja = await createHojaDeGastos({
         tipoProposito: 'compra_materiales',
         motivo: motivo.trim(),
@@ -215,10 +473,11 @@ export default function NuevoRequerimientoPage() {
     }
   }
 
-  const hasAsignacion = !!(asignacion.proyectoId || asignacion.centroCostoId)
   const canSubmit = tipo === 'gastos_viaticos'
-    ? (hasAsignacion && !!motivo.trim())
+    ? (!!(asignacion.proyectoId || asignacion.centroCostoId) && !!motivo.trim())
     : (seleccionados.size > 0 && !!motivo.trim())
+
+  const selArray = Array.from(seleccionados.values())
 
   return (
     <div className="container mx-auto p-4 sm:p-6 max-w-3xl">
@@ -268,7 +527,7 @@ export default function NuevoRequerimientoPage() {
         <Card>
           <CardContent className="pt-6 space-y-4">
 
-            {/* ── Gastos / Viáticos ────────────────────────────── */}
+            {/* Gastos / Viáticos */}
             {tipo === 'gastos_viaticos' && (
               <>
                 <div className="space-y-1.5">
@@ -283,9 +542,7 @@ export default function NuevoRequerimientoPage() {
                 <div className="space-y-1.5">
                   <Label>Categoría</Label>
                   <Select value={categoriaCosto} onValueChange={setCategoriaCosto} disabled={saving}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {CATEGORIAS.map(c => (
                         <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
@@ -296,7 +553,7 @@ export default function NuevoRequerimientoPage() {
               </>
             )}
 
-            {/* ── Materiales: info CC ──────────────────────────── */}
+            {/* Materiales: aviso CC */}
             {tipo === 'compra_materiales' && (
               <div className="flex items-start gap-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 text-sm">
                 <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5 shrink-0" />
@@ -306,12 +563,12 @@ export default function NuevoRequerimientoPage() {
               </div>
             )}
 
-            {/* ── Campos comunes ───────────────────────────────── */}
+            {/* Campos comunes */}
             <div className="space-y-1.5">
               <Label>Motivo <span className="text-red-500">*</span></Label>
               <Input
                 value={motivo}
-                onChange={(e) => setMotivo(e.target.value)}
+                onChange={e => setMotivo(e.target.value)}
                 placeholder={tipo === 'compra_materiales'
                   ? 'Ej: Compra de materiales para proyecto ABC'
                   : 'Ej: Gastos de movilidad proyecto XYZ'}
@@ -324,7 +581,7 @@ export default function NuevoRequerimientoPage() {
                 <Label>Justificación</Label>
                 <Textarea
                   value={justificacion}
-                  onChange={(e) => setJustificacion(e.target.value)}
+                  onChange={e => setJustificacion(e.target.value)}
                   placeholder="Descripción del por qué se requieren estos materiales (opcional)"
                   rows={2}
                   disabled={saving}
@@ -336,7 +593,7 @@ export default function NuevoRequerimientoPage() {
               <Label>Observaciones</Label>
               <Textarea
                 value={observaciones}
-                onChange={(e) => setObservaciones(e.target.value)}
+                onChange={e => setObservaciones(e.target.value)}
                 placeholder="Notas adicionales (opcional)"
                 rows={2}
                 disabled={saving}
@@ -352,11 +609,7 @@ export default function NuevoRequerimientoPage() {
                     : 'Marcar si necesitas recibir dinero antes de los gastos'}
                 </p>
               </div>
-              <Switch
-                checked={requiereAnticipo}
-                onCheckedChange={setRequiereAnticipo}
-                disabled={saving}
-              />
+              <Switch checked={requiereAnticipo} onCheckedChange={setRequiereAnticipo} disabled={saving} />
             </div>
 
             {requiereAnticipo && (
@@ -364,9 +617,7 @@ export default function NuevoRequerimientoPage() {
                 <Label>
                   Monto de anticipo (PEN)
                   {tipo === 'compra_materiales' && totalEstimado > 0 && (
-                    <span className="text-xs text-muted-foreground ml-2">
-                      (estimado: S/ {fmt(totalEstimado)})
-                    </span>
+                    <span className="text-xs text-muted-foreground ml-2">(estimado: S/ {fmt(totalEstimado)})</span>
                   )}
                 </Label>
                 <Input
@@ -374,7 +625,7 @@ export default function NuevoRequerimientoPage() {
                   step="0.01"
                   min="0"
                   value={montoAnticipo}
-                  onChange={(e) => setMontoAnticipo(e.target.value)}
+                  onChange={e => setMontoAnticipo(e.target.value)}
                   placeholder={tipo === 'compra_materiales' ? fmt(totalEstimado) || '0.00' : '0.00'}
                   disabled={saving}
                 />
@@ -383,164 +634,121 @@ export default function NuevoRequerimientoPage() {
           </CardContent>
         </Card>
 
-        {/* ── Selector de items (solo materiales) ─────────────────────── */}
+        {/* ── Items seleccionados (solo materiales) ──────────────────────────── */}
         {tipo === 'compra_materiales' && (
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
+            <CardHeader className="py-3 px-4 flex flex-row items-center justify-between">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <Package className="h-4 w-4 text-blue-600" />
                 Items a comprar
                 {seleccionados.size > 0 && (
-                  <Badge variant="secondary">{seleccionados.size} seleccionado(s)</Badge>
+                  <Badge variant="secondary" className="text-xs">{seleccionados.size}</Badge>
                 )}
               </CardTitle>
-              <div className="relative mt-2">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  className="pl-8"
-                  placeholder="Buscar por código, descripción o proyecto..."
-                  value={busqueda}
-                  onChange={(e) => setBusqueda(e.target.value)}
-                  disabled={saving}
-                />
-              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs gap-1"
+                onClick={() => setShowModal(true)}
+                disabled={saving}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                {seleccionados.size === 0 ? 'Seleccionar Items' : 'Modificar selección'}
+              </Button>
             </CardHeader>
-            <CardContent className="pt-0">
-              {loadingItems ? (
-                <div className="flex items-center justify-center py-8 text-muted-foreground">
-                  <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                  Cargando items disponibles...
-                </div>
-              ) : proyectos.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground text-sm">
-                  No hay items de pedidos disponibles para requerimiento.
-                  <br />
-                  <span className="text-xs">Los pedidos deben estar en estado &quot;enviado&quot; o &quot;parcial&quot; y sin OC activa.</span>
+            <CardContent className="px-4 pb-4">
+              {selArray.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 py-6 text-center text-muted-foreground">
+                  <Package className="h-8 w-8 opacity-30" />
+                  <p className="text-sm">No has seleccionado ningún item aún.</p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShowModal(true)}
+                    disabled={saving || loadingItems}
+                  >
+                    {loadingItems ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Plus className="h-3.5 w-3.5 mr-1" />}
+                    Seleccionar Items de Pedidos
+                  </Button>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {proyectos.map(proyecto => (
-                    <div key={proyecto.id} className="border rounded-lg overflow-hidden">
-                      {/* Proyecto header */}
+                <div className="space-y-2">
+                  {selArray.map(({ item, cantidad, precioEstimado }) => (
+                    <div key={item.id} className="flex items-center gap-2 p-2.5 rounded-lg border bg-muted/20">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium truncate">
+                          <span className="font-mono text-muted-foreground mr-1">{item.codigo}</span>
+                          {item.descripcion}
+                          <span className="text-muted-foreground ml-1">({item.unidad})</span>
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {item.pedidoEquipo.proyecto.codigo} · {item.pedidoEquipo.codigo}
+                        </p>
+                      </div>
+                      {/* Cantidad */}
+                      <div className="flex items-center gap-1 shrink-0">
+                        <span className="text-xs text-muted-foreground">Cant.</span>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0.01"
+                          max={item.cantidadDisponible}
+                          value={cantidad}
+                          onChange={e => updateCantidad(item.id, parseFloat(e.target.value) || 0)}
+                          className="h-7 w-20 text-xs"
+                          disabled={saving}
+                        />
+                      </div>
+                      {/* Precio unitario estimado */}
+                      <div className="flex items-center gap-1 shrink-0">
+                        <span className="text-xs text-muted-foreground">S/</span>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={precioEstimado ?? ''}
+                          onChange={e => updatePrecio(item.id, e.target.value ? parseFloat(e.target.value) : null)}
+                          className="h-7 w-24 text-xs"
+                          placeholder="0.00"
+                          disabled={saving}
+                        />
+                      </div>
+                      {/* Subtotal */}
+                      {precioEstimado != null && (
+                        <span className="text-xs font-medium text-blue-700 dark:text-blue-400 shrink-0 w-20 text-right">
+                          S/ {fmt(cantidad * precioEstimado)}
+                        </span>
+                      )}
+                      {/* Quitar */}
                       <button
                         type="button"
-                        onClick={() => toggleExpansion(proyecto.id)}
-                        className="w-full flex items-center gap-2 px-3 py-2.5 bg-muted/40 hover:bg-muted/70 transition-colors text-left"
+                        onClick={() => removeItem(item.id)}
+                        className="p-1 rounded hover:bg-red-50 shrink-0"
+                        disabled={saving}
                       >
-                        {expandidos.has(proyecto.id)
-                          ? <ChevronDown className="h-4 w-4 shrink-0" />
-                          : <ChevronRight className="h-4 w-4 shrink-0" />}
-                        <span className="font-semibold text-sm">{proyecto.codigo}</span>
-                        <span className="text-sm text-muted-foreground">— {proyecto.nombre}</span>
-                        <span className="ml-auto text-xs text-muted-foreground">
-                          {proyecto.pedidos.reduce((s, p) => s + p.items.length, 0)} item(s)
-                        </span>
+                        <Trash2 className="h-3.5 w-3.5 text-red-400" />
                       </button>
-
-                      {/* Pedidos */}
-                      {expandidos.has(proyecto.id) && proyecto.pedidos.map(pedido => (
-                        <div key={pedido.id}>
-                          <div className="px-4 py-1.5 bg-muted/20 border-t text-xs text-muted-foreground flex items-center gap-2">
-                            <span className="font-medium text-foreground">{pedido.codigo}</span>
-                            <Badge variant="outline" className="text-xs py-0 px-1.5 h-4">
-                              {pedido.estado}
-                            </Badge>
-                          </div>
-                          <div className="divide-y">
-                            {pedido.items.map(item => {
-                              const sel = seleccionados.get(item.id)
-                              const isChecked = !!sel
-                              return (
-                                <div key={item.id} className={`px-4 py-2.5 transition-colors ${isChecked ? 'bg-blue-50 dark:bg-blue-950/10' : 'hover:bg-muted/20'}`}>
-                                  <div className="flex items-start gap-3">
-                                    <Checkbox
-                                      checked={isChecked}
-                                      onCheckedChange={(v) => toggleItem(item, !!v)}
-                                      disabled={saving}
-                                      className="mt-0.5"
-                                    />
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-baseline gap-2 flex-wrap">
-                                        <span className="text-xs font-mono text-muted-foreground">{item.codigo}</span>
-                                        <span className="text-sm font-medium truncate">{item.descripcion}</span>
-                                        <span className="text-xs text-muted-foreground">({item.unidad})</span>
-                                      </div>
-                                      <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
-                                        <span>Disponible: <strong>{item.cantidadDisponible}</strong></span>
-                                        {item.precioUnitario != null && (
-                                          <span>P.U.: S/ {fmt(item.precioUnitario)}</span>
-                                        )}
-                                      </div>
-
-                                      {/* Inputs solo si está seleccionado */}
-                                      {isChecked && sel && (
-                                        <div className="flex items-center gap-3 mt-2 flex-wrap">
-                                          <div className="flex items-center gap-1.5">
-                                            <Label className="text-xs text-muted-foreground whitespace-nowrap">Cantidad:</Label>
-                                            <Input
-                                              type="number"
-                                              step="0.01"
-                                              min="0.01"
-                                              max={item.cantidadDisponible}
-                                              value={sel.cantidad}
-                                              onChange={(e) => updateCantidad(item.id, parseFloat(e.target.value) || 0)}
-                                              className="h-7 w-24 text-sm"
-                                              disabled={saving}
-                                            />
-                                          </div>
-                                          <div className="flex items-center gap-1.5">
-                                            <Label className="text-xs text-muted-foreground whitespace-nowrap">P.U. estimado:</Label>
-                                            <div className="relative">
-                                              <span className="absolute left-2 top-1.5 text-xs text-muted-foreground">S/</span>
-                                              <Input
-                                                type="number"
-                                                step="0.01"
-                                                min="0"
-                                                value={sel.precioEstimado ?? ''}
-                                                onChange={(e) => updatePrecio(item.id, e.target.value ? parseFloat(e.target.value) : null)}
-                                                className="h-7 w-28 pl-6 text-sm"
-                                                placeholder="0.00"
-                                                disabled={saving}
-                                              />
-                                            </div>
-                                          </div>
-                                          {sel.precioEstimado != null && (
-                                            <span className="text-xs font-medium text-blue-700 dark:text-blue-400">
-                                              = S/ {fmt(sel.cantidad * sel.precioEstimado)}
-                                            </span>
-                                          )}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        </div>
-                      ))}
                     </div>
                   ))}
-                </div>
-              )}
 
-              {/* Total estimado */}
-              {seleccionados.size > 0 && (
-                <>
-                  <Separator className="my-4" />
-                  <div className="flex justify-between items-center text-sm font-medium">
-                    <span className="text-muted-foreground">Total estimado ({seleccionados.size} item(s)):</span>
-                    <span className="text-lg font-bold text-blue-700 dark:text-blue-400">
-                      S/ {fmt(totalEstimado)}
-                    </span>
+                  <Separator className="my-2" />
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">{selArray.length} item(s)</span>
+                    <div className="text-right">
+                      <span className="text-xs text-muted-foreground mr-2">Total estimado:</span>
+                      <span className="font-bold text-blue-700 dark:text-blue-400 font-mono">
+                        S/ {fmt(totalEstimado)}
+                      </span>
+                    </div>
                   </div>
-                </>
+                </div>
               )}
             </CardContent>
           </Card>
         )}
 
-        {/* Botones */}
         <div className="flex justify-end gap-2 pt-1">
           <Button type="button" variant="outline" onClick={() => router.back()} disabled={saving}>
             Cancelar
@@ -555,6 +763,18 @@ export default function NuevoRequerimientoPage() {
           </Button>
         </div>
       </form>
+
+      {/* Modal de selección */}
+      <ModalSelectorItems
+        open={showModal}
+        onClose={() => setShowModal(false)}
+        proyectos={proyectos}
+        loading={loadingItems}
+        busqueda={busqueda}
+        onBusqueda={setBusqueda}
+        seleccionados={seleccionados}
+        onToggle={toggleItem}
+      />
     </div>
   )
 }
