@@ -13,7 +13,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   Package, Receipt, Loader2, AlertCircle, CheckCircle2, Wand2,
-  Paperclip, ExternalLink, FileText, X, Upload, ChevronDown, ChevronRight, Eye,
+  Paperclip, ExternalLink, FileText, X, Upload, ChevronDown, ChevronRight, Eye, Plus,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { HojaDeGastos } from '@/types'
@@ -50,6 +50,8 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
   const [showModal, setShowModal] = useState(false)
   const [saving, setSaving] = useState(false)
   const [uploadingFile, setUploadingFile] = useState(false)
+  const [uploadingForComprobante, setUploadingForComprobante] = useState<string | null>(null)
+  const adjuntoInputRef = useRef<HTMLInputElement>(null)
   const [expandedComprobantes, setExpandedComprobantes] = useState<Set<string>>(new Set())
   const [previewing, setPreviewing] = useState<Comprobante | null>(null)
 
@@ -187,6 +189,35 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
     }
   }
 
+  const handleAdjuntarAComprobante = (comprobanteId: string) => {
+    setUploadingForComprobante(comprobanteId)
+    adjuntoInputRef.current?.click()
+  }
+
+  const handleAdjuntoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !uploadingForComprobante) return
+    e.target.value = ''
+    try {
+      setUploadingFile(true)
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('gastoComprobanteId', uploadingForComprobante)
+      const res = await fetch('/api/gasto-adjunto', { method: 'POST', body: fd })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Error al subir archivo')
+      }
+      toast.success('Archivo adjuntado correctamente')
+      onChanged()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al subir archivo')
+    } finally {
+      setUploadingFile(false)
+      setUploadingForComprobante(null)
+    }
+  }
+
   const totalEstimado = items.reduce((s, i) => s + (i.totalEstimado ?? 0), 0)
   const totalReal = items.reduce((s, i) => s + (i.totalReal ?? 0), 0)
   const itemsConPrecioReal = items.filter(i => i.precioReal != null).length
@@ -194,6 +225,15 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
 
   return (
     <>
+      {/* Input oculto para adjuntar a comprobante existente */}
+      <input
+        ref={adjuntoInputRef}
+        type="file"
+        accept="image/*,.pdf"
+        className="hidden"
+        onChange={handleAdjuntoFileChange}
+      />
+
       <Card>
         <CardHeader className="py-3 px-4 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -331,9 +371,23 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                         <div className="flex items-center gap-3 px-3 pb-2 text-xs text-muted-foreground">
                           <span>{new Date(c.fecha).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
                           <span>{c.lineas.length} item(s)</span>
-                          {adjunto
-                            ? <span className="flex items-center gap-1 text-green-600"><Paperclip className="h-3 w-3" />Adjunto</span>
-                            : <span className="flex items-center gap-1 text-amber-600"><Paperclip className="h-3 w-3" />Sin adjunto</span>}
+                          {adjunto ? (
+                            <span className="flex items-center gap-1 text-green-600"><Paperclip className="h-3 w-3" />Adjunto</span>
+                          ) : canAddComprobante ? (
+                            <button
+                              type="button"
+                              onClick={() => handleAdjuntarAComprobante(c.id)}
+                              disabled={uploadingFile && uploadingForComprobante === c.id}
+                              className="flex items-center gap-1 text-amber-600 hover:text-amber-800 hover:underline disabled:opacity-50"
+                            >
+                              {uploadingFile && uploadingForComprobante === c.id
+                                ? <Loader2 className="h-3 w-3 animate-spin" />
+                                : <Plus className="h-3 w-3" />}
+                              Adjuntar archivo
+                            </button>
+                          ) : (
+                            <span className="flex items-center gap-1 text-amber-600"><Paperclip className="h-3 w-3" />Sin adjunto</span>
+                          )}
                         </div>
 
                         {/* Líneas expandibles */}
