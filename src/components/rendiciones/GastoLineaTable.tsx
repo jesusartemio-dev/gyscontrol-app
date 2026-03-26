@@ -396,6 +396,7 @@ export default function GastoLineaTable({
               <th className="text-left p-2 font-medium">Descripcion</th>
               <th className="text-left p-2 font-medium">Categoria</th>
               <th className="text-left p-2 font-medium">Comprobante</th>
+              <th className="text-left p-2 font-medium">Destino</th>
               <th className="text-right p-2 font-medium">Monto</th>
               <th className="text-left p-2 font-medium">Adjuntos</th>
               {editable && <th className="w-[60px]"></th>}
@@ -404,7 +405,7 @@ export default function GastoLineaTable({
           <tbody>
             {lineas.length === 0 ? (
               <tr>
-                <td colSpan={editable ? 7 : 6} className="text-center py-6 text-muted-foreground text-xs">
+                <td colSpan={editable ? 8 : 7} className="text-center py-6 text-muted-foreground text-xs">
                   Sin lineas de gasto
                 </td>
               </tr>
@@ -449,6 +450,22 @@ export default function GastoLineaTable({
                       ) : '-'}
                     </span>
                   </td>
+                  <td className="p-2 text-xs whitespace-nowrap">
+                    {(() => {
+                      const destino = linea.proyecto?.codigo || linea.centroCosto?.nombre
+                        || hojaInfo?.proyectoNombre?.split(' - ')[0]
+                        || hojaInfo?.centroCostoNombre
+                      const esOverride = !!(linea.proyectoId || linea.centroCostoId)
+                      return destino ? (
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] px-1.5 py-0 h-5 font-mono ${esOverride ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-muted text-muted-foreground'}`}
+                        >
+                          {destino}
+                        </Badge>
+                      ) : <span className="text-muted-foreground">—</span>
+                    })()}
+                  </td>
                   <td className="p-2 text-right font-mono text-xs">
                     {formatCurrency(linea.monto)}
                   </td>
@@ -484,7 +501,7 @@ export default function GastoLineaTable({
             )}
             {lineas.length > 0 && (
               <tr className="border-t bg-muted/30 font-medium">
-                <td colSpan={4} className="p-2 text-xs text-right">Total:</td>
+                <td colSpan={5} className="p-2 text-xs text-right">Total:</td>
                 <td className="p-2 text-right font-mono text-xs">{formatCurrency(total)}</td>
                 <td colSpan={editable ? 2 : 1}></td>
               </tr>
