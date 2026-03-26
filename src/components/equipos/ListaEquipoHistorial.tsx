@@ -13,6 +13,16 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatAuditDescription, getAuditHistory } from '@/lib/services/audit-client';
 import { formatDate } from '@/lib/utils';
+
+const formatDateTime = (date: Date | string) => {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  return new Intl.DateTimeFormat('es-PE', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(d);
+};
 import type { AuditLog } from '@/types/modelos';
 
 interface ListaEquipoHistorialProps {
@@ -168,7 +178,7 @@ const ListaEquipoHistorial: React.FC<ListaEquipoHistorialProps> = ({
                         {log.usuario.name || log.usuario.email}
                       </span>
                       <span className="text-[10px] text-gray-300 font-mono ml-auto">
-                        {formatDate(log.createdAt)}
+                        {formatDateTime(log.createdAt)}
                       </span>
                       <button
                         onClick={() => toggleExpanded(log.id)}
@@ -187,6 +197,19 @@ const ListaEquipoHistorial: React.FC<ListaEquipoHistorialProps> = ({
                       <div className="mt-1.5 pl-2 border-l-2 border-gray-100 space-y-1">
                         <p className="text-[11px] text-gray-500">{log.descripcion}</p>
                         {log.cambios && formatChanges(log.cambios)}
+                        {(() => {
+                          if (!log.metadata) return null;
+                          try {
+                            const meta = JSON.parse(log.metadata as string);
+                            if (!meta.motivo) return null;
+                            return (
+                              <div className="text-[11px] bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                                <span className="font-medium text-amber-700">Motivo: </span>
+                                <span className="text-amber-800">{meta.motivo}</span>
+                              </div>
+                            );
+                          } catch { return null; }
+                        })()}
                       </div>
                     )}
                   </div>

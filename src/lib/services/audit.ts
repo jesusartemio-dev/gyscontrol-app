@@ -158,6 +158,34 @@ export async function registrarActualizacion(
   }
 }
 
+// ✅ Crear registro de auditoría para cambio de estado
+export async function registrarCambioEstado(
+  entidadTipo: string,
+  entidadId: string,
+  usuarioId: string,
+  descripcion: string,
+  metadata?: Record<string, any>
+): Promise<void> {
+  try {
+    const { prisma } = await import('@/lib/prisma');
+
+    await prisma.auditLog.create({
+      data: {
+        id: randomUUID(),
+        entidadTipo,
+        entidadId,
+        accion: 'CAMBIAR_ESTADO',
+        usuarioId,
+        descripcion,
+        metadata: metadata ? JSON.stringify(metadata) : null
+      }
+    });
+  } catch (error) {
+    console.error('Error al registrar cambio de estado en auditoría:', error);
+    throw error;
+  }
+}
+
 // ✅ Crear registro de auditoría para eliminación
 export async function registrarEliminacion(
   entidadTipo: string,

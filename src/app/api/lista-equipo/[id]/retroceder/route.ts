@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { canRollback, isValidRollback } from '@/lib/utils/rollbackValidation'
 import { crearEvento } from '@/lib/utils/trazabilidad'
+import { registrarCambioEstado } from '@/lib/services/audit'
 
 // Roles que pueden retroceder: los mismos que aprueban/validan
 const ROLES_ALLOWED = ['admin', 'gerente', 'gestor', 'logistico', 'coordinador_logistico', 'coordinador']
@@ -98,20 +99,26 @@ export async function POST(
       },
     })
 
-    // Registrar evento
+    const auditMetadata = {
+      listaCodigo: lista.codigo,
+      estadoAnterior: lista.estado,
+      estadoNuevo: targetEstado,
+      motivo: motivo || null,
+    }
+    const auditDesc = `Lista ${lista.codigo} retrocedida de ${lista.estado} a ${targetEstado}${motivo ? ': ' + motivo : ''}`
+
+    // Registrar evento de trazabilidad
     await crearEvento(prisma, {
       listaEquipoId: id,
       proyectoId: lista.proyectoId,
       tipo: 'lista_retrocedida',
-      descripcion: `Lista ${lista.codigo} retrocedida de ${lista.estado} a ${targetEstado}${motivo ? ': ' + motivo : ''}`,
+      descripcion: auditDesc,
       usuarioId: session.user.id,
-      metadata: {
-        listaCodigo: lista.codigo,
-        estadoAnterior: lista.estado,
-        estadoNuevo: targetEstado,
-        motivo: motivo || null,
-      },
+      metadata: auditMetadata,
     })
+
+    // Registrar en historial de auditoría (visible en el historial de la lista)
+    await registrarCambioEstado('LISTA_EQUIPO', id, session.user.id, auditDesc, auditMetadata)
 
     return NextResponse.json(updated)
   } catch (error) {
