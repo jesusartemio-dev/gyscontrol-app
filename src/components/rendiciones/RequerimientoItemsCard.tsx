@@ -411,157 +411,137 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
         </CardContent>
       </Card>
 
-      {/* ── Modal: Vista previa del comprobante (split layout) ──────────────── */}
+      {/* ── Vista previa fullscreen del comprobante ──────────────────────────── */}
       {previewing && (() => {
         const adj = previewing.adjuntos[0] || null
         const esPdf = adj && (adj.tipoArchivo?.includes('pdf') || adj.nombreArchivo.toLowerCase().endsWith('.pdf'))
         const esImagen = adj && (adj.tipoArchivo?.startsWith('image/') || /\.(jpg|jpeg|png|webp|gif)$/i.test(adj.nombreArchivo))
         const previewUrl = adj ? `/api/gasto-adjunto/${adj.id}` : null
         return (
-          <Dialog open={!!previewing} onOpenChange={() => setPreviewing(null)}>
-            <DialogContent
-              className="max-w-none w-screen h-screen rounded-none p-0 gap-0 flex flex-col"
-              style={{ position: 'fixed', left: 0, top: 0, transform: 'none' }}
-            >
-              {/* Header */}
-              <DialogHeader className="px-5 pt-4 pb-3 border-b shrink-0 flex-row items-center justify-between space-y-0">
-                <DialogTitle className="flex items-center gap-2 text-base font-semibold">
-                  <Receipt className="h-4 w-4 text-blue-600" />
+          <div
+            style={{ position: 'fixed', inset: 0, zIndex: 9999 }}
+            className="flex flex-col bg-background"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-3 border-b bg-background shrink-0">
+              <div className="flex items-center gap-2">
+                <Receipt className="h-4 w-4 text-blue-600" />
+                <span className="font-semibold text-base">
                   {TIPO_LABELS[previewing.tipoComprobante] || previewing.tipoComprobante} {previewing.numeroComprobante}
-                  <span className="text-sm font-mono font-bold text-green-700 ml-2">{fmt(previewing.montoTotal)}</span>
-                </DialogTitle>
-                <span className="text-xs text-muted-foreground shrink-0">
+                </span>
+                <span className="font-mono font-bold text-green-700 text-sm">{fmt(previewing.montoTotal)}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-muted-foreground">
                   Comprobante {comprobantes.findIndex(c => c.id === previewing.id) + 1}/{comprobantes.length}
                 </span>
-              </DialogHeader>
+                <button
+                  type="button"
+                  onClick={() => setPreviewing(null)}
+                  className="p-1.5 rounded hover:bg-muted transition-colors"
+                  aria-label="Cerrar"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
 
-              {/* Body split */}
-              <div className="flex flex-1 min-h-0">
-                {/* ── Panel izquierdo: datos + items ── */}
-                <div className="w-72 shrink-0 border-r flex flex-col overflow-y-auto">
-                  {/* Datos del comprobante */}
-                  <div className="p-4 space-y-3 border-b">
-                    <div>
-                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Fecha</p>
-                      <p className="text-sm font-medium">
-                        {new Date(previewing.fecha).toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' })}
-                      </p>
+            {/* Body split */}
+            <div className="flex flex-1 min-h-0">
+              {/* ── Panel izquierdo: datos + items ── */}
+              <div className="w-80 shrink-0 border-r flex flex-col overflow-y-auto bg-background">
+                <div className="p-5 space-y-4 border-b">
+                  {[
+                    { label: 'Fecha', value: new Date(previewing.fecha).toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' }) },
+                    { label: 'Monto', value: fmt(previewing.montoTotal), className: 'font-bold font-mono text-green-700' },
+                    { label: 'Tipo comprobante', value: TIPO_LABELS[previewing.tipoComprobante] || previewing.tipoComprobante },
+                    { label: 'Nº comprobante', value: previewing.numeroComprobante || '—', className: 'font-mono' },
+                    { label: 'Proveedor', value: previewing.proveedorNombre || '—' },
+                    { label: 'RUC', value: previewing.proveedorRuc || '—', className: 'font-mono' },
+                  ].map(f => (
+                    <div key={f.label}>
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">{f.label}</p>
+                      <p className={`text-sm ${f.className || ''}`}>{f.value}</p>
                     </div>
-                    <div>
-                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Monto</p>
-                      <p className="text-sm font-bold font-mono text-green-700">{fmt(previewing.montoTotal)}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Tipo comprobante</p>
-                      <p className="text-sm">{TIPO_LABELS[previewing.tipoComprobante] || previewing.tipoComprobante}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Nº comprobante</p>
-                      <p className="text-sm font-mono">{previewing.numeroComprobante || '—'}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Proveedor</p>
-                      <p className="text-sm">{previewing.proveedorNombre || '—'}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">RUC</p>
-                      <p className="text-sm font-mono">{previewing.proveedorRuc || '—'}</p>
-                    </div>
-                  </div>
+                  ))}
+                </div>
 
-                  {/* Items incluidos */}
-                  <div className="p-4 flex-1">
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-2">
-                      Items incluidos ({previewing.lineas.length})
-                    </p>
-                    <div className="space-y-1">
-                      {previewing.lineas.map(l => (
-                        <div key={l.id} className="flex items-start justify-between gap-2 py-1.5 border-b last:border-0">
-                          <span className="text-xs text-foreground/80 flex-1 leading-snug">{l.descripcion}</span>
-                          <span className="text-xs font-mono font-semibold text-green-700 shrink-0">{fmt(l.monto)}</span>
-                        </div>
-                      ))}
-                      <div className="flex justify-between pt-2 text-xs font-semibold border-t mt-1">
-                        <span>Total</span>
-                        <span className="font-mono">{fmt(previewing.montoTotal)}</span>
+                <div className="p-5 flex-1">
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-3">
+                    Items incluidos ({previewing.lineas.length})
+                  </p>
+                  <div className="space-y-0">
+                    {previewing.lineas.map(l => (
+                      <div key={l.id} className="flex items-start justify-between gap-3 py-2 border-b last:border-0">
+                        <span className="text-xs text-foreground/80 flex-1 leading-snug">{l.descripcion}</span>
+                        <span className="text-xs font-mono font-semibold text-green-700 shrink-0">{fmt(l.monto)}</span>
                       </div>
+                    ))}
+                    <div className="flex justify-between pt-3 text-xs font-bold">
+                      <span>Total</span>
+                      <span className="font-mono">{fmt(previewing.montoTotal)}</span>
                     </div>
-                  </div>
-
-                  {/* Footer panel izq */}
-                  <div className="p-3 border-t shrink-0">
-                    <Button variant="outline" size="sm" className="w-full" onClick={() => setPreviewing(null)}>
-                      Cerrar
-                    </Button>
                   </div>
                 </div>
 
-                {/* ── Panel derecho: documento ── */}
-                <div className="flex-1 flex flex-col bg-muted/30 min-w-0">
-                  {!adj ? (
-                    <div className="flex-1 flex flex-col items-center justify-center gap-3 text-muted-foreground">
-                      <FileText className="h-14 w-14 text-muted-foreground/30" />
-                      <p className="text-sm font-medium">Sin documento adjunto</p>
-                      {canAddComprobante && (
-                        <button
-                          type="button"
-                          onClick={() => { setPreviewing(null); handleAdjuntarAComprobante(previewing.id) }}
-                          className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 border border-blue-200 hover:border-blue-400 rounded px-3 py-1.5 transition-colors"
-                        >
-                          <Plus className="h-3.5 w-3.5" />
-                          Adjuntar archivo
-                        </button>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="flex-1 flex flex-col min-h-0">
-                      {/* Toolbar */}
-                      <div className="flex items-center justify-between px-4 py-2 border-b bg-background shrink-0">
-                        <span className="text-xs text-muted-foreground flex items-center gap-1.5">
-                          <Paperclip className="h-3.5 w-3.5" />{adj.nombreArchivo}
-                        </span>
-                        <a
-                          href={previewUrl!}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
-                        >
-                          <ExternalLink className="h-3.5 w-3.5" />Abrir en nueva pestaña
-                        </a>
-                      </div>
-                      {/* Viewer */}
-                      <div className="flex-1 min-h-0 p-3">
-                        {esImagen && (
-                          <img
-                            src={previewUrl!}
-                            alt={adj.nombreArchivo}
-                            className="w-full h-full object-contain rounded-lg"
-                          />
-                        )}
-                        {esPdf && (
-                          <iframe
-                            src={previewUrl!}
-                            className="w-full h-full rounded-lg border-0"
-                            title={adj.nombreArchivo}
-                          />
-                        )}
-                        {!esImagen && !esPdf && (
-                          <div className="flex-1 flex flex-col items-center justify-center gap-3 text-muted-foreground h-full">
-                            <FileText className="h-14 w-14 text-muted-foreground/30" />
-                            <p className="text-sm">{adj.nombreArchivo}</p>
-                            <a href={previewUrl!} target="_blank" rel="noopener noreferrer"
-                              className="flex items-center gap-2 text-blue-600 hover:underline text-sm border border-blue-200 rounded px-3 py-1.5">
-                              <ExternalLink className="h-4 w-4" />Descargar archivo
-                            </a>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
+                <div className="p-4 border-t shrink-0">
+                  <Button variant="outline" size="sm" className="w-full" onClick={() => setPreviewing(null)}>
+                    Cerrar
+                  </Button>
                 </div>
               </div>
-            </DialogContent>
-          </Dialog>
+
+              {/* ── Panel derecho: documento ── */}
+              <div className="flex-1 flex flex-col bg-muted/20 min-w-0">
+                {!adj ? (
+                  <div className="flex-1 flex flex-col items-center justify-center gap-3 text-muted-foreground">
+                    <FileText className="h-16 w-16 text-muted-foreground/20" />
+                    <p className="text-sm font-medium">Sin documento adjunto</p>
+                    {canAddComprobante && (
+                      <button
+                        type="button"
+                        onClick={() => { setPreviewing(null); handleAdjuntarAComprobante(previewing.id) }}
+                        className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 border border-blue-200 hover:border-blue-400 rounded px-3 py-1.5 transition-colors"
+                      >
+                        <Plus className="h-3.5 w-3.5" />Adjuntar archivo
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex-1 flex flex-col min-h-0">
+                    <div className="flex items-center justify-between px-4 py-2 border-b bg-background shrink-0">
+                      <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                        <Paperclip className="h-3.5 w-3.5" />{adj.nombreArchivo}
+                      </span>
+                      <a href={previewUrl!} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-xs text-blue-600 hover:underline">
+                        <ExternalLink className="h-3.5 w-3.5" />Abrir en nueva pestaña
+                      </a>
+                    </div>
+                    <div className="flex-1 min-h-0 p-4">
+                      {esImagen && (
+                        <img src={previewUrl!} alt={adj.nombreArchivo}
+                          className="w-full h-full object-contain" />
+                      )}
+                      {esPdf && (
+                        <iframe src={previewUrl!} className="w-full h-full border-0" title={adj.nombreArchivo} />
+                      )}
+                      {!esImagen && !esPdf && (
+                        <div className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground">
+                          <FileText className="h-16 w-16 text-muted-foreground/20" />
+                          <p className="text-sm">{adj.nombreArchivo}</p>
+                          <a href={previewUrl!} target="_blank" rel="noopener noreferrer"
+                            className="flex items-center gap-2 text-blue-600 hover:underline text-sm border border-blue-200 rounded px-3 py-1.5">
+                            <ExternalLink className="h-4 w-4" />Descargar archivo
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         )
       })()}
 
