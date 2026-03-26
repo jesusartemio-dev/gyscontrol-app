@@ -127,12 +127,10 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
   const executeAction = async (action: () => Promise<HojaDeGastos>, successMsg: string) => {
     try {
       setActionLoading(true)
-      const updated = await action()
-      setHoja(updated)
+      await action()
       toast.success(successMsg)
-      // Reload lineas in case saldo changed
-      const newLineas = await getGastoLineas(id)
-      setLineas(newLineas)
+      // Recargar todo desde GET /:id para asegurar relaciones completas (itemsMateriales, etc.)
+      await loadData()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Error en la operación')
     } finally {
