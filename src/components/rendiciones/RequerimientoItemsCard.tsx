@@ -77,6 +77,20 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
     items.filter(i => i.precioReal != null).map(i => i.id)
   )
 
+  // Mapa itemId → comprobante (para mostrar etiqueta en la tabla)
+  const itemComprobanteMap = new Map<string, { numero: string; tipo: string; id: string }>()
+  for (const c of comprobantes) {
+    for (const l of c.lineas) {
+      if (l.requerimientoMaterialItemId) {
+        itemComprobanteMap.set(l.requerimientoMaterialItemId, {
+          id: c.id,
+          tipo: c.tipoComprobante,
+          numero: c.numeroComprobante,
+        })
+      }
+    }
+  }
+
   const openDialog = () => {
     setTipoComprobante('factura')
     setNumero('')
@@ -283,7 +297,22 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                         <td className="py-2 pr-3 font-mono text-xs text-muted-foreground">{item.codigo}</td>
                         <td className="py-2 pr-3 max-w-[200px]">
                           <span className="line-clamp-2 text-xs">{item.descripcion}</span>
-                          <span className="text-xs text-muted-foreground">{item.unidad}</span>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="text-xs text-muted-foreground">{item.unidad}</span>
+                            {itemComprobanteMap.has(item.id) && (() => {
+                              const c = itemComprobanteMap.get(item.id)!
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewing(comprobantes.find(x => x.id === c.id) || null)}
+                                  className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0 h-4 rounded bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors font-medium leading-none"
+                                >
+                                  <Receipt className="h-2.5 w-2.5" />
+                                  {TIPO_LABELS[c.tipo] || c.tipo} {c.numero}
+                                </button>
+                              )
+                            })()}
+                          </div>
                         </td>
                         <td className="py-2 pr-3">
                           <Badge variant="outline" className="text-xs py-0 px-1.5 h-4 font-normal">

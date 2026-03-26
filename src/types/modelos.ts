@@ -2754,6 +2754,7 @@ export interface HojaDeGastos {
       descripcion: string
       monto: number
       proyectoId?: string | null
+      requerimientoMaterialItemId?: string | null
     }>
   }>
 }
