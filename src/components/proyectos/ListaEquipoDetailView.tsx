@@ -36,7 +36,6 @@ import {
 } from 'lucide-react';
 import ListaEquipoItemList from '@/components/equipos/ListaEquipoItemList';
 import ListaEquipoEditModal from '@/components/equipos/ListaEquipoEditModal';
-import ListaEquipoTimeline from '@/components/equipos/ListaEquipoTimeline';
 import ListaEstadoFlujoBanner from '@/components/equipos/ListaEstadoFlujoBanner';
 import ListaEquipoHistorial from '@/components/equipos/ListaEquipoHistorial';
 import PedidoDesdeListaModal from '@/components/equipos/PedidoDesdeListaModal';
@@ -114,7 +113,6 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
   });
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [showTimeline, setShowTimeline] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
 
   const handleListaUpdated = async () => {
@@ -290,25 +288,8 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
         />
       </Suspense>
 
-      {/* Información Adicional - Colapsable */}
+      {/* Historial Colapsable */}
       <div className="space-y-1 pt-3 border-t">
-        {/* Timeline Colapsable */}
-        <Collapsible open={showTimeline} onOpenChange={setShowTimeline}>
-          <CollapsibleTrigger asChild>
-            <Button variant="ghost" size="sm" className="w-full justify-between h-8 px-2 text-xs">
-              <span className="flex items-center gap-1.5">
-                <Clock className="h-3.5 w-3.5 text-orange-600" />
-                Timeline
-              </span>
-              <ChevronRight className={cn('h-3.5 w-3.5 transition-transform', showTimeline && 'rotate-90')} />
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="pt-2">
-            {lista && <ListaEquipoTimeline lista={lista} className="w-full" />}
-          </CollapsibleContent>
-        </Collapsible>
-
-        {/* Historial Colapsable */}
         <Collapsible open={showHistory} onOpenChange={setShowHistory}>
           <CollapsibleTrigger asChild>
             <Button variant="ghost" size="sm" className="w-full justify-between h-8 px-2 text-xs">
