@@ -37,7 +37,7 @@ const includeRelations = {
       adjuntos: { orderBy: { createdAt: 'asc' as const } },
       lineas: {
         select: {
-          id: true, descripcion: true, monto: true, proyectoId: true, requerimientoMaterialItemId: true,
+          id: true, descripcion: true, monto: true, proyectoId: true,
         },
       },
     },

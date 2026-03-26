@@ -77,16 +77,16 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
     items.filter(i => i.precioReal != null).map(i => i.id)
   )
 
-  // Mapa itemId → comprobante (para mostrar etiqueta en la tabla)
+  // Mapa itemId → comprobante (match por código de item en la descripción de la línea)
+  // Las líneas se generan con descripcion = "${item.codigo} — ${item.descripcion}"
   const itemComprobanteMap = new Map<string, { numero: string; tipo: string; id: string }>()
   for (const c of comprobantes) {
     for (const l of c.lineas) {
-      if (l.requerimientoMaterialItemId) {
-        itemComprobanteMap.set(l.requerimientoMaterialItemId, {
-          id: c.id,
-          tipo: c.tipoComprobante,
-          numero: c.numeroComprobante,
-        })
+      for (const item of items) {
+        if (l.descripcion.startsWith(item.codigo + ' —') || l.descripcion.startsWith(item.codigo + ' -')) {
+          itemComprobanteMap.set(item.id, { id: c.id, tipo: c.tipoComprobante, numero: c.numeroComprobante })
+          break
+        }
       }
     }
   }
