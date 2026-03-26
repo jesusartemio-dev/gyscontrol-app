@@ -524,7 +524,7 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                           className="w-full h-full object-contain" />
                       )}
                       {esPdf && (
-                        <iframe src={previewUrl!} className="w-full h-full border-0" title={adj.nombreArchivo} />
+                        <iframe src={`${previewUrl}#navpanes=0&toolbar=0`} className="w-full h-full border-0" title={adj.nombreArchivo} />
                       )}
                       {!esImagen && !esPdf && (
                         <div className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground">
