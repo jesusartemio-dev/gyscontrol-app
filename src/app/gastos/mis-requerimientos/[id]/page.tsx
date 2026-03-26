@@ -526,14 +526,20 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
         </Card>
       )}
 
-      {/* Resumen financiero */}
-      <ResumenFinanciero
-        montoAnticipo={hoja.montoAnticipo}
-        montoDepositado={hoja.montoDepositado}
-        montoGastado={hoja.montoGastado}
-        saldo={hoja.saldo}
-        requiereAnticipo={hoja.requiereAnticipo}
-      />
+      {/* Resumen financiero — montoGastado calculado en vivo desde lineas */}
+      {(() => {
+        const montoGastadoVivo = lineas.reduce((s, l) => s + l.monto, 0)
+        const saldoVivo = hoja.montoDepositado - montoGastadoVivo
+        return (
+          <ResumenFinanciero
+            montoAnticipo={hoja.montoAnticipo}
+            montoDepositado={hoja.montoDepositado}
+            montoGastado={montoGastadoVivo}
+            saldo={saldoVivo}
+            requiereAnticipo={hoja.requiereAnticipo}
+          />
+        )
+      })()}
 
       {/* Constancias de depósito */}
       {hoja.adjuntos && hoja.adjuntos.length > 0 && (
@@ -632,7 +638,9 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
           )}
           <GastoLineaTable
             hojaDeGastosId={hoja.id}
-            lineas={lineas}
+            lineas={hoja.tipoPropósito === 'compra_materiales'
+              ? lineas.filter(l => !l.gastoComprobanteId)
+              : lineas}
             categorias={categorias}
             editable={isEditable}
             onChanged={loadData}

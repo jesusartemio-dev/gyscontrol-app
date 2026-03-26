@@ -2791,6 +2791,7 @@ export interface GastoLinea {
   proyectoId?: string | null
   centroCostoId?: string | null
   categoriaCosto?: 'equipos' | 'servicios' | 'gastos' | null
+  gastoComprobanteId?: string | null
   createdAt: string
   updatedAt: string
   // Relations
