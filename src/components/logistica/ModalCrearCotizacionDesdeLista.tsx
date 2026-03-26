@@ -253,7 +253,7 @@ export default function ModalCrearCotizacionDesdeLista({
         <div className="px-4 py-3 border-b bg-gray-50/50 flex-shrink-0">
           <div className="flex items-center gap-3">
             <label className="text-xs font-medium text-muted-foreground whitespace-nowrap">
-              Proveedor:
+              Proveedor: <span className="text-red-500">*</span>
             </label>
             <div className="flex-1 relative">
               <div className="relative">
@@ -316,6 +316,14 @@ export default function ModalCrearCotizacionDesdeLista({
             </div>
           </div>
         </div>
+
+        {/* Aviso proveedor requerido */}
+        {!proveedorId && seleccionados.size > 0 && (
+          <div className="px-4 py-1.5 bg-amber-50 border-b border-amber-200 flex items-center gap-1.5 flex-shrink-0">
+            <AlertCircle className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
+            <span className="text-[11px] text-amber-700">Debes seleccionar un proveedor para crear la cotización</span>
+          </div>
+        )}
 
         {/* Search and count */}
         <div className="px-4 py-2 border-b flex items-center gap-2 flex-shrink-0">
@@ -502,24 +510,28 @@ export default function ModalCrearCotizacionDesdeLista({
                   Descartar
                 </Button>
               )}
-              <Button
-                size="sm"
-                onClick={handleCrear}
-                disabled={loading || !proveedorId || seleccionados.size === 0}
-                className="h-7 text-xs min-w-[120px] bg-purple-600 hover:bg-purple-700"
+              <span
+                title={!proveedorId ? 'Selecciona un proveedor primero' : seleccionados.size === 0 ? 'Selecciona al menos un item' : undefined}
               >
-                {loading ? (
-                  <>
-                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                    Creando...
-                  </>
-                ) : (
-                  <>
-                    <Plus className="h-3 w-3 mr-1" />
-                    Crear ({seleccionados.size})
-                  </>
-                )}
-              </Button>
+                <Button
+                  size="sm"
+                  onClick={handleCrear}
+                  disabled={loading || !proveedorId || seleccionados.size === 0}
+                  className="h-7 text-xs min-w-[120px] bg-purple-600 hover:bg-purple-700"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                      Creando...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-3 w-3 mr-1" />
+                      Crear ({seleccionados.size})
+                    </>
+                  )}
+                </Button>
+              </span>
             </div>
           </div>
         </div>
