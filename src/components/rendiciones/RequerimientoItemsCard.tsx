@@ -12,11 +12,9 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
-  DialogFooter,
 } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Package, Receipt, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { Package, Receipt, Loader2, AlertCircle, CheckCircle2, Wand2 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { HojaDeGastos } from '@/types'
 
@@ -24,6 +22,9 @@ type ItemMaterial = NonNullable<HojaDeGastos['itemsMateriales']>[number]
 
 const fmt = (n: number | null | undefined) =>
   n != null ? `S/ ${new Intl.NumberFormat('es-PE', { minimumFractionDigits: 2 }).format(n)}` : '—'
+
+const fmtNum = (n: number) =>
+  new Intl.NumberFormat('es-PE', { minimumFractionDigits: 2 }).format(n)
 
 interface Props {
   hoja: HojaDeGastos
@@ -44,7 +45,6 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
   const [showComprobante, setShowComprobante] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  // Form del comprobante
   const [tipoComprobante, setTipoComprobante] = useState('factura')
   const [numero, setNumero] = useState('')
   const [proveedor, setProveedor] = useState('')
@@ -53,24 +53,39 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
   const [lineas, setLineas] = useState<ComprobanteLinea[]>([])
 
   const openDialog = () => {
-    // Prefill líneas con los items del requerimiento
+    setTipoComprobante('factura')
+    setNumero('')
+    setProveedor('')
+    setRuc('')
+    setFecha(new Date().toISOString().split('T')[0])
     setLineas(
       items.map(item => ({
         itemId: item.id,
         descripcion: `${item.codigo} — ${item.descripcion}`,
         proyectoId: item.proyectoId,
-        proyectoCodigo: item.proyecto?.codigo || item.proyectoId,
-        monto: item.totalEstimado ?? 0,
+        proyectoCodigo: item.proyecto?.codigo || item.proyectoId.slice(0, 8),
+        monto: 0,
       }))
     )
     setShowComprobante(true)
   }
 
-  const updateLinea = (itemId: string, monto: number) => {
+  const updateLinea = (itemId: string, monto: number) =>
     setLineas(prev => prev.map(l => l.itemId === itemId ? { ...l, monto } : l))
+
+  const usarEstimado = (itemId: string) => {
+    const item = items.find(it => it.id === itemId)
+    if (item?.totalEstimado != null) updateLinea(itemId, item.totalEstimado)
   }
 
+  const usarTodosEstimados = () =>
+    setLineas(prev => prev.map(l => {
+      const item = items.find(it => it.id === l.itemId)
+      return { ...l, monto: item?.totalEstimado ?? l.monto }
+    }))
+
   const montoTotal = lineas.reduce((s, l) => s + (l.monto || 0), 0)
+  const lineasConMonto = lineas.filter(l => l.monto > 0).length
 
   const handleSubmit = async () => {
     if (!numero.trim() || !fecha) {
@@ -81,7 +96,6 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
       toast.error('Ingresa el monto para al menos una línea')
       return
     }
-
     try {
       setSaving(true)
       const res = await fetch('/api/gasto-comprobante', {
@@ -97,12 +111,12 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
           fecha,
           lineas: lineas
             .filter(l => l.monto > 0)
-            .map((l, i) => ({
+            .map(l => ({
               descripcion: l.descripcion,
               monto: l.monto,
               proyectoId: l.proyectoId,
               categoriaCosto: 'equipos',
-              requerimientoMaterialItemId: items[i]?.id,
+              requerimientoMaterialItemId: l.itemId,
               cantidad: items.find(it => it.id === l.itemId)?.cantidadSolicitada,
             })),
         }),
@@ -149,15 +163,12 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
             </div>
           ) : (
             <div className="space-y-2">
-              {/* Progress */}
               {itemsConPrecioReal > 0 && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
                   <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
                   <span>{itemsConPrecioReal} de {items.length} item(s) con precio real registrado</span>
                 </div>
               )}
-
-              {/* Items table */}
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -207,7 +218,6 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                   </tbody>
                 </table>
               </div>
-
               <Separator />
               <div className="flex justify-end items-center gap-6 text-sm">
                 <div className="text-right">
@@ -226,133 +236,218 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
         </CardContent>
       </Card>
 
-      {/* Dialog: Registrar Comprobante */}
+      {/* ── Dialog: Registrar Comprobante ─────────────────────────────────────── */}
       <Dialog open={showComprobante} onOpenChange={setShowComprobante}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Receipt className="h-5 w-5 text-blue-600" />
+        <DialogContent className="sm:max-w-xl p-0 gap-0 flex flex-col max-h-[90vh]">
+
+          {/* Header fijo */}
+          <DialogHeader className="px-5 pt-5 pb-4 border-b shrink-0">
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Receipt className="h-4 w-4 text-blue-600" />
               Registrar Comprobante
             </DialogTitle>
-            <DialogDescription>
-              Registra la factura/boleta de compra. Distribuye el monto entre los items del requerimiento.
-            </DialogDescription>
+
+            {/* Campos del comprobante en grid compacto */}
+            <div className="mt-4 space-y-3">
+              {/* Fila 1: Tipo + Número */}
+              <div className="flex gap-3">
+                <div className="w-36 shrink-0 space-y-1">
+                  <Label className="text-xs text-muted-foreground">Tipo</Label>
+                  <Select value={tipoComprobante} onValueChange={setTipoComprobante}>
+                    <SelectTrigger className="h-8 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="factura">Factura</SelectItem>
+                      <SelectItem value="boleta">Boleta</SelectItem>
+                      <SelectItem value="recibo">Recibo</SelectItem>
+                      <SelectItem value="ticket">Ticket</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex-1 space-y-1">
+                  <Label className="text-xs text-muted-foreground">
+                    Número <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    className="h-8 text-sm font-mono"
+                    value={numero}
+                    onChange={e => setNumero(e.target.value)}
+                    placeholder="F001-00123456"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">
+                    Fecha <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    type="date"
+                    className="h-8 text-sm w-36"
+                    value={fecha}
+                    onChange={e => setFecha(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Fila 2: Proveedor + RUC */}
+              <div className="flex gap-3">
+                <div className="flex-1 space-y-1">
+                  <Label className="text-xs text-muted-foreground">Proveedor</Label>
+                  <Input
+                    className="h-8 text-sm"
+                    value={proveedor}
+                    onChange={e => setProveedor(e.target.value)}
+                    placeholder="Nombre del proveedor"
+                  />
+                </div>
+                <div className="w-36 shrink-0 space-y-1">
+                  <Label className="text-xs text-muted-foreground">RUC</Label>
+                  <Input
+                    className="h-8 text-sm font-mono"
+                    value={ruc}
+                    onChange={e => setRuc(e.target.value)}
+                    placeholder="20123456789"
+                    maxLength={11}
+                  />
+                </div>
+              </div>
+            </div>
           </DialogHeader>
 
-          <div className="space-y-4 pt-2">
-            {/* Header del comprobante */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Tipo <span className="text-red-500">*</span></Label>
-                <Select value={tipoComprobante} onValueChange={setTipoComprobante}>
-                  <SelectTrigger className="h-8 text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="factura">Factura</SelectItem>
-                    <SelectItem value="boleta">Boleta</SelectItem>
-                    <SelectItem value="recibo">Recibo</SelectItem>
-                    <SelectItem value="ticket">Ticket</SelectItem>
-                  </SelectContent>
-                </Select>
+          {/* Sección distribución — scrollable */}
+          <div className="flex-1 overflow-y-auto px-5 py-4 min-h-0">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <p className="text-xs font-semibold text-foreground uppercase tracking-wide">
+                  Distribución por item
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Asigna el monto de la factura a cada item. Items en S/ 0 serán omitidos.
+                </p>
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Número <span className="text-red-500">*</span></Label>
-                <Input
-                  className="h-8 text-sm"
-                  value={numero}
-                  onChange={e => setNumero(e.target.value)}
-                  placeholder="F001-123456"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Proveedor</Label>
-                <Input
-                  className="h-8 text-sm"
-                  value={proveedor}
-                  onChange={e => setProveedor(e.target.value)}
-                  placeholder="Nombre del proveedor"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">RUC</Label>
-                <Input
-                  className="h-8 text-sm"
-                  value={ruc}
-                  onChange={e => setRuc(e.target.value)}
-                  placeholder="20123456789"
-                  maxLength={11}
-                />
-              </div>
-              <div className="space-y-1.5 col-span-2">
-                <Label className="text-xs">Fecha del comprobante <span className="text-red-500">*</span></Label>
-                <Input
-                  type="date"
-                  className="h-8 text-sm"
-                  value={fecha}
-                  onChange={e => setFecha(e.target.value)}
-                />
-              </div>
+              {items.some(it => it.totalEstimado != null && it.totalEstimado > 0) && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={usarTodosEstimados}
+                  className="h-7 text-xs shrink-0"
+                >
+                  <Wand2 className="h-3 w-3 mr-1" />
+                  Usar estimados
+                </Button>
+              )}
             </div>
 
-            <Separator />
-
-            {/* Distribución por item */}
-            <div>
-              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                Distribución por item
-              </Label>
-              <p className="text-xs text-muted-foreground mb-3 mt-1">
-                Ingresa el monto de la factura que corresponde a cada item. Items en S/ 0 serán omitidos.
-              </p>
-              <div className="space-y-2">
-                {lineas.map((linea) => {
-                  const item = items.find(it => it.id === linea.itemId)
-                  return (
-                    <div key={linea.itemId} className="flex items-center gap-3 p-2.5 rounded-lg bg-muted/30 border">
+            <div className="space-y-2">
+              {lineas.map((linea) => {
+                const item = items.find(it => it.id === linea.itemId)
+                const tieneEstimado = item?.totalEstimado != null && item.totalEstimado > 0
+                const estaCompleto = linea.monto > 0
+                return (
+                  <div
+                    key={linea.itemId}
+                    className={`rounded-lg border p-3 transition-colors ${
+                      estaCompleto
+                        ? 'bg-green-50 dark:bg-green-950/10 border-green-200 dark:border-green-900'
+                        : 'bg-muted/20'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      {/* Info del item */}
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium truncate">{linea.descripcion}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Proyecto: <span className="font-medium">{linea.proyectoCodigo}</span>
-                          {item && <span className="ml-2">Est: {fmt(item.totalEstimado)}</span>}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs font-mono text-muted-foreground shrink-0">
+                            {item?.codigo}
+                          </span>
+                          <Badge variant="outline" className="text-xs py-0 px-1.5 h-4 font-normal shrink-0">
+                            {linea.proyectoCodigo}
+                          </Badge>
+                          {estaCompleto && (
+                            <CheckCircle2 className="h-3.5 w-3.5 text-green-600 shrink-0" />
+                          )}
+                        </div>
+                        <p className="text-xs mt-0.5 line-clamp-1 text-foreground/80">
+                          {item?.descripcion}
                         </p>
+                        {item && (
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {item.cantidadSolicitada} {item.unidad}
+                            {item.totalEstimado != null && (
+                              <span className="ml-2">· Est: <span className="font-medium">{fmt(item.totalEstimado)}</span></span>
+                            )}
+                          </p>
+                        )}
                       </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <span className="text-xs text-muted-foreground">S/</span>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={linea.monto || ''}
-                          onChange={e => updateLinea(linea.itemId, parseFloat(e.target.value) || 0)}
-                          className="h-7 w-28 text-sm"
-                          placeholder="0.00"
-                        />
+
+                      {/* Input de monto */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {tieneEstimado && !estaCompleto && (
+                          <button
+                            type="button"
+                            onClick={() => usarEstimado(linea.itemId)}
+                            className="text-xs text-blue-600 hover:text-blue-800 underline underline-offset-2 whitespace-nowrap"
+                          >
+                            ≈ est.
+                          </button>
+                        )}
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-muted-foreground">S/</span>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={linea.monto || ''}
+                            onChange={e => updateLinea(linea.itemId, parseFloat(e.target.value) || 0)}
+                            className={`h-8 w-28 text-sm text-right font-mono ${
+                              estaCompleto ? 'border-green-300 focus-visible:ring-green-400' : ''
+                            }`}
+                            placeholder="0.00"
+                          />
+                        </div>
                       </div>
                     </div>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Total */}
-            <div className="flex justify-between items-center p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900">
-              <span className="text-sm font-medium">Total del comprobante:</span>
-              <span className="text-lg font-bold text-blue-700 dark:text-blue-400 font-mono">
-                S/ {new Intl.NumberFormat('es-PE', { minimumFractionDigits: 2 }).format(montoTotal)}
-              </span>
+                  </div>
+                )
+              })}
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowComprobante(false)} disabled={saving}>
-              Cancelar
-            </Button>
-            <Button onClick={handleSubmit} disabled={saving || !numero.trim()} className="bg-blue-600 hover:bg-blue-700">
-              {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-              Registrar Comprobante
-            </Button>
-          </DialogFooter>
+          {/* Footer fijo: total + botones */}
+          <div className="border-t px-5 py-4 shrink-0 bg-background">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    {lineasConMonto} de {lineas.length} item(s) con monto
+                  </p>
+                  <p className="text-lg font-bold font-mono text-blue-700 dark:text-blue-400">
+                    S/ {fmtNum(montoTotal)}
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowComprobante(false)}
+                  disabled={saving}
+                  size="sm"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleSubmit}
+                  disabled={saving || !numero.trim() || montoTotal === 0}
+                  className="bg-blue-600 hover:bg-blue-700"
+                  size="sm"
+                >
+                  {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+                  Registrar
+                </Button>
+              </div>
+            </div>
+          </div>
+
         </DialogContent>
       </Dialog>
     </>
