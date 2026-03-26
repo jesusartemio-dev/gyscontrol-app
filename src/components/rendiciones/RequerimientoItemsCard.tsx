@@ -419,7 +419,7 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
         const previewUrl = adj ? `/api/gasto-adjunto/${adj.id}` : null
         return (
           <Dialog open={!!previewing} onOpenChange={() => setPreviewing(null)}>
-            <DialogContent className="max-w-none w-screen h-screen rounded-none p-0 gap-0 flex flex-col">
+            <DialogContent className="!left-0 !top-0 !translate-x-0 !translate-y-0 max-w-none w-screen h-screen rounded-none p-0 gap-0 flex flex-col">
               {/* Header */}
               <DialogHeader className="px-5 pt-4 pb-3 border-b shrink-0 flex-row items-center justify-between space-y-0">
                 <DialogTitle className="flex items-center gap-2 text-base font-semibold">
