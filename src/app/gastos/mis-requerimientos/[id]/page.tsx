@@ -627,9 +627,8 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
             <div className="flex items-start gap-2 text-xs text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/20 rounded-lg p-2.5 mb-3 border border-blue-200 dark:border-blue-900">
               <Package className="h-3.5 w-3.5 mt-0.5 shrink-0" />
               <span>
-                <strong>Rendición de materiales:</strong> Agrega una línea por cada item de la factura.
-                Usa el campo &quot;Proyecto&quot; en cada línea para imputar al proyecto correcto.
-                Para una factura que cubre varios items, usa el botón &quot;Registrar Comprobante&quot; de arriba.
+                <strong>Gastos adicionales de la compra:</strong> Registra aquí movilidad, pasajes, estacionamiento u otros gastos asociados a la gestión de compra.
+                Las facturas de los materiales se registran en la sección &quot;Items a comprar&quot; de arriba con el botón &quot;Registrar Comprobante&quot;.
               </span>
             </div>
           )}
