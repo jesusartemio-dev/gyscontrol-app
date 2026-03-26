@@ -2734,6 +2734,29 @@ export interface HojaDeGastos {
     pedidoEquipoItem?: { id: string; codigo: string; descripcion: string }
     proyecto?: Pick<Proyecto, 'id' | 'codigo' | 'nombre'>
   }>
+  comprobantes?: Array<{
+    id: string
+    tipoComprobante: string
+    numeroComprobante: string
+    proveedorNombre?: string | null
+    proveedorRuc?: string | null
+    montoTotal: number
+    fecha: string
+    createdAt: string
+    adjuntos: Array<{
+      id: string
+      nombreArchivo: string
+      urlArchivo: string
+      tipoArchivo?: string | null
+    }>
+    lineas: Array<{
+      id: string
+      descripcion: string
+      monto: number
+      proyectoId?: string | null
+      requerimientoMaterialItemId?: string | null
+    }>
+  }>
 }
 
 export interface HojaDeGastosAdjunto {
