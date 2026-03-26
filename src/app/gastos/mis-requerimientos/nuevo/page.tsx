@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -34,7 +34,6 @@ import SelectorAsignacion, { type AsignacionValue } from '@/components/shared/Se
 
 type TipoRequerimiento = 'gastos_viaticos' | 'compra_materiales'
 type AgrupacionModal = 'proyecto' | 'pedido' | 'proveedor'
-type FiltroModal = 'todos' | 'seleccionados'
 
 const CATEGORIAS = [
   { value: 'gastos', label: 'Gastos' },
@@ -54,38 +53,32 @@ const fmt = (n: number | null | undefined) =>
 // ─── Modal de selección ───────────────────────────────────────────────────────
 interface ModalSelectorProps {
   open: boolean
-  /** Confirmar aplica la selección temporal al formulario */
-  onConfirm: (seleccion: Map<string, ItemSeleccionado>) => void
-  /** Cancelar descarta cambios sin tocar el formulario */
+  /** Confirmar agrega los items nuevos al formulario */
+  onConfirm: (nuevos: Map<string, ItemSeleccionado>) => void
+  /** Cancelar descarta sin tocar el formulario */
   onCancel: () => void
   proyectos: ProyectoParaRequerimiento[]
   loading: boolean
   busqueda: string
   onBusqueda: (q: string) => void
-  /** Selección confirmada del formulario (para inicializar la copia temporal) */
-  seleccionConfirmada: Map<string, ItemSeleccionado>
+  /** IDs ya confirmados — se excluyen del modal */
+  yaConfirmados: Set<string>
 }
 
 function ModalSelectorItems({
-  open, onConfirm, onCancel, proyectos, loading, busqueda, onBusqueda, seleccionConfirmada,
+  open, onConfirm, onCancel, proyectos, loading, busqueda, onBusqueda, yaConfirmados,
 }: ModalSelectorProps) {
-  // Copia temporal: se inicializa desde seleccionConfirmada al abrir
+  // Selección temporal: arranca vacía cada vez
   const [temp, setTemp] = useState<Map<string, ItemSeleccionado>>(new Map())
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set())
   const [agrupacion, setAgrupacion] = useState<AgrupacionModal>('pedido')
-  const [filtro, setFiltro] = useState<FiltroModal>('todos')
-  const initializedRef = useRef(false)
 
-  // Al abrir: copiar selección confirmada → temporal
+  // Al abrir: limpiar selección temporal
   useEffect(() => {
     if (open) {
-      setTemp(new Map(seleccionConfirmada))
-      initializedRef.current = true
-      setFiltro('todos')
-    } else {
-      initializedRef.current = false
+      setTemp(new Map())
     }
-  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open])
 
   // Expandir todos los grupos al cargar datos
   useEffect(() => {
@@ -122,16 +115,14 @@ function ModalSelectorItems({
     })
   }
 
-  // Filtrar proyectos según filtro activo
-  const proyectosFiltrados = filtro === 'seleccionados'
-    ? proyectos.map(p => ({
-        ...p,
-        pedidos: p.pedidos.map(ped => ({
-          ...ped,
-          items: ped.items.filter(it => temp.has(it.id)),
-        })).filter(ped => ped.items.length > 0),
-      })).filter(p => p.pedidos.length > 0)
-    : proyectos
+  // Excluir items ya confirmados en el formulario
+  const proyectosFiltrados = proyectos.map(p => ({
+    ...p,
+    pedidos: p.pedidos.map(ped => ({
+      ...ped,
+      items: ped.items.filter(it => !yaConfirmados.has(it.id)),
+    })).filter(ped => ped.items.length > 0),
+  })).filter(p => p.pedidos.length > 0)
 
   const pedidosFlat = proyectosFiltrados.flatMap(p =>
     p.pedidos.map(ped => ({ ...ped, proyectoCodigo: p.codigo, proyectoNombre: p.nombre }))
@@ -160,17 +151,8 @@ function ModalSelectorItems({
     return a.nombre.localeCompare(b.nombre)
   })
 
-  const totalItems = proyectos.reduce((s, p) => s + p.pedidos.reduce((ss, ped) => ss + ped.items.length, 0), 0)
+  const totalDisponibles = proyectosFiltrados.reduce((s, p) => s + p.pedidos.reduce((ss, ped) => ss + ped.items.length, 0), 0)
   const countTemp = temp.size
-
-  // Cambios respecto a la selección confirmada
-  const hayCambios = (() => {
-    if (temp.size !== seleccionConfirmada.size) return true
-    for (const id of temp.keys()) {
-      if (!seleccionConfirmada.has(id)) return true
-    }
-    return false
-  })()
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onCancel() }}>
@@ -178,7 +160,7 @@ function ModalSelectorItems({
         <DialogHeader className="px-5 pt-5 pb-3 border-b shrink-0">
           <DialogTitle className="flex items-center gap-2 text-base">
             <Package className="h-4 w-4 text-blue-600" />
-            Seleccionar Items a Comprar
+            Agregar Items a Comprar
           </DialogTitle>
 
           {/* Búsqueda + agrupación */}
@@ -209,36 +191,10 @@ function ModalSelectorItems({
             </Select>
           </div>
 
-          {/* Filtros: Todos / Seleccionados */}
-          <div className="flex items-center gap-2 mt-2">
-            <button
-              type="button"
-              onClick={() => setFiltro('todos')}
-              className={`text-xs px-3 py-1 rounded-full border transition-colors ${
-                filtro === 'todos'
-                  ? 'bg-foreground text-background border-foreground'
-                  : 'border-border text-muted-foreground hover:border-foreground/40'
-              }`}
-            >
-              Todos ({totalItems})
-            </button>
-            <button
-              type="button"
-              onClick={() => setFiltro('seleccionados')}
-              className={`text-xs px-3 py-1 rounded-full border transition-colors ${
-                filtro === 'seleccionados'
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'border-border text-muted-foreground hover:border-blue-400'
-              }`}
-            >
-              Seleccionados ({countTemp})
-            </button>
-            {hayCambios && (
-              <span className="text-xs text-amber-600 ml-auto">
-                · Hay cambios sin confirmar
-              </span>
-            )}
-          </div>
+          <p className="text-xs text-muted-foreground mt-1.5">
+            {totalDisponibles} item(s) disponibles para agregar
+            {yaConfirmados.size > 0 && ` · ${yaConfirmados.size} ya incluido(s) en el requerimiento`}
+          </p>
         </DialogHeader>
 
         {/* Lista scrollable */}
@@ -250,9 +206,7 @@ function ModalSelectorItems({
             </div>
           ) : proyectosFiltrados.length === 0 ? (
             <div className="text-center py-10 text-sm text-muted-foreground">
-              {filtro === 'seleccionados'
-                ? 'No hay items seleccionados aún.'
-                : 'No hay items disponibles.'}
+              No hay items disponibles para agregar.
             </div>
           ) : agrupacion === 'proyecto' ? (
             // ── Por Proyecto → Pedido ──
@@ -391,8 +345,8 @@ function ModalSelectorItems({
         <DialogFooter className="px-5 py-3 border-t shrink-0 flex items-center justify-between sm:justify-between gap-3">
           <span className="text-sm text-muted-foreground shrink-0">
             {countTemp > 0
-              ? <><span className="font-medium text-foreground">{countTemp}</span> seleccionado(s)</>
-              : 'Ningún item seleccionado'}
+              ? <><span className="font-medium text-foreground">{countTemp}</span> marcado(s) para agregar</>
+              : 'Selecciona items para agregar'}
           </span>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={onCancel}>
@@ -404,7 +358,7 @@ function ModalSelectorItems({
               onClick={() => onConfirm(temp)}
               disabled={countTemp === 0}
             >
-              Confirmar selección
+              Agregar {countTemp > 0 ? `${countTemp} item(s)` : 'items'}
             </Button>
           </div>
         </DialogFooter>
@@ -554,15 +508,15 @@ export default function NuevoRequerimientoPage() {
     return () => clearTimeout(t)
   }, [busqueda, tipo, loadItems])
 
-  // Confirmar selección del modal → aplica al formulario
-  const handleConfirmarModal = (nuevaSeleccion: Map<string, ItemSeleccionado>) => {
-    // Preservar cantidad/precio editados por el usuario si el item ya estaba seleccionado
-    const merged = new Map<string, ItemSeleccionado>()
-    for (const [id, entry] of nuevaSeleccion) {
-      const existing = seleccionados.get(id)
-      merged.set(id, existing ?? entry)
-    }
-    setSeleccionados(merged)
+  // Confirmar del modal → AGREGA los nuevos items a los ya confirmados
+  const handleConfirmarModal = (nuevos: Map<string, ItemSeleccionado>) => {
+    setSeleccionados(prev => {
+      const next = new Map(prev)
+      for (const [id, entry] of nuevos) {
+        if (!next.has(id)) next.set(id, entry)
+      }
+      return next
+    })
     setShowModal(false)
   }
 
@@ -823,7 +777,7 @@ export default function NuevoRequerimientoPage() {
                 disabled={saving}
               >
                 <Plus className="h-3.5 w-3.5" />
-                {seleccionados.size === 0 ? 'Seleccionar Items' : 'Modificar selección'}
+                Agregar Items
               </Button>
             </CardHeader>
             <CardContent className="px-4 pb-4">
@@ -929,7 +883,7 @@ export default function NuevoRequerimientoPage() {
         loading={loadingItems}
         busqueda={busqueda}
         onBusqueda={setBusqueda}
-        seleccionConfirmada={seleccionados}
+        yaConfirmados={new Set(seleccionados.keys())}
       />
     </div>
   )
