@@ -243,6 +243,7 @@ const ListasTable = memo(function ListasTable({
               </TableHead>
               <TableHead className="w-[70px] text-center text-xs font-medium">Cotiz.</TableHead>
               <TableHead className="w-[100px] text-right text-xs font-medium">Total</TableHead>
+              <TableHead className="w-[120px] text-xs font-medium">Creado por</TableHead>
               <TableHead className="w-[90px]">
                 <button
                   onClick={() => handleSort('createdAt')}
@@ -266,7 +267,7 @@ const ListasTable = memo(function ListasTable({
           <TableBody>
             {sortedListas.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground text-sm">
+                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground text-sm">
                   {search || filterEstado !== 'all' ? 'No se encontraron listas' : 'Sin listas de equipos'}
                 </TableCell>
               </TableRow>
@@ -323,6 +324,15 @@ const ListasTable = memo(function ListasTable({
                   </TableCell>
                   <TableCell className="text-right font-mono text-xs text-muted-foreground py-2">
                     ${(lista.montoEstimado || 0).toLocaleString('es-PE', { minimumFractionDigits: 2 })}
+                  </TableCell>
+                  <TableCell className="py-2">
+                    {lista.responsable || lista.user ? (
+                      <span className="text-xs text-muted-foreground">
+                        {(lista.responsable || lista.user).name || (lista.responsable || lista.user).email || '—'}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground py-2">
                     {formatDate(lista.createdAt)}
