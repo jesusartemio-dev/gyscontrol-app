@@ -13,6 +13,7 @@ import {
   ArrowRight,
   X,
   ChevronRight,
+  ChevronDown,
   Loader2,
   AlertTriangle,
   ShoppingCart,
@@ -39,6 +40,7 @@ import {
 import LogisticaListaDetalleItemTableProfessional from '@/components/logistica/LogisticaListaDetalleItemTableProfessional'
 import ModalCrearCotizacionDesdeLista from '@/components/logistica/ModalCrearCotizacionDesdeLista'
 import ListaTimeline from '@/components/logistica/ListaTimeline'
+import ListaEquipoHistorial from '@/components/equipos/ListaEquipoHistorial'
 import type { ListaEquipo } from '@/types'
 
 export default function LogisticaListaDetallePage() {
@@ -49,6 +51,8 @@ export default function LogisticaListaDetallePage() {
   const [showCrearCotizacion, setShowCrearCotizacion] = useState(false)
   const [updatingEstado, setUpdatingEstado] = useState(false)
   const [openConfirmAvanzar, setOpenConfirmAvanzar] = useState(false)
+  const [timelineOpen, setTimelineOpen] = useState(true)
+  const [historialOpen, setHistorialOpen] = useState(true)
 
   const handleRefetch = async () => {
     try {
@@ -336,13 +340,36 @@ export default function LogisticaListaDetallePage() {
 
         {/* Timeline de trazabilidad */}
         <div className="bg-white rounded-lg border">
-          <div className="px-4 py-3 border-b bg-gray-50/50 flex items-center gap-2">
+          <button
+            onClick={() => setTimelineOpen(o => !o)}
+            className="w-full px-4 py-3 border-b bg-gray-50/50 flex items-center gap-2 hover:bg-gray-100/50 transition-colors"
+          >
             <FileText className="h-4 w-4 text-blue-600" />
             <span className="text-sm font-medium">Timeline</span>
-          </div>
-          <div className="p-4">
-            <ListaTimeline listaId={id} />
-          </div>
+            <ChevronDown className={`h-4 w-4 ml-auto text-muted-foreground transition-transform ${timelineOpen ? '' : '-rotate-90'}`} />
+          </button>
+          {timelineOpen && (
+            <div className="p-4">
+              <ListaTimeline listaId={id} />
+            </div>
+          )}
+        </div>
+
+        {/* Historial de auditoría */}
+        <div className="bg-white rounded-lg border">
+          <button
+            onClick={() => setHistorialOpen(o => !o)}
+            className="w-full px-4 py-3 border-b bg-gray-50/50 flex items-center gap-2 hover:bg-gray-100/50 transition-colors"
+          >
+            <FileText className="h-4 w-4 text-purple-600" />
+            <span className="text-sm font-medium">Historial</span>
+            <ChevronDown className={`h-4 w-4 ml-auto text-muted-foreground transition-transform ${historialOpen ? '' : '-rotate-90'}`} />
+          </button>
+          {historialOpen && (
+            <div className="p-4">
+              <ListaEquipoHistorial listaId={id} />
+            </div>
+          )}
         </div>
 
         {/* Órdenes de Compra vinculadas */}
