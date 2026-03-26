@@ -478,7 +478,7 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
             {/* Body split */}
             <div className="flex flex-1 min-h-0">
               {/* ── Panel izquierdo: datos + items ── */}
-              <div className="w-80 shrink-0 border-r flex flex-col overflow-y-auto bg-background">
+              <div className="w-[55%] shrink-0 border-r flex flex-col overflow-y-auto bg-background">
                 <div className="p-5 space-y-4 border-b">
                   {[
                     { label: 'Fecha', value: new Date(previewing.fecha).toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' }) },
