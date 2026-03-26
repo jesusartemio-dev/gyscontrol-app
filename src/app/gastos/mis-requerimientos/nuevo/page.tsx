@@ -33,7 +33,7 @@ import {
 import SelectorAsignacion, { type AsignacionValue } from '@/components/shared/SelectorAsignacion'
 
 type TipoRequerimiento = 'gastos_viaticos' | 'compra_materiales'
-type AgrupacionModal = 'proyecto' | 'pedido'
+type AgrupacionModal = 'proyecto' | 'pedido' | 'proveedor'
 type FiltroModal = 'todos' | 'seleccionados'
 
 const CATEGORIAS = [
@@ -137,6 +137,29 @@ function ModalSelectorItems({
     p.pedidos.map(ped => ({ ...ped, proyectoCodigo: p.codigo, proyectoNombre: p.nombre }))
   )
 
+  // Agrupar por proveedor
+  const proveedoresMap = new Map<string, {
+    id: string; nombre: string; items: ItemParaRequerimiento[]
+  }>()
+  for (const p of proyectosFiltrados) {
+    for (const ped of p.pedidos) {
+      for (const item of ped.items) {
+        const key = item.proveedorId || '__sin_proveedor__'
+        const nombre = item.proveedor?.nombre || item.proveedorNombre || 'Sin proveedor asignado'
+        if (!proveedoresMap.has(key)) {
+          proveedoresMap.set(key, { id: key, nombre, items: [] })
+        }
+        proveedoresMap.get(key)!.items.push(item)
+      }
+    }
+  }
+  // Sin proveedor al final
+  const proveedoresFlat = Array.from(proveedoresMap.values()).sort((a, b) => {
+    if (a.id === '__sin_proveedor__') return 1
+    if (b.id === '__sin_proveedor__') return -1
+    return a.nombre.localeCompare(b.nombre)
+  })
+
   const totalItems = proyectos.reduce((s, p) => s + p.pedidos.reduce((ss, ped) => ss + ped.items.length, 0), 0)
   const countTemp = temp.size
 
@@ -175,12 +198,13 @@ function ModalSelectorItems({
               )}
             </div>
             <Select value={agrupacion} onValueChange={v => setAgrupacion(v as AgrupacionModal)}>
-              <SelectTrigger className="w-[130px] h-9 shrink-0">
+              <SelectTrigger className="w-[140px] h-9 shrink-0">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="proyecto">Por Proyecto</SelectItem>
                 <SelectItem value="pedido">Por Pedido</SelectItem>
+                <SelectItem value="proveedor">Por Proveedor</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -231,69 +255,136 @@ function ModalSelectorItems({
                 : 'No hay items disponibles.'}
             </div>
           ) : agrupacion === 'proyecto' ? (
-            proyectosFiltrados.map(proyecto => (
-              <div key={proyecto.id} className="border rounded-lg overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => toggleExpand(proyecto.id)}
-                  className="w-full flex items-center gap-2 px-3 py-2 bg-muted/50 hover:bg-muted/80 text-left transition-colors"
-                >
-                  {expandidos.has(proyecto.id)
-                    ? <ChevronDown className="h-3.5 w-3.5 shrink-0" />
-                    : <ChevronRight className="h-3.5 w-3.5 shrink-0" />}
-                  <span className="font-semibold text-sm">{proyecto.codigo}</span>
-                  <span className="text-sm text-muted-foreground truncate">— {proyecto.nombre}</span>
-                  <Badge variant="secondary" className="ml-auto text-xs py-0 h-4 shrink-0">
-                    {proyecto.pedidos.reduce((s, p) => s + p.items.length, 0)}
-                  </Badge>
-                </button>
-                {expandidos.has(proyecto.id) && proyecto.pedidos.map(pedido => (
-                  <PedidoGroup
-                    key={pedido.id}
-                    pedido={pedido}
-                    expandidos={expandidos}
-                    onToggleExpand={toggleExpand}
-                    temp={temp}
-                    onToggleItem={toggleItem}
-                    indent
-                  />
-                ))}
-              </div>
-            ))
+            // ── Por Proyecto → Pedido ──
+            proyectosFiltrados.map(proyecto => {
+              const selProyecto = proyecto.pedidos.reduce((s, p) => s + p.items.filter(it => temp.has(it.id)).length, 0)
+              return (
+                <div key={proyecto.id} className="border rounded-lg overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => toggleExpand(proyecto.id)}
+                    className="w-full flex items-center gap-2 px-3 py-2 bg-muted/50 hover:bg-muted/80 text-left transition-colors"
+                  >
+                    {expandidos.has(proyecto.id)
+                      ? <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+                      : <ChevronRight className="h-3.5 w-3.5 shrink-0" />}
+                    <span className="font-semibold text-sm">{proyecto.codigo}</span>
+                    <span className="text-sm text-muted-foreground truncate">— {proyecto.nombre}</span>
+                    <div className="ml-auto flex items-center gap-1.5 shrink-0">
+                      {selProyecto > 0 && (
+                        <Badge className="text-xs py-0 px-1.5 h-4 bg-blue-100 text-blue-700 border-0">
+                          {selProyecto} sel.
+                        </Badge>
+                      )}
+                      <Badge variant="secondary" className="text-xs py-0 h-4">
+                        {proyecto.pedidos.reduce((s, p) => s + p.items.length, 0)}
+                      </Badge>
+                    </div>
+                  </button>
+                  {expandidos.has(proyecto.id) && proyecto.pedidos.map(pedido => (
+                    <PedidoGroup
+                      key={pedido.id}
+                      pedido={pedido}
+                      expandidos={expandidos}
+                      onToggleExpand={toggleExpand}
+                      temp={temp}
+                      onToggleItem={toggleItem}
+                      indent
+                    />
+                  ))}
+                </div>
+              )
+            })
+          ) : agrupacion === 'pedido' ? (
+            // ── Por Pedido ──
+            pedidosFlat.map(pedido => {
+              const selPedido = pedido.items.filter(it => temp.has(it.id)).length
+              return (
+                <div key={pedido.id} className="border rounded-lg overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => toggleExpand(pedido.id)}
+                    className="w-full flex items-center gap-2 px-3 py-2 bg-muted/50 hover:bg-muted/80 text-left transition-colors"
+                  >
+                    {expandidos.has(pedido.id)
+                      ? <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+                      : <ChevronRight className="h-3.5 w-3.5 shrink-0" />}
+                    <span className="font-semibold text-sm">{pedido.codigo}</span>
+                    <Badge variant="outline" className="text-xs py-0 px-1.5 h-4">{pedido.estado}</Badge>
+                    <span className="text-xs text-muted-foreground truncate">
+                      {pedido.proyectoCodigo} — {pedido.proyectoNombre}
+                    </span>
+                    <div className="ml-auto flex items-center gap-1.5 shrink-0">
+                      {selPedido > 0 && (
+                        <Badge className="text-xs py-0 px-1.5 h-4 bg-blue-100 text-blue-700 border-0">
+                          {selPedido} sel.
+                        </Badge>
+                      )}
+                      <Badge variant="secondary" className="text-xs py-0 h-4">
+                        {pedido.items.length}
+                      </Badge>
+                    </div>
+                  </button>
+                  {expandidos.has(pedido.id) && (
+                    <div className="divide-y">
+                      {pedido.items.map(item => (
+                        <ItemRow
+                          key={item.id}
+                          item={item}
+                          checked={temp.has(item.id)}
+                          onToggle={toggleItem}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })
           ) : (
-            pedidosFlat.map(pedido => (
-              <div key={pedido.id} className="border rounded-lg overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => toggleExpand(pedido.id)}
-                  className="w-full flex items-center gap-2 px-3 py-2 bg-muted/50 hover:bg-muted/80 text-left transition-colors"
-                >
-                  {expandidos.has(pedido.id)
-                    ? <ChevronDown className="h-3.5 w-3.5 shrink-0" />
-                    : <ChevronRight className="h-3.5 w-3.5 shrink-0" />}
-                  <span className="font-semibold text-sm">{pedido.codigo}</span>
-                  <Badge variant="outline" className="text-xs py-0 px-1.5 h-4">{pedido.estado}</Badge>
-                  <span className="text-xs text-muted-foreground truncate">
-                    {pedido.proyectoCodigo} — {pedido.proyectoNombre}
-                  </span>
-                  <Badge variant="secondary" className="ml-auto text-xs py-0 h-4 shrink-0">
-                    {pedido.items.length}
-                  </Badge>
-                </button>
-                {expandidos.has(pedido.id) && (
-                  <div className="divide-y">
-                    {pedido.items.map(item => (
-                      <ItemRow
-                        key={item.id}
-                        item={item}
-                        checked={temp.has(item.id)}
-                        onToggle={toggleItem}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))
+            // ── Por Proveedor ──
+            proveedoresFlat.map(prov => {
+              const selProv = prov.items.filter(it => temp.has(it.id)).length
+              const esSinProveedor = prov.id === '__sin_proveedor__'
+              return (
+                <div key={prov.id} className="border rounded-lg overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => toggleExpand(prov.id)}
+                    className="w-full flex items-center gap-2 px-3 py-2 bg-muted/50 hover:bg-muted/80 text-left transition-colors"
+                  >
+                    {expandidos.has(prov.id)
+                      ? <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+                      : <ChevronRight className="h-3.5 w-3.5 shrink-0" />}
+                    <span className={`font-semibold text-sm ${esSinProveedor ? 'text-muted-foreground italic' : ''}`}>
+                      {prov.nombre}
+                    </span>
+                    <div className="ml-auto flex items-center gap-1.5 shrink-0">
+                      {selProv > 0 && (
+                        <Badge className="text-xs py-0 px-1.5 h-4 bg-blue-100 text-blue-700 border-0">
+                          {selProv} sel.
+                        </Badge>
+                      )}
+                      <Badge variant="secondary" className="text-xs py-0 h-4">
+                        {prov.items.length}
+                      </Badge>
+                    </div>
+                  </button>
+                  {expandidos.has(prov.id) && (
+                    <div className="divide-y">
+                      {prov.items.map(item => (
+                        <ItemRow
+                          key={item.id}
+                          item={item}
+                          checked={temp.has(item.id)}
+                          onToggle={toggleItem}
+                          showPedido
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })
           )}
         </div>
 
@@ -374,8 +465,9 @@ interface ItemRowProps {
   checked: boolean
   onToggle: (item: ItemParaRequerimiento, checked: boolean) => void
   indent?: boolean
+  showPedido?: boolean
 }
-function ItemRow({ item, checked, onToggle, indent }: ItemRowProps) {
+function ItemRow({ item, checked, onToggle, indent, showPedido }: ItemRowProps) {
   return (
     <label
       className={`flex items-start gap-3 py-2 cursor-pointer transition-colors select-none ${
@@ -397,9 +489,14 @@ function ItemRow({ item, checked, onToggle, indent }: ItemRowProps) {
           </span>
           <span className="text-xs text-muted-foreground shrink-0">{item.unidad}</span>
         </div>
-        <div className="flex gap-3 mt-0.5 text-xs text-muted-foreground">
+        <div className="flex gap-3 mt-0.5 text-xs text-muted-foreground flex-wrap">
           <span>Disp: <strong className="text-foreground">{item.cantidadDisponible}</strong></span>
           {item.precioUnitario != null && <span>P.U.: S/ {fmt(item.precioUnitario)}</span>}
+          {showPedido && (
+            <span className="text-muted-foreground/70">
+              {item.pedidoEquipo.proyecto.codigo} · {item.pedidoEquipo.codigo}
+            </span>
+          )}
         </div>
       </div>
       {checked && (

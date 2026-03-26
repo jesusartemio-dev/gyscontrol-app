@@ -96,6 +96,9 @@ export interface ItemParaRequerimiento {
   precioUnitario: number | null
   estadoEntrega: string
   pedidoId: string
+  proveedorId: string | null
+  proveedorNombre: string | null
+  proveedor: { id: string; nombre: string } | null
   pedidoEquipo: {
     id: string
     codigo: string

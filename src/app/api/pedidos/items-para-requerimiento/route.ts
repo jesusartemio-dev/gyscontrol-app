@@ -73,6 +73,11 @@ export async function GET(req: Request) {
         precioUnitario: true,
         estadoEntrega: true,
         pedidoId: true,
+        proveedorId: true,
+        proveedorNombre: true,
+        proveedor: {
+          select: { id: true, nombre: true }
+        },
         pedidoEquipo: {
           select: {
             id: true,
