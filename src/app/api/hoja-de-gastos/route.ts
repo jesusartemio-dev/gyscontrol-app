@@ -148,9 +148,15 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Debe incluir al menos un item del pedido' }, { status: 400 })
       }
 
-      // Buscar CC GYS.LOG automáticamente
+      // Buscar CC GYS.LOG automáticamente (nombre exacto primero, luego fallback contains LOG)
       const ccLogistica = await prisma.centroCosto.findFirst({
-        where: { nombre: { contains: 'GYS', mode: 'insensitive' }, activo: true },
+        where: {
+          OR: [
+            { nombre: { equals: 'GYS.LOG', mode: 'insensitive' } },
+            { nombre: { contains: 'GYS.LOG', mode: 'insensitive' } },
+          ],
+          activo: true,
+        },
       })
       if (!ccLogistica) {
         return NextResponse.json({ error: 'Centro de costo GYS.LOG no encontrado. Contacte al administrador.' }, { status: 400 })

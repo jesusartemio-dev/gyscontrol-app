@@ -21,6 +21,17 @@ const includeRelations = {
     include: { usuario: { select: { id: true, name: true } } },
     orderBy: { creadoEn: 'desc' as const },
   },
+  itemsMateriales: {
+    include: {
+      pedidoEquipoItem: {
+        select: {
+          id: true, codigo: true, descripcion: true, unidad: true, precioUnitario: true,
+        },
+      },
+      proyecto: { select: { id: true, codigo: true, nombre: true } },
+    },
+    orderBy: { createdAt: 'asc' as const },
+  },
 }
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
