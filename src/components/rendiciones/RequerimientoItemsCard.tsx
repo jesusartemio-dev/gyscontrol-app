@@ -410,6 +410,7 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                     const esPdf = adj.tipoArchivo?.includes('pdf') || adj.nombreArchivo.toLowerCase().endsWith('.pdf')
                     const esImagen = adj.tipoArchivo?.startsWith('image/') ||
                       /\.(jpg|jpeg|png|webp|gif)$/i.test(adj.nombreArchivo)
+                    const previewUrl = `/api/gasto-adjunto/${adj.id}`
                     return (
                       <div key={adj.id} className="space-y-2">
                         <div className="flex items-center justify-between">
@@ -417,25 +418,24 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                             <Paperclip className="h-3 w-3" />{adj.nombreArchivo}
                           </span>
                           <a
-                            href={adj.urlArchivo}
+                            href={previewUrl}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-xs text-blue-600 hover:underline flex items-center gap-1"
                           >
-                            <ExternalLink className="h-3 w-3" />Abrir en Drive
+                            <ExternalLink className="h-3 w-3" />Abrir
                           </a>
                         </div>
                         {esImagen && (
                           <img
-                            src={adj.urlArchivo}
+                            src={previewUrl}
                             alt={adj.nombreArchivo}
                             className="w-full rounded-lg border object-contain max-h-96"
-                            onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
                           />
                         )}
                         {esPdf && (
                           <iframe
-                            src={adj.urlArchivo}
+                            src={previewUrl}
                             className="w-full rounded-lg border"
                             style={{ height: '420px' }}
                             title={adj.nombreArchivo}
@@ -443,7 +443,7 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                         )}
                         {!esImagen && !esPdf && (
                           <div className="flex items-center justify-center py-8 border rounded-lg bg-muted/20">
-                            <a href={adj.urlArchivo} target="_blank" rel="noopener noreferrer"
+                            <a href={previewUrl} target="_blank" rel="noopener noreferrer"
                               className="flex items-center gap-2 text-blue-600 hover:underline text-sm">
                               <ExternalLink className="h-4 w-4" />
                               Descargar {adj.nombreArchivo}
