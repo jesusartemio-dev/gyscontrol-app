@@ -59,9 +59,9 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
   const [archivoSeleccionado, setArchivoSeleccionado] = useState<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // IDs de items ya cubiertos por algún comprobante existente
+  // Items ya cubiertos = tienen precioReal registrado (lo asigna el API de comprobante)
   const itemsCubiertos = new Set(
-    comprobantes.flatMap(c => c.lineas.map(l => l.requerimientoMaterialItemId).filter(Boolean))
+    items.filter(i => i.precioReal != null).map(i => i.id)
   )
 
   const openDialog = () => {
