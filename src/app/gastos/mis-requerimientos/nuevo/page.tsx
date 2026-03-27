@@ -63,20 +63,40 @@ interface ModalSelectorProps {
   onBusqueda: (q: string) => void
   /** IDs ya confirmados — se excluyen del modal */
   yaConfirmados: Set<string>
+  /** IDs a pre-seleccionar al abrir (viene desde pedido vía URL) */
+  preSeleccionIds?: string[]
 }
 
 function ModalSelectorItems({
-  open, onConfirm, onCancel, proyectos, loading, busqueda, onBusqueda, yaConfirmados,
+  open, onConfirm, onCancel, proyectos, loading, busqueda, onBusqueda, yaConfirmados, preSeleccionIds,
 }: ModalSelectorProps) {
   // Selección temporal: arranca vacía cada vez
   const [temp, setTemp] = useState<Map<string, ItemSeleccionado>>(new Map())
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set())
   const [agrupacion, setAgrupacion] = useState<AgrupacionModal>('pedido')
 
-  // Al abrir: limpiar selección temporal
+  // Al abrir: pre-seleccionar items si vienen por URL, sino limpiar
   useEffect(() => {
     if (open) {
-      setTemp(new Map())
+      if (preSeleccionIds && preSeleccionIds.length > 0) {
+        const initialTemp = new Map<string, ItemSeleccionado>()
+        for (const p of proyectos) {
+          for (const ped of p.pedidos) {
+            for (const item of ped.items) {
+              if (!yaConfirmados.has(item.id) && preSeleccionIds.includes(item.id)) {
+                initialTemp.set(item.id, {
+                  item,
+                  cantidad: item.cantidadDisponible,
+                  precioEstimado: item.precioUnitario,
+                })
+              }
+            }
+          }
+        }
+        setTemp(initialTemp)
+      } else {
+        setTemp(new Map())
+      }
     }
   }, [open])
 
@@ -491,6 +511,7 @@ function NuevoRequerimientoPageInner() {
 
   // Si viene desde un pedido, auto-abrir modal al cargar
   const pedidoCodigoParam = searchParams.get('pedidoCodigo')
+  const itemIdsParam = searchParams.get('itemIds')?.split(',').filter(Boolean) ?? []
 
   useEffect(() => {
     if (tipo === 'compra_materiales') loadItems(pedidoCodigoParam || undefined)
@@ -897,6 +918,7 @@ function NuevoRequerimientoPageInner() {
         busqueda={busqueda}
         onBusqueda={setBusqueda}
         yaConfirmados={new Set(seleccionados.keys())}
+        preSeleccionIds={itemIdsParam.length > 0 ? itemIdsParam : undefined}
       />
     </div>
   )

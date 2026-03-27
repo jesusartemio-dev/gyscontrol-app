@@ -138,6 +138,34 @@ export default function PedidoLogisticaDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [updating, setUpdating] = useState(false)
 
+  // 📋 Estado para crear Requerimiento de Materiales
+  const [showCrearREQ, setShowCrearREQ] = useState(false)
+  const [reqItemsSelected, setReqItemsSelected] = useState<Set<string>>(new Set())
+
+  // Inicializar items del modal REQ al abrirlo
+  useEffect(() => {
+    if (showCrearREQ && pedido?.items) {
+      const initial = new Set<string>()
+      for (const item of pedido.items) {
+        const tieneOC = ((item as any).ordenCompraItems?.length ?? 0) > 0
+        const tieneREQ = itemTieneREQActivo(item as any)
+        if (!tieneOC && !tieneREQ) initial.add(item.id)
+      }
+      setReqItemsSelected(initial)
+    }
+  }, [showCrearREQ])
+
+  const handleIrACrearREQ = () => {
+    if (reqItemsSelected.size === 0) { toast.error('Selecciona al menos un item'); return }
+    const itemIds = Array.from(reqItemsSelected).join(',')
+    window.open(
+      `/gastos/mis-requerimientos/nuevo?tipo=compra_materiales&pedidoCodigo=${encodeURIComponent(pedido!.codigo)}&itemIds=${itemIds}`,
+      '_blank',
+      'noopener,noreferrer'
+    )
+    setShowCrearREQ(false)
+  }
+
   // 🛒 Estado para generar OCs
   const [showGenerarOC, setShowGenerarOC] = useState(false)
   const [generandoOC, setGenerandoOC] = useState(false)
@@ -1622,12 +1650,10 @@ export default function PedidoLogisticaDetailPage() {
                       variant="outline"
                       size="sm"
                       className="h-7 text-xs border-purple-200 text-purple-700 hover:bg-purple-50"
-                      asChild
+                      onClick={() => setShowCrearREQ(true)}
                     >
-                      <Link href={`/gastos/mis-requerimientos/nuevo?tipo=compra_materiales&pedidoCodigo=${encodeURIComponent(pedido.codigo)}`} target="_blank" rel="noopener noreferrer">
-                        <FileText className="h-3 w-3 mr-1" />
-                        Crear Requerimiento
-                      </Link>
+                      <FileText className="h-3 w-3 mr-1" />
+                      Crear Requerimiento
                     </Button>
                   )}
                 </div>
@@ -1667,11 +1693,9 @@ export default function PedidoLogisticaDetailPage() {
                   <FileText className="h-8 w-8 text-gray-300 mb-2" />
                   <p className="text-xs text-muted-foreground mb-3">No hay requerimientos de dinero para este pedido.</p>
                   {puedeGenerarOC && (
-                    <Button variant="outline" size="sm" className="h-7 text-xs" asChild>
-                      <Link href={`/gastos/mis-requerimientos/nuevo?tipo=compra_materiales&pedidoCodigo=${encodeURIComponent(pedido.codigo)}`} target="_blank" rel="noopener noreferrer">
-                        <FileText className="h-3 w-3 mr-1" />
-                        Crear Requerimiento
-                      </Link>
+                    <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setShowCrearREQ(true)}>
+                      <FileText className="h-3 w-3 mr-1" />
+                      Crear Requerimiento
                     </Button>
                   )}
                 </div>
@@ -2114,6 +2138,125 @@ export default function PedidoLogisticaDetailPage() {
                     </div>
                   </>
                 )}
+              </div>
+            )
+          })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para Crear Requerimiento de Materiales desde Pedido */}
+      <Dialog open={showCrearREQ} onOpenChange={setShowCrearREQ}>
+        <DialogContent className="max-w-xl max-h-[80vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle className="text-sm font-medium flex items-center gap-2">
+              <FileText className="h-4 w-4 text-purple-600" />
+              Crear Requerimiento de Materiales
+            </DialogTitle>
+            <p className="text-[11px] text-muted-foreground pt-1">
+              Selecciona los items a incluir. Se abrirá el formulario en una nueva pestaña con estos items pre-cargados.
+            </p>
+          </DialogHeader>
+          {(() => {
+            const itemsElegibles = (pedido?.items || []).filter((item: any) => {
+              const tieneOC = (item.ordenCompraItems?.length ?? 0) > 0
+              const tieneREQ = itemTieneREQActivo(item)
+              return !tieneOC && !tieneREQ
+            })
+            const itemsExcluidos = (pedido?.items || []).length - itemsElegibles.length
+            const todosSeleccionados = itemsElegibles.length > 0 && itemsElegibles.every((i: any) => reqItemsSelected.has(i.id))
+
+            return (
+              <div className="flex flex-col gap-2.5 overflow-hidden min-h-0">
+                {itemsElegibles.length === 0 ? (
+                  <div className="text-center py-8">
+                    <CheckCircle2 className="h-8 w-8 text-emerald-400 mx-auto mb-2" />
+                    <p className="text-xs font-medium text-gray-700">Todos los items ya tienen OC o Requerimiento activo</p>
+                  </div>
+                ) : (
+                  <div className="flex-1 overflow-y-auto border rounded-lg min-h-0">
+                    <table className="w-full text-xs">
+                      <thead className="bg-gray-50 sticky top-0 z-10">
+                        <tr>
+                          <th className="px-3 py-2 text-left w-8">
+                            <Checkbox
+                              checked={todosSeleccionados}
+                              onCheckedChange={(checked) => {
+                                setReqItemsSelected(checked
+                                  ? new Set(itemsElegibles.map((i: any) => i.id))
+                                  : new Set()
+                                )
+                              }}
+                              className="h-3.5 w-3.5"
+                            />
+                          </th>
+                          <th className="px-3 py-2 text-left font-medium text-gray-600">Item</th>
+                          <th className="px-3 py-2 text-right font-medium text-gray-600 w-24">Cant. disp.</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {itemsElegibles.map((item: any) => (
+                          <tr
+                            key={item.id}
+                            className={`cursor-pointer transition-colors ${reqItemsSelected.has(item.id) ? 'bg-purple-50/40' : 'hover:bg-gray-50'}`}
+                            onClick={() => setReqItemsSelected(prev => {
+                              const next = new Set(prev)
+                              next.has(item.id) ? next.delete(item.id) : next.add(item.id)
+                              return next
+                            })}
+                          >
+                            <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
+                              <Checkbox
+                                checked={reqItemsSelected.has(item.id)}
+                                onCheckedChange={(checked) => setReqItemsSelected(prev => {
+                                  const next = new Set(prev)
+                                  checked ? next.add(item.id) : next.delete(item.id)
+                                  return next
+                                })}
+                                className="h-3.5 w-3.5"
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              <div className="font-medium truncate" title={item.descripcion}>{item.descripcion}</div>
+                              <div className="text-[11px] text-gray-400 font-mono">{item.codigo}</div>
+                            </td>
+                            <td className="px-3 py-2 text-right font-medium whitespace-nowrap">
+                              {Math.max(0, item.cantidadPedida - (item.cantidadAtendida || 0))} <span className="text-gray-400 font-normal">{item.unidad}</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {itemsExcluidos > 0 && (
+                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground bg-gray-50 rounded px-2.5 py-1.5 flex-shrink-0">
+                    <CheckCircle2 className="h-3 w-3 flex-shrink-0 text-emerald-500" />
+                    {itemsExcluidos} item{itemsExcluidos !== 1 ? 's' : ''} ya tienen OC o REQ activo — no aparecen en la lista
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center pt-1 flex-shrink-0">
+                  <span className="text-xs text-muted-foreground">
+                    {reqItemsSelected.size} de {itemsElegibles.length} items seleccionados
+                  </span>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setShowCrearREQ(false)} className="h-8 text-xs">
+                      Cancelar
+                    </Button>
+                    {itemsElegibles.length > 0 && (
+                      <Button
+                        size="sm"
+                        onClick={handleIrACrearREQ}
+                        disabled={reqItemsSelected.size === 0}
+                        className="h-8 text-xs bg-purple-600 hover:bg-purple-700"
+                      >
+                        <FileText className="h-3 w-3 mr-1" />
+                        Crear REQ con {reqItemsSelected.size > 0 ? reqItemsSelected.size : ''} item{reqItemsSelected.size !== 1 ? 's' : ''} →
+                      </Button>
+                    )}
+                  </div>
+                </div>
               </div>
             )
           })()}
