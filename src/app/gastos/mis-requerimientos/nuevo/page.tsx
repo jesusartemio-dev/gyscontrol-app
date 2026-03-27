@@ -851,6 +851,7 @@ function NuevoRequerimientoPageInner() {
                           className="h-7 w-20 text-xs"
                           disabled={saving}
                         />
+                        <span className="text-xs text-muted-foreground">{item.unidad}</span>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         <span className="text-xs text-muted-foreground">S/</span>
