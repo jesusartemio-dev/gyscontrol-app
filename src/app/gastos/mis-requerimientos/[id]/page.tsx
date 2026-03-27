@@ -581,6 +581,26 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
               <span className="text-muted-foreground">Categoría:</span>
               <span className="capitalize">{hoja.categoriaCosto || 'gastos'}</span>
             </div>
+            {hoja.tipoPropósito === 'compra_materiales' && hoja.itemsMateriales && hoja.itemsMateriales.length > 0 && (() => {
+              const pedidos = [...new Map(
+                hoja.itemsMateriales
+                  .filter(i => i.pedidoEquipo)
+                  .map(i => [i.pedidoEquipo!.id, i.pedidoEquipo!])
+              ).values()]
+              return pedidos.length > 0 ? (
+                <div className="flex items-center gap-2 flex-wrap col-span-2">
+                  <Package className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="text-muted-foreground shrink-0">Pedido(s):</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {pedidos.map(p => (
+                      <Badge key={p.id} variant="outline" className="text-xs font-mono font-medium">
+                        {p.codigo}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              ) : null
+            })()}
             <div className="flex items-center gap-2">
               <MessageSquare className="h-4 w-4 text-muted-foreground" />
               <span className="text-muted-foreground">Motivo:</span>

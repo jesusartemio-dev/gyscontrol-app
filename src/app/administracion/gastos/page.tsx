@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/dialog'
 import {
   Receipt, Search, X, Loader2, ChevronRight, Check, Banknote, FileCheck, XCircle, Lock,
-  Upload, Download,
+  Upload, Download, TrendingDown, Wallet, ArrowDownToLine,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -34,6 +34,7 @@ import RendicionImportExcelModal from '@/components/administracion/RendicionImpo
 import type { HojaDeGastos } from '@/types'
 
 type TabFilter = 'todas' | 'enviado' | 'aprobado' | 'rendido' | 'validado' | 'cerrado' | 'rechazado'
+type TipoFilter = 'todas' | 'gastos_viaticos' | 'compra_materiales'
 
 const TABS: { key: TabFilter; label: string }[] = [
   { key: 'aprobado', label: 'Por Depositar' },
@@ -112,6 +113,8 @@ function GestionGastosContent() {
   const [uploadingFile, setUploadingFile] = useState(false)
   const [rechazoTarget, setRechazoTarget] = useState<HojaDeGastos | null>(null)
   const [comentarioRechazo, setComentarioRechazo] = useState('')
+
+  const [filtroTipo, setFiltroTipo] = useState<TipoFilter>('todas')
 
   // Import/export state
   const [showImportDialog, setShowImportDialog] = useState(false)
@@ -236,6 +239,9 @@ function GestionGastosContent() {
     } else {
       result = result.filter(h => h.estado === tab)
     }
+    if (filtroTipo !== 'todas') {
+      result = result.filter(h => h.tipoPropósito === filtroTipo)
+    }
     if (searchTerm) {
       const term = searchTerm.toLowerCase()
       result = result.filter(h =>
@@ -249,7 +255,17 @@ function GestionGastosContent() {
       )
     }
     return result
-  }, [hojas, tab, searchTerm])
+  }, [hojas, tab, filtroTipo, searchTerm])
+
+  const totals = useMemo(() => {
+    const totalAnticipo = filtered.filter(h => h.requiereAnticipo).reduce((s, h) => s + h.montoAnticipo, 0)
+    const totalDepositado = filtered.reduce((s, h) => s + h.montoDepositado, 0)
+    const totalGastado = filtered.reduce((s, h) => s + h.montoGastado, 0)
+    const pendienteDeposito = filtered
+      .filter(h => h.estado === 'aprobado' && h.requiereAnticipo)
+      .reduce((s, h) => s + h.montoAnticipo, 0)
+    return { totalAnticipo, totalDepositado, totalGastado, pendienteDeposito }
+  }, [filtered])
 
   const renderActions = (hoja: HojaDeGastos) => {
     const isLoading = actionLoading === hoja.id
@@ -435,21 +451,83 @@ function GestionGastosContent() {
         })}
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Buscar número, empleado, proyecto..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-8 h-9"
-        />
-        {searchTerm && (
-          <button onClick={() => setSearchTerm('')} className="absolute right-2 top-2.5">
-            <X className="h-4 w-4 text-muted-foreground" />
-          </button>
-        )}
+      {/* Search + filtro tipo */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative w-full sm:max-w-sm">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar número, empleado, proyecto..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-8 h-9"
+          />
+          {searchTerm && (
+            <button onClick={() => setSearchTerm('')} className="absolute right-2 top-2.5">
+              <X className="h-4 w-4 text-muted-foreground" />
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-1">
+          {([
+            { key: 'todas', label: 'Todos' },
+            { key: 'gastos_viaticos', label: 'Viáticos' },
+            { key: 'compra_materiales', label: 'Materiales' },
+          ] as { key: TipoFilter; label: string }[]).map(t => (
+            <button
+              key={t.key}
+              onClick={() => setFiltroTipo(t.key)}
+              className={`px-2.5 py-1 rounded text-xs font-medium transition-colors border ${
+                filtroTipo === t.key
+                  ? 'bg-gray-800 text-white border-gray-800'
+                  : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
+
+      {/* Totales */}
+      {!loading && filtered.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div className="rounded-lg border bg-card px-3 py-2.5">
+            <div className="text-[11px] text-muted-foreground mb-0.5">Requerimientos</div>
+            <div className="text-lg font-semibold">{filtered.length}</div>
+          </div>
+          {tab === 'aprobado' ? (
+            <div className="rounded-lg border bg-amber-50 border-amber-200 px-3 py-2.5 col-span-1 sm:col-span-3">
+              <div className="flex items-center gap-1 text-[11px] text-amber-700 mb-0.5">
+                <ArrowDownToLine className="h-3 w-3" /> Pendiente de depósito
+              </div>
+              <div className="text-lg font-semibold text-amber-800 font-mono">
+                {formatCurrency(totals.pendienteDeposito)}
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="rounded-lg border bg-card px-3 py-2.5">
+                <div className="flex items-center gap-1 text-[11px] text-muted-foreground mb-0.5">
+                  <Wallet className="h-3 w-3" /> Total anticipo
+                </div>
+                <div className="text-base font-semibold font-mono">{formatCurrency(totals.totalAnticipo)}</div>
+              </div>
+              <div className="rounded-lg border bg-card px-3 py-2.5">
+                <div className="flex items-center gap-1 text-[11px] text-muted-foreground mb-0.5">
+                  <TrendingDown className="h-3 w-3" /> Total gastado
+                </div>
+                <div className="text-base font-semibold font-mono">{formatCurrency(totals.totalGastado)}</div>
+              </div>
+              <div className="rounded-lg border bg-card px-3 py-2.5">
+                <div className="text-[11px] text-muted-foreground mb-0.5">Saldo neto</div>
+                <div className={`text-base font-semibold font-mono ${totals.totalDepositado - totals.totalGastado < 0 ? 'text-red-600' : 'text-emerald-700'}`}>
+                  {formatCurrency(totals.totalDepositado - totals.totalGastado)}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Content */}
       <Card>

@@ -28,6 +28,7 @@ const includeRelations = {
           id: true, codigo: true, descripcion: true, unidad: true, precioUnitario: true,
         },
       },
+      pedidoEquipo: { select: { id: true, codigo: true } },
       proyecto: { select: { id: true, codigo: true, nombre: true } },
     },
     orderBy: { createdAt: 'asc' as const },
