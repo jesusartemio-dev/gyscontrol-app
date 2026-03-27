@@ -59,6 +59,13 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
                 ordenCompra: { select: { id: true, numero: true, estado: true } },
               },
             },
+            requerimientoMaterialItems: {
+              select: {
+                id: true,
+                hojaDeGastosId: true,
+                hojaDeGastos: { select: { id: true, numero: true, estado: true } },
+              },
+            },
             recepcionesPendientes: {
               where: { estado: { in: ['pendiente', 'en_almacen', 'rechazado'] } },
               include: {

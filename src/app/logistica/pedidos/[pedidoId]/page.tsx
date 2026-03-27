@@ -1135,6 +1135,18 @@ export default function PedidoLogisticaDetailPage() {
                           const tieneOC = (item as any).ordenCompraItems?.length > 0
                           const atendido = (item.cantidadAtendida || 0) > 0
                           const motivo = (item as any).motivoAtencionDirecta
+                          const reqItems: { id: string; hojaDeGastos: { id: string; numero: string; estado: string } }[] =
+                            (item as any).requerimientoMaterialItems || []
+                          const hdgEstadoStyles: Record<string, string> = {
+                            borrador: 'bg-gray-100 text-gray-600',
+                            enviado: 'bg-blue-100 text-blue-700',
+                            aprobado: 'bg-green-100 text-green-700',
+                            rechazado: 'bg-red-100 text-red-700',
+                            depositado: 'bg-cyan-100 text-cyan-700',
+                            rendido: 'bg-purple-100 text-purple-700',
+                            validado: 'bg-emerald-100 text-emerald-700',
+                            cerrado: 'bg-gray-100 text-gray-500',
+                          }
 
                           return (
                             <>
@@ -1152,6 +1164,16 @@ export default function PedidoLogisticaDetailPage() {
                                   {(item as any).ordenCompraItems[0].ordenCompra?.numero}
                                 </Link>
                               )}
+                              {reqItems.map(req => (
+                                <Link
+                                  key={req.id}
+                                  href={`/gastos/mis-requerimientos/${req.hojaDeGastos.id}`}
+                                  className={`inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full mt-0.5 font-medium hover:opacity-80 transition-opacity ${hdgEstadoStyles[req.hojaDeGastos.estado] || 'bg-gray-100 text-gray-600'}`}
+                                >
+                                  <FileText className="h-2.5 w-2.5" />
+                                  {req.hojaDeGastos.numero} · {req.hojaDeGastos.estado}
+                                </Link>
+                              ))}
                               {!tieneOC && (() => {
                                 if (atendido && motivo === 'importacion_gerencia') {
                                   return (
