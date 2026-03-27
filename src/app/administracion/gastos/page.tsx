@@ -33,11 +33,12 @@ import type { HojaDeGastosAdjunto } from '@/types'
 import RendicionImportExcelModal from '@/components/administracion/RendicionImportExcelModal'
 import type { HojaDeGastos } from '@/types'
 
-type TabFilter = 'todas' | 'enviado' | 'aprobado' | 'rendido' | 'validado' | 'cerrado' | 'rechazado'
+type TabFilter = 'todas' | 'enviado' | 'aprobado' | 'depositado' | 'rendido' | 'validado' | 'cerrado' | 'rechazado'
 type TipoFilter = 'todas' | 'gastos_viaticos' | 'compra_materiales'
 
 const TABS: { key: TabFilter; label: string }[] = [
   { key: 'aprobado', label: 'Por Depositar' },
+  { key: 'depositado', label: 'Depositados' },
   { key: 'todas', label: 'Todas' },
   { key: 'enviado', label: 'Por Aprobar' },
   { key: 'rendido', label: 'Rendidos' },
