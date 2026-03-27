@@ -53,11 +53,11 @@ export async function GET(req: Request) {
             },
           },
         },
-        // Sin requerimiento activo: no tiene RequerimientoMaterialItem cuya hoja no esté cerrada
+        // Sin requerimiento activo: solo 'rechazado' libera el item
         requerimientoMaterialItems: {
           none: {
             hojaDeGastos: {
-              estado: { notIn: ['cerrado', 'aprobado', 'depositado', 'rendido', 'validado'] },
+              estado: { not: 'rechazado' },
             },
           },
         },

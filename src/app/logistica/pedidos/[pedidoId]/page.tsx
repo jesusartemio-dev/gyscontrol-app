@@ -1624,7 +1624,7 @@ export default function PedidoLogisticaDetailPage() {
                       className="h-7 text-xs border-purple-200 text-purple-700 hover:bg-purple-50"
                       asChild
                     >
-                      <Link href={`/gastos/mis-requerimientos/nuevo?tipo=compra_materiales&pedidoCodigo=${encodeURIComponent(pedido.codigo)}`}>
+                      <Link href={`/gastos/mis-requerimientos/nuevo?tipo=compra_materiales&pedidoCodigo=${encodeURIComponent(pedido.codigo)}`} target="_blank" rel="noopener noreferrer">
                         <FileText className="h-3 w-3 mr-1" />
                         Crear Requerimiento
                       </Link>
@@ -1668,7 +1668,7 @@ export default function PedidoLogisticaDetailPage() {
                   <p className="text-xs text-muted-foreground mb-3">No hay requerimientos de dinero para este pedido.</p>
                   {puedeGenerarOC && (
                     <Button variant="outline" size="sm" className="h-7 text-xs" asChild>
-                      <Link href={`/gastos/mis-requerimientos/nuevo?tipo=compra_materiales&pedidoCodigo=${encodeURIComponent(pedido.codigo)}`}>
+                      <Link href={`/gastos/mis-requerimientos/nuevo?tipo=compra_materiales&pedidoCodigo=${encodeURIComponent(pedido.codigo)}`} target="_blank" rel="noopener noreferrer">
                         <FileText className="h-3 w-3 mr-1" />
                         Crear Requerimiento
                       </Link>
