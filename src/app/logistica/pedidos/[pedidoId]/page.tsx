@@ -148,7 +148,8 @@ export default function PedidoLogisticaDetailPage() {
   const [ocProveedorFiltro, setOcProveedorFiltro] = useState('__all__')
 
   // Estados de REQ que bloquean la creación de OC para ese item
-  const REQ_ESTADOS_ACTIVOS = ['aprobado', 'depositado', 'rendido', 'validado', 'cerrado']
+  // Solo 'rechazado' libera el item — borrador/enviado también bloquean
+  const REQ_ESTADOS_ACTIVOS = ['borrador', 'enviado', 'aprobado', 'depositado', 'rendido', 'validado', 'cerrado']
 
   const itemTieneREQActivo = (item: any) =>
     ((item.requerimientoMaterialItems || []) as any[]).some(
@@ -803,6 +804,10 @@ export default function PedidoLogisticaDetailPage() {
             return oc && ['confirmada', 'parcial'].includes(oc.estado) && i.estado !== 'entregado'
           })
           // 🟦 Items gestionados por REQ — por estado
+          const reqEnBorrador = items.filter((i: any) => {
+            const req = getREQActivo(i)
+            return req && ['borrador', 'enviado'].includes(req.hojaDeGastos?.estado)
+          })
           const reqEnProceso = items.filter((i: any) => {
             const req = getREQActivo(i)
             return req && ['aprobado', 'depositado', 'rendido', 'validado'].includes(req.hojaDeGastos?.estado)
@@ -820,7 +825,7 @@ export default function PedidoLogisticaDetailPage() {
           // 🟤 Items entregados sin costo
           const sinCosto = items.filter((i: any) => (i.cantidadAtendida || 0) > 0 && (!i.costoTotal || i.costoTotal === 0))
 
-          const hayAlertas = sinProveedor.length > 0 || sinOC.length > 0 || ocPendienteConfirmar.length > 0 || ocEsperandoRecepcion.length > 0 || reqEnProceso.length > 0 || reqEsperandoRecepcion.length > 0 || recepcionesRechazadas.length > 0 || sinCosto.length > 0
+          const hayAlertas = sinProveedor.length > 0 || sinOC.length > 0 || ocPendienteConfirmar.length > 0 || ocEsperandoRecepcion.length > 0 || reqEnBorrador.length > 0 || reqEnProceso.length > 0 || reqEsperandoRecepcion.length > 0 || recepcionesRechazadas.length > 0 || sinCosto.length > 0
           const todoCompleto = !hayAlertas && items.length > 0
 
           if (todoCompleto) return null
@@ -833,7 +838,7 @@ export default function PedidoLogisticaDetailPage() {
                     <FileText className="h-4 w-4 text-amber-500" />
                     <span className="text-xs font-medium">¿Qué falta para completar este pedido?</span>
                     {hayAlertas && (() => {
-                        const total = sinProveedor.length + sinOC.length + ocPendienteConfirmar.length + ocEsperandoRecepcion.length + reqEnProceso.length + reqEsperandoRecepcion.length + recepcionesRechazadas.length + sinCosto.length
+                        const total = sinProveedor.length + sinOC.length + ocPendienteConfirmar.length + ocEsperandoRecepcion.length + reqEnBorrador.length + reqEnProceso.length + reqEsperandoRecepcion.length + recepcionesRechazadas.length + sinCosto.length
                         return (
                           <Badge variant="outline" className={cn('text-[9px] h-4 px-1.5', recepcionesRechazadas.length > 0 ? 'bg-red-50 text-red-700 border-red-200' : 'bg-amber-50 text-amber-700 border-amber-200')}>
                             {total} pendiente{total !== 1 ? 's' : ''}
@@ -939,6 +944,40 @@ export default function PedidoLogisticaDetailPage() {
                                   className="inline-flex items-center gap-1 text-[10px] font-medium text-purple-600 hover:text-purple-800 bg-white border border-purple-200 rounded px-1.5 py-0.5"
                                 >
                                   {oc.numero}
+                                  <ExternalLink className="h-2.5 w-2.5" />
+                                </Link>
+                              ))
+                            })()}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {/* 🟠 REQ en borrador/enviado — bloquea OC, debe cancelarse primero */}
+                    {reqEnBorrador.length > 0 && (
+                      <div className="flex items-start gap-2 text-[11px] bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                        <AlertTriangle className="h-3.5 w-3.5 text-amber-600 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <p className="font-medium text-amber-700">
+                            {reqEnBorrador.length} item{reqEnBorrador.length !== 1 ? 's' : ''} {reqEnBorrador.length !== 1 ? 'tienen' : 'tiene'} un Requerimiento de dinero pendiente de aprobación
+                          </p>
+                          <p className="text-amber-600 mt-0.5">
+                            Para crear una OC para {reqEnBorrador.length !== 1 ? 'estos items' : 'este item'}, el REQ debe ser rechazado o eliminado primero.
+                          </p>
+                          <div className="flex flex-wrap gap-1.5 mt-1">
+                            {(() => {
+                              const reqMap = new Map<string, { id: string; numero: string; estado: string }>()
+                              reqEnBorrador.forEach((i: any) => {
+                                const req = getREQActivo(i)
+                                if (req && !reqMap.has(req.hojaDeGastos.id)) reqMap.set(req.hojaDeGastos.id, req.hojaDeGastos)
+                              })
+                              return Array.from(reqMap.values()).map(hoja => (
+                                <Link
+                                  key={hoja.id}
+                                  href={`/gastos/mis-requerimientos/${hoja.id}`}
+                                  className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-700 hover:text-amber-900 bg-white border border-amber-300 rounded px-1.5 py-0.5"
+                                >
+                                  {hoja.numero}
+                                  <Badge variant="outline" className="text-[8px] h-3.5 px-1 border-amber-300 capitalize">{hoja.estado}</Badge>
                                   <ExternalLink className="h-2.5 w-2.5" />
                                 </Link>
                               ))
