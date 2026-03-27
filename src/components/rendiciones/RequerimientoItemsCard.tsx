@@ -284,6 +284,7 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                       <th className="text-left pb-2 pr-3 font-medium">Código</th>
                       <th className="text-left pb-2 pr-3 font-medium">Descripción</th>
                       <th className="text-left pb-2 pr-3 font-medium">Proyecto</th>
+                      <th className="text-left pb-2 pr-3 font-medium">Pedido</th>
                       <th className="text-right pb-2 pr-3 font-medium">Cant.</th>
                       <th className="text-right pb-2 pr-3 font-medium">P.U. Est.</th>
                       <th className="text-right pb-2 pr-3 font-medium">P.U. Real</th>
@@ -318,6 +319,11 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                           <Badge variant="outline" className="text-xs py-0 px-1.5 h-4 font-normal">
                             {item.proyecto?.codigo || item.proyectoId.slice(0, 8)}
                           </Badge>
+                        </td>
+                        <td className="py-2 pr-3">
+                          {item.pedidoEquipo
+                            ? <Badge variant="secondary" className="text-xs py-0 px-1.5 h-4 font-mono font-normal">{item.pedidoEquipo.codigo}</Badge>
+                            : <span className="text-muted-foreground/40 text-xs">—</span>}
                         </td>
                         <td className="py-2 pr-3 text-right font-mono text-xs">{item.cantidadSolicitada}</td>
                         <td className="py-2 pr-3 text-right font-mono text-xs text-muted-foreground">{fmt(item.precioEstimado)}</td>
