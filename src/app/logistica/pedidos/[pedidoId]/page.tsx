@@ -771,20 +771,27 @@ export default function PedidoLogisticaDetailPage() {
         {/* Panel: ¿Qué falta para completar este pedido? */}
         {!['entregado', 'cancelado'].includes(pedido.estado) && (() => {
           const items = pedido.items || []
-          // 🔴 Sin proveedor
+
+          // Helper: REQ activo (aprobado en adelante)
+          const getREQActivo = (i: any) =>
+            ((i.requerimientoMaterialItems || []) as any[]).find(
+              r => REQ_ESTADOS_ACTIVOS.includes(r.hojaDeGastos?.estado)
+            )
+
+          // 🔴 Sin proveedor (excluyendo items con REQ activo)
           const sinProveedor = items.filter((i: any) => {
             const provId = i.proveedorId || i.listaEquipoItem?.proveedorId
-            return !provId
+            return !provId && !getREQActivo(i)
           })
           // Items con proveedor
           const conProveedor = items.filter((i: any) => {
             const provId = i.proveedorId || i.listaEquipoItem?.proveedorId
             return !!provId
           })
-          // 🟡 Con proveedor pero sin OC
-          const sinOC = conProveedor.filter((i: any) => !(i.ordenCompraItems?.length > 0))
+          // 🟡 Con proveedor pero sin OC y sin REQ activo
+          const sinOC = conProveedor.filter((i: any) => !(i.ordenCompraItems?.length > 0) && !getREQActivo(i))
           // Items con OC
-          const conOC = conProveedor.filter((i: any) => i.ordenCompraItems?.length > 0)
+          const conOC = items.filter((i: any) => i.ordenCompraItems?.length > 0)
           // 🔵 OC pendiente de confirmar (borrador/aprobada/enviada)
           const ocPendienteConfirmar = conOC.filter((i: any) => {
             const oc = i.ordenCompraItems?.[0]?.ordenCompra
@@ -795,6 +802,15 @@ export default function PedidoLogisticaDetailPage() {
             const oc = i.ordenCompraItems?.[0]?.ordenCompra
             return oc && ['confirmada', 'parcial'].includes(oc.estado) && i.estado !== 'entregado'
           })
+          // 🟦 Items gestionados por REQ — por estado
+          const reqEnProceso = items.filter((i: any) => {
+            const req = getREQActivo(i)
+            return req && ['aprobado', 'depositado', 'rendido', 'validado'].includes(req.hojaDeGastos?.estado)
+          })
+          const reqEsperandoRecepcion = items.filter((i: any) => {
+            const req = getREQActivo(i)
+            return req && req.hojaDeGastos?.estado === 'cerrado' && i.estado !== 'entregado'
+          })
           // 🔴 Recepciones rechazadas
           const recepcionesRechazadas = items.flatMap((i: any) =>
             (i.recepcionesPendientes || [])
@@ -804,7 +820,7 @@ export default function PedidoLogisticaDetailPage() {
           // 🟤 Items entregados sin costo
           const sinCosto = items.filter((i: any) => (i.cantidadAtendida || 0) > 0 && (!i.costoTotal || i.costoTotal === 0))
 
-          const hayAlertas = sinProveedor.length > 0 || sinOC.length > 0 || ocPendienteConfirmar.length > 0 || ocEsperandoRecepcion.length > 0 || recepcionesRechazadas.length > 0 || sinCosto.length > 0
+          const hayAlertas = sinProveedor.length > 0 || sinOC.length > 0 || ocPendienteConfirmar.length > 0 || ocEsperandoRecepcion.length > 0 || reqEnProceso.length > 0 || reqEsperandoRecepcion.length > 0 || recepcionesRechazadas.length > 0 || sinCosto.length > 0
           const todoCompleto = !hayAlertas && items.length > 0
 
           if (todoCompleto) return null
@@ -817,7 +833,7 @@ export default function PedidoLogisticaDetailPage() {
                     <FileText className="h-4 w-4 text-amber-500" />
                     <span className="text-xs font-medium">¿Qué falta para completar este pedido?</span>
                     {hayAlertas && (() => {
-                        const total = sinProveedor.length + sinOC.length + ocPendienteConfirmar.length + ocEsperandoRecepcion.length + recepcionesRechazadas.length + sinCosto.length
+                        const total = sinProveedor.length + sinOC.length + ocPendienteConfirmar.length + ocEsperandoRecepcion.length + reqEnProceso.length + reqEsperandoRecepcion.length + recepcionesRechazadas.length + sinCosto.length
                         return (
                           <Badge variant="outline" className={cn('text-[9px] h-4 px-1.5', recepcionesRechazadas.length > 0 ? 'bg-red-50 text-red-700 border-red-200' : 'bg-amber-50 text-amber-700 border-amber-200')}>
                             {total} pendiente{total !== 1 ? 's' : ''}
@@ -928,6 +944,51 @@ export default function PedidoLogisticaDetailPage() {
                               ))
                             })()}
                           </div>
+                        </div>
+                      </div>
+                    )}
+                    {/* 🟦 REQ en proceso (empleado comprando) */}
+                    {reqEnProceso.length > 0 && (
+                      <div className="flex items-start gap-2 text-[11px] bg-cyan-50 border border-cyan-100 rounded-md px-3 py-2">
+                        <Info className="h-3.5 w-3.5 text-cyan-600 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <p className="font-medium text-cyan-700">
+                            {reqEnProceso.length} item{reqEnProceso.length !== 1 ? 's' : ''} en proceso de compra por Requerimiento de dinero
+                          </p>
+                          <div className="flex flex-wrap gap-1.5 mt-1">
+                            {(() => {
+                              const reqMap = new Map<string, { id: string; numero: string; estado: string }>()
+                              reqEnProceso.forEach((i: any) => {
+                                const req = getREQActivo(i)
+                                if (req && !reqMap.has(req.hojaDeGastos.id)) reqMap.set(req.hojaDeGastos.id, req.hojaDeGastos)
+                              })
+                              return Array.from(reqMap.values()).map(hoja => (
+                                <Link
+                                  key={hoja.id}
+                                  href={`/gastos/mis-requerimientos/${hoja.id}`}
+                                  className="inline-flex items-center gap-1 text-[10px] font-medium text-cyan-700 hover:text-cyan-900 bg-white border border-cyan-200 rounded px-1.5 py-0.5"
+                                >
+                                  {hoja.numero}
+                                  <Badge variant="outline" className="text-[8px] h-3.5 px-1 border-cyan-200 capitalize">{hoja.estado}</Badge>
+                                  <ExternalLink className="h-2.5 w-2.5" />
+                                </Link>
+                              ))
+                            })()}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {/* 🟦 REQ cerrado esperando recepción en almacén */}
+                    {reqEsperandoRecepcion.length > 0 && (
+                      <div className="flex items-start gap-2 text-[11px] bg-violet-50 border border-violet-100 rounded-md px-3 py-2">
+                        <Warehouse className="h-3.5 w-3.5 text-violet-500 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <p className="font-medium text-violet-700">
+                            {reqEsperandoRecepcion.length} item{reqEsperandoRecepcion.length !== 1 ? 's' : ''} pendientes de recepción en almacén (compra por REQ)
+                          </p>
+                          <p className="text-violet-600 mt-0.5">
+                            Confirma la llegada en <Link href="/logistica/recepciones" className="underline font-medium">Recepciones</Link>.
+                          </p>
                         </div>
                       </div>
                     )}
