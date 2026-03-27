@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -461,7 +461,7 @@ function ItemRow({ item, checked, onToggle, indent, showPedido }: ItemRowProps) 
 }
 
 // ─── Página principal ─────────────────────────────────────────────────────────
-export default function NuevoRequerimientoPage() {
+function NuevoRequerimientoPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [saving, setSaving] = useState(false)
@@ -899,5 +899,13 @@ export default function NuevoRequerimientoPage() {
         yaConfirmados={new Set(seleccionados.keys())}
       />
     </div>
+  )
+}
+
+export default function NuevoRequerimientoPage() {
+  return (
+    <Suspense>
+      <NuevoRequerimientoPageInner />
+    </Suspense>
   )
 }
