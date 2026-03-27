@@ -644,13 +644,13 @@ export default function PedidoLogisticaDetailPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => setShowCrearREQ(true)}
-                    className="h-7 text-xs border-purple-200 text-purple-700 hover:bg-purple-50"
+                    className="h-7 text-xs"
                   >
                     <FileText className="h-3 w-3 mr-1" />
                     Crear Requerimiento
                   </Button>
                   <Button
-                    variant="default"
+                    variant="outline"
                     size="sm"
                     onClick={() => setShowGenerarOC(true)}
                     className="h-7 text-xs"
