@@ -50,6 +50,25 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
   const [showModal, setShowModal] = useState(false)
   const [saving, setSaving] = useState(false)
   const [uploadingFile, setUploadingFile] = useState(false)
+  const [deletingItem, setDeletingItem] = useState<string | null>(null)
+
+  const handleDeleteItem = async (itemId: string) => {
+    if (!confirm('¿Eliminar este item del requerimiento?')) return
+    setDeletingItem(itemId)
+    try {
+      const res = await fetch(`/api/requerimiento-material-item/${itemId}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Error al eliminar')
+      }
+      toast.success('Item eliminado')
+      onChanged()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al eliminar')
+    } finally {
+      setDeletingItem(null)
+    }
+  }
   const [uploadingForComprobante, setUploadingForComprobante] = useState<string | null>(null)
   const adjuntoInputRef = useRef<HTMLInputElement>(null)
   const [expandedComprobantes, setExpandedComprobantes] = useState<Set<string>>(new Set())
@@ -290,6 +309,7 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                       <th className="text-right pb-2 pr-3 font-medium">P.U. Real</th>
                       <th className="text-right pb-2 font-medium">Total Est.</th>
                       <th className="text-right pb-2 font-medium">Total Real</th>
+                      {hoja.estado === 'borrador' && <th className="pb-2 w-8" />}
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -338,6 +358,21 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                             ? <span className="text-green-700 font-medium">{fmt(item.totalReal)}</span>
                             : <span className="text-muted-foreground/50">—</span>}
                         </td>
+                        {hoja.estado === 'borrador' && (
+                          <td className="py-2 pl-2">
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteItem(item.id)}
+                              disabled={deletingItem === item.id || itemsCubiertos.has(item.id)}
+                              className="text-muted-foreground/40 hover:text-red-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                              title={itemsCubiertos.has(item.id) ? 'Tiene comprobante registrado' : 'Eliminar item'}
+                            >
+                              {deletingItem === item.id
+                                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                : <X className="h-3.5 w-3.5" />}
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
