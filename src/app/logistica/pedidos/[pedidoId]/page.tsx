@@ -639,15 +639,26 @@ export default function PedidoLogisticaDetailPage() {
 
             <div className="flex items-center gap-2">
               {puedeGenerarOC && (
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={() => setShowGenerarOC(true)}
-                  className="h-7 text-xs"
-                >
-                  <ShoppingCart className="h-3 w-3 mr-1" />
-                  Generar OCs
-                </Button>
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowCrearREQ(true)}
+                    className="h-7 text-xs border-purple-200 text-purple-700 hover:bg-purple-50"
+                  >
+                    <FileText className="h-3 w-3 mr-1" />
+                    Crear Requerimiento
+                  </Button>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => setShowGenerarOC(true)}
+                    className="h-7 text-xs"
+                  >
+                    <ShoppingCart className="h-3 w-3 mr-1" />
+                    Crear OC
+                  </Button>
+                </>
               )}
               <Button
                 variant="outline"
@@ -913,7 +924,7 @@ export default function PedidoLogisticaDetailPage() {
                               onClick={() => setShowGenerarOC(true)}
                             >
                               <ShoppingCart className="h-3 w-3 mr-1" />
-                              Generar OCs pendientes
+                              Crear OC
                             </Button>
                           )}
                         </div>
@@ -1599,7 +1610,7 @@ export default function PedidoLogisticaDetailPage() {
                   className="h-7 text-xs"
                 >
                   <ShoppingCart className="h-3 w-3 mr-1" />
-                  Generar OCs
+                  Crear OC
                 </Button>
               )}
             </div>
@@ -1641,22 +1652,9 @@ export default function PedidoLogisticaDetailPage() {
                   <FileText className="h-4 w-4 text-purple-600" />
                   <span className="text-sm font-medium">Requerimientos de Materiales</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="text-[10px] h-5">
-                    {itemsConREQ} de {items.length} items con REQ
-                  </Badge>
-                  {puedeGenerarOC && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 text-xs border-purple-200 text-purple-700 hover:bg-purple-50"
-                      onClick={() => setShowCrearREQ(true)}
-                    >
-                      <FileText className="h-3 w-3 mr-1" />
-                      Crear Requerimiento
-                    </Button>
-                  )}
-                </div>
+                <Badge variant="outline" className="text-[10px] h-5">
+                  {itemsConREQ} de {items.length} items con REQ
+                </Badge>
               </div>
               {hojas.length > 0 ? (
                 <table className="w-full text-xs">
@@ -1691,13 +1689,7 @@ export default function PedidoLogisticaDetailPage() {
               ) : (
                 <div className="flex flex-col items-center justify-center py-8 text-center">
                   <FileText className="h-8 w-8 text-gray-300 mb-2" />
-                  <p className="text-xs text-muted-foreground mb-3">No hay requerimientos de dinero para este pedido.</p>
-                  {puedeGenerarOC && (
-                    <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setShowCrearREQ(true)}>
-                      <FileText className="h-3 w-3 mr-1" />
-                      Crear Requerimiento
-                    </Button>
-                  )}
+                  <p className="text-xs text-muted-foreground">No hay requerimientos de dinero para este pedido.</p>
                 </div>
               )}
             </div>
