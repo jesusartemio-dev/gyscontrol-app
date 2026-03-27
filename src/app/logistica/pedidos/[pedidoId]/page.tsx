@@ -1316,6 +1316,8 @@ export default function PedidoLogisticaDetailPage() {
                                 <Link
                                   key={req.id}
                                   href={`/gastos/mis-requerimientos/${req.hojaDeGastos.id}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
                                   className={`inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full mt-0.5 font-medium hover:opacity-80 transition-opacity ${hdgEstadoStyles[req.hojaDeGastos.estado] || 'bg-gray-100 text-gray-600'}`}
                                 >
                                   <FileText className="h-2.5 w-2.5" />
