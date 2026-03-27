@@ -147,13 +147,22 @@ export default function PedidoLogisticaDetailPage() {
   const [ocItemsState, setOcItemsState] = useState<Record<string, { selected: boolean; proveedorId: string; proveedorNombre: string }>>({})
   const [ocProveedorFiltro, setOcProveedorFiltro] = useState('__all__')
 
+  // Estados de REQ que bloquean la creación de OC para ese item
+  const REQ_ESTADOS_ACTIVOS = ['aprobado', 'depositado', 'rendido', 'validado', 'cerrado']
+
+  const itemTieneREQActivo = (item: any) =>
+    ((item.requerimientoMaterialItems || []) as any[]).some(
+      r => REQ_ESTADOS_ACTIVOS.includes(r.hojaDeGastos?.estado)
+    )
+
   // Inicializar items del modal al abrirlo
   useEffect(() => {
     if (showGenerarOC && pedido?.items) {
       const initial: Record<string, { selected: boolean; proveedorId: string; proveedorNombre: string }> = {}
       for (const item of pedido.items) {
         const tieneOC = ((item as any).ordenCompraItems?.length ?? 0) > 0
-        if (!tieneOC) {
+        const tieneREQ = itemTieneREQActivo(item as any)
+        if (!tieneOC && !tieneREQ) {
           const provId = (item as any).proveedorId || (item as any).listaEquipoItem?.proveedorId || ''
           const provNombre = (item as any).proveedor?.nombre || (item as any).proveedorNombre || (item as any).listaEquipoItem?.proveedor?.nombre || ''
           initial[item.id] = { selected: !!provId, proveedorId: provId, proveedorNombre: provNombre }
@@ -1924,7 +1933,9 @@ export default function PedidoLogisticaDetailPage() {
           {(() => {
             const itemsSinOC = Object.entries(ocItemsState)
             const seleccionados = itemsSinOC.filter(([, v]) => v.selected)
-            const conOC = (pedido?.items || []).filter((i: any) => (i.ordenCompraItems?.length ?? 0) > 0).length
+            const conOC = (pedido?.items || []).filter(
+              (i: any) => (i.ordenCompraItems?.length ?? 0) > 0 || itemTieneREQActivo(i)
+            ).length
 
             // Construir pills de proveedores desde los items
             const provMap = new Map<string, { nombre: string; count: number }>()
@@ -1958,7 +1969,7 @@ export default function PedidoLogisticaDetailPage() {
                 {itemsSinOC.length === 0 ? (
                   <div className="text-center py-8">
                     <CheckCircle2 className="h-8 w-8 text-emerald-400 mx-auto mb-2" />
-                    <p className="text-xs font-medium text-gray-700">Todos los items ya tienen OC vinculada</p>
+                    <p className="text-xs font-medium text-gray-700">Todos los items ya tienen OC o Requerimiento de dinero activo</p>
                   </div>
                 ) : (
                   <>
