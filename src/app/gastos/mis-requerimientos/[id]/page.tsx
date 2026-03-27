@@ -181,6 +181,26 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
 
   const handleRetroceder = () => executeAction(() => retrocederHoja(id), 'Estado retrocedido')
 
+  const [showEliminarConfirm, setShowEliminarConfirm] = useState(false)
+  const [eliminando, setEliminando] = useState(false)
+
+  const handleEliminar = async () => {
+    try {
+      setEliminando(true)
+      const res = await fetch(`/api/hoja-de-gastos/${id}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Error al eliminar')
+      }
+      toast.success('Requerimiento eliminado')
+      router.push(backUrl)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al eliminar')
+      setEliminando(false)
+      setShowEliminarConfirm(false)
+    }
+  }
+
   const downloadBlob = (blob: Blob, filename: string) => {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -403,6 +423,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
   const canCerrar = hoja.estado === 'validado' && ['admin', 'gerente', 'coordinador', 'coordinador_logistico', 'administracion'].includes(role || '')
   const canRechazar = ['enviado', 'rendido', 'validado'].includes(hoja.estado) && ['admin', 'gerente', 'gestor', 'coordinador', 'coordinador_logistico', 'administracion'].includes(role || '')
   const canRetroceder = !['borrador', 'rechazado'].includes(hoja.estado) && ['admin', 'gerente', 'administracion'].includes(role || '')
+  const canEliminar = hoja.estado === 'borrador' && role === 'admin'
 
   return (
     <div className="container mx-auto p-4 sm:p-6 space-y-4 max-w-4xl">
@@ -415,6 +436,17 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
         <span className="text-muted-foreground">/</span>
         <span className="font-mono font-semibold">{hoja.numero}</span>
         <div className="ml-auto flex items-center gap-2">
+          {canEliminar && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowEliminarConfirm(true)}
+              className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+            >
+              <XCircle className="h-4 w-4 mr-1" />
+              Eliminar
+            </Button>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm">
@@ -785,6 +817,30 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
             <Button onClick={handleDepositar} disabled={actionLoading || !montoDeposito} className="bg-purple-600 hover:bg-purple-700">
               {actionLoading && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
               Registrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Eliminar requerimiento (solo admin, solo borrador) */}
+      <Dialog open={showEliminarConfirm} onOpenChange={setShowEliminarConfirm}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-700">
+              <XCircle className="h-5 w-5" />
+              Eliminar Requerimiento
+            </DialogTitle>
+            <DialogDescription>
+              Esta acción es irreversible. Se eliminará el requerimiento <strong>{hoja?.numero}</strong> y todos sus items.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setShowEliminarConfirm(false)} disabled={eliminando}>
+              Cancelar
+            </Button>
+            <Button size="sm" onClick={handleEliminar} disabled={eliminando} className="bg-red-600 hover:bg-red-700">
+              {eliminando && <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />}
+              Eliminar definitivamente
             </Button>
           </DialogFooter>
         </DialogContent>
