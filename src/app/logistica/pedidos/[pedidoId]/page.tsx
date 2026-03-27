@@ -1578,6 +1578,108 @@ export default function PedidoLogisticaDetailPage() {
           )}
         </div>
 
+        {/* 📄 Requerimientos de Materiales vinculados */}
+        {(() => {
+          const items = pedido.items || []
+          // Deduplicar hojas de gastos desde requerimientoMaterialItems de todos los items
+          const hojasMap = new Map<string, { id: string; numero: string; estado: string }>()
+          for (const item of items) {
+            for (const req of ((item as any).requerimientoMaterialItems || []) as any[]) {
+              if (req.hojaDeGastos && !hojasMap.has(req.hojaDeGastos.id)) {
+                hojasMap.set(req.hojaDeGastos.id, req.hojaDeGastos)
+              }
+            }
+          }
+          const hojas = Array.from(hojasMap.values())
+          const itemsConREQ = items.filter((i: any) =>
+            ((i as any).requerimientoMaterialItems || []).length > 0
+          ).length
+
+          const hdgEstadoStyles: Record<string, string> = {
+            borrador: 'bg-gray-100 text-gray-600 border-gray-200',
+            enviado: 'bg-blue-100 text-blue-700 border-blue-200',
+            aprobado: 'bg-green-100 text-green-700 border-green-200',
+            rechazado: 'bg-red-100 text-red-700 border-red-200',
+            depositado: 'bg-cyan-100 text-cyan-700 border-cyan-200',
+            rendido: 'bg-purple-100 text-purple-700 border-purple-200',
+            validado: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+            cerrado: 'bg-gray-100 text-gray-500 border-gray-200',
+          }
+
+          return (
+            <div className="bg-white rounded-lg border">
+              <div className="px-4 py-3 border-b bg-gray-50/50 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-purple-600" />
+                  <span className="text-sm font-medium">Requerimientos de Materiales</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-[10px] h-5">
+                    {itemsConREQ} de {items.length} items con REQ
+                  </Badge>
+                  {puedeGenerarOC && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs border-purple-200 text-purple-700 hover:bg-purple-50"
+                      asChild
+                    >
+                      <Link href={`/gastos/mis-requerimientos/nuevo?tipo=compra_materiales&pedidoCodigo=${encodeURIComponent(pedido.codigo)}`}>
+                        <FileText className="h-3 w-3 mr-1" />
+                        Crear Requerimiento
+                      </Link>
+                    </Button>
+                  )}
+                </div>
+              </div>
+              {hojas.length > 0 ? (
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-50">
+                    <tr className="border-b">
+                      <th className="px-3 py-2 text-left font-medium text-gray-600">N° REQ</th>
+                      <th className="px-3 py-2 text-center font-medium text-gray-600">Estado</th>
+                      <th className="px-3 py-2 text-center font-medium text-gray-600">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {hojas.map(hoja => (
+                      <tr key={hoja.id} className="hover:bg-gray-50/50">
+                        <td className="px-3 py-2 font-mono font-medium">{hoja.numero}</td>
+                        <td className="px-3 py-2 text-center">
+                          <Badge variant="outline" className={`text-[10px] px-1.5 py-0 capitalize ${hdgEstadoStyles[hoja.estado] || ''}`}>
+                            {hoja.estado}
+                          </Badge>
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <Button variant="ghost" size="sm" asChild className="h-6 text-[10px] px-2">
+                            <Link href={`/gastos/mis-requerimientos/${hoja.id}`}>
+                              <ExternalLink className="h-3 w-3 mr-1" />
+                              Ver
+                            </Link>
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <FileText className="h-8 w-8 text-gray-300 mb-2" />
+                  <p className="text-xs text-muted-foreground mb-3">No hay requerimientos de dinero para este pedido.</p>
+                  {puedeGenerarOC && (
+                    <Button variant="outline" size="sm" className="h-7 text-xs" asChild>
+                      <Link href={`/gastos/mis-requerimientos/nuevo?tipo=compra_materiales&pedidoCodigo=${encodeURIComponent(pedido.codigo)}`}>
+                        <FileText className="h-3 w-3 mr-1" />
+                        Crear Requerimiento
+                      </Link>
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        })()}
+
         {/* 📈 Timeline de Trazabilidad - Colapsable */}
         {eventos.length > 0 && (
           <Collapsible open={timelineOpen} onOpenChange={setTimelineOpen}>

@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -463,8 +463,11 @@ function ItemRow({ item, checked, onToggle, indent, showPedido }: ItemRowProps) 
 // ─── Página principal ─────────────────────────────────────────────────────────
 export default function NuevoRequerimientoPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [saving, setSaving] = useState(false)
-  const [tipo, setTipo] = useState<TipoRequerimiento>('gastos_viaticos')
+  const [tipo, setTipo] = useState<TipoRequerimiento>(
+    searchParams.get('tipo') === 'compra_materiales' ? 'compra_materiales' : 'gastos_viaticos'
+  )
   const [showModal, setShowModal] = useState(false)
 
   // Campos comunes
@@ -481,14 +484,24 @@ export default function NuevoRequerimientoPage() {
   const [justificacion, setJustificacion] = useState('')
   const [proyectos, setProyectos] = useState<ProyectoParaRequerimiento[]>([])
   const [loadingItems, setLoadingItems] = useState(false)
-  const [busqueda, setBusqueda] = useState('')
+  const [busqueda, setBusqueda] = useState(searchParams.get('pedidoCodigo') || '')
 
   // Selección CONFIRMADA (lo que va al formulario)
   const [seleccionados, setSeleccionados] = useState<Map<string, ItemSeleccionado>>(new Map())
 
+  // Si viene desde un pedido, auto-abrir modal al cargar
+  const pedidoCodigoParam = searchParams.get('pedidoCodigo')
+
   useEffect(() => {
-    if (tipo === 'compra_materiales') loadItems()
+    if (tipo === 'compra_materiales') loadItems(pedidoCodigoParam || undefined)
   }, [tipo])
+
+  // Auto-abrir modal cuando los items estén cargados y viene de un pedido
+  useEffect(() => {
+    if (pedidoCodigoParam && tipo === 'compra_materiales' && !loadingItems && proyectos.length > 0 && !showModal) {
+      setShowModal(true)
+    }
+  }, [pedidoCodigoParam, tipo, loadingItems, proyectos.length])
 
   const loadItems = useCallback(async (q?: string) => {
     setLoadingItems(true)
