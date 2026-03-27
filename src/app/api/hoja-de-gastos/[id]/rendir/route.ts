@@ -13,7 +13,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const { id } = await params
     const hoja = await prisma.hojaDeGastos.findUnique({
       where: { id },
-      include: { lineas: true },
+      include: { lineas: true, itemsMateriales: true },
     })
     if (!hoja) {
       return NextResponse.json({ error: 'Hoja de gastos no encontrada' }, { status: 404 })
@@ -59,6 +59,30 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           metadata: { montoGastado, saldo, cantidadLineas: hoja.lineas.length },
         },
       })
+
+      // Sin anticipo (aprobado → rendido): crear RecepcionPendiente aquí
+      // Con anticipo ya se crearon al depositar — no duplicar
+      const esCompra = (hoja as any).tipoPropósito === 'compra_materiales'
+      if (esCompra && !hoja.requiereAnticipo && hoja.itemsMateriales.length > 0) {
+        for (const reqItem of hoja.itemsMateriales) {
+          const existe = await tx.recepcionPendiente.findFirst({
+            where: {
+              requerimientoMaterialItemId: reqItem.id,
+              estado: { notIn: ['rechazado'] },
+            },
+          })
+          if (existe) continue
+          await tx.recepcionPendiente.create({
+            data: {
+              pedidoEquipoItemId: reqItem.pedidoEquipoItemId,
+              requerimientoMaterialItemId: reqItem.id,
+              cantidadRecibida: reqItem.cantidadSolicitada,
+              estado: 'pendiente',
+              observaciones: `Compra por ${hoja.numero} — ${reqItem.descripcion}`,
+            },
+          })
+        }
+      }
 
       return updated
     })
