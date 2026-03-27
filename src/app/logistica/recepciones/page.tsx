@@ -240,6 +240,7 @@ export default function RecepcionesPage() {
   } | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
   const [actionMotivo, setActionMotivo] = useState('')
+  const [cantidadReal, setCantidadReal] = useState<string>('')
 
   useEffect(() => {
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current)
@@ -298,10 +299,12 @@ export default function RecepcionesPage() {
       let body: any = {}
 
       switch (type) {
-        case 'confirmar_almacen':
+        case 'confirmar_almacen': {
           url = `/api/recepcion-pendiente/${recepcion.id}/confirmar`
-          body = { paso: 'almacen' }
+          const qty = parseFloat(cantidadReal)
+          body = { paso: 'almacen', ...(cantidadReal && !isNaN(qty) ? { cantidadReal: qty } : {}) }
           break
+        }
         case 'confirmar_proyecto':
           url = `/api/recepcion-pendiente/${recepcion.id}/confirmar`
           body = { paso: 'proyecto' }
@@ -639,7 +642,7 @@ export default function RecepcionesPage() {
       )}
 
       {/* Action Dialog */}
-      <AlertDialog open={!!actionDialog} onOpenChange={(open) => { if (!open) { setActionDialog(null); setActionMotivo('') } }}>
+      <AlertDialog open={!!actionDialog} onOpenChange={(open) => { if (!open) { setActionDialog(null); setActionMotivo(''); setCantidadReal('') } }}>
         <AlertDialogContent className="sm:max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle>
@@ -671,6 +674,32 @@ export default function RecepcionesPage() {
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
+
+          {actionDialog?.type === 'confirmar_almacen' && (
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">
+                Cantidad recibida
+                <span className="text-xs text-muted-foreground font-normal ml-1">
+                  (dejar vacío = {actionDialog.recepcion.cantidadRecibida} solicitado)
+                </span>
+              </label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0.01"
+                max={actionDialog.recepcion.cantidadRecibida}
+                placeholder={String(actionDialog.recepcion.cantidadRecibida)}
+                value={cantidadReal}
+                onChange={e => setCantidadReal(e.target.value)}
+                className="h-8 text-sm"
+              />
+              {cantidadReal && parseFloat(cantidadReal) < actionDialog.recepcion.cantidadRecibida && (
+                <p className="text-xs text-amber-600">
+                  Recepción parcial: el resto ({actionDialog.recepcion.cantidadRecibida - parseFloat(cantidadReal)} unid.) seguirá pendiente para el próximo intento.
+                </p>
+              )}
+            </div>
+          )}
 
           {(actionDialog?.type === 'rechazar' || actionDialog?.type === 'retroceder' || actionDialog?.type === 'retroceder_entrega' || actionDialog?.type === 'revertir') && (
             <div className="space-y-2">

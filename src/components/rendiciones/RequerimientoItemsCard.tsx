@@ -309,7 +309,7 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                       <th className="text-right pb-2 pr-3 font-medium">P.U. Real</th>
                       <th className="text-right pb-2 font-medium">Total Est.</th>
                       <th className="text-right pb-2 font-medium">Total Real</th>
-                      {hoja.estado === 'borrador' && <th className="pb-2 w-8" />}
+                      {['borrador', 'depositado'].includes(hoja.estado) && <th className="pb-2 w-8" />}
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -358,14 +358,14 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                             ? <span className="text-green-700 font-medium">{fmt(item.totalReal)}</span>
                             : <span className="text-muted-foreground/50">—</span>}
                         </td>
-                        {hoja.estado === 'borrador' && (
+                        {['borrador', 'depositado'].includes(hoja.estado) && (
                           <td className="py-2 pl-2">
                             <button
                               type="button"
                               onClick={() => handleDeleteItem(item.id)}
                               disabled={deletingItem === item.id || itemsCubiertos.has(item.id)}
                               className="text-muted-foreground/40 hover:text-red-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                              title={itemsCubiertos.has(item.id) ? 'Tiene comprobante registrado' : 'Eliminar item'}
+                              title={itemsCubiertos.has(item.id) ? 'Tiene comprobante registrado' : 'Item no encontrado — eliminar y liberar'}
                             >
                               {deletingItem === item.id
                                 ? <Loader2 className="h-3.5 w-3.5 animate-spin" />

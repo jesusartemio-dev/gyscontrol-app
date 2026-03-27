@@ -84,17 +84,45 @@ export async function DELETE(
 
     const item = await prisma.requerimientoMaterialItem.findUnique({
       where: { id },
-      include: { hojaDeGastos: { select: { estado: true } } },
+      include: {
+        hojaDeGastos: { select: { estado: true } },
+        recepciones: { select: { id: true, estado: true } },
+      },
     })
 
     if (!item) {
       return NextResponse.json({ error: 'Item no encontrado' }, { status: 404 })
     }
-    if (item.hojaDeGastos.estado !== 'borrador') {
-      return NextResponse.json({ error: 'Solo se pueden eliminar items cuando el requerimiento está en borrador' }, { status: 409 })
+
+    const estadoHoja = item.hojaDeGastos.estado
+    if (!['borrador', 'depositado'].includes(estadoHoja)) {
+      return NextResponse.json(
+        { error: 'Solo se pueden eliminar items en borrador o cuando el dinero fue depositado' },
+        { status: 409 }
+      )
     }
 
-    await prisma.requerimientoMaterialItem.delete({ where: { id } })
+    // En depositado: verificar que la recepción no haya sido confirmada ya
+    if (estadoHoja === 'depositado') {
+      const recepcionActiva = item.recepciones.find(
+        r => ['en_almacen', 'entregado_proyecto'].includes(r.estado)
+      )
+      if (recepcionActiva) {
+        return NextResponse.json(
+          { error: 'No se puede eliminar: el item ya fue recibido en almacén o entregado al proyecto' },
+          { status: 409 }
+        )
+      }
+    }
+
+    // Borrar en transacción: primero recepción pendiente (si existe), luego el item
+    await prisma.$transaction(async (tx) => {
+      const recepcionPendiente = item.recepciones.find(r => r.estado === 'pendiente')
+      if (recepcionPendiente) {
+        await tx.recepcionPendiente.delete({ where: { id: recepcionPendiente.id } })
+      }
+      await tx.requerimientoMaterialItem.delete({ where: { id } })
+    })
 
     return NextResponse.json({ ok: true })
   } catch (error) {

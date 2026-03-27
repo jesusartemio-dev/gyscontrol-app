@@ -18,6 +18,7 @@ export async function POST(
     const body = await req.json()
     const paso: 'almacen' | 'proyecto' = body.paso || 'almacen'
     const observaciones = body.observaciones || null
+    const cantidadReal: number | null = body.cantidadReal ?? null
 
     // Validar permisos por paso
     const role = session.user.role
@@ -86,11 +87,23 @@ export async function POST(
     // PASO 1: Confirmar llegada a almacén
     // ═══════════════════════════════════════
     if (paso === 'almacen') {
+      // Validar cantidad real si se provee
+      if (cantidadReal !== null) {
+        if (cantidadReal <= 0) {
+          return NextResponse.json({ error: 'La cantidad real debe ser mayor a 0' }, { status: 400 })
+        }
+        if (cantidadReal > recepcion.cantidadRecibida) {
+          return NextResponse.json({ error: 'La cantidad real no puede superar la solicitada' }, { status: 400 })
+        }
+      }
+      const cantidadConfirmada = cantidadReal ?? recepcion.cantidadRecibida
+
       const result = await prisma.$transaction(async (tx) => {
         await tx.recepcionPendiente.update({
           where: { id },
           data: {
             estado: 'en_almacen',
+            cantidadRecibida: cantidadConfirmada,
             confirmadoPorId: session.user.id,
             fechaConfirmacion: new Date(),
             observaciones,
