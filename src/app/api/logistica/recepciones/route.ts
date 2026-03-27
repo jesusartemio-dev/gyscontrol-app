@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
           OR: [
             { pedidoEquipoItem: { pedidoEquipo: { proyectoId } } },
             { ordenCompraItem: { ordenCompra: { proyectoId } } },
+            { requerimientoMaterialItem: { proyectoId } },
           ]
         }
       ]
@@ -44,6 +45,9 @@ export async function GET(request: NextRequest) {
             { ordenCompraItem: { descripcion: { contains: search, mode: 'insensitive' } } },
             { ordenCompraItem: { ordenCompra: { numero: { contains: search, mode: 'insensitive' } } } },
             { pedidoEquipoItem: { codigo: { contains: search, mode: 'insensitive' } } },
+            { requerimientoMaterialItem: { codigo: { contains: search, mode: 'insensitive' } } },
+            { requerimientoMaterialItem: { descripcion: { contains: search, mode: 'insensitive' } } },
+            { requerimientoMaterialItem: { hojaDeGastos: { numero: { contains: search, mode: 'insensitive' } } } },
           ]
         }
       ]
@@ -74,6 +78,17 @@ export async function GET(request: NextRequest) {
               id: true,
               codigo: true,
               pedidoEquipo: { select: { id: true, codigo: true } },
+            }
+          },
+          requerimientoMaterialItem: {
+            select: {
+              id: true,
+              codigo: true,
+              descripcion: true,
+              cantidadSolicitada: true,
+              unidad: true,
+              hojaDeGastos: { select: { id: true, numero: true } },
+              proyecto: { select: { id: true, nombre: true, codigo: true } },
             }
           },
           confirmadoPor: { select: { name: true } },

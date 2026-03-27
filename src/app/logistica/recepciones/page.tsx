@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
+import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -73,11 +74,70 @@ interface Recepcion {
       numero: string
       proyecto: { id: string; nombre: string; codigo: string } | null
     }
-  }
+  } | null
   pedidoEquipoItem: {
     id: string
     codigo: string
     pedidoEquipo: { id: string; codigo: string }
+  } | null
+  requerimientoMaterialItem: {
+    id: string
+    codigo: string
+    descripcion: string
+    cantidadSolicitada: number
+    unidad: string
+    hojaDeGastos: { id: string; numero: string }
+    proyecto: { id: string; nombre: string; codigo: string } | null
+  } | null
+}
+
+type RecepcionFuente = 'oc' | 'req' | 'directo'
+
+function getRecepcionInfo(r: Recepcion): {
+  fuente: RecepcionFuente
+  origenLabel: string
+  origenHref: string | null
+  codigo: string
+  descripcion: string
+  cantidad: number
+  unidad: string
+  proyecto: { nombre: string } | null
+} {
+  if (r.requerimientoMaterialItem) {
+    const req = r.requerimientoMaterialItem
+    return {
+      fuente: 'req',
+      origenLabel: req.hojaDeGastos.numero,
+      origenHref: `/gastos/mis-requerimientos/${req.hojaDeGastos.id}`,
+      codigo: req.codigo,
+      descripcion: req.descripcion,
+      cantidad: req.cantidadSolicitada,
+      unidad: req.unidad,
+      proyecto: req.proyecto,
+    }
+  }
+  if (r.ordenCompraItem) {
+    const oc = r.ordenCompraItem
+    return {
+      fuente: 'oc',
+      origenLabel: oc.ordenCompra.numero,
+      origenHref: `/logistica/ordenes-compra/${oc.ordenCompra.id}`,
+      codigo: oc.codigo,
+      descripcion: oc.descripcion,
+      cantidad: oc.cantidad,
+      unidad: oc.unidad,
+      proyecto: oc.ordenCompra.proyecto,
+    }
+  }
+  return {
+    fuente: 'directo',
+    origenLabel: r.pedidoEquipoItem?.pedidoEquipo?.codigo || '—',
+    origenHref: r.pedidoEquipoItem ? `/logistica/pedidos/${r.pedidoEquipoItem.pedidoEquipo.id}` : null,
+    codigo: r.pedidoEquipoItem?.codigo || '—',
+    descripcion: '—',
+    cantidad: r.cantidadRecibida,
+    unidad: '',
+    proyecto: null,
   }
 }
 
@@ -351,7 +411,7 @@ export default function RecepcionesPage() {
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por OC, código de ítem..."
+            placeholder="Buscar por OC, REQ, código de ítem..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9 h-9"
@@ -375,7 +435,7 @@ export default function RecepcionesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[100px]">OC</TableHead>
+                  <TableHead className="w-[130px]">Origen</TableHead>
                   <TableHead>Proyecto</TableHead>
                   <TableHead>Ítem</TableHead>
                   <TableHead className="text-right w-[120px]">Cantidad</TableHead>
@@ -386,22 +446,42 @@ export default function RecepcionesPage() {
               </TableHeader>
               <TableBody>
                 {recepciones.map(r => {
+                  const info = getRecepcionInfo(r)
+                  const fuenteStyles: Record<RecepcionFuente, string> = {
+                    oc: 'bg-blue-50 text-blue-700 border-blue-200',
+                    req: 'bg-purple-50 text-purple-700 border-purple-200',
+                    directo: 'bg-gray-50 text-gray-600 border-gray-200',
+                  }
+                  const fuenteLabel: Record<RecepcionFuente, string> = {
+                    oc: 'OC', req: 'REQ', directo: 'Directo',
+                  }
                   return (
                     <TableRow key={r.id}>
-                      <TableCell className="font-mono text-xs">
-                        {r.ordenCompraItem.ordenCompra.numero}
+                      <TableCell>
+                        <div className="flex flex-col gap-0.5">
+                          <span className={`inline-flex w-fit items-center text-[9px] font-semibold px-1.5 py-0.5 rounded border ${fuenteStyles[info.fuente]}`}>
+                            {fuenteLabel[info.fuente]}
+                          </span>
+                          {info.origenHref ? (
+                            <Link href={info.origenHref} className="font-mono text-[11px] text-blue-600 hover:underline">
+                              {info.origenLabel}
+                            </Link>
+                          ) : (
+                            <span className="font-mono text-[11px] text-muted-foreground">{info.origenLabel}</span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-xs">
-                        {r.ordenCompraItem.ordenCompra.proyecto?.nombre || '—'}
+                        {info.proyecto?.nombre || '—'}
                       </TableCell>
                       <TableCell>
-                        <div className="text-xs font-medium">{r.ordenCompraItem.codigo}</div>
+                        <div className="text-xs font-medium">{info.codigo}</div>
                         <div className="text-[11px] text-muted-foreground truncate max-w-[200px]">
-                          {r.ordenCompraItem.descripcion}
+                          {info.descripcion}
                         </div>
                       </TableCell>
                       <TableCell className="text-right text-xs font-medium">
-                        {r.cantidadRecibida} / {r.ordenCompraItem.cantidad} {r.ordenCompraItem.unidad}
+                        {r.cantidadRecibida} / {info.cantidad} {info.unidad}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         {formatFecha(r.fechaRecepcion)}
@@ -573,15 +653,19 @@ export default function RecepcionesPage() {
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div>
-                {actionDialog?.recepcion && (
-                  <span>
-                    {actionDialog.recepcion.cantidadRecibida} x {actionDialog.recepcion.ordenCompraItem.codigo}
-                    {' '}de OC {actionDialog.recepcion.ordenCompraItem.ordenCompra.numero}
-                  </span>
-                )}
+                {actionDialog?.recepcion && (() => {
+                  const info = getRecepcionInfo(actionDialog.recepcion)
+                  const fuenteLabel: Record<RecepcionFuente, string> = { oc: 'OC', req: 'REQ', directo: 'Pedido' }
+                  return (
+                    <span>
+                      {actionDialog.recepcion.cantidadRecibida} x {info.codigo}
+                      {' '}— {fuenteLabel[info.fuente]} {info.origenLabel}
+                    </span>
+                  )
+                })()}
                 {actionDialog?.type === 'eliminar' && (
                   <span className="block mt-2 text-red-600 font-medium">
-                    Se decrementará la cantidad recibida en la OC. Esta acción no se puede deshacer.
+                    Esta acción revertirá las cantidades registradas. No se puede deshacer.
                   </span>
                 )}
               </div>
