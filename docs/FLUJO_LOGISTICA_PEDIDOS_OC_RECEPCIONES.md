@@ -55,20 +55,23 @@ Un item de pedido puede atenderse por **dos caminos mutuamente excluyentes**:
                 ▼
           HojaDeGastos (compra_materiales):
           borrador → enviado → aprobado → depositado → rendido → validado → cerrado
-                                                                              │
-                                                              RecepcionPendiente (fuente=REQ)
+                                              │              │
+                               (requiereAnticipo=true)  (requiereAnticipo=false)
+                                              ▼              ▼
+                                        RecepcionPendiente (fuente=REQ) CREADAS AQUÍ
+                                        [cerrar mantiene lógica como fallback]
 
 ──────────── FLUJO COMÚN DE RECEPCIÓN ────────────
 
 RecepcionPendiente (fuente: OC o REQ)
       │
-      ▼ [/logistica/recepciones]
-  pendiente
+      ▼ [/logistica/recepciones — badge REQ morado / badge OC azul]
+  pendiente  ◄── logístico puede reintentar compra varios días
       │
       ├──► rechazado
       │
       ▼
-  en_almacen
+  en_almacen  (almacenero confirma llegada; puede registrar cantidad parcial)
       │
       ▼
   entregado_proyecto
@@ -76,6 +79,14 @@ RecepcionPendiente (fuente: OC o REQ)
       ▼
   PedidoEquipoItem.cantidadAtendida += cantidadRecibida
   PedidoEquipo.estado recalculado (parcial / entregado)
+
+──────────── CASO: ITEM NO ENCONTRADO EN TIENDA (REQ en depositado) ────────────
+
+  × en item del REQ (estado depositado)
+      │
+      ├─ RecepcionPendiente en pendiente → eliminada en cascada
+      └─ PedidoEquipoItem queda libre → elegible para nuevo REQ u OC
+         (bloqueado si recepción ya está en en_almacen o entregado_proyecto)
 ```
 
 ---
@@ -160,7 +171,7 @@ RecepcionPendiente (fuente: OC o REQ)
 | `cantidadSolicitada` | Float | Cantidad a comprar |
 | `precioEstimado / precioReal` | Float? | Estimado vs real (se carga al subir comprobante) |
 | `totalEstimado / totalReal` | Float? | Totales calculados |
-| `recepciones` | Rel | RecepcionPendiente generadas al cerrar el REQ |
+| `recepciones` | Rel | RecepcionPendiente generadas al depositar o rendir el REQ |
 
 ### RecepcionPendiente
 
@@ -255,10 +266,10 @@ borrador → enviado → aprobado → depositado → rendido → validado → ce
 | `borrador` | En edición, puede agregar/quitar items |
 | `enviado` | Enviado para aprobación del gerente |
 | `aprobado` | Aprobado, pendiente de depósito del anticipo |
-| `depositado` | Dinero depositado al empleado; puede subir comprobantes |
-| `rendido` | Empleado subió todos los comprobantes y rindió cuentas |
+| `depositado` | Dinero depositado al empleado; puede subir comprobantes. **Si `requiereAnticipo=true`: RecepcionPendiente se crean en este momento** |
+| `rendido` | Empleado subió todos los comprobantes y rindió cuentas. **Si `requiereAnticipo=false`: RecepcionPendiente se crean en este momento** |
 | `validado` | Finanzas validó la rendición |
-| `cerrado` | Cierre definitivo — se crean las RecepcionPendiente automáticamente |
+| `cerrado` | Cierre definitivo — fallback: crea RecepcionPendiente si aún no existen (control de duplicados) |
 
 ### Rendición (estado `depositado`):
 - El empleado sube comprobantes (`GastoComprobante`: factura, boleta, ticket).
@@ -266,10 +277,25 @@ borrador → enviado → aprobado → depositado → rendido → validado → ce
 - Los items del requerimiento muestran badge con el comprobante que los cubre.
 - El total gastado se calcula en vivo desde las líneas.
 
-### Al cerrar el REQ:
-- El sistema crea automáticamente una `RecepcionPendiente` por cada `RequerimientoMaterialItem`.
+### Cuándo se crean las RecepcionPendiente (REQ):
+
+| Condición | Momento de creación |
+|-----------|---------------------|
+| `requiereAnticipo = true` | Al pasar a **`depositado`** |
+| `requiereAnticipo = false` | Al pasar a **`rendido`** |
+| Fallback (ya no deberían crearse aquí) | Al **`cerrar`** — solo si aún no existen (control de duplicados) |
+
+Esto permite que logística vea y gestione las recepciones físicas **antes del cierre financiero**.
+
 - `cantidadRecibida = cantidadSolicitada`, estado inicial: `pendiente`.
-- El almacenero ve estas recepciones en `/logistica/recepciones` identificadas con badge **REQ**.
+- Las recepciones aparecen en `/logistica/recepciones` identificadas con badge **REQ** (morado).
+
+### Eliminar item en estado `depositado`:
+- El botón `×` en la tarjeta de items funciona tanto en `borrador` como en `depositado`.
+- Al eliminar en `depositado`: borra en cascada la `RecepcionPendiente` asociada si está en `pendiente`.
+- **Bloqueado** si la recepción ya está en `en_almacen` o `entregado_proyecto` (ya fue recibida físicamente).
+- El `PedidoEquipoItem` queda libre para crear un nuevo REQ u OC.
+- Caso de uso típico: el logístico no encontró el item en tienda.
 
 ---
 
@@ -318,16 +344,28 @@ La página muestra recepciones de **ambos orígenes** con badge identificador:
 - Solo se crean recepciones si la OC tiene `proyectoId`.
 
 **Desde REQ:**
-- Se crean automáticamente al cerrar la HojaDeGastos.
+- Se crean automáticamente al depositar (`requiereAnticipo=true`) o al rendir (`requiereAnticipo=false`).
 - `cantidadRecibida = RequerimientoMaterialItem.cantidadSolicitada`.
+- Fallback: al cerrar el REQ si aún no existen (control de duplicados).
 
 ### Flujo de la Recepción Pendiente:
 
 | Paso | Estado | Actor | Acción |
 |------|--------|-------|--------|
-| 1 | `pendiente` | Almacenero | Confirmar llegada al almacén → `en_almacen` |
+| 1 | `pendiente` | Almacenero | Confirmar llegada al almacén → `en_almacen` (puede ingresar cantidad parcial) |
 | 1b | `pendiente` | Almacenero | Rechazar (dañado, incorrecto) → `rechazado` |
 | 2 | `en_almacen` | Responsable | Entregar al proyecto → `entregado_proyecto` |
+
+### Recepción parcial al confirmar en almacén:
+- Al confirmar la llegada, el almacenero puede ingresar una **cantidad real menor** a la solicitada.
+- Si cantidad real < solicitada: se actualiza `cantidadRecibida` con la cantidad real y el estado pasa a `en_almacen`.
+- El REQ item refleja la cantidad efectivamente recibida.
+- Para la cantidad restante, el logístico debe crear un nuevo REQ u OC por la diferencia.
+
+### Compra multi-día:
+- Si el item no está disponible el día 1, la `RecepcionPendiente` permanece en `pendiente`.
+- El logístico puede intentar la compra el día 2, 3, etc. sin ninguna acción adicional en el sistema.
+- La recepción sigue visible en `/logistica/recepciones` → tab "Pendientes" hasta que sea confirmada o cancelada.
 
 ---
 
@@ -367,10 +405,16 @@ Un item de pedido solo puede estar en **un camino activo** a la vez:
 - No crea `RecepcionPendiente` (no hay proyecto al que entregar).
 - Flujo de recepción solo actualiza `cantidadRecibida` en los items.
 
-### 9.4 Recepción Parcial
+### 9.4 Recepción Parcial (OC)
 - Item pedido: 100 unidades. Llegaron 60 hoy.
 - OC pasa a `parcial`. Se registran más recepciones cuando llegue el resto.
 - Cuando `cantidadRecibida >= cantidad` en todos los items → OC `completada`.
+
+### 9.4b Recepción Parcial (REQ)
+- Al confirmar llegada al almacén, el almacenero ingresa la cantidad real recibida.
+- Si cantidad real < solicitada: `cantidadRecibida` se actualiza con la cantidad real y el estado pasa a `en_almacen`.
+- La `RecepcionPendiente` no se divide; solo se actualiza la cantidad.
+- El logístico debe crear un nuevo REQ u OC para la cantidad restante.
 
 ### 9.5 Múltiples proveedores desde un pedido
 - Pedido con items de 3 proveedores → se crea **una OC por proveedor**.
@@ -388,6 +432,25 @@ Un item de pedido solo puede estar en **un camino activo** a la vez:
 - `RecepcionPendiente.estado → rechazado`.
 - Si viene de OC: decrementa `OrdenCompraItem.cantidadRecibida`.
 - Workflow manual: contactar proveedor, crear nueva OC o REQ según corresponda.
+
+### 9.8 Compra multi-día (REQ)
+- El logístico sale a comprar el día 1 y no encuentra el item en ninguna tienda.
+- No requiere ninguna acción en el sistema: la `RecepcionPendiente` permanece en `pendiente`.
+- El día 2 (o cualquier día posterior) el logístico vuelve a intentarlo.
+- La recepción sigue visible en `/logistica/recepciones` → tab "Pendientes".
+- Si definitivamente no se consigue el item: eliminar el item del REQ (si el REQ está en `depositado`) para liberar el `PedidoEquipoItem`.
+
+### 9.9 Item no encontrado — eliminar del REQ en `depositado`
+- El logístico no encontró el item; decide eliminarlo del REQ desde el detalle del requerimiento.
+- **Condición:** REQ en estado `depositado` y `RecepcionPendiente` en estado `pendiente`.
+- **Efecto:** elimina el `RequerimientoMaterialItem` y borra en cascada la `RecepcionPendiente` asociada.
+- **Bloqueado si:** la recepción ya está en `en_almacen` o `entregado_proyecto`.
+- **Resultado:** el `PedidoEquipoItem` queda libre para ser atendido por un nuevo REQ u OC.
+
+### 9.10 Independencia físico / financiero (REQ)
+- Desde que el dinero es depositado, el flujo físico (almacén → proyecto) y el financiero (rendir → validar → cerrar) son **independientes**.
+- La recepción física puede completarse antes o después del cierre financiero.
+- El ciclo financiero continúa normalmente independientemente del estado de la recepción.
 
 ---
 
@@ -410,8 +473,12 @@ cancelada   cancelada
 ### HojaDeGastos (compra_materiales)
 ```
 borrador → enviado → aprobado → depositado → rendido → validado → cerrado
-    ↑                    ↓
-rechazado ←──────────────┘
+    ↑                    ↓            │            │
+rechazado ←──────────────┘            │            │
+                                      ▼            ▼
+                           (requiereAnticipo=T) (requiereAnticipo=F)
+                           RecepcionPendiente   RecepcionPendiente
+                           creadas aquí         creadas aquí
 ```
 
 ### RecepcionPendiente
@@ -438,7 +505,8 @@ rechazado    rechazado
 | Depositar anticipo REQ | admin, gerente, administracion |
 | Subir comprobantes REQ | Empleado dueño del REQ |
 | Validar rendición REQ | admin, gerente, administracion |
-| Cerrar REQ (crea recepciones) | admin, gerente, administracion |
+| Cerrar REQ (fallback recepciones) | admin, gerente, administracion |
+| Eliminar item del REQ en depositado | Empleado dueño del REQ, admin, gerente |
 | Confirmar recepción en almacén | admin, gerente, logistico, coordinador_logistico |
 | Entregar a proyecto | admin, gerente, logistico, coordinador_logistico, gestor, coordinador |
 | Rechazar recepción | admin, gerente, logistico, coordinador_logistico, gestor |
@@ -458,9 +526,11 @@ rechazado    rechazado
 | **Solo borrador editable** | Items y campos de OC/REQ solo modificables en estado borrador |
 | **Cancelación OC limitada** | Solo desde borrador o aprobada. Desde enviada: usar retroceder primero |
 | **RecepcionPendiente solo para proyectos (OC)** | Si la OC es para centro de costo, no se crean recepciones |
-| **REQ cerrado crea recepciones** | Al cerrar una HojaDeGastos, el sistema genera RecepcionPendiente por cada item automáticamente |
+| **REQ depositado/rendido crea recepciones** | Al pasar a `depositado` (con anticipo) o `rendido` (sin anticipo), se generan RecepcionPendiente por cada item. `cerrar` es fallback con control de duplicados |
+| **Eliminar item REQ en depositado** | Permitido si la RecepcionPendiente asociada está en `pendiente`. Bloqueado si ya está en `en_almacen` o `entregado_proyecto`. Borra en cascada la recepción y libera el PedidoEquipoItem |
+| **Recepción parcial REQ** | Al confirmar en almacén se puede ingresar cantidad real menor a la solicitada; `cantidadRecibida` se actualiza y el estado pasa a `en_almacen` |
 | **cantidadAtendida solo sube al entregar** | El campo `PedidoEquipoItem.cantidadAtendida` solo se incrementa al pasar a `entregado_proyecto`, no al crear la recepción |
-| **Sin duplicados activos** | No puede haber dos RecepcionPendiente activas para el mismo item en un mismo estado |
+| **Sin duplicados activos** | No puede haber dos RecepcionPendiente activas para el mismo item. El fallback en `cerrar` verifica existencia antes de crear |
 | **Precio real al catálogo** | Al confirmar OC, `precioUnitario` se propaga al `CatálogoEquipo`. Para REQ, `precioReal` se carga al subir el comprobante |
 | **Items sin proveedor excluidos de OC** | Al generar OCs automáticamente, items sin proveedor se omiten |
 
