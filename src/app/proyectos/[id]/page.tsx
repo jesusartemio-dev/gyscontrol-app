@@ -27,6 +27,7 @@ import {
   Target,
   Clock,
   ShieldCheck,
+  HardHat,
 } from 'lucide-react'
 
 import { Card, CardContent } from '@/components/ui/card'
@@ -446,6 +447,19 @@ export default function ProyectoHubPage() {
         ? { porcentaje: (cronogramaStats.tareasConResponsable / cronogramaStats.tareas) * 100, estado: 'ok' as const }
         : undefined,
       coberturaSecundariaLabel: `Responsables ${cronogramaStats.tareasConResponsable}/${cronogramaStats.tareas}`,
+    },
+    {
+      id: 'recursos',
+      title: 'Recursos',
+      description: 'Manlift, Andamios, Herramientas',
+      icon: HardHat,
+      color: 'text-lime-600',
+      bgColor: 'bg-lime-50',
+      hoverBg: 'hover:bg-lime-50',
+      borderColor: 'border-lime-200',
+      href: `${baseUrl}/recursos`,
+      stats: [],
+      badge: 'Ejecución'
     },
     {
       id: 'ssoma',

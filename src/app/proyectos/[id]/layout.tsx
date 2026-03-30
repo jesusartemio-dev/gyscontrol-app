@@ -173,6 +173,7 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
     'listas': 'Listas',
     'pedidos': 'Pedidos',
     'comparacion': 'Comparación',
+    'recursos': 'Recursos',
   }
 
   // Build breadcrumb trail from path segments (e.g. listas/[id] → Listas > Detalle)
