@@ -157,7 +157,7 @@ const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
           </div>
 
           {/* Rollback buttons */}
-          {estado === 'enviado' && ['admin', 'gerente', 'proyectos'].includes(userRole) && (
+          {estado === 'enviado' && ['admin', 'gerente', 'gestor', 'coordinador'].includes(userRole) && (
             <RollbackButton
               entityType="pedidoEquipo"
               entityId={pedidoId}
