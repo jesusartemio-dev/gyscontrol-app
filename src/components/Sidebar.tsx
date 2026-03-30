@@ -245,6 +245,7 @@ export default function Sidebar() {
         { href: '/logistica/listas', label: 'Listas Técnicas', icon: FileText, badge: 'listas-por-cotizar' as NotificationBadgeType },
         { href: '/logistica/pedidos', label: 'Gestión de Pedidos', icon: Package, badge: 'pedidos-pendientes' as NotificationBadgeType },
         { href: '/logistica/solicitudes-recurso', label: 'Solicitudes Recurso', icon: Wrench },
+        { href: '/configuracion/catalogo-recursos', label: 'Catálogo Recursos', icon: Wrench },
         { href: '/logistica/ordenes-compra', label: 'Órdenes de Compra', icon: FileText },
         { href: '/logistica/recepciones', label: 'Recepciones', icon: Package, badge: 'recepciones-pendientes' as NotificationBadgeType },
         { href: '/logistica/proveedores', label: 'Proveedores', icon: Building2 },
@@ -343,7 +344,6 @@ export default function Sidebar() {
         { href: '/catalogo/unidades', label: 'Unidades Equipos', icon: Calculator },
         { href: '/catalogo/unidades-servicio', label: 'Unidades Servicio', icon: Calculator },
         { href: '/catalogo/recursos', label: 'Recursos HH', icon: Wrench },
-        { href: '/configuracion/catalogo-recursos', label: 'Catálogo Recursos', icon: Wrench },
         // 👥 RRHH - Personal y estructura organizacional
         { href: '/admin/personal', label: 'Personal (RRHH)', icon: UserCheck },
         { href: '/configuracion/cargos', label: 'Cargos', icon: Briefcase },
