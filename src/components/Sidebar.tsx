@@ -245,7 +245,7 @@ export default function Sidebar() {
         { href: '/logistica/listas', label: 'Listas Técnicas', icon: FileText, badge: 'listas-por-cotizar' as NotificationBadgeType },
         { href: '/logistica/pedidos', label: 'Gestión de Pedidos', icon: Package, badge: 'pedidos-pendientes' as NotificationBadgeType },
         { href: '/logistica/solicitudes-recurso', label: 'Solicitudes Recurso', icon: Wrench },
-        { href: '/configuracion/catalogo-recursos', label: 'Catálogo Recursos', icon: Wrench },
+        { href: '/logistica/catalogo-recursos', label: 'Catálogo Recursos', icon: Wrench },
         { href: '/logistica/ordenes-compra', label: 'Órdenes de Compra', icon: FileText },
         { href: '/logistica/recepciones', label: 'Recepciones', icon: Package, badge: 'recepciones-pendientes' as NotificationBadgeType },
         { href: '/logistica/proveedores', label: 'Proveedores', icon: Building2 },
