@@ -109,6 +109,21 @@ export async function POST(request: Request) {
       )
     }
 
+    // 🔒 Solo se puede agregar ítems si la lista está en estado borrador
+    const lista = await prisma.listaEquipo.findUnique({
+      where: { id: body.listaId },
+      select: { estado: true },
+    })
+    if (!lista) {
+      return NextResponse.json({ error: 'Lista no encontrada' }, { status: 404 })
+    }
+    if (lista.estado !== 'borrador') {
+      return NextResponse.json(
+        { error: 'Solo se pueden agregar ítems cuando la lista está en estado borrador' },
+        { status: 403 }
+      )
+    }
+
     // 📌 Validación de enums
     const valoresEstado = [
       'borrador',

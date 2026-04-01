@@ -359,7 +359,7 @@ export default async function ListaEquipoDetallePage({ params, searchParams }: P
                  listaNombre={lista.nombre || ''}
                  listaEstado={lista.estado}
                  items={equiposData.items}
-                 editable={true}
+                 editable={lista.estado === 'borrador'}
                />
 
               {/* 📄 Equipment Pagination */}

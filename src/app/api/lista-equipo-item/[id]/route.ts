@@ -69,6 +69,21 @@ export async function PUT(
     const { id } = await context.params
     const payload: ListaEquipoItemUpdatePayload = await request.json()
 
+    // 🔒 Solo se puede editar si la lista está en estado borrador
+    const itemCheck = await prisma.listaEquipoItem.findUnique({
+      where: { id },
+      select: { listaEquipo: { select: { estado: true } } },
+    })
+    if (!itemCheck) {
+      return NextResponse.json({ error: 'Ítem no encontrado' }, { status: 404 })
+    }
+    if (itemCheck.listaEquipo.estado !== 'borrador') {
+      return NextResponse.json(
+        { error: 'Solo se pueden editar ítems cuando la lista está en estado borrador' },
+        { status: 403 }
+      )
+    }
+
     const dataToUpdate: any = {
       codigo: payload.codigo,
       descripcion: payload.descripcion,
@@ -225,6 +240,21 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
     }
 
     const { id } = await context.params
+
+    // 🔒 Solo se puede eliminar si la lista está en estado borrador
+    const itemForDelete = await prisma.listaEquipoItem.findUnique({
+      where: { id },
+      select: { listaEquipo: { select: { estado: true } } },
+    })
+    if (!itemForDelete) {
+      return NextResponse.json({ error: 'Ítem no encontrado' }, { status: 404 })
+    }
+    if (itemForDelete.listaEquipo.estado !== 'borrador') {
+      return NextResponse.json(
+        { error: 'Solo se pueden eliminar ítems cuando la lista está en estado borrador' },
+        { status: 403 }
+      )
+    }
 
     // 🛡️ Validar dependientes antes de eliminar
     const deleteCheck = await canDelete('listaEquipoItem', id)

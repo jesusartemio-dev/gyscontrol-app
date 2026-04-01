@@ -282,7 +282,7 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
           listaNombre={lista?.nombre || ''}
           listaEstado={lista?.estado}
           items={items}
-          editable={true}
+          editable={lista?.estado === 'borrador'}
           onCreated={handleRefreshItems}
           onDeleted={handleRefreshItems}
         />

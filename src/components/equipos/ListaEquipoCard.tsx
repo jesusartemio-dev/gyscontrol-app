@@ -105,6 +105,7 @@ export default function ListaEquipoCard({
           proyectoId={proyectoId}
           listaEstado={lista.estado}
           items={items}
+          editable={lista.estado === 'borrador'}
           onCreated={onRefreshItems}
         />
         <div className="text-right text-sm text-gray-600 font-medium mt-2">
