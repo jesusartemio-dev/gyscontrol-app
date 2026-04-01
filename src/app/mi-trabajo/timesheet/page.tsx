@@ -321,6 +321,29 @@ export default function TimesheetPage() {
     }
   }
 
+  const retirarEnvio = async () => {
+    if (!estadoAprobacion?.id) return
+    try {
+      setEnviando(true)
+      const res = await fetch(`/api/horas-hombre/timesheet-aprobacion/${estadoAprobacion.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accion: 'borrador' }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast({ title: data.error || 'Error al retirar envío', variant: 'destructive' })
+        return
+      }
+      toast({ title: 'Envío retirado. La semana volvió a borrador.' })
+      await cargarEstadoAprobacion()
+    } catch {
+      toast({ title: 'Error al retirar el envío', variant: 'destructive' })
+    } finally {
+      setEnviando(false)
+    }
+  }
+
   const handleEliminar = async () => {
     if (!deleteId) return
     try {
@@ -492,16 +515,27 @@ export default function TimesheetPage() {
               )}
 
               {estadoAprobacion.estado === 'enviado' && (
-                <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3">
-                  <Clock className="h-4 w-4 text-yellow-600" />
-                  <span className="text-sm text-yellow-800">
-                    <strong>Semana enviada</strong> — Pendiente de aprobación.
-                    {estadoAprobacion.fechaEnvio && (
-                      <span className="text-yellow-600 ml-1">
-                        Enviado el {format(new Date(estadoAprobacion.fechaEnvio), 'dd/MM/yyyy HH:mm')}
-                      </span>
-                    )}
-                  </span>
+                <div className="flex items-center justify-between bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-yellow-600" />
+                    <span className="text-sm text-yellow-800">
+                      <strong>Semana enviada</strong> — Pendiente de aprobación.
+                      {estadoAprobacion.fechaEnvio && (
+                        <span className="text-yellow-600 ml-1">
+                          Enviado el {format(new Date(estadoAprobacion.fechaEnvio), 'dd/MM/yyyy HH:mm')}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-yellow-400 text-yellow-800 hover:bg-yellow-100 shrink-0"
+                    onClick={retirarEnvio}
+                    disabled={enviando}
+                  >
+                    {enviando ? 'Retirando...' : 'Retirar envío'}
+                  </Button>
                 </div>
               )}
 

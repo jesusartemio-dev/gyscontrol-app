@@ -21,10 +21,10 @@ export async function PUT(
 
     const { id } = await params
     const body = await request.json()
-    const { accion, motivoRechazo } = body as { accion: 'aprobar' | 'rechazar'; motivoRechazo?: string }
+    const { accion, motivoRechazo } = body as { accion: 'aprobar' | 'rechazar' | 'borrador'; motivoRechazo?: string }
 
-    if (!accion || !['aprobar', 'rechazar'].includes(accion)) {
-      return NextResponse.json({ error: 'Acción inválida. Use "aprobar" o "rechazar"' }, { status: 400 })
+    if (!accion || !['aprobar', 'rechazar', 'borrador'].includes(accion)) {
+      return NextResponse.json({ error: 'Acción inválida. Use "aprobar", "rechazar" o "borrador"' }, { status: 400 })
     }
 
     const aprobacion = await prisma.timesheetAprobacion.findUnique({
@@ -35,7 +35,11 @@ export async function PUT(
       return NextResponse.json({ error: 'Registro no encontrado' }, { status: 404 })
     }
 
-    if (aprobacion.estado !== 'enviado') {
+    if (accion === 'borrador') {
+      if (!['enviado', 'aprobado'].includes(aprobacion.estado)) {
+        return NextResponse.json({ error: `Solo se puede volver a borrador desde "enviado" o "aprobado"` }, { status: 400 })
+      }
+    } else if (aprobacion.estado !== 'enviado') {
       return NextResponse.json({ error: `No se puede ${accion} una semana en estado "${aprobacion.estado}"` }, { status: 400 })
     }
 
@@ -51,13 +55,21 @@ export async function PUT(
     const updated = await prisma.$transaction(async (tx) => {
       const result = await tx.timesheetAprobacion.update({
         where: { id },
-        data: {
-          estado: accion === 'aprobar' ? 'aprobado' : 'rechazado',
-          aprobadoPorId: session.user.id,
-          motivoRechazo: accion === 'rechazar' ? motivoRechazo!.trim() : null,
-          fechaResolucion: new Date(),
-          updatedAt: new Date(),
-        },
+        data: accion === 'borrador'
+          ? {
+              estado: 'borrador',
+              aprobadoPorId: null,
+              motivoRechazo: null,
+              fechaResolucion: null,
+              updatedAt: new Date(),
+            }
+          : {
+              estado: accion === 'aprobar' ? 'aprobado' : 'rechazado',
+              aprobadoPorId: session.user.id,
+              motivoRechazo: accion === 'rechazar' ? motivoRechazo!.trim() : null,
+              fechaResolucion: new Date(),
+              updatedAt: new Date(),
+            },
         include: {
           usuario: { select: { name: true, email: true } },
         },
@@ -78,14 +90,18 @@ export async function PUT(
       return result
     })
 
+    const messages: Record<string, string> = {
+      aprobar: `Semana ${updated.semana} de ${updated.usuario.name} aprobada`,
+      rechazar: `Semana ${updated.semana} de ${updated.usuario.name} rechazada`,
+      borrador: `Semana ${updated.semana} de ${updated.usuario.name} devuelta a borrador`,
+    }
+
     return NextResponse.json({
       id: updated.id,
       estado: updated.estado,
       semana: updated.semana,
       usuario: updated.usuario.name,
-      message: accion === 'aprobar'
-        ? `Semana ${updated.semana} de ${updated.usuario.name} aprobada`
-        : `Semana ${updated.semana} de ${updated.usuario.name} rechazada`,
+      message: messages[accion],
     })
   } catch (error) {
     console.error('Error procesando aprobación:', error)

@@ -216,6 +216,27 @@ export default function SupervisionTimesheetPage() {
     }
   }
 
+  const handleVolverBorrador = async (id: string) => {
+    if (!confirm('¿Devolver esta semana a borrador? El colaborador podrá editarla nuevamente.')) return
+    try {
+      setProcessing(true)
+      const res = await fetch(`/api/horas-hombre/timesheet-aprobacion/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accion: 'borrador' }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      toast({ title: data.message || 'Semana devuelta a borrador' })
+      cargarDatos()
+      cargarResumen()
+    } catch (error: any) {
+      toast({ title: error.message || 'Error al devolver a borrador', variant: 'destructive' })
+    } finally {
+      setProcessing(false)
+    }
+  }
+
   const handleRechazar = async () => {
     if (!rejectId) return
     if (motivoRechazo.trim().length < 10) {
@@ -523,7 +544,27 @@ export default function SupervisionTimesheetPage() {
                                 <XCircle className="h-4 w-4 mr-1" />
                                 Rechazar
                               </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-gray-600 border-gray-300 hover:bg-gray-50"
+                                onClick={(e) => { e.stopPropagation(); handleVolverBorrador(a.id) }}
+                                disabled={processing}
+                              >
+                                Volver a Borrador
+                              </Button>
                             </>
+                          )}
+                          {a.estado === 'aprobado' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-gray-600 border-gray-300 hover:bg-gray-50"
+                              onClick={(e) => { e.stopPropagation(); handleVolverBorrador(a.id) }}
+                              disabled={processing}
+                            >
+                              Volver a Borrador
+                            </Button>
                           )}
                           {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                         </div>
