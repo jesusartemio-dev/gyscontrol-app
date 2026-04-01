@@ -543,7 +543,10 @@ export function RegistroHorasWizard({
         })
       })
 
-      if (!response.ok) throw new Error('Error registrando horas')
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null)
+        throw new Error(errorData?.error || 'Error registrando horas')
+      }
 
       const data = await response.json()
 
@@ -559,7 +562,7 @@ export function RegistroHorasWizard({
       console.error('Error registrando horas:', error)
       toast({
         title: 'Error',
-        description: 'No se pudieron registrar las horas',
+        description: error instanceof Error ? error.message : 'No se pudieron registrar las horas',
         variant: 'destructive'
       })
     } finally {
