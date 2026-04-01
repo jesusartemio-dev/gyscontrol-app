@@ -1440,9 +1440,11 @@ export interface CotizacionProveedor {
   id: string
   proveedorId: string
   proyectoId: string
-  codigo: string                               // ✅ antes 'nombre', ahora es el código único (ej. CJM27-COT-001)
-  numeroSecuencia: number                      // ✅ número puro para control interno
-  estado: EstadoCotizacionProveedor  // ✅ nuevo
+  codigo: string
+  numeroSecuencia: number
+  moneda: string        // "USD" | "PEN"
+  tipoCambio: number | null
+  estado: EstadoCotizacionProveedor
   createdAt: string
   updatedAt: string
   proveedor: Proveedor

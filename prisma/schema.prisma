@@ -461,6 +461,8 @@ model CotizacionProveedor {
   proyectoId              String
   codigo                  String                    @unique
   numeroSecuencia         Int
+  moneda                  String                    @default("USD")
+  tipoCambio              Float?
   createdAt               DateTime                  @default(now())
   updatedAt               DateTime                  @updatedAt
   estado                  EstadoCotizacionProveedor @default(pendiente)
