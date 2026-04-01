@@ -27,7 +27,8 @@ import {
   Loader2,
   Pencil,
   Trash2,
-  Save
+  Save,
+  Lock
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { format, startOfWeek, endOfWeek, addDays, addWeeks, subWeeks } from 'date-fns'
@@ -90,6 +91,7 @@ export function TimesheetSemanal({
   const [editFecha, setEditFecha] = useState('')
   const [editLoading, setEditLoading] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
+  const [estadoSemana, setEstadoSemana] = useState<string | null>(null)
 
   // Sync with parent's semana prop (compare by timestamp to avoid infinite loops)
   useEffect(() => {
@@ -108,13 +110,20 @@ export function TimesheetSemanal({
       setLoading(true)
 
       const semanaISO = format(semanaActual, 'yyyy-\'W\'ww')
-      const response = await fetch(`/api/horas-hombre/timesheet-semanal?semana=${semanaISO}`)
+      const [response, estadoRes] = await Promise.all([
+        fetch(`/api/horas-hombre/timesheet-semanal?semana=${semanaISO}`),
+        fetch(`/api/horas-hombre/timesheet-aprobacion/estado?semana=${semanaISO}`)
+      ])
 
       if (!response.ok) {
         throw new Error('Error al cargar timesheet')
       }
 
       const data = await response.json()
+      if (estadoRes.ok) {
+        const estadoData = await estadoRes.json()
+        setEstadoSemana(estadoData.estado || null)
+      }
 
       setResumenSemana(data.data.resumenSemana)
       setDiasSemana(data.data.diasSemana || [])
@@ -331,8 +340,23 @@ export function TimesheetSemanal({
             <Calendar className="h-5 w-5" />
             Calendario Semanal
           </h3>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 flex items-center gap-2">
             Semana {format(semanaActual, 'w', { locale: es })} de {format(semanaActual, 'yyyy', { locale: es })}
+            {estadoSemana === 'enviado' && (
+              <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-300 text-xs gap-1">
+                <Lock className="h-3 w-3" /> Enviada
+              </Badge>
+            )}
+            {estadoSemana === 'aprobado' && (
+              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300 text-xs gap-1">
+                <Lock className="h-3 w-3" /> Aprobada
+              </Badge>
+            )}
+            {estadoSemana === 'rechazado' && (
+              <Badge variant="outline" className="bg-red-50 text-red-700 border-red-300 text-xs">
+                Rechazada
+              </Badge>
+            )}
           </p>
         </div>
 
@@ -370,14 +394,19 @@ export function TimesheetSemanal({
 
         {/* Celdas de días */}
         <div className="grid grid-cols-7 gap-2 lg:gap-4 mt-2">
-          {diasSemana.map((dia, index) => (
+          {diasSemana.map((dia, index) => {
+            const bloqueada = estadoSemana === 'enviado' || estadoSemana === 'aprobado'
+            return (
             <div
               key={index}
-              className={`min-h-[120px] border rounded-lg p-3 cursor-pointer transition-colors hover:shadow-md ${getColorPorHoras(dia.totalHoras)}`}
+              className={`min-h-[120px] border rounded-lg p-3 transition-colors ${bloqueada ? 'cursor-not-allowed opacity-80' : 'cursor-pointer hover:shadow-md'} ${getColorPorHoras(dia.totalHoras)}`}
               onClick={() => abrirRegistroDia(dia.fechaString, dia.fecha)}
             >
               <div className="flex items-center justify-between mb-2">
                 <span className="text-lg font-bold">{dia.totalHoras}h</span>
+                {bloqueada ? (
+                  <Lock className="h-3.5 w-3.5 text-gray-400" />
+                ) : (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -389,6 +418,7 @@ export function TimesheetSemanal({
                 >
                   <Plus className="h-3 w-3" />
                 </Button>
+                )}
               </div>
 
               <div className="space-y-1">
@@ -431,7 +461,7 @@ export function TimesheetSemanal({
                 )}
               </div>
             </div>
-          ))}
+          )})}
         </div>
       </div>
 
@@ -470,6 +500,9 @@ export function TimesheetSemanal({
                     )}
                   </div>
                 </div>
+                {(estadoSemana === 'enviado' || estadoSemana === 'aprobado') ? (
+                  <Lock className="h-4 w-4 text-gray-400" />
+                ) : (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -481,6 +514,7 @@ export function TimesheetSemanal({
                 >
                   <Plus className="h-4 w-4" />
                 </Button>
+                )}
               </div>
 
               {/* Registros del día */}
