@@ -35,6 +35,9 @@ export async function GET(request: NextRequest) {
         ...(prioridadFiltro && { prioridad: prioridadFiltro as any })
       },
       include: {
+        proyectoActividad: {
+          select: { id: true, nombre: true }
+        },
         proyectoEdt: {
           include: {
             proyecto: {
@@ -109,6 +112,7 @@ export async function GET(request: NextRequest) {
           ? `${tarea.proyectoEdt.proyecto.codigo} - ${tarea.proyectoEdt.proyecto.nombre}`
           : 'Sin proyecto',
         edtNombre: tarea.proyectoEdt?.nombre || 'Sin EDT',
+        actividadNombre: tarea.proyectoActividad?.nombre || null,
         responsableId: tarea.responsableId,
         responsableNombre: tarea.user?.name || 'Sin asignar',
         fechaInicio: tarea.fechaInicio,
@@ -138,6 +142,7 @@ export async function GET(request: NextRequest) {
           ? `${tarea.proyectoServicioCotizado.proyecto.codigo} - ${tarea.proyectoServicioCotizado.proyecto.nombre}`
           : 'Sin proyecto',
         edtNombre: 'Servicio',
+        actividadNombre: null,
         responsableId: tarea.responsableId,
         responsableNombre: tarea.user?.name || 'Sin asignar',
         fechaInicio: tarea.fechaInicio,

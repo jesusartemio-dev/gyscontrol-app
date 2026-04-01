@@ -18,6 +18,7 @@ interface TareaAsignada {
   proyectoId: string
   proyectoNombre: string
   edtNombre: string
+  actividadNombre?: string | null
   responsableId?: string
   responsableNombre?: string
   fechaInicio: Date

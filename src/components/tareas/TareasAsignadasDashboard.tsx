@@ -58,6 +58,7 @@ interface TareaAsignada {
   proyectoId: string
   proyectoNombre: string
   edtNombre: string
+  actividadNombre?: string | null
   responsableId?: string
   responsableNombre?: string
   fechaInicio: Date
@@ -402,6 +403,9 @@ export function TareasAsignadasDashboard({
                           <TableCell>
                             <div className="max-w-[250px]">
                               <p className="font-medium text-sm truncate" title={tarea.nombre}>{tarea.nombre}</p>
+                              {tarea.actividadNombre && (
+                                <p className="text-xs text-blue-600 truncate" title={tarea.actividadNombre}>{tarea.actividadNombre}</p>
+                              )}
                               <p className="text-xs text-gray-500 truncate">{tarea.edtNombre}</p>
                             </div>
                           </TableCell>
@@ -556,8 +560,10 @@ export function TareasAsignadasDashboard({
                     {/* Info grid */}
                     <div className="grid grid-cols-2 gap-2 text-xs mb-3">
                       <div className="flex items-center gap-1 text-gray-600">
-                        <Zap className="h-3 w-3" />
-                        <span className="truncate">{tarea.edtNombre}</span>
+                        <Zap className="h-3 w-3 shrink-0" />
+                        <span className="truncate" title={tarea.actividadNombre ? `${tarea.actividadNombre} · ${tarea.edtNombre}` : tarea.edtNombre}>
+                          {tarea.actividadNombre ? tarea.actividadNombre : tarea.edtNombre}
+                        </span>
                       </div>
                       <div className={`flex items-center gap-1 ${diasInfo.color}`}>
                         <Calendar className="h-3 w-3" />
@@ -686,6 +692,9 @@ export function TareasAsignadasDashboard({
                 <div>
                   <p className="text-sm font-medium text-gray-500">EDT</p>
                   <p className="text-sm">{tareaSeleccionada.edtNombre}</p>
+                  {tareaSeleccionada.actividadNombre && (
+                    <p className="text-xs text-blue-600 mt-0.5">{tareaSeleccionada.actividadNombre}</p>
+                  )}
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-500">Estado</p>
