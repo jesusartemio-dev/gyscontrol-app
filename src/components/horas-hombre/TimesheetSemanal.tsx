@@ -157,7 +157,32 @@ export function TimesheetSemanal({
     onSemanaChange?.(nuevaSemana)
   }
 
-  const abrirRegistroDia = (fechaString: string, fecha?: Date) => {
+  const toISOWeek = (dateStr: string): string => {
+    const d = new Date(dateStr + 'T12:00:00')
+    d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7))
+    const week1 = new Date(d.getFullYear(), 0, 4)
+    const weekNum = 1 + Math.round(((d.getTime() - week1.getTime()) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7)
+    return `${d.getFullYear()}-W${String(weekNum).padStart(2, '0')}`
+  }
+
+  const abrirRegistroDia = async (fechaString: string, fecha?: Date) => {
+    try {
+      const semana = toISOWeek(fechaString)
+      const res = await fetch(`/api/horas-hombre/timesheet-aprobacion/estado?semana=${semana}`)
+      if (res.ok) {
+        const data = await res.json()
+        if (data.estado === 'enviado') {
+          toast({ title: 'Semana bloqueada', description: 'Esta semana ya fue enviada para aprobación. Contacta a tu coordinador para modificarla.', variant: 'destructive' })
+          return
+        }
+        if (data.estado === 'aprobado') {
+          toast({ title: 'Semana aprobada', description: 'Esta semana ya está aprobada. No se pueden registrar más horas.', variant: 'destructive' })
+          return
+        }
+      }
+    } catch {
+      // si falla la validación, permitir abrir (el API lo bloqueará igual)
+    }
     setDiaSeleccionado(fecha || new Date(fechaString + 'T12:00:00'))
     setFechaWizard(fechaString)
     setShowWizard(true)
