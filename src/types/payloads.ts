@@ -669,6 +669,8 @@ export interface CotizacionProveedorPayload {
   codigo?: string                         // ✅ antes 'nombre', ahora es el código generado (ej. CJM27-COT-001)
   numeroSecuencia?: number                // ✅ número puro para control interno
   estado?: EstadoCotizacionProveedor
+  moneda?: string                         // "USD" | "PEN"
+  tipoCambio?: number | null
 }
 
 export interface CotizacionProveedorUpdatePayload extends Partial<CotizacionProveedorPayload> {}

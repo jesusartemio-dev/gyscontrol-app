@@ -54,11 +54,12 @@ function estimarDiasDesdeTexto(texto: string): number {
 
 interface Props {
   items: CotizacionProveedorItem[]
+  moneda?: string
   onUpdated?: () => void
   onItemUpdated?: (updatedItem: CotizacionProveedorItem) => void
 }
 
-export default function CotizacionProveedorTabla({ items, onUpdated, onItemUpdated }: Props) {
+export default function CotizacionProveedorTabla({ items, moneda = 'USD', onUpdated, onItemUpdated }: Props) {
   const [editModeId, setEditModeId] = useState<string | null>(null)
   const [editValues, setEditValues] = useState<Record<string, LocalEditCotizacion>>({})
   const [loadingItems, setLoadingItems] = useState<Record<string, boolean>>({})
@@ -150,8 +151,9 @@ export default function CotizacionProveedorTabla({ items, onUpdated, onItemUpdat
     }
   }
 
+  const currencySymbol = moneda === 'PEN' ? 'S/' : '$'
   const formatCurrency = (value: number) =>
-    value > 0 ? `$${value.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—'
+    value > 0 ? `${currencySymbol}${value.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—'
 
   return (
     <div className="overflow-x-auto">

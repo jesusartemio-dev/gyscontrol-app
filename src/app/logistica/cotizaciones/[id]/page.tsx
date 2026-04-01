@@ -22,7 +22,16 @@ import {
   CheckCircle2,
   ScanSearch,
   UserPlus,
+  DollarSign,
 } from 'lucide-react'
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from '@/components/ui/select'
+import { Input } from '@/components/ui/input'
 import type { CotizacionProveedor } from '@/types'
 import CotizacionProveedorHistorial from '@/components/logistica/CotizacionProveedorHistorial'
 import CotizacionEstadoFlujoBanner from '@/components/logistica/CotizacionEstadoFlujoBanner'
@@ -47,6 +56,7 @@ export default function CotizacionProveedorDetailPage({ params }: PageProps) {
   const [showHistorial, setShowHistorial] = useState(false)
   const [showScanPdf, setShowScanPdf] = useState(false)
   const [showSolicitarOtro, setShowSolicitarOtro] = useState(false)
+  const [savingMoneda, setSavingMoneda] = useState(false)
 
   useEffect(() => {
     params.then((p) => setCotizacionId(p.id))
@@ -108,6 +118,30 @@ Equipo de Compras`
 
     const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(cotizacion.proveedor.correo)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
     window.open(gmailUrl, '_blank')
+  }
+
+  const handleMonedaChange = async (field: 'moneda' | 'tipoCambio', value: string | number | null) => {
+    if (!cotizacion) return
+    const patch: Record<string, any> = { [field]: value }
+    if (field === 'moneda' && value === 'USD') patch.tipoCambio = null
+    setCotizacion(prev => prev ? { ...prev, ...patch } : null)
+    try {
+      setSavingMoneda(true)
+      await fetch(`/api/cotizacion-proveedor/${cotizacionId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      })
+    } catch {
+      toast.error('Error al guardar moneda')
+    } finally {
+      setSavingMoneda(false)
+    }
+  }
+
+  const handleTipoCambioChange = (value: string) => {
+    const v = value === '' ? null : parseFloat(value)
+    setCotizacion(prev => prev ? { ...prev, tipoCambio: v } : null)
   }
 
   const getEstadoBadge = (estado: string) => {
@@ -267,18 +301,67 @@ Equipo de Compras`
         </div>
 
         {/* Stats inline */}
-        <div className="px-4 py-1.5 border-t bg-gray-50/50 flex items-center gap-6 text-xs">
+        <div className="px-4 py-1.5 border-t bg-gray-50/50 flex items-center gap-6 text-xs flex-wrap">
           <div className="flex items-center gap-1.5">
             <Package className="h-3.5 w-3.5 text-muted-foreground" />
             <span className="text-muted-foreground">Items:</span>
             <span className="font-semibold">{stats.totalItems}</span>
           </div>
+
+          {/* Moneda + Tipo de cambio */}
+          <div className="flex items-center gap-1.5">
+            <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
+            <Select
+              value={cotizacion.moneda || 'USD'}
+              onValueChange={(v) => handleMonedaChange('moneda', v)}
+              disabled={savingMoneda}
+            >
+              <SelectTrigger className="h-6 w-20 text-xs border-dashed">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="USD">USD $</SelectItem>
+                <SelectItem value="PEN">PEN S/</SelectItem>
+              </SelectContent>
+            </Select>
+            {cotizacion.moneda === 'PEN' && (
+              <div className="flex items-center gap-1">
+                <span className="text-muted-foreground">TC:</span>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={cotizacion.tipoCambio ?? ''}
+                  onChange={(e) => handleTipoCambioChange(e.target.value)}
+                  onBlur={(e) => {
+                    const v = e.target.value === '' ? null : parseFloat(e.target.value)
+                    handleMonedaChange('tipoCambio', v)
+                  }}
+                  placeholder="3.75"
+                  className="h-6 w-20 text-xs"
+                  disabled={savingMoneda}
+                />
+              </div>
+            )}
+          </div>
+
           <div className="flex items-center gap-1.5">
             <span className="text-muted-foreground">Total:</span>
             <span className="font-semibold">
-              ${stats.totalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              {cotizacion.moneda === 'PEN' ? 'S/' : '$'}{stats.totalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </span>
+            {cotizacion.moneda === 'PEN' && cotizacion.tipoCambio && cotizacion.tipoCambio > 0 && (
+              <span className="text-muted-foreground">
+                ≈ ${(stats.totalCost / cotizacion.tipoCambio).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD
+              </span>
+            )}
+            {cotizacion.moneda === 'USD' && cotizacion.tipoCambio && cotizacion.tipoCambio > 0 && (
+              <span className="text-muted-foreground">
+                ≈ S/{(stats.totalCost * cotizacion.tipoCambio).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              </span>
+            )}
           </div>
+
           <div className="flex items-center gap-1.5">
             <span className="text-muted-foreground">Selección:</span>
             <span className={`font-semibold ${
@@ -317,6 +400,7 @@ Equipo de Compras`
           {cotizacion.items && cotizacion.items.length > 0 ? (
             <CotizacionProveedorTabla
               items={cotizacion.items}
+              moneda={cotizacion.moneda || 'USD'}
               onItemUpdated={(updatedItem) => {
                 setCotizacion(prev => prev ? {
                   ...prev,
