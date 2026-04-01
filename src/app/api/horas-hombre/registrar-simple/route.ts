@@ -61,13 +61,9 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    // Si no hay servicio, retornar error ya que es requerido
+    // El servicio es opcional - proyectos internos pueden no tener servicios cotizados
     if (!proyectoServicio) {
-      console.log('❌ REGISTRO SIMPLE: No hay servicio asociado al proyecto');
-      return NextResponse.json(
-        { error: 'No se encontró un servicio asociado al proyecto' },
-        { status: 404 }
-      );
+      console.log('ℹ️ REGISTRO SIMPLE: Proyecto sin servicio cotizado, se registrará sin asociación de servicio');
     }
 
     // Buscar un recurso por defecto
@@ -116,7 +112,7 @@ export async function POST(request: NextRequest) {
     // 4. 'general' como fallback
     const categoriaFinal = proyectoEdt?.nombre ||
                            proyectoEdt?.edt?.nombre ||
-                           proyectoServicio.edt?.nombre ||
+                           proyectoServicio?.edt?.nombre ||
                            'general';
 
     // 🔒 Verificar que la semana no esté bloqueada (enviada/aprobada)
@@ -135,9 +131,9 @@ export async function POST(request: NextRequest) {
       data: {
         id: randomUUID(),
         proyectoId,
-        proyectoServicioId: proyectoServicio.id,
+        ...(proyectoServicio ? { proyectoServicioId: proyectoServicio.id } : {}),
         categoria: categoriaFinal,
-        nombreServicio: proyectoServicio.nombre || proyectoEdt?.nombre || 'Sin servicio',
+        nombreServicio: proyectoServicio?.nombre || proyectoEdt?.nombre || proyecto.nombre || 'Sin servicio',
         recursoId: recurso.id,
         recursoNombre: recurso.nombre,
         usuarioId: usuarioId,

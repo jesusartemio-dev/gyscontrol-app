@@ -1314,7 +1314,7 @@ model Recurso {
 model RegistroHoras {
   id                       String                     @id
   proyectoId               String
-  proyectoServicioId       String
+  proyectoServicioId       String?
   categoria                String
   nombreServicio           String
   recursoId                String
@@ -1336,7 +1336,7 @@ model RegistroHoras {
   edt                      Edt?                       @relation(fields: [edtId], references: [id])
   proyectoEdt              ProyectoEdt?               @relation(fields: [proyectoEdtId], references: [id])
   proyecto                 Proyecto                   @relation(fields: [proyectoId], references: [id])
-  proyectoServicioCotizado ProyectoServicioCotizado   @relation(fields: [proyectoServicioId], references: [id])
+  proyectoServicioCotizado ProyectoServicioCotizado?  @relation(fields: [proyectoServicioId], references: [id])
   proyectoTarea            ProyectoTarea?             @relation(fields: [proyectoTareaId], references: [id])
   recurso                  Recurso                    @relation(fields: [recursoId], references: [id])
   user                     User                       @relation(fields: [usuarioId], references: [id])
