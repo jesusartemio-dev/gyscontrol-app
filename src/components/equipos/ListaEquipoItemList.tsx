@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Pencil, Trash2, Search, Package, Clock, AlertTriangle, CheckCircle, XCircle, Grid3X3, List, RotateCcw, Plus, ShoppingCart, FileText, Download, Tag, ChevronDown, Wrench, Trophy, Layers, MoreHorizontal } from 'lucide-react'
+import { Pencil, Trash2, Search, Package, Clock, AlertTriangle, CheckCircle, XCircle, Grid3X3, List, RotateCcw, Plus, ShoppingCart, FileText, Download, Tag, ChevronDown, Wrench, Trophy, Layers, MoreHorizontal, Lock } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ListaEquipoItem } from '@/types'
@@ -863,10 +863,27 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
     )
   }
 
+  const estadoLabels: Record<string, string> = {
+    por_revisar: 'Por Revisar',
+    por_cotizar: 'Por Cotizar',
+    por_aprobar: 'Por Aprobar',
+    aprobada: 'Aprobada',
+    anulada: 'Anulada',
+  }
+
   return (
     <div className="space-y-3">
       {renderHeader()}
-       
+
+      {!editable && listaEstado && listaEstado !== 'borrador' && (
+        <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <Lock className="h-3.5 w-3.5 shrink-0" />
+          <span>
+            Esta lista está en estado <strong>{estadoLabels[listaEstado] ?? listaEstado}</strong> — solo se puede editar en estado Borrador.
+          </span>
+        </div>
+      )}
+
       {isLoading ? (
         renderLoadingSkeleton()
       ) : filteredItems.length === 0 ? (
