@@ -98,6 +98,8 @@ export function RegistroHorasWizard({
   const [descripcion, setDescripcion] = useState('')
   const [loading, setLoading] = useState(false)
   const [loadingData, setLoadingData] = useState(false)
+  const [semanaValidando, setSemanaValidando] = useState(false)
+  const [semanaError, setSemanaError] = useState<string | null>(null)
 
   // Datos seleccionados
   const [proyectoSeleccionado, setProyectoSeleccionado] = useState<Proyecto | null>(null)
@@ -166,6 +168,43 @@ export function RegistroHorasWizard({
   ]
 
   const progreso = (pasoActual / pasos.length) * 100
+
+  // Convierte YYYY-MM-DD a formato ISO semana (YYYY-Www)
+  const toISOWeek = (dateStr: string): string => {
+    const d = new Date(dateStr + 'T12:00:00')
+    d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7))
+    const week1 = new Date(d.getFullYear(), 0, 4)
+    const weekNum = 1 + Math.round(((d.getTime() - week1.getTime()) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7)
+    return `${d.getFullYear()}-W${String(weekNum).padStart(2, '0')}`
+  }
+
+  const validarSemana = async (dateStr: string) => {
+    if (!dateStr) return
+    try {
+      setSemanaValidando(true)
+      setSemanaError(null)
+      const semana = toISOWeek(dateStr)
+      const res = await fetch(`/api/horas-hombre/timesheet-aprobacion/estado?semana=${semana}`)
+      if (!res.ok) return
+      const data = await res.json()
+      if (data.estado === 'enviado') {
+        setSemanaError('Esta semana ya fue enviada para aprobación. Contacta a tu coordinador o administrador para modificarla.')
+      } else if (data.estado === 'aprobado') {
+        setSemanaError('Esta semana ya está aprobada. No se pueden registrar más horas.')
+      }
+    } catch {
+      // no bloquear si falla la validación
+    } finally {
+      setSemanaValidando(false)
+    }
+  }
+
+  // Validar semana cuando cambia la fecha en el paso 5
+  useEffect(() => {
+    if (pasoActual === 5 && fecha) {
+      validarSemana(fecha)
+    }
+  }, [fecha, pasoActual])
 
   // Cargar proyectos al montar el componente
   useEffect(() => {
@@ -464,6 +503,7 @@ export function RegistroHorasWizard({
     setFecha(format(new Date(), 'yyyy-MM-dd'))
     setHoras('')
     setDescripcion('')
+    setSemanaError(null)
     setCreandoTarea(false)
     setNombreNuevaTarea('')
     setDescripcionNuevaTarea('')
@@ -1114,9 +1154,17 @@ export function RegistroHorasWizard({
               id="fecha"
               type="date"
               value={fecha}
-              onChange={(e) => setFecha(e.target.value)}
-              className="mt-1"
+              onChange={(e) => { setFecha(e.target.value); setSemanaError(null) }}
+              className={`mt-1 ${semanaError ? 'border-red-400' : ''}`}
             />
+            {semanaValidando && (
+              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                <Loader2 className="h-3 w-3 animate-spin" /> Verificando semana...
+              </p>
+            )}
+            {semanaError && (
+              <p className="text-xs text-red-600 mt-1">{semanaError}</p>
+            )}
           </div>
           <div>
             <Label htmlFor="horas" className="text-sm">Horas *</Label>
@@ -1206,7 +1254,7 @@ export function RegistroHorasWizard({
           <Button
             size="sm"
             onClick={registrarHoras}
-            disabled={loading || !puedeAvanzar()}
+            disabled={loading || !puedeAvanzar() || !!semanaError || semanaValidando}
             className="bg-green-600 hover:bg-green-700"
           >
             {loading ? (
