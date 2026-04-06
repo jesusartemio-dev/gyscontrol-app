@@ -17,7 +17,8 @@ import {
   Loader2,
   AlertTriangle,
   ShoppingCart,
-  ExternalLink
+  ExternalLink,
+  Download,
 } from 'lucide-react'
 import { getLogisticaListaById } from '@/lib/services/logisticaLista'
 import { updateListaEstado } from '@/lib/services/listaEquipo'
@@ -184,6 +185,44 @@ export default function LogisticaListaDetallePage() {
   })()
   const itemsConOCCount = items.filter((i: any) => ((i as any).ordenCompraItems || []).length > 0).length
 
+  const handleExportExcel = async () => {
+    const XLSX = await import('xlsx')
+
+    const rows = items.map((item: any, idx: number) => {
+      const cotizaciones: any[] = item.cotizaciones || item.cotizacionProveedorItems || []
+      const seleccionada = cotizaciones.find((c: any) => c.id === item.cotizacionSeleccionadaId)
+      const proveedorSeleccionado = seleccionada?.cotizacion?.proveedor?.nombre || seleccionada?.cotizacionProveedor?.proveedor?.nombre || ''
+
+      return {
+        '#': idx + 1,
+        Código: item.codigo || '',
+        Descripción: item.descripcion || '',
+        Unidad: item.unidad || '',
+        Cantidad: item.cantidadSolicitada ?? item.cantidad ?? 0,
+        'Precio elegido': item.precioElegido ?? '',
+        'Costo total': item.costoElegido ?? (item.precioElegido && (item.cantidadSolicitada ?? item.cantidad) ? item.precioElegido * (item.cantidadSolicitada ?? item.cantidad) : ''),
+        'Proveedor seleccionado': proveedorSeleccionado,
+        'N° cotizaciones': cotizaciones.length,
+        Estado: item.estado || '',
+        'Tiempo entrega': item.tiempoEntrega || '',
+      }
+    })
+
+    const ws = XLSX.utils.json_to_sheet(rows)
+
+    // Anchos de columna
+    ws['!cols'] = [
+      { wch: 4 }, { wch: 12 }, { wch: 45 }, { wch: 8 }, { wch: 9 },
+      { wch: 14 }, { wch: 13 }, { wch: 28 }, { wch: 15 }, { wch: 12 }, { wch: 16 },
+    ]
+
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Lista')
+
+    const fileName = `${lista.codigo}_${new Date().toISOString().slice(0, 10)}.xlsx`
+    XLSX.writeFile(wb, fileName)
+  }
+
   return (
     <div className="min-h-screen bg-gray-50/50">
       {/* Header */}
@@ -220,6 +259,16 @@ export default function LogisticaListaDetallePage() {
             </div>
 
             <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportExcel}
+                className="h-7 text-xs"
+                disabled={items.length === 0}
+              >
+                <Download className="h-3 w-3 mr-1" />
+                Excel
+              </Button>
               <Button
                 variant="outline"
                 size="sm"

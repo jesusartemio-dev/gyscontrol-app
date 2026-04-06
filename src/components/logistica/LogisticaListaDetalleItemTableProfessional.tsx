@@ -289,8 +289,8 @@ export default function LogisticaListaDetalleItemTableProfessional({ items, onUp
                     </td>
 
                     {/* Descripción */}
-                    <td className="px-3 py-2 max-w-[180px]">
-                      <span className="truncate block" title={item.descripcion}>
+                    <td className="px-3 py-2 min-w-[220px]">
+                      <span className="line-clamp-2 leading-snug" title={item.descripcion}>
                         {item.descripcion}
                       </span>
                       {item.catalogoEquipoId ? (
