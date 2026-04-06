@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Table,
   TableBody,
@@ -25,6 +26,8 @@ import {
   Clock,
   Trash2,
   MoreHorizontal,
+  ChevronsRight,
+  X,
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -242,6 +245,72 @@ export default function RecepcionesPage() {
   const [actionMotivo, setActionMotivo] = useState('')
   const [cantidadReal, setCantidadReal] = useState<string>('')
 
+  // Bulk selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkLoading, setBulkLoading] = useState(false)
+  const [bulkConfirm, setBulkConfirm] = useState<{ tipo: 'almacen' | 'proyecto'; ids: string[]; label: string } | null>(null)
+
+  const canBulkSelect = (r: Recepcion) =>
+    (r.estado === 'pendiente' || r.estado === 'en_almacen') &&
+    ['admin', 'gerente', 'logistico', 'coordinador_logistico'].includes(role)
+
+  const selectableOnPage = recepciones.filter(canBulkSelect)
+  const allPageSelected = selectableOnPage.length > 0 && selectableOnPage.every(r => selectedIds.has(r.id))
+  const somePageSelected = selectableOnPage.some(r => selectedIds.has(r.id))
+
+  const toggleSelectAll = () => {
+    if (allPageSelected) {
+      setSelectedIds(prev => { const n = new Set(prev); selectableOnPage.forEach(r => n.delete(r.id)); return n })
+    } else {
+      setSelectedIds(prev => { const n = new Set(prev); selectableOnPage.forEach(r => n.add(r.id)); return n })
+    }
+  }
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  }
+
+  const executeBulkAction = async () => {
+    if (!bulkConfirm) return
+    setBulkLoading(true)
+    let ok = 0, fail = 0
+    const paso = bulkConfirm.tipo === 'almacen' ? 'almacen' : 'proyecto'
+    for (const id of bulkConfirm.ids) {
+      try {
+        const res = await fetch(`/api/recepcion-pendiente/${id}/confirmar`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ paso }),
+        })
+        if (res.ok) ok++; else fail++
+      } catch { fail++ }
+    }
+    setBulkLoading(false)
+    setBulkConfirm(null)
+    setSelectedIds(new Set())
+    if (ok > 0) toast.success(`${ok} recepción(es) confirmadas`)
+    if (fail > 0) toast.error(`${fail} no pudieron procesarse`)
+    fetchData()
+  }
+
+  const openBulkFromSelection = (tipo: 'almacen' | 'proyecto') => {
+    const estadoFiltro = tipo === 'almacen' ? 'pendiente' : 'en_almacen'
+    const ids = recepciones
+      .filter(r => selectedIds.has(r.id) && r.estado === estadoFiltro)
+      .map(r => r.id)
+    if (ids.length === 0) { toast.error('Ningún item seleccionado tiene el estado correcto'); return }
+    const label = tipo === 'almacen' ? 'Confirmar llegada a almacén' : 'Entregar a proyecto'
+    setBulkConfirm({ tipo, ids, label })
+  }
+
+  const openBulkAll = (tipo: 'almacen' | 'proyecto') => {
+    const estadoFiltro = tipo === 'almacen' ? 'pendiente' : 'en_almacen'
+    const ids = recepciones.filter(r => r.estado === estadoFiltro).map(r => r.id)
+    if (ids.length === 0) return
+    const label = tipo === 'almacen' ? 'Confirmar todos en almacén' : 'Entregar todos al proyecto'
+    setBulkConfirm({ tipo, ids, label })
+  }
+
   useEffect(() => {
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current)
     searchTimeoutRef.current = setTimeout(() => {
@@ -287,6 +356,7 @@ export default function RecepcionesPage() {
   const handleTabChange = (tab: TabEstado) => {
     setActiveTab(tab)
     resetPagination()
+    setSelectedIds(new Set())
   }
 
   const executeAction = async () => {
@@ -409,7 +479,7 @@ export default function RecepcionesPage() {
         })}
       </div>
 
-      {/* Search */}
+      {/* Search + bulk button */}
       <div className="flex items-center gap-2">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -420,6 +490,22 @@ export default function RecepcionesPage() {
             className="pl-9 h-9"
           />
         </div>
+        {activeTab === 'pendiente' && (counts['pendiente'] || 0) > 0 &&
+          ['admin', 'gerente', 'logistico', 'coordinador_logistico'].includes(role) && (
+          <Button size="sm" variant="outline" className="h-9 gap-1.5 text-blue-600 border-blue-200 hover:bg-blue-50"
+            onClick={() => openBulkAll('almacen')} disabled={bulkLoading}>
+            <ChevronsRight className="h-4 w-4" />
+            Pasar todos a Almacén ({counts['pendiente']})
+          </Button>
+        )}
+        {activeTab === 'en_almacen' && (counts['en_almacen'] || 0) > 0 &&
+          ['admin', 'gerente', 'logistico', 'coordinador_logistico', 'gestor', 'coordinador'].includes(role) && (
+          <Button size="sm" variant="outline" className="h-9 gap-1.5 text-green-600 border-green-200 hover:bg-green-50"
+            onClick={() => openBulkAll('proyecto')} disabled={bulkLoading}>
+            <ChevronsRight className="h-4 w-4" />
+            Entregar todos al proyecto ({counts['en_almacen']})
+          </Button>
+        )}
       </div>
 
       {/* Table */}
@@ -438,6 +524,14 @@ export default function RecepcionesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[40px] pl-4">
+                    <Checkbox
+                      checked={allPageSelected}
+                      onCheckedChange={toggleSelectAll}
+                      aria-label="Seleccionar todos"
+                      className={somePageSelected && !allPageSelected ? 'opacity-50' : ''}
+                    />
+                  </TableHead>
                   <TableHead className="w-[130px]">Origen</TableHead>
                   <TableHead>Proyecto</TableHead>
                   <TableHead>Ítem</TableHead>
@@ -459,7 +553,16 @@ export default function RecepcionesPage() {
                     oc: 'OC', req: 'REQ', directo: 'Directo',
                   }
                   return (
-                    <TableRow key={r.id}>
+                    <TableRow key={r.id} className={selectedIds.has(r.id) ? 'bg-blue-50/50' : ''}>
+                      <TableCell className="pl-4">
+                        {canBulkSelect(r) ? (
+                          <Checkbox
+                            checked={selectedIds.has(r.id)}
+                            onCheckedChange={() => toggleSelect(r.id)}
+                            aria-label="Seleccionar"
+                          />
+                        ) : <span className="w-4 h-4 block" />}
+                      </TableCell>
                       <TableCell>
                         <div className="flex flex-col gap-0.5">
                           <span className={`inline-flex w-fit items-center text-[9px] font-semibold px-1.5 py-0.5 rounded border ${fuenteStyles[info.fuente]}`}>
@@ -640,6 +743,57 @@ export default function RecepcionesPage() {
           itemsLabel="recepciones"
         />
       )}
+
+      {/* Floating bulk action bar */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-2xl border border-gray-700">
+          <span className="text-sm font-medium mr-1">{selectedIds.size} seleccionado(s)</span>
+          {recepciones.some(r => selectedIds.has(r.id) && r.estado === 'pendiente') &&
+            ['admin', 'gerente', 'logistico', 'coordinador_logistico'].includes(role) && (
+            <Button size="sm" className="h-7 bg-blue-600 hover:bg-blue-700 text-white gap-1.5"
+              onClick={() => openBulkFromSelection('almacen')} disabled={bulkLoading}>
+              <CheckCircle className="h-3.5 w-3.5" />
+              Confirmar almacén
+            </Button>
+          )}
+          {recepciones.some(r => selectedIds.has(r.id) && r.estado === 'en_almacen') &&
+            ['admin', 'gerente', 'logistico', 'coordinador_logistico', 'gestor', 'coordinador'].includes(role) && (
+            <Button size="sm" className="h-7 bg-green-600 hover:bg-green-700 text-white gap-1.5"
+              onClick={() => openBulkFromSelection('proyecto')} disabled={bulkLoading}>
+              <Truck className="h-3.5 w-3.5" />
+              Entregar al proyecto
+            </Button>
+          )}
+          <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-white hover:bg-gray-700"
+            onClick={() => setSelectedIds(new Set())}>
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      )}
+
+      {/* Bulk confirmation dialog */}
+      <AlertDialog open={!!bulkConfirm} onOpenChange={open => { if (!open) setBulkConfirm(null) }}>
+        <AlertDialogContent className="sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{bulkConfirm?.label}</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se procesarán <strong>{bulkConfirm?.ids.length}</strong> recepción(es).
+              {bulkConfirm?.tipo === 'almacen' && ' Se confirmarán con la cantidad registrada.'}
+              {bulkConfirm?.tipo === 'proyecto' && ' Se marcarán como entregadas al proyecto.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkLoading}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={e => { e.preventDefault(); executeBulkAction() }}
+              disabled={bulkLoading}
+              className={bulkConfirm?.tipo === 'almacen' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'}
+            >
+              {bulkLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : `Confirmar ${bulkConfirm?.ids.length} item(s)`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Action Dialog */}
       <AlertDialog open={!!actionDialog} onOpenChange={(open) => { if (!open) { setActionDialog(null); setActionMotivo(''); setCantidadReal('') } }}>
