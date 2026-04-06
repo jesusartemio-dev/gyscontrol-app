@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { ListaEquipoItem } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -238,6 +239,7 @@ export default function LogisticaListaDetalleItemTableProfessional({ items, onUp
               <tr className="border-b">
                 <th className="px-3 py-2 text-left font-medium text-gray-600 w-8"></th>
                 <th className="px-3 py-2 text-left font-medium text-gray-600">Código</th>
+                <th className="px-3 py-2 text-left font-medium text-gray-600">Pedido</th>
                 <th className="px-3 py-2 text-left font-medium text-gray-600">Descripción</th>
                 <th className="px-3 py-2 text-left font-medium text-gray-600">Proveedor</th>
                 <th className="px-3 py-2 text-center font-medium text-gray-600">Unidad</th>
@@ -286,6 +288,31 @@ export default function LogisticaListaDetalleItemTableProfessional({ items, onUp
                     {/* Código */}
                     <td className="px-3 py-2 font-medium text-gray-900">
                       {item.codigo}
+                    </td>
+
+                    {/* Pedido */}
+                    <td className="px-3 py-2">
+                      {(() => {
+                        const pedidos: any[] = (item as any).pedidos || []
+                        if (pedidos.length === 0) return <span className="text-[10px] text-gray-400">—</span>
+                        return (
+                          <div className="flex flex-col gap-0.5">
+                            {pedidos.map((p: any) => {
+                              const pedido = p.pedido || p.pedidoEquipo
+                              if (!pedido) return null
+                              return (
+                                <Link
+                                  key={p.id}
+                                  href={`/logistica/pedidos/${pedido.id}`}
+                                  className="text-[10px] font-mono text-blue-600 hover:underline whitespace-nowrap"
+                                >
+                                  {pedido.codigo}
+                                </Link>
+                              )
+                            })}
+                          </div>
+                        )
+                      })()}
                     </td>
 
                     {/* Descripción */}
