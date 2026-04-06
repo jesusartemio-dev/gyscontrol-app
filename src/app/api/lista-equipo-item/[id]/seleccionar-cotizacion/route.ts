@@ -164,12 +164,17 @@ export async function PATCH(
       })
     }
 
-    // Es una selección normal - buscar la cotización seleccionada con su proveedor
+    // Es una selección normal - buscar la cotización seleccionada con su proveedor y moneda
     const cotizacionItem = await prisma.cotizacionProveedorItem.findUnique({
       where: { id: cotizacionProveedorItemId },
       include: {
         cotizacionProveedor: {
-          select: { proveedorId: true, proveedor: { select: { nombre: true } } }
+          select: {
+            proveedorId: true,
+            moneda: true,
+            tipoCambio: true,
+            proveedor: { select: { nombre: true } },
+          }
         }
       }
     })
@@ -188,8 +193,23 @@ export async function PATCH(
       data: { esSeleccionada: true },
     })
 
-    // Paso 3: calcular precio y costo total (unitario × cantidad)
-    const precioUnitario = cotizacionItem.precioUnitario ?? 0
+    // Paso 3: calcular precio y costo total (unitario × cantidad), convirtiendo a USD si la cotización es en PEN
+    const precioOriginal = cotizacionItem.precioUnitario ?? 0
+    const monedaCot = cotizacionItem.cotizacionProveedor?.moneda ?? 'USD'
+    const tipoCambioCot = cotizacionItem.cotizacionProveedor?.tipoCambio ?? null
+
+    // Si la cotización es en PEN, validar que tenga TC y convertir a USD
+    if (monedaCot === 'PEN' && (!tipoCambioCot || tipoCambioCot <= 0)) {
+      return NextResponse.json(
+        { error: 'La cotización está en PEN pero no tiene tipo de cambio definido. Define el tipo de cambio en la cotización antes de seleccionar.' },
+        { status: 400 }
+      )
+    }
+
+    const precioUnitario = monedaCot === 'PEN' && tipoCambioCot
+      ? Math.round((precioOriginal / tipoCambioCot) * 10000) / 10000  // PEN → USD, 4 decimales
+      : precioOriginal
+
     const cantidad = cotizacionItem.cantidad ?? cotizacionItem.cantidadOriginal ?? 0
     const costoElegido = precioUnitario * cantidad
 
@@ -223,7 +243,7 @@ export async function PATCH(
     // Auditoría: evento de selección
     crearEvento(prisma, {
       tipo: 'cotizacion_seleccionada',
-      descripcion: `Cotización ${proveedorNombre || 'proveedor'} seleccionada para "${itemAntes?.descripcion || id}" — $${precioUnitario.toFixed(2)}`,
+      descripcion: `Cotización ${proveedorNombre || 'proveedor'} seleccionada para "${itemAntes?.descripcion || id}" — $${precioUnitario.toFixed(2)} USD${monedaCot === 'PEN' ? ` (convertido de S/${precioOriginal.toFixed(2)} × TC ${tipoCambioCot})` : ''}`,
       usuarioId: userId,
       listaEquipoId: itemAntes?.listaId || null,
       metadata: {
@@ -231,7 +251,10 @@ export async function PATCH(
         itemDescripcion: itemAntes?.descripcion,
         cotizacionId: cotizacionProveedorItemId,
         proveedorNombre,
-        precioUnitario,
+        precioUnitarioUSD: precioUnitario,
+        precioOriginal,
+        monedaOriginal: monedaCot,
+        tipoCambioUsado: tipoCambioCot,
         precioAnterior: itemAntes?.precioElegido ?? null,
         area: 'seleccion_cotizacion',
       },
@@ -307,9 +330,15 @@ export async function PATCH(
     // Paso 8: propagar precioLogistica al catálogo
     propagarPrecioLogisticaCatalogo({
       catalogoEquipoId: updatedItem.catalogoEquipoId,
-      precioLogistica: precioUnitario,
+      precioLogistica: precioUnitario, // siempre USD
       userId,
-      metadata: { origen: 'seleccionar-cotizacion', listaEquipoItemId: id },
+      metadata: {
+        origen: 'seleccionar-cotizacion',
+        listaEquipoItemId: id,
+        monedaOriginal: monedaCot,
+        precioOriginal,
+        tipoCambioUsado: tipoCambioCot,
+      },
     }).catch(err => console.error('Error propagating precioLogistica:', err))
 
     // Listo - devolver información completa de la operación

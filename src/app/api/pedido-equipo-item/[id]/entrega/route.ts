@@ -93,6 +93,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
           ...(data.precioUnitario !== undefined ? {
             precioUnitario: data.precioUnitario,
             costoTotal: data.precioUnitario * itemExistente.cantidadPedida,
+            precioUnitarioMoneda: data.precioUnitarioMoneda || 'USD',
+            tipoCambioEntrega: data.tipoCambioEntrega || null,
           } : {}),
           ...(data.tiempoEntregaDias !== undefined ? {
             tiempoEntregaDias: data.tiempoEntregaDias,
@@ -178,6 +180,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
             motivoAtencionDirecta: data.motivoAtencionDirecta || null,
             costoRealUnitario: data.costoRealUnitario || null,
             costoRealMoneda: data.costoRealMoneda || null,
+            precioUnitarioMoneda: data.precioUnitarioMoneda || null,
+            tipoCambioEntrega: data.tipoCambioEntrega || null,
           },
           updatedAt: new Date()
         }

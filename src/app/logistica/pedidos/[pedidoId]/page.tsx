@@ -213,10 +213,12 @@ export default function PedidoLogisticaDetailPage() {
     costoRealUnitario: string
     costoRealMoneda: string
     precioUnitario: string
+    precioMoneda: string
+    tipoCambio: string
     tiempoEntregaDias: string
-  }>({ item: null, cantidadAtendida: 0, estado: 'pendiente', fechaEntregaReal: '', observacionesEntrega: '', motivoAtencionDirecta: '', costoRealUnitario: '', costoRealMoneda: 'USD', precioUnitario: '', tiempoEntregaDias: '' })
+  }>({ item: null, cantidadAtendida: 0, estado: 'pendiente', fechaEntregaReal: '', observacionesEntrega: '', motivoAtencionDirecta: '', costoRealUnitario: '', costoRealMoneda: 'USD', precioUnitario: '', precioMoneda: 'USD', tipoCambio: '', tiempoEntregaDias: '' })
 
-  const resetEditingItem = () => setEditingItem({ item: null, cantidadAtendida: 0, estado: 'pendiente', fechaEntregaReal: '', observacionesEntrega: '', motivoAtencionDirecta: '', costoRealUnitario: '', costoRealMoneda: 'USD', precioUnitario: '', tiempoEntregaDias: '' })
+  const resetEditingItem = () => setEditingItem({ item: null, cantidadAtendida: 0, estado: 'pendiente', fechaEntregaReal: '', observacionesEntrega: '', motivoAtencionDirecta: '', costoRealUnitario: '', costoRealMoneda: 'USD', precioUnitario: '', precioMoneda: 'USD', tipoCambio: '', tiempoEntregaDias: '' })
 
   // ✏️ Estado para edición inline de T.Entrega y F.Entrega
   const [inlineEdit, setInlineEdit] = useState<{ itemId: string; field: 'tiempoEntrega' | 'fechaEntregaEstimada'; value: string } | null>(null)
@@ -359,6 +361,8 @@ export default function PedidoLogisticaDetailPage() {
       costoRealUnitario: (item as any).costoRealUnitario ? String((item as any).costoRealUnitario) : '',
       costoRealMoneda: (item as any).costoRealMoneda || 'USD',
       precioUnitario: item.precioUnitario ? String(item.precioUnitario) : '',
+      precioMoneda: (item as any).precioUnitarioMoneda || 'USD',
+      tipoCambio: (item as any).tipoCambioEntrega ? String((item as any).tipoCambioEntrega) : '',
       tiempoEntregaDias: (item as any).tiempoEntregaDias ? String((item as any).tiempoEntregaDias) : '',
     })
   }
@@ -427,7 +431,25 @@ export default function PedidoLogisticaDetailPage() {
 
       // Precio unitario
       if (editingItem.precioUnitario && parseFloat(editingItem.precioUnitario) > 0) {
-        payload.precioUnitario = parseFloat(editingItem.precioUnitario)
+        const precioIngresado = parseFloat(editingItem.precioUnitario)
+        const tc = parseFloat(editingItem.tipoCambio)
+        const esPEN = editingItem.precioMoneda === 'PEN'
+
+        if (esPEN && tc > 0) {
+          // Guardar en USD para presupuesto (precio ÷ TC)
+          payload.precioUnitario = Math.round((precioIngresado / tc) * 10000) / 10000
+          // Guardar precio original en soles para administración
+          payload.costoRealUnitario = precioIngresado
+          payload.costoRealMoneda = 'PEN'
+        } else if (esPEN && !(tc > 0)) {
+          toast.error('Debes ingresar el tipo de cambio para registrar un precio en soles')
+          return
+        } else {
+          payload.precioUnitario = precioIngresado
+        }
+
+        payload.precioUnitarioMoneda = editingItem.precioMoneda || 'USD'
+        if (esPEN && tc > 0) payload.tipoCambioEntrega = tc
       }
 
       // Tiempo de entrega en días
@@ -1757,7 +1779,7 @@ export default function PedidoLogisticaDetailPage() {
         open={!!editingItem.item}
         onOpenChange={(open) => !open && resetEditingItem()}
       >
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-sm font-medium flex items-center gap-2">
               <Package className="h-4 w-4 text-blue-600" />
@@ -2024,7 +2046,15 @@ export default function PedidoLogisticaDetailPage() {
                           ? 'border-amber-300 bg-amber-50'
                           : 'border-input bg-background'
                       )}>
-                        <span className="text-xs text-muted-foreground">$</span>
+                        {/* Selector moneda */}
+                        <select
+                          value={editingItem.precioMoneda}
+                          onChange={(e) => setEditingItem(prev => ({ ...prev, precioMoneda: e.target.value, tipoCambio: e.target.value === 'USD' ? '' : prev.tipoCambio }))}
+                          className="h-6 rounded border border-input bg-background text-[10px] px-1 focus:outline-none"
+                        >
+                          <option value="USD">USD $</option>
+                          <option value="PEN">PEN S/</option>
+                        </select>
                         <Input
                           type="number"
                           min={0}
@@ -2032,14 +2062,40 @@ export default function PedidoLogisticaDetailPage() {
                           value={editingItem.precioUnitario}
                           onChange={(e) => setEditingItem(prev => ({ ...prev, precioUnitario: e.target.value }))}
                           placeholder="0.00"
-                          className="h-7 text-sm font-medium border-0 p-0 focus-visible:ring-0 shadow-none"
+                          className="h-7 text-sm font-medium border-0 p-0 focus-visible:ring-0 shadow-none flex-1"
                         />
                         <span className="text-[10px] text-muted-foreground whitespace-nowrap">
                           × {cantAtendida || editingItem.item?.cantidadPedida || 0} = <span className="font-medium text-emerald-600">
-                            ${((parseFloat(editingItem.precioUnitario) || 0) * (cantAtendida || editingItem.item?.cantidadPedida || 0)).toFixed(2)}
+                            {editingItem.precioMoneda === 'PEN' ? 'S/' : '$'}{((parseFloat(editingItem.precioUnitario) || 0) * (cantAtendida || editingItem.item?.cantidadPedida || 0)).toFixed(2)}
                           </span>
                         </span>
                       </div>
+
+                      {/* Tipo de cambio (solo si PEN) */}
+                      {editingItem.precioMoneda === 'PEN' && (
+                        <div className="mt-2 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <label className="text-[10px] text-muted-foreground whitespace-nowrap">Tipo de cambio: *</label>
+                            <Input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              value={editingItem.tipoCambio}
+                              onChange={(e) => setEditingItem(prev => ({ ...prev, tipoCambio: e.target.value }))}
+                              placeholder="ej: 3.75"
+                              className="h-7 text-xs w-24"
+                            />
+                            {editingItem.tipoCambio && parseFloat(editingItem.tipoCambio) > 0 && editingItem.precioUnitario && parseFloat(editingItem.precioUnitario) > 0 && (
+                              <span className="text-[10px] text-green-700 font-medium">
+                                = ${(parseFloat(editingItem.precioUnitario) / parseFloat(editingItem.tipoCambio)).toFixed(4)} USD c/u (se guardará en USD)
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-muted-foreground">
+                            El precio en soles quedará en "Costo real" para administración. El presupuesto del pedido usará el equivalente en USD.
+                          </p>
+                        </div>
+                      )}
                     </div>
 
                     {/* Tiempo real de obtención (días) — solo si no tiene tiempoEntregaDias */}
@@ -2127,7 +2183,7 @@ export default function PedidoLogisticaDetailPage() {
                         )}
                       >
                         <Save className="h-3 w-3 mr-1" />
-                        {updating ? 'Guardando...' : esExceso ? 'Guardar con exceso' : esCompleta ? 'Confirmar Entrega' : 'Guardar'}
+                        {updating ? 'Registrando...' : esExceso ? 'Registrar con exceso' : esCompleta ? 'Confirmar Entrega' : 'Registrar'}
                       </Button>
                     </div>
                   </>

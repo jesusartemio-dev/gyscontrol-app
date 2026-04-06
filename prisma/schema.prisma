@@ -779,6 +779,8 @@ model PedidoEquipoItem {
   costoRealUnitario           Float?
   costoRealMoneda             String?
   motivoAtencionDirecta       String?
+  precioUnitarioMoneda        String?
+  tipoCambioEntrega           Float?
   entregaItem                 EntregaItem[]
   listaEquipoItem             ListaEquipoItem?     @relation(fields: [listaEquipoItemId], references: [id])
   listaEquipo                 ListaEquipo?         @relation(fields: [listaId], references: [id])
