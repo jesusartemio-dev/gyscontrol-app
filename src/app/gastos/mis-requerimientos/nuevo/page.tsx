@@ -225,8 +225,14 @@ function ModalSelectorItems({
               Cargando...
             </div>
           ) : proyectosFiltrados.length === 0 ? (
-            <div className="text-center py-10 text-sm text-muted-foreground">
-              No hay items disponibles para agregar.
+            <div className="text-center py-10 space-y-2">
+              <Package className="h-8 w-8 text-muted-foreground/30 mx-auto" />
+              <p className="text-sm text-muted-foreground font-medium">No hay items disponibles para agregar</p>
+              <p className="text-xs text-muted-foreground max-w-xs mx-auto">
+                Se muestran solo items de pedidos en estado <strong>Enviado</strong> o <strong>Parcial</strong>,
+                sin OC activa y sin requerimiento en curso.
+                {busqueda && ' Prueba limpiando la búsqueda.'}
+              </p>
             </div>
           ) : agrupacion === 'proyecto' ? (
             // ── Por Proyecto → Pedido ──
@@ -529,8 +535,8 @@ function NuevoRequerimientoPageInner() {
     try {
       const data = await getItemsParaRequerimiento(q)
       setProyectos(data)
-    } catch {
-      toast.error('Error al cargar items de pedidos')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Error al cargar items de pedidos')
     } finally {
       setLoadingItems(false)
     }

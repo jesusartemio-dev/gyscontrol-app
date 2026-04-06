@@ -13,7 +13,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   Package, Receipt, Loader2, AlertCircle, CheckCircle2, Wand2,
-  Paperclip, ExternalLink, FileText, X, Upload, ChevronDown, ChevronRight, Eye, Plus,
+  Paperclip, ExternalLink, FileText, X, Upload, ChevronDown, ChevronRight, Eye, Plus, Search,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { HojaDeGastos } from '@/types'
@@ -34,6 +34,7 @@ interface Props {
   hoja: HojaDeGastos
   onChanged: () => void
   canAddComprobante: boolean
+  canAddItem?: boolean
 }
 
 interface ComprobanteLinea {
@@ -43,7 +44,7 @@ interface ComprobanteLinea {
   monto: number
 }
 
-export default function RequerimientoItemsCard({ hoja, onChanged, canAddComprobante }: Props) {
+export default function RequerimientoItemsCard({ hoja, onChanged, canAddComprobante, canAddItem }: Props) {
   const items = hoja.itemsMateriales || []
   const comprobantes = hoja.comprobantes || []
 
@@ -51,6 +52,60 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
   const [saving, setSaving] = useState(false)
   const [uploadingFile, setUploadingFile] = useState(false)
   const [deletingItem, setDeletingItem] = useState<string | null>(null)
+
+  // Modal agregar ítem
+  const [showAddItem, setShowAddItem] = useState(false)
+  const [pedidoItems, setPedidoItems] = useState<any[]>([])
+  const [loadingPedidoItems, setLoadingPedidoItems] = useState(false)
+  const [searchItem, setSearchItem] = useState('')
+  const [addingItemId, setAddingItemId] = useState<string | null>(null)
+
+  const openAddItemModal = async () => {
+    setShowAddItem(true)
+    setSearchItem('')
+    setLoadingPedidoItems(true)
+    try {
+      // Traer items de pedidos del mismo proyecto que no estén ya en este requerimiento
+      const existingIds = new Set(items.map(i => i.pedidoEquipoItemId).filter(Boolean))
+      const res = await fetch(`/api/pedido-equipo-item?proyectoId=${hoja.proyectoId}`)
+      if (res.ok) {
+        const data = await res.json()
+        setPedidoItems((data.items || data).filter((i: any) => !existingIds.has(i.id)))
+      }
+    } catch {
+      toast.error('Error al cargar items de pedidos')
+    } finally {
+      setLoadingPedidoItems(false)
+    }
+  }
+
+  const handleAddItem = async (pedidoItem: any) => {
+    setAddingItemId(pedidoItem.id)
+    try {
+      const res = await fetch('/api/requerimiento-material-item', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          hojaDeGastosId: hoja.id,
+          pedidoEquipoItemId: pedidoItem.id,
+          cantidadSolicitada: pedidoItem.cantidadPedida || 1,
+          precioEstimado: pedidoItem.precioUnitario || null,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Error al agregar item')
+      }
+      toast.success(`Item "${pedidoItem.descripcion}" agregado`)
+      // Quitar de la lista local
+      setPedidoItems(prev => prev.filter(i => i.id !== pedidoItem.id))
+      onChanged()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al agregar item')
+    } finally {
+      setAddingItemId(null)
+    }
+  }
 
   const handleDeleteItem = async (itemId: string) => {
     if (!confirm('¿Eliminar este item del requerimiento?')) return
@@ -271,15 +326,23 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
         <CardHeader className="py-3 px-4 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
             <Package className="h-4 w-4 text-blue-600" />
-            Items del Requerimiento
+            Items de Materiales
             <Badge variant="secondary" className="text-xs">{items.length}</Badge>
           </CardTitle>
-          {canAddComprobante && itemsPendientes > 0 && (
-            <Button size="sm" variant="outline" onClick={openDialog} className="h-7 text-xs">
-              <Receipt className="h-3.5 w-3.5 mr-1 text-blue-600" />
-              Registrar Comprobante
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {canAddItem && (
+              <Button size="sm" variant="outline" onClick={openAddItemModal} className="h-7 text-xs">
+                <Plus className="h-3.5 w-3.5 mr-1" />
+                Agregar Ítem
+              </Button>
+            )}
+            {canAddComprobante && itemsPendientes > 0 && (
+              <Button size="sm" variant="outline" onClick={openDialog} className="h-7 text-xs">
+                <Receipt className="h-3.5 w-3.5 mr-1 text-blue-600" />
+                Registrar Comprobante
+              </Button>
+            )}
+          </div>
         </CardHeader>
 
         <CardContent className="px-4 pb-4 space-y-4">
@@ -846,6 +909,87 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
             </div>
           </div>
 
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Dialog: Agregar Ítem ─────────────────────────────────────────────── */}
+      <Dialog open={showAddItem} onOpenChange={setShowAddItem}>
+        <DialogContent className="sm:max-w-lg p-0 gap-0 flex flex-col max-h-[85vh]">
+          <DialogHeader className="px-5 pt-5 pb-3 border-b shrink-0">
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Plus className="h-4 w-4 text-blue-600" />
+              Agregar Ítem al Requerimiento
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="px-4 pt-3 pb-2 shrink-0">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <input
+                value={searchItem}
+                onChange={e => setSearchItem(e.target.value)}
+                placeholder="Buscar por código o descripción..."
+                className="w-full h-8 pl-8 pr-3 text-xs rounded-md border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-4 pb-4">
+            {loadingPedidoItems ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : pedidoItems.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-muted-foreground text-sm gap-2">
+                <Package className="h-8 w-8 opacity-30" />
+                <p>No hay items de pedidos disponibles para agregar</p>
+              </div>
+            ) : (
+              <div className="space-y-1 mt-1">
+                {pedidoItems
+                  .filter(i => {
+                    if (!searchItem) return true
+                    const s = searchItem.toLowerCase()
+                    return i.codigo?.toLowerCase().includes(s) || i.descripcion?.toLowerCase().includes(s)
+                  })
+                  .map(item => (
+                    <div key={item.id} className="flex items-center justify-between gap-3 px-3 py-2 rounded-md border bg-white hover:bg-gray-50 text-xs">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-muted-foreground">{item.codigo}</span>
+                          {item.pedidoEquipo?.codigo && (
+                            <Badge variant="secondary" className="text-[10px] h-4 px-1 font-mono">{item.pedidoEquipo.codigo}</Badge>
+                          )}
+                        </div>
+                        <p className="truncate mt-0.5 text-gray-800">{item.descripcion}</p>
+                        <p className="text-muted-foreground mt-0.5">
+                          {item.cantidadPedida} {item.unidad}
+                          {item.precioUnitario ? ` · $${item.precioUnitario.toFixed(2)}` : ''}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleAddItem(item)}
+                        disabled={addingItemId === item.id}
+                        className="h-7 text-xs shrink-0"
+                      >
+                        {addingItemId === item.id
+                          ? <Loader2 className="h-3 w-3 animate-spin" />
+                          : <><Plus className="h-3 w-3 mr-1" />Agregar</>
+                        }
+                      </Button>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+
+          <div className="border-t px-5 py-3 shrink-0">
+            <Button variant="outline" size="sm" onClick={() => setShowAddItem(false)} className="w-full">
+              Cerrar
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </>

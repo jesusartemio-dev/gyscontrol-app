@@ -672,13 +672,17 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
         <RequerimientoItemsCard
           hoja={hoja}
           onChanged={loadData}
+          canAddItem={hoja.estado === 'borrador'}
           canAddComprobante={canRendir || hoja.estado === 'rendido'}
         />
       )}
 
-      {/* Líneas de gasto / comprobantes */}
+      {/* Items de Gastos */}
       <Card>
-        <CardContent className="p-4">
+        <CardHeader className="py-3 px-4">
+          <CardTitle className="text-sm font-medium">Items de Gastos</CardTitle>
+        </CardHeader>
+        <CardContent className="p-4 pt-0">
           {hoja.tipoPropósito === 'compra_materiales' && isEditable && (
             <div className="flex items-start gap-2 text-xs text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/20 rounded-lg p-2.5 mb-3 border border-blue-200 dark:border-blue-900">
               <Package className="h-3.5 w-3.5 mt-0.5 shrink-0" />
