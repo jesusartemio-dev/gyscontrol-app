@@ -1279,6 +1279,7 @@ export default function PedidoLogisticaDetailPage() {
                     <th className="px-3 py-2 text-center font-medium text-gray-600">Unidad</th>
                     <th className="px-3 py-2 text-center font-medium text-gray-600">Pedido</th>
                     <th className="px-3 py-2 text-center font-medium text-gray-600">Atendido</th>
+                    <th className="px-3 py-2 text-center font-medium text-gray-600">En Req.</th>
                     <th className="px-3 py-2 text-center font-medium text-gray-600">Estado</th>
                     <th className="px-3 py-2 text-center font-medium text-gray-600">T. Entrega</th>
                     <th className="px-3 py-2 text-center font-medium text-gray-600">F.Entrega</th>
@@ -1398,6 +1399,19 @@ export default function PedidoLogisticaDetailPage() {
                         {(item.cantidadAtendida || 0) > item.cantidadPedida && (
                           <span className="text-[9px] text-amber-500 ml-0.5">(+{(item.cantidadAtendida || 0) - item.cantidadPedida})</span>
                         )}
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        {(() => {
+                          const reqs: { cantidadSolicitada?: number; hojaDeGastos: { estado: string } }[] =
+                            (item as any).requerimientoMaterialItems || []
+                          const enReq = reqs
+                            .filter(r => REQ_ESTADOS_ACTIVOS.includes(r.hojaDeGastos?.estado))
+                            .reduce((s, r) => s + (r.cantidadSolicitada || 0), 0)
+                          if (enReq === 0) return <span className="text-gray-300">—</span>
+                          return (
+                            <span className="font-medium text-amber-600">{enReq}</span>
+                          )
+                        })()}
                       </td>
                       <td className="px-3 py-2 text-center">
                         <Badge

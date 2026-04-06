@@ -63,6 +63,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
               select: {
                 id: true,
                 hojaDeGastosId: true,
+                cantidadSolicitada: true,
                 hojaDeGastos: { select: { id: true, numero: true, estado: true } },
               },
             },
