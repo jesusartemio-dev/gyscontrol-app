@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -11,12 +11,21 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Package, Receipt, Loader2, AlertCircle, CheckCircle2, Wand2,
   Paperclip, ExternalLink, FileText, X, Upload, ChevronDown, ChevronRight, Eye, Plus, Search,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { HojaDeGastos } from '@/types'
+import {
+  getItemsParaRequerimiento,
+  type ProyectoParaRequerimiento,
+  type ItemParaRequerimiento,
+} from '@/lib/services/hojaDeGastos'
+
+type AgrupacionModal = 'proyecto' | 'pedido' | 'proveedor'
+interface ItemSeleccionado { item: ItemParaRequerimiento; cantidad: number; precioEstimado: number | null }
 
 type Comprobante = NonNullable<HojaDeGastos['comprobantes']>[number]
 
@@ -53,58 +62,89 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
   const [uploadingFile, setUploadingFile] = useState(false)
   const [deletingItem, setDeletingItem] = useState<string | null>(null)
 
-  // Modal agregar ítem
+  // Modal agregar ítem — versión completa
   const [showAddItem, setShowAddItem] = useState(false)
-  const [pedidoItems, setPedidoItems] = useState<any[]>([])
-  const [loadingPedidoItems, setLoadingPedidoItems] = useState(false)
-  const [searchItem, setSearchItem] = useState('')
-  const [addingItemId, setAddingItemId] = useState<string | null>(null)
+  const [proyectosAddItem, setProyectosAddItem] = useState<ProyectoParaRequerimiento[]>([])
+  const [loadingAddItem, setLoadingAddItem] = useState(false)
+  const [busquedaAddItem, setBusquedaAddItem] = useState('')
+  const [agrupacionAddItem, setAgrupacionAddItem] = useState<AgrupacionModal>('pedido')
+  const [tempAddItem, setTempAddItem] = useState<Map<string, ItemSeleccionado>>(new Map())
+  const [expandidosAddItem, setExpandidosAddItem] = useState<Set<string>>(new Set())
+  const [savingAddItems, setSavingAddItems] = useState(false)
 
-  const openAddItemModal = async () => {
-    setShowAddItem(true)
-    setSearchItem('')
-    setLoadingPedidoItems(true)
+  const yaConfirmadosAddItem = new Set(items.map(i => i.pedidoEquipoItemId).filter(Boolean) as string[])
+
+  const loadItemsParaAgregar = useCallback(async (q?: string) => {
+    setLoadingAddItem(true)
     try {
-      // Traer items de pedidos del mismo proyecto que no estén ya en este requerimiento
-      const existingIds = new Set(items.map(i => i.pedidoEquipoItemId).filter(Boolean))
-      const res = await fetch(`/api/pedido-equipo-item?proyectoId=${hoja.proyectoId}`)
-      if (res.ok) {
-        const data = await res.json()
-        setPedidoItems((data.items || data).filter((i: any) => !existingIds.has(i.id)))
-      }
-    } catch {
-      toast.error('Error al cargar items de pedidos')
+      const data = await getItemsParaRequerimiento(q)
+      setProyectosAddItem(data)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al cargar items')
     } finally {
-      setLoadingPedidoItems(false)
+      setLoadingAddItem(false)
     }
+  }, [])
+
+  const openAddItemModal = () => {
+    setShowAddItem(true)
+    setBusquedaAddItem('')
+    setTempAddItem(new Map())
+    loadItemsParaAgregar()
   }
 
-  const handleAddItem = async (pedidoItem: any) => {
-    setAddingItemId(pedidoItem.id)
-    try {
-      const res = await fetch('/api/requerimiento-material-item', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          hojaDeGastosId: hoja.id,
-          pedidoEquipoItemId: pedidoItem.id,
-          cantidadSolicitada: pedidoItem.cantidadPedida || 1,
-          precioEstimado: pedidoItem.precioUnitario || null,
-        }),
-      })
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error || 'Error al agregar item')
-      }
-      toast.success(`Item "${pedidoItem.descripcion}" agregado`)
-      // Quitar de la lista local
-      setPedidoItems(prev => prev.filter(i => i.id !== pedidoItem.id))
-      onChanged()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al agregar item')
-    } finally {
-      setAddingItemId(null)
+  useEffect(() => {
+    if (!showAddItem) return
+    const t = setTimeout(() => loadItemsParaAgregar(busquedaAddItem || undefined), 350)
+    return () => clearTimeout(t)
+  }, [busquedaAddItem, showAddItem, loadItemsParaAgregar])
+
+  useEffect(() => {
+    if (!showAddItem) return
+    const ids = new Set<string>()
+    proyectosAddItem.forEach(p => {
+      ids.add(p.id)
+      p.pedidos.forEach(ped => ids.add(ped.id))
+    })
+    setExpandidosAddItem(ids)
+  }, [showAddItem, proyectosAddItem])
+
+  const toggleExpandAddItem = (id: string) =>
+    setExpandidosAddItem(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+
+  const toggleTempItem = (item: ItemParaRequerimiento, checked: boolean) =>
+    setTempAddItem(prev => {
+      const n = new Map(prev)
+      if (checked) n.set(item.id, { item, cantidad: item.cantidadDisponible, precioEstimado: item.precioUnitario })
+      else n.delete(item.id)
+      return n
+    })
+
+  const handleConfirmAddItems = async () => {
+    if (tempAddItem.size === 0) return
+    setSavingAddItems(true)
+    let added = 0; let failed = 0
+    for (const { item, cantidad, precioEstimado } of tempAddItem.values()) {
+      try {
+        const res = await fetch('/api/requerimiento-material-item', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            hojaDeGastosId: hoja.id,
+            pedidoEquipoItemId: item.id,
+            cantidadSolicitada: cantidad,
+            precioEstimado: precioEstimado || null,
+          }),
+        })
+        if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Error') }
+        added++
+      } catch { failed++ }
     }
+    setSavingAddItems(false)
+    if (added > 0) toast.success(`${added} item(s) agregado(s)`)
+    if (failed > 0) toast.error(`${failed} item(s) no se pudieron agregar`)
+    setShowAddItem(false)
+    onChanged()
   }
 
   const handleDeleteItem = async (itemId: string) => {
@@ -913,85 +953,246 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
       </Dialog>
 
       {/* ── Dialog: Agregar Ítem ─────────────────────────────────────────────── */}
-      <Dialog open={showAddItem} onOpenChange={setShowAddItem}>
-        <DialogContent className="sm:max-w-lg p-0 gap-0 flex flex-col max-h-[85vh]">
+      <Dialog open={showAddItem} onOpenChange={v => { if (!v) setShowAddItem(false) }}>
+        <DialogContent className="sm:max-w-2xl flex flex-col max-h-[85vh] p-0 gap-0">
           <DialogHeader className="px-5 pt-5 pb-3 border-b shrink-0">
             <DialogTitle className="flex items-center gap-2 text-base">
-              <Plus className="h-4 w-4 text-blue-600" />
-              Agregar Ítem al Requerimiento
+              <Package className="h-4 w-4 text-blue-600" />
+              Agregar Items a Comprar
             </DialogTitle>
+            <div className="flex gap-2 mt-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  className="pl-8 h-9"
+                  placeholder="Buscar código, descripción, proyecto, pedido..."
+                  value={busquedaAddItem}
+                  onChange={e => setBusquedaAddItem(e.target.value)}
+                />
+                {busquedaAddItem && (
+                  <button onClick={() => setBusquedaAddItem('')} className="absolute right-2 top-2.5">
+                    <X className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                )}
+              </div>
+              <Select value={agrupacionAddItem} onValueChange={v => setAgrupacionAddItem(v as AgrupacionModal)}>
+                <SelectTrigger className="w-[140px] h-9 shrink-0"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="proyecto">Por Proyecto</SelectItem>
+                  <SelectItem value="pedido">Por Pedido</SelectItem>
+                  <SelectItem value="proveedor">Por Proveedor</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1.5">
+              {(() => {
+                const total = proyectosAddItem.reduce((s, p) => s + p.pedidos.reduce((ss, ped) => ss + ped.items.filter(it => !yaConfirmadosAddItem.has(it.id)).length, 0), 0)
+                return <>{total} item(s) disponibles para agregar{yaConfirmadosAddItem.size > 0 && ` · ${yaConfirmadosAddItem.size} ya incluido(s) en el requerimiento`}</>
+              })()}
+            </p>
           </DialogHeader>
 
-          <div className="px-4 pt-3 pb-2 shrink-0">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-              <input
-                value={searchItem}
-                onChange={e => setSearchItem(e.target.value)}
-                placeholder="Buscar por código o descripción..."
-                className="w-full h-8 pl-8 pr-3 text-xs rounded-md border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-            </div>
-          </div>
+          <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
+            {loadingAddItem ? (
+              <div className="flex items-center justify-center py-12 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin mr-2" />Cargando...
+              </div>
+            ) : (() => {
+              // filtrar items ya confirmados
+              const filtrados = proyectosAddItem.map(p => ({
+                ...p,
+                pedidos: p.pedidos.map(ped => ({
+                  ...ped,
+                  items: ped.items.filter(it => !yaConfirmadosAddItem.has(it.id)),
+                })).filter(ped => ped.items.length > 0),
+              })).filter(p => p.pedidos.length > 0)
 
-          <div className="flex-1 overflow-y-auto px-4 pb-4">
-            {loadingPedidoItems ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-              </div>
-            ) : pedidoItems.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8 text-muted-foreground text-sm gap-2">
-                <Package className="h-8 w-8 opacity-30" />
-                <p>No hay items de pedidos disponibles para agregar</p>
-              </div>
-            ) : (
-              <div className="space-y-1 mt-1">
-                {pedidoItems
-                  .filter(i => {
-                    if (!searchItem) return true
-                    const s = searchItem.toLowerCase()
-                    return i.codigo?.toLowerCase().includes(s) || i.descripcion?.toLowerCase().includes(s)
-                  })
-                  .map(item => (
-                    <div key={item.id} className="flex items-center justify-between gap-3 px-3 py-2 rounded-md border bg-white hover:bg-gray-50 text-xs">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-muted-foreground">{item.codigo}</span>
-                          {item.pedidoEquipo?.codigo && (
-                            <Badge variant="secondary" className="text-[10px] h-4 px-1 font-mono">{item.pedidoEquipo.codigo}</Badge>
-                          )}
-                        </div>
-                        <p className="truncate mt-0.5 text-gray-800">{item.descripcion}</p>
-                        <p className="text-muted-foreground mt-0.5">
-                          {item.cantidadPedida} {item.unidad}
-                          {item.precioUnitario ? ` · $${item.precioUnitario.toFixed(2)}` : ''}
-                        </p>
+              if (filtrados.length === 0) return (
+                <div className="text-center py-10 space-y-2">
+                  <Package className="h-8 w-8 text-muted-foreground/30 mx-auto" />
+                  <p className="text-sm text-muted-foreground font-medium">No hay items disponibles para agregar</p>
+                  <p className="text-xs text-muted-foreground max-w-xs mx-auto">
+                    Se muestran solo items de pedidos en estado <strong>Enviado</strong> o <strong>Parcial</strong>,
+                    sin OC activa y sin requerimiento en curso.
+                    {busquedaAddItem && ' Prueba limpiando la búsqueda.'}
+                  </p>
+                </div>
+              )
+
+              const pedidosFlat = filtrados.flatMap(p =>
+                p.pedidos.map(ped => ({ ...ped, proyectoCodigo: p.codigo, proyectoNombre: p.nombre }))
+              )
+
+              // Agrupar por proveedor
+              const provMap = new Map<string, { id: string; nombre: string; items: ItemParaRequerimiento[] }>()
+              for (const p of filtrados) for (const ped of p.pedidos) for (const item of ped.items) {
+                const key = item.proveedorId || '__sin_proveedor__'
+                const nombre = item.proveedor?.nombre || item.proveedorNombre || 'Sin proveedor asignado'
+                if (!provMap.has(key)) provMap.set(key, { id: key, nombre, items: [] })
+                provMap.get(key)!.items.push(item)
+              }
+              const provFlat = Array.from(provMap.values()).sort((a, b) =>
+                a.id === '__sin_proveedor__' ? 1 : b.id === '__sin_proveedor__' ? -1 : a.nombre.localeCompare(b.nombre)
+              )
+
+              if (agrupacionAddItem === 'proyecto') return filtrados.map(proyecto => {
+                const sel = proyecto.pedidos.reduce((s, p) => s + p.items.filter(it => tempAddItem.has(it.id)).length, 0)
+                return (
+                  <div key={proyecto.id} className="border rounded-lg overflow-hidden">
+                    <button type="button" onClick={() => toggleExpandAddItem(proyecto.id)}
+                      className="w-full flex items-center gap-2 px-3 py-2 bg-muted/50 hover:bg-muted/80 text-left transition-colors">
+                      {expandidosAddItem.has(proyecto.id) ? <ChevronDown className="h-3.5 w-3.5 shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0" />}
+                      <span className="font-semibold text-sm">{proyecto.codigo}</span>
+                      <span className="text-sm text-muted-foreground truncate">— {proyecto.nombre}</span>
+                      <div className="ml-auto flex items-center gap-1.5 shrink-0">
+                        {sel > 0 && <Badge className="text-xs py-0 px-1.5 h-4 bg-blue-100 text-blue-700 border-0">{sel} sel.</Badge>}
+                        <Badge variant="secondary" className="text-xs py-0 h-4">{proyecto.pedidos.reduce((s, p) => s + p.items.length, 0)}</Badge>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleAddItem(item)}
-                        disabled={addingItemId === item.id}
-                        className="h-7 text-xs shrink-0"
-                      >
-                        {addingItemId === item.id
-                          ? <Loader2 className="h-3 w-3 animate-spin" />
-                          : <><Plus className="h-3 w-3 mr-1" />Agregar</>
-                        }
-                      </Button>
-                    </div>
-                  ))}
-              </div>
-            )}
+                    </button>
+                    {expandidosAddItem.has(proyecto.id) && proyecto.pedidos.map(pedido => (
+                      <AddItemPedidoGroup key={pedido.id} pedido={pedido} expandidos={expandidosAddItem}
+                        onToggleExpand={toggleExpandAddItem} temp={tempAddItem} onToggleItem={toggleTempItem} indent />
+                    ))}
+                  </div>
+                )
+              })
+
+              if (agrupacionAddItem === 'pedido') return pedidosFlat.map(pedido => {
+                const sel = pedido.items.filter(it => tempAddItem.has(it.id)).length
+                return (
+                  <div key={pedido.id} className="border rounded-lg overflow-hidden">
+                    <button type="button" onClick={() => toggleExpandAddItem(pedido.id)}
+                      className="w-full flex items-center gap-2 px-3 py-2 bg-muted/50 hover:bg-muted/80 text-left transition-colors">
+                      {expandidosAddItem.has(pedido.id) ? <ChevronDown className="h-3.5 w-3.5 shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0" />}
+                      <span className="font-semibold text-sm">{pedido.codigo}</span>
+                      <Badge variant="outline" className="text-xs py-0 px-1.5 h-4">{pedido.estado}</Badge>
+                      <span className="text-xs text-muted-foreground truncate">{pedido.proyectoCodigo} — {pedido.proyectoNombre}</span>
+                      <div className="ml-auto flex items-center gap-1.5 shrink-0">
+                        {sel > 0 && <Badge className="text-xs py-0 px-1.5 h-4 bg-blue-100 text-blue-700 border-0">{sel} sel.</Badge>}
+                        <Badge variant="secondary" className="text-xs py-0 h-4">{pedido.items.length}</Badge>
+                      </div>
+                    </button>
+                    {expandidosAddItem.has(pedido.id) && (
+                      <div className="divide-y">
+                        {pedido.items.map(item => (
+                          <AddItemRow key={item.id} item={item} checked={tempAddItem.has(item.id)} onToggle={toggleTempItem} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })
+
+              // Por proveedor
+              return provFlat.map(prov => {
+                const sel = prov.items.filter(it => tempAddItem.has(it.id)).length
+                return (
+                  <div key={prov.id} className="border rounded-lg overflow-hidden">
+                    <button type="button" onClick={() => toggleExpandAddItem(prov.id)}
+                      className="w-full flex items-center gap-2 px-3 py-2 bg-muted/50 hover:bg-muted/80 text-left transition-colors">
+                      {expandidosAddItem.has(prov.id) ? <ChevronDown className="h-3.5 w-3.5 shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0" />}
+                      <span className={`font-semibold text-sm ${prov.id === '__sin_proveedor__' ? 'text-muted-foreground italic' : ''}`}>{prov.nombre}</span>
+                      <div className="ml-auto flex items-center gap-1.5 shrink-0">
+                        {sel > 0 && <Badge className="text-xs py-0 px-1.5 h-4 bg-blue-100 text-blue-700 border-0">{sel} sel.</Badge>}
+                        <Badge variant="secondary" className="text-xs py-0 h-4">{prov.items.length}</Badge>
+                      </div>
+                    </button>
+                    {expandidosAddItem.has(prov.id) && (
+                      <div className="divide-y">
+                        {prov.items.map(item => (
+                          <AddItemRow key={item.id} item={item} checked={tempAddItem.has(item.id)} onToggle={toggleTempItem} showPedido />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })
+            })()}
           </div>
 
-          <div className="border-t px-5 py-3 shrink-0">
-            <Button variant="outline" size="sm" onClick={() => setShowAddItem(false)} className="w-full">
-              Cerrar
-            </Button>
+          <div className="border-t px-5 py-3 shrink-0 flex items-center justify-between gap-3">
+            <span className="text-sm text-muted-foreground shrink-0">
+              {tempAddItem.size > 0
+                ? <><span className="font-medium text-foreground">{tempAddItem.size}</span> marcado(s) para agregar</>
+                : 'Selecciona items para agregar'}
+            </span>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setShowAddItem(false)} disabled={savingAddItems}>Cancelar</Button>
+              <Button size="sm" className="bg-blue-600 hover:bg-blue-700"
+                onClick={handleConfirmAddItems} disabled={tempAddItem.size === 0 || savingAddItems}>
+                {savingAddItems && <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />}
+                Agregar {tempAddItem.size > 0 ? `${tempAddItem.size} item(s)` : 'items'}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
     </>
+  )
+}
+
+// ─── Sub-componentes del modal Agregar Ítem ───────────────────────────────────
+function AddItemPedidoGroup({
+  pedido, expandidos, onToggleExpand, temp, onToggleItem, indent,
+}: {
+  pedido: ProyectoParaRequerimiento['pedidos'][number]
+  expandidos: Set<string>
+  onToggleExpand: (id: string) => void
+  temp: Map<string, ItemSeleccionado>
+  onToggleItem: (item: ItemParaRequerimiento, checked: boolean) => void
+  indent?: boolean
+}) {
+  const sel = pedido.items.filter(it => temp.has(it.id)).length
+  return (
+    <>
+      <button type="button" onClick={() => onToggleExpand(pedido.id)}
+        className={`w-full flex items-center gap-2 px-3 py-1.5 bg-muted/20 hover:bg-muted/40 border-t text-left transition-colors ${indent ? 'pl-6' : ''}`}>
+        {expandidos.has(pedido.id) ? <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />}
+        <span className="text-xs font-medium">{pedido.codigo}</span>
+        <Badge variant="outline" className="text-xs py-0 px-1 h-3.5 font-normal">{pedido.estado}</Badge>
+        {sel > 0 && <Badge className="text-xs py-0 px-1.5 h-3.5 bg-blue-100 text-blue-700 border-0">{sel} sel.</Badge>}
+        <span className="ml-auto text-xs text-muted-foreground">{pedido.items.length} item(s)</span>
+      </button>
+      {expandidos.has(pedido.id) && (
+        <div className="divide-y">
+          {pedido.items.map(item => (
+            <AddItemRow key={item.id} item={item} checked={temp.has(item.id)} onToggle={onToggleItem} indent={indent} />
+          ))}
+        </div>
+      )}
+    </>
+  )
+}
+
+function AddItemRow({
+  item, checked, onToggle, indent, showPedido,
+}: {
+  item: ItemParaRequerimiento
+  checked: boolean
+  onToggle: (item: ItemParaRequerimiento, checked: boolean) => void
+  indent?: boolean
+  showPedido?: boolean
+}) {
+  const fmtLocal = (n: number | null | undefined) =>
+    n != null ? new Intl.NumberFormat('es-PE', { minimumFractionDigits: 2 }).format(n) : null
+  return (
+    <label className={`flex items-start gap-3 py-2 cursor-pointer transition-colors select-none ${
+      checked ? 'bg-blue-50 dark:bg-blue-950/15 border-l-2 border-l-blue-500' : 'hover:bg-muted/20 border-l-2 border-l-transparent'
+    } ${indent ? 'pl-8 pr-4' : 'px-4'}`}>
+      <Checkbox checked={checked} onCheckedChange={v => onToggle(item, !!v)} className="mt-0.5 shrink-0" />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-baseline gap-2 flex-wrap">
+          <span className="text-xs font-mono text-muted-foreground">{item.codigo}</span>
+          <span className={`text-sm truncate ${checked ? 'font-semibold' : 'font-medium'}`}>{item.descripcion}</span>
+          <span className="text-xs text-muted-foreground shrink-0">{item.unidad}</span>
+        </div>
+        <div className="flex gap-3 mt-0.5 text-xs text-muted-foreground flex-wrap">
+          <span>Disp: <strong className="text-foreground">{item.cantidadDisponible}</strong></span>
+          {item.precioUnitario != null && <span>P.U.: S/ {fmtLocal(item.precioUnitario)}</span>}
+          {showPedido && <span className="text-muted-foreground/70">{item.pedidoEquipo.proyecto.codigo} · {item.pedidoEquipo.codigo}</span>}
+        </div>
+      </div>
+      {checked && <span className="text-xs text-blue-600 font-medium shrink-0 self-center">✓</span>}
+    </label>
   )
 }
