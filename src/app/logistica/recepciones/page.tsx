@@ -249,6 +249,8 @@ export default function RecepcionesPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkLoading, setBulkLoading] = useState(false)
   const [bulkConfirm, setBulkConfirm] = useState<{ tipo: 'almacen' | 'proyecto'; ids: string[]; label: string } | null>(null)
+  // cantidades editables por item en el bulk almacén: id → cantidadReal string
+  const [bulkCantidades, setBulkCantidades] = useState<Record<string, string>>({})
 
   const canBulkSelect = (r: Recepcion) =>
     (r.estado === 'pendiente' || r.estado === 'en_almacen') &&
@@ -277,20 +279,34 @@ export default function RecepcionesPage() {
     const paso = bulkConfirm.tipo === 'almacen' ? 'almacen' : 'proyecto'
     for (const id of bulkConfirm.ids) {
       try {
+        const cantidadRealVal = bulkConfirm.tipo === 'almacen' ? parseFloat(bulkCantidades[id] || '') : NaN
+        const body: any = { paso }
+        if (!isNaN(cantidadRealVal) && cantidadRealVal > 0) body.cantidadReal = cantidadRealVal
         const res = await fetch(`/api/recepcion-pendiente/${id}/confirmar`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ paso }),
+          body: JSON.stringify(body),
         })
         if (res.ok) ok++; else fail++
       } catch { fail++ }
     }
     setBulkLoading(false)
     setBulkConfirm(null)
+    setBulkCantidades({})
     setSelectedIds(new Set())
     if (ok > 0) toast.success(`${ok} recepción(es) confirmadas`)
     if (fail > 0) toast.error(`${fail} no pudieron procesarse`)
     fetchData()
+  }
+
+  const initBulkCantidades = (ids: string[], tipo: 'almacen' | 'proyecto') => {
+    if (tipo !== 'almacen') return
+    const init: Record<string, string> = {}
+    for (const id of ids) {
+      const r = recepciones.find(x => x.id === id)
+      if (r) init[id] = String(r.cantidadRecibida)
+    }
+    setBulkCantidades(init)
   }
 
   const openBulkFromSelection = (tipo: 'almacen' | 'proyecto') => {
@@ -300,6 +316,7 @@ export default function RecepcionesPage() {
       .map(r => r.id)
     if (ids.length === 0) { toast.error('Ningún item seleccionado tiene el estado correcto'); return }
     const label = tipo === 'almacen' ? 'Confirmar llegada a almacén' : 'Entregar a proyecto'
+    initBulkCantidades(ids, tipo)
     setBulkConfirm({ tipo, ids, label })
   }
 
@@ -308,6 +325,7 @@ export default function RecepcionesPage() {
     const ids = recepciones.filter(r => r.estado === estadoFiltro).map(r => r.id)
     if (ids.length === 0) return
     const label = tipo === 'almacen' ? 'Confirmar todos en almacén' : 'Entregar todos al proyecto'
+    initBulkCantidades(ids, tipo)
     setBulkConfirm({ tipo, ids, label })
   }
 
@@ -772,28 +790,74 @@ export default function RecepcionesPage() {
       )}
 
       {/* Bulk confirmation dialog */}
-      <AlertDialog open={!!bulkConfirm} onOpenChange={open => { if (!open) setBulkConfirm(null) }}>
-        <AlertDialogContent className="sm:max-w-md">
-          <AlertDialogHeader>
-            <AlertDialogTitle>{bulkConfirm?.label}</AlertDialogTitle>
-            <AlertDialogDescription>
-              Se procesarán <strong>{bulkConfirm?.ids.length}</strong> recepción(es).
-              {bulkConfirm?.tipo === 'almacen' && ' Se confirmarán con la cantidad registrada.'}
-              {bulkConfirm?.tipo === 'proyecto' && ' Se marcarán como entregadas al proyecto.'}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={bulkLoading}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={e => { e.preventDefault(); executeBulkAction() }}
-              disabled={bulkLoading}
-              className={bulkConfirm?.tipo === 'almacen' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'}
-            >
-              {bulkLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : `Confirmar ${bulkConfirm?.ids.length} item(s)`}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {bulkConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-background rounded-xl shadow-2xl border w-full max-w-lg mx-4 flex flex-col max-h-[85vh]">
+            <div className="px-5 pt-5 pb-3 border-b shrink-0">
+              <h2 className="text-base font-semibold">{bulkConfirm.label}</h2>
+              {bulkConfirm.tipo === 'almacen' && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Ajusta las cantidades si algún item llegó parcialmente.
+                </p>
+              )}
+              {bulkConfirm.tipo === 'proyecto' && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Se marcarán {bulkConfirm.ids.length} recepción(es) como entregadas al proyecto.
+                </p>
+              )}
+            </div>
+
+            {bulkConfirm.tipo === 'almacen' && (
+              <div className="flex-1 overflow-y-auto px-5 py-3 space-y-2">
+                {bulkConfirm.ids.map(id => {
+                  const r = recepciones.find(x => x.id === id)
+                  if (!r) return null
+                  const info = getRecepcionInfo(r)
+                  const cantInput = bulkCantidades[id] ?? String(r.cantidadRecibida)
+                  const cantVal = parseFloat(cantInput)
+                  const isParcial = !isNaN(cantVal) && cantVal < r.cantidadRecibida
+                  return (
+                    <div key={id} className="flex items-center gap-3 py-1.5 border-b last:border-0">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-mono text-muted-foreground">{info.codigo}</div>
+                        <div className="text-sm font-medium truncate">{info.descripcion}</div>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0.01"
+                          max={r.cantidadRecibida}
+                          value={cantInput}
+                          onChange={e => setBulkCantidades(prev => ({ ...prev, [id]: e.target.value }))}
+                          className="h-7 w-20 text-xs text-right"
+                        />
+                        <span className="text-xs text-muted-foreground">/ {r.cantidadRecibida} {info.unidad}</span>
+                        {isParcial && <span className="text-[10px] text-amber-600 font-medium">parcial</span>}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            <div className="px-5 py-3 border-t shrink-0 flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => { setBulkConfirm(null); setBulkCantidades({}) }} disabled={bulkLoading}>
+                Cancelar
+              </Button>
+              <Button
+                size="sm"
+                onClick={executeBulkAction}
+                disabled={bulkLoading}
+                className={bulkConfirm.tipo === 'almacen' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'}
+              >
+                {bulkLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                Confirmar {bulkConfirm.ids.length} item(s)
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Action Dialog */}
       <AlertDialog open={!!actionDialog} onOpenChange={(open) => { if (!open) { setActionDialog(null); setActionMotivo(''); setCantidadReal('') } }}>
