@@ -61,7 +61,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         // Evitar duplicados: no crear si ya existe una para este OC item en estado activo
         const existente = await tx.recepcionPendiente.findFirst({
           where: {
-            ordenCompraItemId: item.id,
+            ordenCompraItem: { id: item.id },
             estado: { in: ['pendiente', 'en_almacen'] },
           }
         })
