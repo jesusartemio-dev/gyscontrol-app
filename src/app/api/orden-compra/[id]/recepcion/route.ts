@@ -36,7 +36,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     // Wrap all mutations in a transaction to prevent race conditions (e.g., double-click creating duplicates)
     const { data, recepcionesPendientesCreadas } = await prisma.$transaction(async (tx) => {
-      // Update each item's cantidadRecibida
+      // [1] Update each item's cantidadRecibida
+      console.log('[recepcion] paso 1: actualizando cantidades')
       for (const rec of recepciones) {
         const item = existing.items.find(i => i.id === rec.itemId)
         if (!item) continue
@@ -47,8 +48,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         })
       }
 
-      // Crear RecepcionPendiente para items de proyecto (con o sin pedido)
+      // [2] Crear RecepcionPendiente para items de proyecto (con o sin pedido)
       // No crear para OCs de centro de costo (sin proyectoId)
+      console.log('[recepcion] paso 2: creando recepciones pendientes, proyectoId:', existing.proyectoId)
       let creadas = 0
       for (const rec of recepciones) {
         const item = existing.items.find(i => i.id === rec.itemId)
@@ -65,7 +67,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             estado: { in: ['pendiente', 'en_almacen'] },
           }
         })
-        if (existente) continue
+        if (existente) { console.log('[recepcion] ya existe recepcion pendiente para item', item.id); continue }
 
         const recData: any = {
           cantidadRecibida: cantidadEfectiva,
@@ -73,11 +75,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         }
         if (item.pedidoEquipoItemId) recData.pedidoEquipoItemId = item.pedidoEquipoItemId
         if (item.listaEquipoItemId) recData.listaEquipoItemId = item.listaEquipoItemId
+        console.log('[recepcion] creando recepcionPendiente con:', JSON.stringify(recData))
         await tx.recepcionPendiente.create({ data: recData })
         creadas++
       }
 
-      // Re-fetch items to compute state
+      // [3] Re-fetch items to compute state
+      console.log('[recepcion] paso 3: recalculando estado OC')
       const updatedItems = await tx.ordenCompraItem.findMany({
         where: { ordenCompraId: id },
       })
@@ -92,6 +96,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         nuevoEstado = 'parcial'
       }
 
+      // [4] Update OC
+      console.log('[recepcion] paso 4: actualizando OC estado ->', nuevoEstado)
       const ocData = await tx.ordenCompra.update({
         where: { id },
         data: { estado: nuevoEstado, updatedAt: new Date() },
@@ -106,8 +112,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         },
       })
 
-      // Registrar evento de trazabilidad
+      // [5] Registrar evento de trazabilidad
       if (creadas > 0) {
+        console.log('[recepcion] paso 5: creando eventoTrazabilidad, usuarioId:', session.user.id)
         const itemsResumen = recepciones
           .filter(r => r.cantidadRecibida > 0)
           .map(r => {
@@ -136,6 +143,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         })
       }
 
+      console.log('[recepcion] transacción completada, creadas:', creadas)
       return { data: ocData, nuevoEstado, recepcionesPendientesCreadas: creadas }
     })
 
