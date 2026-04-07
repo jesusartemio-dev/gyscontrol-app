@@ -63,23 +63,17 @@ export default function PedidoEquipoEditModal({ pedido, open, onOpenChange, onUp
   const validateForm = () => {
     const newErrors: { fechaNecesaria?: string; fechaEntregaEstimada?: string } = {}
 
-    // Validación opcional para fechaNecesaria
+    // Validación opcional para fechaNecesaria (comparar como string YYYY-MM-DD para evitar offset UTC)
     if (fechaNecesaria) {
-      const fecha = new Date(fechaNecesaria)
-      const hoy = new Date()
-      hoy.setHours(0, 0, 0, 0)
-
-      if (fecha < hoy) {
+      const hoy = new Date().toISOString().split('T')[0]
+      if (fechaNecesaria < hoy) {
         newErrors.fechaNecesaria = 'La fecha necesaria no puede ser anterior a hoy'
       }
     }
 
     // Validación opcional para fechaEntregaEstimada
     if (fechaEntregaEstimada && fechaNecesaria) {
-      const fechaNecesariaDate = new Date(fechaNecesaria)
-      const fechaEntregaDate = new Date(fechaEntregaEstimada)
-
-      if (fechaEntregaDate < fechaNecesariaDate) {
+      if (fechaEntregaEstimada < fechaNecesaria) {
         newErrors.fechaEntregaEstimada = 'La fecha de entrega estimada no puede ser anterior a la fecha necesaria'
       }
     }
@@ -266,7 +260,6 @@ export default function PedidoEquipoEditModal({ pedido, open, onOpenChange, onUp
                   onChange={(e) => handleInputChange('fechaNecesaria', e.target.value)}
                   className={`pl-10 ${errors.fechaNecesaria ? 'border-red-500 focus:border-red-500' : ''}`}
                   disabled={loading}
-                  min={new Date().toISOString().split('T')[0]}
                 />
               </div>
               {errors.fechaNecesaria && (
