@@ -428,21 +428,27 @@ const PedidoEquipoTableRow = memo<PedidoTableRowProps>(({
       : '-';
   }, [montoTotal]);
 
+  const parseLocalDate = (d: string | Date) => {
+    const str = typeof d === 'string' ? d : d.toISOString()
+    const [y, m, day] = str.split('T')[0].split('-').map(Number)
+    return new Date(y, m - 1, day)
+  }
+
   const fechaPedidoDisplay = useMemo(() => {
-    return pedido.fechaPedido 
-      ? new Date(pedido.fechaPedido).toLocaleDateString('es-PE') 
+    return pedido.fechaPedido
+      ? parseLocalDate(pedido.fechaPedido).toLocaleDateString('es-PE')
       : '-';
   }, [pedido.fechaPedido]);
 
   const fechaNecesariaDisplay = useMemo(() => {
-    return pedido.fechaNecesaria 
-      ? new Date(pedido.fechaNecesaria).toLocaleDateString('es-PE') 
+    return pedido.fechaNecesaria
+      ? parseLocalDate(pedido.fechaNecesaria).toLocaleDateString('es-PE')
       : '-';
   }, [pedido.fechaNecesaria]);
 
   const fechaEntregaDisplay = useMemo(() => {
-    return pedido.fechaEntregaEstimada 
-      ? new Date(pedido.fechaEntregaEstimada).toLocaleDateString('es-PE') 
+    return pedido.fechaEntregaEstimada
+      ? parseLocalDate(pedido.fechaEntregaEstimada).toLocaleDateString('es-PE')
       : '-';
   }, [pedido.fechaEntregaEstimada]);
 

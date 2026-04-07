@@ -196,7 +196,10 @@ const PedidosTable = memo(function PedidosTable({
 
   const formatDate = (date: string | Date | null | undefined) => {
     if (!date) return '-'
-    return new Date(date).toLocaleDateString('es-PE', { day: '2-digit', month: 'short' })
+    // Parse as local date to avoid UTC offset shifting the day
+    const str = typeof date === 'string' ? date : date.toISOString()
+    const [year, month, day] = str.split('T')[0].split('-').map(Number)
+    return new Date(year, month - 1, day).toLocaleDateString('es-PE', { day: '2-digit', month: 'short' })
   }
 
   const formatCurrency = (amount: number) => {

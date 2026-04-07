@@ -133,7 +133,9 @@ export default function LogisticaPedidosTable({ pedidos, loading = false, onDele
   }
 
   const formatDate = (dateString: string | Date) => {
-    return new Date(dateString).toLocaleDateString('es-ES', {
+    const str = typeof dateString === 'string' ? dateString : dateString.toISOString()
+    const [year, month, day] = str.split('T')[0].split('-').map(Number)
+    return new Date(year, month - 1, day).toLocaleDateString('es-ES', {
       day: '2-digit',
       month: '2-digit',
       year: '2-digit'
