@@ -177,12 +177,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     width: '100%',
   },
-  // Anchos de columnas — sin código (como el formato anterior)
-  colDesc:    { width: '46%', flexShrink: 0, overflow: 'hidden' as const },
-  colUnd:     { width: '10%', flexShrink: 0, overflow: 'hidden' as const },
-  colCant:    { width: '10%', flexShrink: 0, overflow: 'hidden' as const, textAlign: 'right' as const },
+  // Anchos de columnas
+  colNum:     { width: '4%',  flexShrink: 0, overflow: 'hidden' as const },
+  colCodigo:  { width: '14%', flexShrink: 0, overflow: 'hidden' as const },
+  colDesc:    { width: '34%', flexShrink: 0, overflow: 'hidden' as const },
+  colUnd:     { width: '8%',  flexShrink: 0, overflow: 'hidden' as const },
+  colCant:    { width: '8%',  flexShrink: 0, overflow: 'hidden' as const, textAlign: 'right' as const },
   colPrecio:  { width: '14%', flexShrink: 0, overflow: 'hidden' as const, textAlign: 'right' as const },
-  colDesc_:   { width: '8%',  flexShrink: 0, overflow: 'hidden' as const, textAlign: 'center' as const },
+  colDesc_:   { width: '6%',  flexShrink: 0, overflow: 'hidden' as const, textAlign: 'center' as const },
   colTotal:   { width: '12%', flexShrink: 0, overflow: 'hidden' as const, textAlign: 'right' as const },
 
   // ── TOTALES ──────────────────────────────────────────────────────────────────
@@ -297,6 +299,8 @@ function OrdenCompraPDF({ oc }: Props) {
         <Text style={{ fontSize: 8.5, fontWeight: 700, marginBottom: 4, color: colors.primary }}>{label}</Text>
       )}
       <View style={styles.tableHeader}>
+        <View style={styles.colNum}><Text style={styles.tableHeaderText}>N°</Text></View>
+        <View style={styles.colCodigo}><Text style={styles.tableHeaderText}>Código</Text></View>
         <View style={styles.colDesc}><Text style={styles.tableHeaderText}>Descripción</Text></View>
         <View style={styles.colUnd}><Text style={styles.tableHeaderText}>Und.</Text></View>
         <View style={styles.colCant}><Text style={styles.tableHeaderText}>Cant.</Text></View>
@@ -306,6 +310,8 @@ function OrdenCompraPDF({ oc }: Props) {
       </View>
       {items.map((item, i) => (
         <View key={item.id} style={[styles.tableRow, i % 2 === 1 ? styles.tableRowAlt : {}]} wrap={false}>
+          <View style={styles.colNum}><Text style={styles.tableCell}>{i + 1}</Text></View>
+          <View style={styles.colCodigo}><Text style={styles.tableCell}>{item.codigo}</Text></View>
           <View style={styles.colDesc}><Text style={styles.tableCell}>{item.descripcion}</Text></View>
           <View style={styles.colUnd}><Text style={styles.tableCell}>{item.unidad}</Text></View>
           <View style={styles.colCant}><Text style={styles.tableCellRight}>{Number(item.cantidad).toFixed(4)}</Text></View>
