@@ -73,7 +73,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           cantidadRecibida: cantidadEfectiva,
           ordenCompraItem: { connect: { id: item.id } },
         }
-        if (item.pedidoEquipoItemId) recData.pedidoEquipoItemId = item.pedidoEquipoItemId
+        if (item.pedidoEquipoItemId) recData.pedidoEquipoItem = { connect: { id: item.pedidoEquipoItemId } }
         if (item.listaEquipoItemId) recData.listaEquipoItemId = item.listaEquipoItemId
         console.log('[recepcion] creando recepcionPendiente con:', JSON.stringify(recData))
         await tx.recepcionPendiente.create({ data: recData })
