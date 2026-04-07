@@ -23,8 +23,9 @@ export function calcularStatsCotizacionLista(lista: ListaEquipo): ListaCotizacio
   let totalItems = lista.listaEquipoItem?.length || 0
 
   // Calcular items que tienen al menos una cotización
+  // La relación en Prisma se llama cotizacionProveedorItems
   let itemsCotizados = lista.listaEquipoItem?.filter(item =>
-    item.cotizaciones && item.cotizaciones.length > 0
+    ((item as any).cotizacionProveedorItems?.length > 0) || (item.cotizaciones && item.cotizaciones.length > 0)
   ).length || 0
 
   // Incluir cotizaciones directamente en la lista si no hay items
@@ -38,7 +39,7 @@ export function calcularStatsCotizacionLista(lista: ListaEquipo): ListaCotizacio
 
   // Calcular número de cotizaciones activas
   const allCotizaciones = [
-    ...(lista.listaEquipoItem?.flatMap(item => item.cotizaciones || []) || []),
+    ...(lista.listaEquipoItem?.flatMap(item => (item as any).cotizacionProveedorItems || item.cotizaciones || []) || []),
     ...listaCotizaciones
   ]
   const cotizacionesCount = allCotizaciones.length
