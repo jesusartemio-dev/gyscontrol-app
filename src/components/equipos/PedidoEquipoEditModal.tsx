@@ -30,10 +30,11 @@ interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   onUpdated: (pedido: PedidoEquipo) => void
-  fields?: ('fechaNecesaria' | 'fechaEntregaEstimada' | 'estado' | 'observacion')[]
+  fields?: ('nombre' | 'fechaNecesaria' | 'fechaEntregaEstimada' | 'estado' | 'observacion')[]
 }
 
 export default function PedidoEquipoEditModal({ pedido, open, onOpenChange, onUpdated, fields }: Props) {
+  const [nombre, setNombre] = useState('')
   const [observacion, setObservacion] = useState('')
   const [fechaNecesaria, setFechaNecesaria] = useState('')
   const [fechaEntregaEstimada, setFechaEntregaEstimada] = useState('')
@@ -42,14 +43,15 @@ export default function PedidoEquipoEditModal({ pedido, open, onOpenChange, onUp
   const [errors, setErrors] = useState<{ fechaNecesaria?: string; fechaEntregaEstimada?: string }>({})
 
   // Default fields to show if none specified
-  const defaultFields: ('fechaNecesaria' | 'fechaEntregaEstimada' | 'estado' | 'observacion')[] =
-    ['fechaNecesaria', 'fechaEntregaEstimada', 'estado', 'observacion']
+  const defaultFields: ('nombre' | 'fechaNecesaria' | 'fechaEntregaEstimada' | 'estado' | 'observacion')[] =
+    ['nombre', 'fechaNecesaria', 'fechaEntregaEstimada', 'estado', 'observacion']
 
   const visibleFields = fields || defaultFields
 
   // Reset form when pedido changes
   useEffect(() => {
     if (pedido) {
+      setNombre((pedido as any).nombre || '')
       setObservacion(pedido.observacion || '')
       setFechaNecesaria(pedido.fechaNecesaria ? formatDateForInput(pedido.fechaNecesaria) : '')
       setFechaEntregaEstimada(pedido.fechaEntregaEstimada ? formatDateForInput(pedido.fechaEntregaEstimada) : '')
@@ -99,6 +101,7 @@ export default function PedidoEquipoEditModal({ pedido, open, onOpenChange, onUp
 
       // Preparar payload para API - ensure dates are sent as date-only strings
       const payload = {
+        nombre: nombre.trim() || null,
         observacion: observacion.trim() || null,
         fechaNecesaria: fechaNecesaria || null,
         fechaEntregaEstimada: fechaEntregaEstimada || null,
@@ -170,7 +173,9 @@ export default function PedidoEquipoEditModal({ pedido, open, onOpenChange, onUp
   }
 
   const handleInputChange = (field: string, value: string) => {
-    if (field === 'observacion') {
+    if (field === 'nombre') {
+      setNombre(value)
+    } else if (field === 'observacion') {
       setObservacion(value)
     } else if (field === 'fechaNecesaria') {
       setFechaNecesaria(value)
@@ -196,6 +201,7 @@ export default function PedidoEquipoEditModal({ pedido, open, onOpenChange, onUp
       onOpenChange(false)
       // Reset form to original values
       if (pedido) {
+        setNombre((pedido as any).nombre || '')
         setObservacion(pedido.observacion || '')
         setFechaNecesaria(pedido.fechaNecesaria || '')
         setFechaEntregaEstimada(pedido.fechaEntregaEstimada || '')
@@ -231,6 +237,21 @@ export default function PedidoEquipoEditModal({ pedido, open, onOpenChange, onUp
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2 }}
         >
+          {visibleFields.includes('nombre') && (
+            <div className="space-y-2">
+              <Label htmlFor="nombre" className="text-sm font-medium text-gray-700">
+                Nombre del pedido (Opcional)
+              </Label>
+              <Input
+                id="nombre"
+                value={nombre}
+                onChange={(e) => handleInputChange('nombre', e.target.value)}
+                placeholder="Ej: Equipos para montaje eléctrico fase 1"
+                disabled={loading}
+              />
+            </div>
+          )}
+
           {visibleFields.includes('fechaNecesaria') && (
             <div className="space-y-2">
               <Label htmlFor="fechaNecesaria" className="text-sm font-medium text-gray-700">

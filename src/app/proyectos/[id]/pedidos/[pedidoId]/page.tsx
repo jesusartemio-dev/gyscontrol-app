@@ -803,7 +803,7 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
         open={showEditModal}
         onOpenChange={setShowEditModal}
         onUpdated={(pedidoActualizado) => setPedido(pedidoActualizado)}
-        fields={['fechaNecesaria', 'observacion']}
+        fields={['nombre', 'fechaNecesaria', 'observacion']}
       />
 
       {/* Modal de item directo */}
