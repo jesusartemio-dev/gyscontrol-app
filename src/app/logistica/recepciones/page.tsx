@@ -245,12 +245,8 @@ export default function RecepcionesPage() {
   const [actionMotivo, setActionMotivo] = useState('')
   const [cantidadReal, setCantidadReal] = useState<string>('')
 
-  // Bulk selection state
+  // Bulk selection (checkbox en tabla principal)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [bulkLoading, setBulkLoading] = useState(false)
-  const [bulkConfirm, setBulkConfirm] = useState<{ tipo: 'almacen' | 'proyecto'; ids: string[]; label: string } | null>(null)
-  // cantidades editables por item en el bulk almacén: id → cantidadReal string
-  const [bulkCantidades, setBulkCantidades] = useState<Record<string, string>>({})
 
   const canBulkSelect = (r: Recepcion) =>
     (r.estado === 'pendiente' || r.estado === 'en_almacen') &&
@@ -272,61 +268,70 @@ export default function RecepcionesPage() {
     setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
   }
 
-  const executeBulkAction = async () => {
-    if (!bulkConfirm) return
-    setBulkLoading(true)
+  // ── Bulk modal (carga TODOS los items del estado) ──────────────────────────
+  const [bulkModal, setBulkModal] = useState<{ tipo: 'almacen' | 'proyecto' } | null>(null)
+  const [bulkItems, setBulkItems] = useState<Recepcion[]>([])
+  const [bulkLoadingItems, setBulkLoadingItems] = useState(false)
+  const [bulkChecked, setBulkChecked] = useState<Set<string>>(new Set())
+  const [bulkCantidades, setBulkCantidades] = useState<Record<string, string>>({})
+  const [bulkSearchModal, setBulkSearchModal] = useState('')
+  const [bulkProcessing, setBulkProcessing] = useState(false)
+
+  const openBulkModal = async (tipo: 'almacen' | 'proyecto', preselectedIds?: string[]) => {
+    setBulkModal({ tipo })
+    setBulkLoadingItems(true)
+    setBulkSearchModal('')
+    try {
+      const estado = tipo === 'almacen' ? 'pendiente' : 'en_almacen'
+      const res = await fetch(`/api/logistica/recepciones?estado=${estado}&limit=500`)
+      const result = await res.json()
+      const items: Recepcion[] = result.ok ? result.data : []
+      setBulkItems(items)
+      // pre-seleccionar: si viene de checkboxes usa esos; si no, todos
+      const ids = preselectedIds && preselectedIds.length > 0
+        ? new Set(preselectedIds.filter(id => items.some(i => i.id === id)))
+        : new Set(items.map((i: Recepcion) => i.id))
+      setBulkChecked(ids)
+      if (tipo === 'almacen') {
+        const cantMap: Record<string, string> = {}
+        items.forEach((i: Recepcion) => { cantMap[i.id] = String(i.cantidadRecibida) })
+        setBulkCantidades(cantMap)
+      }
+    } catch {
+      toast.error('Error al cargar items')
+      setBulkModal(null)
+    } finally {
+      setBulkLoadingItems(false)
+    }
+  }
+
+  const executeBulkModal = async () => {
+    if (!bulkModal) return
+    const ids = Array.from(bulkChecked)
+    if (ids.length === 0) { toast.error('Selecciona al menos un item'); return }
+    setBulkProcessing(true)
     let ok = 0, fail = 0
-    const paso = bulkConfirm.tipo === 'almacen' ? 'almacen' : 'proyecto'
-    for (const id of bulkConfirm.ids) {
+    const paso = bulkModal.tipo === 'almacen' ? 'almacen' : 'proyecto'
+    for (const id of ids) {
       try {
-        const cantidadRealVal = bulkConfirm.tipo === 'almacen' ? parseFloat(bulkCantidades[id] || '') : NaN
         const body: any = { paso }
-        if (!isNaN(cantidadRealVal) && cantidadRealVal > 0) body.cantidadReal = cantidadRealVal
+        if (bulkModal.tipo === 'almacen') {
+          const qty = parseFloat(bulkCantidades[id] || '')
+          if (!isNaN(qty) && qty > 0) body.cantidadReal = qty
+        }
         const res = await fetch(`/api/recepcion-pendiente/${id}/confirmar`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         })
         if (res.ok) ok++; else fail++
       } catch { fail++ }
     }
-    setBulkLoading(false)
-    setBulkConfirm(null)
-    setBulkCantidades({})
+    setBulkProcessing(false)
+    setBulkModal(null)
     setSelectedIds(new Set())
     if (ok > 0) toast.success(`${ok} recepción(es) confirmadas`)
     if (fail > 0) toast.error(`${fail} no pudieron procesarse`)
     fetchData()
-  }
-
-  const initBulkCantidades = (ids: string[], tipo: 'almacen' | 'proyecto') => {
-    if (tipo !== 'almacen') return
-    const init: Record<string, string> = {}
-    for (const id of ids) {
-      const r = recepciones.find(x => x.id === id)
-      if (r) init[id] = String(r.cantidadRecibida)
-    }
-    setBulkCantidades(init)
-  }
-
-  const openBulkFromSelection = (tipo: 'almacen' | 'proyecto') => {
-    const estadoFiltro = tipo === 'almacen' ? 'pendiente' : 'en_almacen'
-    const ids = recepciones
-      .filter(r => selectedIds.has(r.id) && r.estado === estadoFiltro)
-      .map(r => r.id)
-    if (ids.length === 0) { toast.error('Ningún item seleccionado tiene el estado correcto'); return }
-    const label = tipo === 'almacen' ? 'Confirmar llegada a almacén' : 'Entregar a proyecto'
-    initBulkCantidades(ids, tipo)
-    setBulkConfirm({ tipo, ids, label })
-  }
-
-  const openBulkAll = (tipo: 'almacen' | 'proyecto') => {
-    const estadoFiltro = tipo === 'almacen' ? 'pendiente' : 'en_almacen'
-    const ids = recepciones.filter(r => r.estado === estadoFiltro).map(r => r.id)
-    if (ids.length === 0) return
-    const label = tipo === 'almacen' ? 'Confirmar todos en almacén' : 'Entregar todos al proyecto'
-    initBulkCantidades(ids, tipo)
-    setBulkConfirm({ tipo, ids, label })
   }
 
   useEffect(() => {
@@ -511,17 +516,17 @@ export default function RecepcionesPage() {
         {activeTab === 'pendiente' && (counts['pendiente'] || 0) > 0 &&
           ['admin', 'gerente', 'logistico', 'coordinador_logistico'].includes(role) && (
           <Button size="sm" variant="outline" className="h-9 gap-1.5 text-blue-600 border-blue-200 hover:bg-blue-50"
-            onClick={() => openBulkAll('almacen')} disabled={bulkLoading}>
+            onClick={() => openBulkModal('almacen')}>
             <ChevronsRight className="h-4 w-4" />
-            Pasar todos a Almacén ({counts['pendiente']})
+            Confirmar en Almacén ({counts['pendiente']})
           </Button>
         )}
         {activeTab === 'en_almacen' && (counts['en_almacen'] || 0) > 0 &&
           ['admin', 'gerente', 'logistico', 'coordinador_logistico', 'gestor', 'coordinador'].includes(role) && (
           <Button size="sm" variant="outline" className="h-9 gap-1.5 text-green-600 border-green-200 hover:bg-green-50"
-            onClick={() => openBulkAll('proyecto')} disabled={bulkLoading}>
+            onClick={() => openBulkModal('proyecto')}>
             <ChevronsRight className="h-4 w-4" />
-            Entregar todos al proyecto ({counts['en_almacen']})
+            Entregar al proyecto ({counts['en_almacen']})
           </Button>
         )}
       </div>
@@ -769,7 +774,7 @@ export default function RecepcionesPage() {
           {recepciones.some(r => selectedIds.has(r.id) && r.estado === 'pendiente') &&
             ['admin', 'gerente', 'logistico', 'coordinador_logistico'].includes(role) && (
             <Button size="sm" className="h-7 bg-blue-600 hover:bg-blue-700 text-white gap-1.5"
-              onClick={() => openBulkFromSelection('almacen')} disabled={bulkLoading}>
+              onClick={() => openBulkModal('almacen', recepciones.filter(r => selectedIds.has(r.id) && r.estado === 'pendiente').map(r => r.id))}>
               <CheckCircle className="h-3.5 w-3.5" />
               Confirmar almacén
             </Button>
@@ -777,7 +782,7 @@ export default function RecepcionesPage() {
           {recepciones.some(r => selectedIds.has(r.id) && r.estado === 'en_almacen') &&
             ['admin', 'gerente', 'logistico', 'coordinador_logistico', 'gestor', 'coordinador'].includes(role) && (
             <Button size="sm" className="h-7 bg-green-600 hover:bg-green-700 text-white gap-1.5"
-              onClick={() => openBulkFromSelection('proyecto')} disabled={bulkLoading}>
+              onClick={() => openBulkModal('proyecto', recepciones.filter(r => selectedIds.has(r.id) && r.estado === 'en_almacen').map(r => r.id))}>
               <Truck className="h-3.5 w-3.5" />
               Entregar al proyecto
             </Button>
@@ -789,71 +794,148 @@ export default function RecepcionesPage() {
         </div>
       )}
 
-      {/* Bulk confirmation dialog */}
-      {bulkConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-background rounded-xl shadow-2xl border w-full max-w-lg mx-4 flex flex-col max-h-[85vh]">
+      {/* Bulk modal */}
+      {bulkModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-background rounded-xl shadow-2xl border w-full max-w-2xl mx-4 flex flex-col max-h-[85vh]">
+            {/* Header */}
             <div className="px-5 pt-5 pb-3 border-b shrink-0">
-              <h2 className="text-base font-semibold">{bulkConfirm.label}</h2>
-              {bulkConfirm.tipo === 'almacen' && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Ajusta las cantidades si algún item llegó parcialmente.
-                </p>
-              )}
-              {bulkConfirm.tipo === 'proyecto' && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Se marcarán {bulkConfirm.ids.length} recepción(es) como entregadas al proyecto.
-                </p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-base font-semibold">
+                    {bulkModal.tipo === 'almacen' ? 'Confirmar llegada a Almacén' : 'Entregar al Proyecto'}
+                  </h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {bulkModal.tipo === 'almacen'
+                      ? 'Ajusta la cantidad si algún item llegó parcialmente. Desmarca los que no quieras procesar.'
+                      : 'Desmarca los items que no quieras marcar como entregados.'}
+                  </p>
+                </div>
+                <button onClick={() => setBulkModal(null)} className="text-muted-foreground hover:text-foreground">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              {/* Buscador dentro del modal */}
+              <div className="relative mt-3">
+                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por código o descripción..."
+                  value={bulkSearchModal}
+                  onChange={e => setBulkSearchModal(e.target.value)}
+                  className="pl-8 h-8 text-sm"
+                />
+              </div>
+              {/* Seleccionar/deseleccionar todos */}
+              {!bulkLoadingItems && bulkItems.length > 0 && (
+                <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                  <button className="hover:text-foreground underline"
+                    onClick={() => setBulkChecked(new Set(bulkItems.map(i => i.id)))}>
+                    Seleccionar todos ({bulkItems.length})
+                  </button>
+                  <button className="hover:text-foreground underline"
+                    onClick={() => setBulkChecked(new Set())}>
+                    Deseleccionar todos
+                  </button>
+                  <span className="ml-auto font-medium text-foreground">{bulkChecked.size} seleccionados</span>
+                </div>
               )}
             </div>
 
-            {bulkConfirm.tipo === 'almacen' && (
-              <div className="flex-1 overflow-y-auto px-5 py-3 space-y-2">
-                {bulkConfirm.ids.map(id => {
-                  const r = recepciones.find(x => x.id === id)
-                  if (!r) return null
+            {/* Lista */}
+            <div className="flex-1 overflow-y-auto">
+              {bulkLoadingItems ? (
+                <div className="flex items-center justify-center py-16 text-muted-foreground">
+                  <Loader2 className="h-5 w-5 animate-spin mr-2" /> Cargando...
+                </div>
+              ) : (() => {
+                const filtered = bulkItems.filter(r => {
+                  if (!bulkSearchModal) return true
+                  const s = bulkSearchModal.toLowerCase()
                   const info = getRecepcionInfo(r)
-                  const cantInput = bulkCantidades[id] ?? String(r.cantidadRecibida)
-                  const cantVal = parseFloat(cantInput)
-                  const isParcial = !isNaN(cantVal) && cantVal < r.cantidadRecibida
-                  return (
-                    <div key={id} className="flex items-center gap-3 py-1.5 border-b last:border-0">
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs font-mono text-muted-foreground">{info.codigo}</div>
-                        <div className="text-sm font-medium truncate">{info.descripcion}</div>
-                      </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0.01"
-                          max={r.cantidadRecibida}
-                          value={cantInput}
-                          onChange={e => setBulkCantidades(prev => ({ ...prev, [id]: e.target.value }))}
-                          className="h-7 w-20 text-xs text-right"
-                        />
-                        <span className="text-xs text-muted-foreground">/ {r.cantidadRecibida} {info.unidad}</span>
-                        {isParcial && <span className="text-[10px] text-amber-600 font-medium">parcial</span>}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
+                  return info.codigo.toLowerCase().includes(s) || info.descripcion.toLowerCase().includes(s) || info.origenLabel.toLowerCase().includes(s)
+                })
+                if (filtered.length === 0) return (
+                  <div className="flex flex-col items-center justify-center py-12 text-muted-foreground text-sm">
+                    <Package className="h-8 w-8 mb-2 opacity-30" />
+                    No hay items
+                  </div>
+                )
+                return (
+                  <table className="w-full text-sm">
+                    <thead className="border-b bg-muted/30 sticky top-0">
+                      <tr>
+                        <th className="w-10 px-4 py-2"></th>
+                        <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Origen / Proyecto</th>
+                        <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Ítem</th>
+                        <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground">
+                          {bulkModal.tipo === 'almacen' ? 'Cant. real' : 'Cantidad'}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {filtered.map(r => {
+                        const info = getRecepcionInfo(r)
+                        const checked = bulkChecked.has(r.id)
+                        const cantInput = bulkCantidades[r.id] ?? String(r.cantidadRecibida)
+                        const cantVal = parseFloat(cantInput)
+                        const isParcial = bulkModal.tipo === 'almacen' && !isNaN(cantVal) && cantVal < r.cantidadRecibida
+                        return (
+                          <tr key={r.id} className={checked ? 'bg-blue-50/40' : 'opacity-50'}>
+                            <td className="px-4 py-2.5">
+                              <Checkbox checked={checked}
+                                onCheckedChange={() => setBulkChecked(prev => { const n = new Set(prev); n.has(r.id) ? n.delete(r.id) : n.add(r.id); return n })} />
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <div className="text-[10px] font-semibold text-blue-600">{info.origenLabel}</div>
+                              <div className="text-xs text-muted-foreground truncate max-w-[160px]">{info.proyecto?.nombre || '—'}</div>
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <div className="font-mono text-xs text-muted-foreground">{info.codigo}</div>
+                              <div className="text-xs font-medium truncate max-w-[200px]">{info.descripcion}</div>
+                            </td>
+                            <td className="px-3 py-2.5 text-right">
+                              {bulkModal.tipo === 'almacen' ? (
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <Input
+                                    type="number" step="0.01" min="0.01" max={r.cantidadRecibida}
+                                    value={cantInput}
+                                    onChange={e => setBulkCantidades(prev => ({ ...prev, [r.id]: e.target.value }))}
+                                    disabled={!checked}
+                                    className="h-7 w-20 text-xs text-right"
+                                  />
+                                  <span className="text-xs text-muted-foreground shrink-0">/ {r.cantidadRecibida} {info.unidad}</span>
+                                  {isParcial && <span className="text-[10px] text-amber-600 font-medium">parcial</span>}
+                                </div>
+                              ) : (
+                                <span className="text-xs font-medium">{r.cantidadRecibida} {info.unidad}</span>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                )
+              })()}
+            </div>
 
-            <div className="px-5 py-3 border-t shrink-0 flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={() => { setBulkConfirm(null); setBulkCantidades({}) }} disabled={bulkLoading}>
-                Cancelar
-              </Button>
-              <Button
-                size="sm"
-                onClick={executeBulkAction}
-                disabled={bulkLoading}
-                className={bulkConfirm.tipo === 'almacen' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'}
-              >
-                {bulkLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-                Confirmar {bulkConfirm.ids.length} item(s)
-              </Button>
+            {/* Footer */}
+            <div className="px-5 py-3 border-t shrink-0 flex items-center justify-between gap-3">
+              <span className="text-sm text-muted-foreground">
+                {bulkChecked.size > 0
+                  ? <><span className="font-semibold text-foreground">{bulkChecked.size}</span> item(s) seleccionados</>
+                  : 'Ningún item seleccionado'}
+              </span>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setBulkModal(null)} disabled={bulkProcessing}>
+                  Cancelar
+                </Button>
+                <Button size="sm" onClick={executeBulkModal} disabled={bulkChecked.size === 0 || bulkProcessing}
+                  className={bulkModal.tipo === 'almacen' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'}>
+                  {bulkProcessing && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />}
+                  {bulkModal.tipo === 'almacen' ? 'Confirmar en Almacén' : 'Entregar al Proyecto'} ({bulkChecked.size})
+                </Button>
+              </div>
             </div>
           </div>
         </div>
