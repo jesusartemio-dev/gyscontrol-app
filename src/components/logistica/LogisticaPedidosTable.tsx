@@ -26,7 +26,7 @@ import type { PedidoEquipo } from '@/types'
 type EstadoPedidoEquipo = 'borrador' | 'enviado' | 'atendido' | 'parcial' | 'entregado' | 'cancelado'
 import { formatCurrency } from '@/lib/utils'
 
-type SortField = 'codigo' | 'responsable' | 'fechaPedido' | 'estado' | 'itemsCount' | 'progreso' | 'monto'
+type SortField = 'codigo' | 'responsable' | 'fechaPedido' | 'fechaNecesaria' | 'estado' | 'itemsCount' | 'progreso' | 'monto'
 type SortDirection = 'asc' | 'desc'
 
 interface LogisticaPedidosTableProps {
@@ -90,6 +90,10 @@ export default function LogisticaPedidosTable({ pedidos, loading = false, onDele
         case 'fechaPedido':
           aValue = new Date(a.fechaPedido)
           bValue = new Date(b.fechaPedido)
+          break
+        case 'fechaNecesaria':
+          aValue = a.fechaNecesaria ? new Date(a.fechaNecesaria) : new Date(0)
+          bValue = b.fechaNecesaria ? new Date(b.fechaNecesaria) : new Date(0)
           break
         case 'itemsCount':
           aValue = a.items?.length || 0
@@ -184,7 +188,19 @@ export default function LogisticaPedidosTable({ pedidos, loading = false, onDele
               className="text-xs cursor-pointer hover:bg-gray-50 w-[80px]"
               onClick={() => handleSort('fechaPedido')}
             >
-              <span className="flex items-center gap-1">Fecha <SortIcon field="fechaPedido" /></span>
+              <span className="flex items-center gap-1">Pedido <SortIcon field="fechaPedido" /></span>
+            </TableHead>
+            <TableHead
+              className="text-xs cursor-pointer hover:bg-gray-50 w-[80px]"
+              onClick={() => handleSort('fechaNecesaria')}
+            >
+              <span className="flex items-center gap-1">Necesaria <SortIcon field="fechaNecesaria" /></span>
+            </TableHead>
+            <TableHead className="text-xs w-[80px]">
+              Estimada
+            </TableHead>
+            <TableHead className="text-xs w-[80px]">
+              Entregado
             </TableHead>
             <TableHead
               className="text-xs cursor-pointer hover:bg-gray-50 w-[90px]"
@@ -227,10 +243,17 @@ export default function LogisticaPedidosTable({ pedidos, loading = false, onDele
                 onClick={() => router.push(`/logistica/pedidos/${pedido.id}`)}
               >
                 <TableCell className="font-mono text-xs py-2">
-                  <div className="flex items-center gap-1.5">
-                    {pedido.codigo}
-                    {(pedido as any).esUrgente && (
-                      <Badge variant="destructive" className="text-[9px] h-4 px-1 font-semibold">URGENTE</Badge>
+                  <div className="flex flex-col gap-0.5">
+                    <div className="flex items-center gap-1.5">
+                      {pedido.codigo}
+                      {(pedido as any).esUrgente && (
+                        <Badge variant="destructive" className="text-[9px] h-4 px-1 font-semibold">URGENTE</Badge>
+                      )}
+                    </div>
+                    {(pedido as any).nombre && (
+                      <span className="text-[10px] text-muted-foreground font-normal truncate max-w-[180px]" title={(pedido as any).nombre}>
+                        {(pedido as any).nombre}
+                      </span>
                     )}
                   </div>
                 </TableCell>
@@ -244,6 +267,26 @@ export default function LogisticaPedidosTable({ pedidos, loading = false, onDele
                 </TableCell>
                 <TableCell className="py-2 text-xs text-muted-foreground">
                   {formatDate(pedido.fechaPedido)}
+                </TableCell>
+                <TableCell className="py-2 text-xs">
+                  {pedido.fechaNecesaria ? (() => {
+                    const fecha = new Date(pedido.fechaNecesaria)
+                    const hoy = new Date()
+                    const diasRestantes = Math.ceil((fecha.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24))
+                    const color = pedido.estado === 'entregado' ? 'text-muted-foreground' :
+                      diasRestantes < 0 ? 'text-red-600 font-medium' :
+                      diasRestantes <= 7 ? 'text-amber-600 font-medium' :
+                      'text-muted-foreground'
+                    return <span className={color}>{formatDate(fecha)}</span>
+                  })() : <span className="text-muted-foreground">—</span>}
+                </TableCell>
+                <TableCell className="py-2 text-xs text-muted-foreground">
+                  {pedido.fechaEntregaEstimada ? formatDate(pedido.fechaEntregaEstimada) : '—'}
+                </TableCell>
+                <TableCell className="py-2 text-xs">
+                  {pedido.fechaEntregaReal
+                    ? <span className="text-green-600 font-medium">{formatDate(pedido.fechaEntregaReal)}</span>
+                    : <span className="text-muted-foreground">—</span>}
                 </TableCell>
                 <TableCell className="py-2">
                   <Badge variant={estadoConfig.variant} className="text-[10px] h-5 px-1.5">
