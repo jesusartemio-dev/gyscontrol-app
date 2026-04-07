@@ -245,29 +245,6 @@ export default function RecepcionesPage() {
   const [actionMotivo, setActionMotivo] = useState('')
   const [cantidadReal, setCantidadReal] = useState<string>('')
 
-  // Bulk selection (checkbox en tabla principal)
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-
-  const canBulkSelect = (r: Recepcion) =>
-    (r.estado === 'pendiente' || r.estado === 'en_almacen') &&
-    ['admin', 'gerente', 'logistico', 'coordinador_logistico'].includes(role)
-
-  const selectableOnPage = recepciones.filter(canBulkSelect)
-  const allPageSelected = selectableOnPage.length > 0 && selectableOnPage.every(r => selectedIds.has(r.id))
-  const somePageSelected = selectableOnPage.some(r => selectedIds.has(r.id))
-
-  const toggleSelectAll = () => {
-    if (allPageSelected) {
-      setSelectedIds(prev => { const n = new Set(prev); selectableOnPage.forEach(r => n.delete(r.id)); return n })
-    } else {
-      setSelectedIds(prev => { const n = new Set(prev); selectableOnPage.forEach(r => n.add(r.id)); return n })
-    }
-  }
-
-  const toggleSelect = (id: string) => {
-    setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
-  }
-
   // ── Bulk modal (carga TODOS los items del estado) ──────────────────────────
   const [bulkModal, setBulkModal] = useState<{ tipo: 'almacen' | 'proyecto' } | null>(null)
   const [bulkItems, setBulkItems] = useState<Recepcion[]>([])
@@ -277,21 +254,18 @@ export default function RecepcionesPage() {
   const [bulkSearchModal, setBulkSearchModal] = useState('')
   const [bulkProcessing, setBulkProcessing] = useState(false)
 
-  const openBulkModal = async (tipo: 'almacen' | 'proyecto', preselectedIds?: string[]) => {
+  const openBulkModal = async (tipo: 'almacen' | 'proyecto') => {
     setBulkModal({ tipo })
     setBulkLoadingItems(true)
     setBulkSearchModal('')
+    setBulkChecked(new Set())
     try {
       const estado = tipo === 'almacen' ? 'pendiente' : 'en_almacen'
       const res = await fetch(`/api/logistica/recepciones?estado=${estado}&limit=500`)
       const result = await res.json()
       const items: Recepcion[] = result.ok ? result.data : []
       setBulkItems(items)
-      // pre-seleccionar: si viene de checkboxes usa esos; si no, todos
-      const ids = preselectedIds && preselectedIds.length > 0
-        ? new Set(preselectedIds.filter(id => items.some(i => i.id === id)))
-        : new Set(items.map((i: Recepcion) => i.id))
-      setBulkChecked(ids)
+      setBulkChecked(new Set()) // nada seleccionado por defecto
       if (tipo === 'almacen') {
         const cantMap: Record<string, string> = {}
         items.forEach((i: Recepcion) => { cantMap[i.id] = String(i.cantidadRecibida) })
@@ -328,7 +302,7 @@ export default function RecepcionesPage() {
     }
     setBulkProcessing(false)
     setBulkModal(null)
-    setSelectedIds(new Set())
+    setBulkChecked(new Set())
     if (ok > 0) toast.success(`${ok} recepción(es) confirmadas`)
     if (fail > 0) toast.error(`${fail} no pudieron procesarse`)
     fetchData()
@@ -379,7 +353,7 @@ export default function RecepcionesPage() {
   const handleTabChange = (tab: TabEstado) => {
     setActiveTab(tab)
     resetPagination()
-    setSelectedIds(new Set())
+    setBulkChecked(new Set())
   }
 
   const executeAction = async () => {
@@ -518,7 +492,7 @@ export default function RecepcionesPage() {
           <Button size="sm" variant="outline" className="h-9 gap-1.5 text-blue-600 border-blue-200 hover:bg-blue-50"
             onClick={() => openBulkModal('almacen')}>
             <ChevronsRight className="h-4 w-4" />
-            Confirmar en Almacén ({counts['pendiente']})
+            Pasar a Almacén ({counts['pendiente']})
           </Button>
         )}
         {activeTab === 'en_almacen' && (counts['en_almacen'] || 0) > 0 &&
@@ -547,14 +521,6 @@ export default function RecepcionesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[40px] pl-4">
-                    <Checkbox
-                      checked={allPageSelected}
-                      onCheckedChange={toggleSelectAll}
-                      aria-label="Seleccionar todos"
-                      className={somePageSelected && !allPageSelected ? 'opacity-50' : ''}
-                    />
-                  </TableHead>
                   <TableHead className="w-[130px]">Origen</TableHead>
                   <TableHead>Proyecto</TableHead>
                   <TableHead>Ítem</TableHead>
@@ -576,16 +542,7 @@ export default function RecepcionesPage() {
                     oc: 'OC', req: 'REQ', directo: 'Directo',
                   }
                   return (
-                    <TableRow key={r.id} className={selectedIds.has(r.id) ? 'bg-blue-50/50' : ''}>
-                      <TableCell className="pl-4">
-                        {canBulkSelect(r) ? (
-                          <Checkbox
-                            checked={selectedIds.has(r.id)}
-                            onCheckedChange={() => toggleSelect(r.id)}
-                            aria-label="Seleccionar"
-                          />
-                        ) : <span className="w-4 h-4 block" />}
-                      </TableCell>
+                    <TableRow key={r.id}>
                       <TableCell>
                         <div className="flex flex-col gap-0.5">
                           <span className={`inline-flex w-fit items-center text-[9px] font-semibold px-1.5 py-0.5 rounded border ${fuenteStyles[info.fuente]}`}>
@@ -767,33 +724,6 @@ export default function RecepcionesPage() {
         />
       )}
 
-      {/* Floating bulk action bar */}
-      {selectedIds.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-2xl border border-gray-700">
-          <span className="text-sm font-medium mr-1">{selectedIds.size} seleccionado(s)</span>
-          {recepciones.some(r => selectedIds.has(r.id) && r.estado === 'pendiente') &&
-            ['admin', 'gerente', 'logistico', 'coordinador_logistico'].includes(role) && (
-            <Button size="sm" className="h-7 bg-blue-600 hover:bg-blue-700 text-white gap-1.5"
-              onClick={() => openBulkModal('almacen', recepciones.filter(r => selectedIds.has(r.id) && r.estado === 'pendiente').map(r => r.id))}>
-              <CheckCircle className="h-3.5 w-3.5" />
-              Confirmar almacén
-            </Button>
-          )}
-          {recepciones.some(r => selectedIds.has(r.id) && r.estado === 'en_almacen') &&
-            ['admin', 'gerente', 'logistico', 'coordinador_logistico', 'gestor', 'coordinador'].includes(role) && (
-            <Button size="sm" className="h-7 bg-green-600 hover:bg-green-700 text-white gap-1.5"
-              onClick={() => openBulkModal('proyecto', recepciones.filter(r => selectedIds.has(r.id) && r.estado === 'en_almacen').map(r => r.id))}>
-              <Truck className="h-3.5 w-3.5" />
-              Entregar al proyecto
-            </Button>
-          )}
-          <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-white hover:bg-gray-700"
-            onClick={() => setSelectedIds(new Set())}>
-            <X className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      )}
-
       {/* Bulk modal */}
       {bulkModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -803,12 +733,12 @@ export default function RecepcionesPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-base font-semibold">
-                    {bulkModal.tipo === 'almacen' ? 'Confirmar llegada a Almacén' : 'Entregar al Proyecto'}
+                    {bulkModal.tipo === 'almacen' ? 'Pasar a Almacén' : 'Entregar al Proyecto'}
                   </h2>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {bulkModal.tipo === 'almacen'
-                      ? 'Ajusta la cantidad si algún item llegó parcialmente. Desmarca los que no quieras procesar.'
-                      : 'Desmarca los items que no quieras marcar como entregados.'}
+                      ? 'Selecciona los items a confirmar. Ajusta la cantidad si llegaron parcialmente.'
+                      : 'Selecciona los items que quieres marcar como entregados al proyecto.'}
                   </p>
                 </div>
                 <button onClick={() => setBulkModal(null)} className="text-muted-foreground hover:text-foreground">
@@ -827,16 +757,19 @@ export default function RecepcionesPage() {
               </div>
               {/* Seleccionar/deseleccionar todos */}
               {!bulkLoadingItems && bulkItems.length > 0 && (
-                <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                  <button className="hover:text-foreground underline"
+                <div className="flex items-center gap-3 mt-2">
+                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1"
                     onClick={() => setBulkChecked(new Set(bulkItems.map(i => i.id)))}>
+                    <CheckCircle className="h-3 w-3" />
                     Seleccionar todos ({bulkItems.length})
-                  </button>
-                  <button className="hover:text-foreground underline"
-                    onClick={() => setBulkChecked(new Set())}>
-                    Deseleccionar todos
-                  </button>
-                  <span className="ml-auto font-medium text-foreground">{bulkChecked.size} seleccionados</span>
+                  </Button>
+                  {bulkChecked.size > 0 && (
+                    <button className="text-xs text-muted-foreground hover:text-foreground underline"
+                      onClick={() => setBulkChecked(new Set())}>
+                      Limpiar selección
+                    </button>
+                  )}
+                  <span className="ml-auto text-xs font-medium text-foreground">{bulkChecked.size} seleccionados</span>
                 </div>
               )}
             </div>
@@ -933,7 +866,7 @@ export default function RecepcionesPage() {
                 <Button size="sm" onClick={executeBulkModal} disabled={bulkChecked.size === 0 || bulkProcessing}
                   className={bulkModal.tipo === 'almacen' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'}>
                   {bulkProcessing && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />}
-                  {bulkModal.tipo === 'almacen' ? 'Confirmar en Almacén' : 'Entregar al Proyecto'} ({bulkChecked.size})
+                  {bulkModal.tipo === 'almacen' ? 'Pasar a Almacén' : 'Entregar al Proyecto'} ({bulkChecked.size})
                 </Button>
               </div>
             </div>
