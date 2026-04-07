@@ -148,6 +148,7 @@ const DEFAULT_COLUMNS: ColumnConfig[] = [
   { key: 'proyecto', label: 'Proyecto', sortable: true, width: '140px' },
   { key: 'creadoPor', label: 'Creado por', sortable: true, width: '130px' },
   { key: 'fechaPedido', label: 'F. Pedido', sortable: true, width: '90px', align: 'center' },
+  { key: 'fechaNecesaria', label: 'Necesaria', sortable: true, width: '90px', align: 'center' },
   { key: 'fechaEntregaEstimada', label: 'F. Entrega', sortable: true, width: '90px', align: 'center' },
   { key: 'estado', label: 'Estado', sortable: true, width: '100px', align: 'center' },
   { key: 'montoTotal', label: 'Monto', sortable: true, width: '90px', align: 'right' },
@@ -495,6 +496,20 @@ const PedidoEquipoTableRow = memo<PedidoTableRowProps>(({
           <span className={!pedido.fechaPedido ? 'text-muted-foreground' : ''}>
             {fechaPedidoDisplay}
           </span>
+        </TableCell>
+      )}
+
+      {visibleColumns.includes('fechaNecesaria') && (
+        <TableCell className="px-2 py-1.5 text-center text-xs">
+          {pedido.fechaNecesaria ? (() => {
+            const dias = Math.ceil((new Date(pedido.fechaNecesaria).getTime() - Date.now()) / 86400000)
+            const color = pedido.estado === 'entregado' ? 'text-muted-foreground' :
+              dias < 0 ? 'text-red-600 font-medium' :
+              dias <= 7 ? 'text-amber-600 font-medium' : ''
+            return <span className={color}>{fechaNecesariaDisplay}</span>
+          })() : (
+            <span className="text-muted-foreground">-</span>
+          )}
         </TableCell>
       )}
 
