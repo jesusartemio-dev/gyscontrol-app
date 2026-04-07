@@ -59,6 +59,7 @@ export default function PedidoEquipoModalCrear({
 }: Props) {
   const [open, setOpen] = useState(false)
   const [listaId, setListaId] = useState('')
+  const [nombre, setNombre] = useState('')
   const [observacion, setObservacion] = useState('')
   const [fechaNecesaria, setFechaNecesaria] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [loading, setLoading] = useState(false)
@@ -192,6 +193,7 @@ export default function PedidoEquipoModalCrear({
   // Reset form
   const resetForm = () => {
     setListaId('')
+    setNombre('')
     setObservacion('')
     setFechaNecesaria(format(new Date(), 'yyyy-MM-dd'))
     setErrors({})
@@ -212,6 +214,7 @@ export default function PedidoEquipoModalCrear({
         proyectoId,
         responsableId,
         listaId,
+        nombre: nombre.trim() || null,
         observacion: observacion.trim() || undefined,
         fechaNecesaria: new Date(fechaNecesaria).toISOString(),
         // Include selected items
@@ -267,6 +270,19 @@ export default function PedidoEquipoModalCrear({
         </DialogHeader>
 
         <div className="space-y-4 py-2">
+          {/* Nombre del pedido */}
+          <div className="space-y-1.5">
+            <Label htmlFor="nombre" className="text-sm font-medium">Nombre del pedido <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+            <Input
+              id="nombre"
+              placeholder="Ej: Materiales eléctricos fase 1, Herramientas topografía..."
+              value={nombre}
+              onChange={e => setNombre(e.target.value)}
+              maxLength={120}
+              className="text-sm"
+            />
+          </div>
+
           {/* Lista Técnica Selection */}
           <div className="space-y-1.5">
             <Label htmlFor="lista" className="text-sm font-medium">

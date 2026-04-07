@@ -1488,6 +1488,7 @@ export interface PedidoEquipo {
   listaId?: string
   codigo: string                         // ✅ Código obligatorio
   numeroSecuencia: number               // ✅ número puro usado para construir el código (ej. 1 → PED-001)
+  nombre?: string                        // ✅ Nombre descriptivo del pedido
   estado: EstadoPedido
   fechaPedido: string                   // ✅ mantenido por compatibilidad
   fechaNecesaria: string               // ✅ Proyectos indica esta fecha

@@ -180,6 +180,7 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
         proyectoId: body.proyectoId,
         responsableId: body.responsableId,
         listaId: body.listaId ?? null,
+        nombre: body.nombre !== undefined ? (body.nombre || null) : undefined,
         estado: body.estado,
         observacion: body.observacion,
         fechaPedido: body.fechaPedido ? new Date(body.fechaPedido) : undefined,

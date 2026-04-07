@@ -140,7 +140,7 @@ const PedidosTable = memo(function PedidosTable({
       let aVal: any = a[sortField as keyof PedidoEquipo]
       let bVal: any = b[sortField as keyof PedidoEquipo]
 
-      if (sortField === 'createdAt' || sortField === 'fechaEstimada') {
+      if (['createdAt', 'fechaPedido', 'fechaNecesaria', 'fechaEntregaEstimada', 'fechaEntregaReal'].includes(sortField)) {
         aVal = aVal ? new Date(aVal).getTime() : 0
         bVal = bVal ? new Date(bVal).getTime() : 0
       }
@@ -261,12 +261,7 @@ const PedidosTable = memo(function PedidosTable({
                 </button>
               </TableHead>
               <TableHead>
-                <button
-                  onClick={() => handleSort('proveedor')}
-                  className="flex items-center text-xs font-medium"
-                >
-                  Proveedor<SortIcon field="proveedor" />
-                </button>
+                <span className="text-xs font-medium">Nombre / Proveedor</span>
               </TableHead>
               <TableHead className="w-[70px] text-right text-xs font-medium">Items</TableHead>
               <TableHead className="w-[100px] text-right">
@@ -278,11 +273,23 @@ const PedidosTable = memo(function PedidosTable({
                 </button>
               </TableHead>
               <TableHead className="w-[90px]">
-                <button
-                  onClick={() => handleSort('createdAt')}
-                  className="flex items-center text-xs font-medium"
-                >
-                  Fecha<SortIcon field="createdAt" />
+                <button onClick={() => handleSort('fechaPedido')} className="flex items-center text-xs font-medium">
+                  Pedido<SortIcon field="fechaPedido" />
+                </button>
+              </TableHead>
+              <TableHead className="w-[90px]">
+                <button onClick={() => handleSort('fechaNecesaria')} className="flex items-center text-xs font-medium">
+                  Necesaria<SortIcon field="fechaNecesaria" />
+                </button>
+              </TableHead>
+              <TableHead className="w-[90px]">
+                <button onClick={() => handleSort('fechaEntregaEstimada')} className="flex items-center text-xs font-medium">
+                  Estimada<SortIcon field="fechaEntregaEstimada" />
+                </button>
+              </TableHead>
+              <TableHead className="w-[90px]">
+                <button onClick={() => handleSort('fechaEntregaReal')} className="flex items-center text-xs font-medium">
+                  Entregado<SortIcon field="fechaEntregaReal" />
                 </button>
               </TableHead>
               <TableHead className="w-[100px] text-xs font-medium">Estado</TableHead>
@@ -292,7 +299,7 @@ const PedidosTable = memo(function PedidosTable({
           <TableBody>
             {sortedPedidos.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground text-sm">
+                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground text-sm">
                   {search || filterEstado !== 'all' ? 'No se encontraron pedidos' : 'Sin pedidos registrados'}
                 </TableCell>
               </TableRow>
@@ -329,12 +336,12 @@ const PedidosTable = memo(function PedidosTable({
                     </TableCell>
                     <TableCell className="py-2">
                       <div>
-                        <span className={`text-sm font-medium line-clamp-1 ${proveedorNames.size === 0 ? 'text-muted-foreground' : ''}`}>{proveedorLabel}</span>
-                        {(pedido as any).descripcion && (
-                          <span className="text-xs text-muted-foreground line-clamp-1 block">
-                            {(pedido as any).descripcion}
-                          </span>
+                        {(pedido as any).nombre && (
+                          <span className="text-sm font-medium line-clamp-1 block">{(pedido as any).nombre}</span>
                         )}
+                        <span className={`text-xs line-clamp-1 ${(pedido as any).nombre ? 'text-muted-foreground' : `font-medium ${proveedorNames.size === 0 ? 'text-muted-foreground' : ''}`}`}>
+                          {proveedorLabel}
+                        </span>
                       </div>
                     </TableCell>
                     <TableCell className="text-right font-mono text-sm py-2">
@@ -344,7 +351,30 @@ const PedidosTable = memo(function PedidosTable({
                       {formatCurrency(montoTotal)}
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground py-2">
-                      {formatDate((pedido as any).createdAt)}
+                      {formatDate((pedido as any).fechaPedido)}
+                    </TableCell>
+                    <TableCell className="text-xs py-2">
+                      {(pedido as any).fechaNecesaria ? (
+                        <span className={(() => {
+                          const diff = new Date((pedido as any).fechaNecesaria).getTime() - Date.now()
+                          if (pedido.estado === 'entregado') return 'text-muted-foreground'
+                          if (diff < 0) return 'text-red-600 font-medium'
+                          if (diff < 7 * 86400000) return 'text-amber-600 font-medium'
+                          return 'text-foreground'
+                        })()}>
+                          {formatDate((pedido as any).fechaNecesaria)}
+                        </span>
+                      ) : <span className="text-muted-foreground">—</span>}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground py-2">
+                      {formatDate((pedido as any).fechaEntregaEstimada)}
+                    </TableCell>
+                    <TableCell className="text-xs py-2">
+                      {(pedido as any).fechaEntregaReal ? (
+                        <span className="text-green-600 font-medium">
+                          {formatDate((pedido as any).fechaEntregaReal)}
+                        </span>
+                      ) : <span className="text-muted-foreground">—</span>}
                     </TableCell>
                     <TableCell className="py-2">
                       {getEstadoBadge(pedido.estado || 'borrador')}

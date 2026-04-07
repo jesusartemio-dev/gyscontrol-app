@@ -716,6 +716,7 @@ model PedidoEquipo {
   listaId              String?
   codigo               String               @unique
   numeroSecuencia      Int
+  nombre               String?
   estado               EstadoPedido         @default(borrador)
   fechaPedido          DateTime             @default(now())
   observacion          String?

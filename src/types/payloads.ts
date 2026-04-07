@@ -698,6 +698,7 @@ export interface PedidoEquipoPayload {
   proyectoId: string
   responsableId: string
   listaId?: string | null
+  nombre?: string | null        // ✅ nombre descriptivo del pedido
   estado?: EstadoPedido
   observacion?: string
   fechaPedido?: string         // ✅ se mantiene por compatibilidad
