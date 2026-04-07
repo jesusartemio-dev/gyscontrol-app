@@ -101,53 +101,14 @@ export async function GET(request: NextRequest) {
       });
     });
 
-    // 2. Si no hay EDTs en cronogramas, usar fallback de servicios
-    if (proyectoEdts.length === 0) {
-      console.log('🔍 EDTS SIMPLE: No hay cronograma de ejecución, usando servicios como fallback');
-      
-      // 2. FALLBACK: Si no hay cronograma de ejecución, usar servicios
-      const proyectoServicios = await prisma.proyectoServicioCotizado.findMany({
-        where: { proyectoId },
-        select: {
-          id: true,
-          edtId: true,
-          edt: { select: { id: true, nombre: true } },
-          user: {
-            select: { name: true }
-          }
-        }
+    // 2. Si no hay cronograma de ejecución, retornar sin EDTs
+    if (!cronogramaEjecucion) {
+      console.log('🔍 EDTS SIMPLE: No hay cronograma de ejecución para este proyecto');
+      return NextResponse.json({
+        success: true,
+        edts: [],
+        hasCronogramaEjecucion: false
       });
-
-      console.log('🔍 EDTS SIMPLE: Servicios del proyecto:', proyectoServicios.length);
-
-      // Crear EDTs basados en los EDTs de servicios
-      const categoriasEdt = [...new Set(proyectoServicios.map(s => s.edtId).filter(Boolean))];
-
-      // Obtener nombres de los EDTs desde la tabla Edt
-      const edtsInfo = await Promise.all(
-        categoriasEdt.map(async (categoriaId) => {
-          const edt = await prisma.edt.findUnique({
-            where: { id: categoriaId },
-            select: { id: true, nombre: true }
-          });
-          return { categoriaId, nombre: edt?.nombre || categoriaId };
-        })
-      );
-
-      proyectoEdts = edtsInfo.map(({ categoriaId, nombre }, index) => ({
-        id: `categoria-${index}`, // ID temporal
-        nombre: nombre, // ✅ Usar el nombre real del EDT
-        edtId: categoriaId,
-        edt: null, // No hay relación a catálogo Edt en este caso
-        user: proyectoServicios.find(s => s.edtId === categoriaId)?.user || { name: 'Sin responsable' },
-        horasPlan: 0,
-        horasReales: 0,
-        estado: 'planificado',
-        porcentajeAvance: 0,
-        orden: index
-      }));
-
-      console.log('🔍 EDTS SIMPLE: EDTs de fallback construidos:', proyectoEdts.length);
     }
 
     // 3. DEDUPLICACIÓN: Solo eliminar duplicados exactos por ID (no por categoría)
@@ -233,7 +194,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      edts
+      edts,
+      hasCronogramaEjecucion: true
     });
 
   } catch (error) {

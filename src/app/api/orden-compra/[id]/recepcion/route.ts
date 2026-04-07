@@ -68,8 +68,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         if (existente) continue
 
         const recData: any = {
-          ordenCompraItemId: item.id,
           cantidadRecibida: cantidadEfectiva,
+          ordenCompraItem: { connect: { id: item.id } },
         }
         if (item.pedidoEquipoItemId) recData.pedidoEquipoItemId = item.pedidoEquipoItemId
         if (item.listaEquipoItemId) recData.listaEquipoItemId = item.listaEquipoItemId
@@ -119,7 +119,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
         await tx.eventoTrazabilidad.create({
           data: {
-            id: `evt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            id: `evt-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
             proyectoId: existing.proyectoId || null,
             pedidoEquipoId: existing.pedidoEquipoId || null,
             tipo: 'recepcion_registrada',

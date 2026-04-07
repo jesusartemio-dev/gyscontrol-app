@@ -31,8 +31,10 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
-  Building
+  Building,
+  AlertCircle
 } from 'lucide-react'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useToast } from '@/hooks/use-toast'
 import { format } from 'date-fns'
 
@@ -122,6 +124,7 @@ export function RegistroHorasWizard({
   // Datos disponibles
   const [proyectos, setProyectos] = useState<Proyecto[]>([])
   const [edts, setEdts] = useState<Edt[]>([])
+  const [sinCronograma, setSinCronograma] = useState(false)
   const [actividades, setActividades] = useState<any[]>([])
   const [tareasDirectas, setTareasDirectas] = useState<Elemento[]>([])
   const [elementos, setElementos] = useState<Elemento[]>([])
@@ -318,12 +321,18 @@ export function RegistroHorasWizard({
       }
 
       const data = await response.json()
-      console.log('🔍 REACT: Datos EDTs recibidos:', { success: data.success, edtsLength: data.edts?.length || 0 })
-      
-      if (data.success && data.edts) {
-        setEdts(data.edts)
+      console.log('🔍 REACT: Datos EDTs recibidos:', { success: data.success, edtsLength: data.edts?.length || 0, hasCronogramaEjecucion: data.hasCronogramaEjecucion })
+
+      if (data.success) {
+        if (data.hasCronogramaEjecucion === false) {
+          setSinCronograma(true)
+          setEdts([])
+        } else {
+          setSinCronograma(false)
+          setEdts(data.edts || [])
+        }
         setElementos([]) // Limpiar elementos del EDT anterior
-        console.log('✅ REACT: EDTs configurados:', data.edts.length)
+        console.log('✅ REACT: EDTs configurados:', data.edts?.length || 0)
       } else {
         console.error('❌ REACT: Error en respuesta EDTs:', data)
         throw new Error(data.error || 'Error en respuesta de API')
@@ -496,6 +505,7 @@ export function RegistroHorasWizard({
     setElementoSeleccionado(null)
     setActividadSeleccionada(null)
     setEdts([])
+    setSinCronograma(false)
     setActividades([])
     setTareasDirectas([])
     setElementos([])
@@ -648,6 +658,7 @@ export function RegistroHorasWizard({
               setProyectoSeleccionado(proyecto || null)
               setEdtSeleccionado(null) // Limpiar EDT seleccionado
               setEdts([]) // Limpiar lista de EDTs
+              setSinCronograma(false)
             }}
           >
             <SelectTrigger>
@@ -704,6 +715,13 @@ export function RegistroHorasWizard({
           <Loader2 className="h-4 w-4 animate-spin" />
           <span>Cargando EDTs...</span>
         </div>
+      ) : sinCronograma ? (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Este proyecto no tiene un <strong>Cronograma de Ejecución</strong>. Debes crearlo en la sección de Cronograma del proyecto antes de poder registrar horas.
+          </AlertDescription>
+        </Alert>
       ) : (
         <Select
           value={edtSeleccionado?.id || ''}
