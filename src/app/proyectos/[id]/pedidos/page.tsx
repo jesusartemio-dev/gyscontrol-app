@@ -263,6 +263,7 @@ const PedidosTable = memo(function PedidosTable({
               <TableHead>
                 <span className="text-xs font-medium">Nombre / Proveedor</span>
               </TableHead>
+              <TableHead className="w-[110px] text-xs font-medium">Responsable</TableHead>
               <TableHead className="w-[70px] text-right text-xs font-medium">Items</TableHead>
               <TableHead className="w-[100px] text-right">
                 <button
@@ -299,7 +300,7 @@ const PedidosTable = memo(function PedidosTable({
           <TableBody>
             {sortedPedidos.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground text-sm">
+                <TableCell colSpan={11} className="text-center py-8 text-muted-foreground text-sm">
                   {search || filterEstado !== 'all' ? 'No se encontraron pedidos' : 'Sin pedidos registrados'}
                 </TableCell>
               </TableRow>
@@ -343,6 +344,11 @@ const PedidosTable = memo(function PedidosTable({
                           {proveedorLabel}
                         </span>
                       </div>
+                    </TableCell>
+                    <TableCell className="py-2 text-xs text-muted-foreground">
+                      <span className="truncate block max-w-[100px]" title={pedido.responsable?.name ?? undefined}>
+                        {pedido.responsable?.name || '—'}
+                      </span>
                     </TableCell>
                     <TableCell className="text-right font-mono text-sm py-2">
                       {totalItems}
