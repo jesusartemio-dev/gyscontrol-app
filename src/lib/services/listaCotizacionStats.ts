@@ -69,7 +69,7 @@ export function getEstadoCotizacionText(stats: ListaCotizacionStats): string {
   }
 
   if (stats.itemsCotizados > 0) {
-    return 'Parcialmente cotizado'
+    return 'Parcial'
   }
 
   return 'Sin cotizar'
