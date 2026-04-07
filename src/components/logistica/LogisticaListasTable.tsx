@@ -218,7 +218,7 @@ export default function LogisticaListasTable({ listas, loading = false, onDelete
                 className="hover:bg-gray-50/50 cursor-pointer"
                 onClick={() => router.push(`/logistica/listas/${lista.id}`)}
               >
-                <TableCell className="font-mono text-xs py-2">
+                <TableCell className="font-mono text-xs py-2 whitespace-nowrap">
                   {lista.codigo}
                 </TableCell>
                 <TableCell className="py-2">

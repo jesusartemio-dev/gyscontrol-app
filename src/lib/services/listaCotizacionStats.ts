@@ -65,7 +65,7 @@ export function getEstadoCotizacionText(stats: ListaCotizacionStats): string {
   }
 
   if (stats.todosCotizados) {
-    return 'Completamente cotizado'
+    return 'Cotizado'
   }
 
   if (stats.itemsCotizados > 0) {
