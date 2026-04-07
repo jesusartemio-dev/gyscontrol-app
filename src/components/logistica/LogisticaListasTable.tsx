@@ -280,8 +280,61 @@ export default function LogisticaListasTable({ listas, loading = false, onDelete
                     )
                   })()}
                 </TableCell>
-                <TableCell className="text-right font-mono text-xs text-muted-foreground py-2">
-                  ${((lista as any).montoEstimado || 0).toLocaleString('es-PE', { minimumFractionDigits: 2 })}
+                <TableCell className="text-right font-mono text-xs py-2">
+                  {(() => {
+                    const items = lista.listaEquipoItem || []
+                    const total = items.length
+                    const conSeleccion = items.filter((i: any) => !!i.cotizacionSeleccionadaId).length
+                    const costoConfirmado = items.reduce((sum: number, i: any) => sum + (i.costoElegido ?? 0), 0)
+                    const costoEstimado = (lista as any).montoEstimado || 0
+
+                    if (total === 0) return <span className="text-muted-foreground">$0.00</span>
+
+                    if (conSeleccion === total) {
+                      // Todos seleccionados — costo real
+                      return (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="text-green-600 font-medium cursor-help">
+                              ${costoConfirmado.toLocaleString('es-PE', { minimumFractionDigits: 2 })}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="text-xs">Costo confirmado ({total}/{total} ítems)</TooltipContent>
+                        </Tooltip>
+                      )
+                    }
+
+                    if (conSeleccion > 0) {
+                      // Parcial — costo confirmado parcial
+                      return (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="text-amber-600 font-medium cursor-help">
+                              ${costoConfirmado.toLocaleString('es-PE', { minimumFractionDigits: 2 })}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="text-xs">
+                            <div>Costo parcial confirmado ({conSeleccion}/{total} ítems)</div>
+                            <div className="text-muted-foreground mt-0.5">{total - conSeleccion} ítems sin cotización elegida</div>
+                          </TooltipContent>
+                        </Tooltip>
+                      )
+                    }
+
+                    // Sin selección — estimado
+                    return (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="text-muted-foreground cursor-help">
+                            ${costoEstimado.toLocaleString('es-PE', { minimumFractionDigits: 2 })}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="text-xs">
+                          <div>Estimado — ningún ítem tiene cotización elegida</div>
+                        </TooltipContent>
+                      </Tooltip>
+                    )
+                  })()}
                 </TableCell>
                 <TableCell className="py-2 text-xs text-muted-foreground">
                   {formatDate(lista.createdAt)}
