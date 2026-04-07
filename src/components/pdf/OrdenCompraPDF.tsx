@@ -7,7 +7,6 @@ import {
   View,
   StyleSheet,
   PDFDownloadLink,
-  Image
 } from '@react-pdf/renderer'
 import type { OrdenCompra } from '@/types'
 
@@ -16,128 +15,139 @@ interface Props {
 }
 
 const colors = {
-  primary: '#374151',
+  primary: '#1a3557',
   secondary: '#6b7280',
   accent: '#9ca3af',
   dark: '#111827',
   light: '#f9fafb',
   white: '#ffffff',
-  border: '#e5e7eb',
-  borderLight: '#f3f4f6',
-  orange: '#ea580c',
+  border: '#d1d5db',
+  borderLight: '#e5e7eb',
+  orange: '#d97706',
+  teal: '#0f766e',
 }
 
 const styles = StyleSheet.create({
   page: {
-    padding: 45,
+    padding: 40,
+    paddingBottom: 60,
     fontSize: 10,
-    lineHeight: 1.5,
+    lineHeight: 1.4,
     color: colors.dark,
     backgroundColor: colors.white,
   },
-  // Header
+
+  // ── HEADER ──────────────────────────────────────────────────────────────────
   headerContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 8,
+    marginBottom: 0,
     paddingBottom: 10,
     borderBottom: `2px solid ${colors.primary}`,
   },
-  logoSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 35,
-  },
-  logo: {
-    width: 80,
-    height: 40,
-    marginRight: 20,
+  // Lado izquierdo: datos empresa
+  companyBlock: {
+    flexDirection: 'column',
   },
   companyName: {
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: 700,
     color: colors.primary,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   companyTagline: {
-    fontSize: 9,
-    color: colors.secondary,
-    marginBottom: 6,
+    fontSize: 7.5,
+    color: colors.orange,
+    marginBottom: 4,
+    fontStyle: 'italic',
   },
-  companyDetails: {
+  companyDetail: {
     fontSize: 7.5,
     color: colors.secondary,
+    lineHeight: 1.5,
+  },
+  // Lado derecho: datos proveedor
+  supplierBlock: {
+    width: '42%',
+    alignItems: 'flex-end',
+  },
+  supplierName: {
+    fontSize: 9,
+    fontWeight: 700,
+    color: colors.dark,
+    marginBottom: 2,
+    textAlign: 'right',
+  },
+  supplierDetail: {
+    fontSize: 7.5,
+    color: colors.secondary,
+    textAlign: 'right',
     lineHeight: 1.4,
   },
-  // Title
-  titleContainer: {
-    backgroundColor: colors.light,
-    padding: 16,
-    marginBottom: 20,
-    marginTop: 15,
-    border: `1px solid ${colors.borderLight}`,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 14,
-    fontWeight: 700,
+  supplierRuc: {
+    fontSize: 7.5,
     color: colors.orange,
+    textAlign: 'right',
+    marginTop: 2,
   },
-  titleNumber: {
-    fontSize: 14,
+
+  // ── TÍTULO PRINCIPAL ─────────────────────────────────────────────────────────
+  titleSection: {
+    alignItems: 'center',
+    marginTop: 12,
+    marginBottom: 12,
+  },
+  titleMain: {
+    fontSize: 18,
     fontWeight: 700,
     color: colors.dark,
-  },
-  titleDate: {
-    fontSize: 9,
-    color: colors.secondary,
-    marginTop: 4,
-  },
-  // Info sections
-  infoRow: {
-    flexDirection: 'row',
-    gap: 15,
-    marginBottom: 15,
-  },
-  infoCard: {
-    flex: 1,
-    border: `1px solid ${colors.border}`,
-    padding: 12,
-  },
-  infoTitle: {
-    fontSize: 9,
-    fontWeight: 700,
-    color: colors.primary,
-    marginBottom: 6,
-    textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  infoLabel: {
-    fontSize: 8,
+
+  // ── BLOQUE DE REFERENCIAS ────────────────────────────────────────────────────
+  refsContainer: {
+    flexDirection: 'row',
+    borderTop: `1px solid ${colors.border}`,
+    borderBottom: `1px solid ${colors.border}`,
+    marginBottom: 14,
+  },
+  refCell: {
+    flex: 1,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRight: `1px solid ${colors.border}`,
+  },
+  refCellLast: {
+    flex: 1,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  refLabel: {
+    fontSize: 7,
     color: colors.secondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 2,
   },
-  infoValue: {
-    fontSize: 9.5,
+  refValue: {
+    fontSize: 9,
+    fontWeight: 700,
     color: colors.dark,
-    marginBottom: 3,
   },
-  // Table
+
+  // ── TABLA ────────────────────────────────────────────────────────────────────
   table: {
-    marginBottom: 15,
+    marginBottom: 10,
   },
   tableHeader: {
     flexDirection: 'row',
     backgroundColor: colors.primary,
-    paddingVertical: 6,
+    paddingVertical: 5,
     paddingHorizontal: 8,
   },
   tableHeaderText: {
-    fontSize: 8,
+    fontSize: 7.5,
     fontWeight: 700,
     color: colors.white,
     textTransform: 'uppercase',
@@ -147,36 +157,41 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     paddingHorizontal: 8,
     borderBottom: `1px solid ${colors.borderLight}`,
-    flexWrap: 'nowrap' as const,
   },
   tableRowAlt: {
     backgroundColor: colors.light,
   },
   tableCell: {
-    fontSize: 8.5,
+    fontSize: 8,
     color: colors.dark,
   },
   tableCellRight: {
-    fontSize: 8.5,
+    fontSize: 8,
     color: colors.dark,
     textAlign: 'right',
     width: '100%',
   },
-  // Columns widths — each View acts as a fixed container so text wraps inside
-  colNum: { width: '5%', flexShrink: 0, overflow: 'hidden' as const },
-  colCodigo: { width: '15%', flexShrink: 0, overflow: 'hidden' as const },
-  colDesc: { width: '34%', flexShrink: 0, overflow: 'hidden' as const },
-  colUnd: { width: '7%', flexShrink: 0, overflow: 'hidden' as const },
-  colCant: { width: '8%', flexShrink: 0, overflow: 'hidden' as const, textAlign: 'right' as const },
-  colPrecio: { width: '15%', flexShrink: 0, overflow: 'hidden' as const, textAlign: 'right' as const },
-  colTotal: { width: '16%', flexShrink: 0, overflow: 'hidden' as const, textAlign: 'right' as const },
-  // Totals
+  tableCellCenter: {
+    fontSize: 8,
+    color: colors.dark,
+    textAlign: 'center',
+    width: '100%',
+  },
+  // Anchos de columnas — sin código (como el formato anterior)
+  colDesc:    { width: '46%', flexShrink: 0, overflow: 'hidden' as const },
+  colUnd:     { width: '10%', flexShrink: 0, overflow: 'hidden' as const },
+  colCant:    { width: '10%', flexShrink: 0, overflow: 'hidden' as const, textAlign: 'right' as const },
+  colPrecio:  { width: '14%', flexShrink: 0, overflow: 'hidden' as const, textAlign: 'right' as const },
+  colDesc_:   { width: '8%',  flexShrink: 0, overflow: 'hidden' as const, textAlign: 'center' as const },
+  colTotal:   { width: '12%', flexShrink: 0, overflow: 'hidden' as const, textAlign: 'right' as const },
+
+  // ── TOTALES ──────────────────────────────────────────────────────────────────
   totalsContainer: {
     alignItems: 'flex-end',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   totalsBox: {
-    width: 220,
+    width: 200,
     border: `1px solid ${colors.border}`,
   },
   totalsRow: {
@@ -193,81 +208,59 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     backgroundColor: colors.primary,
   },
-  totalsLabel: {
-    fontSize: 9,
-    color: colors.secondary,
+  totalsLabel: { fontSize: 8.5, color: colors.secondary },
+  totalsValue: { fontSize: 8.5, fontWeight: 700, color: colors.dark },
+  totalsLabelBold: { fontSize: 9.5, fontWeight: 700, color: colors.white },
+  totalsValueBold: { fontSize: 9.5, fontWeight: 700, color: colors.white },
+
+  // ── TÉRMINOS ─────────────────────────────────────────────────────────────────
+  termsSection: {
+    marginBottom: 16,
   },
-  totalsValue: {
-    fontSize: 9,
-    fontWeight: 700,
-    color: colors.dark,
+  termRow: {
+    fontSize: 8.5,
+    color: colors.teal,
+    marginBottom: 3,
   },
-  totalsLabelBold: {
-    fontSize: 10,
-    fontWeight: 700,
-    color: colors.white,
-  },
-  totalsValueBold: {
-    fontSize: 10,
-    fontWeight: 700,
-    color: colors.white,
-  },
-  // Observations
+
+  // ── OBSERVACIONES ────────────────────────────────────────────────────────────
   observationsBox: {
     border: `1px solid ${colors.border}`,
-    padding: 12,
-    marginBottom: 20,
+    padding: 10,
+    marginBottom: 16,
   },
   observationsTitle: {
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: 700,
     color: colors.primary,
-    marginBottom: 4,
+    marginBottom: 3,
+    textTransform: 'uppercase',
   },
   observationsText: {
-    fontSize: 9,
+    fontSize: 8.5,
     color: colors.secondary,
     lineHeight: 1.5,
   },
-  // Footer
+
+  // ── PIE DE PÁGINA ────────────────────────────────────────────────────────────
   footer: {
     position: 'absolute',
-    bottom: 30,
-    left: 45,
-    right: 45,
+    bottom: 20,
+    left: 40,
+    right: 40,
     borderTop: `1px solid ${colors.border}`,
-    paddingTop: 8,
+    paddingTop: 6,
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
   },
   footerText: {
     fontSize: 7,
     color: colors.accent,
   },
-  // Signatures
-  signatureRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 40,
-    paddingTop: 10,
-  },
-  signatureBlock: {
-    alignItems: 'center',
-    width: 180,
-  },
-  signatureLine: {
-    width: 160,
-    borderBottom: `1px solid ${colors.dark}`,
-    marginBottom: 4,
-  },
-  signatureName: {
-    fontSize: 9,
-    fontWeight: 700,
-    color: colors.dark,
-  },
-  signatureRole: {
-    fontSize: 8,
-    color: colors.secondary,
+  footerPage: {
+    fontSize: 7,
+    color: colors.accent,
   },
 })
 
@@ -283,7 +276,7 @@ const formatCurrency = (amount: number, moneda = 'PEN') => {
 
 const formatDate = (date: string | null | undefined) => {
   if (!date) return '-'
-  return new Date(date).toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' })
+  return new Date(date).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
 function displayCondicionPago(condicionPago: string, diasCredito?: number | null): string {
@@ -294,144 +287,139 @@ function displayCondicionPago(condicionPago: string, diasCredito?: number | null
 }
 
 function OrdenCompraPDF({ oc }: Props) {
+  const allItems = oc.items || []
+  const equipos = allItems.filter((i: any) => (i.tipoItem || 'equipo') !== 'servicio')
+  const servicios = allItems.filter((i: any) => (i.tipoItem || 'equipo') === 'servicio')
+
+  const renderItemsTable = (items: any[], label?: string) => (
+    <View style={styles.table}>
+      {label && (
+        <Text style={{ fontSize: 8.5, fontWeight: 700, marginBottom: 4, color: colors.primary }}>{label}</Text>
+      )}
+      <View style={styles.tableHeader}>
+        <View style={styles.colDesc}><Text style={styles.tableHeaderText}>Descripción</Text></View>
+        <View style={styles.colUnd}><Text style={styles.tableHeaderText}>Und.</Text></View>
+        <View style={styles.colCant}><Text style={styles.tableHeaderText}>Cant.</Text></View>
+        <View style={styles.colPrecio}><Text style={styles.tableHeaderText}>P. Unidad</Text></View>
+        <View style={styles.colDesc_}><Text style={styles.tableHeaderText}>Desc.%</Text></View>
+        <View style={styles.colTotal}><Text style={styles.tableHeaderText}>P. Neto</Text></View>
+      </View>
+      {items.map((item, i) => (
+        <View key={item.id} style={[styles.tableRow, i % 2 === 1 ? styles.tableRowAlt : {}]} wrap={false}>
+          <View style={styles.colDesc}><Text style={styles.tableCell}>{item.descripcion}</Text></View>
+          <View style={styles.colUnd}><Text style={styles.tableCell}>{item.unidad}</Text></View>
+          <View style={styles.colCant}><Text style={styles.tableCellRight}>{Number(item.cantidad).toFixed(4)}</Text></View>
+          <View style={styles.colPrecio}><Text style={styles.tableCellRight}>{Number(item.precioUnitario).toFixed(4)}</Text></View>
+          <View style={styles.colDesc_}><Text style={styles.tableCellCenter}>0.0000</Text></View>
+          <View style={styles.colTotal}><Text style={styles.tableCellRight}>{formatCurrency(item.costoTotal, oc.moneda)}</Text></View>
+        </View>
+      ))}
+    </View>
+  )
+
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        {/* Header */}
+
+        {/* ── CABECERA ── */}
         <View style={styles.headerContainer}>
-          <View style={styles.logoSection}>
-            <View>
-              <Text style={styles.companyName}>GYS CONTROL</Text>
-              <Text style={styles.companyTagline}>Ingeniería, Montaje y Mantenimiento Industrial</Text>
-              <Text style={styles.companyDetails}>RUC: 20610000000</Text>
-              <Text style={styles.companyDetails}>contacto@gyscontrol.com</Text>
-            </View>
+          {/* Empresa emisora — izquierda */}
+          <View style={styles.companyBlock}>
+            <Text style={styles.companyName}>GYS CONTROL INDUSTRIAL SAC</Text>
+            <Text style={styles.companyDetail}>CAL. LOS GERANIOS NRO. 486 URB. SAN EUGENIO</Text>
+            <Text style={styles.companyDetail}>LIMA - LIMA - 140111 • Perú</Text>
+            <Text style={styles.companyDetail}>RUC: 20545610672</Text>
+            <Text style={{ ...styles.companyTagline, marginTop: 4 }}>
+              Innovación continua en tecnologías aplicadas a mejorar su producción.
+            </Text>
           </View>
-        </View>
 
-        {/* Title */}
-        <View style={styles.titleContainer}>
-          <View style={styles.titleRow}>
-            <Text style={styles.title}>ORDEN DE COMPRA</Text>
-            <Text style={styles.titleNumber}>{oc.numero}</Text>
-          </View>
-          <Text style={styles.titleDate}>
-            Fecha de emisión: {formatDate(oc.fechaEmision)} | Moneda: {oc.moneda} | Condición: {displayCondicionPago(oc.condicionPago, oc.diasCredito)}
-          </Text>
-        </View>
-
-        {/* Proveedor & Entrega */}
-        <View style={styles.infoRow}>
-          <View style={styles.infoCard}>
-            <Text style={styles.infoTitle}>Proveedor</Text>
-            <Text style={styles.infoValue}>{safeText(oc.proveedor?.nombre)}</Text>
-            {oc.proveedor?.ruc && <Text style={styles.infoLabel}>RUC: {oc.proveedor.ruc}</Text>}
-            {oc.proveedor?.direccion && <Text style={styles.infoLabel}>{oc.proveedor.direccion}</Text>}
-            {oc.proveedor?.contactoNombre && <Text style={styles.infoLabel}>Contacto: {oc.proveedor.contactoNombre}</Text>}
-            {oc.proveedor?.contactoTelefono && <Text style={styles.infoLabel}>Tel: {oc.proveedor.contactoTelefono}</Text>}
-            {oc.proveedor?.correo && <Text style={styles.infoLabel}>{oc.proveedor.correo}</Text>}
-          </View>
-          <View style={styles.infoCard}>
-            <Text style={styles.infoTitle}>Datos de Entrega</Text>
-            {oc.lugarEntrega && <Text style={styles.infoValue}>{oc.lugarEntrega}</Text>}
-            {oc.contactoEntrega && <Text style={styles.infoLabel}>Contacto: {oc.contactoEntrega}</Text>}
-            {oc.fechaEntregaEstimada && <Text style={styles.infoLabel}>Fecha estimada: {formatDate(oc.fechaEntregaEstimada)}</Text>}
-            {oc.centroCosto && <Text style={styles.infoLabel}>Centro de Costo: {oc.centroCosto.nombre}</Text>}
-            {oc.proyecto && <Text style={styles.infoLabel}>Proyecto: {oc.proyecto.codigo} - {oc.proyecto.nombre}</Text>}
-            {!oc.lugarEntrega && !oc.contactoEntrega && !oc.fechaEntregaEstimada && (
-              <Text style={styles.infoLabel}>No especificado</Text>
+          {/* Proveedor — derecha */}
+          <View style={styles.supplierBlock}>
+            <Text style={styles.supplierName}>{safeText(oc.proveedor?.nombre)}</Text>
+            {oc.proveedor?.direccion && (
+              <Text style={styles.supplierDetail}>{oc.proveedor.direccion}</Text>
+            )}
+            {oc.proveedor?.ruc && (
+              <Text style={styles.supplierRuc}>RUC: {oc.proveedor.ruc}</Text>
+            )}
+            {oc.proveedor?.contactoNombre && (
+              <Text style={styles.supplierDetail}>Contacto: {oc.proveedor.contactoNombre}</Text>
+            )}
+            {oc.proveedor?.contactoTelefono && (
+              <Text style={styles.supplierDetail}>Tel: {oc.proveedor.contactoTelefono}</Text>
             )}
           </View>
         </View>
 
-        {/* Datos bancarios */}
-        {oc.proveedor?.banco && (
-          <View style={[styles.infoCard, { marginBottom: 15 }]}>
-            <Text style={styles.infoTitle}>Datos Bancarios del Proveedor</Text>
-            <Text style={styles.infoLabel}>
-              Banco: {oc.proveedor.banco} | Cuenta: {oc.proveedor.numeroCuenta || '-'} | CCI: {oc.proveedor.cci || '-'} | Tipo: {oc.proveedor.tipoCuenta || '-'}
-            </Text>
+        {/* ── TÍTULO ── */}
+        <View style={styles.titleSection}>
+          <Text style={styles.titleMain}>Orden de compra N°  {oc.numero}</Text>
+        </View>
+
+        {/* ── REFERENCIAS ── */}
+        <View style={styles.refsContainer}>
+          <View style={styles.refCell}>
+            <Text style={styles.refLabel}>Ref. de nuestra orden</Text>
+            <Text style={styles.refValue}>{oc.numero}</Text>
           </View>
-        )}
+          <View style={styles.refCell}>
+            <Text style={styles.refLabel}>Moneda</Text>
+            <Text style={styles.refValue}>{oc.moneda}</Text>
+          </View>
+          <View style={styles.refCell}>
+            <Text style={styles.refLabel}>Condición de pago</Text>
+            <Text style={styles.refValue}>{displayCondicionPago(oc.condicionPago, oc.diasCredito)}</Text>
+          </View>
+          <View style={styles.refCellLast}>
+            <Text style={styles.refLabel}>Fecha orden</Text>
+            <Text style={styles.refValue}>{formatDate(oc.fechaEmision)}</Text>
+          </View>
+        </View>
 
-        {/* Items Table - Equipos y Materiales */}
-        {(() => {
-          const allItems = oc.items || []
-          const equiposYMateriales = allItems.filter((i: any) => (i.tipoItem || 'equipo') !== 'servicio')
-          const servicios = allItems.filter((i: any) => (i.tipoItem || 'equipo') === 'servicio')
-          return (
-            <>
-              {equiposYMateriales.length > 0 && (
-                <View style={styles.table}>
-                  {servicios.length > 0 && (
-                    <Text style={{ fontSize: 9, fontWeight: 700, marginBottom: 4, color: colors.primary }}>Equipos y Materiales</Text>
-                  )}
-                  <View style={styles.tableHeader}>
-                    <View style={styles.colNum}><Text style={styles.tableHeaderText}>N°</Text></View>
-                    <View style={styles.colCodigo}><Text style={styles.tableHeaderText}>Código</Text></View>
-                    <View style={styles.colDesc}><Text style={styles.tableHeaderText}>Descripción</Text></View>
-                    <View style={styles.colUnd}><Text style={styles.tableHeaderText}>Und.</Text></View>
-                    <View style={styles.colCant}><Text style={styles.tableHeaderText}>Cant.</Text></View>
-                    <View style={styles.colPrecio}><Text style={styles.tableHeaderText}>P. Unit.</Text></View>
-                    <View style={styles.colTotal}><Text style={styles.tableHeaderText}>Total</Text></View>
-                  </View>
-                  {equiposYMateriales.map((item, i) => (
-                    <View key={item.id} style={[styles.tableRow, i % 2 === 1 ? styles.tableRowAlt : {}]} wrap={false}>
-                      <View style={styles.colNum}><Text style={styles.tableCell}>{i + 1}</Text></View>
-                      <View style={styles.colCodigo}><Text style={styles.tableCell}>{item.codigo}</Text></View>
-                      <View style={styles.colDesc}><Text style={styles.tableCell}>{item.descripcion}</Text></View>
-                      <View style={styles.colUnd}><Text style={styles.tableCell}>{item.unidad}</Text></View>
-                      <View style={styles.colCant}><Text style={styles.tableCellRight}>{item.cantidad}</Text></View>
-                      <View style={styles.colPrecio}><Text style={styles.tableCellRight}>{formatCurrency(item.precioUnitario, oc.moneda)}</Text></View>
-                      <View style={styles.colTotal}><Text style={styles.tableCellRight}>{formatCurrency(item.costoTotal, oc.moneda)}</Text></View>
-                    </View>
-                  ))}
-                </View>
-              )}
-              {servicios.length > 0 && (
-                <View style={styles.table}>
-                  <Text style={{ fontSize: 9, fontWeight: 700, marginBottom: 4, color: '#7c3aed' }}>Servicios</Text>
-                  <View style={styles.tableHeader}>
-                    <View style={styles.colNum}><Text style={styles.tableHeaderText}>N°</Text></View>
-                    <View style={styles.colCodigo}><Text style={styles.tableHeaderText}>Código</Text></View>
-                    <View style={{ width: '48%' }}><Text style={styles.tableHeaderText}>Descripción</Text></View>
-                    <View style={styles.colPrecio}><Text style={styles.tableHeaderText}>P. Unit.</Text></View>
-                    <View style={styles.colTotal}><Text style={styles.tableHeaderText}>Total</Text></View>
-                  </View>
-                  {servicios.map((item, i) => (
-                    <View key={item.id} style={[styles.tableRow, i % 2 === 1 ? styles.tableRowAlt : {}]} wrap={false}>
-                      <View style={styles.colNum}><Text style={styles.tableCell}>{i + 1}</Text></View>
-                      <View style={styles.colCodigo}><Text style={styles.tableCell}>{item.codigo}</Text></View>
-                      <View style={{ width: '48%' }}><Text style={styles.tableCell}>{item.descripcion}</Text></View>
-                      <View style={styles.colPrecio}><Text style={styles.tableCellRight}>{formatCurrency(item.precioUnitario, oc.moneda)}</Text></View>
-                      <View style={styles.colTotal}><Text style={styles.tableCellRight}>{formatCurrency(item.costoTotal, oc.moneda)}</Text></View>
-                    </View>
-                  ))}
-                </View>
-              )}
-            </>
-          )
-        })()}
+        {/* ── ITEMS ── */}
+        {equipos.length > 0 && renderItemsTable(equipos, servicios.length > 0 ? 'Equipos y Materiales' : undefined)}
+        {servicios.length > 0 && renderItemsTable(servicios, 'Servicios')}
 
-        {/* Totals */}
+        {/* ── TOTALES ── */}
         <View style={styles.totalsContainer}>
           <View style={styles.totalsBox}>
             <View style={styles.totalsRow}>
-              <Text style={styles.totalsLabel}>Subtotal</Text>
+              <Text style={styles.totalsLabel}>Total base</Text>
               <Text style={styles.totalsValue}>{formatCurrency(oc.subtotal, oc.moneda)}</Text>
             </View>
             <View style={styles.totalsRow}>
-              <Text style={styles.totalsLabel}>IGV (18%)</Text>
+              <Text style={styles.totalsLabel}>Impuestos (IGV 18%)</Text>
               <Text style={styles.totalsValue}>{formatCurrency(oc.igv, oc.moneda)}</Text>
             </View>
             <View style={styles.totalsRowTotal}>
-              <Text style={styles.totalsLabelBold}>TOTAL</Text>
+              <Text style={styles.totalsLabelBold}>Total</Text>
               <Text style={styles.totalsValueBold}>{formatCurrency(oc.total, oc.moneda)}</Text>
             </View>
           </View>
         </View>
 
-        {/* Observations */}
+        {/* ── TÉRMINOS DE ENTREGA ── */}
+        <View style={styles.termsSection}>
+          <Text style={styles.termRow}>Términos de pago: {displayCondicionPago(oc.condicionPago, oc.diasCredito)}</Text>
+          {oc.fechaEntregaEstimada && (
+            <Text style={styles.termRow}>Fecha de entrega estimada: {formatDate(oc.fechaEntregaEstimada)}</Text>
+          )}
+          {oc.lugarEntrega && (
+            <Text style={styles.termRow}>Lugar de entrega: {oc.lugarEntrega}</Text>
+          )}
+          {oc.contactoEntrega && (
+            <Text style={styles.termRow}>Contacto entrega: {oc.contactoEntrega}</Text>
+          )}
+          {oc.proyecto && (
+            <Text style={styles.termRow}>Proyecto: {oc.proyecto.codigo} — {oc.proyecto.nombre}</Text>
+          )}
+          {oc.centroCosto && (
+            <Text style={styles.termRow}>Centro de costo: {oc.centroCosto.nombre}</Text>
+          )}
+        </View>
+
+        {/* ── OBSERVACIONES ── */}
         {oc.observaciones && (
           <View style={styles.observationsBox}>
             <Text style={styles.observationsTitle}>Observaciones</Text>
@@ -439,11 +427,15 @@ function OrdenCompraPDF({ oc }: Props) {
           </View>
         )}
 
-        {/* Footer */}
+        {/* ── PIE DE PÁGINA ── */}
         <View style={styles.footer} fixed>
-          <Text style={styles.footerText}>GYS Control - Orden de Compra {oc.numero}</Text>
-          <Text style={styles.footerText}>Generado: {new Date().toLocaleDateString('es-PE')}</Text>
+          <Text style={styles.footerText}>Teléfono: +51 1 4787587  •  Sitio web: http://www.gyscontrol.com</Text>
+          <Text
+            style={styles.footerPage}
+            render={({ pageNumber, totalPages }) => `Página: ${pageNumber} / ${totalPages}`}
+          />
         </View>
+
       </Page>
     </Document>
   )
