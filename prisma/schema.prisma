@@ -3542,6 +3542,7 @@ model OrdenCompra {
   igv                  Float             @default(0)
   total                Float             @default(0)
   lugarEntrega         String?
+  tiempoEntrega        String?
   contactoEntrega      String?
   observaciones        String?
   fechaEmision         DateTime          @default(now())

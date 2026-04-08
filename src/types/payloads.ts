@@ -1458,6 +1458,7 @@ export interface OrdenCompraPayload {
   condicionPago?: string
   moneda?: string
   lugarEntrega?: string
+  tiempoEntrega?: string
   contactoEntrega?: string
   observaciones?: string
   fechaEntregaEstimada?: string
@@ -1469,6 +1470,7 @@ export interface OrdenCompraUpdatePayload {
   condicionPago?: string
   moneda?: string
   lugarEntrega?: string | null
+  tiempoEntrega?: string | null
   contactoEntrega?: string | null
   observaciones?: string | null
   fechaEntregaEstimada?: string | null

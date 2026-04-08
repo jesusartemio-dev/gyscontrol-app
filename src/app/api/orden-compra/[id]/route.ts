@@ -13,6 +13,19 @@ const includeRelations = {
   aprobador: { select: { id: true, name: true, email: true } },
   items: {
     orderBy: { createdAt: 'asc' as const },
+    include: {
+      listaEquipoItem: {
+        select: {
+          cotizacionSeleccionada: {
+            select: {
+              cotizacionProveedor: {
+                select: { codigo: true }
+              }
+            }
+          }
+        }
+      }
+    }
   },
   cuentasPorPagar: {
     where: { estado: { not: 'anulada' as const } },
@@ -76,6 +89,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (payload.diasCredito !== undefined) updateData.diasCredito = payload.diasCredito ? Number(payload.diasCredito) : null
     if (payload.moneda !== undefined) updateData.moneda = payload.moneda
     if (payload.lugarEntrega !== undefined) updateData.lugarEntrega = payload.lugarEntrega
+    if (payload.tiempoEntrega !== undefined) updateData.tiempoEntrega = payload.tiempoEntrega
     if (payload.contactoEntrega !== undefined) updateData.contactoEntrega = payload.contactoEntrega
     if (payload.observaciones !== undefined) updateData.observaciones = payload.observaciones
     if (payload.fechaEntregaEstimada !== undefined) {

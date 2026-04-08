@@ -2847,6 +2847,7 @@ export interface OrdenCompra {
   igv: number
   total: number
   lugarEntrega?: string | null
+  tiempoEntrega?: string | null
   contactoEntrega?: string | null
   observaciones?: string | null
   fechaEmision: string

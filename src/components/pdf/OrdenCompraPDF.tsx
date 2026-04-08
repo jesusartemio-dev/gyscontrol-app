@@ -278,7 +278,9 @@ const formatCurrency = (amount: number, moneda = 'PEN') => {
 
 const formatDate = (date: string | null | undefined) => {
   if (!date) return '-'
-  return new Date(date).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const str = typeof date === 'string' ? date : new Date(date).toISOString()
+  const [y, m, d] = str.split('T')[0].split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
 function displayCondicionPago(condicionPago: string, diasCredito?: number | null): string {
@@ -292,6 +294,13 @@ function OrdenCompraPDF({ oc }: Props) {
   const allItems = oc.items || []
   const equipos = allItems.filter((i: any) => (i.tipoItem || 'equipo') !== 'servicio')
   const servicios = allItems.filter((i: any) => (i.tipoItem || 'equipo') === 'servicio')
+
+  // Referencia(s) de cotización derivadas de los ítems
+  const cotizacionCodigos = [...new Set(
+    allItems
+      .map((i: any) => i.listaEquipoItem?.cotizacionSeleccionada?.cotizacionProveedor?.codigo)
+      .filter(Boolean)
+  )]
 
   const renderItemsTable = (items: any[], label?: string) => (
     <View style={styles.table}>
@@ -332,8 +341,7 @@ function OrdenCompraPDF({ oc }: Props) {
           {/* Empresa emisora — izquierda */}
           <View style={styles.companyBlock}>
             <Text style={styles.companyName}>GYS CONTROL INDUSTRIAL SAC</Text>
-            <Text style={styles.companyDetail}>CAL. LOS GERANIOS NRO. 486 URB. SAN EUGENIO</Text>
-            <Text style={styles.companyDetail}>LIMA - LIMA - 140111 • Perú</Text>
+            <Text style={styles.companyDetail}>Av. Aurelio Garcia y Garcia 1178, Lima - Perú</Text>
             <Text style={styles.companyDetail}>RUC: 20545610672</Text>
             <Text style={{ ...styles.companyTagline, marginTop: 4 }}>
               Innovación continua en tecnologías aplicadas a mejorar su producción.
@@ -369,6 +377,12 @@ function OrdenCompraPDF({ oc }: Props) {
             <Text style={styles.refLabel}>Ref. de nuestra orden</Text>
             <Text style={styles.refValue}>{oc.numero}</Text>
           </View>
+          {cotizacionCodigos.length > 0 && (
+            <View style={styles.refCell}>
+              <Text style={styles.refLabel}>Ref. cotización</Text>
+              <Text style={styles.refValue}>{cotizacionCodigos.join(', ')}</Text>
+            </View>
+          )}
           <View style={styles.refCell}>
             <Text style={styles.refLabel}>Moneda</Text>
             <Text style={styles.refValue}>{oc.moneda}</Text>
@@ -408,6 +422,9 @@ function OrdenCompraPDF({ oc }: Props) {
         {/* ── TÉRMINOS DE ENTREGA ── */}
         <View style={styles.termsSection}>
           <Text style={styles.termRow}>Términos de pago: {displayCondicionPago(oc.condicionPago, oc.diasCredito)}</Text>
+          {(oc as any).tiempoEntrega && (
+            <Text style={styles.termRow}>Tiempo de entrega: {(oc as any).tiempoEntrega}</Text>
+          )}
           {oc.fechaEntregaEstimada && (
             <Text style={styles.termRow}>Fecha de entrega estimada: {formatDate(oc.fechaEntregaEstimada)}</Text>
           )}
@@ -416,9 +433,6 @@ function OrdenCompraPDF({ oc }: Props) {
           )}
           {oc.contactoEntrega && (
             <Text style={styles.termRow}>Contacto entrega: {oc.contactoEntrega}</Text>
-          )}
-          {oc.proyecto && (
-            <Text style={styles.termRow}>Proyecto: {oc.proyecto.codigo} — {oc.proyecto.nombre}</Text>
           )}
           {oc.centroCosto && (
             <Text style={styles.termRow}>Centro de costo: {oc.centroCosto.nombre}</Text>

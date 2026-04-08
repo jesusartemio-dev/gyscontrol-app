@@ -181,6 +181,7 @@ export async function POST(req: Request) {
         igv,
         total,
         lugarEntrega: payload.lugarEntrega || null,
+        tiempoEntrega: payload.tiempoEntrega || null,
         contactoEntrega: payload.contactoEntrega || null,
         observaciones: payload.observaciones || null,
         fechaEntregaEstimada: payload.fechaEntregaEstimada ? new Date(payload.fechaEntregaEstimada) : null,

@@ -93,6 +93,7 @@ function NuevaOrdenCompraContent() {
   const [formaPagoCustom, setFormaPagoCustom] = useState('')
   const [moneda, setMoneda] = useState('PEN')
   const [lugarEntrega, setLugarEntrega] = useState('')
+  const [tiempoEntrega, setTiempoEntrega] = useState('')
   const [contactoEntrega, setContactoEntrega] = useState('')
   const [observaciones, setObservaciones] = useState('')
   const [requiereRecepcion, setRequiereRecepcion] = useState(true)
@@ -349,6 +350,7 @@ function NuevaOrdenCompraContent() {
         condicionPago: buildCondicionPago() || undefined,
         moneda,
         lugarEntrega: lugarEntrega || undefined,
+        tiempoEntrega: tiempoEntrega || undefined,
         contactoEntrega: contactoEntrega || undefined,
         observaciones: observaciones || undefined,
         items: validItems.map((item): OrdenCompraItemPayload => ({
@@ -503,6 +505,10 @@ function NuevaOrdenCompraContent() {
             <div>
               <Label className="text-xs">Lugar de Entrega</Label>
               <Input value={lugarEntrega} onChange={e => setLugarEntrega(e.target.value)} placeholder="Dirección" className="h-9" />
+            </div>
+            <div>
+              <Label className="text-xs">Tiempo de Entrega</Label>
+              <Input value={tiempoEntrega} onChange={e => setTiempoEntrega(e.target.value)} placeholder="Ej: 7 días, inmediato, stock" className="h-9" />
             </div>
             <div>
               <Label className="text-xs">Contacto de Entrega</Label>

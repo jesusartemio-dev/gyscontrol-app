@@ -139,6 +139,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
     formaPagoCustom: '',
     moneda: 'PEN',
     lugarEntrega: '',
+    tiempoEntrega: '',
     contactoEntrega: '',
     observaciones: '',
     requiereRecepcion: true,
@@ -168,6 +169,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
       ...parsed,
       moneda: oc.moneda,
       lugarEntrega: oc.lugarEntrega || '',
+      tiempoEntrega: oc.tiempoEntrega || '',
       contactoEntrega: oc.contactoEntrega || '',
       observaciones: oc.observaciones || '',
       requiereRecepcion: oc.requiereRecepcion,
@@ -194,6 +196,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
           })(),
           moneda: headerForm.moneda,
           lugarEntrega: headerForm.lugarEntrega || null,
+          tiempoEntrega: headerForm.tiempoEntrega || null,
           contactoEntrega: headerForm.contactoEntrega || null,
           observaciones: headerForm.observaciones || null,
           requiereRecepcion: headerForm.requiereRecepcion,
@@ -751,7 +754,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
       </div>
 
       {/* Delivery Info */}
-      {(oc.lugarEntrega || oc.contactoEntrega || oc.fechaEntregaEstimada) && (
+      {(oc.lugarEntrega || oc.tiempoEntrega || oc.contactoEntrega || oc.fechaEntregaEstimada) && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -761,6 +764,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
           </CardHeader>
           <CardContent className="text-sm space-y-1">
             {oc.lugarEntrega && <div><span className="text-muted-foreground">Lugar:</span> {oc.lugarEntrega}</div>}
+            {oc.tiempoEntrega && <div><span className="text-muted-foreground">Tiempo de entrega:</span> {oc.tiempoEntrega}</div>}
             {oc.contactoEntrega && <div><span className="text-muted-foreground">Contacto:</span> {oc.contactoEntrega}</div>}
             {oc.fechaEntregaEstimada && <div><span className="text-muted-foreground">Fecha estimada:</span> {formatDate(oc.fechaEntregaEstimada)}</div>}
           </CardContent>
@@ -1348,6 +1352,12 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
                 <Label className="text-xs">Lugar de Entrega</Label>
                 <Input value={headerForm.lugarEntrega} onChange={e => setHeaderForm(f => ({ ...f, lugarEntrega: e.target.value }))} placeholder="Dirección" className="h-9" />
               </div>
+              <div>
+                <Label className="text-xs">Tiempo de Entrega</Label>
+                <Input value={headerForm.tiempoEntrega} onChange={e => setHeaderForm(f => ({ ...f, tiempoEntrega: e.target.value }))} placeholder="Ej: 7 días, inmediato, stock" className="h-9" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-xs">Contacto de Entrega</Label>
                 <Input value={headerForm.contactoEntrega} onChange={e => setHeaderForm(f => ({ ...f, contactoEntrega: e.target.value }))} placeholder="Nombre / teléfono" className="h-9" />
