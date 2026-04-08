@@ -71,6 +71,7 @@ import PedidoEstadoFlujoBanner from '@/components/equipos/PedidoEstadoFlujoBanne
 import TipoItemBadge from '@/components/shared/TipoItemBadge'
 import PedidoEquipoEditModal from '@/components/equipos/PedidoEquipoEditModal'
 import { PedidoItemDirectoModal } from '@/components/equipos/PedidoItemDirectoModal'
+import { AgregarDeListaModal } from '@/components/equipos/AgregarDeListaModal'
 import { useDeleteWithValidation } from '@/hooks/useDeleteWithValidation'
 import { DeleteWithValidationDialog } from '@/components/DeleteWithValidationDialog'
 import { formatCurrency, formatDate } from '@/lib/utils'
@@ -110,6 +111,7 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
   const [revertirRechazo, setRevertirRechazo] = useState<{ confirmando: boolean; motivo: string; procesando: boolean }>({ confirmando: false, motivo: '', procesando: false })
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null)
   const [confirmDeleteItem, setConfirmDeleteItem] = useState<{ id: string; codigo: string } | null>(null)
+  const [showAgregarDeListaModal, setShowAgregarDeListaModal] = useState(false)
 
   const deleteValidation = useDeleteWithValidation({
     entity: 'pedidoEquipo',
@@ -618,6 +620,15 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
                 variant="outline"
                 size="sm"
                 className="h-6 text-[10px] gap-1"
+                onClick={() => setShowAgregarDeListaModal(true)}
+              >
+                <List className="h-3 w-3" />
+                De lista
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-6 text-[10px] gap-1"
                 onClick={() => setShowItemDirectoModal(true)}
               >
                 <Plus className="h-3 w-3" />
@@ -986,6 +997,16 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
         onConfirm={deleteValidation.confirmDelete}
         onCancel={deleteValidation.cancelDelete}
         entityLabel="pedido"
+      />
+
+      {/* Modal agregar de lista */}
+      <AgregarDeListaModal
+        open={showAgregarDeListaModal}
+        onClose={() => setShowAgregarDeListaModal(false)}
+        pedidoId={pedidoId}
+        proyectoId={proyectoId}
+        listaIdPrincipal={(pedido as any).listaId}
+        onCreated={reloadPedido}
       />
 
       {/* Dialog confirmar eliminar item */}
