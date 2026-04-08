@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox'
 import {
   Package, Receipt, Loader2, AlertCircle, CheckCircle2, Wand2,
-  Paperclip, ExternalLink, FileText, X, Upload, ChevronDown, ChevronRight, Eye, Plus, Search,
+  Paperclip, ExternalLink, FileText, X, Upload, ChevronDown, ChevronRight, Eye, Plus, Search, Pencil, Check,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { HojaDeGastos } from '@/types'
@@ -145,6 +145,48 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
     if (failed > 0) toast.error(`${failed} item(s) no se pudieron agregar`)
     setShowAddItem(false)
     onChanged()
+  }
+
+  const [editingItemId, setEditingItemId] = useState<string | null>(null)
+  const [editCantidad, setEditCantidad] = useState('')
+  const [editPrecio, setEditPrecio] = useState('')
+  const [savingEdit, setSavingEdit] = useState(false)
+
+  const startEditItem = (item: NonNullable<HojaDeGastos['itemsMateriales']>[number]) => {
+    setEditingItemId(item.id)
+    setEditCantidad(String(item.cantidadSolicitada))
+    setEditPrecio(item.precioEstimado != null ? String(item.precioEstimado) : '')
+  }
+
+  const cancelEditItem = () => {
+    setEditingItemId(null)
+    setEditCantidad('')
+    setEditPrecio('')
+  }
+
+  const saveEditItem = async (itemId: string) => {
+    setSavingEdit(true)
+    try {
+      const res = await fetch(`/api/requerimiento-material-item/${itemId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cantidadSolicitada: parseFloat(editCantidad) || 1,
+          precioEstimado: editPrecio !== '' ? parseFloat(editPrecio) : null,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Error al guardar')
+      }
+      toast.success('Item actualizado')
+      setEditingItemId(null)
+      onChanged()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al guardar')
+    } finally {
+      setSavingEdit(false)
+    }
   }
 
   const handleDeleteItem = async (itemId: string) => {
@@ -463,8 +505,31 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                             ? <Badge variant="secondary" className="text-xs py-0 px-1.5 h-4 font-mono font-normal">{item.pedidoEquipo.codigo}</Badge>
                             : <span className="text-muted-foreground/40 text-xs">—</span>}
                         </td>
-                        <td className="py-2 pr-3 text-right font-mono text-xs">{item.cantidadSolicitada}</td>
-                        <td className="py-2 pr-3 text-right font-mono text-xs text-muted-foreground">{fmt(item.precioEstimado)}</td>
+                        <td className="py-2 pr-3 text-right font-mono text-xs">
+                          {editingItemId === item.id
+                            ? <input
+                                type="number"
+                                min="0.01"
+                                step="0.01"
+                                value={editCantidad}
+                                onChange={e => setEditCantidad(e.target.value)}
+                                className="w-16 text-right border rounded px-1 py-0.5 text-xs font-mono"
+                              />
+                            : item.cantidadSolicitada}
+                        </td>
+                        <td className="py-2 pr-3 text-right font-mono text-xs text-muted-foreground">
+                          {editingItemId === item.id
+                            ? <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                placeholder="0.00"
+                                value={editPrecio}
+                                onChange={e => setEditPrecio(e.target.value)}
+                                className="w-20 text-right border rounded px-1 py-0.5 text-xs font-mono"
+                              />
+                            : fmt(item.precioEstimado)}
+                        </td>
                         <td className="py-2 pr-3 text-right font-mono text-xs">
                           {item.precioReal != null
                             ? <span className="text-green-700 font-medium">{fmt(item.precioReal)}</span>
@@ -478,17 +543,54 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                         </td>
                         {['borrador', 'depositado'].includes(hoja.estado) && (
                           <td className="py-2 pl-2">
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteItem(item.id)}
-                              disabled={deletingItem === item.id || itemsCubiertos.has(item.id)}
-                              className="text-muted-foreground/40 hover:text-red-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                              title={itemsCubiertos.has(item.id) ? 'Tiene comprobante registrado' : 'Item no encontrado — eliminar y liberar'}
-                            >
-                              {deletingItem === item.id
-                                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                : <X className="h-3.5 w-3.5" />}
-                            </button>
+                            <div className="flex items-center gap-1">
+                              {editingItemId === item.id ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => saveEditItem(item.id)}
+                                    disabled={savingEdit}
+                                    className="text-green-600 hover:text-green-700 disabled:opacity-50 transition-colors"
+                                    title="Guardar"
+                                  >
+                                    {savingEdit ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={cancelEditItem}
+                                    disabled={savingEdit}
+                                    className="text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+                                    title="Cancelar"
+                                  >
+                                    <X className="h-3.5 w-3.5" />
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  {hoja.estado === 'borrador' && !itemsCubiertos.has(item.id) && (
+                                    <button
+                                      type="button"
+                                      onClick={() => startEditItem(item)}
+                                      className="text-muted-foreground/40 hover:text-blue-500 transition-colors"
+                                      title="Editar cantidad y precio"
+                                    >
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteItem(item.id)}
+                                    disabled={deletingItem === item.id || itemsCubiertos.has(item.id)}
+                                    className="text-muted-foreground/40 hover:text-red-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                    title={itemsCubiertos.has(item.id) ? 'Tiene comprobante registrado' : 'Eliminar item'}
+                                  >
+                                    {deletingItem === item.id
+                                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                      : <X className="h-3.5 w-3.5" />}
+                                  </button>
+                                </>
+                              )}
+                            </div>
                           </td>
                         )}
                       </tr>
