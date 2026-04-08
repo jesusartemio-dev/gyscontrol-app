@@ -193,6 +193,7 @@ export async function POST(request: NextRequest) {
               fechaOrdenCompraRecomendada,
               estado: 'pendiente',
               estadoEntrega: 'pendiente',
+              catalogoEquipoId: itemOriginal?.catalogoEquipoId || null,
               proveedorId: itemOriginal?.proveedorId || null,
               proveedorNombre: itemOriginal?.proveedor?.nombre || null,
               updatedAt: now
