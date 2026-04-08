@@ -379,7 +379,7 @@ function OrdenCompraPDF({ oc }: Props) {
           </View>
           {cotizacionCodigos.length > 0 && (
             <View style={styles.refCell}>
-              <Text style={styles.refLabel}>Ref. cotización</Text>
+              <Text style={styles.refLabel}>Ref. de su orden</Text>
               <Text style={styles.refValue}>{cotizacionCodigos.join(', ')}</Text>
             </View>
           )}
