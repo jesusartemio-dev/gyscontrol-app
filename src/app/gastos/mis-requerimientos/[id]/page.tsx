@@ -614,6 +614,10 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
       {(() => {
         const montoGastadoVivo = lineas.reduce((s, l) => s + l.monto, 0)
         const saldoVivo = hoja.montoDepositado - montoGastadoVivo
+        const materiales = hoja.itemsMateriales || []
+        const materialesPendientes = materiales.filter(i => i.precioReal == null)
+        const materialesTotal = materiales.reduce((s, i) => s + (i.totalEstimado ?? 0), 0)
+        const materialesPendientesMonto = materialesPendientes.reduce((s, i) => s + (i.totalEstimado ?? 0), 0)
         return (
           <ResumenFinanciero
             montoAnticipo={hoja.montoAnticipo}
@@ -621,6 +625,10 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
             montoGastado={montoGastadoVivo}
             saldo={saldoVivo}
             requiereAnticipo={hoja.requiereAnticipo}
+            materialesCount={materiales.length > 0 ? materiales.length : undefined}
+            materialesTotal={materialesTotal}
+            materialesPendientesCount={materialesPendientes.length}
+            materialesPendientesMonto={materialesPendientesMonto}
           />
         )
       })()}
