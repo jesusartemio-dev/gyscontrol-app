@@ -74,6 +74,7 @@ import { PedidoItemDirectoModal } from '@/components/equipos/PedidoItemDirectoMo
 import { useDeleteWithValidation } from '@/hooks/useDeleteWithValidation'
 import { DeleteWithValidationDialog } from '@/components/DeleteWithValidationDialog'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { deletePedidoEquipoItem } from '@/lib/services/pedidoEquipoItem'
 
 interface PageProps {
   params: Promise<{
@@ -107,6 +108,8 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
   const [procesandoRecepcion, setProcesandoRecepcion] = useState<string | null>(null)
   const [rechazoDetalleModal, setRechazoDetalleModal] = useState<any>(null)
   const [revertirRechazo, setRevertirRechazo] = useState<{ confirmando: boolean; motivo: string; procesando: boolean }>({ confirmando: false, motivo: '', procesando: false })
+  const [deletingItemId, setDeletingItemId] = useState<string | null>(null)
+  const [confirmDeleteItem, setConfirmDeleteItem] = useState<{ id: string; codigo: string } | null>(null)
 
   const deleteValidation = useDeleteWithValidation({
     entity: 'pedidoEquipo',
@@ -161,6 +164,25 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
     const pedidoData = await getPedidoEquipoById(pedidoId)
     if (pedidoData) setPedido(pedidoData)
   }, [pedidoId])
+
+  const handleDeleteItem = async () => {
+    if (!confirmDeleteItem) return
+    setDeletingItemId(confirmDeleteItem.id)
+    try {
+      const ok = await deletePedidoEquipoItem(confirmDeleteItem.id)
+      if (ok) {
+        toast.success('Item eliminado')
+        setConfirmDeleteItem(null)
+        await reloadPedido()
+      } else {
+        toast.error('No se pudo eliminar el item')
+      }
+    } catch {
+      toast.error('Error al eliminar el item')
+    } finally {
+      setDeletingItemId(null)
+    }
+  }
 
   const handleConfirmarRecepcion = useCallback(async (recepcionId: string, paso: 'almacen' | 'proyecto' = 'proyecto') => {
     setProcesandoRecepcion(recepcionId)
@@ -619,6 +641,7 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
                     <th className="px-3 py-2 text-center font-medium text-gray-600">T. Entrega</th>
                     <th className="px-3 py-2 text-center font-medium text-gray-600">F.Entrega</th>
                     <th className="px-3 py-2 text-right font-medium text-gray-600">Costo</th>
+                    {pedido.estado === 'borrador' && <th className="px-3 py-2 w-8" />}
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -698,6 +721,18 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
                       <td className="px-3 py-2 text-right font-medium text-emerald-600">
                         {item.costoTotal ? formatCurrency(item.costoTotal) : '—'}
                       </td>
+                      {pedido.estado === 'borrador' && (
+                        <td className="px-2 py-2">
+                          <button
+                            onClick={() => setConfirmDeleteItem({ id: item.id, codigo: item.codigo })}
+                            disabled={deletingItemId === item.id}
+                            className="p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
+                            title="Eliminar item"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -952,6 +987,26 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
         onCancel={deleteValidation.cancelDelete}
         entityLabel="pedido"
       />
+
+      {/* Dialog confirmar eliminar item */}
+      <Dialog open={!!confirmDeleteItem} onOpenChange={(open) => { if (!open) setConfirmDeleteItem(null) }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Eliminar item</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            ¿Eliminar el item <span className="font-mono font-medium text-foreground">{confirmDeleteItem?.codigo}</span>? Esta acción no se puede deshacer.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setConfirmDeleteItem(null)} disabled={!!deletingItemId}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" size="sm" onClick={handleDeleteItem} disabled={!!deletingItemId}>
+              {deletingItemId ? 'Eliminando...' : 'Eliminar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
