@@ -375,6 +375,58 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
         doc.text('Sin líneas de gasto registradas', margin, y)
       }
 
+      // --- Equipos y Materiales ---
+      const materiales = hoja.itemsMateriales || []
+      if (materiales.length > 0) {
+        y = (doc as any).lastAutoTable.finalY + 8
+
+        const matBody = materiales.map((item: any) => [
+          item.codigo || '-',
+          item.descripcion || '-',
+          item.unidad || '-',
+          Number(item.cantidadSolicitada).toFixed(2),
+          item.precioEstimado ? fmtMoney(Number(item.precioEstimado)) : '-',
+          item.totalEstimado ? fmtMoney(Number(item.totalEstimado)) : fmtMoney(Number(item.cantidadSolicitada) * Number(item.precioEstimado || 0)),
+        ])
+        const totalMat = materiales.reduce((s: number, i: any) => s + Number(i.totalEstimado ?? (i.cantidadSolicitada * (i.precioEstimado || 0))), 0)
+        matBody.push(['', '', '', '', 'TOTAL', fmtMoney(totalMat)])
+
+        autoTable(doc, {
+          startY: y,
+          head: [['Código', 'Descripción', 'Unidad', 'Cantidad', 'P. Est.', 'Total Est.']],
+          body: matBody,
+          theme: 'grid',
+          headStyles: { fillColor: [31, 78, 121], textColor: [255, 255, 255], fontSize: 9, halign: 'center' },
+          styles: { fontSize: 8, cellPadding: 2.5, overflow: 'linebreak' },
+          columnStyles: {
+            0: { cellWidth: 24 },
+            1: { cellWidth: 'auto' },
+            2: { cellWidth: 16 },
+            3: { cellWidth: 18, halign: 'right' },
+            4: { cellWidth: 24, halign: 'right' },
+            5: { cellWidth: 26, halign: 'right' },
+          },
+          margin: { left: margin, right: margin },
+          didParseCell: (data: any) => {
+            if (data.section === 'body' && data.row.index === matBody.length - 1) {
+              data.cell.styles.fontStyle = 'bold'
+            }
+          },
+          didDrawPage: (_data: any) => {
+            doc.setFontSize(10)
+            doc.setTextColor(...primary)
+          },
+        })
+
+        // Add section title above the table
+        const tableY = y
+        doc.setFontSize(10)
+        doc.setTextColor(...primary)
+        doc.setFont('helvetica', 'bold')
+        doc.text('EQUIPOS Y MATERIALES', margin, tableY - 2)
+        doc.setFont('helvetica', 'normal')
+      }
+
       // Footer
       const pageCount = doc.getNumberOfPages()
       for (let i = 1; i <= pageCount; i++) {

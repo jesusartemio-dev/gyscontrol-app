@@ -34,6 +34,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
           include: { adjuntos: true, categoriaGasto: true },
           orderBy: { fecha: 'asc' },
         },
+        itemsMateriales: {
+          orderBy: { createdAt: 'asc' },
+        },
         adjuntos: { orderBy: { createdAt: 'asc' } },
       },
     })
@@ -222,6 +225,76 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     } else {
       ws.getCell(row, 1).value = 'Sin líneas de gasto registradas'
       ws.getCell(row, 1).font = { italic: true, size: 10, color: { argb: 'FF888888' } }
+    }
+
+    // --- Equipos y Materiales ---
+    const materiales = (hoja as any).itemsMateriales || []
+    if (materiales.length > 0) {
+      row += 2
+
+      const matHeaderRow = ws.getRow(row)
+      ws.mergeCells(row, 1, row, 7)
+      ws.getCell(row, 1).value = 'EQUIPOS Y MATERIALES'
+      ws.getCell(row, 1).font = headerFont
+      ws.getCell(row, 1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E79' } }
+      ws.getCell(row, 1).alignment = { horizontal: 'center' }
+      matHeaderRow.height = 22
+      row++
+
+      const matHeaders = ['Código', 'Descripción', 'Unidad', 'Cant. Solicitada', 'Precio Est.', 'Total Est.', 'Observación']
+      const matThRow = ws.getRow(row)
+      matHeaders.forEach((h, i) => {
+        const cell = ws.getCell(row, i + 1)
+        cell.value = h
+        cell.font = { bold: true, size: 10, color: { argb: 'FFFFFFFF' } }
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E75B6' } }
+        cell.alignment = { horizontal: 'center', vertical: 'middle' }
+        cell.border = thinBorder
+      })
+      matThRow.height = 20
+      row++
+
+      const evenFill2: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F7FB' } }
+      let totalEstMat = 0
+
+      materiales.forEach((item: any, idx: number) => {
+        const r = ws.getRow(row)
+        const fill = idx % 2 === 0 ? undefined : evenFill2
+        const totalEst = Number(item.totalEstimado ?? (item.cantidadSolicitada * (item.precioEstimado || 0)))
+        totalEstMat += totalEst
+
+        const vals = [
+          item.codigo || '-',
+          item.descripcion || '-',
+          item.unidad || '-',
+          Number(item.cantidadSolicitada),
+          Number(item.precioEstimado || 0),
+          totalEst,
+          item.observacion || '',
+        ]
+        vals.forEach((v, i) => {
+          const cell = ws.getCell(row, i + 1)
+          cell.value = v
+          cell.font = { size: 10 }
+          cell.border = thinBorder
+          if (fill) cell.fill = fill
+          if (i >= 3) { cell.numFmt = currencyFmt; cell.alignment = { horizontal: 'right' } }
+        })
+        r.height = 16
+        row++
+      })
+
+      // Total row materiales
+      const matTotalRow = ws.getRow(row)
+      ws.mergeCells(row, 1, row, 5)
+      ws.getCell(row, 1).value = 'TOTAL'
+      ws.getCell(row, 1).font = { bold: true, size: 10 }
+      ws.getCell(row, 1).alignment = { horizontal: 'right' }
+      ws.getCell(row, 6).value = totalEstMat
+      ws.getCell(row, 6).numFmt = currencyFmt
+      ws.getCell(row, 6).font = { bold: true, size: 10 }
+      for (let c = 1; c <= 7; c++) ws.getCell(row, c).border = thinBorder
+      matTotalRow.height = 18
     }
 
     // Generate buffer
