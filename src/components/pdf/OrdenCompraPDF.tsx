@@ -183,8 +183,8 @@ const styles = StyleSheet.create({
   colDesc:    { width: '34%', flexShrink: 0, overflow: 'hidden' as const },
   colUnd:     { width: '8%',  flexShrink: 0, overflow: 'hidden' as const },
   colCant:    { width: '8%',  flexShrink: 0, overflow: 'hidden' as const, textAlign: 'right' as const },
-  colPrecio:  { width: '14%', flexShrink: 0, overflow: 'hidden' as const, textAlign: 'right' as const },
-  colDesc_:   { width: '6%',  flexShrink: 0, overflow: 'hidden' as const, textAlign: 'center' as const },
+  colPrecio:  { width: '13%', flexShrink: 0, overflow: 'hidden' as const, textAlign: 'right' as const },
+  colDesc_:   { width: '9%',  flexShrink: 0, overflow: 'hidden' as const, textAlign: 'center' as const },
   colTotal:   { width: '12%', flexShrink: 0, overflow: 'hidden' as const, textAlign: 'right' as const },
 
   // ── TOTALES ──────────────────────────────────────────────────────────────────
@@ -323,9 +323,9 @@ function OrdenCompraPDF({ oc }: Props) {
           <View style={styles.colCodigo}><Text style={styles.tableCell}>{item.codigo}</Text></View>
           <View style={styles.colDesc}><Text style={styles.tableCell}>{item.descripcion}</Text></View>
           <View style={styles.colUnd}><Text style={styles.tableCell}>{item.unidad}</Text></View>
-          <View style={styles.colCant}><Text style={styles.tableCellRight}>{Number(item.cantidad).toFixed(4)}</Text></View>
-          <View style={styles.colPrecio}><Text style={styles.tableCellRight}>{Number(item.precioUnitario).toFixed(4)}</Text></View>
-          <View style={styles.colDesc_}><Text style={styles.tableCellCenter}>0.0000</Text></View>
+          <View style={styles.colCant}><Text style={styles.tableCellRight}>{Number(item.cantidad).toFixed(2)}</Text></View>
+          <View style={styles.colPrecio}><Text style={styles.tableCellRight}>{Number(item.precioUnitario).toFixed(2)}</Text></View>
+          <View style={styles.colDesc_}><Text style={styles.tableCellCenter}>0.00</Text></View>
           <View style={styles.colTotal}><Text style={styles.tableCellRight}>{formatCurrency(item.costoTotal, oc.moneda)}</Text></View>
         </View>
       ))}
