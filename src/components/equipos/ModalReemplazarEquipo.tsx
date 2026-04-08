@@ -147,6 +147,7 @@ export default function ModalReemplazarEquipo({
         estado: 'borrador',
         origen: 'reemplazo',
         listaId,
+        catalogoEquipoId: selected.id,
         proyectoEquipoItemId: proyectoEquipoItemOriginal ?? undefined,
         proyectoEquipoId: item.proyectoEquipoId,
         reemplazaProyectoEquipoCotizadoItemId: proyectoEquipoItemOriginal ?? undefined,
