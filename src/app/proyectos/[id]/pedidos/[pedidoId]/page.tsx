@@ -625,15 +625,29 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
                 <List className="h-3 w-3" />
                 De lista
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-6 text-[10px] gap-1"
-                onClick={() => setShowItemDirectoModal(true)}
-              >
-                <Plus className="h-3 w-3" />
-                Item Directo
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-6 text-[10px] gap-1"
+                        onClick={() => setShowItemDirectoModal(true)}
+                        disabled={userRole !== 'admin'}
+                      >
+                        <Plus className="h-3 w-3" />
+                        Item Directo
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {userRole !== 'admin' && (
+                    <TooltipContent>
+                      <p className="text-xs">Solo el administrador puede agregar items directos</p>
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              </TooltipProvider>
             </div>
           </div>
 
