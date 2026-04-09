@@ -157,6 +157,8 @@ function NuevaOrdenCompraContent() {
             if (newItems.length > 0) {
               setItems(newItems)
               toast.success(`${newItems.length} item(s) cargados desde el pedido`)
+            } else {
+              toast.warning('Los items seleccionados ya fueron entregados o no están disponibles para OC. Use "Revertir entrega" primero si desea regularizar.')
             }
           })
           .catch(() => toast.error('Error al cargar items del pedido'))

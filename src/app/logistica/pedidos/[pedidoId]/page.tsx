@@ -149,7 +149,8 @@ export default function PedidoLogisticaDetailPage() {
       for (const item of pedido.items) {
         const tieneOC = ((item as any).ordenCompraItems?.length ?? 0) > 0
         const tieneREQ = itemTieneREQActivo(item as any)
-        if (!tieneOC && !tieneREQ) initial.add(item.id)
+        const estadoItem = (item as any).estado
+        if (!tieneOC && !tieneREQ && !['cancelado', 'entregado'].includes(estadoItem)) initial.add(item.id)
       }
       setReqItemsSelected(initial)
     }
@@ -191,7 +192,8 @@ export default function PedidoLogisticaDetailPage() {
       for (const item of pedido.items) {
         const tieneOC = ((item as any).ordenCompraItems?.length ?? 0) > 0
         const tieneREQ = itemTieneREQActivo(item as any)
-        if (!tieneOC && !tieneREQ) {
+        const estadoItem = (item as any).estado
+        if (!tieneOC && !tieneREQ && !['cancelado', 'entregado'].includes(estadoItem)) {
           const provId = (item as any).proveedorId || (item as any).listaEquipoItem?.proveedorId || ''
           const provNombre = (item as any).proveedor?.nombre || (item as any).proveedorNombre || (item as any).listaEquipoItem?.proveedor?.nombre || ''
           initial[item.id] = { selected: !!provId, proveedorId: provId, proveedorNombre: provNombre }
@@ -2267,7 +2269,7 @@ export default function PedidoLogisticaDetailPage() {
             const itemsElegibles = (pedido?.items || []).filter((item: any) => {
               const tieneOC = (item.ordenCompraItems?.length ?? 0) > 0
               const tieneREQ = itemTieneREQActivo(item)
-              return !tieneOC && !tieneREQ
+              return !tieneOC && !tieneREQ && !['cancelado', 'entregado'].includes(item.estado)
             })
             const itemsExcluidos = (pedido?.items || []).length - itemsElegibles.length
             const todosSeleccionados = itemsElegibles.length > 0 && itemsElegibles.every((i: any) => reqItemsSelected.has(i.id))
