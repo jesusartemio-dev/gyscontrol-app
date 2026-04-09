@@ -239,3 +239,13 @@ export async function reemplazarItemLista(id: string, data: Partial<ListaEquipoI
     throw error
   }
 }
+
+// ✅ Reordenar ítems de lista de equipo
+export async function reordenarListaEquipoItems(items: { id: string; orden: number }[]): Promise<void> {
+  const res = await fetch('/api/lista-equipo-item/reordenar', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items }),
+  })
+  if (!res.ok) throw new Error('Error al reordenar ítems de lista')
+}

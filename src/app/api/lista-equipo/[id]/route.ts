@@ -30,6 +30,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
         proyecto: true,
         user: true,
         listaEquipoItem: {
+          orderBy: { orden: 'asc' as const },
           include: {
             proveedor: true,
             cotizacionProveedorItems: true,

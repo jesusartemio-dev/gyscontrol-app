@@ -1325,6 +1325,7 @@ export interface ListaEquipo {
   codigo: string                   // ✅ antes era 'nombre', ahora es el código único (ej. CJM27-LST-001)
   nombre: string
   numeroSecuencia: number          // ✅ número crudo, usado para construir el código
+  orden: number
   estado: EstadoListaEquipo
   createdAt: string
   updatedAt: string
@@ -1357,6 +1358,7 @@ export interface ListaEquipo {
 export interface ListaEquipoItem {
   id: string
   listaId: string
+  orden: number
   proyectoEquipoItemId?: string
   proyectoEquipoId?: string
   reemplazaProyectoEquipoCotizadoItemId?: string // 🆕 Si este item reemplaza uno cotizado
@@ -1492,6 +1494,7 @@ export interface PedidoEquipo {
   codigo: string                         // ✅ Código obligatorio
   numeroSecuencia: number               // ✅ número puro usado para construir el código (ej. 1 → PED-001)
   nombre?: string                        // ✅ Nombre descriptivo del pedido
+  orden: number
   estado: EstadoPedido
   fechaPedido: string                   // ✅ mantenido por compatibilidad
   fechaNecesaria: string               // ✅ Proyectos indica esta fecha
@@ -1534,6 +1537,7 @@ export interface PedidoEquipo {
 export interface PedidoEquipoItem {
   id: string
   pedidoId: string
+  orden: number
   listaId?: string
   listaEquipoItemId?: string
   cantidadPedida: number

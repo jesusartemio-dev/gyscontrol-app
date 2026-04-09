@@ -8,7 +8,22 @@
 import { useEffect, useState, useMemo, memo } from 'react';
 import { useRouter } from 'next/navigation';
 import { getProyectoById } from '@/lib/services/proyecto';
-import { getListaEquiposPorProyecto, deleteListaEquipo } from '@/lib/services/listaEquipo';
+import { getListaEquiposPorProyecto, deleteListaEquipo, reordenarListasEquipo } from '@/lib/services/listaEquipo';
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  arrayMove,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -39,7 +54,8 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  ShoppingCart
+  ShoppingCart,
+  GripVertical,
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -77,6 +93,35 @@ function LoadingSkeleton() {
   );
 }
 
+function SortableListaRow({ lista, disabled, onClick, children }: {
+  lista: any;
+  disabled: boolean;
+  onClick: () => void;
+  children: (dragHandle: React.ReactNode) => React.ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: lista.id,
+    disabled,
+  });
+  const dragHandle = (
+    <TableCell className="w-6 p-0 pl-1" onClick={(e) => e.stopPropagation()}>
+      <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1">
+        <GripVertical className="h-3.5 w-3.5 text-gray-400 opacity-0 group-hover:opacity-100" />
+      </div>
+    </TableCell>
+  );
+  return (
+    <TableRow
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }}
+      className="group cursor-pointer hover:bg-muted/50"
+      onClick={onClick}
+    >
+      {children(dragHandle)}
+    </TableRow>
+  );
+}
+
 // Componente de tabla de listas
 const ListasTable = memo(function ListasTable({
   listas,
@@ -96,9 +141,34 @@ const ListasTable = memo(function ListasTable({
   const [filterEstado, setFilterEstado] = useState('all');
   const [sortField, setSortField] = useState<string>('createdAt');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [localListas, setLocalListas] = useState<any[]>([]);
+
+  useEffect(() => {
+    setLocalListas([...listas].sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0)));
+  }, [listas]);
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
+  const canDrag = !search && filterEstado === 'all';
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIdx = localListas.findIndex(l => l.id === active.id);
+    const newIdx = localListas.findIndex(l => l.id === over.id);
+    if (oldIdx === -1 || newIdx === -1) return;
+    const reordenados = arrayMove(localListas, oldIdx, newIdx).map((l, i) => ({ ...l, orden: i }));
+    setLocalListas(reordenados);
+    try {
+      await reordenarListasEquipo(reordenados.map(l => ({ id: l.id, orden: l.orden })));
+    } catch {
+      toast.error('Error al guardar el orden');
+      setLocalListas([...listas].sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0)));
+    }
+  };
 
   const filteredListas = useMemo(() => {
-    let result = listas;
+    let result = canDrag ? localListas : [...localListas];
 
     if (search) {
       const term = search.toLowerCase();
@@ -114,9 +184,10 @@ const ListasTable = memo(function ListasTable({
     }
 
     return result;
-  }, [listas, search, filterEstado]);
+  }, [localListas, search, filterEstado, canDrag]);
 
   const sortedListas = useMemo(() => {
+    if (canDrag) return filteredListas; // preserve drag order
     return [...filteredListas].sort((a, b) => {
       let aVal = a[sortField];
       let bVal = b[sortField];
@@ -131,7 +202,7 @@ const ListasTable = memo(function ListasTable({
       if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [filteredListas, sortField, sortDir]);
+  }, [filteredListas, sortField, sortDir, canDrag]);
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -224,6 +295,7 @@ const ListasTable = memo(function ListasTable({
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50 hover:bg-muted/50">
+              {canDrag && <TableHead className="w-6 p-0" />}
               <TableHead className="w-[25%]">
                 <button
                   onClick={() => handleSort('nombre')}
@@ -267,10 +339,112 @@ const ListasTable = memo(function ListasTable({
           <TableBody>
             {sortedListas.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground text-sm">
+                <TableCell colSpan={canDrag ? 11 : 10} className="text-center py-8 text-muted-foreground text-sm">
                   {search || filterEstado !== 'all' ? 'No se encontraron listas' : 'Sin listas de equipos'}
                 </TableCell>
               </TableRow>
+            ) : canDrag ? (
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={sortedListas.map(l => l.id)} strategy={verticalListSortingStrategy}>
+                  {sortedListas.map((lista) => (
+                    <SortableListaRow
+                      key={lista.id}
+                      lista={lista}
+                      disabled={false}
+                      onClick={() => router.push(`/proyectos/${proyectoId}/listas/${lista.id}`)}
+                    >
+                      {(dragHandle) => (<>
+                      {dragHandle}
+                  <TableCell className="py-2">
+                    <div>
+                      <span className="text-xs font-medium line-clamp-2">{lista.nombre}</span>
+                      <span className="font-mono text-[10px] text-muted-foreground block">{lista.codigo || '-'}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="py-2">
+                    {(() => {
+                      const grupos = [...new Map<string, string>(
+                        (lista.items || [])
+                          .filter((i: any) => i.proyectoEquipoCotizado || i.proyectoEquipoItem?.proyectoEquipoCotizado)
+                          .map((i: any) => {
+                            const grupo = i.proyectoEquipoCotizado || i.proyectoEquipoItem?.proyectoEquipoCotizado;
+                            return [grupo.id as string, grupo.nombre as string];
+                          })
+                      ).values()];
+                      return grupos.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {grupos.map((nombre, idx) => (
+                            <Badge key={idx} variant="outline" className="text-[10px] px-1.5 py-0 font-normal whitespace-nowrap">
+                              {nombre}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      );
+                    })()}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-sm py-2">
+                    {lista.totalItems || lista.items?.length || 0}
+                  </TableCell>
+                  <TableCell className="text-center py-2">
+                    {(lista._count?.cotizacionProveedorItem || lista.cotizacionCount || 0) > 0 ? (
+                      <div className="flex items-center justify-center gap-1">
+                        <ShoppingCart className="h-3.5 w-3.5 text-green-500" />
+                        <span className="text-xs font-medium text-green-700">
+                          {lista._count?.cotizacionProveedorItem || lista.cotizacionCount || 0}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-xs text-muted-foreground py-2">
+                    ${(lista.montoEstimado || 0).toLocaleString('es-PE', { minimumFractionDigits: 2 })}
+                  </TableCell>
+                  <TableCell className="py-2">
+                    {lista.responsable || lista.user ? (
+                      <span className="text-xs text-muted-foreground">
+                        {(lista.responsable || lista.user).name || (lista.responsable || lista.user).email || '—'}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground py-2">
+                    {formatDate(lista.createdAt)}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground py-2">
+                    {lista.fechaNecesaria ? formatDate(lista.fechaNecesaria) : '—'}
+                  </TableCell>
+                  <TableCell className="py-2">
+                    {getEstadoBadge(lista.estado)}
+                  </TableCell>
+                  <TableCell className="py-2" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0"
+                        onClick={() => router.push(`/proyectos/${proyectoId}/listas/${lista.id}`)}
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => onDelete(lista)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                    </>)}
+                    </SortableListaRow>
+                  ))}
+                </SortableContext>
+              </DndContext>
             ) : (
               sortedListas.map((lista) => (
                 <TableRow

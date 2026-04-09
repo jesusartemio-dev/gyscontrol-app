@@ -95,3 +95,13 @@ export async function deletePedidoEquipoItem(id: string): Promise<boolean> {
     return false
   }
 }
+
+// ✅ Reordenar ítems de pedido de equipo
+export async function reordenarPedidoEquipoItems(items: { id: string; orden: number }[]): Promise<void> {
+  const res = await fetch('/api/pedido-equipo-item/reordenar', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items }),
+  })
+  if (!res.ok) throw new Error('Error al reordenar ítems de pedido')
+}

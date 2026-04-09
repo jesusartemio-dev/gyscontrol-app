@@ -45,6 +45,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
           },
         },
         pedidoEquipoItem: {
+          orderBy: { orden: 'asc' as const },
           include: {
             listaEquipoItem: {
               include: {

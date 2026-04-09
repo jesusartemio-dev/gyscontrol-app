@@ -22,7 +22,23 @@ import {
   getPedidoEquipos,
   createPedidoEquipo,
   updatePedidoEquipo,
+  reordenarPedidosEquipo,
 } from '@/lib/services/pedidoEquipo'
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  arrayMove,
+  useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import {
   createPedidoEquipoItem,
   updatePedidoEquipoItem,
@@ -54,6 +70,7 @@ import {
   Zap,
   Send,
   X,
+  GripVertical,
 } from 'lucide-react'
 import Link from 'next/link'
 import PedidoEquipoModalCrear from '@/components/equipos/PedidoEquipoModalCrear'
@@ -88,6 +105,35 @@ function LoadingSkeleton() {
   )
 }
 
+function SortablePedidoRow({ pedido, disabled, onClick, children }: {
+  pedido: PedidoEquipo;
+  disabled: boolean;
+  onClick: () => void;
+  children: (dragHandle: React.ReactNode) => React.ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: pedido.id,
+    disabled,
+  });
+  const dragHandle = (
+    <TableCell className="w-6 p-0 pl-1" onClick={(e) => e.stopPropagation()}>
+      <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1">
+        <GripVertical className="h-3.5 w-3.5 text-gray-400 opacity-0 group-hover:opacity-100" />
+      </div>
+    </TableCell>
+  );
+  return (
+    <TableRow
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }}
+      className="group cursor-pointer hover:bg-muted/50"
+      onClick={onClick}
+    >
+      {children(dragHandle)}
+    </TableRow>
+  );
+}
+
 // Componente de tabla de pedidos
 const PedidosTable = memo(function PedidosTable({
   pedidos,
@@ -103,6 +149,30 @@ const PedidosTable = memo(function PedidosTable({
   const router = useRouter()
   const [search, setSearch] = useState('')
   const [filterEstado, setFilterEstado] = useState('all')
+  const [localPedidos, setLocalPedidos] = useState<PedidoEquipo[]>([])
+
+  useEffect(() => {
+    setLocalPedidos([...pedidos].sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0)))
+  }, [pedidos])
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
+  const canDrag = !search && filterEstado === 'all'
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIdx = localPedidos.findIndex(p => p.id === active.id)
+    const newIdx = localPedidos.findIndex(p => p.id === over.id)
+    if (oldIdx === -1 || newIdx === -1) return
+    const reordenados = arrayMove(localPedidos, oldIdx, newIdx).map((p, i) => ({ ...p, orden: i }))
+    setLocalPedidos(reordenados)
+    try {
+      await reordenarPedidosEquipo(reordenados.map(p => ({ id: p.id, orden: p.orden })))
+    } catch {
+      toast.error('Error al guardar el orden')
+      setLocalPedidos([...pedidos].sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0)))
+    }
+  }
 
   const deleteValidation = useDeleteWithValidation({
     entity: 'pedidoEquipo',
@@ -117,7 +187,7 @@ const PedidosTable = memo(function PedidosTable({
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
   const filteredPedidos = useMemo(() => {
-    let result = pedidos
+    let result = canDrag ? localPedidos : [...localPedidos]
 
     if (search) {
       const term = search.toLowerCase()
@@ -133,9 +203,10 @@ const PedidosTable = memo(function PedidosTable({
     }
 
     return result
-  }, [pedidos, search, filterEstado])
+  }, [localPedidos, search, filterEstado, canDrag])
 
   const sortedPedidos = useMemo(() => {
+    if (canDrag) return filteredPedidos
     return [...filteredPedidos].sort((a, b) => {
       let aVal: any = a[sortField as keyof PedidoEquipo]
       let bVal: any = b[sortField as keyof PedidoEquipo]
@@ -155,7 +226,7 @@ const PedidosTable = memo(function PedidosTable({
       if (aVal > bVal) return sortDir === 'asc' ? 1 : -1
       return 0
     })
-  }, [filteredPedidos, sortField, sortDir])
+  }, [filteredPedidos, sortField, sortDir, canDrag])
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -255,6 +326,7 @@ const PedidosTable = memo(function PedidosTable({
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50 hover:bg-muted/50">
+              {canDrag && <TableHead className="w-6 p-0" />}
               <TableHead className="w-[120px]">
                 <button
                   onClick={() => handleSort('codigo')}
@@ -303,16 +375,16 @@ const PedidosTable = memo(function PedidosTable({
           <TableBody>
             {sortedPedidos.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={11} className="text-center py-8 text-muted-foreground text-sm">
+                <TableCell colSpan={canDrag ? 12 : 11} className="text-center py-8 text-muted-foreground text-sm">
                   {search || filterEstado !== 'all' ? 'No se encontraron pedidos' : 'Sin pedidos registrados'}
                 </TableCell>
               </TableRow>
-            ) : (
-              sortedPedidos.map((pedido) => {
+            ) : canDrag ? (
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={sortedPedidos.map(p => p.id)} strategy={verticalListSortingStrategy}>
+                  {sortedPedidos.map((pedido) => {
                 const montoTotal = pedido.items?.reduce((sum, item) => sum + (item.costoTotal || 0), 0) || 0
                 const totalItems = pedido.items?.length || 0
-
-                // Compute proveedor label from items
                 const proveedorNames = new Set(
                   pedido.items?.map(i =>
                     (i as any).proveedorNombre || (i as any).listaEquipoItem?.proveedor?.nombre
@@ -320,16 +392,16 @@ const PedidosTable = memo(function PedidosTable({
                 )
                 const proveedorLabel = proveedorNames.size === 0
                   ? ((pedido as any).esUrgente ? 'Sin asignar' : 'Sin proveedor')
-                  : proveedorNames.size === 1
-                    ? [...proveedorNames][0]
-                    : 'Varios'
-
+                  : proveedorNames.size === 1 ? [...proveedorNames][0] : 'Varios'
                 return (
-                  <TableRow
+                  <SortablePedidoRow
                     key={pedido.id}
-                    className="group cursor-pointer hover:bg-muted/50"
+                    pedido={pedido}
+                    disabled={false}
                     onClick={() => router.push(`/proyectos/${proyectoId}/pedidos/${pedido.id}`)}
                   >
+                    {(dragHandle) => (<>
+                    {dragHandle}
                     <TableCell className="font-mono text-xs text-muted-foreground py-2">
                       <div className="flex items-center gap-1.5">
                         {pedido.codigo || '-'}
@@ -405,6 +477,90 @@ const PedidosTable = memo(function PedidosTable({
                             className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
                             onClick={() => deleteValidation.requestDelete(pedido.id)}
                           >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                    </>)}
+                  </SortablePedidoRow>
+                )
+                  })}
+                </SortableContext>
+              </DndContext>
+            ) : (
+              sortedPedidos.map((pedido) => {
+                const montoTotal = pedido.items?.reduce((sum, item) => sum + (item.costoTotal || 0), 0) || 0
+                const totalItems = pedido.items?.length || 0
+                const proveedorNames = new Set(
+                  pedido.items?.map(i =>
+                    (i as any).proveedorNombre || (i as any).listaEquipoItem?.proveedor?.nombre
+                  ).filter(Boolean) || []
+                )
+                const proveedorLabel = proveedorNames.size === 0
+                  ? ((pedido as any).esUrgente ? 'Sin asignar' : 'Sin proveedor')
+                  : proveedorNames.size === 1 ? [...proveedorNames][0] : 'Varios'
+                return (
+                  <TableRow
+                    key={pedido.id}
+                    className="group cursor-pointer hover:bg-muted/50"
+                    onClick={() => router.push(`/proyectos/${proyectoId}/pedidos/${pedido.id}`)}
+                  >
+                    <TableCell className="font-mono text-xs text-muted-foreground py-2">
+                      <div className="flex items-center gap-1.5">
+                        {pedido.codigo || '-'}
+                        {(pedido as any).esUrgente && (
+                          <Badge variant="destructive" className="text-[9px] h-4 px-1">URGENTE</Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-2">
+                      <div>
+                        {(pedido as any).nombre && (
+                          <span className="text-sm font-medium line-clamp-1 block">{(pedido as any).nombre}</span>
+                        )}
+                        <span className={`text-xs line-clamp-1 ${(pedido as any).nombre ? 'text-muted-foreground' : `font-medium ${proveedorNames.size === 0 ? 'text-muted-foreground' : ''}`}`}>
+                          {proveedorLabel}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-2 text-xs text-muted-foreground">
+                      <span className="truncate block max-w-[100px]" title={pedido.responsable?.name ?? undefined}>
+                        {pedido.responsable?.name || '—'}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-sm py-2">{totalItems}</TableCell>
+                    <TableCell className="text-right font-mono text-sm font-medium py-2">{formatCurrency(montoTotal)}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground py-2">{formatDate((pedido as any).fechaPedido)}</TableCell>
+                    <TableCell className="text-xs py-2">
+                      {(pedido as any).fechaNecesaria ? (
+                        <span className={(() => {
+                          const diff = new Date((pedido as any).fechaNecesaria).getTime() - Date.now()
+                          if (pedido.estado === 'entregado') return 'text-muted-foreground'
+                          if (diff < 0) return 'text-red-600 font-medium'
+                          if (diff < 7 * 86400000) return 'text-amber-600 font-medium'
+                          return 'text-foreground'
+                        })()}>
+                          {formatDate((pedido as any).fechaNecesaria)}
+                        </span>
+                      ) : <span className="text-muted-foreground">—</span>}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground py-2">{formatDate((pedido as any).fechaEntregaEstimada)}</TableCell>
+                    <TableCell className="text-xs py-2">
+                      {(pedido as any).fechaEntregaReal ? (
+                        <span className="text-green-600 font-medium">{formatDate((pedido as any).fechaEntregaReal)}</span>
+                      ) : <span className="text-muted-foreground">—</span>}
+                    </TableCell>
+                    <TableCell className="py-2">{getEstadoBadge(pedido.estado || 'borrador')}</TableCell>
+                    <TableCell className="py-2" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0"
+                          onClick={() => router.push(`/proyectos/${proyectoId}/pedidos/${pedido.id}`)}>
+                          <Eye className="h-3.5 w-3.5" />
+                        </Button>
+                        {(pedido.estado === 'borrador' || pedido.estado === 'cancelado') && (
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => deleteValidation.requestDelete(pedido.id)}>
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         )}

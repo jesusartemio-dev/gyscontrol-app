@@ -177,3 +177,13 @@ export const createPedidoDesdeListaContextual = async (payload: PedidoEquipoPayl
     throw error
   }
 }
+
+// ✅ Reordenar pedidos de equipo
+export async function reordenarPedidosEquipo(items: { id: string; orden: number }[]): Promise<void> {
+  const res = await fetch('/api/pedido-equipo/reordenar', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items }),
+  })
+  if (!res.ok) throw new Error('Error al reordenar pedidos')
+}

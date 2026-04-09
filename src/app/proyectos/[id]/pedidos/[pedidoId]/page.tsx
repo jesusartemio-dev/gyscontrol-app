@@ -6,7 +6,7 @@
 
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { notFound, useRouter } from 'next/navigation'
 import { getProyectoById } from '@/lib/services/proyecto'
 import { getPedidoEquipoById } from '@/lib/services/pedidoEquipo'
@@ -64,6 +64,7 @@ import {
   List,
   ExternalLink,
   Zap,
+  GripVertical,
 } from 'lucide-react'
 import Link from 'next/link'
 import type { Proyecto, PedidoEquipo } from '@/types'
@@ -76,7 +77,22 @@ import { AgregarDeListaModal } from '@/components/equipos/AgregarDeListaModal'
 import { useDeleteWithValidation } from '@/hooks/useDeleteWithValidation'
 import { DeleteWithValidationDialog } from '@/components/DeleteWithValidationDialog'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { deletePedidoEquipoItem } from '@/lib/services/pedidoEquipoItem'
+import { deletePedidoEquipoItem, reordenarPedidoEquipoItems } from '@/lib/services/pedidoEquipoItem'
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  arrayMove,
+  useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 interface PageProps {
   params: Promise<{
@@ -92,6 +108,26 @@ function LoadingSkeleton() {
       <Skeleton className="h-24 w-full" />
       <Skeleton className="h-64 w-full" />
     </div>
+  )
+}
+
+function SortablePedidoItemRow({ id, children }: { id: string; children: (dragHandle: React.ReactNode) => React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+  const dragHandle = (
+    <td className="px-1 py-2 w-5" onClick={(e) => e.stopPropagation()}>
+      <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity">
+        <GripVertical className="h-3.5 w-3.5 text-gray-400" />
+      </div>
+    </td>
+  )
+  return (
+    <tr
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }}
+      className="hover:bg-gray-50/50 group"
+    >
+      {children(dragHandle)}
+    </tr>
   )
 }
 
@@ -113,6 +149,31 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null)
   const [confirmDeleteItem, setConfirmDeleteItem] = useState<{ id: string; codigo: string } | null>(null)
   const [showAgregarDeListaModal, setShowAgregarDeListaModal] = useState(false)
+  const [localPedidoItems, setLocalPedidoItems] = useState<any[]>([])
+
+  useEffect(() => {
+    if (pedido?.items) {
+      setLocalPedidoItems([...pedido.items].sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0)))
+    }
+  }, [pedido?.items])
+
+  const dndSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
+
+  const handleDragEndPedidoItems = async (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIdx = localPedidoItems.findIndex((i: any) => i.id === active.id)
+    const newIdx = localPedidoItems.findIndex((i: any) => i.id === over.id)
+    if (oldIdx === -1 || newIdx === -1) return
+    const reordenados = arrayMove(localPedidoItems, oldIdx, newIdx).map((item: any, idx: number) => ({ ...item, orden: idx }))
+    setLocalPedidoItems(reordenados)
+    try {
+      await reordenarPedidoEquipoItems(reordenados.map((i: any) => ({ id: i.id, orden: i.orden })))
+    } catch {
+      toast.error('Error al guardar el orden')
+      if (pedido?.items) setLocalPedidoItems([...pedido.items].sort((a: any, b: any) => (a.orden ?? 0) - (b.orden ?? 0)))
+    }
+  }
 
   const deleteValidation = useDeleteWithValidation({
     entity: 'pedidoEquipo',
@@ -657,6 +718,7 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
               <table className="w-full text-xs">
                 <thead className="bg-gray-50">
                   <tr className="border-b">
+                    <th className="w-5 p-0" />
                     <th className="px-3 py-2 text-left font-medium text-gray-600">Código</th>
                     <th className="px-3 py-2 text-left font-medium text-gray-600">Descripción</th>
                     <th className="px-3 py-2 text-left font-medium text-gray-600">Proveedor</th>
@@ -670,9 +732,13 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
                     {pedido.estado === 'borrador' && <th className="px-3 py-2 w-8" />}
                   </tr>
                 </thead>
+                <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleDragEndPedidoItems}>
+                  <SortableContext items={localPedidoItems.map((i: any) => i.id)} strategy={verticalListSortingStrategy}>
                 <tbody className="divide-y">
-                  {pedido.items.map((item) => (
-                    <tr key={item.id} className="hover:bg-gray-50/50">
+                  {localPedidoItems.map((item: any) => (
+                    <SortablePedidoItemRow key={item.id} id={item.id}>
+                    {(dragHandle) => (<>
+                      {dragHandle}
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-1.5">
                           <span className="font-mono font-medium">{item.codigo}</span>
@@ -779,9 +845,12 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
                           </button>
                         </td>
                       )}
-                    </tr>
+                    </>)}
+                    </SortablePedidoItemRow>
                   ))}
                 </tbody>
+                  </SortableContext>
+                </DndContext>
               </table>
             </div>
           ) : (

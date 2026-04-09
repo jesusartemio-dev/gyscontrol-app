@@ -625,6 +625,7 @@ model ListaEquipo {
   nombre                     String
   numeroSecuencia            Int
   estado                     EstadoListaEquipo            @default(borrador)
+  orden                      Int                          @default(0)
   createdAt                  DateTime                     @default(now())
   updatedAt                  DateTime                     @updatedAt
   responsableId              String
@@ -668,6 +669,7 @@ model ListaEquipoItem {
   unidad                                String
   marca                                 String                       @default("SIN-MARCA")
   cantidad                              Float
+  orden                                 Int                          @default(0)
   verificado                            Boolean                      @default(false)
   verificadoPorId                       String?
   verificadoAt                          DateTime?
@@ -720,6 +722,7 @@ model PedidoEquipo {
   numeroSecuencia      Int
   nombre               String?
   estado               EstadoPedido         @default(borrador)
+  orden                Int                  @default(0)
   fechaPedido          DateTime             @default(now())
   observacion          String?
   fechaEntregaEstimada DateTime?
@@ -761,6 +764,7 @@ model PedidoEquipoItem {
   comentarioLogisticaAt       DateTime?
   createdAt                   DateTime             @default(now())
   updatedAt                   DateTime             @updatedAt
+  orden                       Int                  @default(0)
   listaId                     String?
   codigo                      String
   descripcion                 String

@@ -6,20 +6,35 @@
 
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  arrayMove,
+  useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Pencil, Trash2, Search, Package, Clock, AlertTriangle, CheckCircle, XCircle, Grid3X3, List, RotateCcw, Plus, ShoppingCart, FileText, Download, Tag, ChevronDown, Wrench, Trophy, Layers, MoreHorizontal, Lock, Zap } from 'lucide-react'
+import { Pencil, Trash2, Search, Package, Clock, AlertTriangle, CheckCircle, XCircle, Grid3X3, List, RotateCcw, Plus, ShoppingCart, FileText, Download, Tag, ChevronDown, Wrench, Trophy, Layers, MoreHorizontal, Lock, Zap, GripVertical } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ListaEquipoItem } from '@/types'
-import { updateListaEquipoItem } from '@/lib/services/listaEquipoItem'
+import { updateListaEquipoItem, reordenarListaEquipoItems } from '@/lib/services/listaEquipoItem'
 import { toast } from 'sonner'
 import ModalReemplazarEquipo from './ModalReemplazarEquipo'
 import ModalAgregarItemDesdeCatalogo from './ModalAgregarItemDesdeCatalogo'
@@ -109,9 +124,40 @@ const getOrigenVariant = (origen: string): "default" | "secondary" | "outline" =
 }
 
 
+function SortableItemRow({ id, disabled, showHandle, rowClassName, children }: {
+  id: string
+  disabled: boolean
+  showHandle: boolean
+  rowClassName?: string
+  children: (dragHandle: React.ReactNode) => React.ReactNode
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id, disabled })
+  const dragHandle = showHandle ? (
+    <td className="w-5 px-1" onClick={(e) => e.stopPropagation()}>
+      <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity p-0.5">
+        <GripVertical className="h-3.5 w-3.5 text-gray-400" />
+      </div>
+    </td>
+  ) : null
+  return (
+    <tr
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }}
+      className={rowClassName || 'border-b hover:bg-gray-50 transition-colors group'}
+    >
+      {children(dragHandle)}
+    </tr>
+  )
+}
+
 export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, listaNombre, listaEstado, items, editable = true, onCreated, onItemUpdated, onItemsUpdated, onDeleted, onRefresh }: Props) {
   const router = useRouter()
   const { data: session } = useSession()
+  const [localItems, setLocalItems] = useState<ListaEquipoItem[]>([])
+  useEffect(() => {
+    setLocalItems([...items].sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0)))
+  }, [items])
+  const dndSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
   const rol = (session?.user as any)?.role || ''
   const puedeSeleccionarCotizacion = ['admin', 'gerente', 'gestor', 'coordinador'].includes(rol)
   const [selectorItem, setSelectorItem] = useState<ListaEquipoItem | null>(null)
@@ -186,7 +232,12 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
   , [items])
 
   // 🔍 Filter and search items using memoized summaries
+  const canDragItems = !searchTerm && categoriaFiltro === '__ALL__' && viewMode === 'list'
+
   const filteredItems = useMemo(() => {
+    // Build order map from localItems for drag ordering
+    const orderMap = new Map(localItems.map((item, idx) => [item.id, idx]))
+
     let filtered = [...itemsWithResumen]
 
     // Category filter
@@ -205,8 +256,30 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
       )
     }
 
-    return filtered.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-  }, [itemsWithResumen, searchTerm, categoriaFiltro])
+    // Sort: use localItems order when dragging, else by orden field
+    return filtered.sort((a, b) => {
+      if (canDragItems) {
+        return (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0)
+      }
+      return (a.orden ?? 0) - (b.orden ?? 0) || a.createdAt.localeCompare(b.createdAt)
+    })
+  }, [itemsWithResumen, searchTerm, categoriaFiltro, localItems, canDragItems])
+
+  const handleDragEndItems = async (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIdx = localItems.findIndex(i => i.id === active.id)
+    const newIdx = localItems.findIndex(i => i.id === over.id)
+    if (oldIdx === -1 || newIdx === -1) return
+    const reordenados = arrayMove(localItems, oldIdx, newIdx).map((item, idx) => ({ ...item, orden: idx }))
+    setLocalItems(reordenados)
+    try {
+      await reordenarListaEquipoItems(reordenados.map(i => ({ id: i.id, orden: i.orden })))
+    } catch {
+      toast.error('Error al guardar el orden')
+      setLocalItems([...items].sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0)))
+    }
+  }
 
   const handleSaveComentario = async (itemId: string) => {
     try {
@@ -516,6 +589,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
           <table className={`w-full ${textSize}`}>
             <thead>
               <tr className="bg-gray-50 border-b">
+                {canDragItems && <th className="w-5 p-0" />}
                 <th className={`${cellPadding} ${columnWidths.codigoDescripcion} text-left font-semibold text-gray-700`}>
                   Código / Descripción
                 </th>
@@ -549,6 +623,8 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                 <th className={`${cellPadding} ${columnWidths.acciones} text-center font-semibold text-gray-700`}></th>
               </tr>
             </thead>
+          <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleDragEndItems}>
+            <SortableContext items={filteredItems.map(i => i.id)} strategy={verticalListSortingStrategy}>
           <tbody>
             {filteredItems.map((item) => {
               const isEditingComentario = editComentarioItemId === item.id
@@ -558,12 +634,17 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
 
               const rowIndex = filteredItems.indexOf(item)
               return (
-                <tr
+                <SortableItemRow
                    key={item.id}
-                   className={`border-b hover:bg-gray-50 transition-colors ${
+                   id={item.id}
+                   disabled={!canDragItems}
+                   showHandle={canDragItems}
+                   rowClassName={`border-b hover:bg-gray-50 transition-colors group ${
                      rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'
                    }`}
                  >
+                 {(dragHandle) => (<>
+                   {dragHandle}
                    <td className={`${cellPadding} ${columnWidths.codigoDescripcion} text-gray-700`}>
                        <div className="space-y-0.5">
                          <div className="flex items-center gap-1.5">
@@ -873,11 +954,14 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                         </DropdownMenuContent>
                       </DropdownMenu>
                    </td>
-                   </tr>
+                   </>)}
+                   </SortableItemRow>
                )
                  })
                }
            </tbody>
+            </SortableContext>
+          </DndContext>
            </table>
         </div>
       </div>

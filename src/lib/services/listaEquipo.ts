@@ -479,3 +479,13 @@ export async function getListasEquipoPorProyectoOptimized(proyectoId: string, pa
 export async function searchListasEquipo(searchText: string, filters: Omit<ListaEquipoFilters, 'search'> = {}): Promise<ListaEquipoMasterResponse | null> {
   return getListasEquipoMaster({ ...filters, search: searchText })
 }
+
+// ✅ Reordenar listas de equipo
+export async function reordenarListasEquipo(items: { id: string; orden: number }[]): Promise<void> {
+  const res = await fetch('/api/lista-equipo/reordenar', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items }),
+  })
+  if (!res.ok) throw new Error('Error al reordenar listas')
+}
