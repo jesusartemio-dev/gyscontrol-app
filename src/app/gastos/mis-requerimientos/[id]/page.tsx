@@ -629,6 +629,20 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
             materialesTotal={materialesTotal}
             materialesPendientesCount={materialesPendientes.length}
             materialesPendientesMonto={materialesPendientesMonto}
+            canEditAnticipo={hoja.estado === 'borrador' && hoja.requiereAnticipo}
+            onSaveAnticipo={async (monto) => {
+              const res = await fetch(`/api/hoja-de-gastos/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ montoAnticipo: monto }),
+              })
+              if (!res.ok) {
+                const err = await res.json()
+                throw new Error(err.error || 'Error al guardar')
+              }
+              toast.success('Anticipo actualizado')
+              await loadData()
+            }}
           />
         )
       })()}

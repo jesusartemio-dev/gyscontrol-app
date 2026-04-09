@@ -1,7 +1,8 @@
 'use client'
 
+import { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
-import { Banknote, ArrowDownCircle, ArrowUpCircle, Wallet, Package, AlertCircle } from 'lucide-react'
+import { Banknote, ArrowDownCircle, ArrowUpCircle, Wallet, Package, AlertCircle, Pencil, Check, X, Loader2 } from 'lucide-react'
 import clsx from 'clsx'
 
 interface ResumenFinancieroProps {
@@ -14,6 +15,8 @@ interface ResumenFinancieroProps {
   materialesPendientesMonto?: number
   materialesPendientesCount?: number
   materialesCount?: number
+  canEditAnticipo?: boolean
+  onSaveAnticipo?: (monto: number) => Promise<void>
 }
 
 const formatCurrency = (amount: number) =>
@@ -29,14 +32,37 @@ export default function ResumenFinanciero({
   materialesPendientesMonto,
   materialesPendientesCount,
   materialesCount,
+  canEditAnticipo,
+  onSaveAnticipo,
 }: ResumenFinancieroProps) {
+  const [editingAnticipo, setEditingAnticipo] = useState(false)
+  const [anticipoInput, setAnticipoInput] = useState('')
+  const [savingAnticipo, setSavingAnticipo] = useState(false)
+
+  const startEditAnticipo = () => {
+    setAnticipoInput(String(montoAnticipo))
+    setEditingAnticipo(true)
+  }
+
+  const saveAnticipo = async () => {
+    const monto = parseFloat(anticipoInput)
+    if (isNaN(monto) || monto < 0) return
+    setSavingAnticipo(true)
+    try {
+      await onSaveAnticipo?.(monto)
+      setEditingAnticipo(false)
+    } finally {
+      setSavingAnticipo(false)
+    }
+  }
+
   const items = [
     ...(requiereAnticipo ? [
-      { label: 'Anticipo solicitado', value: montoAnticipo, icon: Banknote, color: 'text-blue-600', bg: 'bg-blue-50' },
-      { label: 'Depositado', value: montoDepositado, icon: ArrowDownCircle, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+      { label: 'Anticipo solicitado', value: montoAnticipo, icon: Banknote, color: 'text-blue-600', bg: 'bg-blue-50', editable: true },
+      { label: 'Depositado', value: montoDepositado, icon: ArrowDownCircle, color: 'text-emerald-600', bg: 'bg-emerald-50', editable: false },
     ] : []),
-    { label: 'Total gastado', value: montoGastado, icon: ArrowUpCircle, color: 'text-orange-600', bg: 'bg-orange-50' },
-    { label: 'Saldo', value: saldo, icon: Wallet, color: saldo >= 0 ? 'text-emerald-600' : 'text-red-600', bg: saldo >= 0 ? 'bg-emerald-50' : 'bg-red-50' },
+    { label: 'Total gastado', value: montoGastado, icon: ArrowUpCircle, color: 'text-orange-600', bg: 'bg-orange-50', editable: false },
+    { label: 'Saldo', value: saldo, icon: Wallet, color: saldo >= 0 ? 'text-emerald-600' : 'text-red-600', bg: saldo >= 0 ? 'bg-emerald-50' : 'bg-red-50', editable: false },
   ]
 
   const hayMaterialesPendientes = materialesPendientesCount != null && materialesPendientesCount > 0
@@ -47,14 +73,42 @@ export default function ResumenFinanciero({
         {items.map((item) => (
           <Card key={item.label} className="border-none shadow-sm">
             <CardContent className="p-3 flex items-center gap-2">
-              <div className={clsx('p-1.5 rounded-md', item.bg)}>
+              <div className={clsx('p-1.5 rounded-md shrink-0', item.bg)}>
                 <item.icon className={clsx('h-4 w-4', item.color)} />
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-[10px] text-muted-foreground truncate">{item.label}</p>
-                <p className={clsx('text-sm font-semibold font-mono', item.color)}>
-                  {formatCurrency(item.value)}
-                </p>
+                {item.editable && canEditAnticipo && editingAnticipo ? (
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={anticipoInput}
+                      onChange={e => setAnticipoInput(e.target.value)}
+                      className="w-24 border rounded px-1 py-0.5 text-xs font-mono"
+                      autoFocus
+                      onKeyDown={e => { if (e.key === 'Enter') saveAnticipo(); if (e.key === 'Escape') setEditingAnticipo(false) }}
+                    />
+                    <button type="button" onClick={saveAnticipo} disabled={savingAnticipo} className="text-green-600 hover:text-green-700 disabled:opacity-50">
+                      {savingAnticipo ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                    </button>
+                    <button type="button" onClick={() => setEditingAnticipo(false)} disabled={savingAnticipo} className="text-muted-foreground/50 hover:text-muted-foreground">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1">
+                    <p className={clsx('text-sm font-semibold font-mono', item.color)}>
+                      {formatCurrency(item.value)}
+                    </p>
+                    {item.editable && canEditAnticipo && (
+                      <button type="button" onClick={startEditAnticipo} className="text-muted-foreground/30 hover:text-blue-500 transition-colors ml-1">
+                        <Pencil className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
