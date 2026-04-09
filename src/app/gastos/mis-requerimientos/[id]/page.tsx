@@ -152,18 +152,33 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
   const handleValidar = () => executeAction(() => validarHoja(id), 'Rendición validada')
   const handleCerrar = () => executeAction(() => cerrarHoja(id), 'Requerimiento cerrado')
 
-  const handleDepositar = async () => {
+  // Registra el depósito (sin cambiar estado)
+  const handleRegistrarDeposito = async () => {
     const monto = parseFloat(montoDeposito)
-    if (!monto || monto <= 0) {
-      toast.error('Ingrese un monto válido')
-      return
+    if (!monto || monto <= 0) { toast.error('Ingrese un monto válido'); return }
+    try {
+      setActionLoading(true)
+      const adjuntoIds = depositoAdjuntos.map(a => a.id)
+      const res = await fetch(`/api/hoja-de-gastos/${id}/depositos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ monto, adjuntoIds }),
+      })
+      if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Error') }
+      toast.success('Depósito registrado')
+      setShowDeposito(false)
+      setMontoDeposito('')
+      setDepositoAdjuntos([])
+      await loadData()
+    } catch (e: any) {
+      toast.error(e.message || 'Error al registrar depósito')
+    } finally {
+      setActionLoading(false)
     }
-    const adjuntoIds = depositoAdjuntos.map(a => a.id)
-    await executeAction(() => depositarHoja(id, monto, adjuntoIds), 'Depósito registrado')
-    setShowDeposito(false)
-    setMontoDeposito('')
-    setDepositoAdjuntos([])
   }
+
+  // Avanza el estado a "depositado" (requiere al menos un depósito registrado)
+  const handleAvanzarDepositado = () => executeAction(() => depositarHoja(id), 'Avanzado a Depositado')
 
   const handleUploadConstancia = async (file: File) => {
     try {
@@ -210,14 +225,14 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
         body: JSON.stringify({ monto, descripcion: descripcionDepositoAdicional || undefined, adjuntoIds }),
       })
       if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Error') }
-      toast.success('Depósito adicional registrado')
+      toast.success('Depósito registrado')
       setShowDepositoAdicional(false)
       setMontoDepositoAdicional('')
       setDescripcionDepositoAdicional('')
       setAdjuntosAdicional([])
       await loadData()
     } catch (e: any) {
-      toast.error(e.message || 'Error al registrar depósito adicional')
+      toast.error(e.message || 'Error al registrar depósito')
     } finally {
       setActionLoading(false)
     }
@@ -526,6 +541,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
   const canEnviar = ['borrador', 'rechazado'].includes(hoja.estado)
   const canAprobar = hoja.estado === 'enviado' && ['admin', 'gerente', 'gestor', 'coordinador', 'coordinador_logistico', 'administracion'].includes(role || '')
   const canDepositar = hoja.estado === 'aprobado' && hoja.requiereAnticipo && ['admin', 'gerente', 'administracion'].includes(role || '')
+  const canAvanzarDepositado = canDepositar && (hoja.depositos?.length ?? 0) > 0
   const canRendir = (hoja.estado === 'aprobado' && !hoja.requiereAnticipo) || hoja.estado === 'depositado'
   const canValidarLineas = hoja.estado === 'rendido' && ['admin', 'gerente', 'administracion'].includes(role || '')
   const allLineasConforme = lineas.length > 0 && lineas.every(l => l.conformidad === 'conforme')
@@ -608,14 +624,18 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
               )}
               {canDepositar && (
                 <Button size="sm" onClick={() => {
-                  setMontoDeposito(String(hoja.montoAnticipo || ''))
-                  // Pre-cargar adjuntos sueltos existentes (subidos en sesiones anteriores)
-                  const sueltos = (hoja.adjuntos || []).filter(a => a.tipo === 'constancia_deposito' && !a.depositoHojaId)
-                  setDepositoAdjuntos(sueltos)
+                  setMontoDeposito('')
+                  setDepositoAdjuntos([])
                   setShowDeposito(true)
-                }} disabled={actionLoading} className="bg-purple-600 hover:bg-purple-700">
+                }} disabled={actionLoading} variant="outline" className="border-purple-400 text-purple-700 hover:bg-purple-50">
                   <Banknote className="h-3.5 w-3.5 mr-1" />
                   Registrar depósito
+                </Button>
+              )}
+              {canAvanzarDepositado && (
+                <Button size="sm" onClick={handleAvanzarDepositado} disabled={actionLoading} className="bg-purple-600 hover:bg-purple-700">
+                  <Banknote className="h-3.5 w-3.5 mr-1" />
+                  Avanzar a Depositado
                 </Button>
               )}
               {canRendir && (
@@ -712,16 +732,16 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
       })()}
 
       {/* Depósitos registrados */}
-      {hoja.requiereAnticipo && ((hoja.depositos?.length ?? 0) > 0 || hoja.estado === 'depositado') && (
+      {hoja.requiereAnticipo && ['aprobado', 'depositado', 'rendido', 'validado', 'cerrado'].includes(hoja.estado) && (
         <Card>
           <CardHeader className="py-3 px-4 flex flex-row items-center justify-between">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Banknote className="h-4 w-4 text-purple-600" />
               Depósitos ({(hoja.depositos || []).length})
             </CardTitle>
-            {hoja.estado === 'depositado' && ['admin', 'gerente', 'administracion'].includes(role || '') && (
-              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setShowDepositoAdicional(true)}>
-                + Depósito adicional
+            {['aprobado', 'depositado'].includes(hoja.estado) && ['admin', 'gerente', 'administracion'].includes(role || '') && (
+              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setShowDepositoAdicional(true) }}>
+                + Registrar depósito
               </Button>
             )}
           </CardHeader>
@@ -736,12 +756,12 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground">{new Date(dep.fecha).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
-                    {idx > 0 && ['admin', 'gerente', 'administracion'].includes(role || '') && (
+                    {['aprobado', 'depositado'].includes(hoja.estado) && ['admin', 'gerente', 'administracion'].includes(role || '') && (hoja.estado === 'aprobado' || idx > 0) && (
                       <button
                         onClick={() => handleEliminarDeposito(dep.id)}
                         disabled={deletingDeposito === dep.id}
                         className="text-red-400 hover:text-red-600 disabled:opacity-50"
-                        title="Eliminar depósito adicional"
+                        title="Eliminar depósito"
                       >
                         {deletingDeposito === dep.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
                       </button>
@@ -995,9 +1015,9 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDeposito(false)}>Cancelar</Button>
-            <Button onClick={handleDepositar} disabled={actionLoading || !montoDeposito} className="bg-purple-600 hover:bg-purple-700">
+            <Button onClick={handleRegistrarDeposito} disabled={actionLoading || !montoDeposito} className="bg-purple-600 hover:bg-purple-700">
               {actionLoading && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-              Registrar
+              Registrar depósito
             </Button>
           </DialogFooter>
         </DialogContent>

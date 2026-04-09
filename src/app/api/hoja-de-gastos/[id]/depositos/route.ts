@@ -51,8 +51,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (!hoja) {
       return NextResponse.json({ error: 'Hoja de gastos no encontrada' }, { status: 404 })
     }
-    if (hoja.estado !== 'depositado') {
-      return NextResponse.json({ error: 'Solo se pueden agregar depósitos adicionales cuando la hoja está en estado depositado' }, { status: 400 })
+    if (!['aprobado', 'depositado'].includes(hoja.estado)) {
+      return NextResponse.json({ error: 'Solo se pueden registrar depósitos cuando la hoja está en estado aprobado o depositado' }, { status: 400 })
     }
 
     const { monto, descripcion, adjuntoIds = [] } = await req.json()
@@ -97,9 +97,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         data: {
           hojaDeGastosId: id,
           tipo: 'depositado',
-          descripcion: `Depósito adicional registrado: S/ ${monto.toFixed(2)}`,
+          descripcion: `Depósito registrado: S/ ${monto.toFixed(2)}`,
           usuarioId: session.user.id,
-          metadata: { monto, depositoId: dep.id, adicional: true },
+          metadata: { monto, depositoId: dep.id },
         },
       })
 

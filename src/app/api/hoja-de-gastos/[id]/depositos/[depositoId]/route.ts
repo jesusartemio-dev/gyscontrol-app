@@ -28,8 +28,8 @@ export async function DELETE(
     if (!hoja) {
       return NextResponse.json({ error: 'Hoja no encontrada' }, { status: 404 })
     }
-    if (hoja.estado !== 'depositado') {
-      return NextResponse.json({ error: 'Solo se pueden eliminar depósitos cuando la hoja está en estado depositado' }, { status: 400 })
+    if (!['aprobado', 'depositado'].includes(hoja.estado)) {
+      return NextResponse.json({ error: 'Solo se pueden eliminar depósitos cuando la hoja está en estado aprobado o depositado' }, { status: 400 })
     }
 
     const deposito = await prisma.depositoHoja.findUnique({ where: { id: depositoId } })
@@ -37,10 +37,12 @@ export async function DELETE(
       return NextResponse.json({ error: 'Depósito no encontrado' }, { status: 404 })
     }
 
-    // Verificar que no sea el único depósito
-    const totalDepositos = await prisma.depositoHoja.count({ where: { hojaDeGastosId: id } })
-    if (totalDepositos <= 1) {
-      return NextResponse.json({ error: 'No se puede eliminar el único depósito. Use retroceder estado si desea cancelarlo.' }, { status: 400 })
+    // En estado depositado no se puede eliminar el único depósito
+    if (hoja.estado === 'depositado') {
+      const totalDepositos = await prisma.depositoHoja.count({ where: { hojaDeGastosId: id } })
+      if (totalDepositos <= 1) {
+        return NextResponse.json({ error: 'No se puede eliminar el único depósito. Use retroceder estado si desea cancelarlo.' }, { status: 400 })
+      }
     }
 
     await prisma.$transaction(async (tx) => {

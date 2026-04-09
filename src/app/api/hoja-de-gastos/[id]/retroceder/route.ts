@@ -50,11 +50,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       extraData.fechaAprobacion = null
     }
     if (estadoActual === 'depositado') {
-      extraData.montoDepositado = 0
-      extraData.saldo = 0
       extraData.fechaDeposito = null
-      // Eliminar todos los registros de depósito
-      await prisma.depositoHoja.deleteMany({ where: { hojaDeGastosId: id } })
+      // Los DepositoHoja se conservan para que el admin pueda re-avanzar sin re-registrar
+      // Recalcular montoDepositado desde los depósitos existentes
+      const depositosExistentes = await prisma.depositoHoja.findMany({ where: { hojaDeGastosId: id } })
+      const totalDepositos = depositosExistentes.reduce((s, d) => s + d.monto, 0)
+      extraData.montoDepositado = totalDepositos
+      extraData.saldo = totalDepositos - hoja.montoGastado
     }
     if (estadoActual === 'rendido') {
       extraData.fechaRendicion = null

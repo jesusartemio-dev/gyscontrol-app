@@ -3,7 +3,12 @@ import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
-export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+/**
+ * POST /api/hoja-de-gastos/[id]/depositar
+ * Avanza el estado de aprobado → depositado.
+ * Requiere que exista al menos un DepositoHoja registrado previamente.
+ */
+export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
@@ -11,58 +16,39 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
 
     if (!['admin', 'gerente', 'administracion'].includes(session.user.role)) {
-      return NextResponse.json({ error: 'Sin permisos para registrar depósito' }, { status: 403 })
+      return NextResponse.json({ error: 'Sin permisos para avanzar a depositado' }, { status: 403 })
     }
 
     const { id } = await params
     const hoja = await prisma.hojaDeGastos.findUnique({
       where: { id },
-      include: {
-        itemsMateriales: true,
-      },
+      include: { itemsMateriales: true },
     })
     if (!hoja) {
       return NextResponse.json({ error: 'Hoja de gastos no encontrada' }, { status: 404 })
     }
     if (hoja.estado !== 'aprobado') {
-      return NextResponse.json({ error: 'Solo se puede depositar desde estado aprobado' }, { status: 400 })
+      return NextResponse.json({ error: 'Solo se puede avanzar a depositado desde estado aprobado' }, { status: 400 })
     }
     if (!hoja.requiereAnticipo) {
       return NextResponse.json({ error: 'Esta hoja no requiere anticipo' }, { status: 400 })
     }
 
-    const payload = await req.json()
-    const montoDepositado = payload.montoDepositado || hoja.montoAnticipo
-    const descripcion: string | undefined = payload.descripcion
-    const adjuntoIds: string[] = payload.adjuntoIds || []
+    // Verificar que exista al menos un depósito registrado
+    const depositos = await prisma.depositoHoja.findMany({ where: { hojaDeGastosId: id } })
+    if (depositos.length === 0) {
+      return NextResponse.json({ error: 'Debe registrar al menos un depósito antes de avanzar' }, { status: 400 })
+    }
+
+    const montoTotal = depositos.reduce((s, d) => s + d.monto, 0)
 
     const data = await prisma.$transaction(async (tx) => {
-      // Crear registro de depósito
-      const deposito = await tx.depositoHoja.create({
-        data: {
-          hojaDeGastosId: id,
-          monto: montoDepositado,
-          fecha: new Date(),
-          descripcion: descripcion || null,
-          creadoPorId: session.user.id,
-          updatedAt: new Date(),
-        },
-      })
-
-      // Vincular adjuntos al depósito si se enviaron
-      if (adjuntoIds.length > 0) {
-        await tx.hojaDeGastosAdjunto.updateMany({
-          where: { id: { in: adjuntoIds }, hojaDeGastosId: id },
-          data: { depositoHojaId: deposito.id },
-        })
-      }
-
       const updated = await tx.hojaDeGastos.update({
         where: { id },
         data: {
           estado: 'depositado',
-          montoDepositado,
-          saldo: montoDepositado - hoja.montoGastado,
+          montoDepositado: montoTotal,
+          saldo: montoTotal - hoja.montoGastado,
           fechaDeposito: new Date(),
           updatedAt: new Date(),
         },
@@ -72,11 +58,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         data: {
           hojaDeGastosId: id,
           tipo: 'depositado',
-          descripcion: `Deposito registrado: S/ ${montoDepositado.toFixed(2)}`,
+          descripcion: `Avanzado a Depositado — Total depositado: S/ ${montoTotal.toFixed(2)}`,
           estadoAnterior: 'aprobado',
           estadoNuevo: 'depositado',
           usuarioId: session.user.id,
-          metadata: { monto: montoDepositado, montoAnticipo: hoja.montoAnticipo, depositoId: deposito.id },
+          metadata: { montoTotal, cantidadDepositos: depositos.length },
         },
       })
 
@@ -85,10 +71,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       if (esCompra && hoja.itemsMateriales.length > 0) {
         for (const reqItem of hoja.itemsMateriales) {
           const existe = await tx.recepcionPendiente.findFirst({
-            where: {
-              requerimientoMaterialItemId: reqItem.id,
-              estado: { notIn: ['rechazado'] },
-            },
+            where: { requerimientoMaterialItemId: reqItem.id, estado: { notIn: ['rechazado'] } },
           })
           if (existe) continue
           await tx.recepcionPendiente.create({
@@ -108,7 +91,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error al depositar:', error)
-    return NextResponse.json({ error: 'Error al registrar depósito' }, { status: 500 })
+    console.error('Error al avanzar a depositado:', error)
+    return NextResponse.json({ error: 'Error al avanzar a depositado' }, { status: 500 })
   }
 }
