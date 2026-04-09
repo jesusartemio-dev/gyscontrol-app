@@ -222,7 +222,7 @@ export default function LogisticaListasTable({ listas, loading = false, onDelete
                   {lista.codigo}
                 </TableCell>
                 <TableCell className="py-2">
-                  <span className="text-xs font-medium truncate block max-w-[200px]" title={lista.nombre}>
+                  <span className="text-xs font-medium line-clamp-2 leading-snug" title={lista.nombre}>
                     {lista.nombre}
                   </span>
                 </TableCell>
