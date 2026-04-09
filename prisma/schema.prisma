@@ -1534,6 +1534,7 @@ model User {
   hojasComoEmpleado               HojaDeGastos[]              @relation("HojaEmpleado")
   hojasComoAprobador              HojaDeGastos[]              @relation("HojaAprobador")
   hojasEventos                    HojaDeGastosEvento[]        @relation("HojaEventoUsuario")
+  depositosCreados                DepositoHoja[]              @relation("DepositoCreadoPor")
   // Órdenes de compra
   ordenesCompraSolicitante        OrdenCompra[]               @relation("OCsolicitante")
   ordenesCompraAprobador          OrdenCompra[]               @relation("OCaprobador")
@@ -3343,6 +3344,7 @@ model HojaDeGastos {
   eventos           HojaDeGastosEvento[]
   itemsMateriales   RequerimientoMaterialItem[]
   comprobantes      GastoComprobante[]
+  depositos         DepositoHoja[]
 
   @@index([proyectoId, estado])
   @@index([centroCostoId, estado])
@@ -3372,6 +3374,7 @@ model HojaDeGastosEvento {
 model HojaDeGastosAdjunto {
   id             String   @id @default(cuid())
   hojaDeGastosId String
+  depositoHojaId String?
   nombreArchivo  String
   urlArchivo     String
   driveFileId    String?
@@ -3380,10 +3383,30 @@ model HojaDeGastosAdjunto {
   tipo           String   @default("constancia_deposito")
   createdAt      DateTime @default(now())
 
-  hojaDeGastos HojaDeGastos @relation(fields: [hojaDeGastosId], references: [id], onDelete: Cascade)
+  hojaDeGastos HojaDeGastos  @relation(fields: [hojaDeGastosId], references: [id], onDelete: Cascade)
+  depositoHoja DepositoHoja? @relation(fields: [depositoHojaId], references: [id], onDelete: SetNull)
 
   @@index([hojaDeGastosId])
+  @@index([depositoHojaId])
   @@map("hoja_de_gastos_adjunto")
+}
+
+model DepositoHoja {
+  id             String   @id @default(cuid())
+  hojaDeGastosId String
+  monto          Float
+  fecha          DateTime
+  descripcion    String?
+  creadoPorId    String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime
+
+  hojaDeGastos HojaDeGastos        @relation(fields: [hojaDeGastosId], references: [id], onDelete: Cascade)
+  creadoPor    User                @relation("DepositoCreadoPor", fields: [creadoPorId], references: [id])
+  adjuntos     HojaDeGastosAdjunto[]
+
+  @@index([hojaDeGastosId])
+  @@map("deposito_hoja")
 }
 
 model GastoLinea {

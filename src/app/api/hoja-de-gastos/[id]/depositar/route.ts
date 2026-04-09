@@ -33,8 +33,30 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const payload = await req.json()
     const montoDepositado = payload.montoDepositado || hoja.montoAnticipo
+    const descripcion: string | undefined = payload.descripcion
+    const adjuntoIds: string[] = payload.adjuntoIds || []
 
     const data = await prisma.$transaction(async (tx) => {
+      // Crear registro de depósito
+      const deposito = await tx.depositoHoja.create({
+        data: {
+          hojaDeGastosId: id,
+          monto: montoDepositado,
+          fecha: new Date(),
+          descripcion: descripcion || null,
+          creadoPorId: session.user.id,
+          updatedAt: new Date(),
+        },
+      })
+
+      // Vincular adjuntos al depósito si se enviaron
+      if (adjuntoIds.length > 0) {
+        await tx.hojaDeGastosAdjunto.updateMany({
+          where: { id: { in: adjuntoIds }, hojaDeGastosId: id },
+          data: { depositoHojaId: deposito.id },
+        })
+      }
+
       const updated = await tx.hojaDeGastos.update({
         where: { id },
         data: {
@@ -54,7 +76,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           estadoAnterior: 'aprobado',
           estadoNuevo: 'depositado',
           usuarioId: session.user.id,
-          metadata: { monto: montoDepositado, montoAnticipo: hoja.montoAnticipo },
+          metadata: { monto: montoDepositado, montoAnticipo: hoja.montoAnticipo, depositoId: deposito.id },
         },
       })
 

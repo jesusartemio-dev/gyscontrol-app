@@ -44,6 +44,13 @@ const includeRelations = {
     },
     orderBy: { createdAt: 'asc' as const },
   },
+  depositos: {
+    include: {
+      adjuntos: { orderBy: { createdAt: 'asc' as const } },
+      creadoPor: { select: { id: true, name: true } },
+    },
+    orderBy: { createdAt: 'asc' as const },
+  },
 }
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {

@@ -53,6 +53,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       extraData.montoDepositado = 0
       extraData.saldo = 0
       extraData.fechaDeposito = null
+      // Eliminar todos los registros de depósito
+      await prisma.depositoHoja.deleteMany({ where: { hojaDeGastosId: id } })
     }
     if (estadoActual === 'rendido') {
       extraData.fechaRendicion = null

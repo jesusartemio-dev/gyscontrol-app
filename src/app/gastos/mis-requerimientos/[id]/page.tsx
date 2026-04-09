@@ -91,11 +91,19 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
   const [showRechazo, setShowRechazo] = useState(false)
   const [comentarioRechazo, setComentarioRechazo] = useState('')
 
-  // Depositar dialog
+  // Depositar dialog (primer depósito)
   const [showDeposito, setShowDeposito] = useState(false)
   const [montoDeposito, setMontoDeposito] = useState('')
   const [depositoAdjuntos, setDepositoAdjuntos] = useState<HojaDeGastosAdjunto[]>([])
   const [uploadingFile, setUploadingFile] = useState(false)
+
+  // Depósito adicional dialog
+  const [showDepositoAdicional, setShowDepositoAdicional] = useState(false)
+  const [montoDepositoAdicional, setMontoDepositoAdicional] = useState('')
+  const [descripcionDepositoAdicional, setDescripcionDepositoAdicional] = useState('')
+  const [adjuntosAdicional, setAdjuntosAdicional] = useState<HojaDeGastosAdjunto[]>([])
+  const [uploadingAdicional, setUploadingAdicional] = useState(false)
+  const [deletingDeposito, setDeletingDeposito] = useState<string | null>(null)
 
   const role = session?.user?.role
 
@@ -150,7 +158,8 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
       toast.error('Ingrese un monto válido')
       return
     }
-    await executeAction(() => depositarHoja(id, monto), 'Depósito registrado')
+    const adjuntoIds = depositoAdjuntos.map(a => a.id)
+    await executeAction(() => depositarHoja(id, monto, adjuntoIds), 'Depósito registrado')
     setShowDeposito(false)
     setMontoDeposito('')
     setDepositoAdjuntos([])
@@ -161,7 +170,6 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
       setUploadingFile(true)
       const adjunto = await uploadHojaAdjunto(id, file)
       setDepositoAdjuntos(prev => [...prev, adjunto])
-      toast.success('Constancia subida')
     } catch (e: any) {
       toast.error(e.message || 'Error al subir constancia')
     } finally {
@@ -173,9 +181,59 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
     try {
       await deleteHojaAdjunto(adjuntoId)
       setDepositoAdjuntos(prev => prev.filter(a => a.id !== adjuntoId))
-      toast.success('Constancia eliminada')
     } catch (e: any) {
       toast.error(e.message || 'Error al eliminar')
+    }
+  }
+
+  const handleUploadAdicional = async (file: File) => {
+    try {
+      setUploadingAdicional(true)
+      const adjunto = await uploadHojaAdjunto(id, file)
+      setAdjuntosAdicional(prev => [...prev, adjunto])
+    } catch (e: any) {
+      toast.error(e.message || 'Error al subir constancia')
+    } finally {
+      setUploadingAdicional(false)
+    }
+  }
+
+  const handleDepositoAdicional = async () => {
+    const monto = parseFloat(montoDepositoAdicional)
+    if (!monto || monto <= 0) { toast.error('Ingrese un monto válido'); return }
+    try {
+      setActionLoading(true)
+      const adjuntoIds = adjuntosAdicional.map(a => a.id)
+      const res = await fetch(`/api/hoja-de-gastos/${id}/depositos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ monto, descripcion: descripcionDepositoAdicional || undefined, adjuntoIds }),
+      })
+      if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Error') }
+      toast.success('Depósito adicional registrado')
+      setShowDepositoAdicional(false)
+      setMontoDepositoAdicional('')
+      setDescripcionDepositoAdicional('')
+      setAdjuntosAdicional([])
+      await loadData()
+    } catch (e: any) {
+      toast.error(e.message || 'Error al registrar depósito adicional')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleEliminarDeposito = async (depositoId: string) => {
+    try {
+      setDeletingDeposito(depositoId)
+      const res = await fetch(`/api/hoja-de-gastos/${id}/depositos/${depositoId}`, { method: 'DELETE' })
+      if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Error') }
+      toast.success('Depósito eliminado')
+      await loadData()
+    } catch (e: any) {
+      toast.error(e.message || 'Error al eliminar depósito')
+    } finally {
+      setDeletingDeposito(null)
     }
   }
 
@@ -647,19 +705,58 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
         )
       })()}
 
-      {/* Constancias de depósito */}
-      {hoja.adjuntos && hoja.adjuntos.length > 0 && (
+      {/* Depósitos registrados */}
+      {hoja.requiereAnticipo && ((hoja.depositos?.length ?? 0) > 0 || hoja.estado === 'depositado') && (
         <Card>
-          <CardHeader className="py-3 px-4">
-            <CardTitle className="text-sm font-medium">Constancias de Depósito</CardTitle>
+          <CardHeader className="py-3 px-4 flex flex-row items-center justify-between">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Banknote className="h-4 w-4 text-purple-600" />
+              Depósitos ({(hoja.depositos || []).length})
+            </CardTitle>
+            {hoja.estado === 'depositado' && ['admin', 'gerente', 'administracion'].includes(role || '') && (
+              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setShowDepositoAdicional(true)}>
+                + Depósito adicional
+              </Button>
+            )}
           </CardHeader>
-          <CardContent className="px-4 pb-3 space-y-1">
-            {hoja.adjuntos.map(adj => (
-              <div key={adj.id} className="flex items-center justify-between text-sm bg-green-50 border border-green-200 rounded px-3 py-1.5">
-                <a href={adj.urlArchivo} target="_blank" rel="noopener noreferrer" className="text-green-700 hover:underline truncate">{adj.nombreArchivo}</a>
-                <span className="text-xs text-muted-foreground ml-2">{new Date(adj.createdAt).toLocaleDateString('es-PE')}</span>
+          <CardContent className="px-4 pb-3 space-y-2">
+            {(hoja.depositos || []).map((dep: any, idx: number) => (
+              <div key={dep.id} className="border rounded-lg p-3 bg-purple-50/50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground font-medium">#{idx + 1}</span>
+                    <span className="text-sm font-semibold text-purple-800">S/ {dep.monto.toFixed(2)}</span>
+                    {dep.descripcion && <span className="text-xs text-muted-foreground">· {dep.descripcion}</span>}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">{new Date(dep.fecha).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                    {idx > 0 && ['admin', 'gerente', 'administracion'].includes(role || '') && (
+                      <button
+                        onClick={() => handleEliminarDeposito(dep.id)}
+                        disabled={deletingDeposito === dep.id}
+                        className="text-red-400 hover:text-red-600 disabled:opacity-50"
+                        title="Eliminar depósito adicional"
+                      >
+                        {deletingDeposito === dep.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {dep.adjuntos && dep.adjuntos.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {dep.adjuntos.map((adj: any) => (
+                      <div key={adj.id} className="flex items-center gap-1.5 text-xs">
+                        <FileText className="h-3 w-3 text-purple-500 shrink-0" />
+                        <a href={adj.urlArchivo} target="_blank" rel="noopener noreferrer" className="text-purple-700 hover:underline truncate">{adj.nombreArchivo}</a>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
+            {(hoja.depositos || []).length === 0 && (
+              <p className="text-xs text-muted-foreground">Sin depósitos registrados aún.</p>
+            )}
           </CardContent>
         </Card>
       )}
@@ -796,7 +893,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
             </CardTitle>
           </CardHeader>
           <CardContent className="px-4 pb-4">
-            <HojaEventosTimeline eventos={(hoja as any).eventos} />
+            <HojaEventosTimeline eventos={(hoja as any).eventos} depositos={(hoja as any).depositos || []} />
           </CardContent>
         </Card>
       )}
@@ -893,6 +990,58 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDeposito(false)}>Cancelar</Button>
             <Button onClick={handleDepositar} disabled={actionLoading || !montoDeposito} className="bg-purple-600 hover:bg-purple-700">
+              {actionLoading && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+              Registrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Depósito adicional Dialog */}
+      <Dialog open={showDepositoAdicional} onOpenChange={setShowDepositoAdicional}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Banknote className="h-5 w-5 text-purple-600" />
+              Depósito adicional
+            </DialogTitle>
+            <DialogDescription>Registre un depósito adicional para este requerimiento.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 pt-2">
+            <div>
+              <Label>Monto (PEN) <span className="text-red-500">*</span></Label>
+              <Input type="number" step="0.01" min="0" value={montoDepositoAdicional} onChange={(e) => setMontoDepositoAdicional(e.target.value)} placeholder="0.00" />
+            </div>
+            <div>
+              <Label>Descripción (opcional)</Label>
+              <Input value={descripcionDepositoAdicional} onChange={(e) => setDescripcionDepositoAdicional(e.target.value)} placeholder="Ej: Segundo depósito" />
+            </div>
+            <div>
+              <Label>Constancia de depósito</Label>
+              <div className="mt-1 border-2 border-dashed border-gray-300 rounded-lg p-3 text-center">
+                <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" id="constancia-adicional-upload"
+                  onChange={(e) => { const file = e.target.files?.[0]; if (file) handleUploadAdicional(file); e.target.value = '' }} />
+                <label htmlFor="constancia-adicional-upload" className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
+                  {uploadingAdicional
+                    ? <span className="flex items-center justify-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Subiendo...</span>
+                    : <span className="flex items-center justify-center gap-2"><Upload className="h-4 w-4" /> Subir constancia (PDF, JPG, PNG)</span>}
+                </label>
+              </div>
+              {adjuntosAdicional.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  {adjuntosAdicional.map(adj => (
+                    <div key={adj.id} className="flex items-center justify-between text-xs bg-green-50 border border-green-200 rounded px-2 py-1">
+                      <a href={adj.urlArchivo} target="_blank" rel="noopener noreferrer" className="text-green-700 hover:underline truncate">{adj.nombreArchivo}</a>
+                      <button onClick={async () => { await deleteHojaAdjunto(adj.id); setAdjuntosAdicional(prev => prev.filter(a => a.id !== adj.id)) }} className="text-red-500 hover:text-red-700 ml-2"><X className="h-3 w-3" /></button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDepositoAdicional(false)}>Cancelar</Button>
+            <Button onClick={handleDepositoAdicional} disabled={actionLoading || !montoDepositoAdicional} className="bg-purple-600 hover:bg-purple-700">
               {actionLoading && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
               Registrar
             </Button>

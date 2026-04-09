@@ -2721,6 +2721,7 @@ export interface HojaDeGastos {
   aprobador?: { id: string; name: string | null; email: string } | null
   lineas?: GastoLinea[]
   adjuntos?: HojaDeGastosAdjunto[]
+  depositos?: DepositoHoja[]
   itemsMateriales?: Array<{
     id: string
     codigo: string
@@ -2765,6 +2766,7 @@ export interface HojaDeGastos {
 export interface HojaDeGastosAdjunto {
   id: string
   hojaDeGastosId: string
+  depositoHojaId?: string | null
   nombreArchivo: string
   urlArchivo: string
   driveFileId?: string | null
@@ -2772,6 +2774,18 @@ export interface HojaDeGastosAdjunto {
   tamano?: number | null
   tipo: string
   createdAt: string
+}
+
+export interface DepositoHoja {
+  id: string
+  hojaDeGastosId: string
+  monto: number
+  fecha: string
+  descripcion?: string | null
+  creadoPorId: string
+  createdAt: string
+  adjuntos?: HojaDeGastosAdjunto[]
+  creadoPor?: { id: string; name: string | null }
 }
 
 export interface GastoLinea {

@@ -25,8 +25,20 @@ interface HojaEvento {
   creadoEn: string
 }
 
+interface DepositoAdjunto {
+  id: string
+  nombreArchivo: string
+  urlArchivo: string
+}
+
+interface Deposito {
+  id: string
+  adjuntos: DepositoAdjunto[]
+}
+
 interface HojaEventosTimelineProps {
   eventos: HojaEvento[]
+  depositos?: Deposito[]
 }
 
 const ICON_MAP: Record<string, { icon: typeof FileText; color: string; bg: string }> = {
@@ -53,7 +65,8 @@ const formatDateTime = (date: string) => {
   })
 }
 
-export default function HojaEventosTimeline({ eventos }: HojaEventosTimelineProps) {
+export default function HojaEventosTimeline({ eventos, depositos = [] }: HojaEventosTimelineProps) {
+  const depositoMap = new Map(depositos.map(d => [d.id, d]))
   if (!eventos || eventos.length === 0) {
     return (
       <div className="text-center py-6 text-sm text-muted-foreground">
@@ -71,6 +84,8 @@ export default function HojaEventosTimeline({ eventos }: HojaEventosTimelineProp
         {eventos.map((evento) => {
           const config = ICON_MAP[evento.tipo] || ICON_MAP.creado
           const Icon = config.icon
+          const depositoId = evento.metadata?.depositoId
+          const deposito = depositoId ? depositoMap.get(depositoId) : undefined
 
           return (
             <div key={evento.id} className="flex gap-3 relative">
@@ -91,6 +106,17 @@ export default function HojaEventosTimeline({ eventos }: HojaEventosTimelineProp
                     </span>
                   )}
                 </div>
+                {deposito && deposito.adjuntos.length > 0 && (
+                  <div className="mt-1 space-y-0.5">
+                    {deposito.adjuntos.map(adj => (
+                      <a key={adj.id} href={adj.urlArchivo} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-xs text-purple-600 hover:underline">
+                        <Paperclip className="h-3 w-3" />
+                        {adj.nombreArchivo}
+                      </a>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )

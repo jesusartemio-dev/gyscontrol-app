@@ -2,10 +2,11 @@ import type { HojaDeGastosAdjunto } from '@/types'
 
 const BASE_URL = '/api/hoja-de-gastos-adjunto'
 
-export async function uploadHojaAdjunto(hojaDeGastosId: string, file: File): Promise<HojaDeGastosAdjunto> {
+export async function uploadHojaAdjunto(hojaDeGastosId: string, file: File, depositoHojaId?: string): Promise<HojaDeGastosAdjunto> {
   const formData = new FormData()
   formData.append('file', file)
   formData.append('hojaDeGastosId', hojaDeGastosId)
+  if (depositoHojaId) formData.append('depositoHojaId', depositoHojaId)
 
   const res = await fetch(BASE_URL, {
     method: 'POST',

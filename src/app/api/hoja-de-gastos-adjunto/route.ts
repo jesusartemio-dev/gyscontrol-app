@@ -32,6 +32,7 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData()
     const file = formData.get('file') as File
     const hojaDeGastosId = formData.get('hojaDeGastosId') as string
+    const depositoHojaId = formData.get('depositoHojaId') as string | null
 
     if (!file) {
       return NextResponse.json({ error: 'Archivo requerido' }, { status: 400 })
@@ -60,6 +61,7 @@ export async function POST(request: NextRequest) {
     const adjunto = await prisma.hojaDeGastosAdjunto.create({
       data: {
         hojaDeGastosId,
+        depositoHojaId: depositoHojaId || null,
         nombreArchivo: file.name,
         urlArchivo: driveFile.webViewLink || '',
         driveFileId: driveFile.id || null,

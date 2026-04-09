@@ -137,8 +137,8 @@ export async function getItemsParaRequerimiento(q?: string): Promise<ProyectoPar
 
 export const enviarHoja = (id: string) => postAction(id, 'enviar')
 export const aprobarHoja = (id: string) => postAction(id, 'aprobar')
-export const depositarHoja = (id: string, montoDepositado?: number) =>
-  postAction(id, 'depositar', { montoDepositado })
+export const depositarHoja = (id: string, montoDepositado?: number, adjuntoIds?: string[], descripcion?: string) =>
+  postAction(id, 'depositar', { montoDepositado, adjuntoIds, descripcion })
 export const rendirHoja = (id: string) => postAction(id, 'rendir')
 export const validarHoja = (id: string) => postAction(id, 'validar')
 export const cerrarHoja = (id: string) => postAction(id, 'cerrar')
