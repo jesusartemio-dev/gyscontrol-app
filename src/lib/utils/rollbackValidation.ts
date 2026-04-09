@@ -190,23 +190,7 @@ async function checkListaEquipoRollback(id: string, targetEstado: string): Promi
 
   const blockers: RollbackBlocker[] = []
 
-  if (lista.estado === 'por_aprobar' && targetEstado === 'por_cotizar') {
-    // Verificar si hay items con cotización seleccionada que bloqueen
-    const seleccionados = await prisma.listaEquipoItem.count({
-      where: {
-        listaId: id,
-        cotizacionSeleccionadaId: { not: null },
-      },
-    })
-    if (seleccionados > 0) {
-      blockers.push({
-        entity: 'ListaEquipoItem',
-        count: seleccionados,
-        message: `${seleccionados} ítem(s) tienen cotización ganadora seleccionada — quita la selección primero`,
-      })
-    }
-  }
-
+  // por_aprobar → por_cotizar: siempre permitido (las selecciones se conservan)
   // por_revisar → borrador: siempre permitido
   // por_cotizar → por_revisar: siempre permitido
 
