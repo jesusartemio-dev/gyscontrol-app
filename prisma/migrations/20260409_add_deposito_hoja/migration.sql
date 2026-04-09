@@ -25,7 +25,7 @@ CREATE INDEX "hoja_de_gastos_adjunto_depositoHojaId_idx" ON "hoja_de_gastos_adju
 ALTER TABLE "deposito_hoja" ADD CONSTRAINT "deposito_hoja_hojaDeGastosId_fkey" FOREIGN KEY ("hojaDeGastosId") REFERENCES "hoja_de_gastos"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "deposito_hoja" ADD CONSTRAINT "deposito_hoja_creadoPorId_fkey" FOREIGN KEY ("creadoPorId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "deposito_hoja" ADD CONSTRAINT "deposito_hoja_creadoPorId_fkey" FOREIGN KEY ("creadoPorId") REFERENCES "user"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "hoja_de_gastos_adjunto" ADD CONSTRAINT "hoja_de_gastos_adjunto_depositoHojaId_fkey" FOREIGN KEY ("depositoHojaId") REFERENCES "deposito_hoja"("id") ON DELETE SET NULL ON UPDATE CASCADE;
