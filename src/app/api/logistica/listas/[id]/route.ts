@@ -30,6 +30,8 @@ export async function GET(
                   select: {
                     id: true,
                     codigo: true,
+                    moneda: true,
+                    tipoCambio: true,
                     proveedor: {
                       select: { nombre: true },
                     },
