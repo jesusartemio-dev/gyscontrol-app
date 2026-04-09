@@ -1558,7 +1558,7 @@ export default function PedidoLogisticaDetailPage() {
                           const tieneOCItem = ((item as any).ordenCompraItems?.length ?? 0) > 0
                           const tieneREQItem = itemTieneREQActivo(item as any)
                           const esEntregadoViaOC = tieneOCItem && item.estado === 'entregado'
-                          const puedeAtender = !tieneOCItem && !tieneREQItem
+                          const puedeAtender = !tieneOCItem && !tieneREQItem && item.estado !== 'entregado'
                           const puedeRevertir = ['admin', 'gerente'].includes(userRole) &&
                             ['atendido', 'parcial', 'entregado'].includes(item.estado) &&
                             !tieneOCItem &&
