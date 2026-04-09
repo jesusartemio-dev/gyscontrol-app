@@ -205,12 +205,16 @@ export default function CotizacionSelectorModal({ item, onUpdated }: Props) {
         <div className="overflow-y-auto flex-1 min-h-0 p-4 py-3 space-y-1.5">
           {cotizaciones.map((cot: any) => {
             const precio = cot.precioUnitario ?? 0
-            const costoTotal = precio * (item.cantidad ?? 1)
+            const cantidad = item.cantidad ?? 1
             const isSelected = selectedId === cot.id
             const isCurrent = item.cotizacionSeleccionadaId === cot.id
-            const sym = getSymbol(cot)
+            const esPEN = getMonedaCot(cot) === 'PEN'
+            const tc = getTipoCambioCot(cot)
+            // Precio principal siempre en USD para comparación clara
+            const precioUSD = toUSD(precio, cot)
+            const totalUSD = precioUSD * cantidad
             // Comparar en USD para detectar el mejor precio entre monedas distintas
-            const esMejorPrecio = toUSD(precio, cot) === stats.precioMinUSD && precio > 0
+            const esMejorPrecio = precioUSD === stats.precioMinUSD && precio > 0
 
             return (
               <div
@@ -277,22 +281,28 @@ export default function CotizacionSelectorModal({ item, onUpdated }: Props) {
                     </div>
                   </div>
 
-                  {/* Precios en línea — en moneda nativa de la cotización */}
+                  {/* Precios — USD como referencia principal, nativo como secundario si es PEN */}
                   <div className="flex items-center gap-3 shrink-0 text-right">
                     <div>
                       <div className={`text-xs font-bold ${
                         isSelected ? 'text-blue-600' : isCurrent ? 'text-green-600' : ''
                       }`}>
-                        {sym}{precio.toFixed(2)}
+                        ${precioUSD.toFixed(2)}
                       </div>
+                      {esPEN && tc && (
+                        <div className="text-[9px] text-amber-600">S/{precio.toFixed(2)}</div>
+                      )}
                       <div className="text-[9px] text-muted-foreground">unit.</div>
                     </div>
                     <div>
                       <div className={`text-xs font-bold ${
                         isSelected ? 'text-blue-600' : isCurrent ? 'text-green-600' : ''
                       }`}>
-                        {sym}{costoTotal.toFixed(2)}
+                        ${totalUSD.toFixed(2)}
                       </div>
+                      {esPEN && tc && (
+                        <div className="text-[9px] text-amber-600">S/{(precio * cantidad).toFixed(2)}</div>
+                      )}
                       <div className="text-[9px] text-muted-foreground">total</div>
                     </div>
                     <div className="w-14">
