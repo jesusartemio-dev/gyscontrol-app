@@ -95,6 +95,16 @@ export async function updateCotizacionEquipoItem(
   }
 }
 
+// ✅ Reordenar ítems de equipo
+export async function reordenarCotizacionEquipoItems(items: { id: string; orden: number }[]): Promise<void> {
+  const res = await fetch('/api/cotizacion-equipo-item/reordenar', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items }),
+  })
+  if (!res.ok) throw new Error('Error al reordenar ítems de equipo')
+}
+
 // ✅ Eliminar ítem de equipo
 export async function deleteCotizacionEquipoItem(id: string): Promise<void> {
   try {

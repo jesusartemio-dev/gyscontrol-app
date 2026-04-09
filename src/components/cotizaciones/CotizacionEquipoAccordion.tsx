@@ -42,6 +42,7 @@ interface Props {
   onMultipleCreated?: (items: CotizacionEquipoItem[]) => void
   onDeleted: (itemId: string) => void
   onUpdated: (item: CotizacionEquipoItem) => void
+  onItemsReordered?: (items: CotizacionEquipoItem[]) => void
   onDeletedGrupo: () => void
   onUpdatedNombre: (nuevoNombre: string) => void
   onRefresh?: () => Promise<void>
@@ -56,6 +57,7 @@ export default function CotizacionEquipoAccordion({
   onMultipleCreated,
   onDeleted,
   onUpdated,
+  onItemsReordered,
   onDeletedGrupo,
   onUpdatedNombre,
   onRefresh,
@@ -370,6 +372,7 @@ export default function CotizacionEquipoAccordion({
                     onUpdated={onUpdated}
                     onEdit={handleOpenEditModal}
                     onVincular={setVincularItem}
+                    onItemsReordered={onItemsReordered}
                     isLocked={isLocked}
                   />
                 )}

@@ -67,6 +67,15 @@ export async function deleteCotizacionEquipo(id: string): Promise<void> {
   }
 }
 
+export async function reordenarCotizacionEquipos(items: { id: string; orden: number }[]): Promise<void> {
+  const res = await fetch('/api/cotizacion-equipo/reordenar', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items }),
+  })
+  if (!res.ok) throw new Error('Error al reordenar grupos de equipos')
+}
+
 export async function updateCotizacionEquipoSubtotales(id: string, data: {
   subtotalCliente: number
   subtotalInterno: number

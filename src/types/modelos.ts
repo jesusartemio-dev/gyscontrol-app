@@ -869,6 +869,7 @@ export interface CotizacionEquipo {
   descripcion?: string
   subtotalInterno: number
   subtotalCliente: number
+  orden: number
   createdAt: string
   updatedAt: string
   items: CotizacionEquipoItem[]
@@ -891,6 +892,7 @@ export interface CotizacionEquipoItem {
   cantidad: number
   costoInterno: number
   costoCliente: number
+  orden: number
   createdAt: string
   updatedAt: string
   // Relaciones opcionales si haces include

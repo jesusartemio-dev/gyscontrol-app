@@ -26,8 +26,10 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
         user: true,
         plantilla: true,
         cotizacionEquipo: {
+          orderBy: { orden: 'asc' },
           include: {
             cotizacionEquipoItem: {
+              orderBy: { orden: 'asc' },
               include: { catalogoEquipo: { select: { updatedAt: true } } }
             }
           }
