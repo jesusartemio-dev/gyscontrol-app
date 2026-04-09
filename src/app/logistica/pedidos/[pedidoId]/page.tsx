@@ -522,6 +522,30 @@ export default function PedidoLogisticaDetailPage() {
   const [rechazoDetalleModal, setRechazoDetalleModal] = useState<any>(null)
   const [revertirRechazo, setRevertirRechazo] = useState<{ confirmando: boolean; motivo: string; procesando: boolean }>({ confirmando: false, motivo: '', procesando: false })
 
+  // Revertir entrega directa
+  const [revirtiendoItemId, setRevirtiendoItemId] = useState<string | null>(null)
+  const handleRevertirEntrega = async (itemId: string, itemDescripcion: string) => {
+    if (!confirm(`¿Revertir la entrega de "${itemDescripcion}"?\n\nEl item volverá a estado Pendiente y podrás crear la OC correctamente.`)) return
+    setRevirtiendoItemId(itemId)
+    try {
+      const res = await fetch(`/api/pedido-equipo-item/${itemId}/revertir-entrega`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ motivo: 'Reversión para regularización con Orden de Compra' }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Error al revertir')
+      }
+      toast.success('Entrega revertida. El item está nuevamente pendiente.')
+      await cargarDatos()
+    } catch (err: any) {
+      toast.error(err.message || 'Error al revertir entrega')
+    } finally {
+      setRevirtiendoItemId(null)
+    }
+  }
+
   // Recepciones pendientes (aplanar desde items)
   const recepcionesPendientes = (pedido?.items || []).flatMap((item: any) =>
     (item.recepcionesPendientes || []).map((r: any) => ({
@@ -1528,15 +1552,34 @@ export default function PedidoLogisticaDetailPage() {
                         {item.costoTotal ? formatCurrency(item.costoTotal) : '—'}
                       </td>
                       <td className="px-3 py-2 text-center">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openItemEdit(item)}
-                          className="h-6 text-[10px] px-2"
-                        >
-                          <Edit className="h-3 w-3 mr-1" />
-                          Atender
-                        </Button>
+                        <div className="flex items-center gap-1 justify-center">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openItemEdit(item)}
+                            className="h-6 text-[10px] px-2"
+                          >
+                            <Edit className="h-3 w-3 mr-1" />
+                            Atender
+                          </Button>
+                          {['admin', 'gerente'].includes(userRole) &&
+                            ['atendido', 'parcial', 'entregado'].includes(item.estado) &&
+                            !(item as any).recepcionesPendientes?.some((r: any) => ['en_almacen', 'entregado_proyecto'].includes(r.estado)) && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRevertirEntrega(item.id, item.descripcion)}
+                              disabled={revirtiendoItemId === item.id}
+                              className="h-6 text-[10px] px-2 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                              title="Revertir entrega directa para regularizar con OC"
+                            >
+                              {revirtiendoItemId === item.id
+                                ? <span className="animate-spin">↻</span>
+                                : '↩'}
+                              {' '}Revertir
+                            </Button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
