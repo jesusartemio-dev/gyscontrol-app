@@ -557,6 +557,7 @@ export interface CatalogoEquipo {
   precioVenta: number
   precioLogistica?: number
   precioReal?: number
+  fechaActualizacion?: string
   estado: string
   createdAt: string
   updatedAt: string

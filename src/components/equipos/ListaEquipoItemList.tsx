@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Pencil, Trash2, Search, Package, Clock, AlertTriangle, CheckCircle, XCircle, Grid3X3, List, RotateCcw, Plus, ShoppingCart, FileText, Download, Tag, ChevronDown, Wrench, Trophy, Layers, MoreHorizontal, Lock } from 'lucide-react'
+import { Pencil, Trash2, Search, Package, Clock, AlertTriangle, CheckCircle, XCircle, Grid3X3, List, RotateCcw, Plus, ShoppingCart, FileText, Download, Tag, ChevronDown, Wrench, Trophy, Layers, MoreHorizontal, Lock, Zap } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ListaEquipoItem } from '@/types'
@@ -632,6 +632,27 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                             interactive={false}
                           />
                         </div>
+                        {/* Indicador de precio de referencia del catálogo */}
+                        {(item.cotizaciones?.length || 0) === 0 && item.catalogoEquipo?.precioLogistica && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center gap-0.5 text-[10px] text-amber-600 cursor-help">
+                                <Zap className="h-2.5 w-2.5" />
+                                <span>Ref: {formatCurrency(item.catalogoEquipo.precioLogistica)}</span>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" className="text-xs max-w-[180px]">
+                              <p className="font-medium">Precio de referencia (catálogo)</p>
+                              <p className="text-muted-foreground">Último precio logístico registrado.</p>
+                              {item.catalogoEquipo?.fechaActualizacion && (
+                                <p className="text-muted-foreground mt-0.5">
+                                  Actualizado: {new Date(item.catalogoEquipo.fechaActualizacion).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                                </p>
+                              )}
+                              <p className="text-amber-600 mt-1">Pendiente de cotizar con proveedor.</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
                       </div>
                    </td>
                    <td className={`${cellPadding} ${columnWidths.costoEntrega} text-right`}>

@@ -160,6 +160,8 @@ export async function GET(
                 codigo: true,
                 descripcion: true,
                 marca: true,
+                precioLogistica: true,
+                fechaActualizacion: true,
                 categoriaEquipo: {
                   select: {
                     id: true,
