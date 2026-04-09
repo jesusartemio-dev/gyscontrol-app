@@ -142,6 +142,12 @@ export async function GET(request: Request) {
              tipoItem: true,
              proveedorNombre: true,
              catalogoEquipoId: true,
+             catalogoEquipo: {
+               select: {
+                 precioLogistica: true,
+                 fechaActualizacion: true,
+               }
+             },
              fechaEntregaEstimada: true,
              fechaEntregaReal: true,
              estadoEntrega: true,

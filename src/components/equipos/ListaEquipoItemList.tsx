@@ -632,33 +632,33 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                             interactive={false}
                           />
                         </div>
-                        {/* Indicador de precio de referencia del catálogo */}
-                        {(item.cotizaciones?.length || 0) === 0 && item.catalogoEquipo?.precioLogistica && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="flex items-center gap-0.5 text-[10px] text-amber-600 cursor-help">
-                                <Zap className="h-2.5 w-2.5" />
-                                <span>Ref: {formatCurrency(item.catalogoEquipo.precioLogistica)}</span>
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent side="bottom" className="text-xs max-w-[180px]">
-                              <p className="font-medium">Precio de referencia (catálogo)</p>
-                              <p className="text-muted-foreground">Último precio logístico registrado.</p>
-                              {item.catalogoEquipo?.fechaActualizacion && (
-                                <p className="text-muted-foreground mt-0.5">
-                                  Actualizado: {new Date(item.catalogoEquipo.fechaActualizacion).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                                </p>
-                              )}
-                              <p className="text-amber-600 mt-1">Pendiente de cotizar con proveedor.</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
                       </div>
                    </td>
                    <td className={`${cellPadding} ${columnWidths.costoEntrega} text-right`}>
                       <div className="font-medium text-gray-900">
                         {costoTotal > 0 ? formatCurrency(costoTotal) : '—'}
                       </div>
+                      {/* Indicador de precio de referencia del catálogo */}
+                      {costoTotal === 0 && item.catalogoEquipo?.precioLogistica && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex items-center justify-end gap-0.5 text-[10px] text-amber-600 cursor-help">
+                              <Zap className="h-2.5 w-2.5" />
+                              <span>Ref: {formatCurrency(item.catalogoEquipo.precioLogistica * item.cantidad)}</span>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="left" className="text-xs max-w-[200px]">
+                            <p className="font-medium">Precio de referencia (catálogo)</p>
+                            <p className="text-muted-foreground text-[10px]">Último precio logístico: {formatCurrency(item.catalogoEquipo.precioLogistica)} × {item.cantidad}</p>
+                            {item.catalogoEquipo?.fechaActualizacion && (
+                              <p className="text-muted-foreground text-[10px] mt-0.5">
+                                Actualizado: {new Date(item.catalogoEquipo.fechaActualizacion).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                              </p>
+                            )}
+                            <p className="text-amber-600 text-[10px] mt-1">Pendiente de cotizar con proveedor.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
                       {(item.tiempoEntrega || item.tiempoEntregaDias) && (
                         <div className="text-[10px] text-muted-foreground">
                           {item.tiempoEntrega || `${item.tiempoEntregaDias}d`}

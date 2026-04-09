@@ -63,6 +63,7 @@ import {
   Wrench,
   List,
   ExternalLink,
+  Zap,
 } from 'lucide-react'
 import Link from 'next/link'
 import type { Proyecto, PedidoEquipo } from '@/types'
@@ -745,6 +746,26 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
                       </td>
                       <td className="px-3 py-2 text-right font-medium text-emerald-600">
                         {item.costoTotal ? formatCurrency(item.costoTotal) : '—'}
+                        {!item.costoTotal && (item as any).catalogoEquipo?.precioLogistica && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center justify-end gap-0.5 text-[10px] text-amber-600 cursor-help mt-0.5">
+                                <Zap className="h-2.5 w-2.5" />
+                                <span>Ref: {formatCurrency((item as any).catalogoEquipo.precioLogistica * ((item as any).cantidadPedida || 1))}</span>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent side="left" className="text-xs max-w-[200px]">
+                              <p className="font-medium">Precio de referencia (catálogo)</p>
+                              <p className="text-muted-foreground text-[10px]">Último precio logístico: {formatCurrency((item as any).catalogoEquipo.precioLogistica)} × {(item as any).cantidadPedida || 1}</p>
+                              {(item as any).catalogoEquipo?.fechaActualizacion && (
+                                <p className="text-muted-foreground text-[10px] mt-0.5">
+                                  Actualizado: {formatDate((item as any).catalogoEquipo.fechaActualizacion)}
+                                </p>
+                              )}
+                              <p className="text-amber-600 text-[10px] mt-1">Sin cotización confirmada.</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
                       </td>
                       {pedido.estado === 'borrador' && (
                         <td className="px-2 py-2">
