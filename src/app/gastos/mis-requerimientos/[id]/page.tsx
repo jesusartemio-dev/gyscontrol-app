@@ -982,11 +982,11 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
                 </label>
               </div>
               {depositoAdjuntos.length > 0 && (
-                <div className="mt-2 space-y-1">
+                <div className="mt-2 max-h-32 overflow-y-auto space-y-1">
                   {depositoAdjuntos.map(adj => (
                     <div key={adj.id} className="flex items-center justify-between text-xs bg-green-50 border border-green-200 rounded px-2 py-1">
-                      <a href={adj.urlArchivo} target="_blank" rel="noopener noreferrer" className="text-green-700 hover:underline truncate">{adj.nombreArchivo}</a>
-                      <button onClick={() => handleDeleteConstancia(adj.id)} className="text-red-500 hover:text-red-700 ml-2"><X className="h-3 w-3" /></button>
+                      <a href={adj.urlArchivo} target="_blank" rel="noopener noreferrer" className="text-green-700 hover:underline truncate max-w-[280px]">{adj.nombreArchivo}</a>
+                      <button onClick={() => handleDeleteConstancia(adj.id)} className="text-red-500 hover:text-red-700 ml-2 shrink-0"><X className="h-3 w-3" /></button>
                     </div>
                   ))}
                 </div>
