@@ -1349,20 +1349,51 @@ export default function PedidoLogisticaDetailPage() {
                             cerrado: 'bg-gray-100 text-gray-500',
                           }
 
+                          const ocId = (item as any).ordenCompraItems?.[0]?.ordenCompra?.id
+                          const ocNumero = (item as any).ordenCompraItems?.[0]?.ordenCompra?.numero
+                          const primerReq = reqItems[0]
+
                           return (
                             <>
                               {tieneProveedor ? (
-                                <div className="truncate text-xs">{provNombre}</div>
+                                // Nombre del proveedor: azul+clickable si tiene OC o REQ, gris si no
+                                tieneOC ? (
+                                  <Link
+                                    href={`/logistica/ordenes-compra/${ocId}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="truncate text-xs text-blue-600 hover:underline font-medium flex items-center gap-0.5"
+                                    title={`Abrir OC ${ocNumero}`}
+                                  >
+                                    <ShoppingCart className="h-3 w-3 shrink-0" />
+                                    {provNombre}
+                                  </Link>
+                                ) : primerReq ? (
+                                  <Link
+                                    href={`/gastos/mis-requerimientos/${primerReq.hojaDeGastos.id}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="truncate text-xs text-blue-600 hover:underline font-medium flex items-center gap-0.5"
+                                    title={`Abrir REQ ${primerReq.hojaDeGastos.numero}`}
+                                  >
+                                    <FileText className="h-3 w-3 shrink-0" />
+                                    {provNombre}
+                                  </Link>
+                                ) : (
+                                  <div className="truncate text-xs">{provNombre}</div>
+                                )
                               ) : (
                                 <div className="truncate text-gray-400 text-xs">—</div>
                               )}
                               {tieneOC && (
                                 <Link
-                                  href={`/logistica/ordenes-compra/${(item as any).ordenCompraItems[0].ordenCompra?.id}`}
+                                  href={`/logistica/ordenes-compra/${ocId}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
                                   className="inline-flex items-center gap-0.5 text-[9px] text-blue-600 hover:underline mt-0.5"
                                 >
                                   <ShoppingCart className="h-2.5 w-2.5" />
-                                  {(item as any).ordenCompraItems[0].ordenCompra?.numero}
+                                  {ocNumero}
                                 </Link>
                               )}
                               {reqItems.map(req => (
