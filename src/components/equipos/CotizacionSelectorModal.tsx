@@ -26,28 +26,48 @@ export default function CotizacionSelectorModal({ item, onUpdated }: Props) {
   const [isConfirming, setIsConfirming] = useState(false)
 
   // Obtener cotizaciones disponibles ordenadas por precio
+  // Helpers de moneda — leen de cot.cotizacion o cot.cotizacionProveedor
+  const getMonedaCot = (cot: any): string =>
+    cot.cotizacion?.moneda || cot.cotizacionProveedor?.moneda || 'USD'
+
+  const getTipoCambioCot = (cot: any): number | null =>
+    cot.cotizacion?.tipoCambio ?? cot.cotizacionProveedor?.tipoCambio ?? null
+
+  // Convierte el precioUnitario nativo de la cotización a USD para comparaciones
+  const toUSD = (precio: number, cot: any): number => {
+    const moneda = getMonedaCot(cot)
+    const tc = getTipoCambioCot(cot)
+    if (moneda === 'PEN' && tc && tc > 0) return precio / tc
+    return precio
+  }
+
+  // Símbolo según moneda nativa de la cotización
+  const getSymbol = (cot: any): string =>
+    getMonedaCot(cot) === 'PEN' ? 'S/' : '$'
+
   const cotizaciones = useMemo(() => {
     const list = item.cotizaciones || []
     const disponibles = list.filter((cot: any) => {
       const estado = cot.cotizacion?.estado || cot.estado
       return estado !== 'rechazado'
     })
+    // Ordenar por precio convertido a USD para comparación justa entre monedas
     return [...disponibles].sort(
-      (a: any, b: any) => (a.precioUnitario ?? 0) - (b.precioUnitario ?? 0)
+      (a: any, b: any) => toUSD(a.precioUnitario ?? 0, a) - toUSD(b.precioUnitario ?? 0, b)
     )
   }, [item.cotizaciones])
 
-  // Stats
+  // Stats en USD para comparaciones correctas entre cotizaciones de distinta moneda
   const stats = useMemo(() => {
-    const precios = cotizaciones
-      .map((c: any) => c.precioUnitario ?? 0)
+    const preciosUSD = cotizaciones
+      .map((c: any) => toUSD(c.precioUnitario ?? 0, c))
       .filter((p) => p > 0)
     const tiempos = cotizaciones
       .map((c: any) => c.tiempoEntregaDias ?? 999)
       .filter((t) => t < 999)
     return {
-      precioMin: precios.length > 0 ? Math.min(...precios) : 0,
-      precioMax: precios.length > 0 ? Math.max(...precios) : 0,
+      precioMinUSD: preciosUSD.length > 0 ? Math.min(...preciosUSD) : 0,
+      precioMaxUSD: preciosUSD.length > 0 ? Math.max(...preciosUSD) : 0,
       tiempoMin: tiempos.length > 0 ? Math.min(...tiempos) : null,
     }
   }, [cotizaciones])
@@ -188,7 +208,9 @@ export default function CotizacionSelectorModal({ item, onUpdated }: Props) {
             const costoTotal = precio * (item.cantidad ?? 1)
             const isSelected = selectedId === cot.id
             const isCurrent = item.cotizacionSeleccionadaId === cot.id
-            const esMejorPrecio = precio === stats.precioMin && precio > 0
+            const sym = getSymbol(cot)
+            // Comparar en USD para detectar el mejor precio entre monedas distintas
+            const esMejorPrecio = toUSD(precio, cot) === stats.precioMinUSD && precio > 0
 
             return (
               <div
@@ -248,13 +270,13 @@ export default function CotizacionSelectorModal({ item, onUpdated }: Props) {
                     </p>
                   </div>
 
-                  {/* Precios en línea */}
+                  {/* Precios en línea — en moneda nativa de la cotización */}
                   <div className="flex items-center gap-3 shrink-0 text-right">
                     <div>
                       <div className={`text-xs font-bold ${
                         isSelected ? 'text-blue-600' : isCurrent ? 'text-green-600' : ''
                       }`}>
-                        ${precio.toFixed(2)}
+                        {sym}{precio.toFixed(2)}
                       </div>
                       <div className="text-[9px] text-muted-foreground">unit.</div>
                     </div>
@@ -262,7 +284,7 @@ export default function CotizacionSelectorModal({ item, onUpdated }: Props) {
                       <div className={`text-xs font-bold ${
                         isSelected ? 'text-blue-600' : isCurrent ? 'text-green-600' : ''
                       }`}>
-                        ${costoTotal.toFixed(2)}
+                        {sym}{costoTotal.toFixed(2)}
                       </div>
                       <div className="text-[9px] text-muted-foreground">total</div>
                     </div>
@@ -287,8 +309,9 @@ export default function CotizacionSelectorModal({ item, onUpdated }: Props) {
         <div className="flex items-center justify-between px-4 py-3 border-t flex-shrink-0">
           <span className="text-[10px] text-muted-foreground">
             {cotizaciones.length} opción{cotizaciones.length > 1 ? 'es' : ''} •
-            ${stats.precioMin.toFixed(2)}
-            {stats.precioMax !== stats.precioMin && ` - $${stats.precioMax.toFixed(2)}`}
+            ${stats.precioMinUSD.toFixed(2)}
+            {stats.precioMaxUSD !== stats.precioMinUSD && ` - $${stats.precioMaxUSD.toFixed(2)}`}
+            {' '}USD
           </span>
           <div className="flex items-center gap-1.5">
             {item.cotizacionSeleccionadaId && (

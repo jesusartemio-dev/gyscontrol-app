@@ -17,7 +17,10 @@ export async function GET(
       },
       include: {
         cotizacionProveedor: {
-          include: {
+          select: {
+            id: true,
+            moneda: true,
+            tipoCambio: true,
             proveedor: {
               select: {
                 id: true,

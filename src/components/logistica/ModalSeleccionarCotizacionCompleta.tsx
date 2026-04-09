@@ -20,6 +20,7 @@ import {
   UserCheck,
 } from 'lucide-react'
 import type { CotizacionProveedorItem } from '@/types'
+import { getMonedaSymbol } from '@/lib/utils/currency'
 
 interface Props {
   open: boolean
@@ -59,6 +60,18 @@ export default function ModalSeleccionarCotizacionCompleta({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [initialized, setInitialized] = useState(false)
 
+  // Helper: convierte precio a USD según moneda/TC de la cotización
+  const toUSD = (precio: number, cot: any): number => {
+    const moneda = cot?.cotizacionProveedor?.moneda
+    const tc = cot?.cotizacionProveedor?.tipoCambio
+    if (moneda === 'PEN' && tc && tc > 0) return precio / tc
+    return precio
+  }
+
+  // Moneda de los items de esta cotización (todos comparten la misma)
+  const thisMoneda: string = (items[0]?.cotizacionProveedor as any)?.moneda || 'USD'
+  const thisSymbol = getMonedaSymbol(thisMoneda)
+
   // Build comparison data
   const comparisons: ItemComparison[] = useMemo(() => {
     const result = items
@@ -70,11 +83,13 @@ export default function ModalSeleccionarCotizacionCompleta({
         const cantidad = item.cantidad ?? item.cantidadOriginal ?? 0
         const thisPrecio = item.precioUnitario || 0
         const thisTotal = thisPrecio * cantidad
+        const thisUSD = toUSD(thisPrecio, item)
 
-        // Find best other price
+        // Encontrar el mejor otro precio comparando en USD
         let bestOther: any = null
         for (const c of otherCots) {
-          if (!bestOther || c.precioUnitario < bestOther.precioUnitario) {
+          const cUSD = toUSD(c.precioUnitario, c)
+          if (!bestOther || cUSD < toUSD(bestOther.precioUnitario, bestOther)) {
             bestOther = c
           }
         }
@@ -82,6 +97,7 @@ export default function ModalSeleccionarCotizacionCompleta({
         const bestOtherPrecio = bestOther?.precioUnitario || null
         const bestOtherTotal = bestOtherPrecio ? bestOtherPrecio * cantidad : null
         const bestOtherProveedor = bestOther?.cotizacionProveedor?.proveedor?.nombre || null
+        const bestOtherUSD = bestOther ? toUSD(bestOther.precioUnitario, bestOther) : null
 
         const seleccionada = listaItem?.cotizacionSeleccionada
         const selectedByThis = seleccionada?.id === item.id
@@ -99,7 +115,8 @@ export default function ModalSeleccionarCotizacionCompleta({
           bestOtherTotal,
           bestOtherProveedor,
           bestOtherEntrega: bestOther?.tiempoEntrega || null,
-          isBestPrice: thisPrecio > 0 && (!bestOtherPrecio || thisPrecio <= bestOtherPrecio),
+          // isBestPrice compara en USD para equidad entre monedas distintas
+          isBestPrice: thisUSD > 0 && (!bestOtherUSD || thisUSD <= bestOtherUSD),
           isAlreadySelected: !!listaItem?.cotizacionSeleccionadaId,
           selectedByThis,
           selectedByOther,
@@ -210,8 +227,16 @@ export default function ModalSeleccionarCotizacionCompleta({
     onClose()
   }
 
+  // Formatea en moneda nativa de esta cotización
   const formatCurrency = (v: number) =>
-    `$${v.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+    `${thisSymbol}${v.toLocaleString(thisMoneda === 'PEN' ? 'es-PE' : 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+  // Formatea precio del "otro" proveedor en su moneda nativa
+  const formatOtherCurrency = (v: number, cot: any) => {
+    const moneda = cot?.cotizacionProveedor?.moneda || 'USD'
+    const sym = getMonedaSymbol(moneda)
+    return `${sym}${v.toLocaleString(moneda === 'PEN' ? 'es-PE' : 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  }
 
   if (!open) return null
 
@@ -270,8 +295,14 @@ export default function ModalSeleccionarCotizacionCompleta({
               {comparisons.map((comp) => {
                 const isChecked = selected.has(comp.listaItemId)
                 const canSelect = comp.thisPrecio > 0 && !comp.selectedByThis
-                const priceDiff = comp.bestOtherPrecio && comp.thisPrecio > 0
-                  ? ((comp.thisPrecio - comp.bestOtherPrecio) / comp.bestOtherPrecio * 100)
+                // % diferencia calculado en USD para comparación justa entre monedas
+                const thisUSD = toUSD(comp.thisPrecio, comp.item)
+                const bestOtherUSD = comp.bestOtherPrecio
+                  ? toUSD(comp.bestOtherPrecio, (comp.item.listaEquipoItem as any)?.cotizacionProveedorItems
+                      ?.find((c: any) => c.precioUnitario === comp.bestOtherPrecio) || {})
+                  : null
+                const priceDiff = bestOtherUSD && thisUSD > 0
+                  ? ((thisUSD - bestOtherUSD) / bestOtherUSD * 100)
                   : null
 
                 return (
@@ -322,7 +353,13 @@ export default function ModalSeleccionarCotizacionCompleta({
                       {comp.bestOtherPrecio ? (
                         <div>
                           <div className={`font-medium ${!comp.isBestPrice ? 'text-green-600' : 'text-muted-foreground'}`}>
-                            {formatCurrency(comp.bestOtherPrecio)}
+                            {(() => {
+                              const otherCot = (comp.item.listaEquipoItem as any)?.cotizacionProveedorItems
+                                ?.find((c: any) => c.precioUnitario === comp.bestOtherPrecio && c.id !== comp.item.id)
+                              return otherCot
+                                ? formatOtherCurrency(comp.bestOtherPrecio, otherCot)
+                                : formatCurrency(comp.bestOtherPrecio)
+                            })()}
                           </div>
                           <div className="text-[10px] text-muted-foreground truncate max-w-[90px]" title={comp.bestOtherProveedor || ''}>
                             {comp.bestOtherProveedor}

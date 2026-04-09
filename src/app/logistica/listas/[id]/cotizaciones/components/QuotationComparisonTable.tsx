@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { CheckCircle, Award, DollarSign, Clock } from 'lucide-react'
 import { toast } from 'sonner'
+import { getMonedaSymbol } from '@/lib/utils/currency'
 
 interface QuotationItem {
   id: string
@@ -26,6 +27,12 @@ interface QuotationItem {
     proveedor: {
       nombre: string
     }
+  }
+  // La API devuelve cotizacionProveedor completo (moneda y tipoCambio incluidos)
+  cotizacionProveedor?: {
+    moneda?: string
+    tipoCambio?: number | null
+    proveedor?: { nombre: string }
   }
 }
 
@@ -71,20 +78,30 @@ export default function QuotationComparisonTable({ listaId, onWinnerSelected }: 
     }
   }
 
+  // Convierte precio nativo a USD para comparaciones entre cotizaciones de distinta moneda
+  const toUSD = (quotation: QuotationItem): number => {
+    const precio = quotation.precioUnitario ?? 0
+    const moneda = quotation.cotizacionProveedor?.moneda
+    const tc = quotation.cotizacionProveedor?.tipoCambio
+    if (moneda === 'PEN' && tc && tc > 0) return precio / tc
+    return precio
+  }
+
   const getPriceComparison = (quotations: QuotationItem[]) => {
     if (quotations.length === 0) return null
 
-    const prices = quotations
+    // Comparar en USD para equidad entre monedas
+    const pricesUSD = quotations
       .filter(q => q.precioUnitario && q.precioUnitario > 0)
-      .map(q => q.precioUnitario!)
+      .map(q => toUSD(q))
       .sort((a, b) => a - b)
 
-    if (prices.length === 0) return null
+    if (pricesUSD.length === 0) return null
 
     return {
-      min: prices[0],
-      max: prices[prices.length - 1],
-      avg: prices.reduce((sum, p) => sum + p, 0) / prices.length
+      min: pricesUSD[0],
+      max: pricesUSD[pricesUSD.length - 1],
+      avg: pricesUSD.reduce((sum, p) => sum + p, 0) / pricesUSD.length
     }
   }
 
@@ -108,12 +125,13 @@ export default function QuotationComparisonTable({ listaId, onWinnerSelected }: 
   const getBestPriceIcon = (quotation: QuotationItem, allQuotations: QuotationItem[]) => {
     if (!quotation.precioUnitario) return null
 
-    const validPrices = allQuotations
+    // Comparar en USD para detectar mejor precio entre monedas distintas
+    const validPricesUSD = allQuotations
       .filter(q => q.precioUnitario && q.precioUnitario > 0)
-      .map(q => q.precioUnitario!)
+      .map(q => toUSD(q))
 
-    const minPrice = Math.min(...validPrices)
-    return quotation.precioUnitario === minPrice ?
+    const minPriceUSD = Math.min(...validPricesUSD)
+    return toUSD(quotation) === minPriceUSD ?
       <span title="Mejor precio"><DollarSign className="h-4 w-4 text-green-600 ml-1" /></span> : null
   }
 
@@ -258,7 +276,7 @@ export default function QuotationComparisonTable({ listaId, onWinnerSelected }: 
                               <div className="flex items-center justify-end gap-2">
                                 {quotation.precioUnitario ? (
                                   <>
-                                    ${quotation.precioUnitario.toFixed(2)}
+                                    {getMonedaSymbol(quotation.cotizacionProveedor?.moneda)}{quotation.precioUnitario.toFixed(2)}
                                     {getBestPriceIcon(quotation, itemData.quotations)}
                                   </>
                                 ) : (

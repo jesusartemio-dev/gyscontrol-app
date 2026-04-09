@@ -65,6 +65,23 @@ export default function LogisticaCotizacionSelectorModal({
   const modalOpen = open !== undefined ? open : isOpen
   const setModalOpen = onOpenChange || setIsOpen
 
+  // Helpers de moneda
+  const getMonedaCot = (cot: CotizacionProveedorItem): string =>
+    (cot.cotizacionProveedor as any)?.moneda || 'USD'
+
+  const getTipoCambioCot = (cot: CotizacionProveedorItem): number | null =>
+    (cot.cotizacionProveedor as any)?.tipoCambio ?? null
+
+  const toUSD = (precio: number, cot: CotizacionProveedorItem): number => {
+    const moneda = getMonedaCot(cot)
+    const tc = getTipoCambioCot(cot)
+    if (moneda === 'PEN' && tc && tc > 0) return precio / tc
+    return precio
+  }
+
+  const getSymbol = (cot: CotizacionProveedorItem): string =>
+    getMonedaCot(cot) === 'PEN' ? 'S/' : '$'
+
   // 🔄 Filtrar y ordenar cotizaciones
   const processedCotizaciones = useMemo(() => {
     let filtered = item.cotizaciones
@@ -76,18 +93,18 @@ export default function LogisticaCotizacionSelectorModal({
 
     // Filtrar por búsqueda (proveedor)
     if (searchTerm) {
-      filtered = filtered.filter(cot => 
+      filtered = filtered.filter(cot =>
         cot.cotizacionProveedor?.proveedor?.nombre?.toLowerCase().includes(searchTerm.toLowerCase())
       )
     }
 
-    // Ordenar
+    // Ordenar — precios comparados en USD para equidad entre monedas
     const sorted = [...filtered].sort((a, b) => {
       switch (sortBy) {
         case 'precio-asc':
-          return (a.precioUnitario ?? 0) - (b.precioUnitario ?? 0)
+          return toUSD(a.precioUnitario ?? 0, a) - toUSD(b.precioUnitario ?? 0, b)
         case 'precio-desc':
-          return (b.precioUnitario ?? 0) - (a.precioUnitario ?? 0)
+          return toUSD(b.precioUnitario ?? 0, b) - toUSD(a.precioUnitario ?? 0, a)
         case 'tiempo-asc':
           return (a.tiempoEntregaDias ?? 999) - (b.tiempoEntregaDias ?? 999)
         case 'tiempo-desc':
@@ -133,17 +150,18 @@ export default function LogisticaCotizacionSelectorModal({
     }
   }
 
-  // 📊 Calcular estadísticas
+  // 📊 Calcular estadísticas — precios en USD para comparación justa
   const stats = useMemo(() => {
-    const precios = item.cotizaciones.map(c => c.precioUnitario ?? 0).filter(p => p > 0)
+    const preciosUSD = item.cotizaciones
+      .map(c => toUSD(c.precioUnitario ?? 0, c))
+      .filter(p => p > 0)
     const tiempos = item.cotizaciones.map(c => c.tiempoEntregaDias ?? 0).filter(t => t > 0)
-    
+
     return {
-      precioMin: Math.min(...precios),
-      precioMax: Math.max(...precios),
-      precioPromedio: precios.reduce((a, b) => a + b, 0) / precios.length,
-      tiempoMin: Math.min(...tiempos),
-      tiempoMax: Math.max(...tiempos),
+      precioMinUSD: preciosUSD.length > 0 ? Math.min(...preciosUSD) : 0,
+      precioMaxUSD: preciosUSD.length > 0 ? Math.max(...preciosUSD) : 0,
+      tiempoMin: tiempos.length > 0 ? Math.min(...tiempos) : 0,
+      tiempoMax: tiempos.length > 0 ? Math.max(...tiempos) : 0,
       totalCotizaciones: item.cotizaciones.length,
       cotizacionesDisponibles: item.cotizaciones.filter(c => c.estado === 'cotizado').length
     }
@@ -159,12 +177,12 @@ export default function LogisticaCotizacionSelectorModal({
     }
   }
 
-  // 🏅 Determinar si es la mejor opción
+  // 🏅 Determinar si es la mejor opción — comparar en USD
   const getBestOptionIndicator = (cotizacion: CotizacionProveedorItem) => {
     const precio = cotizacion.precioUnitario ?? 0
     const tiempo = cotizacion.tiempoEntregaDias ?? 999
-    
-    const esMejorPrecio = precio === stats.precioMin && precio > 0
+
+    const esMejorPrecio = toUSD(precio, cotizacion) === stats.precioMinUSD && precio > 0
     const esMejorTiempo = tiempo === stats.tiempoMin && tiempo > 0
     
     if (esMejorPrecio && esMejorTiempo) {
@@ -222,7 +240,7 @@ export default function LogisticaCotizacionSelectorModal({
                 <div className="text-xs text-gray-500">Seleccionados</div>
               </div>
               <div className="text-center">
-                <div className="text-lg font-semibold text-blue-600">${stats.precioMin.toFixed(2)}</div>
+                <div className="text-lg font-semibold text-blue-600">${stats.precioMinUSD.toFixed(2)} USD</div>
                 <div className="text-xs text-gray-500">Mejor precio</div>
               </div>
             </div>
@@ -285,6 +303,7 @@ export default function LogisticaCotizacionSelectorModal({
                   const costoTotal = precio * cantidad
                   const isSelected = item.cotizacionSeleccionadaId === cotizacion.id
                   const bestOption = getBestOptionIndicator(cotizacion)
+                  const sym = getSymbol(cotizacion)
 
                   return (
                     <div 
@@ -327,14 +346,14 @@ export default function LogisticaCotizacionSelectorModal({
                           <div>
                             <div className="text-xs text-gray-500">Precio Unitario</div>
                             <div className="text-lg font-bold text-green-600">
-                              ${precio.toFixed(2)}
+                              {sym}{precio.toFixed(2)}
                             </div>
                           </div>
-                          
+
                           <div>
                             <div className="text-xs text-gray-500">Total</div>
                             <div className="text-lg font-bold text-gray-900">
-                              ${costoTotal.toFixed(2)}
+                              {sym}{costoTotal.toFixed(2)}
                             </div>
                           </div>
                           

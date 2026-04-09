@@ -110,13 +110,19 @@ export default function LogisticaCotizacionesTable({ cotizaciones, loading = fal
           bValue = b.items?.length || 0
           break
         case 'totalCost': {
-          const calcTotal = (items: any[]) => items.reduce((s: number, i: any) => {
-            const precio = i.precioUnitario || 0
-            const cantidad = i.cantidad ?? i.cantidadOriginal ?? 0
-            return s + (i.costoTotal || precio * cantidad)
-          }, 0)
-          aValue = calcTotal(a.items || (a as any).cotizacionProveedorItem || [])
-          bValue = calcTotal(b.items || (b as any).cotizacionProveedorItem || [])
+          const calcTotalUsd = (cot: CotizacionProveedor) => {
+            const items = cot.items || (cot as any).cotizacionProveedorItem || []
+            const nativo = items.reduce((s: number, i: any) => {
+              const precio = i.precioUnitario || 0
+              const cantidad = i.cantidad ?? i.cantidadOriginal ?? 0
+              return s + (i.costoTotal || precio * cantidad)
+            }, 0)
+            return cot.moneda === 'PEN' && cot.tipoCambio && cot.tipoCambio > 0
+              ? nativo / cot.tipoCambio
+              : nativo
+          }
+          aValue = calcTotalUsd(a)
+          bValue = calcTotalUsd(b)
           break
         }
         default:
@@ -280,11 +286,15 @@ export default function LogisticaCotizacionesTable({ cotizaciones, loading = fal
             const cotItems = cot.items || (cot as any).cotizacionProveedorItem || []
             const itemsCount = cotItems.length
             const conPrecio = cotItems.filter((i: any) => i.precioUnitario && i.precioUnitario > 0).length
-            const totalCost = cotItems.reduce((s: number, i: any) => {
+            const totalCostNativo = cotItems.reduce((s: number, i: any) => {
               const precio = i.precioUnitario || 0
               const cantidad = i.cantidad ?? i.cantidadOriginal ?? 0
               return s + (i.costoTotal || precio * cantidad)
             }, 0)
+            // Convertir a USD si la cotización está en soles
+            const totalCost = cot.moneda === 'PEN' && cot.tipoCambio && cot.tipoCambio > 0
+              ? totalCostNativo / cot.tipoCambio
+              : totalCostNativo
             const preciosCompletos = itemsCount > 0 && conPrecio === itemsCount
             const flujo = FLUJO_COTIZACION[cot.estado as string]
             // pendiente → solicitado: cuando tiene items (se envió al proveedor)
