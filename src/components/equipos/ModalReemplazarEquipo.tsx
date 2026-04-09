@@ -137,12 +137,14 @@ export default function ModalReemplazarEquipo({
       }
 
       // Step 2: Create new replacement item
+      // Inherit presupuesto from the original cotizado item (price GYS quoted to client)
+      const presupuestoHeredado = item.presupuesto || item.proyectoEquipoItem?.precioCliente || 0
       const nuevoItem = await createListaEquipoItem({
         codigo: selected.codigo,
         descripcion: selected.descripcion,
         unidad: selected.unidad?.nombre ?? 'UND',
         cantidad,
-        presupuesto: 0,
+        presupuesto: presupuestoHeredado,
         comentarioRevision: motivoCambio,
         estado: 'borrador',
         origen: 'reemplazo',
