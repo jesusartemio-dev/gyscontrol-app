@@ -909,7 +909,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
               Eliminar Requerimiento
             </DialogTitle>
             <DialogDescription>
-              Esta acción es irreversible. Se eliminará el requerimiento <strong>{hoja?.numero}</strong> y todos sus items.
+              Esta acción es irreversible. Se eliminará el requerimiento <strong>{hoja?.numero}</strong>, todos sus ítems, comprobantes registrados y documentos adjuntos.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
