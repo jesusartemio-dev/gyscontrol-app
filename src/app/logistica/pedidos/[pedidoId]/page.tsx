@@ -526,9 +526,13 @@ export default function PedidoLogisticaDetailPage() {
 
   // Revertir entrega directa
   const [revirtiendoItemId, setRevirtiendoItemId] = useState<string | null>(null)
-  const handleRevertirEntrega = async (itemId: string, itemDescripcion: string) => {
-    if (!confirm(`¿Revertir la entrega de "${itemDescripcion}"?\n\nEl item volverá a estado Pendiente y podrás crear la OC correctamente.`)) return
+  const [revertirConfirm, setRevertirConfirm] = useState<{ itemId: string; descripcion: string } | null>(null)
+
+  const handleRevertirEntrega = async () => {
+    if (!revertirConfirm) return
+    const { itemId } = revertirConfirm
     setRevirtiendoItemId(itemId)
+    setRevertirConfirm(null)
     try {
       const res = await fetch(`/api/pedido-equipo-item/${itemId}/revertir-entrega`, {
         method: 'POST',
@@ -1587,7 +1591,7 @@ export default function PedidoLogisticaDetailPage() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => handleRevertirEntrega(item.id, item.descripcion)}
+                                  onClick={() => setRevertirConfirm({ itemId: item.id, descripcion: item.descripcion })}
                                   disabled={revirtiendoItemId === item.id}
                                   className="h-6 text-[10px] px-2 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
                                   title="Revertir entrega directa para regularizar con OC"
@@ -2566,6 +2570,37 @@ export default function PedidoLogisticaDetailPage() {
               </div>
             )
           })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal confirmación revertir entrega directa */}
+      <Dialog open={!!revertirConfirm} onOpenChange={(open) => { if (!open) setRevertirConfirm(null) }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-medium flex items-center gap-2 text-amber-700">
+              <AlertTriangle className="h-4 w-4" />
+              ¿Revertir entrega?
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-xs text-gray-600">
+            <p>Se revertirá la entrega de:</p>
+            <p className="font-medium text-gray-800 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+              {revertirConfirm?.descripcion}
+            </p>
+            <p>El item volverá a estado <span className="font-medium">Pendiente</span> y podrás crear una OC para regularizar.</p>
+          </div>
+          <DialogFooter className="gap-2 mt-2">
+            <Button variant="outline" size="sm" onClick={() => setRevertirConfirm(null)} className="h-8 text-xs">
+              Cancelar
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleRevertirEntrega}
+              className="h-8 text-xs bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              Sí, revertir entrega
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
