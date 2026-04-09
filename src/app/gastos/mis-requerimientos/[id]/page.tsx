@@ -91,13 +91,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
   const [showRechazo, setShowRechazo] = useState(false)
   const [comentarioRechazo, setComentarioRechazo] = useState('')
 
-  // Depositar dialog (primer depósito)
-  const [showDeposito, setShowDeposito] = useState(false)
-  const [montoDeposito, setMontoDeposito] = useState('')
-  const [depositoAdjuntos, setDepositoAdjuntos] = useState<HojaDeGastosAdjunto[]>([])
-  const [uploadingFile, setUploadingFile] = useState(false)
-
-  // Depósito adicional dialog
+  // Depósito dialog
   const [showDepositoAdicional, setShowDepositoAdicional] = useState(false)
   const [montoDepositoAdicional, setMontoDepositoAdicional] = useState('')
   const [descripcionDepositoAdicional, setDescripcionDepositoAdicional] = useState('')
@@ -152,54 +146,8 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
   const handleValidar = () => executeAction(() => validarHoja(id), 'Rendición validada')
   const handleCerrar = () => executeAction(() => cerrarHoja(id), 'Requerimiento cerrado')
 
-  // Registra el depósito (sin cambiar estado)
-  const handleRegistrarDeposito = async () => {
-    const monto = parseFloat(montoDeposito)
-    if (!monto || monto <= 0) { toast.error('Ingrese un monto válido'); return }
-    try {
-      setActionLoading(true)
-      const adjuntoIds = depositoAdjuntos.map(a => a.id)
-      const res = await fetch(`/api/hoja-de-gastos/${id}/depositos`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ monto, adjuntoIds }),
-      })
-      if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Error') }
-      toast.success('Depósito registrado')
-      setShowDeposito(false)
-      setMontoDeposito('')
-      setDepositoAdjuntos([])
-      await loadData()
-    } catch (e: any) {
-      toast.error(e.message || 'Error al registrar depósito')
-    } finally {
-      setActionLoading(false)
-    }
-  }
-
   // Avanza el estado a "depositado" (requiere al menos un depósito registrado)
   const handleAvanzarDepositado = () => executeAction(() => depositarHoja(id), 'Avanzado a Depositado')
-
-  const handleUploadConstancia = async (file: File) => {
-    try {
-      setUploadingFile(true)
-      const adjunto = await uploadHojaAdjunto(id, file)
-      setDepositoAdjuntos(prev => [...prev, adjunto])
-    } catch (e: any) {
-      toast.error(e.message || 'Error al subir constancia')
-    } finally {
-      setUploadingFile(false)
-    }
-  }
-
-  const handleDeleteConstancia = async (adjuntoId: string) => {
-    try {
-      await deleteHojaAdjunto(adjuntoId)
-      setDepositoAdjuntos(prev => prev.filter(a => a.id !== adjuntoId))
-    } catch (e: any) {
-      toast.error(e.message || 'Error al eliminar')
-    }
-  }
 
   const handleUploadAdicional = async (file: File) => {
     try {
@@ -608,7 +556,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
             requiereAnticipo={hoja.requiereAnticipo}
             rechazadoEn={hoja.rechazadoEn}
           />
-          {(canEnviar || canAprobar || canDepositar || canRendir || canValidarLineas || canCerrar || canRechazar || canRetroceder) && (
+          {(canEnviar || canAprobar || canAvanzarDepositado || canRendir || canValidarLineas || canCerrar || canRechazar || canRetroceder) && (
             <div className="flex flex-wrap gap-2 border-t pt-3">
               {canEnviar && (
                 <Button size="sm" onClick={handleEnviar} disabled={actionLoading} className="bg-blue-600 hover:bg-blue-700">
@@ -620,16 +568,6 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
                 <Button size="sm" onClick={handleAprobar} disabled={actionLoading} className="bg-emerald-600 hover:bg-emerald-700">
                   <CheckCircle className="h-3.5 w-3.5 mr-1" />
                   Aprobar
-                </Button>
-              )}
-              {canDepositar && (
-                <Button size="sm" onClick={() => {
-                  setMontoDeposito('')
-                  setDepositoAdjuntos([])
-                  setShowDeposito(true)
-                }} disabled={actionLoading} variant="outline" className="border-purple-400 text-purple-700 hover:bg-purple-50">
-                  <Banknote className="h-3.5 w-3.5 mr-1" />
-                  Registrar depósito
                 </Button>
               )}
               {canAvanzarDepositado && (
@@ -740,7 +678,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
               Depósitos ({(hoja.depositos || []).length})
             </CardTitle>
             {['aprobado', 'depositado'].includes(hoja.estado) && ['admin', 'gerente', 'administracion'].includes(role || '') && (
-              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setShowDepositoAdicional(true) }}>
+              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setMontoDepositoAdicional(''); setDescripcionDepositoAdicional(''); setAdjuntosAdicional([]); setShowDepositoAdicional(true) }}>
                 + Registrar depósito
               </Button>
             )}
@@ -955,83 +893,15 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
         </DialogContent>
       </Dialog>
 
-      {/* Depositar Dialog */}
-      <Dialog open={showDeposito} onOpenChange={setShowDeposito}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Banknote className="h-5 w-5 text-purple-600" />
-              Registrar Depósito
-            </DialogTitle>
-            <DialogDescription>
-              Registre el monto depositado al empleado.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 pt-2">
-            <div>
-              <Label>Monto depositado (PEN) <span className="text-red-500">*</span></Label>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                value={montoDeposito}
-                onChange={(e) => setMontoDeposito(e.target.value)}
-                placeholder="0.00"
-              />
-            </div>
-            <div>
-              <Label>Constancia de depósito</Label>
-              <div className="mt-1 border-2 border-dashed border-gray-300 rounded-lg p-3 text-center">
-                <input
-                  type="file"
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  className="hidden"
-                  id="constancia-upload-detail"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (file) handleUploadConstancia(file)
-                    e.target.value = ''
-                  }}
-                />
-                <label htmlFor="constancia-upload-detail" className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
-                  {uploadingFile ? (
-                    <span className="flex items-center justify-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Subiendo...</span>
-                  ) : (
-                    <span className="flex items-center justify-center gap-2"><Upload className="h-4 w-4" /> Subir constancia (PDF, JPG, PNG)</span>
-                  )}
-                </label>
-              </div>
-              {depositoAdjuntos.length > 0 && (
-                <div className="mt-2 max-h-32 overflow-y-auto space-y-1">
-                  {depositoAdjuntos.map(adj => (
-                    <div key={adj.id} className="flex items-center justify-between text-xs bg-green-50 border border-green-200 rounded px-2 py-1">
-                      <a href={adj.urlArchivo} target="_blank" rel="noopener noreferrer" className="text-green-700 hover:underline truncate max-w-[280px]">{adj.nombreArchivo}</a>
-                      <button onClick={() => handleDeleteConstancia(adj.id)} className="text-red-500 hover:text-red-700 ml-2 shrink-0"><X className="h-3 w-3" /></button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeposito(false)}>Cancelar</Button>
-            <Button onClick={handleRegistrarDeposito} disabled={actionLoading || !montoDeposito} className="bg-purple-600 hover:bg-purple-700">
-              {actionLoading && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-              Registrar depósito
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Depósito adicional Dialog */}
+      {/* Depósito Dialog */}
       <Dialog open={showDepositoAdicional} onOpenChange={setShowDepositoAdicional}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Banknote className="h-5 w-5 text-purple-600" />
-              Depósito adicional
+              Registrar depósito
             </DialogTitle>
-            <DialogDescription>Registre un depósito adicional para este requerimiento.</DialogDescription>
+            <DialogDescription>Registre el monto depositado al empleado. Puede adjuntar la constancia de depósito.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 pt-2">
             <div>
