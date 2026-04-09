@@ -148,6 +148,20 @@ export async function POST(request: Request) {
     // 📦 Log completo del payload recibido
     console.log('📥 Payload recibido en API lista-equipo-item:', body)
 
+    // Si hay catalogoEquipoId, obtener marca y categoria directamente del catálogo
+    let marcaFinal = body.marca || ''
+    let categoriaFinal = body.categoria || ''
+    if (body.catalogoEquipoId) {
+      const catalogoItem = await prisma.catalogoEquipo.findUnique({
+        where: { id: body.catalogoEquipoId },
+        select: { marca: true, categoriaEquipo: { select: { nombre: true } } },
+      })
+      if (catalogoItem) {
+        marcaFinal = catalogoItem.marca || marcaFinal
+        categoriaFinal = catalogoItem.categoriaEquipo?.nombre || categoriaFinal
+      }
+    }
+
     // ✅ Crear nuevo ítem
     const nuevo = await prisma.listaEquipoItem.create({
       data: {
@@ -162,10 +176,10 @@ export async function POST(request: Request) {
         responsableId: session.user.id,
         codigo: body.codigo,
         descripcion: body.descripcion,
-        categoria: body.categoria || 'SIN-CATEGORIA',
+        categoria: categoriaFinal || 'SIN-CATEGORIA',
         tipoItem: body.tipoItem || 'equipo',
         unidad: body.unidad,
-        marca: body.marca || 'SIN-MARCA',
+        marca: marcaFinal || 'SIN-MARCA',
         cantidad: body.cantidad ?? 0,
         verificado: body.verificado ?? false,
         comentarioRevision: body.comentarioRevision || null,
