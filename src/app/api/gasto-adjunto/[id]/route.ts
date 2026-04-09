@@ -49,6 +49,9 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
         gastoLinea: {
           include: { hojaDeGastos: { select: { estado: true } } },
         },
+        gastoComprobante: {
+          include: { hojaDeGastos: { select: { estado: true } } },
+        },
       },
     })
 
@@ -56,8 +59,11 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
       return NextResponse.json({ error: 'Adjunto no encontrado' }, { status: 404 })
     }
 
-    const hoja = existing.gastoLinea?.hojaDeGastos
-    if (!hoja || !['borrador', 'rechazado', 'aprobado', 'depositado'].includes(hoja.estado)) {
+    const hojaEstado =
+      existing.gastoLinea?.hojaDeGastos?.estado ??
+      existing.gastoComprobante?.hojaDeGastos?.estado
+
+    if (!hojaEstado || !['borrador', 'rechazado', 'aprobado', 'depositado'].includes(hojaEstado)) {
       return NextResponse.json({ error: 'No se pueden eliminar adjuntos en este estado' }, { status: 400 })
     }
 

@@ -58,6 +58,8 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
   const comprobantes = hoja.comprobantes || []
 
   const [showModal, setShowModal] = useState(false)
+  const [editingComprobanteId, setEditingComprobanteId] = useState<string | null>(null)
+  const [deletingComprobanteId, setDeletingComprobanteId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [uploadingFile, setUploadingFile] = useState(false)
   const [deletingItem, setDeletingItem] = useState<string | null>(null)
@@ -211,6 +213,14 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
   const [expandedComprobantes, setExpandedComprobantes] = useState<Set<string>>(new Set())
   const [previewing, setPreviewing] = useState<Comprobante | null>(null)
 
+  // Sync previewing cuando la hoja se recarga (para que adjuntos aparezcan actualizados)
+  React.useEffect(() => {
+    if (previewing) {
+      const updated = comprobantes.find(c => c.id === previewing.id)
+      if (updated) setPreviewing(updated)
+    }
+  }, [hoja])
+
   const toggleExpandComprobante = (id: string) =>
     setExpandedComprobantes(prev => {
       const next = new Set(prev)
@@ -248,6 +258,7 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
   }
 
   const openDialog = () => {
+    setEditingComprobanteId(null)
     setTipoComprobante('factura')
     setNumero('')
     setProveedor('')
@@ -266,6 +277,56 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
         }))
     )
     setShowModal(true)
+  }
+
+  const openEditDialog = (c: typeof comprobantes[number]) => {
+    setEditingComprobanteId(c.id)
+    setTipoComprobante(c.tipoComprobante)
+    setNumero(c.numeroComprobante)
+    setProveedor(c.proveedorNombre || '')
+    setRuc(c.proveedorRuc || '')
+    const d = new Date(c.fecha)
+    setFecha(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`)
+    setArchivoSeleccionado(null)
+    // Todos los items: los que están en este comprobante con su monto, el resto en 0
+    const itemsEnEsteComprobante = new Map<string, number>()
+    for (const linea of c.lineas) {
+      for (const item of items) {
+        if (linea.descripcion.startsWith(item.codigo + ' —') || linea.descripcion.startsWith(item.codigo + ' -')) {
+          itemsEnEsteComprobante.set(item.id, linea.monto)
+          break
+        }
+      }
+    }
+    setLineas(
+      items
+        .filter(item => !itemsCubiertos.has(item.id) || itemsEnEsteComprobante.has(item.id))
+        .map(item => ({
+          itemId: item.id,
+          proyectoId: item.proyectoId,
+          proyectoCodigo: item.proyecto?.codigo || item.proyectoId.slice(0, 8),
+          monto: itemsEnEsteComprobante.get(item.id) ?? 0,
+        }))
+    )
+    setShowModal(true)
+  }
+
+  const handleDeleteComprobante = async (comprobanteId: string) => {
+    if (!confirm('¿Eliminar este comprobante? Se revertirá el precio real de los items asociados.')) return
+    setDeletingComprobanteId(comprobanteId)
+    try {
+      const res = await fetch(`/api/gasto-comprobante/${comprobanteId}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Error al eliminar')
+      }
+      toast.success('Comprobante eliminado')
+      onChanged()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al eliminar')
+    } finally {
+      setDeletingComprobanteId(null)
+    }
   }
 
   const updateLinea = (itemId: string, monto: number) =>
@@ -290,9 +351,74 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
     setArchivoSeleccionado(f)
   }
 
+  const handleSubmitEdit = async () => {
+    try {
+      setSaving(true)
+      const res = await fetch(`/api/gasto-comprobante/${editingComprobanteId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tipoComprobante,
+          numeroComprobante: numero.trim(),
+          proveedorNombre: proveedor.trim() || null,
+          proveedorRuc: ruc.trim() || null,
+          montoTotal,
+          fecha,
+          lineas: lineas
+            .filter(l => l.monto > 0)
+            .map(l => ({
+              descripcion: (() => {
+                const it = items.find(i => i.id === l.itemId)
+                return it ? `${it.codigo} — ${it.descripcion}` : l.itemId
+              })(),
+              monto: l.monto,
+              proyectoId: l.proyectoId,
+              categoriaCosto: 'equipos',
+              requerimientoMaterialItemId: l.itemId,
+              cantidad: items.find(it => it.id === l.itemId)?.cantidadSolicitada,
+            })),
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Error al editar comprobante')
+      }
+
+      // Reemplazar adjunto si hay archivo nuevo
+      if (archivoSeleccionado) {
+        setUploadingFile(true)
+        // Eliminar adjunto anterior si existe
+        const comprobanteActual = comprobantes.find(c => c.id === editingComprobanteId)
+        if (comprobanteActual?.adjuntos[0]) {
+          await fetch(`/api/gasto-adjunto/${comprobanteActual.adjuntos[0].id}`, { method: 'DELETE' })
+        }
+        const fd = new FormData()
+        fd.append('file', archivoSeleccionado)
+        fd.append('gastoComprobanteId', editingComprobanteId!)
+        const uploadRes = await fetch('/api/gasto-adjunto', { method: 'POST', body: fd })
+        if (!uploadRes.ok) toast.warning('Comprobante actualizado, pero el archivo no se pudo subir')
+        setUploadingFile(false)
+      }
+
+      toast.success('Comprobante actualizado')
+      setShowModal(false)
+      setEditingComprobanteId(null)
+      onChanged()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al actualizar comprobante')
+    } finally {
+      setSaving(false)
+      setUploadingFile(false)
+    }
+  }
+
   const handleSubmit = async () => {
     if (!numero.trim() || !fecha) {
       toast.error('Número de comprobante y fecha son requeridos')
+      return
+    }
+    if (editingComprobanteId) {
+      await handleSubmitEdit()
       return
     }
     if (lineas.every(l => !l.monto)) {
@@ -654,6 +780,30 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                               <Eye className="h-3 w-3" />
                               Ver
                             </button>
+                            {canAddComprobante && (
+                              <button
+                                type="button"
+                                onClick={() => openEditDialog(c)}
+                                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-blue-600 px-2 py-0.5 rounded border hover:border-blue-300 transition-colors"
+                                title="Editar comprobante"
+                              >
+                                <Pencil className="h-3 w-3" />
+                                Editar
+                              </button>
+                            )}
+                            {canAddComprobante && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteComprobante(c.id)}
+                                disabled={deletingComprobanteId === c.id}
+                                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-red-600 px-2 py-0.5 rounded border hover:border-red-300 transition-colors disabled:opacity-50"
+                                title="Eliminar comprobante"
+                              >
+                                {deletingComprobanteId === c.id
+                                  ? <Loader2 className="h-3 w-3 animate-spin" />
+                                  : <X className="h-3 w-3" />}
+                              </button>
+                            )}
                           </div>
                         </div>
 
@@ -843,10 +993,15 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
           <DialogHeader className="px-5 pt-5 pb-4 border-b shrink-0">
             <DialogTitle className="flex items-center gap-2 text-base">
               <Receipt className="h-4 w-4 text-blue-600" />
-              Registrar Comprobante
-              {comprobantes.length > 0 && (
+              {editingComprobanteId ? 'Editar Comprobante' : 'Registrar Comprobante'}
+              {!editingComprobanteId && comprobantes.length > 0 && (
                 <Badge variant="secondary" className="text-xs font-normal">
                   #{comprobantes.length + 1} de varios
+                </Badge>
+              )}
+              {editingComprobanteId && (
+                <Badge variant="outline" className="text-xs font-normal text-blue-600 border-blue-300">
+                  Editando
                 </Badge>
               )}
             </DialogTitle>
@@ -917,7 +1072,19 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
 
               {/* Adjunto */}
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Adjuntar archivo</Label>
+                <Label className="text-xs text-muted-foreground">
+                  {editingComprobanteId ? 'Reemplazar archivo adjunto' : 'Adjuntar archivo'}
+                </Label>
+                {editingComprobanteId && !archivoSeleccionado && (() => {
+                  const adjActual = comprobantes.find(c => c.id === editingComprobanteId)?.adjuntos[0]
+                  return adjActual ? (
+                    <div className="flex items-center gap-2 h-8 px-3 rounded-md border bg-muted/30 text-xs text-muted-foreground">
+                      <Paperclip className="h-3.5 w-3.5 shrink-0 text-green-600" />
+                      <span className="truncate flex-1">{adjActual.nombreArchivo}</span>
+                      <span className="text-[10px] shrink-0">· Haz clic abajo para reemplazar</span>
+                    </div>
+                  ) : null
+                })()}
                 {archivoSeleccionado ? (
                   <div className="flex items-center gap-2 h-8 px-3 rounded-md border bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900">
                     <Paperclip className="h-3.5 w-3.5 text-blue-600 shrink-0" />
@@ -957,7 +1124,9 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide">Distribución por item</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Solo items sin comprobante asignado. Items en S/ 0 serán omitidos.
+                  {editingComprobanteId
+                    ? 'Items asignados a este comprobante y disponibles. Items en S/ 0 serán removidos.'
+                    : 'Solo items sin comprobante asignado. Items en S/ 0 serán omitidos.'}
                 </p>
               </div>
               {lineas.some(l => items.find(it => it.id === l.itemId)?.totalEstimado) && (
@@ -1060,7 +1229,7 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                   size="sm"
                 >
                   {(saving || uploadingFile) && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-                  {uploadingFile ? 'Subiendo archivo...' : 'Registrar'}
+                  {uploadingFile ? 'Subiendo archivo...' : editingComprobanteId ? 'Guardar cambios' : 'Registrar'}
                 </Button>
               </div>
             </div>
