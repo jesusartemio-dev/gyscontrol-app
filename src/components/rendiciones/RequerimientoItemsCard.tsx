@@ -567,11 +567,12 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                   <AlertCircle className="h-3.5 w-3.5 shrink-0" />
                   <span>
                     <strong>{itemsPendientes}</strong> item{itemsPendientes !== 1 ? 's' : ''} pendiente{itemsPendientes !== 1 ? 's' : ''} de rendir
-                    {itemsConPrecioReal > 0 && <span className="text-amber-600"> · {itemsConPrecioReal} rendido{itemsConPrecioReal !== 1 ? 's' : ''}</span>}
+                    {itemsConPrecioReal > 0 && ['rendido', 'validado', 'cerrado'].includes(hoja.estado) && <span className="text-amber-600"> · {itemsConPrecioReal} rendido{itemsConPrecioReal !== 1 ? 's' : ''}</span>}
+                    {itemsConPrecioReal > 0 && !['rendido', 'validado', 'cerrado'].includes(hoja.estado) && <span className="text-blue-600"> · {itemsConPrecioReal} con comprobante</span>}
                   </span>
                 </div>
               )}
-              {itemsPendientes === 0 && itemsConPrecioReal > 0 && (
+              {itemsPendientes === 0 && itemsConPrecioReal > 0 && ['rendido', 'validado', 'cerrado'].includes(hoja.estado) && (
                 <div className="flex items-center gap-2 text-xs text-green-700 bg-green-50 border border-green-200 rounded-md px-3 py-2">
                   <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
                   <span>Todos los items han sido rendidos</span>
@@ -598,8 +599,10 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                     {items.map(item => (
                       <tr key={item.id} className={`transition-colors ${itemsCubiertos.has(item.id) ? 'bg-green-50/50 dark:bg-green-950/5' : 'hover:bg-muted/30'}`}>
                         <td className="py-2 pr-3">
-                          {itemsCubiertos.has(item.id)
+                          {itemsCubiertos.has(item.id) && ['rendido', 'validado', 'cerrado'].includes(hoja.estado)
                             ? <Badge className="text-[10px] px-1.5 py-0 h-4 bg-green-100 text-green-700 border-0 font-medium">Rendido</Badge>
+                            : itemsCubiertos.has(item.id)
+                            ? <Badge className="text-[10px] px-1.5 py-0 h-4 bg-blue-100 text-blue-700 border-0 font-medium">Con comprobante</Badge>
                             : <Badge className="text-[10px] px-1.5 py-0 h-4 bg-amber-100 text-amber-700 border-0 font-medium">Pendiente</Badge>}
                         </td>
                         <td className="py-2 pr-3 font-mono text-xs text-muted-foreground">{item.codigo}</td>

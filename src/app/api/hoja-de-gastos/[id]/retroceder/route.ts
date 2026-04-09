@@ -56,7 +56,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
     if (estadoActual === 'rendido') {
       extraData.fechaRendicion = null
-      // Limpiar precioReal/totalReal de ítems de material para que vuelvan a "Pendiente"
+    }
+
+    // Si el destino es un estado pre-rendido, limpiar precioReal/totalReal de todos los ítems
+    // (cubre retrocesos desde rendido, y también aprobado→borrador, depositado→aprobado, etc.)
+    const ESTADOS_PRE_RENDIDO = ['borrador', 'enviado', 'aprobado', 'depositado']
+    if (ESTADOS_PRE_RENDIDO.includes(estadoPrevio)) {
       await prisma.requerimientoMaterialItem.updateMany({
         where: { hojaDeGastosId: id },
         data: { precioReal: null, totalReal: null, updatedAt: new Date() },
