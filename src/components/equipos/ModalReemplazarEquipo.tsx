@@ -142,6 +142,7 @@ export default function ModalReemplazarEquipo({
       const nuevoItem = await createListaEquipoItem({
         codigo: selected.codigo,
         descripcion: selected.descripcion,
+        marca: selected.marca || '',
         unidad: selected.unidad?.nombre ?? 'UND',
         cantidad,
         presupuesto: presupuestoHeredado,
