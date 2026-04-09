@@ -607,7 +607,13 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
                 </Button>
               )}
               {canDepositar && (
-                <Button size="sm" onClick={() => { setMontoDeposito(String(hoja.montoAnticipo || '')); setShowDeposito(true) }} disabled={actionLoading} className="bg-purple-600 hover:bg-purple-700">
+                <Button size="sm" onClick={() => {
+                  setMontoDeposito(String(hoja.montoAnticipo || ''))
+                  // Pre-cargar adjuntos sueltos existentes (subidos en sesiones anteriores)
+                  const sueltos = (hoja.adjuntos || []).filter(a => a.tipo === 'constancia_deposito' && !a.depositoHojaId)
+                  setDepositoAdjuntos(sueltos)
+                  setShowDeposito(true)
+                }} disabled={actionLoading} className="bg-purple-600 hover:bg-purple-700">
                   <Banknote className="h-3.5 w-3.5 mr-1" />
                   Registrar depósito
                 </Button>
