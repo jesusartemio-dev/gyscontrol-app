@@ -388,6 +388,19 @@ export default function LogisticaCotizacionesTable({ cotizaciones, loading = fal
                       : '—'
                     }
                   </span>
+                  {cot.moneda === 'PEN' && cot.tipoCambio && totalCost > 0 && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="text-[9px] text-amber-600 font-medium cursor-help mt-0.5">
+                          S/ · TC {cot.tipoCambio.toFixed(3)}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="left" className="text-xs max-w-[180px]">
+                        Cotización en soles (S/{totalCostNativo.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}).
+                        Total convertido a USD con TC {cot.tipoCambio}.
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
                 </TableCell>
                 <TableCell className="py-2">
                   <div className="flex items-center gap-1">

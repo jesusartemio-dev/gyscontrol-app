@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import LogisticaCotizacionSelector from './LogisticaCotizacionSelector'
 import {
   Trophy,
@@ -69,9 +70,9 @@ export default function LogisticaListaDetalleItemTableProfessional({ items, onUp
         const estado = c.cotizacion?.estado || c.estado
         return estado !== 'rechazado' && c.precioUnitario && c.precioUnitario > 0
       })
-      // Find cheapest
+      // Encontrar el más barato comparando en USD para equidad entre monedas
       const mejor = cots.reduce((best: any, current: any) =>
-        !best || (current.precioUnitario < best.precioUnitario) ? current : best
+        !best || cotToUSD(current.precioUnitario, current) < cotToUSD(best.precioUnitario, best) ? current : best
       , null)
 
       if (!mejor) continue
@@ -113,6 +114,14 @@ export default function LogisticaListaDetalleItemTableProfessional({ items, onUp
     }
   }
 
+  // Helper: convierte precio nativo de una cotización a USD
+  const cotToUSD = (precio: number, cot: any): number => {
+    const moneda = cot?.cotizacion?.moneda || cot?.cotizacionProveedor?.moneda
+    const tc = cot?.cotizacion?.tipoCambio ?? cot?.cotizacionProveedor?.tipoCambio
+    if (moneda === 'PEN' && tc && tc > 0) return precio / tc
+    return precio
+  }
+
   // Calcular estadísticas del ítem
   const getItemStats = (item: ListaEquipoItem) => {
     const cotizaciones = item.cotizaciones || []
@@ -124,23 +133,30 @@ export default function LogisticaListaDetalleItemTableProfessional({ items, onUp
     const hasSelection = !!item.cotizacionSeleccionadaId
     const selectedCot = cotizaciones.find((c: any) => c.id === item.cotizacionSeleccionadaId)
 
-    const preciosDisponibles = cotizaciones
-      .filter((c: any) => {
-        const estado = c.cotizacion?.estado || c.estado
-        return estado !== 'rechazado' && c.precioUnitario && c.precioUnitario > 0
-      })
-      .map((c: any) => c.precioUnitario!)
-    const mejorPrecio = preciosDisponibles.length > 0 ? Math.min(...preciosDisponibles) : null
-    const isOptimalSelection = selectedCot && mejorPrecio && (selectedCot as any).precioUnitario === mejorPrecio
+    // Comparar en USD para equidad entre monedas
+    const disponibles = cotizaciones.filter((c: any) => {
+      const estado = c.cotizacion?.estado || c.estado
+      return estado !== 'rechazado' && c.precioUnitario && c.precioUnitario > 0
+    })
+    const preciosUSD = disponibles.map((c: any) => cotToUSD(c.precioUnitario, c))
+    const mejorPrecioUSD = preciosUSD.length > 0 ? Math.min(...preciosUSD) : null
+    const selectedUSD = selectedCot ? cotToUSD((selectedCot as any).precioUnitario, selectedCot) : null
+    const isOptimalSelection = selectedUSD !== null && mejorPrecioUSD !== null && selectedUSD === mejorPrecioUSD
+
+    // Moneda de la cotización seleccionada (para mostrar indicador TC)
+    const selectedMoneda: string = (selectedCot as any)?.cotizacion?.moneda || (selectedCot as any)?.cotizacionProveedor?.moneda || 'USD'
+    const selectedTC: number | null = (selectedCot as any)?.cotizacion?.tipoCambio ?? (selectedCot as any)?.cotizacionProveedor?.tipoCambio ?? null
 
     return {
       cotizacionesCount,
       cotizacionesDisponibles,
       hasSelection,
       selectedCot,
-      mejorPrecio,
+      mejorPrecio: mejorPrecioUSD,   // ya en USD
       isOptimalSelection,
-      needsAttention: cotizacionesCount > 0 && !hasSelection && cotizacionesDisponibles > 0
+      needsAttention: cotizacionesCount > 0 && !hasSelection && cotizacionesDisponibles > 0,
+      selectedMoneda,
+      selectedTC,
     }
   }
 
@@ -254,6 +270,7 @@ export default function LogisticaListaDetalleItemTableProfessional({ items, onUp
             <tbody>
               {filteredItems.map((item) => {
                 const itemStats = getItemStats(item)
+                const isPEN = itemStats.selectedMoneda === 'PEN' && !!itemStats.selectedTC
 
                 // Determinar estado visual
                 let rowClass = ''
@@ -348,7 +365,7 @@ export default function LogisticaListaDetalleItemTableProfessional({ items, onUp
                       {item.cantidad}
                     </td>
 
-                    {/* Precio unitario */}
+                    {/* Precio unitario — siempre en USD (convertido por backend al seleccionar) */}
                     <td className="px-3 py-2 text-right">
                       <span className={`font-medium ${statusColor || 'text-gray-900'}`}>
                         {item.precioElegido ? formatCurrency(item.precioElegido) : '—'}
@@ -357,6 +374,19 @@ export default function LogisticaListaDetalleItemTableProfessional({ items, onUp
                         <div className="text-[9px] text-yellow-600">
                           Mejor: {formatCurrency(itemStats.mejorPrecio)}
                         </div>
+                      )}
+                      {isPEN && item.precioElegido && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="text-[9px] text-amber-600 font-medium cursor-help">
+                              S/ · TC {itemStats.selectedTC!.toFixed(3)}
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="left" className="text-xs max-w-[200px]">
+                            Cotización en soles. Precio convertido a USD con TC {itemStats.selectedTC}.
+                            Precio nativo: S/{(item.precioElegido * itemStats.selectedTC!).toFixed(2)}
+                          </TooltipContent>
+                        </Tooltip>
                       )}
                     </td>
 
