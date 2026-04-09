@@ -230,7 +230,7 @@ export default function LogisticaCotizacionesTable({ cotizaciones, loading = fal
         <TableHeader>
           <TableRow className="hover:bg-transparent">
             <TableHead
-              className="text-xs cursor-pointer hover:bg-gray-50 w-[100px]"
+              className="text-xs cursor-pointer hover:bg-gray-50 w-[140px]"
               onClick={() => handleSort('codigo')}
             >
               <span className="flex items-center gap-1">Código <SortIcon field="codigo" /></span>
@@ -309,7 +309,7 @@ export default function LogisticaCotizacionesTable({ cotizaciones, loading = fal
                 className="hover:bg-gray-50/50 cursor-pointer"
                 onClick={() => router.push(`/logistica/cotizaciones/${cot.id}`)}
               >
-                <TableCell className="font-mono text-xs py-2">
+                <TableCell className="font-mono text-xs py-2 whitespace-nowrap">
                   {cot.codigo}
                 </TableCell>
                 <TableCell className="py-2">
