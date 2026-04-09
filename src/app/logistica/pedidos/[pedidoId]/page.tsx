@@ -1562,6 +1562,7 @@ export default function PedidoLogisticaDetailPage() {
                           const puedeRevertir = ['admin', 'gerente'].includes(userRole) &&
                             ['atendido', 'parcial', 'entregado'].includes(item.estado) &&
                             !tieneOCItem &&
+                            !tieneREQItem &&
                             !(item as any).recepcionesPendientes?.some((r: any) => ['en_almacen', 'entregado_proyecto'].includes(r.estado))
                           return (
                             <div className="flex items-center gap-1 justify-center">
