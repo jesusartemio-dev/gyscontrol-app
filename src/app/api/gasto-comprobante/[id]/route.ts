@@ -230,7 +230,7 @@ export async function DELETE(
     if (!comprobante) {
       return NextResponse.json({ error: 'Comprobante no encontrado' }, { status: 404 })
     }
-    if (!['aprobado', 'depositado'].includes(comprobante.hojaDeGastos.estado)) {
+    if (!['borrador', 'aprobado', 'depositado'].includes(comprobante.hojaDeGastos.estado)) {
       return NextResponse.json(
         { error: 'No se puede eliminar el comprobante en este estado' },
         { status: 409 }

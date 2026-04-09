@@ -795,7 +795,7 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                                 Editar
                               </button>
                             )}
-                            {canAddComprobante && (
+                            {(canAddComprobante || hoja.estado === 'borrador') && (
                               <button
                                 type="button"
                                 onClick={() => setConfirmDelete({ type: 'comprobante', id: c.id, msg: '¿Eliminar este comprobante? Se revertirá el precio real de los ítems asociados.' })}
