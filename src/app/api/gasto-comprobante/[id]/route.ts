@@ -224,7 +224,7 @@ export async function DELETE(
     const { id } = await params
     const comprobante = await prisma.gastoComprobante.findUnique({
       where: { id },
-      include: { hojaDeGastos: { select: { estado: true } } },
+      include: { hojaDeGastos: { select: { id: true, estado: true } } },
     })
 
     if (!comprobante) {
@@ -237,9 +237,34 @@ export async function DELETE(
       )
     }
 
-    // Las líneas se eliminan en cascada por FK de GastoLinea.gastoComprobanteId? No, no hay cascade.
-    // Necesitamos desvincular o borrar líneas primero.
+    // Obtener líneas para limpiar precioReal de los ítems vinculados
+    // El vínculo es por prefijo de descripción: "<codigo> — <desc>"
+    const lineas = await prisma.gastoLinea.findMany({
+      where: { gastoComprobanteId: id },
+      select: { descripcion: true, hojaDeGastosId: true },
+    })
+
     await prisma.$transaction(async (tx) => {
+      // Limpiar precioReal/totalReal de los ítems que cubrían este comprobante
+      const hojaDeGastosId = comprobante.hojaDeGastos.id
+      if (hojaDeGastosId) {
+        for (const linea of lineas) {
+          const codigoPrefijo = linea.descripcion.split(' —')[0].split(' -')[0].trim()
+          if (!codigoPrefijo) continue
+          const item = await tx.requerimientoMaterialItem.findFirst({
+            where: {
+              hojaDeGastosId,
+              codigo: codigoPrefijo,
+            },
+          })
+          if (item) {
+            await tx.requerimientoMaterialItem.update({
+              where: { id: item.id },
+              data: { precioReal: null, totalReal: null, updatedAt: new Date() },
+            })
+          }
+        }
+      }
       // Desvincular las líneas del comprobante (no se borran, se convierten en líneas sueltas)
       await tx.gastoLinea.updateMany({
         where: { gastoComprobanteId: id },

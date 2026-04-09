@@ -95,9 +95,9 @@ export async function DELETE(
     }
 
     const estadoHoja = item.hojaDeGastos.estado
-    if (!['borrador', 'depositado'].includes(estadoHoja)) {
+    if (!['borrador', 'aprobado', 'depositado'].includes(estadoHoja)) {
       return NextResponse.json(
-        { error: 'Solo se pueden eliminar items en borrador o cuando el dinero fue depositado' },
+        { error: 'Solo se pueden eliminar items cuando el requerimiento está en borrador, aprobado o depositado' },
         { status: 409 }
       )
     }

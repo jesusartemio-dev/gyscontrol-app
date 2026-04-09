@@ -56,6 +56,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
     if (estadoActual === 'rendido') {
       extraData.fechaRendicion = null
+      // Limpiar precioReal/totalReal de ítems de material para que vuelvan a "Pendiente"
+      await prisma.requerimientoMaterialItem.updateMany({
+        where: { hojaDeGastosId: id },
+        data: { precioReal: null, totalReal: null, updatedAt: new Date() },
+      })
     }
     if (estadoActual === 'validado') {
       extraData.fechaValidacion = null

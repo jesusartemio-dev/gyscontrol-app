@@ -707,9 +707,9 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                                   <button
                                     type="button"
                                     onClick={() => setConfirmDelete({ type: 'item', id: item.id, msg: '¿Eliminar este ítem del requerimiento?' })}
-                                    disabled={deletingItem === item.id || itemsCubiertos.has(item.id)}
+                                    disabled={deletingItem === item.id || (itemsCubiertos.has(item.id) && !['borrador', 'aprobado', 'depositado'].includes(hoja.estado))}
                                     className="text-muted-foreground/40 hover:text-red-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                                    title={itemsCubiertos.has(item.id) ? 'Tiene comprobante registrado' : 'Eliminar item'}
+                                    title={itemsCubiertos.has(item.id) && !['borrador', 'aprobado', 'depositado'].includes(hoja.estado) ? 'Tiene comprobante registrado' : 'Eliminar item'}
                                   >
                                     {deletingItem === item.id
                                       ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
