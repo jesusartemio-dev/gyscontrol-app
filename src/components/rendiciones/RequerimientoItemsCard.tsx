@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -192,7 +192,6 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
   }
 
   const handleDeleteItem = async (itemId: string) => {
-    if (!confirm('¿Eliminar este item del requerimiento?')) return
     setDeletingItem(itemId)
     try {
       const res = await fetch(`/api/requerimiento-material-item/${itemId}`, { method: 'DELETE' })
@@ -208,6 +207,9 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
       setDeletingItem(null)
     }
   }
+  // Confirmación modal para eliminar item o comprobante
+  const [confirmDelete, setConfirmDelete] = useState<{ type: 'item' | 'comprobante'; id: string; msg: string } | null>(null)
+
   const [uploadingForComprobante, setUploadingForComprobante] = useState<string | null>(null)
   const adjuntoInputRef = useRef<HTMLInputElement>(null)
   const [expandedComprobantes, setExpandedComprobantes] = useState<Set<string>>(new Set())
@@ -312,7 +314,6 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
   }
 
   const handleDeleteComprobante = async (comprobanteId: string) => {
-    if (!confirm('¿Eliminar este comprobante? Se revertirá el precio real de los items asociados.')) return
     setDeletingComprobanteId(comprobanteId)
     try {
       const res = await fetch(`/api/gasto-comprobante/${comprobanteId}`, { method: 'DELETE' })
@@ -705,7 +706,7 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                                   )}
                                   <button
                                     type="button"
-                                    onClick={() => handleDeleteItem(item.id)}
+                                    onClick={() => setConfirmDelete({ type: 'item', id: item.id, msg: '¿Eliminar este ítem del requerimiento?' })}
                                     disabled={deletingItem === item.id || itemsCubiertos.has(item.id)}
                                     className="text-muted-foreground/40 hover:text-red-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                                     title={itemsCubiertos.has(item.id) ? 'Tiene comprobante registrado' : 'Eliminar item'}
@@ -794,7 +795,7 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                             {canAddComprobante && (
                               <button
                                 type="button"
-                                onClick={() => handleDeleteComprobante(c.id)}
+                                onClick={() => setConfirmDelete({ type: 'comprobante', id: c.id, msg: '¿Eliminar este comprobante? Se revertirá el precio real de los ítems asociados.' })}
                                 disabled={deletingComprobanteId === c.id}
                                 className="flex items-center gap-1 text-xs text-muted-foreground hover:text-red-600 px-2 py-0.5 rounded border hover:border-red-300 transition-colors disabled:opacity-50"
                                 title="Eliminar comprobante"
@@ -1411,6 +1412,41 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Dialog: Confirmar eliminación (item o comprobante) ───────────────── */}
+      <Dialog open={!!confirmDelete} onOpenChange={(open) => { if (!open) setConfirmDelete(null) }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-red-700 flex items-center gap-2">
+              <X className="h-4 w-4" />
+              Confirmar eliminación
+            </DialogTitle>
+            <DialogDescription>{confirmDelete?.msg}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setConfirmDelete(null)}>
+              Cancelar
+            </Button>
+            <Button
+              size="sm"
+              className="bg-red-600 hover:bg-red-700"
+              disabled={deletingItem !== null || deletingComprobanteId !== null}
+              onClick={() => {
+                if (!confirmDelete) return
+                const { type, id } = confirmDelete
+                setConfirmDelete(null)
+                if (type === 'item') handleDeleteItem(id)
+                else handleDeleteComprobante(id)
+              }}
+            >
+              {(deletingItem !== null || deletingComprobanteId !== null) && (
+                <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+              )}
+              Eliminar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
