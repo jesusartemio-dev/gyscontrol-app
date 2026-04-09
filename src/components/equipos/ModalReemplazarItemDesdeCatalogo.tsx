@@ -189,6 +189,7 @@ export default function ModalReemplazarItemDesdeCatalogo({
       const nuevoItem = await createListaEquipoItem({
         codigo: selected.codigo,
         descripcion: selected.descripcion,
+        marca: selected.marca || '',
         unidad: selected.unidad?.nombre ?? 'UND',
         cantidad,
         presupuesto: 0,
@@ -199,7 +200,7 @@ export default function ModalReemplazarItemDesdeCatalogo({
         proyectoEquipoItemId: proyectoEquipoItemId,
         proyectoEquipoId: item.proyectoEquipoId,
         reemplazaProyectoEquipoCotizadoItemId: proyectoEquipoItemId,
-        responsableId: session.user.id, // ✅ Agregar responsableId
+        responsableId: session.user.id,
       })
 
       // ✅ Actualizar ProyectoEquipoItem para que apunte al nuevo ítem
