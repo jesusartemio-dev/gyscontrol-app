@@ -60,8 +60,8 @@ const categoriaLabel: Record<string, string> = {
   gastos: 'Gastos',
 }
 
-function getAsignadoA(oc: OrdenCompra): string {
-  if (oc.proyecto) return `${oc.proyecto.codigo} - ${oc.proyecto.nombre}`
+function getCentroCosto(oc: OrdenCompra): string {
+  if (oc.proyecto) return oc.proyecto.codigo
   if (oc.centroCosto) return oc.centroCosto.nombre
   return '-'
 }
@@ -234,7 +234,7 @@ export default function OrdenesCompraPage() {
                 <TableRow>
                   <TableHead>Número</TableHead>
                   <TableHead>Proveedor</TableHead>
-                  <TableHead>Asignado a</TableHead>
+                  <TableHead>Centro de Costos</TableHead>
                   <TableHead>Categoría</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Factura</TableHead>
@@ -253,8 +253,8 @@ export default function OrdenesCompraPage() {
                   >
                     <TableCell className="font-mono text-sm font-medium">{oc.numero}</TableCell>
                     <TableCell className="max-w-[180px] truncate">{oc.proveedor?.nombre || '-'}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
-                      {getAsignadoA(oc)}
+                    <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate" title={oc.proyecto?.nombre || oc.centroCosto?.nombre}>
+                      {getCentroCosto(oc)}
                     </TableCell>
                     <TableCell>
                       <span className="text-xs text-muted-foreground capitalize">
