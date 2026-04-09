@@ -1321,13 +1321,13 @@ export default function PedidoLogisticaDetailPage() {
                   {pedido.items.map((item) => (
                     <tr key={item.id} className="hover:bg-gray-50/50">
                       <td className="px-3 py-2">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-mono font-medium">{item.codigo}</span>
+                        <span className="font-mono font-medium">{item.codigo}</span>
+                        <div className="mt-0.5">
                           <TipoItemBadge tipoItem={(item as any).tipoItem} catalogoEquipoId={(item as any).catalogoEquipoId} />
                         </div>
                       </td>
-                      <td className="px-3 py-2 text-gray-600 max-w-[180px] truncate" title={item.descripcion}>
-                        {item.descripcion}
+                      <td className="px-3 py-2 text-gray-600 min-w-[220px] max-w-[280px]" title={item.descripcion}>
+                        <div className="line-clamp-2 leading-snug">{item.descripcion}</div>
                       </td>
                       <td className="px-3 py-2 text-gray-600 max-w-[160px]">
                         {(() => {

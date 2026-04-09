@@ -21,7 +21,7 @@ const CONFIG: Record<string, { label: string; className: string; tooltip: string
     tooltip: 'Equipo del catálogo',
   },
   equipo_libre: {
-    label: 'Eq. libre',
+    label: 'Equ. libre',
     className: 'bg-blue-50 text-blue-500 border-blue-100',
     tooltip: 'Equipo ingresado manualmente',
   },
