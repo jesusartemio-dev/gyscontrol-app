@@ -1580,6 +1580,9 @@ export default function PedidoLogisticaDetailPage() {
                               {esEntregadoViaOC && (
                                 <span className="text-[10px] text-gray-400 italic">vía OC</span>
                               )}
+                              {!tieneOCItem && tieneREQItem && item.estado === 'entregado' && (
+                                <span className="text-[10px] text-gray-400 italic">vía REQ</span>
+                              )}
                               {puedeRevertir && (
                                 <Button
                                   variant="ghost"
