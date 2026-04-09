@@ -265,9 +265,16 @@ export default function CotizacionSelectorModal({ item, onUpdated }: Props) {
                         </span>
                       )}
                     </div>
-                    <p className="text-[10px] text-muted-foreground truncate">
-                      {getCodigo(cot)}
-                    </p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-[10px] text-muted-foreground truncate">
+                        {getCodigo(cot)}
+                      </p>
+                      {getMonedaCot(cot) === 'PEN' && getTipoCambioCot(cot) && (
+                        <span className="text-[9px] px-1 py-0.5 bg-amber-100 text-amber-700 rounded shrink-0 font-medium">
+                          S/ · TC {getTipoCambioCot(cot)!.toFixed(3)}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Precios en línea — en moneda nativa de la cotización */}
