@@ -135,10 +135,11 @@ export async function DELETE(
         r => ['en_almacen', 'entregado_proyecto'].includes(r.estado)
       )
       if (recepcionActiva) {
-        return NextResponse.json(
-          { error: 'No se puede eliminar: el item ya fue recibido en almacén o entregado al proyecto' },
-          { status: 409 }
-        )
+        const esEntregado = recepcionActiva.estado === 'entregado_proyecto'
+        const mensaje = esEntregado
+          ? 'No se puede eliminar: el ítem ya fue entregado al proyecto. Contacta al administrador si necesitas anularlo.'
+          : 'No se puede eliminar: el ítem ya llegó al almacén. Para poder eliminarlo, primero ve a Logística → Recepciones y rechaza la recepción de este ítem.'
+        return NextResponse.json({ error: mensaje }, { status: 409 })
       }
     }
 

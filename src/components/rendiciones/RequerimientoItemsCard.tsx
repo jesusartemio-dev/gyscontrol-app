@@ -742,17 +742,32 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                                       <Pencil className="h-3.5 w-3.5" />
                                     </button>
                                   )}
-                                  <button
-                                    type="button"
-                                    onClick={() => setConfirmDelete({ type: 'item', id: item.id, msg: '¿Eliminar este ítem del requerimiento?' })}
-                                    disabled={deletingItem === item.id || (itemsCubiertos.has(item.id) && !['borrador', 'aprobado', 'depositado'].includes(hoja.estado))}
-                                    className="text-muted-foreground/40 hover:text-red-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                                    title={itemsCubiertos.has(item.id) && !['borrador', 'aprobado', 'depositado'].includes(hoja.estado) ? 'Tiene comprobante registrado' : 'Eliminar item'}
-                                  >
-                                    {deletingItem === item.id
-                                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                      : <X className="h-3.5 w-3.5" />}
-                                  </button>
+                                  {(() => {
+                                    const recepcionActiva = item.recepciones?.find(r => ['en_almacen', 'entregado_proyecto'].includes(r.estado))
+                                    const bloqueadoPorRecepcion = !!recepcionActiva
+                                    const titleRecepcion = recepcionActiva?.estado === 'entregado_proyecto'
+                                      ? 'Ya fue entregado al proyecto — no se puede eliminar'
+                                      : 'Ya llegó al almacén — para eliminar, primero rechaza la recepción en Logística → Recepciones'
+                                    return (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          if (bloqueadoPorRecepcion) {
+                                            toast.error(titleRecepcion)
+                                            return
+                                          }
+                                          setConfirmDelete({ type: 'item', id: item.id, msg: '¿Eliminar este ítem del requerimiento?' })
+                                        }}
+                                        disabled={deletingItem === item.id || (itemsCubiertos.has(item.id) && !['borrador', 'aprobado', 'depositado'].includes(hoja.estado))}
+                                        className={`transition-colors ${bloqueadoPorRecepcion ? 'text-amber-400 hover:text-amber-600 cursor-help' : 'text-muted-foreground/40 hover:text-red-500 disabled:opacity-30 disabled:cursor-not-allowed'}`}
+                                        title={bloqueadoPorRecepcion ? titleRecepcion : itemsCubiertos.has(item.id) && !['borrador', 'aprobado', 'depositado'].includes(hoja.estado) ? 'Tiene comprobante registrado' : 'Eliminar ítem'}
+                                      >
+                                        {deletingItem === item.id
+                                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                          : <X className="h-3.5 w-3.5" />}
+                                      </button>
+                                    )
+                                  })()}
                                 </>
                               )}
                             </div>
