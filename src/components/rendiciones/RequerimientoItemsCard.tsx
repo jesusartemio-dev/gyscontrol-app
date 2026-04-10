@@ -245,18 +245,27 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
     items.filter(i => i.precioReal != null).map(i => i.id)
   )
 
-  // Mapa itemId → comprobante (match por código de item en la descripción de la línea)
-  // Las líneas se generan con descripcion = "${item.codigo} — ${item.descripcion}"
+  // Matching de línea → item: primero por descripción completa "código — descripción" (exacto),
+  // luego fallback a prefijo de código (para datos legacy). Esto resuelve items con código duplicado.
+  const matchLineaAItem = (lineaDesc: string, item: typeof items[number]) => {
+    const fullDesc = `${item.codigo} — ${item.descripcion}`
+    const fullDescAlt = `${item.codigo} - ${item.descripcion}`
+    return lineaDesc === fullDesc || lineaDesc === fullDescAlt ||
+      lineaDesc.startsWith(fullDesc) || lineaDesc.startsWith(fullDescAlt)
+  }
+  const matchLineaAItemFallback = (lineaDesc: string, item: typeof items[number]) =>
+    lineaDesc.startsWith(item.codigo + ' —') || lineaDesc.startsWith(item.codigo + ' -')
+
+  const findItemForLinea = (lineaDesc: string): typeof items[number] | undefined =>
+    items.find(i => matchLineaAItem(lineaDesc, i)) ?? items.find(i => matchLineaAItemFallback(lineaDesc, i))
+
+  // Mapa itemId → comprobante
   const itemComprobanteMap = new Map<string, { numero: string; tipo: string; id: string; hasAdjunto: boolean }>()
   for (const c of comprobantes) {
     const hasAdjunto = c.adjuntos.length > 0
     for (const l of c.lineas) {
-      for (const item of items) {
-        if (l.descripcion.startsWith(item.codigo + ' —') || l.descripcion.startsWith(item.codigo + ' -')) {
-          itemComprobanteMap.set(item.id, { id: c.id, tipo: c.tipoComprobante, numero: c.numeroComprobante, hasAdjunto })
-          break
-        }
-      }
+      const item = findItemForLinea(l.descripcion)
+      if (item) itemComprobanteMap.set(item.id, { id: c.id, tipo: c.tipoComprobante, numero: c.numeroComprobante, hasAdjunto })
     }
   }
 
@@ -294,12 +303,8 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
     // Todos los items: los que están en este comprobante con su monto, el resto en 0
     const itemsEnEsteComprobante = new Map<string, number>()
     for (const linea of c.lineas) {
-      for (const item of items) {
-        if (linea.descripcion.startsWith(item.codigo + ' —') || linea.descripcion.startsWith(item.codigo + ' -')) {
-          itemsEnEsteComprobante.set(item.id, linea.monto)
-          break
-        }
-      }
+      const item = findItemForLinea(linea.descripcion)
+      if (item) itemsEnEsteComprobante.set(item.id, linea.monto)
     }
     setLineas(
       items
