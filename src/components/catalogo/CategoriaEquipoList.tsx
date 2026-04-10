@@ -75,19 +75,30 @@ export default function CategoriaEquipoList({ data, onUpdate, onDelete, onRefres
     }
   }
 
-  const handleConfirmarEliminar = (categoria: CategoriaEquipo) => {
+  const [verificando, setVerificando] = useState(false)
+
+  const handleConfirmarEliminar = async (categoria: CategoriaEquipo) => {
     setCategoriaAEliminar(categoria)
     setEquiposEnUso([])
+    setVerificando(true)
+    try {
+      // Pre-cargar equipos en uso antes de abrir el dialog
+      const res = await fetch(`/api/categoria-equipo/${categoria.id}/en-uso`)
+      if (res.ok) {
+        const data = await res.json()
+        setEquiposEnUso(data.equiposEnUso || [])
+      }
+    } catch { /* si falla, abrimos igual y el delete mostrará el error */ }
+    finally { setVerificando(false) }
     setDeleteDialogOpen(true)
   }
 
   const handleEliminar = async () => {
-    if (!categoriaAEliminar) return
+    if (!categoriaAEliminar || equiposEnUso.length > 0) return
     setEliminando(true)
     try {
       const result = await deleteCategoriaEquipo(categoriaAEliminar.id)
       if ('error' in result) {
-        setEquiposEnUso(result.equiposEnUso || [])
         toast.error(result.error)
         return
       }
