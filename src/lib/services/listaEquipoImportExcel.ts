@@ -151,7 +151,7 @@ export async function verificarExistenciaEquipos(
               // Crear nueva categoría
               console.log(`🔹 Creando nueva categoría: ${categoria}`)
               const nuevaCategoria = await createCategoriaEquipo({
-                nombre: categoria.trim()
+                nombre: categoria.trim().toUpperCase()
               })
               categoriaId = nuevaCategoria.id
               categoriaPorNombre.set(categoria.toLowerCase(), nuevaCategoria)
