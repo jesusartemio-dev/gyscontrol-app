@@ -398,17 +398,28 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
       // Reemplazar adjunto si hay archivo nuevo
       if (archivoSeleccionado) {
         setUploadingFile(true)
-        // Eliminar adjunto anterior si existe
-        const comprobanteActual = comprobantes.find(c => c.id === editingComprobanteId)
-        if (comprobanteActual?.adjuntos[0]) {
-          await fetch(`/api/gasto-adjunto/${comprobanteActual.adjuntos[0].id}`, { method: 'DELETE' })
+        try {
+          // Eliminar adjunto anterior si existe
+          const comprobanteActual = comprobantes.find(c => c.id === editingComprobanteId)
+          if (comprobanteActual?.adjuntos[0]) {
+            await fetch(`/api/gasto-adjunto/${comprobanteActual.adjuntos[0].id}`, { method: 'DELETE' })
+          }
+          const fd = new FormData()
+          fd.append('file', archivoSeleccionado)
+          fd.append('gastoComprobanteId', editingComprobanteId!)
+          const uploadRes = await fetch('/api/gasto-adjunto', { method: 'POST', body: fd })
+          if (!uploadRes.ok) {
+            const err = await uploadRes.json().catch(() => ({}))
+            throw new Error(err.error || 'Error al subir el archivo')
+          }
+        } catch (uploadErr) {
+          toast.error(
+            `Comprobante actualizado, pero el archivo no se pudo adjuntar: ${uploadErr instanceof Error ? uploadErr.message : 'Error desconocido'}`,
+            { duration: 8000 }
+          )
+        } finally {
+          setUploadingFile(false)
         }
-        const fd = new FormData()
-        fd.append('file', archivoSeleccionado)
-        fd.append('gastoComprobanteId', editingComprobanteId!)
-        const uploadRes = await fetch('/api/gasto-adjunto', { method: 'POST', body: fd })
-        if (!uploadRes.ok) toast.warning('Comprobante actualizado, pero el archivo no se pudo subir')
-        setUploadingFile(false)
       }
 
       toast.success('Comprobante actualizado')
@@ -473,19 +484,34 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
       const comprobante = await res.json()
 
       // 2. Subir adjunto si hay archivo seleccionado
+      let fileOk = true
       if (archivoSeleccionado) {
         setUploadingFile(true)
-        const fd = new FormData()
-        fd.append('file', archivoSeleccionado)
-        fd.append('gastoComprobanteId', comprobante.id)
-        const uploadRes = await fetch('/api/gasto-adjunto', { method: 'POST', body: fd })
-        if (!uploadRes.ok) {
-          toast.warning('Comprobante registrado, pero el archivo no se pudo subir')
+        try {
+          const fd = new FormData()
+          fd.append('file', archivoSeleccionado)
+          fd.append('gastoComprobanteId', comprobante.id)
+          const uploadRes = await fetch('/api/gasto-adjunto', { method: 'POST', body: fd })
+          if (!uploadRes.ok) {
+            const err = await uploadRes.json().catch(() => ({}))
+            throw new Error(err.error || 'Error al subir el archivo')
+          }
+        } catch (uploadErr) {
+          fileOk = false
+          toast.error(
+            `Comprobante registrado, pero el archivo no se pudo adjuntar: ${uploadErr instanceof Error ? uploadErr.message : 'Error desconocido'}. Puedes adjuntarlo manualmente desde la lista.`,
+            { duration: 8000 }
+          )
+        } finally {
+          setUploadingFile(false)
         }
-        setUploadingFile(false)
       }
 
-      toast.success('Comprobante registrado correctamente')
+      if (fileOk && archivoSeleccionado) {
+        toast.success('Comprobante registrado con archivo adjunto')
+      } else if (!archivoSeleccionado) {
+        toast.success('Comprobante registrado correctamente')
+      }
       setShowModal(false)
       onChanged()
     } catch (err) {
