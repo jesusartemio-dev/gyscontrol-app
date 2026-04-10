@@ -370,7 +370,7 @@ export default function CatalogoEquipoForm({ equipo, vista, camposEditables, onC
             <Input
               type="number"
               min={0}
-              step={0.01}
+              step="any"
               {...register('precioLogistica', { setValueAs: v => v === '' || v === null ? undefined : Number(v) })}
               onFocus={(e) => e.target.select()}
               placeholder="0.00"
@@ -383,7 +383,7 @@ export default function CatalogoEquipoForm({ equipo, vista, camposEditables, onC
             <Input
               type="number"
               min={0}
-              step={0.01}
+              step="any"
               {...register('precioReal', { setValueAs: v => v === '' || v === null ? undefined : Number(v) })}
               onFocus={(e) => e.target.select()}
               placeholder="0.00"
