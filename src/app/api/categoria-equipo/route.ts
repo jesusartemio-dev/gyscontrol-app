@@ -21,7 +21,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Nombre es requerido' }, { status: 400 })
     }
 
-    const nombreTrimmed = body.nombre.trim().toUpperCase()
+    const nombreTrimmed = body.nombre.trim()
     
     if (nombreTrimmed.length === 0) {
       return NextResponse.json({ error: 'Nombre no puede estar vacío' }, { status: 400 })

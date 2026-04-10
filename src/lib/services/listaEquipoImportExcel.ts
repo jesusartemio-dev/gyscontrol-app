@@ -144,18 +144,13 @@ export async function verificarExistenciaEquipos(
             console.log(`⚠️ Item ${codigo}: Categoría vacía, usando categoría por defecto`)
             categoriaId = categoriaDefaultId!
           } else {
-            // Buscar categoría existente
+            // Buscar categoría existente (case-insensitive)
             categoriaId = categoriaPorNombre.get(categoria.toLowerCase())?.id as string
 
             if (!categoriaId) {
-              // Crear nueva categoría
-              console.log(`🔹 Creando nueva categoría: ${categoria}`)
-              const nuevaCategoria = await createCategoriaEquipo({
-                nombre: categoria.trim().toUpperCase()
-              })
-              categoriaId = nuevaCategoria.id
-              categoriaPorNombre.set(categoria.toLowerCase(), nuevaCategoria)
-              console.log(`✅ Categoría creada: ${nuevaCategoria.nombre}`)
+              // Categoría no encontrada → usar categoría por defecto, no crear nuevas
+              console.log(`⚠️ Item ${codigo}: Categoría "${categoria}" no encontrada, usando categoría por defecto`)
+              categoriaId = categoriaDefaultId!
             }
           }
 
