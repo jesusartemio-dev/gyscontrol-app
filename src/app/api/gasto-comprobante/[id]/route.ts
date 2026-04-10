@@ -145,7 +145,7 @@ export async function PATCH(
           proveedorNombre: proveedorNombre ?? comprobante.proveedorNombre,
           proveedorRuc: proveedorRuc ?? comprobante.proveedorRuc,
           montoTotal: montoTotal ?? comprobante.montoTotal,
-          fecha: fecha ? new Date(fecha) : comprobante.fecha,
+          fecha: fecha ? new Date(fecha + 'T12:00:00.000Z') : comprobante.fecha,
           observaciones: observaciones ?? comprobante.observaciones,
           updatedAt: new Date(),
         },
@@ -155,7 +155,7 @@ export async function PATCH(
       const hojaDeGastosId = comprobante.hojaDeGastos.id
       const newTipo = tipoComprobante ?? comprobante.tipoComprobante
       const newNumero = numeroComprobante ?? comprobante.numeroComprobante
-      const newFecha = fecha ? new Date(fecha) : comprobante.fecha
+      const newFecha = fecha ? new Date(fecha + 'T12:00:00.000Z') : comprobante.fecha
 
       for (const linea of lineas) {
         await tx.gastoLinea.create({

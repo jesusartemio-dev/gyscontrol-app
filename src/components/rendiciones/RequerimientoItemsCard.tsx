@@ -289,7 +289,7 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
     setProveedor(c.proveedorNombre || '')
     setRuc(c.proveedorRuc || '')
     const d = new Date(c.fecha)
-    setFecha(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`)
+    setFecha(`${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`)
     setArchivoSeleccionado(null)
     // Todos los items: los que están en este comprobante con su monto, el resto en 0
     const itemsEnEsteComprobante = new Map<string, number>()
@@ -843,7 +843,7 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
 
                         {/* Meta info compacta */}
                         <div className="flex items-center gap-3 px-3 pb-2 text-xs text-muted-foreground">
-                          <span>{new Date(c.fecha).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                          <span>{new Date(c.fecha).toLocaleDateString('es-PE', { timeZone: 'UTC', day: '2-digit', month: 'short', year: 'numeric' })}</span>
                           <span>{c.lineas.length} item(s)</span>
                           {adjunto ? (
                             <span className="flex items-center gap-1 text-green-600"><Paperclip className="h-3 w-3" />Adjunto</span>
@@ -926,7 +926,7 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
               <div className="w-[55%] shrink-0 border-r flex flex-col overflow-y-auto bg-background">
                 <div className="p-5 space-y-4 border-b">
                   {[
-                    { label: 'Fecha', value: new Date(previewing.fecha).toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' }) },
+                    { label: 'Fecha', value: new Date(previewing.fecha).toLocaleDateString('es-PE', { timeZone: 'UTC', day: '2-digit', month: 'long', year: 'numeric' }) },
                     { label: 'Monto', value: fmt(previewing.montoTotal), className: 'font-bold font-mono text-green-700' },
                     { label: 'Tipo comprobante', value: TIPO_LABELS[previewing.tipoComprobante] || previewing.tipoComprobante },
                     { label: 'Nº comprobante', value: previewing.numeroComprobante || '—', className: 'font-mono' },
