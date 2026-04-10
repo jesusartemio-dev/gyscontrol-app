@@ -205,6 +205,32 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
   const [showEliminarConfirm, setShowEliminarConfirm] = useState(false)
   const [eliminando, setEliminando] = useState(false)
 
+  // Activar anticipo (para requerimientos aprobados sin anticipo)
+  const [showActivarAnticipo, setShowActivarAnticipo] = useState(false)
+  const [montoActivarAnticipo, setMontoActivarAnticipo] = useState('')
+
+  const handleActivarAnticipo = async () => {
+    const monto = parseFloat(montoActivarAnticipo)
+    if (!monto || monto <= 0) { toast.error('Ingrese un monto de anticipo válido'); return }
+    try {
+      setActionLoading(true)
+      const res = await fetch(`/api/hoja-de-gastos/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ activarAnticipo: true, montoAnticipo: monto }),
+      })
+      if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Error') }
+      toast.success('Depósito activado. Ahora puede registrar depósitos.')
+      setShowActivarAnticipo(false)
+      setMontoActivarAnticipo('')
+      await loadData()
+    } catch (e: any) {
+      toast.error(e.message || 'Error al activar depósito')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
   const handleEliminar = async () => {
     try {
       setEliminando(true)
@@ -489,6 +515,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
   const canEnviar = ['borrador', 'rechazado'].includes(hoja.estado)
   const canAprobar = hoja.estado === 'enviado' && ['admin', 'gerente', 'gestor', 'coordinador', 'coordinador_logistico', 'administracion'].includes(role || '')
   const canDepositar = hoja.estado === 'aprobado' && hoja.requiereAnticipo && ['admin', 'gerente', 'administracion'].includes(role || '')
+  const canActivarAnticipo = hoja.estado === 'aprobado' && !hoja.requiereAnticipo && ['admin', 'gerente', 'administracion'].includes(role || '')
   const canAvanzarDepositado = canDepositar && (hoja.depositos?.length ?? 0) > 0
   const canRendir = (hoja.estado === 'aprobado' && !hoja.requiereAnticipo) || hoja.estado === 'depositado'
   const canValidarLineas = hoja.estado === 'rendido' && ['admin', 'gerente', 'administracion'].includes(role || '')
@@ -556,7 +583,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
             requiereAnticipo={hoja.requiereAnticipo}
             rechazadoEn={hoja.rechazadoEn}
           />
-          {(canEnviar || canAprobar || canAvanzarDepositado || canRendir || canValidarLineas || canCerrar || canRechazar || canRetroceder) && (
+          {(canEnviar || canAprobar || canActivarAnticipo || canAvanzarDepositado || canRendir || canValidarLineas || canCerrar || canRechazar || canRetroceder) && (
             <div className="flex flex-wrap gap-2 border-t pt-3">
               {canEnviar && (
                 <Button size="sm" onClick={handleEnviar} disabled={actionLoading} className="bg-blue-600 hover:bg-blue-700">
@@ -568,6 +595,12 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
                 <Button size="sm" onClick={handleAprobar} disabled={actionLoading} className="bg-emerald-600 hover:bg-emerald-700">
                   <CheckCircle className="h-3.5 w-3.5 mr-1" />
                   Aprobar
+                </Button>
+              )}
+              {canActivarAnticipo && (
+                <Button size="sm" onClick={() => { setMontoActivarAnticipo(''); setShowActivarAnticipo(true) }} disabled={actionLoading} variant="outline" className="border-purple-400 text-purple-700 hover:bg-purple-50">
+                  <Banknote className="h-3.5 w-3.5 mr-1" />
+                  Activar depósito
                 </Button>
               )}
               {canAvanzarDepositado && (
@@ -940,6 +973,45 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
             <Button onClick={handleDepositoAdicional} disabled={actionLoading || !montoDepositoAdicional} className="bg-purple-600 hover:bg-purple-700">
               {actionLoading && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
               Registrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Activar depósito en requerimiento aprobado sin anticipo */}
+      <Dialog open={showActivarAnticipo} onOpenChange={setShowActivarAnticipo}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-purple-700">
+              <Banknote className="h-5 w-5" />
+              Activar depósito
+            </DialogTitle>
+            <DialogDescription>
+              Este requerimiento fue aprobado sin anticipo. Al activar el depósito, el flujo cambiará a: <strong>Aprobado → Depositado → Rendido</strong>. Ingrese el monto a depositar.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <Label htmlFor="montoActivarAnticipo" className="text-sm">Monto anticipo (S/)</Label>
+              <Input
+                id="montoActivarAnticipo"
+                type="number"
+                min="0.01"
+                step="0.01"
+                placeholder="0.00"
+                value={montoActivarAnticipo}
+                onChange={e => setMontoActivarAnticipo(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setShowActivarAnticipo(false)} disabled={actionLoading}>
+              Cancelar
+            </Button>
+            <Button size="sm" onClick={handleActivarAnticipo} disabled={actionLoading} className="bg-purple-600 hover:bg-purple-700">
+              {actionLoading && <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />}
+              Activar depósito
             </Button>
           </DialogFooter>
         </DialogContent>

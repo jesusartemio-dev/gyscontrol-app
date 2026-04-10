@@ -87,12 +87,41 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (!existing) {
       return NextResponse.json({ error: 'Hoja de gastos no encontrada' }, { status: 404 })
     }
+
+    const payload = await req.json()
+    const updateData: any = { updatedAt: new Date() }
+
+    // Caso especial: activar anticipo en estado aprobado (solo admin/gerente/administracion)
+    if (existing.estado === 'aprobado' && payload.activarAnticipo === true) {
+      if (!['admin', 'gerente', 'administracion'].includes(session.user.role)) {
+        return NextResponse.json({ error: 'Sin permisos para activar anticipo' }, { status: 403 })
+      }
+      if (existing.requiereAnticipo) {
+        return NextResponse.json({ error: 'El requerimiento ya tiene anticipo activado' }, { status: 409 })
+      }
+      updateData.requiereAnticipo = true
+      updateData.montoAnticipo = payload.montoAnticipo ?? 0
+      const data = await prisma.hojaDeGastos.update({
+        where: { id },
+        data: updateData,
+        include: includeRelations,
+      })
+      await prisma.hojaDeGastosEvento.create({
+        data: {
+          hojaDeGastosId: id,
+          tipo: 'anticipo_activado',
+          descripcion: `Depósito activado post-aprobación. Monto anticipo: S/ ${(payload.montoAnticipo ?? 0).toFixed(2)}`,
+          usuarioId: session.user.id,
+          metadata: { montoAnticipo: payload.montoAnticipo ?? 0 },
+        },
+      })
+      return NextResponse.json(data)
+    }
+
     if (!['borrador', 'rechazado'].includes(existing.estado)) {
       return NextResponse.json({ error: 'Solo se puede editar en estado borrador o rechazado' }, { status: 400 })
     }
 
-    const payload = await req.json()
-    const updateData: any = { updatedAt: new Date() }
     if (payload.motivo !== undefined) updateData.motivo = payload.motivo.trim()
     if (payload.observaciones !== undefined) updateData.observaciones = payload.observaciones
     if (payload.requiereAnticipo !== undefined) {
