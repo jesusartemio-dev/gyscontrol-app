@@ -20,7 +20,7 @@ const DEFAULTS: Record<Vista, { columnas: string[], permisos: Record<string, any
   comercial: {
     columnas: ['codigo', 'descripcion', 'categoria', 'unidad', 'marca', 'precioLista', 'precioVenta', 'estado', 'updatedAt'],
     permisos: {
-      canCreate: false, canEdit: true, canDelete: false, canImport: false, canExport: true,
+      canCreate: false, canEdit: true, canDelete: false, canImport: true, canExport: true,
       camposEditables: ['precioLista']
     }
   },
