@@ -13,10 +13,33 @@ export async function DELETE(
     }
 
     // Verificar si tiene equipos vinculados antes de eliminar
-    const enUso = await prisma.catalogoEquipo.count({ where: { categoriaId: id } })
-    if (enUso > 0) {
+    const equiposEnUso = await prisma.catalogoEquipo.findMany({
+      where: { categoriaId: id },
+      select: {
+        id: true,
+        codigo: true,
+        descripcion: true,
+        listaEquipoItem: {
+          select: {
+            listaEquipo: {
+              select: {
+                nombre: true,
+                codigo: true,
+                proyecto: { select: { codigo: true, nombre: true } },
+              },
+            },
+          },
+          take: 3,
+        },
+      },
+      take: 20,
+    })
+    if (equiposEnUso.length > 0) {
       return NextResponse.json(
-        { error: `No se puede eliminar: ${enUso} equipo${enUso !== 1 ? 's' : ''} del catálogo usan esta categoría. Reasígnalos primero.` },
+        {
+          error: `No se puede eliminar: ${equiposEnUso.length} equipo${equiposEnUso.length !== 1 ? 's' : ''} del catálogo usan esta categoría.`,
+          equiposEnUso,
+        },
         { status: 409 }
       )
     }

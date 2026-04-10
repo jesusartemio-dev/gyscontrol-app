@@ -48,16 +48,16 @@ export async function updateCategoriaEquipo(id: string, data: { nombre: string; 
   return res.json()
 }
 
-export async function deleteCategoriaEquipo(id: string) {
+export async function deleteCategoriaEquipo(id: string): Promise<{ ok: true } | { error: string; equiposEnUso?: any[] }> {
   const res = await fetch(`/api/categoria-equipo/${id}`, {
     method: 'DELETE',
   })
 
   if (!res.ok) {
-    const errorText = await res.text()
-    console.error('❌ Error al eliminar categoría de equipo:', errorText)
-    throw new Error('Error al eliminar categoría de equipo: ' + errorText)
+    const body = await res.json().catch(() => ({}))
+    console.error('❌ Error al eliminar categoría de equipo:', body)
+    return { error: body.error || 'Error al eliminar', equiposEnUso: body.equiposEnUso }
   }
 
-  return res.json()
+  return { ok: true }
 }

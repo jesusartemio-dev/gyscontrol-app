@@ -40,6 +40,7 @@ export default function CategoriaEquipoList({ data, onUpdate, onDelete, onRefres
   const [categoriaAEliminar, setCategoriaAEliminar] = useState<CategoriaEquipo | null>(null)
   const [guardando, setGuardando] = useState(false)
   const [eliminando, setEliminando] = useState(false)
+  const [equiposEnUso, setEquiposEnUso] = useState<any[]>([])
 
   const handleEditar = (categoria: CategoriaEquipo) => {
     setEditando(categoria.id)
@@ -76,6 +77,7 @@ export default function CategoriaEquipoList({ data, onUpdate, onDelete, onRefres
 
   const handleConfirmarEliminar = (categoria: CategoriaEquipo) => {
     setCategoriaAEliminar(categoria)
+    setEquiposEnUso([])
     setDeleteDialogOpen(true)
   }
 
@@ -83,13 +85,17 @@ export default function CategoriaEquipoList({ data, onUpdate, onDelete, onRefres
     if (!categoriaAEliminar) return
     setEliminando(true)
     try {
-      await deleteCategoriaEquipo(categoriaAEliminar.id)
+      const result = await deleteCategoriaEquipo(categoriaAEliminar.id)
+      if ('error' in result) {
+        setEquiposEnUso(result.equiposEnUso || [])
+        toast.error(result.error)
+        return
+      }
       toast.success('Categoría eliminada')
       onDelete?.(categoriaAEliminar.id)
       setDeleteDialogOpen(false)
       setCategoriaAEliminar(null)
-    } catch (error) {
-      toast.error('Error al eliminar')
+      setEquiposEnUso([])
     } finally {
       setEliminando(false)
     }
@@ -193,19 +199,41 @@ export default function CategoriaEquipoList({ data, onUpdate, onDelete, onRefres
           ))}
         </div>
 
-        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-          <AlertDialogContent>
+        <AlertDialog open={deleteDialogOpen} onOpenChange={(open) => { setDeleteDialogOpen(open); if (!open) setEquiposEnUso([]) }}>
+          <AlertDialogContent className="max-w-lg">
             <AlertDialogHeader>
               <AlertDialogTitle>¿Eliminar categoría?</AlertDialogTitle>
               <AlertDialogDescription>
                 Se eliminará la categoría "{categoriaAEliminar?.nombre}". Esta acción no se puede deshacer.
               </AlertDialogDescription>
             </AlertDialogHeader>
+            {equiposEnUso.length > 0 && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
+                <p className="text-sm font-medium text-amber-800">
+                  {equiposEnUso.length} equipo{equiposEnUso.length !== 1 ? 's' : ''} del catálogo usan esta categoría. Reasígnalos primero:
+                </p>
+                <ul className="space-y-1.5 max-h-48 overflow-y-auto">
+                  {equiposEnUso.map((eq: any) => {
+                    const lista = eq.listaEquipoItem?.[0]?.listaEquipo
+                    return (
+                      <li key={eq.id} className="text-xs text-amber-700 border-b border-amber-100 pb-1 last:border-0">
+                        <span className="font-mono font-semibold">{eq.codigo}</span> — {eq.descripcion}
+                        {lista && (
+                          <span className="block text-amber-600 mt-0.5">
+                            Lista: {lista.codigo} · {lista.proyecto?.codigo} {lista.proyecto?.nombre}
+                          </span>
+                        )}
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            )}
             <AlertDialogFooter>
               <AlertDialogCancel disabled={eliminando}>Cancelar</AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleEliminar}
-                disabled={eliminando}
+                disabled={eliminando || equiposEnUso.length > 0}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
                 {eliminando ? 'Eliminando...' : 'Eliminar'}
@@ -335,19 +363,41 @@ export default function CategoriaEquipoList({ data, onUpdate, onDelete, onRefres
         </table>
       </div>
 
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
+      <AlertDialog open={deleteDialogOpen} onOpenChange={(open) => { setDeleteDialogOpen(open); if (!open) setEquiposEnUso([]) }}>
+        <AlertDialogContent className="max-w-lg">
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar categoría?</AlertDialogTitle>
             <AlertDialogDescription>
               Se eliminará la categoría "{categoriaAEliminar?.nombre}". Esta acción no se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {equiposEnUso.length > 0 && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
+              <p className="text-sm font-medium text-amber-800">
+                {equiposEnUso.length} equipo{equiposEnUso.length !== 1 ? 's' : ''} del catálogo usan esta categoría. Reasígnalos primero:
+              </p>
+              <ul className="space-y-1.5 max-h-48 overflow-y-auto">
+                {equiposEnUso.map((eq: any) => {
+                  const lista = eq.listaEquipoItem?.[0]?.listaEquipo
+                  return (
+                    <li key={eq.id} className="text-xs text-amber-700 border-b border-amber-100 pb-1 last:border-0">
+                      <span className="font-mono font-semibold">{eq.codigo}</span> — {eq.descripcion}
+                      {lista && (
+                        <span className="block text-amber-600 mt-0.5">
+                          Lista: {lista.codigo} · {lista.proyecto?.codigo} {lista.proyecto?.nombre}
+                        </span>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={eliminando}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleEliminar}
-              disabled={eliminando}
+              disabled={eliminando || equiposEnUso.length > 0}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {eliminando ? 'Eliminando...' : 'Eliminar'}
