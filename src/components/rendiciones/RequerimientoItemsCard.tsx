@@ -245,15 +245,20 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
     items.filter(i => i.precioReal != null).map(i => i.id)
   )
 
-  // Mapa itemId → comprobante (match por código de item en la descripción de la línea)
-  // Las líneas se generan con descripcion = "${item.codigo} — ${item.descripcion}"
-  const itemComprobanteMap = new Map<string, { numero: string; tipo: string; id: string }>()
+  // Mapa itemId → comprobante
+  // Usa requerimientoMaterialItemId exacto si disponible; fallback a prefijo de código
+  const itemComprobanteMap = new Map<string, { numero: string; tipo: string; id: string; hasAdjunto: boolean }>()
   for (const c of comprobantes) {
+    const hasAdjunto = c.adjuntos.length > 0
     for (const l of c.lineas) {
-      for (const item of items) {
-        if (l.descripcion.startsWith(item.codigo + ' —') || l.descripcion.startsWith(item.codigo + ' -')) {
-          itemComprobanteMap.set(item.id, { id: c.id, tipo: c.tipoComprobante, numero: c.numeroComprobante })
-          break
+      if (l.requerimientoMaterialItemId) {
+        itemComprobanteMap.set(l.requerimientoMaterialItemId, { id: c.id, tipo: c.tipoComprobante, numero: c.numeroComprobante, hasAdjunto })
+      } else {
+        for (const item of items) {
+          if (l.descripcion.startsWith(item.codigo + ' —') || l.descripcion.startsWith(item.codigo + ' -')) {
+            itemComprobanteMap.set(item.id, { id: c.id, tipo: c.tipoComprobante, numero: c.numeroComprobante, hasAdjunto })
+            break
+          }
         }
       }
     }
@@ -291,12 +296,17 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
     setFecha(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`)
     setArchivoSeleccionado(null)
     // Todos los items: los que están en este comprobante con su monto, el resto en 0
+    // Usa requerimientoMaterialItemId exacto si disponible; fallback a prefijo de código
     const itemsEnEsteComprobante = new Map<string, number>()
     for (const linea of c.lineas) {
-      for (const item of items) {
-        if (linea.descripcion.startsWith(item.codigo + ' —') || linea.descripcion.startsWith(item.codigo + ' -')) {
-          itemsEnEsteComprobante.set(item.id, linea.monto)
-          break
+      if (linea.requerimientoMaterialItemId) {
+        itemsEnEsteComprobante.set(linea.requerimientoMaterialItemId, linea.monto)
+      } else {
+        for (const item of items) {
+          if (linea.descripcion.startsWith(item.codigo + ' —') || linea.descripcion.startsWith(item.codigo + ' -')) {
+            itemsEnEsteComprobante.set(item.id, linea.monto)
+            break
+          }
         }
       }
     }
@@ -602,7 +612,10 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                           {itemsCubiertos.has(item.id) && ['rendido', 'validado', 'cerrado'].includes(hoja.estado)
                             ? <Badge className="text-[10px] px-1.5 py-0 h-4 bg-green-100 text-green-700 border-0 font-medium">Rendido</Badge>
                             : itemsCubiertos.has(item.id)
-                            ? <Badge className="text-[10px] px-1.5 py-0 h-4 bg-blue-100 text-blue-700 border-0 font-medium">Con comprobante</Badge>
+                            ? <Badge className={`text-[10px] px-1.5 py-0 h-4 border-0 font-medium flex items-center gap-0.5 ${itemComprobanteMap.get(item.id)?.hasAdjunto ? 'bg-blue-100 text-blue-700' : 'bg-blue-50 text-blue-600'}`}>
+                                Con comprobante
+                                {!itemComprobanteMap.get(item.id)?.hasAdjunto && <AlertCircle className="h-2.5 w-2.5 text-amber-500" />}
+                              </Badge>
                             : <Badge className="text-[10px] px-1.5 py-0 h-4 bg-amber-100 text-amber-700 border-0 font-medium">Pendiente</Badge>}
                         </td>
                         <td className="py-2 pr-3 font-mono text-xs text-muted-foreground">{item.codigo}</td>
@@ -1076,9 +1089,14 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
 
               {/* Adjunto */}
               <div className="space-y-1">
+                {(() => {
+                  const adjActual = editingComprobanteId ? comprobantes.find(c => c.id === editingComprobanteId)?.adjuntos[0] : null
+                  return (
                 <Label className="text-xs text-muted-foreground">
-                  {editingComprobanteId ? 'Reemplazar archivo adjunto' : 'Adjuntar archivo'}
+                  {adjActual ? 'Reemplazar archivo adjunto' : 'Adjuntar archivo'}
                 </Label>
+                  )
+                })()}
                 {editingComprobanteId && !archivoSeleccionado && (() => {
                   const adjActual = comprobantes.find(c => c.id === editingComprobanteId)?.adjuntos[0]
                   return adjActual ? (
