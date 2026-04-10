@@ -38,7 +38,7 @@ import {
   Plus, Search, Package, Pencil, Trash2, X, Loader2, AlertCircle,
   CheckCircle, Clock, XCircle, ChevronDown, ChevronUp,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
-  BarChart3, Filter, Sparkles
+  BarChart3, Filter, Sparkles, BookOpen,
 } from 'lucide-react'
 
 type CatalogoEquipoConId = CatalogoEquipoPayload & { id: string }
@@ -128,6 +128,8 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
   // UI state
   const [filtersExpanded, setFiltersExpanded] = useState(true)
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null)
+  const [showCategoriasGuia, setShowCategoriasGuia] = useState(false)
+  const [buscarCategoria, setBuscarCategoria] = useState('')
 
   const hasCol = (key: string) => vistaConfig?.columnas.includes(key) ?? false
   const canCreate = vistaConfig?.permisos.canCreate ?? false
@@ -395,10 +397,22 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
             )}
           </div>
         )
-      case 'catUndMarca':
+      case 'catUndMarca': {
+        const catDesc = allCategorias.find(c => c.nombre === eq.categoriaEquipo?.nombre)?.descripcion
         return (
           <div className="space-y-0.5">
-            <Badge variant="secondary" className="text-xs font-normal">{eq.categoriaEquipo?.nombre || '—'}</Badge>
+            {catDesc ? (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge variant="secondary" className="text-xs font-normal cursor-help">{eq.categoriaEquipo?.nombre || '—'}</Badge>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="max-w-56 text-xs">{catDesc}</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ) : (
+              <Badge variant="secondary" className="text-xs font-normal">{eq.categoriaEquipo?.nombre || '—'}</Badge>
+            )}
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <span>{eq.unidad?.nombre || '—'}</span>
               <span className="text-muted-foreground/40">·</span>
@@ -406,6 +420,7 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
             </div>
           </div>
         )
+      }
       case 'uso':
         return renderUsageCell(eq)
       case 'precioLogistica':
@@ -571,6 +586,12 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
                 Importar PDF
               </Button>
             )}
+            {allCategorias.length > 0 && (
+              <Button size="sm" variant="outline" onClick={() => { setBuscarCategoria(''); setShowCategoriasGuia(true) }} className="gap-1.5 text-blue-700 border-blue-300 hover:bg-blue-50">
+                <BookOpen className="h-3.5 w-3.5" />
+                Guía de categorías
+              </Button>
+            )}
           </div>
         </div>
 
@@ -582,6 +603,49 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
           unidades={allUnidades}
           onSuccess={cargarDatos}
         />
+
+        {/* Modal: Guía de categorías */}
+        <Dialog open={showCategoriasGuia} onOpenChange={setShowCategoriasGuia}>
+          <DialogContent className="sm:max-w-lg max-h-[80vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-blue-700">
+                <BookOpen className="h-5 w-5" />
+                Guía de Categorías
+              </DialogTitle>
+              <DialogDescription>
+                Referencia de categorías y los tipos de equipos que incluye cada una.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                placeholder="Buscar categoría..."
+                value={buscarCategoria}
+                onChange={e => setBuscarCategoria(e.target.value)}
+                className="pl-8 h-8 text-sm"
+                autoFocus
+              />
+            </div>
+            <div className="overflow-y-auto flex-1 space-y-2 pr-1">
+              {allCategorias
+                .filter(c => !buscarCategoria.trim() || c.nombre.toLowerCase().includes(buscarCategoria.toLowerCase()) || c.descripcion?.toLowerCase().includes(buscarCategoria.toLowerCase()))
+                .map(cat => (
+                  <div key={cat.id} className="rounded-lg border p-3 space-y-1">
+                    <p className="text-sm font-semibold text-foreground">{cat.nombre}</p>
+                    {cat.descripcion ? (
+                      <p className="text-xs text-muted-foreground">{cat.descripcion}</p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground/50 italic">Sin descripción</p>
+                    )}
+                  </div>
+                ))
+              }
+              {allCategorias.filter(c => !buscarCategoria.trim() || c.nombre.toLowerCase().includes(buscarCategoria.toLowerCase()) || c.descripcion?.toLowerCase().includes(buscarCategoria.toLowerCase())).length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">No se encontraron categorías</p>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Stats Bar */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
