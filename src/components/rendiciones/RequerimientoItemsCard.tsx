@@ -245,20 +245,16 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
     items.filter(i => i.precioReal != null).map(i => i.id)
   )
 
-  // Mapa itemId → comprobante
-  // Usa requerimientoMaterialItemId exacto si disponible; fallback a prefijo de código
+  // Mapa itemId → comprobante (match por código de item en la descripción de la línea)
+  // Las líneas se generan con descripcion = "${item.codigo} — ${item.descripcion}"
   const itemComprobanteMap = new Map<string, { numero: string; tipo: string; id: string; hasAdjunto: boolean }>()
   for (const c of comprobantes) {
     const hasAdjunto = c.adjuntos.length > 0
     for (const l of c.lineas) {
-      if (l.requerimientoMaterialItemId) {
-        itemComprobanteMap.set(l.requerimientoMaterialItemId, { id: c.id, tipo: c.tipoComprobante, numero: c.numeroComprobante, hasAdjunto })
-      } else {
-        for (const item of items) {
-          if (l.descripcion.startsWith(item.codigo + ' —') || l.descripcion.startsWith(item.codigo + ' -')) {
-            itemComprobanteMap.set(item.id, { id: c.id, tipo: c.tipoComprobante, numero: c.numeroComprobante, hasAdjunto })
-            break
-          }
+      for (const item of items) {
+        if (l.descripcion.startsWith(item.codigo + ' —') || l.descripcion.startsWith(item.codigo + ' -')) {
+          itemComprobanteMap.set(item.id, { id: c.id, tipo: c.tipoComprobante, numero: c.numeroComprobante, hasAdjunto })
+          break
         }
       }
     }
@@ -296,17 +292,12 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
     setFecha(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`)
     setArchivoSeleccionado(null)
     // Todos los items: los que están en este comprobante con su monto, el resto en 0
-    // Usa requerimientoMaterialItemId exacto si disponible; fallback a prefijo de código
     const itemsEnEsteComprobante = new Map<string, number>()
     for (const linea of c.lineas) {
-      if (linea.requerimientoMaterialItemId) {
-        itemsEnEsteComprobante.set(linea.requerimientoMaterialItemId, linea.monto)
-      } else {
-        for (const item of items) {
-          if (linea.descripcion.startsWith(item.codigo + ' —') || linea.descripcion.startsWith(item.codigo + ' -')) {
-            itemsEnEsteComprobante.set(item.id, linea.monto)
-            break
-          }
+      for (const item of items) {
+        if (linea.descripcion.startsWith(item.codigo + ' —') || linea.descripcion.startsWith(item.codigo + ' -')) {
+          itemsEnEsteComprobante.set(item.id, linea.monto)
+          break
         }
       }
     }

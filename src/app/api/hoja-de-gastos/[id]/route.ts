@@ -39,7 +39,6 @@ const includeRelations = {
       lineas: {
         select: {
           id: true, descripcion: true, monto: true, proyectoId: true,
-          requerimientoMaterialItemId: true,
         },
       },
     },
