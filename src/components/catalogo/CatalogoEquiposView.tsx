@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import CatalogoEquipoForm from '@/components/catalogo/CatalogoEquipoForm'
 import { BotonesImportExport } from '@/components/catalogo/BotonesImportExport'
-import { exportarEquiposAExcel, importarEquiposDesdeExcel } from '@/lib/utils/equiposExcel'
+import { exportarEquiposAExcel, importarEquiposDesdeExcel, descargarPlantillaCatalogoEquipo } from '@/lib/utils/equiposExcel'
 import { importarEquiposDesdeExcelValidado } from '@/lib/utils/equiposImportUtils'
 import { recalcularCatalogoEquipo } from '@/lib/utils/recalculoCatalogoEquipo'
 import { getCategoriasEquipo } from '@/lib/services/categoriaEquipo'
@@ -562,6 +562,7 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
               <BotonesImportExport
                 onExportar={canExport ? handleExportar : undefined}
                 onImportar={canImport ? handleImportar : undefined}
+                onDescargarPlantilla={canImport ? () => descargarPlantillaCatalogoEquipo().catch(() => toast.error('Error al descargar plantilla')) : undefined}
               />
             )}
             {canImport && (

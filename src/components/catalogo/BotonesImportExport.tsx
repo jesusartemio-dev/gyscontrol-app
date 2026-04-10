@@ -3,21 +3,23 @@
 // 🔧 Diseño estilizado y mejorado para Catálogo de Servicios
 // ===================================================
 
-import { Download, Upload, Loader2 } from 'lucide-react'
+import { Download, Upload, Loader2, FileDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 interface Props {
   onExportar?: () => void
   onImportar?: (e: React.ChangeEvent<HTMLInputElement>) => void
+  onDescargarPlantilla?: () => void
   importando?: boolean
   exportLabel?: string
   importLabel?: string
   acceptedFileTypes?: string
 }
 
-export function BotonesImportExport({ 
-  onExportar, 
-  onImportar, 
+export function BotonesImportExport({
+  onExportar,
+  onImportar,
+  onDescargarPlantilla,
   importando = false,
   exportLabel = "Exportar Excel",
   importLabel = "Importar Excel",
@@ -25,6 +27,16 @@ export function BotonesImportExport({
 }: Props) {
   return (
     <div className="flex gap-4 bg-gray-50 p-3 rounded-lg shadow-sm border w-fit">
+      {onDescargarPlantilla && (
+        <Button
+          variant="outline"
+          onClick={onDescargarPlantilla}
+          className="flex items-center gap-2 text-purple-700 border-purple-400 hover:bg-purple-50"
+        >
+          <FileDown size={18} />
+          Descargar plantilla
+        </Button>
+      )}
       {onExportar && (
         <Button
           variant="outline"
