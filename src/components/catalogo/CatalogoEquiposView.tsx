@@ -562,7 +562,7 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
               <BotonesImportExport
                 onExportar={canExport ? handleExportar : undefined}
                 onImportar={canImport ? handleImportar : undefined}
-                onDescargarPlantilla={canImport ? () => descargarPlantillaCatalogoEquipo().catch(() => toast.error('Error al descargar plantilla')) : undefined}
+                onDescargarPlantilla={(canImport || canExport) ? () => descargarPlantillaCatalogoEquipo().catch(() => toast.error('Error al descargar plantilla')) : undefined}
               />
             )}
             {canImport && (
