@@ -371,7 +371,7 @@ export default function CatalogoEquipoForm({ equipo, vista, camposEditables, onC
               type="number"
               min={0}
               step={0.01}
-              {...register('precioLogistica', { valueAsNumber: true })}
+              {...register('precioLogistica', { setValueAs: v => v === '' || v === null ? undefined : Number(v) })}
               onFocus={(e) => e.target.select()}
               placeholder="0.00"
               className={cn("h-7 text-xs font-mono flex-1", !canEditField('precioLogistica') && disabledClass)}
@@ -384,7 +384,7 @@ export default function CatalogoEquipoForm({ equipo, vista, camposEditables, onC
               type="number"
               min={0}
               step={0.01}
-              {...register('precioReal', { valueAsNumber: true })}
+              {...register('precioReal', { setValueAs: v => v === '' || v === null ? undefined : Number(v) })}
               onFocus={(e) => e.target.select()}
               placeholder="0.00"
               className={cn("h-7 text-xs font-mono flex-1", !canEditField('precioReal') && disabledClass)}
