@@ -26,16 +26,18 @@ export async function PATCH(
 
     const item = await prisma.requerimientoMaterialItem.findUnique({
       where: { id },
-      include: { hojaDeGastos: { select: { estado: true, tipoPropósito: true } } },
+      include: { hojaDeGastos: { select: { id: true, estado: true, tipoPropósito: true } } },
     })
 
     if (!item) {
       return NextResponse.json({ error: 'Item no encontrado' }, { status: 404 })
     }
-    if (item.hojaDeGastos.estado !== 'borrador') {
-      return NextResponse.json({ error: 'Solo se pueden modificar items cuando el requerimiento está en borrador' }, { status: 409 })
+    if (!['borrador', 'aprobado', 'depositado'].includes(item.hojaDeGastos.estado)) {
+      return NextResponse.json({ error: 'Solo se pueden modificar items cuando el requerimiento está en borrador, aprobado o depositado' }, { status: 409 })
     }
 
+    const cantidadAnterior = item.cantidadSolicitada
+    const precioAnterior = item.precioEstimado
     const cantidadSolicitada = body.cantidadSolicitada ?? item.cantidadSolicitada
     const precioEstimado = 'precioEstimado' in body ? body.precioEstimado : item.precioEstimado
     const totalEstimado = precioEstimado !== null && precioEstimado !== undefined
@@ -51,6 +53,31 @@ export async function PATCH(
         updatedAt: new Date(),
       },
     })
+
+    // Registrar evento de auditoría si el requerimiento ya estaba aprobado/depositado
+    if (item.hojaDeGastos.estado !== 'borrador') {
+      const cambios: string[] = []
+      if (cantidadAnterior !== cantidadSolicitada) cambios.push(`cantidad: ${cantidadAnterior} → ${cantidadSolicitada}`)
+      if (precioAnterior !== precioEstimado) cambios.push(`precio est.: ${precioAnterior ?? '—'} → ${precioEstimado ?? '—'}`)
+      await prisma.hojaDeGastosEvento.create({
+        data: {
+          hojaDeGastosId: item.hojaDeGastos.id,
+          tipo: 'item_editado',
+          descripcion: `Ítem editado post-aprobación: ${item.codigo} — ${item.descripcion}${cambios.length ? ` (${cambios.join(', ')})` : ''}`,
+          usuarioId: session.user.id,
+          metadata: {
+            itemId: id,
+            codigo: item.codigo,
+            descripcion: item.descripcion,
+            cantidadAnterior,
+            cantidadNueva: cantidadSolicitada,
+            precioAnterior,
+            precioNuevo: precioEstimado,
+            estadoHoja: item.hojaDeGastos.estado,
+          },
+        },
+      })
+    }
 
     return NextResponse.json(updated)
   } catch (error) {

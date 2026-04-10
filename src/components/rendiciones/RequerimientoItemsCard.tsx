@@ -732,7 +732,7 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                                 </>
                               ) : (
                                 <>
-                                  {hoja.estado === 'borrador' && !itemsCubiertos.has(item.id) && (
+                                  {['borrador', 'aprobado', 'depositado'].includes(hoja.estado) && !itemsCubiertos.has(item.id) && (
                                     <button
                                       type="button"
                                       onClick={() => startEditItem(item)}

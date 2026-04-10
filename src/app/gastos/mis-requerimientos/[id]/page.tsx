@@ -807,7 +807,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
         <RequerimientoItemsCard
           hoja={hoja}
           onChanged={loadData}
-          canAddItem={hoja.estado === 'borrador'}
+          canAddItem={['borrador', 'aprobado', 'depositado'].includes(hoja.estado)}
           canAddComprobante={canRendir || hoja.estado === 'rendido'}
         />
       )}

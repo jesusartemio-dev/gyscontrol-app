@@ -33,7 +33,7 @@ export async function POST(req: Request) {
       )
     }
 
-    // Validar que la hoja es de tipo materiales y está en borrador
+    // Validar que la hoja es de tipo materiales y está en estado editable
     const hoja = await prisma.hojaDeGastos.findUnique({
       where: { id: hojaDeGastosId },
       select: { id: true, estado: true, tipoPropósito: true },
@@ -45,8 +45,8 @@ export async function POST(req: Request) {
     if (hoja.tipoPropósito !== 'compra_materiales') {
       return NextResponse.json({ error: 'Solo se pueden agregar items a requerimientos de materiales' }, { status: 400 })
     }
-    if (hoja.estado !== 'borrador') {
-      return NextResponse.json({ error: 'Solo se pueden agregar items cuando el requerimiento está en borrador' }, { status: 409 })
+    if (!['borrador', 'aprobado', 'depositado'].includes(hoja.estado)) {
+      return NextResponse.json({ error: 'Solo se pueden agregar items cuando el requerimiento está en borrador, aprobado o depositado' }, { status: 409 })
     }
 
     // Verificar que el item no está ya en esta hoja
@@ -97,6 +97,26 @@ export async function POST(req: Request) {
         proyecto: { select: { id: true, codigo: true, nombre: true } },
       },
     })
+
+    // Registrar evento de auditoría si el requerimiento ya estaba aprobado/depositado
+    if (hoja.estado !== 'borrador') {
+      await prisma.hojaDeGastosEvento.create({
+        data: {
+          hojaDeGastosId,
+          tipo: 'item_agregado',
+          descripcion: `Ítem agregado post-aprobación: ${pedidoItem.codigo} — ${pedidoItem.descripcion} (x${cantidadSolicitada} ${pedidoItem.unidad})`,
+          usuarioId: session.user.id,
+          metadata: {
+            itemId: item.id,
+            codigo: pedidoItem.codigo,
+            descripcion: pedidoItem.descripcion,
+            cantidadSolicitada,
+            precioEstimado: precio,
+            estadoHoja: hoja.estado,
+          },
+        },
+      })
+    }
 
     return NextResponse.json(item)
   } catch (error) {
