@@ -27,6 +27,7 @@ export interface ItemExcelImportado {
   catalogoId?: string
   proyectoEquipoItemId?: string
   categoriaCatalogo?: string // Categoría del catálogo para detectar discrepancias
+  advertenciaCategoria?: string // Categoría del Excel que no se encontró en la BD
 }
 
 export interface ResumenImportacionExcel {
@@ -140,17 +141,20 @@ export async function verificarExistenciaEquipos(
           let categoriaId: string
 
           if (!categoria || categoria.trim().length === 0) {
-            // Usar categoría por defecto si está vacía
-            console.log(`⚠️ Item ${codigo}: Categoría vacía, usando categoría por defecto`)
+            // Usar categoría por defecto si está vacía, marcar advertencia
+            console.log(`⚠️ Item ${codigo}: Categoría vacía, usando SIN-CATEGORIA`)
             categoriaId = categoriaDefaultId!
+            ;(excelItem as any)._advertenciaCategoria = ''
           } else {
             // Buscar categoría existente (case-insensitive)
             categoriaId = categoriaPorNombre.get(categoria.toLowerCase())?.id as string
 
             if (!categoriaId) {
-              // Categoría no encontrada → usar categoría por defecto, no crear nuevas
-              console.log(`⚠️ Item ${codigo}: Categoría "${categoria}" no encontrada, usando categoría por defecto`)
+              // Categoría no encontrada → usar SIN-CATEGORIA, marcar advertencia
+              console.log(`⚠️ Item ${codigo}: Categoría "${categoria}" no encontrada, usando SIN-CATEGORIA`)
               categoriaId = categoriaDefaultId!
+              // Marcar advertencia para mostrar en el paso de verificación
+              ;(excelItem as any)._advertenciaCategoria = categoria.trim()
             }
           }
 
@@ -195,7 +199,8 @@ export async function verificarExistenciaEquipos(
         estado,
         catalogoId,
         proyectoEquipoItemId,
-        categoriaCatalogo
+        categoriaCatalogo,
+        advertenciaCategoria: (excelItem as any)._advertenciaCategoria,
       })
     }
 

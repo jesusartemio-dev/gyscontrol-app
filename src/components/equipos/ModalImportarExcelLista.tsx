@@ -956,6 +956,27 @@ export default function ModalImportarExcelLista({
           )
         })()}
 
+        {(() => {
+          const itemsSinCategoria = resumen.items.filter(i => i.advertenciaCategoria !== undefined)
+          if (itemsSinCategoria.length === 0) return null
+          return (
+            <div className="flex items-start gap-2 p-2 rounded-lg bg-red-50 border border-red-200">
+              <AlertTriangle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
+              <div className="text-xs text-red-700">
+                <p className="font-medium">{itemsSinCategoria.length} item{itemsSinCategoria.length !== 1 ? 's' : ''} sin categoría válida — se asignarán a <strong>SIN-CATEGORIA</strong>:</p>
+                <ul className="mt-1 space-y-0.5 max-h-24 overflow-y-auto">
+                  {itemsSinCategoria.map(i => (
+                    <li key={i.codigo}>
+                      · <strong>{i.codigo}</strong> {i.descripcion}
+                      {i.advertenciaCategoria ? <span className="text-red-500"> (categoría "{i.advertenciaCategoria}" no existe)</span> : <span className="text-red-500"> (sin categoría)</span>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )
+        })()}
+
         <div className="flex gap-2 pt-2">
           <Button variant="outline" size="sm" onClick={() => setStep('upload')} disabled={loading} className="h-8">
             <ArrowLeft className="w-3 h-3 mr-1" />
