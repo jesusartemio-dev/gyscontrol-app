@@ -268,10 +268,10 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
     setRuc('')
     setFecha(new Date().toISOString().split('T')[0])
     setArchivoSeleccionado(null)
-    // Solo items no cubiertos arrancan en 0; cubiertos se omiten
+    // Items no cubiertos + items huérfanos (precioReal set pero sin comprobante activo)
     setLineas(
       items
-        .filter(item => !itemsCubiertos.has(item.id))
+        .filter(item => !itemsCubiertos.has(item.id) || !itemComprobanteMap.has(item.id))
         .map(item => ({
           itemId: item.id,
           proyectoId: item.proyectoId,
@@ -303,7 +303,7 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
     }
     setLineas(
       items
-        .filter(item => !itemsCubiertos.has(item.id) || itemsEnEsteComprobante.has(item.id))
+        .filter(item => !itemsCubiertos.has(item.id) || itemsEnEsteComprobante.has(item.id) || !itemComprobanteMap.has(item.id))
         .map(item => ({
           itemId: item.id,
           proyectoId: item.proyectoId,
@@ -1164,8 +1164,8 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                 <p className="text-xs font-semibold uppercase tracking-wide">Distribución por item</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {editingComprobanteId
-                    ? 'Items asignados a este comprobante y disponibles. Items en S/ 0 serán removidos.'
-                    : 'Solo items sin comprobante asignado. Items en S/ 0 serán omitidos.'}
+                    ? 'Items asignados a este comprobante, disponibles y sin comprobante activo. Items en S/ 0 serán removidos.'
+                    : 'Items sin comprobante asignado y huérfanos (sin comprobante activo). Items en S/ 0 serán omitidos.'}
                 </p>
               </div>
               {lineas.some(l => items.find(it => it.id === l.itemId)?.totalEstimado) && (
@@ -1187,12 +1187,15 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                   const item = items.find(it => it.id === linea.itemId)
                   const tieneEstimado = item?.totalEstimado != null && item.totalEstimado > 0
                   const estaCompleto = linea.monto > 0
+                  const esHuerfano = item && itemsCubiertos.has(item.id) && !itemComprobanteMap.has(item.id)
                   return (
                     <div
                       key={linea.itemId}
                       className={`rounded-lg border p-3 transition-colors ${
                         estaCompleto
                           ? 'bg-green-50 dark:bg-green-950/10 border-green-200 dark:border-green-900'
+                          : esHuerfano
+                          ? 'bg-amber-50 dark:bg-amber-950/10 border-amber-200 dark:border-amber-900'
                           : 'bg-muted/20'
                       }`}
                     >
@@ -1204,6 +1207,9 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                               {linea.proyectoCodigo}
                             </Badge>
                             {estaCompleto && <CheckCircle2 className="h-3.5 w-3.5 text-green-600 shrink-0" />}
+                            {esHuerfano && !estaCompleto && (
+                              <span className="text-[10px] text-amber-600 font-medium">Sin comprobante activo</span>
+                            )}
                           </div>
                           <p className="text-xs mt-0.5 line-clamp-1 text-foreground/80">{item?.descripcion}</p>
                           {item && (
