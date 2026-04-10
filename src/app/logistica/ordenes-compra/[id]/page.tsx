@@ -350,8 +350,8 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
   const handleAction = async (action: string, fn: () => Promise<any>) => {
     try {
       setActionLoading(action)
-      const updated = await fn()
-      setOC(updated)
+      await fn()
+      await loadData()
       toast.success(`OC ${action} exitosamente`)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : `Error al ${action}`)
@@ -890,8 +890,8 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
               }
               try {
                 setActionLoading('recepcion')
-                const updated = await registrarRecepcionOC(oc.id, items)
-                setOC(updated)
+                await registrarRecepcionOC(oc.id, items)
+                await loadData()
                 setEditingRecepcion(false)
                 toast.success('Recepción registrada exitosamente')
               } catch (error) {
