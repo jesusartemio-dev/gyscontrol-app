@@ -216,7 +216,7 @@ export async function POST(
       if (listaItem?.catalogoEquipoId && winner?.precioUnitario != null) {
         propagarPrecioLogisticaCatalogo({
           catalogoEquipoId: listaItem.catalogoEquipoId,
-          precioLogistica: winner.precioUnitario,
+          precioLogistica: Math.round(winner.precioUnitario * 100) / 100,
           userId,
           metadata: { origen: 'select-winners-bulk', listaEquipoItemId: itemId },
         }).catch(err => console.error('Error propagating precioLogistica:', err))

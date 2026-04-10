@@ -98,7 +98,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       if (listaItem?.catalogoEquipoId) {
         propagarPrecioLogisticaCatalogo({
           catalogoEquipoId: listaItem.catalogoEquipoId,
-          precioLogistica: updated.precioUnitario,
+          precioLogistica: Math.round(updated.precioUnitario * 100) / 100,
           userId,
           metadata: { origen: 'cotizacion-proveedor-item-put', cotizacionItemId: id },
         }).catch(err => console.error('Error propagating precioLogistica:', err))

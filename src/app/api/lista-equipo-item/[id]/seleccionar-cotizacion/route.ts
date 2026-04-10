@@ -330,7 +330,7 @@ export async function PATCH(
     // Paso 8: propagar precioLogistica al catálogo
     propagarPrecioLogisticaCatalogo({
       catalogoEquipoId: updatedItem.catalogoEquipoId,
-      precioLogistica: precioUnitario, // siempre USD
+      precioLogistica: Math.round(precioUnitario * 100) / 100, // redondeado a 2 decimales
       userId,
       metadata: {
         origen: 'seleccionar-cotizacion',

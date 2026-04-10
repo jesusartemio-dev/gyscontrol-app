@@ -93,7 +93,7 @@ export async function POST(request: Request) {
     if (listaItem?.catalogoEquipoId && cotizacionItem.precioUnitario != null) {
       propagarPrecioLogisticaCatalogo({
         catalogoEquipoId: listaItem.catalogoEquipoId,
-        precioLogistica: cotizacionItem.precioUnitario,
+        precioLogistica: Math.round(cotizacionItem.precioUnitario * 100) / 100,
         userId,
         metadata: { origen: 'cotizacion-proveedor-seleccionar', listaEquipoItemId },
       }).catch(err => console.error('Error propagating precioLogistica:', err))
