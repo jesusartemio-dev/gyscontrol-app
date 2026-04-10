@@ -63,6 +63,7 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
   const [saving, setSaving] = useState(false)
   const [uploadingFile, setUploadingFile] = useState(false)
   const [deletingItem, setDeletingItem] = useState<string | null>(null)
+  const [bloqueadoRecepcion, setBloqueadoRecepcion] = useState<{ estado: string } | null>(null)
 
   // Modal agregar ítem — versión completa
   const [showAddItem, setShowAddItem] = useState(false)
@@ -745,22 +746,19 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                                   {(() => {
                                     const recepcionActiva = item.recepciones?.find(r => ['en_almacen', 'entregado_proyecto'].includes(r.estado))
                                     const bloqueadoPorRecepcion = !!recepcionActiva
-                                    const titleRecepcion = recepcionActiva?.estado === 'entregado_proyecto'
-                                      ? 'Ya fue entregado al proyecto — no se puede eliminar'
-                                      : 'Ya llegó al almacén — para eliminar, primero rechaza la recepción en Logística → Recepciones'
                                     return (
                                       <button
                                         type="button"
                                         onClick={() => {
                                           if (bloqueadoPorRecepcion) {
-                                            toast.error(titleRecepcion)
+                                            setBloqueadoRecepcion({ estado: recepcionActiva.estado })
                                             return
                                           }
                                           setConfirmDelete({ type: 'item', id: item.id, msg: '¿Eliminar este ítem del requerimiento?' })
                                         }}
                                         disabled={deletingItem === item.id || (itemsCubiertos.has(item.id) && !['borrador', 'aprobado', 'depositado'].includes(hoja.estado))}
-                                        className={`transition-colors ${bloqueadoPorRecepcion ? 'text-amber-400 hover:text-amber-600 cursor-help' : 'text-muted-foreground/40 hover:text-red-500 disabled:opacity-30 disabled:cursor-not-allowed'}`}
-                                        title={bloqueadoPorRecepcion ? titleRecepcion : itemsCubiertos.has(item.id) && !['borrador', 'aprobado', 'depositado'].includes(hoja.estado) ? 'Tiene comprobante registrado' : 'Eliminar ítem'}
+                                        className={`transition-colors ${bloqueadoPorRecepcion ? 'text-amber-400 hover:text-amber-600' : 'text-muted-foreground/40 hover:text-red-500 disabled:opacity-30 disabled:cursor-not-allowed'}`}
+                                        title={bloqueadoPorRecepcion ? 'Ver por qué no se puede eliminar' : itemsCubiertos.has(item.id) && !['borrador', 'aprobado', 'depositado'].includes(hoja.estado) ? 'Tiene comprobante registrado' : 'Eliminar ítem'}
                                       >
                                         {deletingItem === item.id
                                           ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -1510,6 +1508,45 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
               )}
               Eliminar
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Dialog: No se puede eliminar (recepción activa) ─────────────────── */}
+      <Dialog open={!!bloqueadoRecepcion} onOpenChange={(open) => { if (!open) setBloqueadoRecepcion(null) }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-amber-700 flex items-center gap-2">
+              <AlertCircle className="h-4 w-4" />
+              No se puede eliminar
+            </DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-3 pt-1">
+                {bloqueadoRecepcion?.estado === 'entregado_proyecto' ? (
+                  <p className="text-sm text-foreground">
+                    Este ítem ya fue <strong>entregado al proyecto</strong>. No es posible eliminarlo porque hay trazabilidad de entrega registrada.
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-sm text-foreground">
+                      Este ítem ya <strong>llegó al almacén</strong>. Para poder eliminarlo del requerimiento, primero debes rechazar la recepción.
+                    </p>
+                    <div className="bg-amber-50 border border-amber-200 rounded-md p-3 text-xs text-amber-800">
+                      <p className="font-semibold mb-1">¿Cómo hacerlo?</p>
+                      <ol className="list-decimal list-inside space-y-1">
+                        <li>Ve a <strong>Logística → Recepciones</strong></li>
+                        <li>Busca la recepción de este ítem</li>
+                        <li>Usa la opción <strong>"Rechazar"</strong> con el motivo</li>
+                        <li>Vuelve aquí y podrás eliminarlo</li>
+                      </ol>
+                    </div>
+                  </>
+                )}
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button size="sm" onClick={() => setBloqueadoRecepcion(null)}>Entendido</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
