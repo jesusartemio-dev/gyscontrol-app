@@ -402,14 +402,12 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
         return (
           <div className="space-y-0.5">
             {catDesc ? (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Badge variant="secondary" className="text-xs font-normal cursor-help">{eq.categoriaEquipo?.nombre || '—'}</Badge>
-                  </TooltipTrigger>
-                  <TooltipContent side="right" className="max-w-56 text-xs">{catDesc}</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge variant="secondary" className="text-xs font-normal cursor-help">{eq.categoriaEquipo?.nombre || '—'}</Badge>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="max-w-56 text-xs">{catDesc}</TooltipContent>
+              </Tooltip>
             ) : (
               <Badge variant="secondary" className="text-xs font-normal">{eq.categoriaEquipo?.nombre || '—'}</Badge>
             )}
@@ -523,6 +521,16 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
             <Badge variant="secondary" className="font-normal">
               {hasActiveFilters ? `${equiposFiltrados.length}/` : ''}{equipos.length}
             </Badge>
+            {allCategorias.length > 0 && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button size="sm" variant="outline" onClick={() => { setBuscarCategoria(''); setShowCategoriasGuia(true) }} className="h-7 w-7 p-0 text-blue-700 border-blue-300 hover:bg-blue-50">
+                    <BookOpen className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Guía de categorías</TooltipContent>
+              </Tooltip>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
@@ -584,12 +592,6 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
               <Button size="sm" variant="outline" onClick={handleOpenPdfImport} className="gap-1.5">
                 <Sparkles className="h-3.5 w-3.5 text-purple-600" />
                 Importar PDF
-              </Button>
-            )}
-            {allCategorias.length > 0 && (
-              <Button size="sm" variant="outline" onClick={() => { setBuscarCategoria(''); setShowCategoriasGuia(true) }} className="gap-1.5 text-blue-700 border-blue-300 hover:bg-blue-50">
-                <BookOpen className="h-3.5 w-3.5" />
-                Guía de categorías
               </Button>
             )}
           </div>
