@@ -154,12 +154,16 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
   const cargarDatos = async () => {
     try {
       setLoading(true)
-      const [config, data] = await Promise.all([
+      const [config, data, cats, units] = await Promise.all([
         getVistaConfig(vista),
         getCatalogoEquiposVista(vista),
+        getCategoriasEquipo(),
+        getUnidades(),
       ])
       setVistaConfig(config)
       setEquipos(data)
+      setAllCategorias(cats)
+      setAllUnidades(units)
     } catch (err) {
       console.error('Error al cargar datos:', err)
       toast.error('Error al cargar equipos')
