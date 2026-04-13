@@ -316,55 +316,78 @@ export default function ModalEscanearCotizacionPDF({
               </div>
 
               {/* Condiciones comerciales detectadas */}
-              {condiciones && Object.values(condiciones).some(v => v !== null) && (
-                <div className="px-4 py-2.5 border-b bg-purple-50/60">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[10px] font-semibold text-purple-700 uppercase tracking-wide">
-                      Condiciones comerciales detectadas
-                    </span>
-                    <label className="flex items-center gap-1.5 cursor-pointer">
-                      <Checkbox
-                        checked={applyCondiciones}
-                        onCheckedChange={(v) => setApplyCondiciones(!!v)}
-                        className="h-3.5 w-3.5"
-                      />
-                      <span className="text-[10px] text-purple-700">Aplicar</span>
-                    </label>
+              {condiciones && Object.values(condiciones).some(v => v !== null) && (() => {
+                // Construir lista de campos detectados con diff vs valores existentes
+                const condFields: { icon: React.ReactNode; label: string; nuevo: string; anterior: string | null }[] = []
+
+                if (condiciones.condicionPago) {
+                  const nuevo = condiciones.condicionPago + (condiciones.diasCredito ? ` · ${condiciones.diasCredito} días` : '')
+                  const anteriorPago = cotizacion.condicionPago
+                  const anteriorDias = cotizacion.diasCredito
+                  const anterior = anteriorPago ? anteriorPago + (anteriorDias ? ` · ${anteriorDias} días` : '') : null
+                  condFields.push({ icon: <CreditCard className="h-3 w-3 shrink-0" />, label: 'Pago', nuevo, anterior: anterior !== nuevo ? anterior : null })
+                }
+                if (condiciones.tiempoEntrega) {
+                  const anterior = cotizacion.tiempoEntrega || null
+                  condFields.push({ icon: <Truck className="h-3 w-3 shrink-0" />, label: 'Entrega', nuevo: condiciones.tiempoEntrega, anterior: anterior !== condiciones.tiempoEntrega ? anterior : null })
+                }
+                if (condiciones.lugarEntrega) {
+                  const anterior = cotizacion.lugarEntrega || null
+                  condFields.push({ icon: <MapPin className="h-3 w-3 shrink-0" />, label: 'Lugar', nuevo: condiciones.lugarEntrega, anterior: anterior !== condiciones.lugarEntrega ? anterior : null })
+                }
+                if (condiciones.contactoEntrega) {
+                  const anterior = cotizacion.contactoEntrega || null
+                  condFields.push({ icon: <Phone className="h-3 w-3 shrink-0" />, label: 'Contacto', nuevo: condiciones.contactoEntrega, anterior: anterior !== condiciones.contactoEntrega ? anterior : null })
+                }
+                if (condiciones.observaciones) {
+                  const anterior = cotizacion.observaciones || null
+                  condFields.push({ icon: <NotebookText className="h-3 w-3 shrink-0" />, label: 'Obs.', nuevo: condiciones.observaciones, anterior: anterior !== condiciones.observaciones ? anterior : null })
+                }
+
+                const overwriteCount = condFields.filter(f => f.anterior !== null).length
+
+                return (
+                  <div className="px-4 py-2.5 border-b bg-purple-50/60">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-semibold text-purple-700 uppercase tracking-wide">
+                          Condiciones comerciales detectadas
+                        </span>
+                        {overwriteCount > 0 && (
+                          <span className="flex items-center gap-1 text-[10px] text-amber-600 font-medium">
+                            <AlertCircle className="h-3 w-3" />
+                            {overwriteCount} campo{overwriteCount > 1 ? 's' : ''} con datos existentes
+                          </span>
+                        )}
+                      </div>
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <Checkbox
+                          checked={applyCondiciones}
+                          onCheckedChange={(v) => setApplyCondiciones(!!v)}
+                          className="h-3.5 w-3.5"
+                        />
+                        <span className="text-[10px] text-purple-700">Aplicar</span>
+                      </label>
+                    </div>
+                    <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs">
+                      {condFields.map((f, i) => (
+                        <span key={i} className="flex items-center gap-1">
+                          <span className="text-purple-400">{f.icon}</span>
+                          {f.anterior !== null ? (
+                            <>
+                              <span className="text-muted-foreground line-through text-[10px]">{f.anterior}</span>
+                              <ArrowRight className="h-2.5 w-2.5 text-amber-500 shrink-0" />
+                              <span className="text-amber-700 font-medium">{f.nuevo}</span>
+                            </>
+                          ) : (
+                            <span className="text-purple-800">{f.nuevo}</span>
+                          )}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-purple-800">
-                    {condiciones.condicionPago && (
-                      <span className="flex items-center gap-1">
-                        <CreditCard className="h-3 w-3 shrink-0" />
-                        {condiciones.condicionPago}{condiciones.diasCredito ? ` · ${condiciones.diasCredito} días` : ''}
-                      </span>
-                    )}
-                    {condiciones.tiempoEntrega && (
-                      <span className="flex items-center gap-1">
-                        <Truck className="h-3 w-3 shrink-0" />
-                        {condiciones.tiempoEntrega}
-                      </span>
-                    )}
-                    {condiciones.lugarEntrega && (
-                      <span className="flex items-center gap-1">
-                        <MapPin className="h-3 w-3 shrink-0" />
-                        {condiciones.lugarEntrega}
-                      </span>
-                    )}
-                    {condiciones.contactoEntrega && (
-                      <span className="flex items-center gap-1">
-                        <Phone className="h-3 w-3 shrink-0" />
-                        {condiciones.contactoEntrega}
-                      </span>
-                    )}
-                    {condiciones.observaciones && (
-                      <span className="flex items-center gap-1">
-                        <NotebookText className="h-3 w-3 shrink-0" />
-                        {condiciones.observaciones}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
+                )
+              })()}
 
               <table className="w-full text-xs">
                 <thead className="bg-gray-50 sticky top-0 z-10 border-b">
