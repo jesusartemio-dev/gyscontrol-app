@@ -13,6 +13,7 @@ import {
   buildPromptPAR,
 } from '@/lib/ssoma/prompts'
 import type { SsomaPromptData, SsomaActividadesAltoRiesgo } from '@/lib/ssoma/tipos'
+import { getModelForTask } from '@/lib/agente/models'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -161,15 +162,16 @@ export async function POST(
       const prompt1 = buildPromptIPERC_Part1(promptData, doc.codigoDocumento)
       const prompt2 = buildPromptIPERC_Part2(promptData, doc.codigoDocumento)
 
+      const ipercModel = getModelForTask('ssoma-iperc')
       const startMs = Date.now()
       const [res1, res2] = await Promise.all([
         anthropic.messages.create({
-          model: 'claude-sonnet-4-20250514',
+          model: ipercModel,
           max_tokens: 8000,
           messages: [{ role: 'user', content: prompt1 }],
         }),
         anthropic.messages.create({
-          model: 'claude-sonnet-4-20250514',
+          model: ipercModel,
           max_tokens: 8000,
           messages: [{ role: 'user', content: prompt2 }],
         }),
@@ -210,7 +212,7 @@ export async function POST(
         data: {
           userId,
           tipo: 'ssoma-documento-regenerar',
-          modelo: 'claude-sonnet-4-20250514',
+          modelo: ipercModel,
           tokensInput: totalInput,
           tokensOutput: totalOutput,
           costoEstimado,
@@ -267,10 +269,14 @@ export async function POST(
         return NextResponse.json({ error: 'Tipo de documento no soportado' }, { status: 400 })
     }
 
+    // MATRIZ_EPP usa Haiku (listas de EPP formulaicas); resto usa Sonnet
+    const docModel = doc.tipo === 'MATRIZ_EPP'
+      ? getModelForTask('ssoma-epp')
+      : getModelForTask('ssoma-document')
     const startMs = Date.now()
     const maxTokens = doc.tipo === 'PLAN_EMERGENCIA' ? 4096 : 4000
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: docModel,
       max_tokens: maxTokens,
       messages: [{ role: 'user', content: prompt }],
     })
@@ -285,7 +291,7 @@ export async function POST(
       data: {
         userId,
         tipo: 'ssoma-documento-regenerar',
-        modelo: 'claude-sonnet-4-20250514',
+        modelo: docModel,
         tokensInput: response.usage.input_tokens,
         tokensOutput: response.usage.output_tokens,
         costoEstimado,

@@ -14,6 +14,9 @@ export type AITask =
   | 'excel-extraction'  // Excel CSV → JSON structured data
   | 'pdf-extraction'    // PDF proposal → JSON structured data
   | 'ocr'               // Receipt/invoice OCR → JSON
+  | 'ssoma-iperc'       // SSOMA: matriz de riesgos IPERC (50 filas, razonamiento complejo)
+  | 'ssoma-document'    // SSOMA: PETS, PAR, PLAN_EMERGENCIA (procedimientos técnicos)
+  | 'ssoma-epp'         // SSOMA: MATRIZ_EPP (listas de EPP por rol, formulaico)
 
 const TASK_DEFAULTS: Record<AITask, string> = {
   'chat': MODELS.sonnet,
@@ -21,6 +24,9 @@ const TASK_DEFAULTS: Record<AITask, string> = {
   'excel-extraction': MODELS.haiku,
   'pdf-extraction': MODELS.haiku,
   'ocr': MODELS.haiku,
+  'ssoma-iperc': MODELS.sonnet,    // Identificación de riesgos contextual → Sonnet
+  'ssoma-document': MODELS.sonnet, // Procedimientos técnicos de seguridad → Sonnet
+  'ssoma-epp': MODELS.haiku,       // Listas de EPP por rol (referencia estándar) → Haiku
 }
 
 // Environment variable overrides (change model without redeploying)
@@ -30,6 +36,9 @@ const ENV_OVERRIDES: Record<AITask, string | undefined> = {
   'excel-extraction': process.env.AI_EXTRACT_MODEL,
   'pdf-extraction': process.env.AI_EXTRACT_MODEL,
   'ocr': process.env.AI_OCR_MODEL,
+  'ssoma-iperc': process.env.AI_SSOMA_IPERC_MODEL,
+  'ssoma-document': process.env.AI_SSOMA_DOCUMENT_MODEL,
+  'ssoma-epp': process.env.AI_SSOMA_EPP_MODEL,
 }
 
 /**

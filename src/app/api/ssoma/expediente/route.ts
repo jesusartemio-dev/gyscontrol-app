@@ -12,6 +12,7 @@ import {
   buildPromptPAR,
 } from '@/lib/ssoma/prompts'
 import { getDocSpecs, type SsomaPromptData, type SsomaActividadesAltoRiesgo, type SsomaDocSpec } from '@/lib/ssoma/tipos'
+import { getModelForTask } from '@/lib/agente/models'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -245,11 +246,12 @@ export async function POST(req: Request) {
 
         // IPERC: 2 llamadas paralelas de 25 filas cada una
         if (spec.tipo === 'IPERC') {
+          const ipercModel = getModelForTask('ssoma-iperc')
           const p1 = buildPromptIPERC_Part1(promptData, spec.codigoDocumento)
           const p2 = buildPromptIPERC_Part2(promptData, spec.codigoDocumento)
           const [r1, r2] = await Promise.all([
-            anthropic.messages.create({ model: 'claude-sonnet-4-20250514', max_tokens: 8000, messages: [{ role: 'user', content: p1 }] }),
-            anthropic.messages.create({ model: 'claude-sonnet-4-20250514', max_tokens: 8000, messages: [{ role: 'user', content: p2 }] }),
+            anthropic.messages.create({ model: ipercModel, max_tokens: 8000, messages: [{ role: 'user', content: p1 }] }),
+            anthropic.messages.create({ model: ipercModel, max_tokens: 8000, messages: [{ role: 'user', content: p2 }] }),
           ])
           const t1 = r1.content[0].type === 'text' ? r1.content[0].text : ''
           const t2 = r2.content[0].type === 'text' ? r2.content[0].text : ''
@@ -262,7 +264,7 @@ export async function POST(req: Request) {
 
           const usage = await prisma.agenteUsage.create({
             data: {
-              userId, tipo: 'ssoma-documento', modelo: 'claude-sonnet-4-20250514',
+              userId, tipo: 'ssoma-documento', modelo: ipercModel,
               tokensInput: totalInput, tokensOutput: totalOutput, costoEstimado, duracionMs,
               metadata: { docTipo: 'IPERC', expedienteId: expediente.id, proyectoId, filasTotal: merged.filas.length },
             },
@@ -278,10 +280,13 @@ export async function POST(req: Request) {
           })
         }
 
-        // Non-IPERC: single call
+        // Non-IPERC: single call — MATRIZ_EPP usa Haiku, resto Sonnet
+        const docModel = spec.tipo === 'MATRIZ_EPP'
+          ? getModelForTask('ssoma-epp')
+          : getModelForTask('ssoma-document')
         const prompt = getPrompt(spec)
         const response = await anthropic.messages.create({
-          model: 'claude-sonnet-4-20250514',
+          model: docModel,
           max_tokens: 4000,
           messages: [{ role: 'user', content: prompt }],
         })
@@ -296,7 +301,7 @@ export async function POST(req: Request) {
           data: {
             userId,
             tipo: 'ssoma-documento',
-            modelo: 'claude-sonnet-4-20250514',
+            modelo: docModel,
             tokensInput: response.usage.input_tokens,
             tokensOutput: response.usage.output_tokens,
             costoEstimado,

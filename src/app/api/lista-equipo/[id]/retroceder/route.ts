@@ -71,6 +71,11 @@ export async function POST(
       )
     }
 
+    // Retroceder desde aprobada requiere rol admin
+    if (lista.estado === 'aprobada' && session.user.role !== 'admin') {
+      return NextResponse.json({ error: 'Solo administradores pueden retroceder una lista aprobada' }, { status: 403 })
+    }
+
     const check = await canRollback('listaEquipo', id, targetEstado)
     if (!check.allowed) {
       return NextResponse.json(
@@ -88,6 +93,8 @@ export async function POST(
       cleanFields.fechaInicioCotizacion = null
     } else if (targetEstado === 'por_cotizar') {
       cleanFields.fechaFinCotizacion = null
+    } else if (targetEstado === 'por_aprobar') {
+      cleanFields.fechaAprobacionFinal = null
     }
 
     const updated = await prisma.listaEquipo.update({
@@ -98,6 +105,34 @@ export async function POST(
         updatedAt: new Date(),
       },
     })
+
+    // Des-sincronizar reales al retroceder desde aprobada
+    if (lista.estado === 'aprobada') {
+      try {
+        const listaItems = await prisma.listaEquipoItem.findMany({
+          where: { listaId: id, proyectoEquipoItemId: { not: null } },
+          select: { id: true },
+        })
+        if (listaItems.length > 0) {
+          const itemIds = listaItems.map(i => i.id)
+          await prisma.proyectoEquipoCotizadoItem.updateMany({
+            where: {
+              listaEquipoSeleccionadoId: { in: itemIds },
+              estado: 'en_lista',
+            },
+            data: {
+              cantidadReal: null,
+              precioReal: null,
+              costoReal: null,
+              estado: 'pendiente',
+              listaEquipoSeleccionadoId: null,
+            },
+          })
+        }
+      } catch (syncError) {
+        console.error('⚠️ Error al des-sincronizar reales:', syncError)
+      }
+    }
 
     const auditMetadata = {
       listaCodigo: lista.codigo,

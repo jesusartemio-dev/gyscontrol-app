@@ -21,9 +21,10 @@ import { getIAFeatureFlags } from '@/lib/agente/featureFlags'
 // Allow up to 5 minutes for PDF analysis + multi-tool loops
 export const maxDuration = 300
 
-const MAX_HISTORY_MESSAGES = 10
-const MAX_BODY_SIZE = 4 * 1024 * 1024 // 4MB safety limit before Vercel's 4.5MB
-const AGENT_MAX_TOKENS_TDR = 8192 // Extended output for TDR/PDF analysis
+const MAX_HISTORY_MESSAGES = 6         // Máximo de mensajes de historial (bajado de 10)
+const MAX_HISTORY_INPUT_TOKENS = 10_000 // ~40K chars estimado — limita historial pesado con tool results
+const MAX_BODY_SIZE = 4 * 1024 * 1024  // 4MB safety limit before Vercel's 4.5MB
+const AGENT_MAX_TOKENS_TDR = 8192      // Extended output for TDR/PDF analysis
 const RETRY_DELAYS_MS = [15_000, 30_000, 60_000] // Exponential backoff: 15s, 30s, 60s
 const MAX_RETRIES = 3
 
@@ -33,10 +34,42 @@ function getClient(): Anthropic {
   return new Anthropic({ apiKey })
 }
 
-/** Recorta el historial a los últimos N mensajes, preservando siempre el último (que es el actual) */
+/** Estima tokens de un mensaje (aprox 4 chars por token) */
+function estimateMessageTokens(msg: ChatMessage): number {
+  const contentChars = typeof msg.content === 'string' ? msg.content.length : 0
+  // Tool results and attachments can be very large; estimate conservatively
+  const attachmentChars = (msg.attachments || []).reduce((sum, a) => sum + (a.base64 ? Math.floor(a.base64.length * 0.75) : 0), 0)
+  return Math.ceil((contentChars + attachmentChars) / 4)
+}
+
+/**
+ * Recorta el historial por dos criterios:
+ * 1. Máximo MAX_HISTORY_MESSAGES mensajes
+ * 2. Tokens estimados de input <= MAX_HISTORY_INPUT_TOKENS
+ * Siempre preserva el último mensaje (el actual del usuario).
+ */
 function trimHistory(messages: ChatMessage[]): ChatMessage[] {
-  if (messages.length <= MAX_HISTORY_MESSAGES) return messages
-  return messages.slice(-MAX_HISTORY_MESSAGES)
+  if (messages.length <= 1) return messages
+
+  const last = messages[messages.length - 1]
+  const history = messages.slice(0, -1)
+
+  // Primero limitar por conteo
+  const byCount = history.length > MAX_HISTORY_MESSAGES - 1
+    ? history.slice(-(MAX_HISTORY_MESSAGES - 1))
+    : history
+
+  // Luego limitar por tokens estimados (desde el final, preservar los más recientes)
+  let tokenBudget = MAX_HISTORY_INPUT_TOKENS - estimateMessageTokens(last)
+  const kept: ChatMessage[] = []
+  for (let i = byCount.length - 1; i >= 0; i--) {
+    const t = estimateMessageTokens(byCount[i])
+    if (tokenBudget - t < 0) break
+    tokenBudget -= t
+    kept.unshift(byCount[i])
+  }
+
+  return [...kept, last]
 }
 
 /**

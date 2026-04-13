@@ -22,7 +22,7 @@ export const flujoEstados: Record<EstadoListaEquipo, FlujoEstado> = {
   por_revisar: { siguiente: 'por_cotizar',  retroceder: 'borrador',      roles: ['coordinador', 'admin'] },
   por_cotizar: { siguiente: 'por_aprobar',  retroceder: 'por_revisar',   roles: ['logistico', 'coordinador_logistico', 'admin'] },
   por_aprobar: { siguiente: 'aprobada',     retroceder: 'por_cotizar',   roles: ['gestor', 'admin'] },
-  aprobada:    {                                                          roles: [] },
+  aprobada:    { retroceder: 'por_aprobar',                               roles: ['admin'] },
   anulada:     {                                                          roles: [] },
 }
 
