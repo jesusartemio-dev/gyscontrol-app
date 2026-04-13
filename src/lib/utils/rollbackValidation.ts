@@ -195,22 +195,7 @@ async function checkListaEquipoRollback(id: string, targetEstado: string): Promi
   // por_revisar → borrador: siempre permitido
   // por_cotizar → por_revisar: siempre permitido
 
-  // aprobada → por_aprobar: bloquear si hay pedidos de equipo activos con ítems de esta lista
-  if (targetEstado === 'por_aprobar') {
-    const pedidoCount = await prisma.pedidoEquipoItem.count({
-      where: {
-        listaEquipoItem: { listaId: id },
-        pedidoEquipo: { estado: { notIn: ['borrador', 'cancelado'] } },
-      },
-    })
-    if (pedidoCount > 0) {
-      blockers.push({
-        entity: 'PedidoEquipo',
-        count: pedidoCount,
-        message: `Tiene ${pedidoCount} ítem(s) en pedidos activos — cancélalos primero`,
-      })
-    }
-  }
+  // aprobada → por_aprobar: sin bloqueantes — solo admin puede hacerlo y fuerza el retroceso
 
   const allowed = blockers.length === 0
 
