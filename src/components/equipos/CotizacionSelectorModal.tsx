@@ -12,6 +12,9 @@ import {
   Loader2,
   X,
   Circle,
+  CreditCard,
+  MapPin,
+  Truck,
 } from 'lucide-react'
 
 interface Props {
@@ -168,6 +171,16 @@ export default function CotizacionSelectorModal({ item, onUpdated }: Props) {
   const getCodigo = (cot: any) =>
     cot.cotizacion?.codigo || cot.cotizacionProveedor?.codigo || '-'
 
+  const getCondiciones = (cot: any) => {
+    const src = cot.cotizacion || cot.cotizacionProveedor || {}
+    return {
+      condicionPago: src.condicionPago as string | null | undefined,
+      diasCredito: src.diasCredito as number | null | undefined,
+      lugarEntrega: src.lugarEntrega as string | null | undefined,
+      tiempoEntrega: src.tiempoEntrega as string | null | undefined,
+    }
+  }
+
   return (
     <div className="flex flex-col min-h-0 max-h-full">
       {/* Header compacto */}
@@ -279,6 +292,38 @@ export default function CotizacionSelectorModal({ item, onUpdated }: Props) {
                         </span>
                       )}
                     </div>
+                    {/* Condiciones comerciales */}
+                    {(() => {
+                      const cond = getCondiciones(cot)
+                      const chips = []
+                      if (cond.condicionPago)
+                        chips.push(
+                          <span key="pago" className="flex items-center gap-0.5">
+                            <CreditCard className="h-2.5 w-2.5 shrink-0" />
+                            {cond.condicionPago}{cond.diasCredito ? ` ${cond.diasCredito}d` : ''}
+                          </span>
+                        )
+                      if (cond.tiempoEntrega)
+                        chips.push(
+                          <span key="entrega" className="flex items-center gap-0.5">
+                            <Truck className="h-2.5 w-2.5 shrink-0" />
+                            {cond.tiempoEntrega}
+                          </span>
+                        )
+                      if (cond.lugarEntrega)
+                        chips.push(
+                          <span key="lugar" className="flex items-center gap-0.5">
+                            <MapPin className="h-2.5 w-2.5 shrink-0" />
+                            {cond.lugarEntrega}
+                          </span>
+                        )
+                      if (chips.length === 0) return null
+                      return (
+                        <div className="flex flex-wrap gap-x-2 gap-y-0 mt-0.5 text-[9px] text-muted-foreground">
+                          {chips}
+                        </div>
+                      )
+                    })()}
                   </div>
 
                   {/* Precios — USD como referencia principal, nativo como secundario si es PEN */}

@@ -18,7 +18,10 @@ import {
   Package,
   X,
   Zap,
-  Loader2
+  Loader2,
+  CreditCard,
+  MapPin,
+  Truck,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -147,6 +150,15 @@ export default function LogisticaListaDetalleItemTableProfessional({ items, onUp
     const selectedMoneda: string = (selectedCot as any)?.cotizacion?.moneda || (selectedCot as any)?.cotizacionProveedor?.moneda || 'USD'
     const selectedTC: number | null = (selectedCot as any)?.cotizacion?.tipoCambio ?? (selectedCot as any)?.cotizacionProveedor?.tipoCambio ?? null
 
+    // Condiciones comerciales de la cotización seleccionada
+    const selectedCondSrc = (selectedCot as any)?.cotizacion || (selectedCot as any)?.cotizacionProveedor || null
+    const selectedCondiciones = selectedCondSrc ? {
+      condicionPago: selectedCondSrc.condicionPago as string | null | undefined,
+      diasCredito: selectedCondSrc.diasCredito as number | null | undefined,
+      lugarEntrega: selectedCondSrc.lugarEntrega as string | null | undefined,
+      tiempoEntrega: selectedCondSrc.tiempoEntrega as string | null | undefined,
+    } : null
+
     return {
       cotizacionesCount,
       cotizacionesDisponibles,
@@ -157,6 +169,7 @@ export default function LogisticaListaDetalleItemTableProfessional({ items, onUp
       needsAttention: cotizacionesCount > 0 && !hasSelection && cotizacionesDisponibles > 0,
       selectedMoneda,
       selectedTC,
+      selectedCondiciones,
     }
   }
 
@@ -349,10 +362,41 @@ export default function LogisticaListaDetalleItemTableProfessional({ items, onUp
                     </td>
 
                     {/* Proveedor */}
-                    <td className="px-3 py-2 max-w-[100px]">
+                    <td className="px-3 py-2 max-w-[130px]">
                       <span className="truncate block text-gray-600" title={(item as any).proveedor?.nombre || ''}>
                         {(item as any).proveedor?.nombre || '—'}
                       </span>
+                      {itemStats.selectedCondiciones && (() => {
+                        const cond = itemStats.selectedCondiciones
+                        const chips = []
+                        if (cond.condicionPago)
+                          chips.push(
+                            <span key="pago" className="flex items-center gap-0.5">
+                              <CreditCard className="h-2.5 w-2.5 shrink-0" />
+                              {cond.condicionPago}{cond.diasCredito ? ` ${cond.diasCredito}d` : ''}
+                            </span>
+                          )
+                        if (cond.tiempoEntrega)
+                          chips.push(
+                            <span key="entrega" className="flex items-center gap-0.5">
+                              <Truck className="h-2.5 w-2.5 shrink-0" />
+                              {cond.tiempoEntrega}
+                            </span>
+                          )
+                        if (cond.lugarEntrega)
+                          chips.push(
+                            <span key="lugar" className="flex items-center gap-0.5">
+                              <MapPin className="h-2.5 w-2.5 shrink-0" />
+                              {cond.lugarEntrega}
+                            </span>
+                          )
+                        if (chips.length === 0) return null
+                        return (
+                          <div className="flex flex-wrap gap-x-1.5 gap-y-0 mt-0.5 text-[9px] text-muted-foreground">
+                            {chips}
+                          </div>
+                        )
+                      })()}
                     </td>
 
                     {/* Unidad */}
