@@ -200,7 +200,7 @@ async function checkListaEquipoRollback(id: string, targetEstado: string): Promi
     const pedidoCount = await prisma.pedidoEquipoItem.count({
       where: {
         listaEquipoItem: { listaId: id },
-        pedidoEquipo: { estado: { notIn: ['borrador', 'cancelado', 'anulado'] } },
+        pedidoEquipo: { estado: { notIn: ['borrador', 'cancelado'] } },
       },
     })
     if (pedidoCount > 0) {

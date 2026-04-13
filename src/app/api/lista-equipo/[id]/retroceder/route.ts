@@ -121,9 +121,9 @@ export async function POST(
               estado: 'en_lista',
             },
             data: {
-              cantidadReal: null,
-              precioReal: null,
-              costoReal: null,
+              cantidadReal: undefined,
+              precioReal: undefined,
+              costoReal: undefined,
               estado: 'pendiente',
               listaEquipoSeleccionadoId: null,
             },
