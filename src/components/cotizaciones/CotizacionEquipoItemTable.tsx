@@ -205,35 +205,48 @@ function SortableRow({
             Precio estimado
           </div>
         ) : null}
-        {tieneVentajaGerencia && (
-          <TooltipProvider delayDuration={200}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="flex items-center justify-end gap-0.5 mt-0.5 cursor-help">
-                  <span className={cn(
-                    "px-1 py-0.5 text-[8px] font-medium rounded",
-                    fueEditadoManualmente
-                      ? "bg-purple-700 text-white"
-                      : "bg-purple-100 text-purple-700"
-                  )}>
-                    G: {formatCompact(precioGerenciaEfectivo)} ▲{margenGerenciaPct.toFixed(0)}%
-                  </span>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="text-xs">
-                {fueEditadoManualmente
-                  ? `Precio Gerencia editado manualmente — margen real: ${margenGerenciaPct.toFixed(1)}%`
-                  : `Precio Gerencia del catálogo — margen real: ${margenGerenciaPct.toFixed(1)}%`
-                }
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        )}
       </td>
       {/* GYS P.T. */}
       <td className="px-1 py-1 text-right font-mono text-[10px] font-medium text-blue-700 bg-blue-50/30">
         {formatCompact(item.costoInterno)}
       </td>
+      {/* GERENCIA P.U. y P.T. — solo gerente/admin */}
+      {isGerenciaRole && (
+        <>
+          <td className="px-1 py-1 text-right bg-purple-50/30">
+            <TooltipProvider delayDuration={200}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className={cn(
+                    "font-mono text-[10px] cursor-default",
+                    precioGerenciaEfectivo < item.precioInterno ? "text-purple-700 font-medium" : "text-purple-400"
+                  )}>
+                    {formatCompact(precioGerenciaEfectivo)}
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs">
+                  {fueEditadoManualmente
+                    ? `Editado manualmente — margen real: ${margenGerenciaPct.toFixed(1)}%`
+                    : precioGerenciaEfectivo < item.precioInterno
+                      ? `Precio especial del catálogo — margen real: ${margenGerenciaPct.toFixed(1)}%`
+                      : 'Sin precio especial — igual al costo interno'
+                  }
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            {fueEditadoManualmente && (
+              <div className="text-[8px] text-purple-600 leading-tight">editado</div>
+            )}
+          </td>
+          <td className="px-1 py-1 text-right font-mono text-[10px] font-medium bg-purple-50/30 border-r">
+            <span className={cn(
+              precioGerenciaEfectivo < item.precioInterno ? "text-purple-700" : "text-purple-400"
+            )}>
+              {formatCompact(precioGerenciaEfectivo * item.cantidad)}
+            </span>
+          </td>
+        </>
+      )}
       {/* % */}
       <td className="px-1 py-1 text-center">
         <span className={cn(
@@ -330,6 +343,9 @@ export default function CotizacionEquipoItemTable({
   const totalCliente = Math.round(
     localItems.reduce((sum, i) => sum + i.precioInterno * (i.factorVenta ?? 1.15) * i.cantidad, 0) * 100
   ) / 100
+  const totalGerencia = Math.round(
+    localItems.reduce((sum, i) => sum + (i.precioGerencia ?? i.precioInterno) * i.cantidad, 0) * 100
+  ) / 100
 
   const filteredItems = localItems.filter(i =>
     i.descripcion.toLowerCase().includes(filter.toLowerCase()) ||
@@ -410,6 +426,9 @@ export default function CotizacionEquipoItemTable({
                 <th rowSpan={2} className="px-1 py-0.5 text-center font-semibold text-gray-700 border-r">Qty</th>
                 <th colSpan={2} className="px-1 py-0.5 text-center font-semibold text-green-700 bg-green-50 border-r">CLIENTE</th>
                 <th colSpan={2} className="px-1 py-0.5 text-center font-semibold text-blue-700 bg-blue-50 border-r">GYS</th>
+                {isGerenciaRole && (
+                  <th colSpan={2} className="px-1 py-0.5 text-center font-semibold text-purple-700 bg-purple-50 border-r">GERENCIA</th>
+                )}
                 <th rowSpan={2} className="px-1 py-0.5 text-center font-semibold text-gray-700 border-r">%</th>
                 {showReferencia && (
                   <th colSpan={3} className="px-1 py-0.5 text-center font-semibold text-gray-500 bg-gray-50 border-r">REF.</th>
@@ -421,6 +440,12 @@ export default function CotizacionEquipoItemTable({
                 <th className="px-1 py-0.5 text-right font-medium text-green-600 bg-green-50/50 border-r">P.T.</th>
                 <th className="px-1 py-0.5 text-right font-medium text-blue-600 bg-blue-50/50">P.U.</th>
                 <th className="px-1 py-0.5 text-right font-medium text-blue-600 bg-blue-50/50 border-r">P.T.</th>
+                {isGerenciaRole && (
+                  <>
+                    <th className="px-1 py-0.5 text-right font-medium text-purple-600 bg-purple-50/50">P.U.</th>
+                    <th className="px-1 py-0.5 text-right font-medium text-purple-600 bg-purple-50/50 border-r">P.T.</th>
+                  </>
+                )}
                 {showReferencia && (
                   <>
                     <th className="px-1 py-0.5 text-right font-medium text-gray-500">P.Lista</th>
@@ -470,6 +495,14 @@ export default function CotizacionEquipoItemTable({
                 <td className="px-1 py-1 text-right font-mono font-bold text-blue-700 bg-blue-50/50">
                   {formatCompact(totalInterno)}
                 </td>
+                {isGerenciaRole && (
+                  <>
+                    <td className="px-1 py-1 text-right font-mono text-purple-600 bg-purple-50/50"></td>
+                    <td className="px-1 py-1 text-right font-mono font-bold text-purple-700 bg-purple-50/50">
+                      {formatCompact(totalGerencia)}
+                    </td>
+                  </>
+                )}
                 <td></td>
                 {showReferencia && <td colSpan={3}></td>}
                 <td></td>
