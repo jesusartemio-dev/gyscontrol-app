@@ -56,6 +56,8 @@ export async function POST(req: NextRequest) {
         cantidad: data.cantidad,
         costoInterno: data.costoInterno,
         costoCliente: data.costoCliente,
+        precioGerencia: data.precioGerencia ?? null,
+        precioGerenciaEditado: data.precioGerenciaEditado ?? false,
         updatedAt: new Date(),
       },
       select: {
@@ -73,6 +75,8 @@ export async function POST(req: NextRequest) {
         cantidad: true,
         costoInterno: true,
         costoCliente: true,
+        precioGerencia: true,
+        precioGerenciaEditado: true,
         createdAt: true,
         updatedAt: true,
         cotizacionEquipoId: true,

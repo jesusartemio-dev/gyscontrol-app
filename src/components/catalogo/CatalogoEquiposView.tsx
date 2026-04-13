@@ -56,6 +56,7 @@ const ALL_COLUMNS = [
   { key: 'uso', label: 'Uso', align: 'center' as const },
   { key: 'precioLogistica', label: 'Precio\nLogística', align: 'right' as const },
   { key: 'precioReal', label: 'Precio\nReal', align: 'right' as const },
+  { key: 'precioGerencia', label: 'Precio\nGerencia', align: 'right' as const },
   { key: 'precioLista', label: 'Precio\nLista', align: 'right' as const },
   { key: 'factores', label: 'Factor\nC / V', align: 'center' as const },
   { key: 'precioInterno', label: 'Precio\nInterno', align: 'right' as const },
@@ -429,6 +430,8 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
         return <span className="font-mono text-sm text-muted-foreground">{formatCurrency(eq.precioLogistica)}</span>
       case 'precioReal':
         return <span className="font-mono text-sm text-muted-foreground">{formatCurrency(eq.precioReal)}</span>
+      case 'precioGerencia':
+        return <span className="font-mono text-sm font-medium text-purple-700">{formatCurrency(eq.precioGerencia)}</span>
       case 'precioLista':
         return <span className="text-muted-foreground font-mono text-sm">{formatCurrency(eq.precioLista)}</span>
       case 'factores':

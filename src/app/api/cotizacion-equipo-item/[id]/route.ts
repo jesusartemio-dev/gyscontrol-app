@@ -9,6 +9,8 @@ import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { recalcularTotalesCotizacion } from '@/lib/utils/recalculoCotizacion'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
 // ✅ Actualizar un ítem
 export async function PUT(req: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -39,6 +41,8 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
         ...(data.cantidad !== undefined && { cantidad: data.cantidad }),
         ...(data.costoInterno !== undefined && { costoInterno: data.costoInterno }),
         ...(data.costoCliente !== undefined && { costoCliente: data.costoCliente }),
+        ...(data.precioGerencia !== undefined && { precioGerencia: data.precioGerencia }),
+        ...(data.precioGerenciaEditado !== undefined && { precioGerenciaEditado: data.precioGerenciaEditado }),
         updatedAt: new Date(),
       },
       select: {
@@ -58,12 +62,30 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
         precioCliente: true,
         costoInterno: true,
         costoCliente: true,
+        precioGerencia: true,
+        precioGerenciaEditado: true,
         createdAt: true,
         updatedAt: true
       }
     })
 
-    // 2️⃣ Recalcular totales
+    // 2️⃣ Si el gerente editó precioGerencia, propagarlo al catálogo
+    if (
+      data.precioGerenciaEditado === true &&
+      data.precioGerencia !== undefined &&
+      actualizado.catalogoEquipoId
+    ) {
+      const session = await getServerSession(authOptions)
+      const role = (session?.user as any)?.role as string | undefined
+      if (role === 'admin' || role === 'gerente') {
+        await prisma.catalogoEquipo.update({
+          where: { id: actualizado.catalogoEquipoId },
+          data: { precioGerencia: data.precioGerencia }
+        })
+      }
+    }
+
+    // 3️⃣ Recalcular totales
     const grupo = await prisma.cotizacionEquipo.findUnique({
       where: { id: actualizado.cotizacionEquipoId },
       select: { cotizacionId: true },
@@ -72,6 +94,7 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
     if (grupo) {
       await recalcularTotalesCotizacion(grupo.cotizacionId)
     }
+
 
     return NextResponse.json(actualizado)
   } catch (error) {

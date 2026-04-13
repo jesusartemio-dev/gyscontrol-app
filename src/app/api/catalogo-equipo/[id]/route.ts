@@ -6,7 +6,7 @@ import { authOptions } from '@/lib/auth'
 import { registrarActualizacion } from '@/lib/services/audit'
 
 const VALID_VISTAS = ['admin', 'comercial', 'logistica', 'proyectos']
-const CAMPOS_PRECIO = ['precioLista', 'precioLogistica', 'precioReal', 'factorCosto', 'factorVenta']
+const CAMPOS_PRECIO = ['precioLista', 'precioLogistica', 'precioReal', 'precioGerencia', 'factorCosto', 'factorVenta']
 
 export async function GET(_req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params
@@ -62,7 +62,7 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
 
     const allowedFields = [
       'nombre', 'descripcion', 'categoriaEquipoId', 'unidadId', 'precio',
-      'codigo', 'marca', 'precioLista', 'precioInterno', 'factorCosto', 'factorVenta', 'precioVenta', 'precioLogistica', 'precioReal', 'categoriaId', 'estado'
+      'codigo', 'marca', 'precioLista', 'precioInterno', 'factorCosto', 'factorVenta', 'precioVenta', 'precioLogistica', 'precioReal', 'precioGerencia', 'categoriaId', 'estado'
     ]
 
     const payload: Record<string, any> = {}
@@ -120,7 +120,7 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
     })
 
     // Audit logging for price changes
-    const AUDIT_FIELDS = ['precioLista', 'precioLogistica', 'precioReal', 'precioInterno', 'precioVenta', 'factorCosto', 'factorVenta']
+    const AUDIT_FIELDS = ['precioLista', 'precioLogistica', 'precioReal', 'precioGerencia', 'precioInterno', 'precioVenta', 'factorCosto', 'factorVenta']
     const cambios: Record<string, { anterior: any; nuevo: any }> = {}
 
     for (const field of AUDIT_FIELDS) {

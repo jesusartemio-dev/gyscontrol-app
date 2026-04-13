@@ -49,6 +49,7 @@ interface RowProps {
   idx: number
   isLocked: boolean
   showReferencia: boolean
+  isGerenciaRole: boolean
   onEdit?: (item: CotizacionEquipoItem) => void
   onDeleted?: (id: string) => void
   onVincular?: (item: CotizacionEquipoItem) => void
@@ -60,6 +61,7 @@ function SortableRow({
   idx,
   isLocked,
   showReferencia,
+  isGerenciaRole,
   onEdit,
   onDeleted,
   onVincular,
@@ -75,6 +77,17 @@ function SortableRow({
     : item.costoInterno > 0
       ? ((item.costoCliente - item.costoInterno) / item.costoInterno) * 100
       : 0
+
+  // Badge gerencia: visible cuando el precio especial es menor que precioInterno (ventaja real)
+  // o cuando el gerente lo editó manualmente (precioGerenciaEditado = true)
+  const precioGerenciaEfectivo = item.precioGerencia ?? item.precioInterno
+  const fueEditadoManualmente = item.precioGerenciaEditado === true
+  const tieneVentajaGerencia = isGerenciaRole && (
+    fueEditadoManualmente || precioGerenciaEfectivo < item.precioInterno
+  )
+  const margenGerenciaPct = tieneVentajaGerencia && precioGerenciaEfectivo > 0
+    ? ((item.precioCliente - precioGerenciaEfectivo) / precioGerenciaEfectivo) * 100
+    : 0
 
   const freshness = item.catalogoEquipoId
     ? priceFreshness(item.catalogoEquipo?.updatedAt)
@@ -192,6 +205,30 @@ function SortableRow({
             Precio estimado
           </div>
         ) : null}
+        {tieneVentajaGerencia && (
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center justify-end gap-0.5 mt-0.5 cursor-help">
+                  <span className={cn(
+                    "px-1 py-0.5 text-[8px] font-medium rounded",
+                    fueEditadoManualmente
+                      ? "bg-purple-700 text-white"
+                      : "bg-purple-100 text-purple-700"
+                  )}>
+                    G: {formatCompact(precioGerenciaEfectivo)} ▲{margenGerenciaPct.toFixed(0)}%
+                  </span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">
+                {fueEditadoManualmente
+                  ? `Precio Gerencia editado manualmente — margen real: ${margenGerenciaPct.toFixed(1)}%`
+                  : `Precio Gerencia del catálogo — margen real: ${margenGerenciaPct.toFixed(1)}%`
+                }
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
       </td>
       {/* GYS P.T. */}
       <td className="px-1 py-1 text-right font-mono text-[10px] font-medium text-blue-700 bg-blue-50/30">
@@ -259,6 +296,7 @@ interface Props {
   onVincular?: (item: CotizacionEquipoItem) => void
   onItemsReordered?: (items: CotizacionEquipoItem[]) => void
   isLocked?: boolean
+  isGerenciaRole?: boolean
 }
 
 export default function CotizacionEquipoItemTable({
@@ -268,6 +306,7 @@ export default function CotizacionEquipoItemTable({
   onVincular,
   onItemsReordered,
   isLocked = false,
+  isGerenciaRole = false,
 }: Props) {
   const formatCompact = (amount: number) =>
     amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -408,6 +447,7 @@ export default function CotizacionEquipoItemTable({
                       idx={idx}
                       isLocked={isLocked}
                       showReferencia={showReferencia}
+                      isGerenciaRole={isGerenciaRole}
                       onEdit={onEdit}
                       onDeleted={onDeleted}
                       onVincular={onVincular}

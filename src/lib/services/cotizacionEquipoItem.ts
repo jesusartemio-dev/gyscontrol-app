@@ -33,6 +33,11 @@ export async function createCotizacionEquipoItem(data: {
     const factorVenta = Number(equipo.factorVenta) || 1.15
     const precioCliente = Number(data.precioUnitario) || 0
     const cantidad = Number(data.cantidad) || 1
+    // Precio gerencia: usa el precio especial del catálogo si existe, si no cae a precioInterno.
+    // precioGerenciaEditado = false porque viene del catálogo, no fue editado manualmente en la cotización.
+    const precioGerencia = equipo.precioGerencia != null
+      ? Number(equipo.precioGerencia)
+      : precioInterno
 
     const itemPayload = {
       cotizacionEquipoId: data.cotizacionEquipoId,
@@ -49,7 +54,9 @@ export async function createCotizacionEquipoItem(data: {
       precioCliente,
       cantidad,
       costoInterno: +(precioInterno * cantidad).toFixed(2),
-      costoCliente: +(precioCliente * cantidad).toFixed(2)
+      costoCliente: +(precioCliente * cantidad).toFixed(2),
+      precioGerencia,
+      precioGerenciaEditado: false,
     }
 
     // 🐛 Debug: Log payload para debugging

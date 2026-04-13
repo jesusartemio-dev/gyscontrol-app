@@ -557,6 +557,7 @@ export interface CatalogoEquipo {
   precioVenta: number
   precioLogistica?: number
   precioReal?: number
+  precioGerencia?: number
   fechaActualizacion?: string
   estado: string
   createdAt: string
@@ -892,6 +893,8 @@ export interface CotizacionEquipoItem {
   cantidad: number
   costoInterno: number
   costoCliente: number
+  precioGerencia?: number
+  precioGerenciaEditado: boolean
   orden: number
   createdAt: string
   updatedAt: string

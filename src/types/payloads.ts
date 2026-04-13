@@ -171,6 +171,7 @@ export interface CatalogoEquipoPayload {
   precioVenta: number
   precioLogistica?: number
   precioReal?: number
+  precioGerencia?: number
   categoriaId: string
   unidadId: string
   estado: string
@@ -357,6 +358,8 @@ export interface CotizacionEquipoItemPayload {
   cantidad: number
   costoInterno: number
   costoCliente: number
+  precioGerencia?: number
+  precioGerenciaEditado?: boolean
 }
 
 export interface CotizacionEquipoItemUpdatePayload extends Partial<CotizacionEquipoItemPayload> {}

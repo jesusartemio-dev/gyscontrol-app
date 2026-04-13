@@ -6,15 +6,15 @@ type Vista = typeof VALID_VISTAS[number]
 
 const VALID_COLUMNS = [
   'codigo', 'descripcion', 'categoria', 'unidad', 'marca', 'uso',
-  'precioLogistica', 'precioReal', 'precioLista', 'factorCosto', 'factorVenta', 'precioInterno', 'precioVenta', 'estado', 'updatedAt'
+  'precioLogistica', 'precioReal', 'precioGerencia', 'precioLista', 'factorCosto', 'factorVenta', 'precioInterno', 'precioVenta', 'estado', 'updatedAt'
 ]
 
 const DEFAULTS: Record<Vista, { columnas: string[], permisos: Record<string, any> }> = {
   admin: {
-    columnas: ['codigo', 'descripcion', 'categoria', 'unidad', 'marca', 'uso', 'precioLogistica', 'precioReal', 'precioLista', 'factorCosto', 'factorVenta', 'precioInterno', 'precioVenta', 'estado', 'updatedAt'],
+    columnas: ['codigo', 'descripcion', 'categoria', 'unidad', 'marca', 'uso', 'precioLogistica', 'precioReal', 'precioGerencia', 'precioLista', 'factorCosto', 'factorVenta', 'precioInterno', 'precioVenta', 'estado', 'updatedAt'],
     permisos: {
       canCreate: true, canEdit: true, canDelete: true, canImport: true, canExport: true,
-      camposEditables: ['codigo', 'descripcion', 'marca', 'categoriaId', 'unidadId', 'estado', 'precioLista', 'factorCosto', 'factorVenta', 'precioLogistica', 'precioReal']
+      camposEditables: ['codigo', 'descripcion', 'marca', 'categoriaId', 'unidadId', 'estado', 'precioLista', 'factorCosto', 'factorVenta', 'precioLogistica', 'precioReal', 'precioGerencia']
     }
   },
   comercial: {

@@ -47,6 +47,7 @@ interface Props {
   onUpdatedNombre: (nuevoNombre: string) => void
   onRefresh?: () => Promise<void>
   isLocked?: boolean
+  isGerenciaRole?: boolean
 }
 
 export default function CotizacionEquipoAccordion({
@@ -62,6 +63,7 @@ export default function CotizacionEquipoAccordion({
   onUpdatedNombre,
   onRefresh,
   isLocked = false,
+  isGerenciaRole = false,
 }: Props) {
   const [isOpen, setIsOpen] = useState(false)
   const [editando, setEditando] = useState(false)
@@ -374,6 +376,7 @@ export default function CotizacionEquipoAccordion({
                     onVincular={setVincularItem}
                     onItemsReordered={onItemsReordered}
                     isLocked={isLocked}
+                    isGerenciaRole={isGerenciaRole}
                   />
                 )}
               </div>
@@ -423,6 +426,7 @@ export default function CotizacionEquipoAccordion({
         item={editingItem}
         onItemCreated={handleItemCreated}
         onItemUpdated={handleItemUpdated}
+        isGerenciaRole={isGerenciaRole}
       />
 
       {/* Delete confirmation dialog */}

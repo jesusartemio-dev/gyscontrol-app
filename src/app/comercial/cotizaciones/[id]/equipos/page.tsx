@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import { useSession } from 'next-auth/react'
 import { Package, GripVertical } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -74,6 +75,8 @@ function SortableGrupo({
 
 export default function CotizacionEquiposPage() {
   const { cotizacion, setCotizacion, refreshCotizacion, isLocked } = useCotizacionContext()
+  const { data: session } = useSession()
+  const isGerenciaRole = ['admin', 'gerente'].includes((session?.user as any)?.role ?? '')
   const [showEquipoModal, setShowEquipoModal] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -216,6 +219,7 @@ export default function CotizacionEquiposPage() {
                         equipo={e}
                         cotizacionId={cotizacion.id}
                         cotizacionCodigo={cotizacion.codigo}
+                        isGerenciaRole={isGerenciaRole}
                         onCreated={i => actualizarEquipo(e.id, items => [...items, i])}
                         onMultipleCreated={newItems => actualizarEquipo(e.id, items => [...items, ...newItems])}
                         onUpdated={async (item) => {

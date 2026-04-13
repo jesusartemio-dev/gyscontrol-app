@@ -38,6 +38,7 @@ const schema = z.object({
   factorVenta: z.number().min(1).max(3, 'Debe ser entre 1 y 3'),
   precioLogistica: z.number().min(0).optional(),
   precioReal: z.number().min(0).optional(),
+  precioGerencia: z.number().min(0).optional(),
   estado: z.string().min(1, 'Estado requerido')
 })
 
@@ -87,6 +88,7 @@ export default function CatalogoEquipoForm({ equipo, vista, camposEditables, onC
       factorVenta: equipo?.factorVenta || 1.15,
       precioLogistica: equipo?.precioLogistica ?? undefined,
       precioReal: equipo?.precioReal ?? undefined,
+      precioGerencia: equipo?.precioGerencia ?? undefined,
       estado: equipo?.estado || 'pendiente'
     }
   })
@@ -145,6 +147,7 @@ export default function CatalogoEquipoForm({ equipo, vista, camposEditables, onC
       precioVenta: calculados.precioVenta,
       precioLogistica: values.precioLogistica,
       precioReal: values.precioReal,
+      precioGerencia: values.precioGerencia,
       categoriaId: values.categoriaId,
       unidadId: values.unidadId,
       estado: values.estado || 'pendiente'
@@ -363,7 +366,7 @@ export default function CatalogoEquipoForm({ equipo, vista, camposEditables, onC
           </div>
         </div>
 
-        {/* Precio Logística y Precio Real */}
+        {/* Precio Logística, Precio Real y Precio Gerencia */}
         <div className="mt-2 pt-2 border-t border-gray-200 grid grid-cols-2 gap-2">
           <div className="flex items-center gap-2">
             <Label className="text-[10px] text-muted-foreground whitespace-nowrap">P.Logística</Label>
@@ -391,6 +394,20 @@ export default function CatalogoEquipoForm({ equipo, vista, camposEditables, onC
               disabled={!canEditField('precioReal')}
             />
           </div>
+          {canEditField('precioGerencia') && (
+            <div className="flex items-center gap-2 col-span-2">
+              <Label className="text-[10px] text-purple-700 whitespace-nowrap font-medium">P.Gerencia</Label>
+              <Input
+                type="number"
+                min={0}
+                step="any"
+                {...register('precioGerencia', { setValueAs: v => v === '' || v === null ? undefined : Number(v) })}
+                onFocus={(e) => e.target.select()}
+                placeholder="Precio especial interno (solo gerencia)"
+                className="h-7 text-xs font-mono flex-1 border-purple-200 focus:border-purple-400"
+              />
+            </div>
+          )}
         </div>
       </div>
 

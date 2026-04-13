@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Package, Loader2, Calculator } from 'lucide-react'
+import { Package, Loader2, Calculator, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { getCategoriasEquipo } from '@/lib/services/categoriaEquipo'
@@ -38,6 +38,7 @@ interface Props {
   item?: CotizacionEquipoItem // Si se pasa, es modo edición
   onItemCreated: (item: CotizacionEquipoItem) => void
   onItemUpdated?: (item: CotizacionEquipoItem) => void
+  isGerenciaRole?: boolean
 }
 
 const formatCurrency = (amount: number): string => {
@@ -55,6 +56,7 @@ export default function CotizacionEquipoItemCreateModal({
   item,
   onItemCreated,
   onItemUpdated,
+  isGerenciaRole = false,
 }: Props) {
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -76,6 +78,8 @@ export default function CotizacionEquipoItemCreateModal({
   const [factorVenta, setFactorVenta] = useState(1.15)
   const [factorCostoDisplay, setFactorCostoDisplay] = useState('1.00')
   const [factorVentaDisplay, setFactorVentaDisplay] = useState('1.15')
+  const [precioGerencia, setPrecioGerencia] = useState<number | undefined>(undefined)
+  const [precioGerenciaChanged, setPrecioGerenciaChanged] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
@@ -104,6 +108,8 @@ export default function CotizacionEquipoItemCreateModal({
       setFactorVenta(item.factorVenta || 1.15)
       setFactorCostoDisplay((item.factorCosto || 1).toFixed(2))
       setFactorVentaDisplay((item.factorVenta || 1.15).toFixed(2))
+      setPrecioGerencia(item.precioGerencia ?? undefined)
+      setPrecioGerenciaChanged(false)
     }
   }, [isOpen, item, categorias, unidades])
 
@@ -137,6 +143,8 @@ export default function CotizacionEquipoItemCreateModal({
     setFactorVenta(1.15)
     setFactorCostoDisplay('1.00')
     setFactorVentaDisplay('1.15')
+    setPrecioGerencia(undefined)
+    setPrecioGerenciaChanged(false)
   }
 
   // Calcular costos en tiempo real
@@ -196,7 +204,11 @@ export default function CotizacionEquipoItemCreateModal({
         precioCliente: calculados.precioCliente,
         cantidad,
         costoInterno: calculados.costoInterno,
-        costoCliente: calculados.costoCliente
+        costoCliente: calculados.costoCliente,
+        ...(isGerenciaRole && precioGerenciaChanged && precioGerencia !== undefined && {
+          precioGerencia,
+          precioGerenciaEditado: true,
+        }),
       }
 
       if (isEditMode && item) {
@@ -423,6 +435,38 @@ export default function CotizacionEquipoItemCreateModal({
                 </span>
               </div>
             </div>
+
+            {/* Precio Gerencia — solo gerente/admin en modo edición */}
+            {isGerenciaRole && isEditMode && (
+              <div className="mt-2 pt-2 border-t border-purple-100">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <ShieldCheck className="h-3 w-3 text-purple-600" />
+                  <span className="text-[10px] font-medium text-purple-700">Precio Gerencia</span>
+                  <span className="text-[9px] text-purple-400">(se guarda en catálogo)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={precioGerencia ?? ''}
+                    onChange={(e) => {
+                      const v = e.target.value === '' ? undefined : parseFloat(e.target.value)
+                      setPrecioGerencia(v)
+                      setPrecioGerenciaChanged(true)
+                    }}
+                    onFocus={(e) => e.target.select()}
+                    placeholder={calculados.precioInterno.toFixed(2)}
+                    className="h-7 text-xs font-mono flex-1 border-purple-200 focus:border-purple-400"
+                  />
+                  {precioGerencia !== undefined && precioGerencia < calculados.precioInterno && (
+                    <span className="text-[9px] text-purple-600 font-medium whitespace-nowrap">
+                      ▲{(((calculados.precioCliente - precioGerencia) / precioGerencia) * 100).toFixed(0)}% margen real
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Resumen de costos */}
