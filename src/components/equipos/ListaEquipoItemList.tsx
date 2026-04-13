@@ -82,6 +82,7 @@ import {
   generarResumenPedidos,
   obtenerColorDisponibilidad
 } from '@/lib/utils/pedidoDisplayHelpers'
+import { getItemEditPermissions, type EstadoListaEquipo } from '@/lib/utils/flujoListaEquipo'
 
 interface Props {
   listaId: string
@@ -160,6 +161,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
   const dndSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
   const rol = (session?.user as any)?.role || ''
   const puedeSeleccionarCotizacion = ['admin', 'gerente', 'gestor', 'coordinador'].includes(rol)
+  const { canVerify } = getItemEditPermissions((listaEstado as EstadoListaEquipo) ?? 'borrador')
   const [selectorItem, setSelectorItem] = useState<ListaEquipoItem | null>(null)
   const [editComentarioItemId, setEditComentarioItemId] = useState<string | null>(null)
   const [editComentarioValues, setEditComentarioValues] = useState<Record<string, string>>({})
@@ -825,13 +827,13 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                    </td>
                    <td className={`${cellPadding} ${columnWidths.verificadoComentario}`}>
                       {(listaEstado === 'borrador' || listaEstado === 'por_revisar') ? (
-                        /* Borrador / Por Revisar: checkbox interactivo + comentario editable */
+                        /* Borrador: nota editable sin verificar. Por Revisar: checkbox + comentario para coordinador */
                         <div className="flex items-center gap-2">
                           <div className="flex-shrink-0">
                             <Checkbox
                               checked={item.verificado}
-                              disabled={!editable}
-                              onCheckedChange={(val) => editable && handleVerificado(item, Boolean(val))}
+                              disabled={!canVerify}
+                              onCheckedChange={(val) => canVerify && handleVerificado(item, Boolean(val))}
                             />
                           </div>
                           <div className="flex-1 min-w-0">
@@ -843,12 +845,13 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                             >
                               <PopoverTrigger asChild>
                                 {(() => {
+                                  const canEditComment = editable || canVerify
                                   const displayComment = editComentarioValues[item.id] ?? item.comentarioRevision
                                   return (
                                     <div
-                                      onClick={() => editable && setEditComentarioItemId(item.id)}
+                                      onClick={() => canEditComment && setEditComentarioItemId(item.id)}
                                       className={`text-xs cursor-pointer hover:bg-muted/50 rounded transition-colors leading-tight ${
-                                        editable ? 'hover:text-blue-600' : ''
+                                        canEditComment ? 'hover:text-blue-600' : ''
                                       } ${item.verificado ? 'text-green-700' : 'text-gray-600'}`}
                                       title={displayComment || 'Click para agregar comentario'}
                                     >
@@ -856,14 +859,14 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                                         <span>{displayComment}</span>
                                       ) : (
                                         <span className="text-muted-foreground italic text-xs">
-                                          {editable ? '+' : '—'}
+                                          {canEditComment ? '+' : '—'}
                                         </span>
                                       )}
                                     </div>
                                   )
                                 })()}
                               </PopoverTrigger>
-                              {editable && (
+                              {(editable || canVerify) && (
                                 <PopoverContent className="w-72 p-3" align="start" side="bottom">
                                   <div className="space-y-2">
                                     <p className="text-xs font-medium text-muted-foreground">Comentario de revisión</p>
@@ -980,7 +983,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
     <div className="space-y-3">
       {renderHeader()}
 
-      {!editable && listaEstado && listaEstado !== 'borrador' && (
+      {!editable && listaEstado && listaEstado !== 'borrador' && listaEstado !== 'por_revisar' && (
         <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
           <Lock className="h-3.5 w-3.5 shrink-0" />
           <span>
@@ -1028,8 +1031,8 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                         <div className="flex items-center gap-1 flex-shrink-0">
                           <Checkbox
                             checked={item.verificado}
-                            disabled={!editable}
-                            onCheckedChange={(val) => editable && handleVerificado(item, Boolean(val))}
+                            disabled={!canVerify}
+                            onCheckedChange={(val) => canVerify && handleVerificado(item, Boolean(val))}
                           />
                           {item.verificado && (
                             <CheckCircle className="h-3 w-3 text-green-600" />
@@ -1144,15 +1147,15 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                         >
                           <PopoverTrigger asChild>
                             <div
-                              onClick={() => editable && setEditComentarioItemId(item.id)}
+                              onClick={() => (editable || canVerify) && setEditComentarioItemId(item.id)}
                               className={`text-muted-foreground p-1.5 rounded border-dashed border ${
-                                editable ? 'cursor-pointer hover:bg-muted/50' : ''
+                                (editable || canVerify) ? 'cursor-pointer hover:bg-muted/50' : ''
                               }`}
                             >
-                              {(editComentarioValues[item.id] ?? item.comentarioRevision) || (editable ? '+ Comentario' : '—')}
+                              {(editComentarioValues[item.id] ?? item.comentarioRevision) || ((editable || canVerify) ? '+ Comentario' : '—')}
                             </div>
                           </PopoverTrigger>
-                          {editable && (
+                          {(editable || canVerify) && (
                             <PopoverContent className="w-72 p-3" align="start" side="bottom">
                               <div className="space-y-2">
                                 <p className="text-xs font-medium text-muted-foreground">Comentario de revisión</p>

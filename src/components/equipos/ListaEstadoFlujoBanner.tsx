@@ -59,7 +59,7 @@ export default function ListaEstadoFlujoBanner({ estado, listaId, totalItems = 0
   const [openConfirmAvanzar, setOpenConfirmAvanzar] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  const faltanVerificar = estado === 'borrador' && totalItems > 0 && itemsVerificados < totalItems
+  const faltanVerificar = estado === 'por_revisar' && totalItems > 0 && itemsVerificados < totalItems
   const siguienteLabel = flujo.siguiente ? (estadoLabels[flujo.siguiente] || flujo.siguiente) : ''
   const currentIndex = estadosFlujoPrincipal.indexOf(estado)
   const isAnulada = estado === 'anulada'
