@@ -33,8 +33,9 @@ import {
 } from 'lucide-react'
 
 import type { CotizacionProveedor } from '@/types'
-import type { ScanMatch } from '@/app/api/cotizacion-proveedor/[id]/scan-pdf/route'
+import type { ScanMatch, ScanCondiciones } from '@/app/api/cotizacion-proveedor/[id]/scan-pdf/route'
 import { updateCotizacionProveedorItem } from '@/lib/services/cotizacionProveedorItem'
+import { CreditCard, MapPin, Truck, Phone, NotebookText } from 'lucide-react'
 
 interface Props {
   open: boolean
@@ -61,6 +62,8 @@ export default function ModalEscanearCotizacionPDF({
   const [phase, setPhase] = useState<Phase>('upload')
   const [file, setFile] = useState<File | null>(null)
   const [matches, setMatches] = useState<ScanMatch[]>([])
+  const [condiciones, setCondiciones] = useState<ScanCondiciones | null>(null)
+  const [applyCondiciones, setApplyCondiciones] = useState(true)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [applying, setApplying] = useState(false)
   const [dragOver, setDragOver] = useState(false)
@@ -112,6 +115,7 @@ export default function ModalEscanearCotizacionPDF({
 
       const foundMatches: ScanMatch[] = data.matches || []
       setMatches(foundMatches)
+      setCondiciones(data.condiciones || null)
       // Pre-select items where a price was found
       setSelected(new Set(foundMatches.filter(m => m.precioUnitario !== null).map(m => m.itemId)))
       setPhase('review')
@@ -165,7 +169,20 @@ export default function ModalEscanearCotizacionPDF({
           })
         })
       )
-      toast.success(`${selectedMatches.length} ítem(s) actualizados`)
+
+      // Aplicar condiciones comerciales a la cabecera de la cotización
+      if (applyCondiciones && condiciones) {
+        const hasCondiciones = Object.values(condiciones).some(v => v !== null)
+        if (hasCondiciones) {
+          await fetch(`/api/cotizacion-proveedor/${cotizacion.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(condiciones),
+          })
+        }
+      }
+
+      toast.success(`${selectedMatches.length} ítem(s) actualizados${applyCondiciones && condiciones ? ' + condiciones comerciales' : ''}`)
       onApplied?.()
       handleClose()
     } catch (err) {
@@ -180,6 +197,8 @@ export default function ModalEscanearCotizacionPDF({
     setPhase('upload')
     setFile(null)
     setMatches([])
+    setCondiciones(null)
+    setApplyCondiciones(true)
     setSelected(new Set())
     setShowConfirm(false)
     onClose()
@@ -295,6 +314,57 @@ export default function ModalEscanearCotizacionPDF({
                   </span>
                 )}
               </div>
+
+              {/* Condiciones comerciales detectadas */}
+              {condiciones && Object.values(condiciones).some(v => v !== null) && (
+                <div className="px-4 py-2.5 border-b bg-purple-50/60">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[10px] font-semibold text-purple-700 uppercase tracking-wide">
+                      Condiciones comerciales detectadas
+                    </span>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <Checkbox
+                        checked={applyCondiciones}
+                        onCheckedChange={(v) => setApplyCondiciones(!!v)}
+                        className="h-3.5 w-3.5"
+                      />
+                      <span className="text-[10px] text-purple-700">Aplicar</span>
+                    </label>
+                  </div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-purple-800">
+                    {condiciones.condicionPago && (
+                      <span className="flex items-center gap-1">
+                        <CreditCard className="h-3 w-3 shrink-0" />
+                        {condiciones.condicionPago}{condiciones.diasCredito ? ` · ${condiciones.diasCredito} días` : ''}
+                      </span>
+                    )}
+                    {condiciones.tiempoEntrega && (
+                      <span className="flex items-center gap-1">
+                        <Truck className="h-3 w-3 shrink-0" />
+                        {condiciones.tiempoEntrega}
+                      </span>
+                    )}
+                    {condiciones.lugarEntrega && (
+                      <span className="flex items-center gap-1">
+                        <MapPin className="h-3 w-3 shrink-0" />
+                        {condiciones.lugarEntrega}
+                      </span>
+                    )}
+                    {condiciones.contactoEntrega && (
+                      <span className="flex items-center gap-1">
+                        <Phone className="h-3 w-3 shrink-0" />
+                        {condiciones.contactoEntrega}
+                      </span>
+                    )}
+                    {condiciones.observaciones && (
+                      <span className="flex items-center gap-1">
+                        <NotebookText className="h-3 w-3 shrink-0" />
+                        {condiciones.observaciones}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <table className="w-full text-xs">
                 <thead className="bg-gray-50 sticky top-0 z-10 border-b">

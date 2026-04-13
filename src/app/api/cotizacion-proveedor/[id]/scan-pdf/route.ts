@@ -20,55 +20,95 @@ export type ScanMatch = {
   observacion: string | null
 }
 
+export type ScanCondiciones = {
+  condicionPago: string | null    // "contado" | "factura" | "cheque" | "letra" | "adelanto" | otro texto
+  diasCredito: number | null
+  lugarEntrega: string | null
+  tiempoEntrega: string | null    // plazo general de entrega (cabecera)
+  contactoEntrega: string | null
+  observaciones: string | null
+}
+
 // ── Constants ──────────────────────────────────────────────────────────────
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024 // 20MB
 
 const SYSTEM_PROMPT = `Eres un especialista en extracción de datos de cotizaciones de proveedores en PDF para equipos de procurement.
-Tu tarea: para cada ítem de una orden de compra, encontrar el precio unitario y plazo de entrega en el PDF del proveedor.
+Tu tarea: extraer dos cosas del PDF:
+1. Para cada ítem de la lista: precio unitario y plazo de entrega
+2. Las condiciones comerciales generales de la cotización (forma de pago, lugar de entrega, etc.)
 
-Reglas:
+Reglas para ítems:
 - Busca por código primero (coincidencia exacta del código alfanumérico), luego por descripción (coincidencia parcial)
-- precioUnitario debe ser un número decimal (sin símbolo de moneda, solo el valor)
-- tiempoEntrega debe ser texto libre tal como aparece en el PDF (ej. "30 días", "6 semanas", "inmediato")
+- precioUnitario: número decimal sin símbolo de moneda
+- tiempoEntrega: texto libre tal como aparece en el PDF (ej. "30 días", "6 semanas", "stock")
 - tiempoEntregaDias: convierte tiempoEntrega a días enteros si puedes estimarlo, sino null
-- Si no encuentras el ítem en el PDF, devuelve precioUnitario: null, tiempoEntrega: null, tiempoEntregaDias: null
-- confianza: "alta" si encontraste por código exacto, "media" si fue por descripción similar, "baja" si es inferido o incierto
-- Devuelve ÚNICAMENTE un JSON array válido, sin markdown, backticks ni texto adicional`
+- Si no encuentras el ítem: precioUnitario null, tiempoEntrega null, tiempoEntregaDias null
+- confianza: "alta" si encontraste por código exacto, "media" si fue por descripción similar, "baja" si es inferido
+
+Reglas para condiciones comerciales (objeto "condiciones"):
+- condicionPago: forma de pago detectada. Normaliza a: "contado", "factura", "cheque", "letra", "adelanto", o texto libre si no encaja
+- diasCredito: número de días de crédito si se menciona (ej. "30 días" → 30), sino null
+- lugarEntrega: lugar de entrega mencionado (ej. "Almacén Lima", "Planta cliente"), sino null
+- tiempoEntrega: plazo general de entrega de la cotización si aparece en el encabezado (no por ítem), sino null
+- contactoEntrega: nombre o teléfono de contacto para entrega, sino null
+- observaciones: notas generales de la cotización (validez de oferta, garantía, etc.), sino null
+
+Devuelve ÚNICAMENTE un JSON objeto con esta estructura exacta, sin markdown ni backticks:
+{ "items": [...], "condiciones": { "condicionPago": ..., "diasCredito": ..., "lugarEntrega": ..., "tiempoEntrega": ..., "contactoEntrega": ..., "observaciones": ... } }`
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 function parseScanResponse(
   text: string,
   items: { id: string; codigo: string; descripcion: string }[]
-): ScanMatch[] {
+): { matches: ScanMatch[]; condiciones: ScanCondiciones } {
   let cleaned = text.trim()
   if (cleaned.startsWith('```')) {
     cleaned = cleaned.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '')
   }
 
-  let parsed: unknown[]
-  try {
-    parsed = JSON.parse(cleaned)
-    if (!Array.isArray(parsed)) throw new Error('Not an array')
-  } catch {
-    // Return all items as unmatched if parse fails
-    return items.map(item => ({
-      itemId: item.id,
-      codigo: item.codigo,
-      descripcion: item.descripcion,
-      precioUnitario: null,
-      tiempoEntrega: null,
-      tiempoEntregaDias: null,
-      confianza: 'baja' as const,
-      observacion: `No se pudo procesar la respuesta de IA: ${text.substring(0, 100)}`,
-    }))
+  const emptyCondiciones: ScanCondiciones = {
+    condicionPago: null, diasCredito: null, lugarEntrega: null,
+    tiempoEntrega: null, contactoEntrega: null, observaciones: null,
   }
 
-  // Build a map from itemId → item info for merging
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(cleaned)
+  } catch {
+    return {
+      matches: items.map(item => ({
+        itemId: item.id, codigo: item.codigo, descripcion: item.descripcion,
+        precioUnitario: null, tiempoEntrega: null, tiempoEntregaDias: null,
+        confianza: 'baja' as const,
+        observacion: `No se pudo procesar la respuesta de IA: ${text.substring(0, 100)}`,
+      })),
+      condiciones: emptyCondiciones,
+    }
+  }
+
+  // Support both new format { items, condiciones } and legacy array format
+  const rawItems: unknown[] = Array.isArray(parsed)
+    ? parsed
+    : Array.isArray((parsed as any)?.items) ? (parsed as any).items : []
+
+  const rawCondiciones: Record<string, unknown> = (!Array.isArray(parsed) && (parsed as any)?.condiciones)
+    ? (parsed as any).condiciones
+    : {}
+
+  const condiciones: ScanCondiciones = {
+    condicionPago: typeof rawCondiciones.condicionPago === 'string' ? rawCondiciones.condicionPago : null,
+    diasCredito: typeof rawCondiciones.diasCredito === 'number' ? Math.round(rawCondiciones.diasCredito) : null,
+    lugarEntrega: typeof rawCondiciones.lugarEntrega === 'string' ? rawCondiciones.lugarEntrega : null,
+    tiempoEntrega: typeof rawCondiciones.tiempoEntrega === 'string' ? rawCondiciones.tiempoEntrega : null,
+    contactoEntrega: typeof rawCondiciones.contactoEntrega === 'string' ? rawCondiciones.contactoEntrega : null,
+    observaciones: typeof rawCondiciones.observaciones === 'string' ? rawCondiciones.observaciones : null,
+  }
+
   const itemMap = new Map(items.map(i => [i.id, i]))
 
-  return parsed.map((raw: unknown) => {
+  const matches: ScanMatch[] = rawItems.map((raw: unknown) => {
     const r = raw as Record<string, unknown>
     const itemId = String(r.itemId ?? '')
     const item = itemMap.get(itemId)
@@ -85,6 +125,8 @@ function parseScanResponse(
       observacion: typeof r.observacion === 'string' ? r.observacion : null,
     }
   })
+
+  return { matches, condiciones }
 }
 
 // ── Handler ────────────────────────────────────────────────────────────────
@@ -160,12 +202,24 @@ export async function POST(
 
     const userText = `Analiza este PDF de cotización del proveedor.
 
-Nuestra orden de compra contiene los siguientes ítems (en JSON):
+Nuestra lista de compra contiene los siguientes ítems (en JSON):
 ${itemsJson}
 
-Para cada ítem, encuentra el precio unitario y plazo de entrega en el PDF.
-Devuelve SOLO un JSON array con exactamente ${items.length} elementos, uno por cada itemId:
-[{ "itemId": "...", "precioUnitario": number|null, "tiempoEntrega": "string|null", "tiempoEntregaDias": number|null, "confianza": "alta|media|baja", "observacion": "string|null" }]`
+Devuelve SOLO un JSON objeto con esta estructura exacta:
+{
+  "items": [
+    { "itemId": "...", "precioUnitario": number|null, "tiempoEntrega": "string|null", "tiempoEntregaDias": number|null, "confianza": "alta|media|baja", "observacion": "string|null" }
+  ],
+  "condiciones": {
+    "condicionPago": "string|null",
+    "diasCredito": number|null,
+    "lugarEntrega": "string|null",
+    "tiempoEntrega": "string|null",
+    "contactoEntrega": "string|null",
+    "observaciones": "string|null"
+  }
+}
+El array "items" debe tener exactamente ${items.length} elementos, uno por cada itemId de la lista.`
 
     const scanStart = Date.now()
     const message = await client.messages.create({
@@ -210,9 +264,9 @@ Devuelve SOLO un JSON array con exactamente ${items.length} elementos, uno por c
       .map(block => block.text)
       .join('')
 
-    const matches = parseScanResponse(responseText, items)
+    const { matches, condiciones } = parseScanResponse(responseText, items)
 
-    return NextResponse.json({ ok: true, matches })
+    return NextResponse.json({ ok: true, matches, condiciones })
   } catch (error) {
     console.error('Error en scan-pdf de cotización:', error)
     const msg = error instanceof Error ? error.message : 'Error desconocido'
