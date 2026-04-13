@@ -86,6 +86,12 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
                     ordenCompra: { select: { numero: true } },
                   },
                 },
+                requerimientoMaterialItem: {
+                  select: {
+                    id: true,
+                    hojaDeGastos: { select: { numero: true } },
+                  },
+                },
                 confirmadoPor: { select: { name: true } },
                 rechazadoPor: { select: { name: true } },
               },

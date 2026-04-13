@@ -756,7 +756,13 @@ export default function PedidoLogisticaDetailPage() {
                         Llegaron <strong>{r.cantidadRecibida}</strong> x {r.itemDescripcion}
                         <span className="text-muted-foreground"> ({r.itemCodigo})</span>
                         {' '}desde{' '}
-                        <span className="font-medium">{r.ordenCompraItem?.ordenCompra?.numero || 'OC'}</span>
+                        {r.ordenCompraItem?.ordenCompra?.numero ? (
+                          <span className="font-medium text-blue-700">{r.ordenCompraItem.ordenCompra.numero}</span>
+                        ) : r.requerimientoMaterialItem?.hojaDeGastos?.numero ? (
+                          <span className="font-medium text-amber-700">REQ-{r.requerimientoMaterialItem.hojaDeGastos.numero}</span>
+                        ) : (
+                          <span className="text-muted-foreground italic">sin referencia</span>
+                        )}
                         {' '}el{' '}
                         <span className="text-muted-foreground">{formatDate(r.fechaRecepcion)}</span>
                       </span>
@@ -813,6 +819,12 @@ export default function PedidoLogisticaDetailPage() {
                         <CheckCircle2 className="h-3.5 w-3.5 text-green-500 inline mr-1" />
                         <strong>{r.cantidadRecibida}</strong> x {r.itemDescripcion}
                         <span className="text-muted-foreground"> ({r.itemCodigo})</span>
+                        {' '}
+                        {r.ordenCompraItem?.ordenCompra?.numero ? (
+                          <span className="font-medium text-blue-700">{r.ordenCompraItem.ordenCompra.numero}</span>
+                        ) : r.requerimientoMaterialItem?.hojaDeGastos?.numero ? (
+                          <span className="font-medium text-amber-700">REQ-{r.requerimientoMaterialItem.hojaDeGastos.numero}</span>
+                        ) : null}
                         {' — '}
                         <span className="text-muted-foreground">
                           En almacén desde {formatDate(r.fechaConfirmacion || r.fechaRecepcion)}
