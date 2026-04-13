@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { CheckCircle, Award, DollarSign, Clock } from 'lucide-react'
+import { CheckCircle, Award, DollarSign, Clock, CreditCard, MapPin, Truck } from 'lucide-react'
 import { toast } from 'sonner'
 import { getMonedaSymbol } from '@/lib/utils/currency'
 
@@ -28,10 +28,16 @@ interface QuotationItem {
       nombre: string
     }
   }
-  // La API devuelve cotizacionProveedor completo (moneda y tipoCambio incluidos)
+  // La API devuelve cotizacionProveedor completo (moneda, tipoCambio y condiciones comerciales)
   cotizacionProveedor?: {
     moneda?: string
     tipoCambio?: number | null
+    condicionPago?: string | null
+    diasCredito?: number | null
+    lugarEntrega?: string | null
+    tiempoEntrega?: string | null
+    contactoEntrega?: string | null
+    observaciones?: string | null
     proveedor?: { nombre: string }
   }
 }
@@ -255,14 +261,16 @@ export default function QuotationComparisonTable({ listaId, onWinnerSelected }: 
                     <TableHeader>
                       <TableRow>
                         <TableHead>Proveedor</TableHead>
-                        <TableHead className="text-right">Precio Unitario</TableHead>
-                        <TableHead className="text-right">Tiempo Entrega</TableHead>
+                        <TableHead className="text-right">Precio Unit.</TableHead>
+                        <TableHead className="text-right">T. Entrega</TableHead>
+                        <TableHead>Condiciones comerciales</TableHead>
                         <TableHead className="text-center">Estado</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {itemData.quotations.map((quotation) => {
                         const isWinner = itemData.selectedWinner === quotation.id
+                        const cond = quotation.cotizacionProveedor
 
                         return (
                           <TableRow
@@ -293,6 +301,32 @@ export default function QuotationComparisonTable({ listaId, onWinnerSelected }: 
                                   </>
                                 ) : (
                                   <span className="text-muted-foreground">-</span>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                                {cond?.condicionPago && (
+                                  <span className="flex items-center gap-1">
+                                    <CreditCard className="h-3 w-3 shrink-0" />
+                                    {cond.condicionPago}
+                                    {cond.diasCredito ? ` ${cond.diasCredito}d` : ''}
+                                  </span>
+                                )}
+                                {cond?.tiempoEntrega && (
+                                  <span className="flex items-center gap-1">
+                                    <Truck className="h-3 w-3 shrink-0" />
+                                    {cond.tiempoEntrega}
+                                  </span>
+                                )}
+                                {cond?.lugarEntrega && (
+                                  <span className="flex items-center gap-1">
+                                    <MapPin className="h-3 w-3 shrink-0" />
+                                    {cond.lugarEntrega}
+                                  </span>
+                                )}
+                                {!cond?.condicionPago && !cond?.tiempoEntrega && !cond?.lugarEntrega && (
+                                  <span className="italic">—</span>
                                 )}
                               </div>
                             </TableCell>

@@ -52,7 +52,27 @@ export async function POST(req: Request) {
           include: {
             ordenCompraItems: { select: { id: true } },
             listaEquipoItem: {
-              select: { id: true, proveedorId: true, proveedor: { select: { id: true, nombre: true } } }
+              select: {
+                id: true,
+                proveedorId: true,
+                proveedor: { select: { id: true, nombre: true } },
+                cotizacionSeleccionadaId: true,
+                cotizacionSeleccionada: {
+                  select: {
+                    cotizacionProveedor: {
+                      select: {
+                        condicionPago: true,
+                        diasCredito: true,
+                        lugarEntrega: true,
+                        tiempoEntrega: true,
+                        contactoEntrega: true,
+                        observaciones: true,
+                        moneda: true,
+                      }
+                    }
+                  }
+                }
+              }
             },
             proveedor: { select: { id: true, nombre: true } },
           }
@@ -118,6 +138,11 @@ export async function POST(req: Request) {
       for (const [proveedorId, grupoItems] of gruposPorProveedor) {
         const numero = await generarNumeroOC()
 
+        // Obtener condiciones comerciales de la cotización seleccionada del primer ítem con cotización
+        const condCot = grupoItems
+          .map(i => (i.listaEquipoItem as any)?.cotizacionSeleccionada?.cotizacionProveedor)
+          .find(Boolean)
+
         const ocItems = grupoItems.map(item => ({
           codigo: item.codigo,
           descripcion: item.descripcion,
@@ -146,12 +171,17 @@ export async function POST(req: Request) {
             proyectoId: pedido.proyectoId || null,
             categoriaCosto: 'equipos',
             solicitanteId: session.user.id,
-            condicionPago,
-            moneda,
+            // Condiciones comerciales: parámetro manual > cotización seleccionada > default
+            condicionPago: condicionPago !== 'contado' ? condicionPago : (condCot?.condicionPago || condicionPago),
+            diasCredito: condCot?.diasCredito || null,
+            lugarEntrega: condCot?.lugarEntrega || null,
+            tiempoEntrega: condCot?.tiempoEntrega || null,
+            contactoEntrega: condCot?.contactoEntrega || null,
+            moneda: condCot?.moneda || moneda,
             subtotal,
             igv,
             total,
-            observaciones: observaciones || `Generada desde pedido ${pedido.codigo}`,
+            observaciones: observaciones || (condCot?.observaciones ? `${condCot.observaciones} | Generada desde pedido ${pedido.codigo}` : `Generada desde pedido ${pedido.codigo}`),
             fechaEntregaEstimada: fechaProveedor ? new Date(fechaProveedor) : null,
             updatedAt: new Date(),
             items: { create: ocItems },

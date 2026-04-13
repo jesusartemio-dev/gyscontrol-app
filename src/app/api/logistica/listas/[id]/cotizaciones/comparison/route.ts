@@ -21,6 +21,12 @@ export async function GET(
             id: true,
             moneda: true,
             tipoCambio: true,
+            condicionPago: true,
+            diasCredito: true,
+            lugarEntrega: true,
+            tiempoEntrega: true,
+            contactoEntrega: true,
+            observaciones: true,
             proveedor: {
               select: {
                 id: true,

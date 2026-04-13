@@ -23,6 +23,14 @@ import {
   ScanSearch,
   UserPlus,
   DollarSign,
+  CreditCard,
+  MapPin,
+  Truck,
+  Phone,
+  NotebookText,
+  Pencil,
+  Check,
+  X,
 } from 'lucide-react'
 import {
   Select,
@@ -57,6 +65,15 @@ export default function CotizacionProveedorDetailPage({ params }: PageProps) {
   const [showScanPdf, setShowScanPdf] = useState(false)
   const [showSolicitarOtro, setShowSolicitarOtro] = useState(false)
   const [savingMoneda, setSavingMoneda] = useState(false)
+  const [editingCondiciones, setEditingCondiciones] = useState(false)
+  const [condicionesForm, setCondicionesForm] = useState({
+    condicionPago: '',
+    diasCredito: '',
+    lugarEntrega: '',
+    tiempoEntrega: '',
+    contactoEntrega: '',
+    observaciones: '',
+  })
 
   useEffect(() => {
     params.then((p) => setCotizacionId(p.id))
@@ -142,6 +159,43 @@ Equipo de Compras`
   const handleTipoCambioChange = (value: string) => {
     const v = value === '' ? null : parseFloat(value)
     setCotizacion(prev => prev ? { ...prev, tipoCambio: v } : null)
+  }
+
+  const handleEditCondiciones = () => {
+    if (!cotizacion) return
+    setCondicionesForm({
+      condicionPago: cotizacion.condicionPago || '',
+      diasCredito: cotizacion.diasCredito?.toString() || '',
+      lugarEntrega: cotizacion.lugarEntrega || '',
+      tiempoEntrega: cotizacion.tiempoEntrega || '',
+      contactoEntrega: cotizacion.contactoEntrega || '',
+      observaciones: cotizacion.observaciones || '',
+    })
+    setEditingCondiciones(true)
+  }
+
+  const handleSaveCondiciones = async () => {
+    if (!cotizacion) return
+    const patch = {
+      condicionPago: condicionesForm.condicionPago || null,
+      diasCredito: condicionesForm.diasCredito ? parseInt(condicionesForm.diasCredito) : null,
+      lugarEntrega: condicionesForm.lugarEntrega || null,
+      tiempoEntrega: condicionesForm.tiempoEntrega || null,
+      contactoEntrega: condicionesForm.contactoEntrega || null,
+      observaciones: condicionesForm.observaciones || null,
+    }
+    try {
+      await fetch(`/api/cotizacion-proveedor/${cotizacionId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      })
+      setCotizacion(prev => prev ? { ...prev, ...patch } : null)
+      setEditingCondiciones(false)
+      toast.success('Condiciones guardadas')
+    } catch {
+      toast.error('Error al guardar condiciones')
+    }
   }
 
   const getEstadoBadge = (estado: string) => {
@@ -384,6 +438,134 @@ Equipo de Compras`
       </div>
 
       <div className="p-4 space-y-3">
+        {/* Condiciones Comerciales */}
+        <div className="bg-white rounded-lg border">
+          <div className="px-4 py-2.5 flex items-center justify-between border-b">
+            <div className="flex items-center gap-2">
+              <CreditCard className="h-3.5 w-3.5 text-gray-400" />
+              <span className="text-xs font-medium text-gray-600">Condiciones Comerciales</span>
+            </div>
+            {!editingCondiciones ? (
+              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-gray-500" onClick={handleEditCondiciones}>
+                <Pencil className="h-3 w-3 mr-1" />Editar
+              </Button>
+            ) : (
+              <div className="flex gap-1">
+                <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-green-600" onClick={handleSaveCondiciones}>
+                  <Check className="h-3 w-3 mr-1" />Guardar
+                </Button>
+                <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-gray-500" onClick={() => setEditingCondiciones(false)}>
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            )}
+          </div>
+          <div className="px-4 py-3">
+            {!editingCondiciones ? (
+              <div className="grid grid-cols-2 gap-x-8 gap-y-1.5 text-xs">
+                <div className="flex items-center gap-2">
+                  <CreditCard className="h-3 w-3 text-gray-400 shrink-0" />
+                  <span className="text-gray-500">Pago:</span>
+                  <span className="font-medium">
+                    {cotizacion.condicionPago
+                      ? `${cotizacion.condicionPago}${cotizacion.diasCredito ? ` (${cotizacion.diasCredito} días)` : ''}`
+                      : <span className="text-gray-400 italic">No especificado</span>}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Truck className="h-3 w-3 text-gray-400 shrink-0" />
+                  <span className="text-gray-500">Entrega:</span>
+                  <span className="font-medium">{cotizacion.tiempoEntrega || <span className="text-gray-400 italic">No especificado</span>}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-3 w-3 text-gray-400 shrink-0" />
+                  <span className="text-gray-500">Lugar:</span>
+                  <span className="font-medium">{cotizacion.lugarEntrega || <span className="text-gray-400 italic">No especificado</span>}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Phone className="h-3 w-3 text-gray-400 shrink-0" />
+                  <span className="text-gray-500">Contacto:</span>
+                  <span className="font-medium">{cotizacion.contactoEntrega || <span className="text-gray-400 italic">No especificado</span>}</span>
+                </div>
+                {cotizacion.observaciones && (
+                  <div className="col-span-2 flex items-start gap-2">
+                    <NotebookText className="h-3 w-3 text-gray-400 shrink-0 mt-0.5" />
+                    <span className="text-gray-500">Obs:</span>
+                    <span className="font-medium">{cotizacion.observaciones}</span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">Condición de pago</label>
+                  <select
+                    className="w-full h-7 text-xs border rounded px-2 bg-white"
+                    value={condicionesForm.condicionPago}
+                    onChange={(e) => setCondicionesForm(p => ({ ...p, condicionPago: e.target.value }))}
+                  >
+                    <option value="">Sin especificar</option>
+                    <option value="contado">Contado</option>
+                    <option value="factura">Factura</option>
+                    <option value="cheque">Cheque</option>
+                    <option value="letra">Letra</option>
+                    <option value="adelanto">Adelanto</option>
+                    <option value="otro">Otro</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">Días de crédito</label>
+                  <Input
+                    type="number"
+                    min="0"
+                    placeholder="Ej: 30"
+                    className="h-7 text-xs"
+                    value={condicionesForm.diasCredito}
+                    onChange={(e) => setCondicionesForm(p => ({ ...p, diasCredito: e.target.value }))}
+                    disabled={!condicionesForm.condicionPago || condicionesForm.condicionPago === 'contado'}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">Tiempo de entrega</label>
+                  <Input
+                    placeholder="Ej: 15 días, Stock"
+                    className="h-7 text-xs"
+                    value={condicionesForm.tiempoEntrega}
+                    onChange={(e) => setCondicionesForm(p => ({ ...p, tiempoEntrega: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">Lugar de entrega</label>
+                  <Input
+                    placeholder="Ej: Almacén Lima"
+                    className="h-7 text-xs"
+                    value={condicionesForm.lugarEntrega}
+                    onChange={(e) => setCondicionesForm(p => ({ ...p, lugarEntrega: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">Contacto entrega</label>
+                  <Input
+                    placeholder="Nombre / teléfono"
+                    className="h-7 text-xs"
+                    value={condicionesForm.contactoEntrega}
+                    onChange={(e) => setCondicionesForm(p => ({ ...p, contactoEntrega: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1 col-span-2">
+                  <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">Observaciones</label>
+                  <Input
+                    placeholder="Notas adicionales"
+                    className="h-7 text-xs"
+                    value={condicionesForm.observaciones}
+                    onChange={(e) => setCondicionesForm(p => ({ ...p, observaciones: e.target.value }))}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Estado flujo */}
         <CotizacionEstadoFlujoBanner
           estado={estado}

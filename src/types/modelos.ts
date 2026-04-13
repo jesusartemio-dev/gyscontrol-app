@@ -1452,6 +1452,13 @@ export interface CotizacionProveedor {
   numeroSecuencia: number
   moneda: string        // "USD" | "PEN"
   tipoCambio: number | null
+  // Condiciones comerciales
+  condicionPago?: string | null
+  diasCredito?: number | null
+  lugarEntrega?: string | null
+  tiempoEntrega?: string | null
+  contactoEntrega?: string | null
+  observaciones?: string | null
   estado: EstadoCotizacionProveedor
   createdAt: string
   updatedAt: string

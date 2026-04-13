@@ -674,6 +674,13 @@ export interface CotizacionProveedorPayload {
   estado?: EstadoCotizacionProveedor
   moneda?: string                         // "USD" | "PEN"
   tipoCambio?: number | null
+  // Condiciones comerciales (alineadas a OrdenCompra)
+  condicionPago?: string | null
+  diasCredito?: number | null
+  lugarEntrega?: string | null
+  tiempoEntrega?: string | null
+  contactoEntrega?: string | null
+  observaciones?: string | null
 }
 
 export interface CotizacionProveedorUpdatePayload extends Partial<CotizacionProveedorPayload> {}
