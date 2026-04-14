@@ -7,9 +7,10 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { ArrowLeft, ShoppingCart, Loader2, Building2, Calendar, User, AlertTriangle, Package } from 'lucide-react'
+import { ArrowLeft, Loader2, Building2, Calendar, User, AlertTriangle, Package } from 'lucide-react'
 import { toast } from 'sonner'
 import { getPedidoInternoById, deletePedidoInterno, type PedidoInterno } from '@/lib/services/pedidoInterno'
+import PedidoEstadoFlujoBanner from '@/components/equipos/PedidoEstadoFlujoBanner'
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' }).format(amount)
@@ -45,6 +46,10 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
       .catch(() => toast.error('Error al cargar el pedido'))
       .finally(() => setLoading(false))
   }, [id])
+
+  const handleEstadoUpdated = (nuevoEstado: string) => {
+    setPedido(prev => prev ? { ...prev, estado: nuevoEstado } : prev)
+  }
 
   const handleDelete = async () => {
     if (!pedido) return
@@ -118,6 +123,14 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
           </Button>
         )}
       </div>
+
+      {/* Estado flujo */}
+      <PedidoEstadoFlujoBanner
+        estado={pedido.estado}
+        pedidoId={pedido.id}
+        contexto="proyectos"
+        onUpdated={handleEstadoUpdated}
+      />
 
       {/* Info cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

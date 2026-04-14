@@ -18,7 +18,7 @@ export interface FlujoPedidoEstado {
 }
 
 export const flujoEstadosPedido: Record<EstadoPedidoEquipo, FlujoPedidoEstado> = {
-  borrador:   { siguiente: 'enviado',    cancelar: 'cancelado', roles: ['proyectos', 'admin'] },
+  borrador:   { siguiente: 'enviado',    cancelar: 'cancelado', roles: ['proyectos', 'admin', 'gerente', 'gestor', 'coordinador', 'logistico', 'coordinador_logistico'] },
   enviado:    { siguiente: 'atendido',   cancelar: 'cancelado', roles: ['logistico', 'admin'] },
   atendido:   { siguiente: 'parcial',    cancelar: 'cancelado', roles: ['logistico', 'admin'] },
   parcial:    { siguiente: 'entregado',  cancelar: 'cancelado', roles: ['logistico', 'admin'] },
