@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { ProgresoService } from '@/lib/services/progresoService'
 
 interface Bloqueo {
   tipoBloqueoId?: string
@@ -231,6 +232,29 @@ export async function PUT(request: NextRequest, context: RouteContext) {
           where: { id: proyectoTareaId },
           data: { horasReales: { increment: horas }, updatedAt: new Date() }
         })
+      }
+    }
+
+    // Propagar progreso hacia arriba: Actividad → EDT → Fase → Proyecto
+    // Recolectar todas las tareas afectadas (con progreso o con horas) para obtener sus actividadId
+    const todasTareasAfectadas = [
+      ...Array.from(tareasConProgreso),
+      ...Object.keys(horasPorTarea).filter(id => !tareasConProgreso.has(id))
+    ]
+    if (todasTareasAfectadas.length > 0) {
+      const tareasConActividad = await prisma.proyectoTarea.findMany({
+        where: { id: { in: todasTareasAfectadas } },
+        select: { proyectoActividadId: true }
+      })
+      const actividadesUnicas = [...new Set(
+        tareasConActividad.map(t => t.proyectoActividadId).filter(Boolean) as string[]
+      )]
+      for (const actividadId of actividadesUnicas) {
+        try {
+          await ProgresoService.actualizarProgresoActividad(actividadId)
+        } catch (err) {
+          console.error(`⚠️ Error propagando progreso para actividad ${actividadId}:`, err)
+        }
       }
     }
 
