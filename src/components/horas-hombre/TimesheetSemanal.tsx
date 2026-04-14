@@ -425,7 +425,7 @@ export function TimesheetSemanal({
                 {dia.registros.slice(0, 3).map((registro) => (
                   <div
                     key={registro.id}
-                    className={`text-xs rounded px-2 py-1 truncate group relative ${registro.origen === 'campo' ? 'bg-orange-100/80 border-l-2 border-orange-400' : 'bg-white/80'} ${esRegistroEditable(registro) ? 'hover:bg-blue-50 hover:ring-1 hover:ring-blue-300' : ''}`}
+                    className={`text-xs rounded px-2 py-1 group relative ${registro.origen === 'campo' ? 'bg-orange-100/80 border-l-2 border-orange-400' : 'bg-white/80'} ${esRegistroEditable(registro) ? 'hover:bg-blue-50 hover:ring-1 hover:ring-blue-300' : ''}`}
                     title={`${getTextoJerarquico(registro)}: ${registro.descripcion}${registro.origen === 'campo' ? ' (Campo)' : ''}`}
                     onClick={(e) => {
                       e.stopPropagation()
@@ -434,12 +434,24 @@ export function TimesheetSemanal({
                       }
                     }}
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="truncate flex-1" title={getTextoJerarquico(registro)}>
-                        {registro.origen === 'campo' && <span className="text-orange-600 mr-0.5">C</span>}
-                        {getTextoJerarquico(registro)}
-                      </span>
-                      <div className="flex items-center gap-1 ml-1">
+                    <div className="flex items-start justify-between gap-1">
+                      <div className="min-w-0 flex-1">
+                        {/* Fila 1: código proyecto + EDT */}
+                        <div className="truncate font-semibold leading-tight text-gray-700">
+                          {registro.origen === 'campo' && <span className="text-orange-600 mr-0.5">C</span>}
+                          {registro.proyectoNombre.split(' - ')[0]}
+                          {registro.edtNombre && registro.edtNombre !== 'Sin EDT' && (
+                            <span className="text-gray-400 font-normal"> · {registro.edtNombre}</span>
+                          )}
+                        </div>
+                        {/* Fila 2: nombre de tarea o actividad */}
+                        {(registro.tareaNombre || registro.actividadNombre) && (
+                          <div className="truncate text-gray-500 leading-tight" style={{ fontSize: '0.65rem' }}>
+                            {registro.actividadNombre && !registro.tareaNombre ? registro.actividadNombre : registro.tareaNombre}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
                         <span className="font-medium">{registro.horas}h</span>
                         {registro.aprobado && (
                           <Badge variant="outline" className="text-xs px-1 py-0 h-4">
