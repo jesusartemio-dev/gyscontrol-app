@@ -22,6 +22,7 @@ import {
   CreditCard,
   MapPin,
   Truck,
+  ExternalLink,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -373,22 +374,22 @@ export default function LogisticaListaDetalleItemTableProfessional({ items, onUp
                         if (!provNombre) return <span className="text-gray-400">—</span>
                         return (
                           <>
-                            {cotId ? (
+                            <span className="truncate block text-gray-700 text-xs font-medium" title={provNombre}>
+                              {provNombre}
+                            </span>
+                            {cotCodigo && cotId ? (
                               <Link
                                 href={`/logistica/cotizaciones/${cotId}`}
-                                className="text-blue-600 hover:underline truncate block font-medium text-xs"
-                                title={provNombre}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[9px] text-blue-600 hover:underline font-mono flex items-center gap-0.5"
                               >
-                                {provNombre}
+                                {cotCodigo}
+                                <ExternalLink className="h-2.5 w-2.5 shrink-0" />
                               </Link>
-                            ) : (
-                              <span className="truncate block text-gray-600 text-xs" title={provNombre}>
-                                {provNombre}
-                              </span>
-                            )}
-                            {cotCodigo && (
+                            ) : cotCodigo ? (
                               <span className="text-[9px] text-muted-foreground font-mono">{cotCodigo}</span>
-                            )}
+                            ) : null}
                             {itemStats.selectedCondiciones && (() => {
                               const cond = itemStats.selectedCondiciones
                               const chips = []
