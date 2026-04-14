@@ -800,7 +800,7 @@ export default function PedidoLogisticaDetailPage() {
                             target="_blank"
                             rel="noopener noreferrer"
                             className="font-medium text-amber-700 hover:underline"
-                          >REQ-{r.requerimientoMaterialItem.hojaDeGastos.numero}</a>
+                          >{r.requerimientoMaterialItem.hojaDeGastos.numero}</a>
                         ) : (
                           <span className="text-muted-foreground italic">sin referencia</span>
                         )}
@@ -874,7 +874,7 @@ export default function PedidoLogisticaDetailPage() {
                             target="_blank"
                             rel="noopener noreferrer"
                             className="font-medium text-amber-700 hover:underline"
-                          >REQ-{r.requerimientoMaterialItem.hojaDeGastos.numero}</a>
+                          >{r.requerimientoMaterialItem.hojaDeGastos.numero}</a>
                         ) : null}
                         {' — '}
                         <span className="text-muted-foreground">
