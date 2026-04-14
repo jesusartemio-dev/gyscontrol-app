@@ -147,10 +147,11 @@ export default function PedidoLogisticaDetailPage() {
     if (showCrearREQ && pedido?.items) {
       const initial = new Set<string>()
       for (const item of pedido.items) {
-        const tieneOC = ((item as any).ordenCompraItems?.length ?? 0) > 0
+        const totalOrdenado = ((item as any).ordenCompraItems as any[] ?? []).reduce((sum: number, oci: any) => sum + (oci.cantidad || 0), 0)
+        const cantidadRestante = item.cantidadPedida - totalOrdenado
         const tieneREQ = itemTieneREQActivo(item as any)
         const estadoItem = (item as any).estado
-        if (!tieneOC && !tieneREQ && !['cancelado', 'entregado'].includes(estadoItem)) initial.add(item.id)
+        if (cantidadRestante > 0 && !tieneREQ && !['cancelado', 'entregado'].includes(estadoItem)) initial.add(item.id)
       }
       setReqItemsSelected(initial)
     }
@@ -2400,9 +2401,10 @@ export default function PedidoLogisticaDetailPage() {
           </DialogHeader>
           {(() => {
             const itemsElegibles = (pedido?.items || []).filter((item: any) => {
-              const tieneOC = (item.ordenCompraItems?.length ?? 0) > 0
+              const totalOrdenado = ((item.ordenCompraItems as any[]) ?? []).reduce((sum: number, oci: any) => sum + (oci.cantidad || 0), 0)
+              const cantidadRestante = item.cantidadPedida - totalOrdenado
               const tieneREQ = itemTieneREQActivo(item)
-              return !tieneOC && !tieneREQ && !['cancelado', 'entregado'].includes(item.estado)
+              return cantidadRestante > 0 && !tieneREQ && !['cancelado', 'entregado'].includes(item.estado)
             })
             const itemsExcluidos = (pedido?.items || []).length - itemsElegibles.length
             const todosSeleccionados = itemsElegibles.length > 0 && itemsElegibles.every((i: any) => reqItemsSelected.has(i.id))
