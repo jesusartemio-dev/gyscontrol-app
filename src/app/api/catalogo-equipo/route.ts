@@ -122,20 +122,21 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const r2 = (v: number) => Math.round(v * 100) / 100
     const nuevo = await prisma.catalogoEquipo.create({
       data: {
         id: createId(),
         codigo: data.codigo,
         descripcion: data.descripcion,
         marca: data.marca,
-        precioLista: data.precioLista,
-        precioInterno: data.precioInterno,
+        precioLista: r2(data.precioLista),
+        precioInterno: r2(data.precioInterno),
         factorCosto: data.factorCosto,
         factorVenta: data.factorVenta,
-        precioVenta: data.precioVenta,
-        precioLogistica: data.precioLogistica ?? null,
-        precioReal: data.precioReal ?? null,
-        precioGerencia: data.precioGerencia ?? null,
+        precioVenta: r2(data.precioVenta),
+        precioLogistica: data.precioLogistica != null ? r2(data.precioLogistica) : null,
+        precioReal: data.precioReal != null ? r2(data.precioReal) : null,
+        precioGerencia: data.precioGerencia != null ? r2(data.precioGerencia) : null,
         categoriaId: data.categoriaId,
         unidadId: data.unidadId,
         estado: data.estado || 'pendiente',

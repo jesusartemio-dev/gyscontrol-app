@@ -95,12 +95,18 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
     }
 
     // Server-side recalculation when price/factors change
+    const r2 = (v: number) => Math.round(v * 100) / 100
     if ('precioLista' in payload || 'factorCosto' in payload || 'factorVenta' in payload) {
-      const pLista = payload.precioLista ?? anterior.precioLista
+      const pLista = payload.precioLista != null ? r2(payload.precioLista) : anterior.precioLista
       const fCosto = payload.factorCosto ?? anterior.factorCosto
       const fVenta = payload.factorVenta ?? anterior.factorVenta
-      payload.precioInterno = +(pLista * fCosto).toFixed(2)
-      payload.precioVenta = +(payload.precioInterno * fVenta).toFixed(2)
+      if (payload.precioLista != null) payload.precioLista = r2(payload.precioLista)
+      payload.precioInterno = r2(pLista * fCosto)
+      payload.precioVenta = r2(payload.precioInterno * fVenta)
+    }
+    const precioFields = ['precioLogistica', 'precioReal', 'precioGerencia'] as const
+    for (const f of precioFields) {
+      if (payload[f] != null) payload[f] = r2(payload[f])
     }
 
     // Always track who updated
