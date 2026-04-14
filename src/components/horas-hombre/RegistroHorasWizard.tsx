@@ -545,26 +545,66 @@ export function RegistroHorasWizard({
 
   const avanzarPaso = async () => {
     if (puedeAvanzar() && pasoActual < pasos.length) {
-      // Proyectos internos: desde paso 1 saltar pasos 2 y 3, auto-seleccionar EDT GEN, ir a paso 4
+      // Proyectos internos: desde paso 1 saltar todo, auto-seleccionar EDT GEN + tarea Trabajo General, ir a paso 5
       if (esInterno && pasoActual === 1 && proyectoSeleccionado) {
         try {
           setLoadingData(true)
-          const response = await fetch(`/api/edts-proyecto-simple?proyectoId=${proyectoSeleccionado.id}`)
-          const data = await response.json()
-          if (data.success && data.edts?.length > 0) {
-            const genEdt = data.edts[0]
-            setEdts(data.edts)
-            setEdtSeleccionado(genEdt)
-            setNivelSeleccionado('tarea')
-            setCreandoTarea(false)
-            setElementoSeleccionado(null)
-            setPasoActual(4)
-            cargarElementos(genEdt.id)
-          } else {
+
+          // 1. Obtener el EDT GEN del proyecto interno
+          const edtsResp = await fetch(`/api/edts-proyecto-simple?proyectoId=${proyectoSeleccionado.id}`)
+          const edtsData = await edtsResp.json()
+          if (!edtsData.success || !edtsData.edts?.length) {
             toast({ title: 'Error', description: 'No se encontró cronograma en este proyecto interno', variant: 'destructive' })
+            return
           }
+          const genEdt = edtsData.edts[0]
+          setEdts(edtsData.edts)
+          setEdtSeleccionado(genEdt)
+          setNivelSeleccionado('tarea')
+
+          // 2. Buscar si ya existe la tarea "Trabajo General" bajo ese EDT
+          const tareasResp = await fetch(`/api/horas-hombre/tareas-directas-edt/${genEdt.id}`)
+          const tareasData = await tareasResp.json()
+          let tareaGeneral = tareasData.tareas?.[0] ?? null
+
+          // 3. Si no existe, crearla automáticamente
+          if (!tareaGeneral) {
+            const hoy = new Date().toISOString().split('T')[0]
+            const finAnio = `${new Date().getFullYear()}-12-31`
+            const createResp = await fetch('/api/tareas', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                nombre: 'Trabajo General',
+                descripcion: 'Tarea genérica para registro de horas internas',
+                fechaInicio: hoy,
+                fechaFin: finAnio,
+                proyectoEdtId: genEdt.id,
+                proyectoId: proyectoSeleccionado.id,
+                horasEstimadas: 9999,
+                estado: 'en_progreso'
+              })
+            })
+            const createData = await createResp.json()
+            tareaGeneral = {
+              id: createData.id,
+              nombre: createData.nombre,
+              tipo: 'tarea' as const,
+              responsableNombre: 'Interno',
+              horasPlan: 9999,
+              horasReales: 0,
+              estado: 'en_progreso',
+              progreso: 0,
+              descripcion: ''
+            }
+          }
+
+          // 4. Auto-seleccionar tarea e ir directo al paso 5 (Completar)
+          setElementoSeleccionado(tareaGeneral)
+          setCreandoTarea(false)
+          setPasoActual(5)
         } catch {
-          toast({ title: 'Error', description: 'Error al cargar el proyecto interno', variant: 'destructive' })
+          toast({ title: 'Error', description: 'Error al preparar el registro interno', variant: 'destructive' })
         } finally {
           setLoadingData(false)
         }
@@ -590,8 +630,13 @@ export function RegistroHorasWizard({
   const retrocederPaso = () => {
     if (puedeRetroceder()) {
       let pasoPrevio = pasoActual - 1
-      // Proyectos internos: desde paso 4 volver directamente a paso 1 (pasos 2 y 3 no existen)
-      if (esInterno && pasoActual === 4) pasoPrevio = 1
+      // Proyectos internos: desde paso 5 volver directamente a paso 1 (pasos 2,3,4 no se muestran)
+      if (esInterno && pasoActual === 5) {
+        pasoPrevio = 1
+        setEdtSeleccionado(null)
+        setElementoSeleccionado(null)
+        setNivelSeleccionado('')
+      }
       setPasoActual(pasoPrevio)
     }
   }
@@ -1289,9 +1334,9 @@ export function RegistroHorasWizard({
     <div className="space-y-4">
       {/* Header compacto con progreso */}
       {(() => {
-        // Para internos: pasos efectivos son 1,4,5 → mostrar como 1,2,3
-        const totalEfectivo = esInterno ? 3 : pasos.length
-        const pasoEfectivo = esInterno ? (pasoActual === 1 ? 1 : pasoActual === 4 ? 2 : 3) : pasoActual
+        // Para internos: pasos efectivos son 1,5 → mostrar como 1,2
+        const totalEfectivo = esInterno ? 2 : pasos.length
+        const pasoEfectivo = esInterno ? (pasoActual === 1 ? 1 : 2) : pasoActual
         const progresoEfectivo = (pasoEfectivo / totalEfectivo) * 100
         const tituloEfectivo = pasos[pasoActual - 1].titulo
         return (
