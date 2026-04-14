@@ -536,8 +536,6 @@ export function RegistroHorasWizard({
   }
 
   const puedeAvanzar = () => {
-    // Para proyectos internos el paso 3 se salta — validar solo pasos relevantes
-    if (esInterno && pasoActual === 2) return !!edtSeleccionado
     return pasos[pasoActual - 1].validacion(datosActuales)
   }
 
@@ -545,16 +543,37 @@ export function RegistroHorasWizard({
     return pasoActual > 1
   }
 
-  const avanzarPaso = () => {
+  const avanzarPaso = async () => {
     if (puedeAvanzar() && pasoActual < pasos.length) {
-      let nuevoPaso = pasoActual + 1
-
-      // Proyectos internos: saltar paso 3 (Tipo de Registro), siempre ir a Tarea directa
-      if (esInterno && nuevoPaso === 3) {
-        setNivelSeleccionado('tarea')
-        nuevoPaso = 4
+      // Proyectos internos: desde paso 1 saltar pasos 2 y 3, auto-seleccionar EDT GEN, ir a paso 4
+      if (esInterno && pasoActual === 1 && proyectoSeleccionado) {
+        try {
+          setLoadingData(true)
+          const response = await fetch(`/api/edts-proyecto-simple?proyectoId=${proyectoSeleccionado.id}`)
+          const data = await response.json()
+          if (data.success && data.edts?.length > 0) {
+            const genEdt = data.edts[0]
+            setEdts(data.edts)
+            setEdtSeleccionado(genEdt)
+            setNivelSeleccionado('tarea')
+            setCreandoTarea(false)
+            setElementoSeleccionado(null)
+            setPasoActual(4)
+            cargarElementos(genEdt.id)
+          } else {
+            toast({ title: 'Error', description: 'No se encontró cronograma en este proyecto interno', variant: 'destructive' })
+          }
+        } catch {
+          toast({ title: 'Error', description: 'Error al cargar el proyecto interno', variant: 'destructive' })
+        } finally {
+          setLoadingData(false)
+        }
+        return
       }
 
+      let nuevoPaso = pasoActual + 1
+
+      // Proyectos no-internos: saltar paso 3 si ya se eligió nivel (no aplica a internos)
       // Cargar datos necesarios para el siguiente paso
       if (nuevoPaso === 2 && proyectoSeleccionado) {
         cargarEdts(proyectoSeleccionado.id)
@@ -571,8 +590,8 @@ export function RegistroHorasWizard({
   const retrocederPaso = () => {
     if (puedeRetroceder()) {
       let pasoPrevio = pasoActual - 1
-      // Proyectos internos: desde paso 4 volver a paso 2 (saltar el 3)
-      if (esInterno && pasoPrevio === 3) pasoPrevio = 2
+      // Proyectos internos: desde paso 4 volver directamente a paso 1 (pasos 2 y 3 no existen)
+      if (esInterno && pasoActual === 4) pasoPrevio = 1
       setPasoActual(pasoPrevio)
     }
   }
@@ -1180,7 +1199,7 @@ export function RegistroHorasWizard({
                   <div className="text-xs text-green-600 mt-1">
                     {nivelSeleccionado === 'actividad' && actividadSeleccionada
                       ? `📂 EDT: ${edtSeleccionado?.nombre || 'N/A'} → 🎯 Actividad: ${actividadSeleccionada.nombre} → ✅ Tarea: ${elementoSeleccionado.nombre}`
-                      : `${esInterno ? '🏢 Área' : '📂 EDT'}: ${edtSeleccionado?.nombre || 'N/A'} → ✅ Tarea: ${elementoSeleccionado.nombre}`
+                      : esInterno ? `✅ Tarea: ${elementoSeleccionado.nombre}` : `📂 EDT: ${edtSeleccionado?.nombre || 'N/A'} → ✅ Tarea: ${elementoSeleccionado.nombre}`
                     }
                   </div>
                 </div>
@@ -1199,7 +1218,7 @@ export function RegistroHorasWizard({
         <div className="p-3 bg-gray-50 rounded-lg border text-sm">
           <div className="flex flex-wrap gap-x-3 gap-y-1 text-gray-700">
             <span><strong>Proyecto:</strong> {proyectoSeleccionado?.codigo}</span>
-            <span><strong>{esInterno ? 'Área' : 'EDT'}:</strong> {edtSeleccionado?.nombre}</span>
+            {!esInterno && <span><strong>EDT:</strong> {edtSeleccionado?.nombre}</span>}
             <span><strong>Tarea:</strong> {elementoSeleccionado?.nombre}</span>
           </div>
         </div>
@@ -1270,11 +1289,11 @@ export function RegistroHorasWizard({
     <div className="space-y-4">
       {/* Header compacto con progreso */}
       {(() => {
-        // Para internos: pasos efectivos son 1,2,4,5 → mostrar como 1,2,3,4
-        const totalEfectivo = esInterno ? 4 : pasos.length
-        const pasoEfectivo = esInterno && pasoActual >= 4 ? pasoActual - 1 : pasoActual
+        // Para internos: pasos efectivos son 1,4,5 → mostrar como 1,2,3
+        const totalEfectivo = esInterno ? 3 : pasos.length
+        const pasoEfectivo = esInterno ? (pasoActual === 1 ? 1 : pasoActual === 4 ? 2 : 3) : pasoActual
         const progresoEfectivo = (pasoEfectivo / totalEfectivo) * 100
-        const tituloEfectivo = esInterno && pasoActual === 2 ? 'Seleccionar Área' : pasos[pasoActual - 1].titulo
+        const tituloEfectivo = pasos[pasoActual - 1].titulo
         return (
           <div className="space-y-2">
             <div className="flex items-center justify-between">

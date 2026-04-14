@@ -70,14 +70,14 @@ export async function POST(req: NextRequest) {
 
     const proyectoId = randomUUID()
 
-    // Buscar o crear el EDT del catálogo "General" (para proyectos internos)
+    // Buscar o crear el EDT del catálogo "GEN" (para proyectos internos)
     const edtCatalogo = await prisma.edt.upsert({
-      where: { nombre: 'General' },
+      where: { nombre: 'GEN' },
       update: {},
-      create: { nombre: 'General', updatedAt: new Date() }
+      create: { nombre: 'GEN', updatedAt: new Date() }
     })
 
-    // Crear el proyecto interno en una transacción junto con su cronograma y EDT "General"
+    // Crear el proyecto interno en una transacción junto con su cronograma y EDT "GEN"
     const proyecto = await prisma.$transaction(async (tx) => {
       const p = await tx.proyecto.create({
         data: {
@@ -111,14 +111,14 @@ export async function POST(req: NextRequest) {
         }
       })
 
-      // Auto-crear EDT "General" vinculado al catálogo
+      // Auto-crear EDT "GEN" vinculado al catálogo
       await tx.proyectoEdt.create({
         data: {
           id: randomUUID(),
           proyectoId,
           proyectoCronogramaId: cronogramaId,
           edtId: edtCatalogo.id,
-          nombre: 'General',
+          nombre: 'GEN',
           orden: 1,
           updatedAt: new Date(),
         }
