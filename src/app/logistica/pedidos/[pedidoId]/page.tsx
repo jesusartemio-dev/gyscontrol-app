@@ -2464,7 +2464,7 @@ export default function PedidoLogisticaDetailPage() {
                               <div className="text-[11px] text-gray-400 font-mono">{item.codigo}</div>
                             </td>
                             <td className="px-3 py-2 text-right font-medium whitespace-nowrap">
-                              {Math.max(0, item.cantidadPedida - (item.cantidadAtendida || 0))} <span className="text-gray-400 font-normal">{item.unidad}</span>
+                              {item.cantidadPedida - ((item.ordenCompraItems as any[] ?? []).reduce((s: number, o: any) => s + (o.cantidad || 0), 0))} <span className="text-gray-400 font-normal">{item.unidad}</span>
                             </td>
                           </tr>
                         ))}
@@ -2685,7 +2685,7 @@ export default function PedidoLogisticaDetailPage() {
                                     )}
                                   </div>
                                 </td>
-                                <td className="px-3 py-2 text-right font-medium whitespace-nowrap">{item.cantidadPedida} <span className="text-gray-400 font-normal">{item.unidad}</span></td>
+                                <td className="px-3 py-2 text-right font-medium whitespace-nowrap">{item.cantidadPedida - ((item.ordenCompraItems as any[] ?? []).reduce((s: number, o: any) => s + (o.cantidad || 0), 0))} <span className="text-gray-400 font-normal">{item.unidad}</span></td>
                                 <td className="px-3 py-2 text-right">
                                   {precioMostrar != null ? (
                                     <div>
