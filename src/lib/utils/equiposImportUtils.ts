@@ -65,11 +65,11 @@ export async function importarEquiposDesdeExcelValidado(
     }
 
     const yaExiste = codigosExistentes.includes(codigo)
-    const precioLista = parseFloat(row['PrecioLista'] || row['PrecioInterno']) || 0
+    const precioLista = Math.round((parseFloat(row['PrecioLista'] || row['PrecioInterno']) || 0) * 100) / 100
     const factorCosto = 1.00
     const factorVenta = 1.15
-    const precioInterno = calcularPrecioInterno(precioLista, factorCosto)
-    const precioVenta = calcularPrecioVenta(precioInterno, factorVenta)
+    const precioInterno = Math.round(calcularPrecioInterno(precioLista, factorCosto) * 100) / 100
+    const precioVenta = Math.round(calcularPrecioVenta(precioInterno, factorVenta) * 100) / 100
 
     equiposValidos.push({
       codigo,

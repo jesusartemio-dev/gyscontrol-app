@@ -140,7 +140,7 @@ export default function CatalogoEquipoForm({ equipo, vista, camposEditables, onC
       codigo: values.codigo,
       descripcion: values.descripcion,
       marca: values.marca || '',
-      precioLista: values.precioLista,
+      precioLista: Math.round(values.precioLista * 100) / 100,
       precioInterno: calculados.precioInterno,
       factorCosto: values.factorCosto,
       factorVenta: values.factorVenta,
