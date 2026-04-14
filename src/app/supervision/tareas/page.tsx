@@ -42,7 +42,9 @@ import {
   Calendar,
   Plus,
   Zap,
-  CalendarClock
+  CalendarClock,
+  Pencil,
+  Loader2
 } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Info } from 'lucide-react'
@@ -161,6 +163,17 @@ export default function SupervisionTareasPage() {
   const [showCrearModal, setShowCrearModal] = useState(false)
   const [creandoTarea, setCreandoTarea] = useState(false)
   const [errorCrearTarea, setErrorCrearTarea] = useState<string | null>(null)
+
+  // Modal de edición
+  const [showEditarModal, setShowEditarModal] = useState(false)
+  const [tareaEditando, setTareaEditando] = useState<Tarea | null>(null)
+  const [editNombre, setEditNombre] = useState('')
+  const [editDescripcion, setEditDescripcion] = useState('')
+  const [editFechaInicio, setEditFechaInicio] = useState('')
+  const [editFechaFin, setEditFechaFin] = useState('')
+  const [editHorasEstimadas, setEditHorasEstimadas] = useState('')
+  const [editPersonasEstimadas, setEditPersonasEstimadas] = useState('1')
+  const [guardandoEdicion, setGuardandoEdicion] = useState(false)
 
   // Estado de actualización
   const [actualizandoTarea, setActualizandoTarea] = useState<string | null>(null)
@@ -438,6 +451,46 @@ export default function SupervisionTareasPage() {
       toast({ title: 'Error', description: 'No se pudo actualizar', variant: 'destructive' })
     } finally {
       setActualizandoTarea(null)
+    }
+  }
+
+  const abrirEditarModal = (tarea: Tarea) => {
+    setTareaEditando(tarea)
+    setEditNombre(tarea.nombre)
+    setEditDescripcion(tarea.descripcion || '')
+    setEditFechaInicio(format(new Date(tarea.fechaInicio), 'yyyy-MM-dd'))
+    setEditFechaFin(format(new Date(tarea.fechaFin), 'yyyy-MM-dd'))
+    setEditHorasEstimadas(String(tarea.horasPlan))
+    setEditPersonasEstimadas(String(tarea.personasEstimadas || 1))
+    setShowEditarModal(true)
+  }
+
+  const guardarEdicion = async () => {
+    if (!tareaEditando || !editNombre.trim() || !editFechaInicio || !editFechaFin) return
+    try {
+      setGuardandoEdicion(true)
+      const response = await fetch('/api/supervision/tareas', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tareaId: tareaEditando.id,
+          tipo: tareaEditando.tipo,
+          nombre: editNombre.trim(),
+          descripcion: editDescripcion,
+          fechaInicio: editFechaInicio,
+          fechaFin: editFechaFin,
+          horasEstimadas: parseFloat(editHorasEstimadas) || tareaEditando.horasPlan,
+          personasEstimadas: parseInt(editPersonasEstimadas) || 1,
+        })
+      })
+      if (!response.ok) throw new Error('Error al guardar')
+      toast({ title: 'Tarea actualizada', description: 'Los cambios fueron guardados correctamente' })
+      setShowEditarModal(false)
+      cargarDatos()
+    } catch {
+      toast({ title: 'Error', description: 'No se pudo guardar la tarea', variant: 'destructive' })
+    } finally {
+      setGuardandoEdicion(false)
     }
   }
 
@@ -1047,14 +1100,24 @@ export default function SupervisionTareasPage() {
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => abrirAsignarModal(tarea)}
-                          >
-                            <UserPlus className="h-4 w-4 mr-1" />
-                            {tarea.responsableId ? 'Cambiar' : 'Asignar'}
-                          </Button>
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => abrirEditarModal(tarea)}
+                              title="Editar tarea"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => abrirAsignarModal(tarea)}
+                            >
+                              <UserPlus className="h-4 w-4 mr-1" />
+                              {tarea.responsableId ? 'Cambiar' : 'Asignar'}
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     )
@@ -1137,6 +1200,55 @@ export default function SupervisionTareasPage() {
             </Button>
             <Button onClick={asignarTarea}>
               <UserPlus className="h-4 w-4 mr-2" />
+              Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de editar tarea */}
+      <Dialog open={showEditarModal} onOpenChange={setShowEditarModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-5 w-5" />
+              Editar Tarea
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <Label>Nombre *</Label>
+              <Input value={editNombre} onChange={(e) => setEditNombre(e.target.value)} className="mt-1" />
+            </div>
+            <div>
+              <Label>Descripción</Label>
+              <TextareaComponent value={editDescripcion} onChange={(e) => setEditDescripcion(e.target.value)} rows={2} className="mt-1" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Fecha Inicio *</Label>
+                <Input type="date" value={editFechaInicio} onChange={(e) => setEditFechaInicio(e.target.value)} className="mt-1" />
+              </div>
+              <div>
+                <Label>Fecha Fin *</Label>
+                <Input type="date" value={editFechaFin} onChange={(e) => setEditFechaFin(e.target.value)} className="mt-1" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Hrs/persona</Label>
+                <Input type="number" min={0.5} step={0.5} value={editHorasEstimadas} onChange={(e) => setEditHorasEstimadas(e.target.value)} className="mt-1" />
+              </div>
+              <div>
+                <Label>Personas</Label>
+                <Input type="number" min={1} value={editPersonasEstimadas} onChange={(e) => setEditPersonasEstimadas(e.target.value)} className="mt-1" />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditarModal(false)}>Cancelar</Button>
+            <Button onClick={guardarEdicion} disabled={guardandoEdicion || !editNombre.trim()}>
+              {guardandoEdicion ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Pencil className="h-4 w-4 mr-1" />}
               Guardar
             </Button>
           </DialogFooter>

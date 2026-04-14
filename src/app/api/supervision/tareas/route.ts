@@ -212,7 +212,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { tareaId, tipo, responsableId, estado, prioridad, porcentajeCompletado, personasEstimadas } = body
+    const { tareaId, tipo, responsableId, estado, prioridad, porcentajeCompletado, personasEstimadas, nombre, descripcion, fechaInicio, fechaFin, horasEstimadas } = body
 
     if (!tareaId || !tipo) return NextResponse.json({ error: 'Se requiere tareaId y tipo' }, { status: 400 })
 
@@ -220,6 +220,11 @@ export async function PATCH(request: NextRequest) {
 
     if (tipo === 'proyecto_tarea') {
       const updateData: any = { updatedAt: new Date() }
+      if (nombre !== undefined) updateData.nombre = nombre
+      if (descripcion !== undefined) updateData.descripcion = descripcion
+      if (fechaInicio !== undefined) updateData.fechaInicio = new Date(fechaInicio)
+      if (fechaFin !== undefined) updateData.fechaFin = new Date(fechaFin)
+      if (horasEstimadas !== undefined) updateData.horasEstimadas = parseFloat(horasEstimadas)
       if (responsableId !== undefined) updateData.responsableId = responsableId || null
       if (estado) { updateData.estado = estado; if (estado === 'completada') updateData.porcentajeCompletado = 100 }
       if (prioridad) updateData.prioridad = prioridad
@@ -228,6 +233,10 @@ export async function PATCH(request: NextRequest) {
       tareaActualizada = await prisma.proyectoTarea.update({ where: { id: tareaId }, data: updateData, include: { user: { select: { id: true, name: true, email: true } } } })
     } else {
       const updateData: any = { updatedAt: new Date() }
+      if (nombre !== undefined) updateData.nombre = nombre
+      if (descripcion !== undefined) updateData.descripcion = descripcion
+      if (fechaInicio !== undefined) updateData.fechaInicio = new Date(fechaInicio)
+      if (fechaFin !== undefined) updateData.fechaFin = new Date(fechaFin)
       if (responsableId !== undefined) updateData.responsableId = responsableId || null
       if (estado) { updateData.estado = estado; if (estado === 'completada') updateData.porcentajeCompletado = 100 }
       if (prioridad) updateData.prioridad = prioridad
