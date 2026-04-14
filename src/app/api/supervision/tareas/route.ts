@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
         },
         proyectoActividad: { select: { id: true, nombre: true } }
       },
-      orderBy: [{ fechaFin: 'asc' }, { prioridad: 'desc' }]
+      orderBy: { nombre: 'asc' }
     })
 
     // Obtener Tareas simples
@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
           include: { proyecto: { select: { id: true, codigo: true, nombre: true, estado: true } } }
         }
       },
-      orderBy: [{ fechaFin: 'asc' }, { prioridad: 'desc' }]
+      orderBy: { nombre: 'asc' }
     })
 
     // Obtener lista de proyectos regulares (activos)
