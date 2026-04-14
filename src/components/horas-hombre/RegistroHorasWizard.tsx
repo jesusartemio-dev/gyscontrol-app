@@ -240,7 +240,7 @@ export function RegistroHorasWizard({
       setLoadingData(true)
       console.log('🔍 REACT: Loading data activado')
 
-      const url = '/api/proyectos'
+      const url = '/api/proyectos?includeInternos=true'
       console.log('🔍 REACT: URL de la API:', url)
 
       const response = await fetch(url)

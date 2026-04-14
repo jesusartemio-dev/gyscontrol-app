@@ -387,6 +387,10 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
       getProyectoById(id)
         .then(async (data) => {
           if (data) {
+            if (data.esInterno) {
+              router.replace('/administracion/proyectos-internos')
+              return
+            }
             setProyecto(data)
             await fetchCronogramaStats(id)
           } else {

@@ -15,9 +15,10 @@ export async function GET(request: NextRequest) {
     const estado = searchParams.get('estado')
     const estadosActivos = searchParams.get('estadosActivos') === 'true'
     const lightweight = searchParams.get('fields') === 'id,codigo,nombre'
+    const includeInternos = searchParams.get('includeInternos') === 'true'
 
-    // Construir filtro
-    const where: any = {}
+    // Construir filtro — excluir proyectos internos salvo que se pida explícitamente
+    const where: any = includeInternos ? {} : { esInterno: false }
     if (estado) {
       where.estado = estado
     } else if (estadosActivos) {

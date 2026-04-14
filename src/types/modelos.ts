@@ -1116,6 +1116,8 @@ export interface Proyecto {
   diasCredito?: number | null
   codigo: string
   estado: string
+  esInterno?: boolean
+  centroCostoId?: string | null
   fechaInicio: string
   fechaFin?: string
   createdAt: string
