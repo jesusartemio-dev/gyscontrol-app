@@ -281,6 +281,21 @@ export function ProyectoCronogramaTab({
     toast({ title: 'Datos actualizados' })
   }
 
+  const handleRecalcularProgreso = async () => {
+    try {
+      setIsLoading(true)
+      const response = await fetch(`/api/proyectos/${proyectoId}/cronograma/recalcular-progreso`, { method: 'POST' })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Error al recalcular')
+      handleRefresh()
+      toast({ title: 'Progreso recalculado', description: result.message })
+    } catch (error) {
+      toast({ title: 'Error', description: error instanceof Error ? error.message : 'No se pudo recalcular.', variant: 'destructive' })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const handleSaveConfiguracion = async () => {
     try {
       setIsLoading(true)
@@ -971,6 +986,19 @@ export function ProyectoCronogramaTab({
                 <Download className="h-4 w-4 mr-2" />
                 Exportar Excel (MS Project)
               </DropdownMenuItem>
+
+              {!esComercial && hasCronograma && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => {
+                    setDropdownOpen(false)
+                    setTimeout(() => handleRecalcularProgreso(), 100)
+                  }} disabled={isLoading}>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Recalcular Progreso
+                  </DropdownMenuItem>
+                </>
+              )}
 
               {!esComercial && (
                 <>

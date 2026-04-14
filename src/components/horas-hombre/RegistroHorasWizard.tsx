@@ -53,6 +53,7 @@ interface Proyecto {
   responsableNombre: string
   fechaInicio?: string
   fechaFin?: string
+  esInterno?: boolean
 }
 
 interface Edt {
@@ -277,7 +278,8 @@ export function RegistroHorasWizard({
         estado: proyecto.estado,
         responsableNombre: proyecto.comercial?.name || proyecto.gestor?.name || 'Sin responsable',
         fechaInicio: proyecto.fechaInicio,
-        fechaFin: proyecto.fechaFin
+        fechaFin: proyecto.fechaFin,
+        esInterno: proyecto.esInterno ?? false,
       }))
       console.log('🔍 REACT: Configurando proyectos en estado', {
         proyectosCount: proyectos.length,
@@ -521,6 +523,8 @@ export function RegistroHorasWizard({
     setFechaFinTarea('')
   }
 
+  const esInterno = proyectoSeleccionado?.esInterno ?? false
+
   const datosActuales = {
     proyectoSeleccionado,
     edtSeleccionado,
@@ -532,6 +536,8 @@ export function RegistroHorasWizard({
   }
 
   const puedeAvanzar = () => {
+    // Para proyectos internos el paso 3 se salta — validar solo pasos relevantes
+    if (esInterno && pasoActual === 2) return !!edtSeleccionado
     return pasos[pasoActual - 1].validacion(datosActuales)
   }
 
@@ -541,25 +547,33 @@ export function RegistroHorasWizard({
 
   const avanzarPaso = () => {
     if (puedeAvanzar() && pasoActual < pasos.length) {
-      const nuevoPaso = pasoActual + 1
-      
+      let nuevoPaso = pasoActual + 1
+
+      // Proyectos internos: saltar paso 3 (Tipo de Registro), siempre ir a Tarea directa
+      if (esInterno && nuevoPaso === 3) {
+        setNivelSeleccionado('tarea')
+        nuevoPaso = 4
+      }
+
       // Cargar datos necesarios para el siguiente paso
       if (nuevoPaso === 2 && proyectoSeleccionado) {
         cargarEdts(proyectoSeleccionado.id)
-      } else if (nuevoPaso === 4 && edtSeleccionado && nivelSeleccionado) {
-        // Cargar elementos para ambos niveles
+      } else if (nuevoPaso === 4 && edtSeleccionado) {
         cargarElementos(edtSeleccionado.id)
-        setCreandoTarea(false) // Reset estado
+        setCreandoTarea(false)
         setElementoSeleccionado(null)
       }
-      
+
       setPasoActual(nuevoPaso)
     }
   }
 
   const retrocederPaso = () => {
     if (puedeRetroceder()) {
-      setPasoActual(pasoActual - 1)
+      let pasoPrevio = pasoActual - 1
+      // Proyectos internos: desde paso 4 volver a paso 2 (saltar el 3)
+      if (esInterno && pasoPrevio === 3) pasoPrevio = 2
+      setPasoActual(pasoPrevio)
     }
   }
 
@@ -652,12 +666,11 @@ export function RegistroHorasWizard({
           <Select
             value={proyectoSeleccionado?.id || ''}
             onValueChange={(value) => {
-              console.log('🔄 REACT: Proyecto seleccionado', { value })
               const proyecto = proyectos.find(p => p.id === value)
-              console.log('🔄 REACT: Proyecto encontrado', { proyecto })
               setProyectoSeleccionado(proyecto || null)
-              setEdtSeleccionado(null) // Limpiar EDT seleccionado
-              setEdts([]) // Limpiar lista de EDTs
+              setEdtSeleccionado(null)
+              setEdts([])
+              setNivelSeleccionado('')
               setSinCronograma(false)
             }}
           >
@@ -667,22 +680,39 @@ export function RegistroHorasWizard({
             <SelectContent>
               {proyectos.length === 0 ? (
                 <SelectItem value="__empty__" disabled>
-                  <div className="text-sm text-gray-500">
-                    No hay proyectos disponibles
-                  </div>
+                  <div className="text-sm text-gray-500">No hay proyectos disponibles</div>
                 </SelectItem>
               ) : (
-                proyectos.map((proyecto, index) => {
-                  console.log(`🎨 REACT: Renderizando SelectItem ${index + 1}`, { proyecto, index })
-                  return (
-                    <SelectItem key={proyecto.id} value={proyecto.id}>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-semibold text-blue-700">{proyecto.codigo}</span>
-                        <span className="text-xs text-gray-500">- {proyecto.nombre}</span>
-                      </div>
-                    </SelectItem>
-                  )
-                })
+                <>
+                  {/* Proyectos de cliente */}
+                  {proyectos.filter(p => !p.esInterno).length > 0 && (
+                    <>
+                      <div className="px-2 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wide">Proyectos</div>
+                      {proyectos.filter(p => !p.esInterno).map((proyecto) => (
+                        <SelectItem key={proyecto.id} value={proyecto.id}>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-semibold text-blue-700">{proyecto.codigo}</span>
+                            <span className="text-xs text-gray-500">- {proyecto.nombre}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
+                  {/* Proyectos internos */}
+                  {proyectos.filter(p => p.esInterno).length > 0 && (
+                    <>
+                      <div className="px-2 py-1 text-xs font-semibold text-emerald-600 uppercase tracking-wide border-t mt-1 pt-2">Internos</div>
+                      {proyectos.filter(p => p.esInterno).map((proyecto) => (
+                        <SelectItem key={proyecto.id} value={proyecto.id}>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-semibold text-emerald-700">{proyecto.codigo}</span>
+                            <span className="text-xs text-gray-500">- {proyecto.nombre}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
+                </>
               )}
             </SelectContent>
           </Select>
@@ -703,9 +733,14 @@ export function RegistroHorasWizard({
     )
   }
 
-  const renderPaso2 = () => (
+  const renderPaso2 = () => {
+    const labelEdt = esInterno ? 'Selecciona un Área *' : 'Selecciona un EDT *'
+    const placeholderEdt = esInterno ? 'Seleccionar área...' : 'Seleccionar EDT...'
+    const cardColor = esInterno ? 'bg-emerald-50 border-emerald-200' : 'bg-purple-50 border-purple-200'
+    const iconColor = esInterno ? 'text-emerald-600' : 'text-purple-600'
+    return (
     <div className="space-y-4">
-      <Label>Selecciona un EDT *</Label>
+      <Label>{labelEdt}</Label>
       {!proyectoSeleccionado ? (
         <div className="text-sm text-gray-600 p-4 bg-gray-50 rounded">
           Selecciona primero un proyecto
@@ -713,7 +748,7 @@ export function RegistroHorasWizard({
       ) : loadingData ? (
         <div className="flex items-center gap-2 p-4">
           <Loader2 className="h-4 w-4 animate-spin" />
-          <span>Cargando EDTs...</span>
+          <span>{esInterno ? 'Cargando áreas...' : 'Cargando EDTs...'}</span>
         </div>
       ) : sinCronograma ? (
         <Alert variant="destructive">
@@ -731,18 +766,20 @@ export function RegistroHorasWizard({
           }}
         >
           <SelectTrigger>
-            <SelectValue placeholder="Seleccionar EDT..." />
+            <SelectValue placeholder={placeholderEdt} />
           </SelectTrigger>
           <SelectContent>
             {edts.map((edt) => (
               <SelectItem key={edt.id} value={edt.id}>
                 <div className="flex flex-col">
                   <span className="font-medium">
-                    {edt.categoriaNombre && edt.categoriaNombre !== edt.nombre ? `${edt.categoriaNombre} - ${edt.nombre}` : edt.nombre}
+                    {esInterno ? edt.nombre : (edt.categoriaNombre && edt.categoriaNombre !== edt.nombre ? `${edt.categoriaNombre} - ${edt.nombre}` : edt.nombre)}
                   </span>
-                  <span className="text-sm text-gray-600">
-                    {edt.responsableNombre} • {edt.horasReales}h/{edt.horasPlan}h
-                  </span>
+                  {!esInterno && (
+                    <span className="text-sm text-gray-600">
+                      {edt.responsableNombre} • {edt.horasReales}h/{edt.horasPlan}h
+                    </span>
+                  )}
                 </div>
               </SelectItem>
             ))}
@@ -750,24 +787,27 @@ export function RegistroHorasWizard({
         </Select>
       )}
       {edtSeleccionado && (
-        <Card className="bg-purple-50 border-purple-200">
+        <Card className={cardColor}>
           <CardContent className="p-3">
             <div className="flex items-center gap-2">
-              <FolderOpen className="h-4 w-4 text-purple-600" />
+              <FolderOpen className={`h-4 w-4 ${iconColor}`} />
               <div>
                 <div className="font-medium">
-                  {edtSeleccionado.categoriaNombre && edtSeleccionado.categoriaNombre !== edtSeleccionado.nombre ? `${edtSeleccionado.categoriaNombre} - ${edtSeleccionado.nombre}` : edtSeleccionado.nombre}
+                  {esInterno ? edtSeleccionado.nombre : (edtSeleccionado.categoriaNombre && edtSeleccionado.categoriaNombre !== edtSeleccionado.nombre ? `${edtSeleccionado.categoriaNombre} - ${edtSeleccionado.nombre}` : edtSeleccionado.nombre)}
                 </div>
-                <div className="text-sm text-gray-600">
-                  {edtSeleccionado.responsableNombre} • {edtSeleccionado.horasReales}h/{edtSeleccionado.horasPlan}h
-                </div>
+                {!esInterno && (
+                  <div className="text-sm text-gray-600">
+                    {edtSeleccionado.responsableNombre} • {edtSeleccionado.horasReales}h/{edtSeleccionado.horasPlan}h
+                  </div>
+                )}
               </div>
             </div>
           </CardContent>
         </Card>
       )}
     </div>
-  )
+    )
+  }
 
   const handleNivelChange = (value: 'actividad' | 'tarea') => {
     setNivelSeleccionado(value)
@@ -1140,7 +1180,7 @@ export function RegistroHorasWizard({
                   <div className="text-xs text-green-600 mt-1">
                     {nivelSeleccionado === 'actividad' && actividadSeleccionada
                       ? `📂 EDT: ${edtSeleccionado?.nombre || 'N/A'} → 🎯 Actividad: ${actividadSeleccionada.nombre} → ✅ Tarea: ${elementoSeleccionado.nombre}`
-                      : `📂 EDT: ${edtSeleccionado?.nombre || 'N/A'} → ✅ Tarea: ${elementoSeleccionado.nombre} (directa)`
+                      : `${esInterno ? '🏢 Área' : '📂 EDT'}: ${edtSeleccionado?.nombre || 'N/A'} → ✅ Tarea: ${elementoSeleccionado.nombre}`
                     }
                   </div>
                 </div>
@@ -1159,7 +1199,7 @@ export function RegistroHorasWizard({
         <div className="p-3 bg-gray-50 rounded-lg border text-sm">
           <div className="flex flex-wrap gap-x-3 gap-y-1 text-gray-700">
             <span><strong>Proyecto:</strong> {proyectoSeleccionado?.codigo}</span>
-            <span><strong>EDT:</strong> {edtSeleccionado?.nombre}</span>
+            <span><strong>{esInterno ? 'Área' : 'EDT'}:</strong> {edtSeleccionado?.nombre}</span>
             <span><strong>Tarea:</strong> {elementoSeleccionado?.nombre}</span>
           </div>
         </div>
@@ -1229,18 +1269,27 @@ export function RegistroHorasWizard({
   const content = (
     <div className="space-y-4">
       {/* Header compacto con progreso */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">Paso {pasoActual}/{pasos.length}</span>
-            <span className="font-medium text-sm">{pasos[pasoActual - 1].titulo}</span>
+      {(() => {
+        // Para internos: pasos efectivos son 1,2,4,5 → mostrar como 1,2,3,4
+        const totalEfectivo = esInterno ? 4 : pasos.length
+        const pasoEfectivo = esInterno && pasoActual >= 4 ? pasoActual - 1 : pasoActual
+        const progresoEfectivo = (pasoEfectivo / totalEfectivo) * 100
+        const tituloEfectivo = esInterno && pasoActual === 2 ? 'Seleccionar Área' : pasos[pasoActual - 1].titulo
+        return (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500">Paso {pasoEfectivo}/{totalEfectivo}</span>
+                <span className="font-medium text-sm">{tituloEfectivo}</span>
+              </div>
+              <Badge variant="outline" className="text-xs px-2 py-0.5">
+                {Math.round(progresoEfectivo)}%
+              </Badge>
+            </div>
+            <Progress value={progresoEfectivo} className="w-full h-1.5" />
           </div>
-          <Badge variant="outline" className="text-xs px-2 py-0.5">
-            {Math.round(progreso)}%
-          </Badge>
-        </div>
-        <Progress value={progreso} className="w-full h-1.5" />
-      </div>
+        )
+      })()}
 
       {/* Contenido del paso */}
       <div className="min-h-[200px]">
