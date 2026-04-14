@@ -562,13 +562,13 @@ export function RegistroHorasWizard({
           setEdtSeleccionado(genEdt)
           setNivelSeleccionado('tarea')
 
-          // 2. Buscar si ya existe la tarea "Trabajo General" bajo ese EDT
+          // 2. Cargar tareas bajo ese EDT
           const tareasResp = await fetch(`/api/horas-hombre/tareas-directas-edt/${genEdt.id}`)
           const tareasData = await tareasResp.json()
-          let tareaGeneral = tareasData.tareas?.[0] ?? null
+          const tareasList = tareasData.tareas ?? []
 
-          // 3. Si no existe, crearla automáticamente
-          if (!tareaGeneral) {
+          // 3. Si no hay tareas, crear "Trabajo General" automáticamente
+          if (tareasList.length === 0) {
             const hoy = new Date().toISOString().split('T')[0]
             const finAnio = `${new Date().getFullYear()}-12-31`
             const createResp = await fetch('/api/tareas', {
@@ -586,7 +586,7 @@ export function RegistroHorasWizard({
               })
             })
             const createData = await createResp.json()
-            tareaGeneral = {
+            const nuevaTarea = {
               id: createData.id,
               nombre: createData.nombre,
               tipo: 'tarea' as const,
@@ -597,12 +597,24 @@ export function RegistroHorasWizard({
               progreso: 0,
               descripcion: ''
             }
+            setTareasDirectas([nuevaTarea])
+            setElementoSeleccionado(nuevaTarea)
+            setCreandoTarea(false)
+            setPasoActual(5)
+          } else if (tareasList.length === 1) {
+            // 4a. Solo 1 tarea → auto-seleccionar y saltar a Completar
+            setTareasDirectas(tareasList)
+            setElementoSeleccionado(tareasList[0])
+            setCreandoTarea(false)
+            setPasoActual(5)
+          } else {
+            // 4b. Múltiples tareas → mostrar selector (paso 4)
+            setTareasDirectas(tareasList)
+            setElementos(tareasList)
+            setElementoSeleccionado(null)
+            setCreandoTarea(false)
+            setPasoActual(4)
           }
-
-          // 4. Auto-seleccionar tarea e ir directo al paso 5 (Completar)
-          setElementoSeleccionado(tareaGeneral)
-          setCreandoTarea(false)
-          setPasoActual(5)
         } catch {
           toast({ title: 'Error', description: 'Error al preparar el registro interno', variant: 'destructive' })
         } finally {
@@ -630,12 +642,24 @@ export function RegistroHorasWizard({
   const retrocederPaso = () => {
     if (puedeRetroceder()) {
       let pasoPrevio = pasoActual - 1
-      // Proyectos internos: desde paso 5 volver directamente a paso 1 (pasos 2,3,4 no se muestran)
-      if (esInterno && pasoActual === 5) {
-        pasoPrevio = 1
-        setEdtSeleccionado(null)
-        setElementoSeleccionado(null)
-        setNivelSeleccionado('')
+      if (esInterno) {
+        if (pasoActual === 5 && tareasDirectas.length <= 1) {
+          // 1 tarea (auto-seleccionada) → volver directo a paso 1
+          pasoPrevio = 1
+          setEdtSeleccionado(null)
+          setElementoSeleccionado(null)
+          setNivelSeleccionado('')
+        } else if (pasoActual === 4 || (pasoActual === 5 && tareasDirectas.length > 1)) {
+          // múltiples tareas → desde paso 4 o 5 volver a paso 1
+          pasoPrevio = pasoActual === 5 ? 4 : 1
+          if (pasoActual === 4) {
+            setEdtSeleccionado(null)
+            setElementoSeleccionado(null)
+            setNivelSeleccionado('')
+          } else {
+            setElementoSeleccionado(null)
+          }
+        }
       }
       setPasoActual(pasoPrevio)
     }
@@ -1334,9 +1358,12 @@ export function RegistroHorasWizard({
     <div className="space-y-4">
       {/* Header compacto con progreso */}
       {(() => {
-        // Para internos: pasos efectivos son 1,5 → mostrar como 1,2
-        const totalEfectivo = esInterno ? 2 : pasos.length
-        const pasoEfectivo = esInterno ? (pasoActual === 1 ? 1 : 2) : pasoActual
+        // Para internos: 2 pasos (1→5) si 1 tarea, 3 pasos (1→4→5) si múltiples tareas
+        const internoMultiple = esInterno && tareasDirectas.length > 1
+        const totalEfectivo = esInterno ? (internoMultiple ? 3 : 2) : pasos.length
+        const pasoEfectivo = esInterno
+          ? (pasoActual === 1 ? 1 : pasoActual === 4 ? 2 : internoMultiple ? 3 : 2)
+          : pasoActual
         const progresoEfectivo = (pasoEfectivo / totalEfectivo) * 100
         const tituloEfectivo = pasos[pasoActual - 1].titulo
         return (
