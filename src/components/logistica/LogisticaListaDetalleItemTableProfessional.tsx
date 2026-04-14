@@ -361,40 +361,66 @@ export default function LogisticaListaDetalleItemTableProfessional({ items, onUp
                       )}
                     </td>
 
-                    {/* Proveedor */}
-                    <td className="px-3 py-2 max-w-[130px]">
-                      <span className="truncate block text-gray-600" title={(item as any).proveedor?.nombre || ''}>
-                        {(item as any).proveedor?.nombre || '—'}
-                      </span>
-                      {itemStats.selectedCondiciones && (() => {
-                        const cond = itemStats.selectedCondiciones
-                        const chips = []
-                        if (cond.condicionPago)
-                          chips.push(
-                            <span key="pago" className="flex items-center gap-0.5">
-                              <CreditCard className="h-2.5 w-2.5 shrink-0" />
-                              {cond.condicionPago}{cond.diasCredito ? ` ${cond.diasCredito}d` : ''}
-                            </span>
-                          )
-                        if (cond.tiempoEntrega)
-                          chips.push(
-                            <span key="entrega" className="flex items-center gap-0.5">
-                              <Truck className="h-2.5 w-2.5 shrink-0" />
-                              {cond.tiempoEntrega}
-                            </span>
-                          )
-                        if (cond.lugarEntrega)
-                          chips.push(
-                            <span key="lugar" className="flex items-center gap-0.5">
-                              <MapPin className="h-2.5 w-2.5 shrink-0" />
-                              {cond.lugarEntrega}
-                            </span>
-                          )
-                        if (chips.length === 0) return null
+                    {/* Proveedor / Cotización seleccionada */}
+                    <td className="px-3 py-2 max-w-[140px]">
+                      {(() => {
+                        const selCot = itemStats.selectedCot as any
+                        const cotId = selCot?.cotizacion?.id || selCot?.cotizacionProveedor?.id
+                        const cotCodigo = selCot?.cotizacion?.codigo || selCot?.cotizacionProveedor?.codigo
+                        const provNombre = selCot?.cotizacion?.proveedor?.nombre
+                          || selCot?.cotizacionProveedor?.proveedor?.nombre
+                          || (item as any).proveedor?.nombre
+                        if (!provNombre) return <span className="text-gray-400">—</span>
                         return (
-                          <div className="flex flex-wrap gap-x-1.5 gap-y-0 mt-0.5 text-[9px] text-muted-foreground">
-                            {chips}
-                          </div>
+                          <>
+                            {cotId ? (
+                              <Link
+                                href={`/logistica/cotizaciones/${cotId}`}
+                                className="text-blue-600 hover:underline truncate block font-medium text-xs"
+                                title={provNombre}
+                              >
+                                {provNombre}
+                              </Link>
+                            ) : (
+                              <span className="truncate block text-gray-600 text-xs" title={provNombre}>
+                                {provNombre}
+                              </span>
+                            )}
+                            {cotCodigo && (
+                              <span className="text-[9px] text-muted-foreground font-mono">{cotCodigo}</span>
+                            )}
+                            {itemStats.selectedCondiciones && (() => {
+                              const cond = itemStats.selectedCondiciones
+                              const chips = []
+                              if (cond.condicionPago)
+                                chips.push(
+                                  <span key="pago" className="flex items-center gap-0.5">
+                                    <CreditCard className="h-2.5 w-2.5 shrink-0" />
+                                    {cond.condicionPago}{cond.diasCredito ? ` ${cond.diasCredito}d` : ''}
+                                  </span>
+                                )
+                              if (cond.tiempoEntrega)
+                                chips.push(
+                                  <span key="entrega" className="flex items-center gap-0.5">
+                                    <Truck className="h-2.5 w-2.5 shrink-0" />
+                                    {cond.tiempoEntrega}
+                                  </span>
+                                )
+                              if (cond.lugarEntrega)
+                                chips.push(
+                                  <span key="lugar" className="flex items-center gap-0.5">
+                                    <MapPin className="h-2.5 w-2.5 shrink-0" />
+                                    {cond.lugarEntrega}
+                                  </span>
+                                )
+                              if (chips.length === 0) return null
+                              return (
+                                <div className="flex flex-wrap gap-x-1.5 gap-y-0 mt-0.5 text-[9px] text-muted-foreground">
+                                  {chips}
+                                </div>
+                              )
+                            })()}
+                          </>
                         )
                       })()}
                     </td>
