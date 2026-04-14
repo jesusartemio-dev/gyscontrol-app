@@ -102,13 +102,13 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
                     codigo: true,
                     descripcion: true,
                     cantidad: true,
-                    ordenCompra: { select: { numero: true } },
+                    ordenCompra: { select: { id: true, numero: true } },
                   },
                 },
                 requerimientoMaterialItem: {
                   select: {
                     id: true,
-                    hojaDeGastos: { select: { numero: true } },
+                    hojaDeGastos: { select: { id: true, numero: true } },
                   },
                 },
                 confirmadoPor: { select: { name: true } },

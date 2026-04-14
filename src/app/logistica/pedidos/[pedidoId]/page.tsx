@@ -788,9 +788,19 @@ export default function PedidoLogisticaDetailPage() {
                         <span className="text-muted-foreground"> ({r.itemCodigo})</span>
                         {' '}desde{' '}
                         {r.ordenCompraItem?.ordenCompra?.numero ? (
-                          <span className="font-medium text-blue-700">{r.ordenCompraItem.ordenCompra.numero}</span>
+                          <a
+                            href={`/logistica/ordenes-compra/${r.ordenCompraItem.ordenCompra.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-medium text-blue-700 hover:underline"
+                          >{r.ordenCompraItem.ordenCompra.numero}</a>
                         ) : r.requerimientoMaterialItem?.hojaDeGastos?.numero ? (
-                          <span className="font-medium text-amber-700">REQ-{r.requerimientoMaterialItem.hojaDeGastos.numero}</span>
+                          <a
+                            href={`/gastos/mis-requerimientos/${r.requerimientoMaterialItem.hojaDeGastos.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-medium text-amber-700 hover:underline"
+                          >REQ-{r.requerimientoMaterialItem.hojaDeGastos.numero}</a>
                         ) : (
                           <span className="text-muted-foreground italic">sin referencia</span>
                         )}
@@ -852,9 +862,19 @@ export default function PedidoLogisticaDetailPage() {
                         <span className="text-muted-foreground"> ({r.itemCodigo})</span>
                         {' '}
                         {r.ordenCompraItem?.ordenCompra?.numero ? (
-                          <span className="font-medium text-blue-700">{r.ordenCompraItem.ordenCompra.numero}</span>
+                          <a
+                            href={`/logistica/ordenes-compra/${r.ordenCompraItem.ordenCompra.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-medium text-blue-700 hover:underline"
+                          >{r.ordenCompraItem.ordenCompra.numero}</a>
                         ) : r.requerimientoMaterialItem?.hojaDeGastos?.numero ? (
-                          <span className="font-medium text-amber-700">REQ-{r.requerimientoMaterialItem.hojaDeGastos.numero}</span>
+                          <a
+                            href={`/gastos/mis-requerimientos/${r.requerimientoMaterialItem.hojaDeGastos.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-medium text-amber-700 hover:underline"
+                          >REQ-{r.requerimientoMaterialItem.hojaDeGastos.numero}</a>
                         ) : null}
                         {' — '}
                         <span className="text-muted-foreground">
