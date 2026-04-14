@@ -275,21 +275,35 @@ export async function POST(request: NextRequest) {
     let cronogramaId: string
 
     if (proyecto.esInterno) {
-      // Buscar el cronograma de ejecución auto-creado del proyecto interno
+      // Buscar el cronograma de ejecución del proyecto interno
       const cronograma = await prisma.proyectoCronograma.findFirst({
         where: { proyectoId, tipo: 'ejecucion' }
       })
       if (!cronograma) {
         return NextResponse.json({ error: 'El proyecto interno no tiene cronograma de ejecución. Contacte al administrador.' }, { status: 400 })
       }
-      const edtGeneral = await prisma.proyectoEdt.findFirst({
-        where: { proyectoId, proyectoCronogramaId: cronograma.id }
-      })
-      if (!edtGeneral) {
-        return NextResponse.json({ error: 'El proyecto interno no tiene EDT configurado. Contacte al administrador.' }, { status: 400 })
-      }
-      edtIdFinal = edtGeneral.id
       cronogramaId = cronograma.id
+
+      if (proyectoEdtId) {
+        // Usar el EDT que el usuario seleccionó explícitamente
+        const edtElegido = await prisma.proyectoEdt.findFirst({
+          where: { id: proyectoEdtId, proyectoId, proyectoCronogramaId: cronograma.id }
+        })
+        if (!edtElegido) {
+          return NextResponse.json({ error: 'El EDT seleccionado no pertenece a este proyecto interno.' }, { status: 400 })
+        }
+        edtIdFinal = edtElegido.id
+      } else {
+        // Fallback: primer EDT del cronograma (proyectos con un solo EDT "General")
+        const edtGeneral = await prisma.proyectoEdt.findFirst({
+          where: { proyectoId, proyectoCronogramaId: cronograma.id },
+          orderBy: { orden: 'asc' }
+        })
+        if (!edtGeneral) {
+          return NextResponse.json({ error: 'El proyecto interno no tiene EDT configurado. Contacte al administrador.' }, { status: 400 })
+        }
+        edtIdFinal = edtGeneral.id
+      }
     } else {
       // Proyecto regular: EDT requerido
       if (!proyectoEdtId) return NextResponse.json({ error: 'El EDT es requerido' }, { status: 400 })

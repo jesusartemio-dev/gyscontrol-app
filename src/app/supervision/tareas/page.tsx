@@ -563,8 +563,8 @@ export default function SupervisionTareasPage() {
       toast({ title: 'Error', description: 'Debe seleccionar un proyecto', variant: 'destructive' })
       return
     }
-    if (nuevaTarea.modo === 'proyecto' && !nuevaTarea.proyectoEdtId) {
-      toast({ title: 'Error', description: 'Debe seleccionar un EDT', variant: 'destructive' })
+    if (!nuevaTarea.proyectoEdtId) {
+      toast({ title: 'Error', description: 'Debe seleccionar un EDT / Área', variant: 'destructive' })
       return
     }
     if (!nuevaTarea.nombre.trim()) {
@@ -589,8 +589,8 @@ export default function SupervisionTareasPage() {
         horasEstimadas: horasPP > 0 ? horasPP * personas : null,
         personasEstimadas: personas
       }
-      // Para proyectos regulares se requiere EDT; para internos el API lo resuelve solo
-      if (nuevaTarea.modo === 'proyecto') payload.proyectoEdtId = nuevaTarea.proyectoEdtId
+      // Siempre enviar el EDT seleccionado (tanto para proyectos regulares como internos)
+      payload.proyectoEdtId = nuevaTarea.proyectoEdtId
 
       const response = await fetch('/api/supervision/tareas', {
         method: 'POST',
@@ -1223,27 +1223,52 @@ export default function SupervisionTareasPage() {
                 </div>
               </div>
             ) : (
-              <div>
-                <Label className="text-xs text-gray-500">Proyecto Interno *</Label>
-                <Select
-                  value={nuevaTarea.proyectoId || '__none__'}
-                  onValueChange={(v) => setNuevaTarea({ ...nuevaTarea, proyectoId: v === '__none__' ? '' : v })}
-                >
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder="Seleccionar..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Seleccionar...</SelectItem>
-                    {proyectosInternos.map(p => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.codigo} — {p.nombre}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {proyectosInternos.length === 0 && (
-                  <p className="text-xs text-amber-600 mt-1">No hay proyectos internos creados. Ve a Administración → Proyectos Internos.</p>
-                )}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs text-gray-500">Proyecto Interno *</Label>
+                  <Select
+                    value={nuevaTarea.proyectoId || '__none__'}
+                    onValueChange={(v) => {
+                      const id = v === '__none__' ? '' : v
+                      setNuevaTarea({ ...nuevaTarea, proyectoId: id, proyectoEdtId: '' })
+                      if (id) cargarEdtsProyecto(id)
+                      else setEdtsProyecto([])
+                    }}
+                  >
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Seleccionar..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Seleccionar...</SelectItem>
+                      {proyectosInternos.map(p => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.codigo} — {p.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {proyectosInternos.length === 0 && (
+                    <p className="text-xs text-amber-600 mt-1">No hay proyectos internos creados.</p>
+                  )}
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">Área (EDT) *</Label>
+                  <Select
+                    value={nuevaTarea.proyectoEdtId || '__none__'}
+                    onValueChange={(v) => setNuevaTarea({ ...nuevaTarea, proyectoEdtId: v === '__none__' ? '' : v })}
+                    disabled={!nuevaTarea.proyectoId || cargandoEdts || edtsProyecto.length === 0}
+                  >
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder={cargandoEdts ? 'Cargando...' : edtsProyecto.length === 0 ? 'Selecciona proyecto' : 'Área...'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Seleccionar...</SelectItem>
+                      {edtsProyecto.map(edt => (
+                        <SelectItem key={edt.id} value={edt.id}>{edt.nombre}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             )}
 
@@ -1379,7 +1404,7 @@ export default function SupervisionTareasPage() {
             <Button
               size="sm"
               onClick={crearTarea}
-              disabled={creandoTarea || !nuevaTarea.proyectoId || (nuevaTarea.modo === 'proyecto' && !nuevaTarea.proyectoEdtId)}
+              disabled={creandoTarea || !nuevaTarea.proyectoId || !nuevaTarea.proyectoEdtId}
               className={nuevaTarea.modo === 'interno' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-purple-600 hover:bg-purple-700'}
             >
               {creandoTarea ? (
