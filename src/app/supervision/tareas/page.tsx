@@ -144,7 +144,7 @@ export default function SupervisionTareasPage() {
   const [metricas, setMetricas] = useState<Metricas | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // Filtros
+  // Filtros (inicializados desde localStorage)
   const [filtroProyecto, setFiltroProyecto] = useState<string>('')
   const [filtroResponsable, setFiltroResponsable] = useState<string>('')
   const [filtroEstado, setFiltroEstado] = useState<string>('')
@@ -152,6 +152,7 @@ export default function SupervisionTareasPage() {
   const [filtroSinAsignar, setFiltroSinAsignar] = useState<boolean>(false)
   const [filtroTipo, setFiltroTipo] = useState<string>('')
   const [filtroEdt, setFiltroEdt] = useState<string>('')
+  const [filtrosRestaurados, setFiltrosRestaurados] = useState(false)
 
   // Modal de asignacion
   const [showAsignarModal, setShowAsignarModal] = useState(false)
@@ -247,6 +248,40 @@ export default function SupervisionTareasPage() {
       setLoading(false)
     }
   }
+
+  // Restaurar filtros desde localStorage al montar
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('tareas_filtros')
+      if (saved) {
+        const f = JSON.parse(saved)
+        if (f.proyecto) setFiltroProyecto(f.proyecto)
+        if (f.responsable) setFiltroResponsable(f.responsable)
+        if (f.estado) setFiltroEstado(f.estado)
+        if (f.busqueda) setFiltroBusqueda(f.busqueda)
+        if (f.sinAsignar) setFiltroSinAsignar(true)
+        if (f.tipo) setFiltroTipo(f.tipo)
+        if (f.edt) setFiltroEdt(f.edt)
+      }
+    } catch {}
+    setFiltrosRestaurados(true)
+  }, [])
+
+  // Guardar filtros en localStorage cuando cambian
+  useEffect(() => {
+    if (!filtrosRestaurados) return
+    try {
+      localStorage.setItem('tareas_filtros', JSON.stringify({
+        proyecto: filtroProyecto,
+        responsable: filtroResponsable,
+        estado: filtroEstado,
+        busqueda: filtroBusqueda,
+        sinAsignar: filtroSinAsignar,
+        tipo: filtroTipo,
+        edt: filtroEdt,
+      }))
+    } catch {}
+  }, [filtroProyecto, filtroResponsable, filtroEstado, filtroBusqueda, filtroSinAsignar, filtroTipo, filtroEdt, filtrosRestaurados])
 
   // Cargar solo una vez al montar (cuando la sesión esté lista)
   useEffect(() => {
@@ -583,6 +618,7 @@ export default function SupervisionTareasPage() {
     setFiltroSinAsignar(false)
     setFiltroTipo('')
     setFiltroEdt('')
+    try { localStorage.removeItem('tareas_filtros') } catch {}
   }
 
   // Abrir modal para crear
