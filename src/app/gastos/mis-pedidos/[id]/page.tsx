@@ -1,16 +1,32 @@
 'use client'
 
-import React, { useState, useEffect, use } from 'react'
+import React, { useState, useEffect, use, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { ArrowLeft, Loader2, Building2, Calendar, User, AlertTriangle, Package } from 'lucide-react'
+import { ArrowLeft, Loader2, Building2, Calendar, User, AlertTriangle, Package, Plus, Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { getPedidoInternoById, deletePedidoInterno, type PedidoInterno } from '@/lib/services/pedidoInterno'
+import { getPedidoInternoById, deletePedidoInterno, type PedidoInterno, type PedidoInternoItem } from '@/lib/services/pedidoInterno'
 import PedidoEstadoFlujoBanner from '@/components/equipos/PedidoEstadoFlujoBanner'
+
+const UNIDADES = ['und', 'par', 'm', 'm²', 'm³', 'kg', 'lt', 'caja', 'bolsa', 'rollo', 'juego', 'set']
+
+interface ItemDraft {
+  codigo: string
+  descripcion: string
+  unidad: string
+  cantidadPedida: number
+  precioUnitario: number
+}
+
+const ITEM_VACIO: ItemDraft = { codigo: '', descripcion: '', unidad: 'und', cantidadPedida: 1, precioUnitario: 0 }
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' }).format(amount)
@@ -40,6 +56,17 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
   const [loading, setLoading] = useState(true)
   const [openDelete, setOpenDelete] = useState(false)
 
+  // Modal de ítem
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editingItem, setEditingItem] = useState<PedidoInternoItem | null>(null)
+  const [draft, setDraft] = useState<ItemDraft>({ ...ITEM_VACIO })
+  const [savingItem, setSavingItem] = useState(false)
+  const descripcionRef = useRef<HTMLInputElement>(null)
+
+  // Eliminar ítem
+  const [deletingItemId, setDeletingItemId] = useState<string | null>(null)
+  const [confirmDeleteItem, setConfirmDeleteItem] = useState<PedidoInternoItem | null>(null)
+
   useEffect(() => {
     getPedidoInternoById(id)
       .then(setPedido)
@@ -50,6 +77,137 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
   const handleEstadoUpdated = (nuevoEstado: string) => {
     setPedido(prev => prev ? { ...prev, estado: nuevoEstado } : prev)
   }
+
+  // ─── CRUD ítems ────────────────────────────────────────────────
+
+  const openAddModal = () => {
+    setDraft({ ...ITEM_VACIO })
+    setEditingItem(null)
+    setModalOpen(true)
+    setTimeout(() => descripcionRef.current?.focus(), 100)
+  }
+
+  const openEditModal = (item: PedidoInternoItem) => {
+    setDraft({
+      codigo: item.codigo ?? '',
+      descripcion: item.descripcion,
+      unidad: item.unidad,
+      cantidadPedida: item.cantidadPedida,
+      precioUnitario: item.precioUnitario ?? 0,
+    })
+    setEditingItem(item)
+    setModalOpen(true)
+    setTimeout(() => descripcionRef.current?.focus(), 100)
+  }
+
+  const handleSaveItem = async () => {
+    if (!draft.descripcion.trim()) return toast.error('La descripción es obligatoria')
+    if (draft.cantidadPedida <= 0) return toast.error('La cantidad debe ser mayor a 0')
+    if (!pedido) return
+
+    try {
+      setSavingItem(true)
+
+      if (editingItem) {
+        // Editar
+        const res = await fetch(`/api/pedido-equipo-item/${editingItem.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            codigo: draft.codigo || null,
+            descripcion: draft.descripcion.trim(),
+            unidad: draft.unidad,
+            cantidadPedida: draft.cantidadPedida,
+            precioUnitario: draft.precioUnitario || null,
+            costoTotal: draft.precioUnitario ? draft.cantidadPedida * draft.precioUnitario : null,
+          }),
+        })
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          throw new Error(err.error || 'Error al actualizar ítem')
+        }
+        const updated = await res.json()
+        setPedido(prev => prev ? {
+          ...prev,
+          pedidoEquipoItem: prev.pedidoEquipoItem.map(i =>
+            i.id === editingItem.id ? {
+              ...i,
+              codigo: updated.codigo,
+              descripcion: updated.descripcion,
+              unidad: updated.unidad,
+              cantidadPedida: updated.cantidadPedida,
+              precioUnitario: updated.precioUnitario,
+              costoTotal: updated.costoTotal,
+            } : i
+          )
+        } : prev)
+        toast.success('Ítem actualizado')
+      } else {
+        // Crear
+        const res = await fetch('/api/pedido-equipo-item', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pedidoId: pedido.id,
+            codigo: draft.codigo || `ITEM-${Date.now()}`,
+            descripcion: draft.descripcion.trim(),
+            unidad: draft.unidad,
+            cantidadPedida: draft.cantidadPedida,
+            precioUnitario: draft.precioUnitario || null,
+            costoTotal: draft.precioUnitario ? draft.cantidadPedida * draft.precioUnitario : null,
+          }),
+        })
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          throw new Error(err.error || 'Error al agregar ítem')
+        }
+        const created = await res.json()
+        setPedido(prev => prev ? {
+          ...prev,
+          pedidoEquipoItem: [...prev.pedidoEquipoItem, {
+            id: created.id,
+            codigo: created.codigo,
+            descripcion: created.descripcion,
+            unidad: created.unidad,
+            cantidadPedida: created.cantidadPedida,
+            precioUnitario: created.precioUnitario,
+            costoTotal: created.costoTotal,
+            estado: created.estado,
+          }]
+        } : prev)
+        toast.success('Ítem agregado')
+      }
+
+      setModalOpen(false)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Error al guardar ítem')
+    } finally {
+      setSavingItem(false)
+    }
+  }
+
+  const handleDeleteItem = async (item: PedidoInternoItem) => {
+    try {
+      setDeletingItemId(item.id)
+      const res = await fetch(`/api/pedido-equipo-item/${item.id}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Error al eliminar ítem')
+      }
+      setPedido(prev => prev ? {
+        ...prev,
+        pedidoEquipoItem: prev.pedidoEquipoItem.filter(i => i.id !== item.id)
+      } : prev)
+      toast.success('Ítem eliminado')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Error al eliminar ítem')
+    } finally {
+      setDeletingItemId(null)
+      setConfirmDeleteItem(null)
+    }
+  }
+
+  // ─── Eliminar pedido ──────────────────────────────────────────
 
   const handleDelete = async () => {
     if (!pedido) return
@@ -78,6 +236,8 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
       </div>
     )
   }
+
+  const esBorrador = pedido.estado === 'borrador'
 
   const totalPresupuesto = pedido.pedidoEquipoItem?.reduce(
     (sum, item) => sum + (item.costoTotal ?? 0), 0
@@ -112,7 +272,7 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
             <p className="text-sm text-muted-foreground">{pedido.nombre}</p>
           )}
         </div>
-        {pedido.estado === 'borrador' && (
+        {esBorrador && (
           <Button
             variant="outline"
             size="sm"
@@ -177,32 +337,52 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
       {/* Items */}
       <Card>
         <CardHeader className="pb-2 px-4 pt-4">
-          <CardTitle className="text-sm font-semibold flex items-center gap-2">
-            <Package className="h-4 w-4" />
-            Ítems del pedido ({pedido.pedidoEquipoItem?.length ?? 0})
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <Package className="h-4 w-4" />
+              Ítems del pedido ({pedido.pedidoEquipoItem?.length ?? 0})
+            </CardTitle>
+            {esBorrador && (
+              <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={openAddModal}>
+                <Plus className="h-3.5 w-3.5" />
+                Agregar ítem
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {(pedido.pedidoEquipoItem?.length ?? 0) === 0 ? (
-            <p className="text-center py-8 text-sm text-muted-foreground">Sin ítems</p>
+            <div className="flex flex-col items-center justify-center py-10 gap-2 text-muted-foreground">
+              <Package className="h-8 w-8 opacity-30" />
+              <p className="text-sm">Sin ítems</p>
+              {esBorrador && (
+                <Button size="sm" variant="outline" className="mt-1 text-xs gap-1" onClick={openAddModal}>
+                  <Plus className="h-3.5 w-3.5" />
+                  Agregar ítem
+                </Button>
+              )}
+            </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Código</TableHead>
+                  <TableHead className="w-8 text-center">#</TableHead>
                   <TableHead>Descripción</TableHead>
-                  <TableHead className="text-center">Cant.</TableHead>
-                  <TableHead>Unidad</TableHead>
-                  <TableHead className="text-right">P. Unit.</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead>Estado</TableHead>
+                  <TableHead className="text-center w-16">Cant.</TableHead>
+                  <TableHead className="w-16">Unidad</TableHead>
+                  <TableHead className="text-right w-24">P. Unit.</TableHead>
+                  <TableHead className="text-right w-24">Total</TableHead>
+                  {esBorrador && <TableHead className="w-16" />}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {pedido.pedidoEquipoItem?.map(item => (
+                {pedido.pedidoEquipoItem?.map((item, idx) => (
                   <TableRow key={item.id}>
-                    <TableCell className="font-mono text-xs">{item.codigo}</TableCell>
-                    <TableCell className="text-sm">{item.descripcion}</TableCell>
+                    <TableCell className="text-center text-xs text-muted-foreground">{idx + 1}</TableCell>
+                    <TableCell>
+                      <p className="text-sm font-medium">{item.descripcion}</p>
+                      {item.codigo && <p className="text-[10px] text-muted-foreground font-mono">{item.codigo}</p>}
+                    </TableCell>
                     <TableCell className="text-center text-sm">{item.cantidadPedida}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{item.unidad}</TableCell>
                     <TableCell className="text-right font-mono text-sm">
@@ -211,11 +391,32 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
                     <TableCell className="text-right font-mono text-sm font-medium">
                       {item.costoTotal ? formatCurrency(item.costoTotal) : '—'}
                     </TableCell>
-                    <TableCell>
-                      <Badge className="text-xs bg-gray-100 text-gray-700 border-0">
-                        {item.estado}
-                      </Badge>
-                    </TableCell>
+                    {esBorrador && (
+                      <TableCell>
+                        <div className="flex items-center gap-1 justify-end">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                            onClick={() => openEditModal(item)}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-red-400 hover:text-red-600 hover:bg-red-50"
+                            onClick={() => setConfirmDeleteItem(item)}
+                            disabled={deletingItemId === item.id}
+                          >
+                            {deletingItemId === item.id
+                              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              : <Trash2 className="h-3.5 w-3.5" />
+                            }
+                          </Button>
+                        </div>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
@@ -237,7 +438,111 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
         Creado el {formatDate(pedido.createdAt)}
       </p>
 
-      {/* Delete dialog */}
+      {/* Modal agregar/editar ítem */}
+      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base">
+              {editingItem ? 'Editar ítem' : 'Agregar ítem'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Descripción <span className="text-red-500">*</span></Label>
+              <Input
+                ref={descripcionRef}
+                value={draft.descripcion}
+                onChange={e => setDraft(d => ({ ...d, descripcion: e.target.value }))}
+                placeholder="Ej: Casco de seguridad tipo I"
+                className="h-8 text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Código (opcional)</Label>
+              <Input
+                value={draft.codigo}
+                onChange={e => setDraft(d => ({ ...d, codigo: e.target.value }))}
+                placeholder="Ej: EPP-001"
+                className="h-8 text-sm font-mono"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Unidad</Label>
+                <Select value={draft.unidad} onValueChange={v => setDraft(d => ({ ...d, unidad: v }))}>
+                  <SelectTrigger className="h-8 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {UNIDADES.map(u => (
+                      <SelectItem key={u} value={u}>{u}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Cantidad</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={draft.cantidadPedida}
+                  onChange={e => setDraft(d => ({ ...d, cantidadPedida: Number(e.target.value) }))}
+                  className="h-8 text-sm"
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Precio estimado (S/)</Label>
+              <Input
+                type="number"
+                min={0}
+                step={0.01}
+                value={draft.precioUnitario || ''}
+                onChange={e => setDraft(d => ({ ...d, precioUnitario: Number(e.target.value) }))}
+                placeholder="0.00"
+                className="h-8 text-sm"
+              />
+            </div>
+            {draft.precioUnitario > 0 && draft.cantidadPedida > 0 && (
+              <p className="text-xs text-right text-muted-foreground">
+                Total estimado: <span className="font-semibold text-foreground">{formatCurrency(draft.cantidadPedida * draft.precioUnitario)}</span>
+              </p>
+            )}
+          </div>
+          <DialogFooter className="gap-2 mt-1">
+            <Button variant="ghost" size="sm" onClick={() => setModalOpen(false)} disabled={savingItem}>
+              Cancelar
+            </Button>
+            <Button size="sm" onClick={handleSaveItem} disabled={savingItem}>
+              {savingItem ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
+              {editingItem ? 'Guardar cambios' : 'Agregar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmar eliminar ítem */}
+      <AlertDialog open={!!confirmDeleteItem} onOpenChange={open => !open && setConfirmDeleteItem(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar ítem</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Eliminar &quot;{confirmDeleteItem?.descripcion}&quot;? Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => confirmDeleteItem && handleDeleteItem(confirmDeleteItem)}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirmar eliminar pedido */}
       <AlertDialog open={openDelete} onOpenChange={setOpenDelete}>
         <AlertDialogContent>
           <AlertDialogHeader>
