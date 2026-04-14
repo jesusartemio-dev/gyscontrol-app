@@ -37,7 +37,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Sin permisos para generar órdenes de compra' }, { status: 403 })
     }
 
-    const { pedidoId, itemIds, moneda = 'USD', condicionPago = 'contado', observaciones, fechaEntregaEstimada, fechasEntregaPorProveedor } = await req.json()
+    const { pedidoId, itemIds, moneda = 'USD', condicionPago = 'contado', observaciones, fechaEntregaEstimada, fechasEntregaPorProveedor, usarPrecioCotizacion = false } = await req.json()
 
     if (!pedidoId) {
       return NextResponse.json({ error: 'pedidoId es requerido' }, { status: 400 })
@@ -59,8 +59,14 @@ export async function POST(req: Request) {
                 cotizacionSeleccionadaId: true,
                 cotizacionSeleccionada: {
                   select: {
+                    id: true,
+                    precioUnitario: true,
+                    tiempoEntrega: true,
+                    tiempoEntregaDias: true,
                     cotizacionProveedor: {
                       select: {
+                        id: true,
+                        codigo: true,
                         condicionPago: true,
                         diasCredito: true,
                         lugarEntrega: true,
@@ -68,6 +74,7 @@ export async function POST(req: Request) {
                         contactoEntrega: true,
                         observaciones: true,
                         moneda: true,
+                        tipoCambio: true,
                       }
                     }
                   }
@@ -143,18 +150,33 @@ export async function POST(req: Request) {
           .map(i => (i.listaEquipoItem as any)?.cotizacionSeleccionada?.cotizacionProveedor)
           .find(Boolean)
 
-        const ocItems = grupoItems.map(item => ({
-          codigo: item.codigo,
-          descripcion: item.descripcion,
-          tipoItem: (item as any).tipoItem || 'equipo',
-          unidad: item.unidad,
-          cantidad: item.cantidadPedida,
-          precioUnitario: item.precioUnitario || 0,
-          costoTotal: item.cantidadPedida * (item.precioUnitario || 0),
-          pedidoEquipoItemId: item.id,
-          listaEquipoItemId: item.listaEquipoItemId || null,
-          updatedAt: new Date(),
-        }))
+        const ocItems = grupoItems.map(item => {
+          const cotSeleccionada = (item.listaEquipoItem as any)?.cotizacionSeleccionada
+          // Si usarPrecioCotizacion y hay precio en la cotización seleccionada, usarlo
+          // Convertir a USD si la cotización está en PEN con tipo de cambio
+          let precioFinal = item.precioUnitario || 0
+          if (usarPrecioCotizacion && cotSeleccionada?.precioUnitario) {
+            const monedaCot = cotSeleccionada.cotizacionProveedor?.moneda
+            const tcCot = cotSeleccionada.cotizacionProveedor?.tipoCambio
+            if (monedaCot === 'PEN' && tcCot && tcCot > 0) {
+              precioFinal = cotSeleccionada.precioUnitario / tcCot
+            } else {
+              precioFinal = cotSeleccionada.precioUnitario
+            }
+          }
+          return {
+            codigo: item.codigo,
+            descripcion: item.descripcion,
+            tipoItem: (item as any).tipoItem || 'equipo',
+            unidad: item.unidad,
+            cantidad: item.cantidadPedida,
+            precioUnitario: precioFinal,
+            costoTotal: item.cantidadPedida * precioFinal,
+            pedidoEquipoItemId: item.id,
+            listaEquipoItemId: item.listaEquipoItemId || null,
+            updatedAt: new Date(),
+          }
+        })
 
         const subtotal = ocItems.reduce((sum, i) => sum + i.costoTotal, 0)
         const igv = subtotal * 0.18

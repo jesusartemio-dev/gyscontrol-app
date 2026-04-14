@@ -175,6 +175,7 @@ export default function PedidoLogisticaDetailPage() {
   const [ocFechaGlobal, setOcFechaGlobal] = useState('')
   const [ocItemsState, setOcItemsState] = useState<Record<string, { selected: boolean; proveedorId: string; proveedorNombre: string }>>({})
   const [ocProveedorFiltro, setOcProveedorFiltro] = useState('__all__')
+  const [usarPrecioCotizacion, setUsarPrecioCotizacion] = useState(true)
 
   // Estados de REQ que bloquean la creación de OC para ese item
   // Solo 'rechazado' libera el item — borrador/enviado también bloquean
@@ -515,6 +516,35 @@ export default function PedidoLogisticaDetailPage() {
     const itemIds = seleccionados.map(([id]) => id).join(',')
     const proyectoId = (pedido as any)?.proyecto?.id || ''
     router.push(`/logistica/ordenes-compra/nueva?proyectoId=${proyectoId}&pedidoItems=${itemIds}`)
+  }
+
+  const handleGenerarOCDesdeAPI = async () => {
+    const seleccionados = Object.entries(ocItemsState).filter(([, v]) => v.selected)
+    if (seleccionados.length === 0) { toast.error('Selecciona al menos un item'); return }
+    setGenerandoOC(true)
+    try {
+      const res = await fetch('/api/orden-compra/desde-pedido', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pedidoId,
+          itemIds: seleccionados.map(([id]) => id),
+          usarPrecioCotizacion,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Error al generar OC')
+      }
+      const data = await res.json()
+      toast.success(`${data.resumen.totalOCs} OC(s) generadas con ${data.resumen.totalItems} items`)
+      setShowGenerarOC(false)
+      await cargarDatos()
+    } catch (err: any) {
+      toast.error(err.message || 'Error al generar OC')
+    } finally {
+      setGenerandoOC(false)
+    }
   }
 
   // Estado para rechazo de recepción
@@ -1420,6 +1450,22 @@ export default function PedidoLogisticaDetailPage() {
                                   {req.hojaDeGastos.numero} · {req.hojaDeGastos.estado}
                                 </Link>
                               ))}
+                              {/* Cotización de referencia */}
+                              {(() => {
+                                const cotRef = (item as any).listaEquipoItem?.cotizacionSeleccionada?.cotizacionProveedor
+                                if (!cotRef?.id || !cotRef?.codigo) return null
+                                return (
+                                  <Link
+                                    href={`/logistica/cotizaciones/${cotRef.id}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-0.5 text-[9px] text-purple-600 hover:underline mt-0.5 font-mono"
+                                  >
+                                    <ExternalLink className="h-2 w-2 shrink-0" />
+                                    {cotRef.codigo}
+                                  </Link>
+                                )
+                              })()}
                               {!tieneOC && (() => {
                                 if (atendido && motivo === 'importacion_gerencia') {
                                   return (
@@ -2446,9 +2492,31 @@ export default function PedidoLogisticaDetailPage() {
               <ShoppingCart className="h-4 w-4 text-blue-600" />
               Crear Orden de Compra desde Pedido
             </DialogTitle>
-            <p className="text-[11px] text-muted-foreground pt-1">
-              Filtra por proveedor para seleccionar rápido. Completa proveedor, moneda y condiciones en la siguiente pantalla.
-            </p>
+            {/* Toggle: respetar cotización vs configurar manualmente */}
+            <div className="mt-2 flex items-center justify-between gap-3 rounded-lg border p-2.5 bg-gray-50">
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-gray-700">
+                  {usarPrecioCotizacion ? '⚡ Generación automática' : '✏️ Configuración manual'}
+                </p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  {usarPrecioCotizacion
+                    ? 'Usa precios y condiciones de las cotizaciones seleccionadas en la lista. Se crean las OCs directamente.'
+                    : 'Abre el formulario completo para definir proveedor, moneda y condiciones manualmente.'}
+                </p>
+              </div>
+              <button
+                onClick={() => setUsarPrecioCotizacion(v => !v)}
+                className={cn(
+                  'relative shrink-0 inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none',
+                  usarPrecioCotizacion ? 'bg-blue-600' : 'bg-gray-300'
+                )}
+              >
+                <span className={cn(
+                  'inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform shadow',
+                  usarPrecioCotizacion ? 'translate-x-4' : 'translate-x-0.5'
+                )} />
+              </button>
+            </div>
           </DialogHeader>
           {(() => {
             const itemsSinOC = Object.entries(ocItemsState)
@@ -2549,12 +2617,27 @@ export default function PedidoLogisticaDetailPage() {
                             </th>
                             <th className="px-3 py-2 text-left font-medium text-gray-600">Item</th>
                             <th className="px-3 py-2 text-right font-medium text-gray-600 w-20">Cant.</th>
+                            <th className="px-3 py-2 text-right font-medium text-gray-600 w-28">Precio</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y">
                           {itemsFiltrados.map(([itemId, state]) => {
                             const item = pedido?.items?.find((i: any) => i.id === itemId) as any
                             if (!item) return null
+                            const cotSel = item.listaEquipoItem?.cotizacionSeleccionada
+                            const cotProv = cotSel?.cotizacionProveedor
+                            const precioPedido = item.precioUnitario
+                            // Precio cotización convertido a USD si aplica
+                            const precioCotRaw = cotSel?.precioUnitario
+                            const monedaCot = cotProv?.moneda
+                            const tcCot = cotProv?.tipoCambio
+                            const precioCotUSD = precioCotRaw
+                              ? (monedaCot === 'PEN' && tcCot && tcCot > 0 ? precioCotRaw / tcCot : precioCotRaw)
+                              : null
+                            const precioMostrar = usarPrecioCotizacion ? precioCotUSD : precioPedido
+                            const hayDiferencia = precioCotUSD != null && precioPedido != null
+                              && Math.abs(precioCotUSD - precioPedido) > 0.001
+
                             return (
                               <tr
                                 key={itemId}
@@ -2570,9 +2653,31 @@ export default function PedidoLogisticaDetailPage() {
                                 </td>
                                 <td className="px-3 py-2">
                                   <div className="font-medium truncate" title={item.descripcion}>{item.descripcion}</div>
-                                  <div className="text-[11px] text-gray-400 font-mono">{item.codigo}</div>
+                                  <div className="flex items-center gap-1.5 mt-0.5">
+                                    <span className="text-[10px] text-gray-400 font-mono">{item.codigo}</span>
+                                    {cotProv?.codigo && (
+                                      <span className="text-[9px] text-purple-600 font-mono">· {cotProv.codigo}</span>
+                                    )}
+                                  </div>
                                 </td>
                                 <td className="px-3 py-2 text-right font-medium whitespace-nowrap">{item.cantidadPedida} <span className="text-gray-400 font-normal">{item.unidad}</span></td>
+                                <td className="px-3 py-2 text-right">
+                                  {precioMostrar != null ? (
+                                    <div>
+                                      <div className={cn('text-xs font-medium', usarPrecioCotizacion && hayDiferencia ? 'text-blue-700' : '')}>
+                                        ${precioMostrar.toFixed(2)}
+                                      </div>
+                                      {usarPrecioCotizacion && hayDiferencia && precioPedido != null && (
+                                        <div className="text-[9px] text-gray-400 line-through">${precioPedido.toFixed(2)}</div>
+                                      )}
+                                      {!usarPrecioCotizacion && precioCotUSD != null && hayDiferencia && (
+                                        <div className="text-[9px] text-blue-500">cot: ${precioCotUSD.toFixed(2)}</div>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <span className="text-[10px] text-gray-400">—</span>
+                                  )}
+                                </td>
                               </tr>
                             )
                           })}
@@ -2594,19 +2699,35 @@ export default function PedidoLogisticaDetailPage() {
                     {seleccionados.length} de {itemsSinOC.length} items seleccionados
                   </span>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setShowGenerarOC(false)} className="h-8 text-xs">
+                    <Button variant="outline" size="sm" onClick={() => setShowGenerarOC(false)} className="h-8 text-xs" disabled={generandoOC}>
                       Cancelar
                     </Button>
                     {itemsSinOC.length > 0 && (
-                      <Button
-                        size="sm"
-                        onClick={handleIrACrearOC}
-                        disabled={seleccionados.length === 0}
-                        className="h-8 text-xs"
-                      >
-                        <ShoppingCart className="h-3 w-3 mr-1" />
-                        Crear OC con {seleccionados.length > 0 ? seleccionados.length : ''} item{seleccionados.length !== 1 ? 's' : ''} →
-                      </Button>
+                      usarPrecioCotizacion ? (
+                        <Button
+                          size="sm"
+                          onClick={handleGenerarOCDesdeAPI}
+                          disabled={seleccionados.length === 0 || generandoOC}
+                          className="h-8 text-xs bg-blue-600 hover:bg-blue-700"
+                        >
+                          {generandoOC ? (
+                            <span className="animate-spin mr-1">↻</span>
+                          ) : (
+                            <ShoppingCart className="h-3 w-3 mr-1" />
+                          )}
+                          Generar {seleccionados.length} OC automática{seleccionados.length !== 1 ? 's' : ''}
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          onClick={handleIrACrearOC}
+                          disabled={seleccionados.length === 0}
+                          className="h-8 text-xs"
+                        >
+                          <ShoppingCart className="h-3 w-3 mr-1" />
+                          Configurar OC ({seleccionados.length} items) →
+                        </Button>
+                      )
                     )}
                   </div>
                 </div>

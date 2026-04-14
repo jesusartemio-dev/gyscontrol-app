@@ -50,6 +50,23 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
             listaEquipoItem: {
               include: {
                 proveedor: true,
+                cotizacionSeleccionada: {
+                  select: {
+                    id: true,
+                    precioUnitario: true,
+                    tiempoEntrega: true,
+                    tiempoEntregaDias: true,
+                    cotizacionProveedor: {
+                      select: {
+                        id: true,
+                        codigo: true,
+                        moneda: true,
+                        tipoCambio: true,
+                        proveedor: { select: { nombre: true } },
+                      },
+                    },
+                  },
+                },
               },
             },
             proveedor: { select: { id: true, nombre: true } },
