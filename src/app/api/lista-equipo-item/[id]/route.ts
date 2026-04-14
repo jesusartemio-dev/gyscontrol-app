@@ -69,7 +69,7 @@ export async function PUT(
     const { id } = await context.params
     const payload: ListaEquipoItemUpdatePayload = await request.json()
 
-    // 🔒 Solo se puede editar si la lista está en estado borrador
+    // 🔒 Validar permisos según estado de la lista
     const itemCheck = await prisma.listaEquipoItem.findUnique({
       where: { id },
       select: { listaEquipo: { select: { estado: true } } },
@@ -77,9 +77,17 @@ export async function PUT(
     if (!itemCheck) {
       return NextResponse.json({ error: 'Ítem no encontrado' }, { status: 404 })
     }
-    if (itemCheck.listaEquipo.estado !== 'borrador') {
+    const estadoLista = itemCheck.listaEquipo.estado
+    const soloVerificacion = payload.verificado !== undefined || payload.comentarioRevision !== undefined
+    if (estadoLista === 'por_revisar' && !soloVerificacion) {
       return NextResponse.json(
-        { error: 'Solo se pueden editar ítems cuando la lista está en estado borrador' },
+        { error: 'En estado por revisar solo se puede actualizar la verificación y comentarios' },
+        { status: 403 }
+      )
+    }
+    if (estadoLista !== 'borrador' && estadoLista !== 'por_revisar') {
+      return NextResponse.json(
+        { error: 'Solo se pueden editar ítems cuando la lista está en estado borrador o por revisar' },
         { status: 403 }
       )
     }
