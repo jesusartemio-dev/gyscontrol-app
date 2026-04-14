@@ -50,7 +50,7 @@ export async function POST(req: Request) {
         proyecto: { select: { id: true, codigo: true, nombre: true, gestorId: true } },
         pedidoEquipoItem: {
           include: {
-            ordenCompraItems: { select: { id: true } },
+            ordenCompraItems: { select: { id: true, cantidad: true } },
             listaEquipoItem: {
               select: {
                 id: true,
@@ -114,14 +114,18 @@ export async function POST(req: Request) {
     const itemsSinProveedor = items.filter(item => !getProveedorId(item))
     items = items.filter(item => !!getProveedorId(item))
 
-    // Excluir items que ya tienen OC vinculada
-    const itemsConOC = items.filter(item => item.ordenCompraItems.length > 0)
-    items = items.filter(item => item.ordenCompraItems.length === 0)
+    // Excluir items que ya están completamente cubiertos por OCs existentes
+    const getCantidadRestante = (item: typeof items[0]) => {
+      const totalOrdenado = item.ordenCompraItems.reduce((sum, oci) => sum + (oci.cantidad || 0), 0)
+      return item.cantidadPedida - totalOrdenado
+    }
+    const itemsCompletamenteCubiertos = items.filter(item => getCantidadRestante(item) <= 0)
+    items = items.filter(item => getCantidadRestante(item) > 0)
 
     if (items.length === 0) {
       const razones: string[] = []
       if (itemsSinProveedor.length > 0) razones.push(`${itemsSinProveedor.length} sin proveedor`)
-      if (itemsConOC.length > 0) razones.push(`${itemsConOC.length} ya tienen OC`)
+      if (itemsCompletamenteCubiertos.length > 0) razones.push(`${itemsCompletamenteCubiertos.length} ya tienen OC completa`)
       return NextResponse.json(
         { error: `No hay items elegibles para generar OCs. ${razones.join(', ')}.` },
         { status: 400 }
@@ -164,14 +168,15 @@ export async function POST(req: Request) {
               precioFinal = cotSeleccionada.precioUnitario
             }
           }
+          const cantidadRestante = getCantidadRestante(item)
           return {
             codigo: item.codigo,
             descripcion: item.descripcion,
             tipoItem: (item as any).tipoItem || 'equipo',
             unidad: item.unidad,
-            cantidad: item.cantidadPedida,
+            cantidad: cantidadRestante,
             precioUnitario: precioFinal,
-            costoTotal: item.cantidadPedida * precioFinal,
+            costoTotal: cantidadRestante * precioFinal,
             pedidoEquipoItemId: item.id,
             listaEquipoItemId: item.listaEquipoItemId || null,
             updatedAt: new Date(),
@@ -273,7 +278,7 @@ export async function POST(req: Request) {
         totalOCs: ordenesCreadas.length,
         totalItems: items.length,
         itemsSinProveedor: itemsSinProveedor.length,
-        itemsConOCExistente: itemsConOC.length,
+        itemsConOCExistente: itemsCompletamenteCubiertos.length,
       }
     })
   } catch (error) {

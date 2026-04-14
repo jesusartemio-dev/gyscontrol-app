@@ -75,6 +75,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
               select: {
                 id: true,
                 ordenCompraId: true,
+                cantidad: true,
                 ordenCompra: { select: { id: true, numero: true, estado: true } },
               },
             },

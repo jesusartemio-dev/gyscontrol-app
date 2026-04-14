@@ -191,10 +191,11 @@ export default function PedidoLogisticaDetailPage() {
     if (showGenerarOC && pedido?.items) {
       const initial: Record<string, { selected: boolean; proveedorId: string; proveedorNombre: string }> = {}
       for (const item of pedido.items) {
-        const tieneOC = ((item as any).ordenCompraItems?.length ?? 0) > 0
+        const totalOrdenado = ((item as any).ordenCompraItems as any[] ?? []).reduce((sum: number, oci: any) => sum + (oci.cantidad || 0), 0)
+        const cantidadRestante = item.cantidadPedida - totalOrdenado
         const tieneREQ = itemTieneREQActivo(item as any)
         const estadoItem = (item as any).estado
-        if (!tieneOC && !tieneREQ && !['cancelado', 'entregado'].includes(estadoItem)) {
+        if (cantidadRestante > 0 && !tieneREQ && !['cancelado', 'entregado'].includes(estadoItem)) {
           const provId = (item as any).proveedorId || (item as any).listaEquipoItem?.proveedorId || ''
           const provNombre = (item as any).proveedor?.nombre || (item as any).proveedorNombre || (item as any).listaEquipoItem?.proveedor?.nombre || ''
           initial[item.id] = { selected: !!provId, proveedorId: provId, proveedorNombre: provNombre }
@@ -2521,9 +2522,11 @@ export default function PedidoLogisticaDetailPage() {
           {(() => {
             const itemsSinOC = Object.entries(ocItemsState)
             const seleccionados = itemsSinOC.filter(([, v]) => v.selected)
-            const conOC = (pedido?.items || []).filter(
-              (i: any) => (i.ordenCompraItems?.length ?? 0) > 0 || itemTieneREQActivo(i)
-            ).length
+            const conOC = (pedido?.items || []).filter((i: any) => {
+              const totalOrdenado = ((i.ordenCompraItems as any[]) ?? []).reduce((sum: number, oci: any) => sum + (oci.cantidad || 0), 0)
+              const cantidadRestante = i.cantidadPedida - totalOrdenado
+              return cantidadRestante <= 0 || itemTieneREQActivo(i)
+            }).length
 
             // Construir pills de proveedores desde los items
             const provMap = new Map<string, { nombre: string; count: number }>()
