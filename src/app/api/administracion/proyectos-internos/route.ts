@@ -26,7 +26,6 @@ export async function GET() {
         orderBy: { nombre: 'asc' }
       }),
       prisma.user.findMany({
-        where: { role: { in: ['admin', 'coordinador', 'gestor', 'proyectos'] } },
         select: { id: true, name: true, role: true },
         orderBy: { name: 'asc' }
       }),
