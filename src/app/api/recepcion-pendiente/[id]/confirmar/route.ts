@@ -201,7 +201,7 @@ export async function POST(
             pedidoEquipoItemId: pedidoItem.id,
             listaEquipoItemId: pedidoItem.listaEquipoItemId || null,
             recepcionPendienteId: id,
-            proyectoId: pedido.proyectoId,
+            proyectoId: pedido.proyectoId as string,
             fechaEntrega: new Date(),
             estado: nuevoEstadoEntrega as any,
             cantidad: pedidoItem.cantidadPedida,

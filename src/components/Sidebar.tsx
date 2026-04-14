@@ -277,6 +277,7 @@ export default function Sidebar() {
       roles: ['admin', 'gerente', 'gestor', 'coordinador', 'coordinador_logistico', 'proyectos', 'colaborador', 'logistico', 'administracion'],
       links: [
         { href: '/gastos/mis-requerimientos', label: 'Mis Requerimientos', icon: CreditCard },
+        { href: '/gastos/mis-pedidos', label: 'Mis Pedidos Internos', icon: ShoppingCart },
         { href: '/gastos/requerimientos', label: 'Aprobar Requerimientos', icon: CheckCircle2, roles: ['admin', 'gerente', 'gestor', 'coordinador', 'coordinador_logistico', 'administracion'] as any },
       ],
     },

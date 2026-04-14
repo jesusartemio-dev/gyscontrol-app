@@ -83,7 +83,7 @@ export async function POST(req: Request) {
         hojaDeGastosId,
         pedidoEquipoItemId,
         pedidoId: pedidoItem.pedidoId,
-        proyectoId: pedidoItem.pedidoEquipo.proyectoId,
+        proyectoId: pedidoItem.pedidoEquipo.proyectoId as string,
         codigo: pedidoItem.codigo,
         descripcion: pedidoItem.descripcion,
         unidad: pedidoItem.unidad,

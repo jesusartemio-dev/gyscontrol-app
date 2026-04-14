@@ -27,6 +27,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
       include: {
         user: true,
         proyecto: true,
+        centroCosto: true,
         listaEquipo: {
           include: {
             listaEquipoItem: {
@@ -181,6 +182,9 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
         codigo: true,
         proyecto: {
           select: { nombre: true }
+        },
+        centroCosto: {
+          select: { nombre: true }
         }
       }
     })
@@ -271,7 +275,7 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
             descripcion: `Actualización del pedido ${pedidoActual.codigo}`,
             cambios: JSON.stringify(cambios),
             metadata: JSON.stringify({
-              proyecto: pedidoActual.proyecto.nombre,
+              proyecto: pedidoActual.proyecto?.nombre ?? pedidoActual.centroCosto?.nombre,
               codigo: pedidoActual.codigo
             })
           }

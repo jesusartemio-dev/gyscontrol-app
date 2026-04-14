@@ -157,7 +157,7 @@ export async function POST(
           metadata: {
             motivoReversion: motivo,
             pedidoCodigo: pedido.codigo,
-            proyectoNombre: pedido.proyecto.nombre,
+            proyectoNombre: pedido.proyecto?.nombre ?? '',
             estadoAnterior,
             entregasEliminadas: item.entregaItem.length,
           },

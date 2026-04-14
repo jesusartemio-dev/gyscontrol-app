@@ -20,6 +20,8 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const proyectoId = searchParams.get('proyectoId')
+    const centroCostoId = searchParams.get('centroCostoId')
+    const soloInternos = searchParams.get('soloInternos') === 'true'
     const estado = searchParams.get('estado')
     const responsableId = searchParams.get('responsableId')
     const fechaDesde = searchParams.get('fechaDesde')
@@ -31,9 +33,17 @@ export async function GET(request: Request) {
 
     // Build where clause dynamically
     const whereClause: any = {}
-    
+
     if (proyectoId) {
       whereClause.proyectoId = proyectoId
+    }
+
+    if (centroCostoId) {
+      whereClause.centroCostoId = centroCostoId
+    }
+
+    if (soloInternos) {
+      whereClause.centroCostoId = { not: null }
     }
     
     if (estado) {
@@ -90,12 +100,20 @@ export async function GET(request: Request) {
         fechaEntregaEstimada: true,
         fechaEntregaReal: true,
         proyectoId: true,
+        centroCostoId: true,
         responsableId: true,
         listaId: true,
         esUrgente: true,
         prioridad: true,
         createdAt: true,
         updatedAt: true,
+        centroCosto: {
+          select: {
+            id: true,
+            nombre: true,
+            tipo: true,
+          },
+        },
         user: {
           select: {
             id: true,
@@ -210,19 +228,37 @@ export async function POST(request: Request) {
     const body: PedidoEquipoPayload = await request.json()
 
     // 🎯 Validaciones mínimas
-    if (!body.proyectoId || !body.responsableId || !body.fechaNecesaria) {
+    if (!body.responsableId || !body.fechaNecesaria) {
       return NextResponse.json(
-        { error: 'Campos requeridos faltantes (proyectoId, responsableId, fechaNecesaria)' },
+        { error: 'Campos requeridos faltantes (responsableId, fechaNecesaria)' },
         { status: 400 }
       )
     }
 
-    // 🔎 Validar existencia de proyecto
-    const proyecto = await prisma.proyecto.findUnique({
-      where: { id: body.proyectoId },
-    })
-    if (!proyecto) {
-      return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 })
+    // Debe tener exactamente uno: proyectoId o centroCostoId
+    if (!body.proyectoId && !body.centroCostoId) {
+      return NextResponse.json(
+        { error: 'Debe indicar proyectoId o centroCostoId' },
+        { status: 400 }
+      )
+    }
+    if (body.proyectoId && body.centroCostoId) {
+      return NextResponse.json(
+        { error: 'proyectoId y centroCostoId son mutuamente excluyentes' },
+        { status: 400 }
+      )
+    }
+
+    // 🔎 Validar existencia de proyecto o centro de costo
+    let proyecto: { id: string; codigo: string; nombre: string } | null = null
+    let centroCosto: { id: string; nombre: string } | null = null
+
+    if (body.proyectoId) {
+      proyecto = await prisma.proyecto.findUnique({ where: { id: body.proyectoId } })
+      if (!proyecto) return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 })
+    } else {
+      centroCosto = await prisma.centroCosto.findUnique({ where: { id: body.centroCostoId! } })
+      if (!centroCosto) return NextResponse.json({ error: 'Centro de costo no encontrado' }, { status: 404 })
     }
 
     // 🔎 Validar existencia de responsable
@@ -233,7 +269,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Responsable no encontrado' }, { status: 404 })
     }
 
-    // 🔎 Validar lista técnica si se envía
+    // 🔎 Validar lista técnica si se envía (solo aplica para pedidos de proyecto)
     if (body.listaId) {
       const lista = await prisma.listaEquipo.findUnique({
         where: { id: body.listaId },
@@ -244,12 +280,26 @@ export async function POST(request: Request) {
     }
 
     // 🔢 Generar código secuencial
-    const ultimoPedido = await prisma.pedidoEquipo.findFirst({
-      where: { proyectoId: body.proyectoId },
-      orderBy: { numeroSecuencia: 'desc' },
-    })
-    const nuevoNumero = ultimoPedido ? ultimoPedido.numeroSecuencia + 1 : 1
-    const codigoGenerado = `${proyecto.codigo}-PED-${String(nuevoNumero).padStart(3, '0')}`
+    let codigoGenerado: string
+    let nuevoNumero: number
+
+    if (proyecto) {
+      const ultimoPedido = await prisma.pedidoEquipo.findFirst({
+        where: { proyectoId: proyecto.id },
+        orderBy: { numeroSecuencia: 'desc' },
+      })
+      nuevoNumero = ultimoPedido ? ultimoPedido.numeroSecuencia + 1 : 1
+      codigoGenerado = `${proyecto.codigo}-PED-${String(nuevoNumero).padStart(3, '0')}`
+    } else {
+      // Pedido interno: secuencia global de pedidos internos
+      const ultimoPedidoInt = await prisma.pedidoEquipo.findFirst({
+        where: { centroCostoId: { not: null } },
+        orderBy: { numeroSecuencia: 'desc' },
+      })
+      nuevoNumero = ultimoPedidoInt ? ultimoPedidoInt.numeroSecuencia + 1 : 1
+      const prefijo = centroCosto!.nombre.substring(0, 4).toUpperCase().replace(/\s/g, '')
+      codigoGenerado = `INT-${prefijo}-${String(nuevoNumero).padStart(3, '0')}`
+    }
 
     // 📦 Pre-cargar items de lista si hay seleccionados (para pricing fallback)
     let listaItemsMap = new Map<string, any>()
@@ -288,7 +338,8 @@ export async function POST(request: Request) {
       const pedido = await tx.pedidoEquipo.create({
         data: {
           id: pedidoId,
-          proyectoId: body.proyectoId,
+          proyectoId: body.proyectoId ?? null,
+          centroCostoId: body.centroCostoId ?? null,
           responsableId: body.responsableId,
           listaId: body.listaId ?? null,
           codigo: codigoGenerado,
@@ -376,12 +427,45 @@ export async function POST(request: Request) {
         })
       }
 
+      // 3️⃣ Crear items libres (pedidos internos sin lista)
+      if (body.itemsLibres && body.itemsLibres.length > 0) {
+        let presupuestoLibres = 0
+        for (const itemLibre of body.itemsLibres) {
+          const costoTotal = (itemLibre.precioUnitario ?? 0) * itemLibre.cantidadPedida
+          presupuestoLibres += costoTotal
+          await tx.pedidoEquipoItem.create({
+            data: {
+              id: randomUUID(),
+              pedidoId: pedido.id,
+              codigo: itemLibre.codigo,
+              descripcion: itemLibre.descripcion,
+              unidad: itemLibre.unidad,
+              cantidadPedida: itemLibre.cantidadPedida,
+              precioUnitario: itemLibre.precioUnitario ?? 0,
+              costoTotal,
+              responsableId: body.responsableId,
+              estado: 'pendiente',
+              estadoEntrega: 'pendiente',
+              tipoItem: 'equipo',
+              updatedAt: now,
+            },
+          })
+          itemsCreados++
+        }
+        if (presupuestoLibres > 0) {
+          await tx.pedidoEquipo.update({
+            where: { id: pedido.id },
+            data: { presupuestoTotal: presupuestoTotal + presupuestoLibres, updatedAt: now },
+          })
+        }
+      }
+
       // EventoTrazabilidad para pedidos urgentes
       if (body.esUrgente) {
         await tx.eventoTrazabilidad.create({
           data: {
             id: `evt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            proyectoId: body.proyectoId,
+            proyectoId: body.proyectoId ?? null,
             pedidoEquipoId: pedido.id,
             tipo: 'pedido_urgente',
             descripcion: `Pedido urgente creado. Motivo: ${body.observacion || 'No especificado'}. Sin lista técnica previa.`,
@@ -427,7 +511,7 @@ export async function POST(request: Request) {
         session.user.id,
         `Pedido ${resultado.pedido.codigo}`,
         {
-          proyecto: proyecto.nombre,
+          proyecto: proyecto?.nombre ?? centroCosto?.nombre,
           codigo: resultado.pedido.codigo,
           fechaNecesaria: body.fechaNecesaria,
           estado: resultado.pedido.estado,

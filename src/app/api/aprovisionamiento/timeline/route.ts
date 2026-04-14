@@ -385,6 +385,8 @@ export async function GET(request: NextRequest) {
 
       // 🔄 Procesar pedidos y calcular fechas/montos
       for (const pedido of pedidos) {
+        // Saltar pedidos internos (sin proyecto) en el timeline de aprovisionamiento
+        if (!pedido.proyecto) continue
         // 🧮 Calcular monto total del pedido
         const monto = pedido.pedidoEquipoItem.reduce((total, item) => {
           return total + (item.cantidadPedida * (item.precioUnitario || 0))
@@ -477,7 +479,7 @@ export async function GET(request: NextRequest) {
           coherencia: coherenciaPedido,
           alertas,
           color,
-          responsable: pedido.proyecto.gestor?.name || undefined,
+          responsable: pedido.proyecto?.gestor?.name || undefined,
           dependencias,
           diasRetraso: diasRetrasoPedido > 0 ? diasRetrasoPedido : undefined,
           metadatos: {

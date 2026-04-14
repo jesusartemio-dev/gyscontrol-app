@@ -119,11 +119,11 @@ export async function GET(request: NextRequest) {
         id: pedido.id,
         codigo: pedido.codigo,
         numeroSecuencia: pedido.numeroSecuencia,
-        proyecto: {
+        proyecto: pedido.proyecto ? {
           id: pedido.proyecto.id,
           nombre: pedido.proyecto.nombre,
           codigo: pedido.proyecto.codigo
-        },
+        } : undefined,
         responsable: {
           id: pedido.user?.id || '',
           name: pedido.user?.name || 'Sin asignar',

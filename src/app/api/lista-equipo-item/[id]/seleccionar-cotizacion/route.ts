@@ -101,7 +101,7 @@ export async function PATCH(
         where: { listaEquipoItemId: id },
         include: {
           pedidoEquipo: {
-            select: { id: true, codigo: true, fechaNecesaria: true, proyecto: { select: { nombre: true } } }
+            select: { id: true, codigo: true, fechaNecesaria: true, proyecto: { select: { nombre: true } }, centroCosto: { select: { nombre: true } } }
           }
         }
       })
@@ -123,7 +123,7 @@ export async function PATCH(
         pedidosActualizados.push({
           pedidoId: pedidoItem.pedidoEquipo.id,
           pedidoCodigo: pedidoItem.pedidoEquipo.codigo,
-          proyectoNombre: pedidoItem.pedidoEquipo.proyecto.nombre,
+          proyectoNombre: pedidoItem.pedidoEquipo.proyecto?.nombre ?? pedidoItem.pedidoEquipo.centroCosto?.nombre ?? '',
           itemId: pedidoItem.id,
           precioAnterior: pedidoItem.precioUnitario,
           precioNuevo: 0,
@@ -265,7 +265,7 @@ export async function PATCH(
       where: { listaEquipoItemId: id },
       include: {
         pedidoEquipo: {
-          select: { id: true, codigo: true, fechaNecesaria: true, proyecto: { select: { nombre: true } } }
+          select: { id: true, codigo: true, fechaNecesaria: true, proyecto: { select: { nombre: true } }, centroCosto: { select: { nombre: true } } }
         }
       }
     })
@@ -297,7 +297,7 @@ export async function PATCH(
       pedidosActualizados.push({
         pedidoId: pedidoItem.pedidoEquipo.id,
         pedidoCodigo: pedidoItem.pedidoEquipo.codigo,
-        proyectoNombre: pedidoItem.pedidoEquipo.proyecto.nombre,
+        proyectoNombre: pedidoItem.pedidoEquipo.proyecto?.nombre ?? pedidoItem.pedidoEquipo.centroCosto?.nombre ?? '',
         itemId: pedidoItem.id,
         precioAnterior: pedidoItem.precioUnitario,
         precioNuevo: precioUnitario,

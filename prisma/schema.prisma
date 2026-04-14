@@ -725,7 +725,8 @@ model ListaEquipoItem {
 
 model PedidoEquipo {
   id                   String               @id
-  proyectoId           String
+  proyectoId           String?
+  centroCostoId        String?
   responsableId        String
   listaId              String?
   codigo               String               @unique
@@ -745,7 +746,8 @@ model PedidoEquipo {
   presupuestoTotal     Float                @default(0)
   prioridad            String?              @default("media")
   listaEquipo          ListaEquipo?         @relation(fields: [listaId], references: [id])
-  proyecto             Proyecto             @relation(fields: [proyectoId], references: [id])
+  proyecto             Proyecto?            @relation(fields: [proyectoId], references: [id])
+  centroCosto          CentroCosto?         @relation(fields: [centroCostoId], references: [id])
   user                 User                 @relation(fields: [responsableId], references: [id])
   pedidoEquipoItem            PedidoEquipoItem[]
   ordenesCompra               OrdenCompra[]
@@ -757,6 +759,7 @@ model PedidoEquipo {
   @@index([proyectoId, estado, createdAt(sort: Desc)], map: "idx_pedido_proyecto_estado_fecha")
   @@index([proyectoId, responsableId, estado], map: "idx_pedido_proyecto_responsable_estado")
   @@index([responsableId, estado, fechaNecesaria], map: "idx_pedido_responsable_estado_fecha")
+  @@index([centroCostoId, estado], map: "idx_pedido_centro_costo_estado")
   @@map("pedido_equipo")
 }
 
@@ -3312,6 +3315,7 @@ model CentroCosto {
   ordenesCompra    OrdenCompra[]
   gastoLineas      GastoLinea[]
   proyectosInternos Proyecto[]
+  pedidosEquipo    PedidoEquipo[]
 
   @@index([tipo, activo])
   @@map("centro_costo")

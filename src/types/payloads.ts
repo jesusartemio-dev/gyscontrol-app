@@ -705,21 +705,29 @@ export interface CotizacionProveedorItemUpdatePayload
   extends Partial<CotizacionProveedorItemPayload> {}
 
 export interface PedidoEquipoPayload {
-  proyectoId: string
+  proyectoId?: string           // Requerido si no hay centroCostoId
+  centroCostoId?: string        // Requerido si no hay proyectoId (pedido interno)
   responsableId: string
   listaId?: string | null
-  nombre?: string | null        // ✅ nombre descriptivo del pedido
+  nombre?: string | null
   estado?: EstadoPedido
   observacion?: string
-  fechaPedido?: string         // ✅ se mantiene por compatibilidad
-  fechaNecesaria: string       // ✅ obligatoria: la fecha que PROYECTOS necesita el pedido
-  fechaEntregaEstimada?: string // logística propone esta fecha
-  fechaEntregaReal?: string     // fecha cuando se entregó
-  prioridad?: 'baja' | 'media' | 'alta' | 'critica' // ✅ prioridad del pedido
-  esUrgente?: boolean          // ✅ marca si es urgente
-  itemsSeleccionados?: Array<{ // ✅ items seleccionados desde el modal contextual
+  fechaPedido?: string
+  fechaNecesaria: string
+  fechaEntregaEstimada?: string
+  fechaEntregaReal?: string
+  prioridad?: 'baja' | 'media' | 'alta' | 'critica'
+  esUrgente?: boolean
+  itemsSeleccionados?: Array<{
     listaEquipoItemId: string
     cantidadPedida: number
+  }>
+  itemsLibres?: Array<{         // Items manuales para pedidos internos (sin lista)
+    codigo: string
+    descripcion: string
+    unidad: string
+    cantidadPedida: number
+    precioUnitario?: number
   }>
 }
 

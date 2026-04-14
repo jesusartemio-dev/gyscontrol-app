@@ -109,8 +109,8 @@ export async function GET(req: Request) {
           item.codigo.toLowerCase().includes(busqueda) ||
           item.descripcion.toLowerCase().includes(busqueda) ||
           item.pedidoEquipo.codigo.toLowerCase().includes(busqueda) ||
-          item.pedidoEquipo.proyecto.nombre.toLowerCase().includes(busqueda) ||
-          item.pedidoEquipo.proyecto.codigo.toLowerCase().includes(busqueda)
+          (item.pedidoEquipo.proyecto?.nombre.toLowerCase() ?? '').includes(busqueda) ||
+          (item.pedidoEquipo.proyecto?.codigo.toLowerCase() ?? '').includes(busqueda)
         )
       : items
 
@@ -142,6 +142,9 @@ export async function GET(req: Request) {
     for (const item of conDisponible) {
       const proy = item.pedidoEquipo.proyecto
       const ped = item.pedidoEquipo
+
+      // Skip internal pedidos (no project) in this requerimiento grouping
+      if (!proy) continue
 
       if (!byProyecto.has(proy.id)) {
         byProyecto.set(proy.id, {
