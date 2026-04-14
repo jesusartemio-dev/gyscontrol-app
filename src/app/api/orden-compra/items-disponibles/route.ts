@@ -24,14 +24,13 @@ export async function GET(req: Request) {
     }
     const proveedorId = searchParams.get('proveedorId') || undefined
 
-    // Items de pedidos elegibles (enviado/atendido/parcial) sin OC existente
+    // Items de pedidos elegibles (enviado/atendido/parcial) con cantidad restante > 0
     const pedidoItems = await prisma.pedidoEquipoItem.findMany({
       where: {
         pedidoEquipo: {
           proyectoId,
           estado: { in: ['enviado', 'atendido', 'parcial'] },
         },
-        ordenCompraItems: { none: {} },
         estado: { notIn: ['cancelado', 'entregado'] },
         ...(proveedorId ? { proveedorId } : {}),
       },
@@ -45,6 +44,7 @@ export async function GET(req: Request) {
         proveedorId: true,
         proveedorNombre: true,
         listaEquipoItemId: true,
+        ordenCompraItems: { select: { cantidad: true } },
         pedidoEquipo: {
           select: { id: true, codigo: true },
         },
@@ -55,13 +55,21 @@ export async function GET(req: Request) {
       orderBy: { createdAt: 'desc' },
     })
 
+    const itemsConRestante = pedidoItems
+      .map(item => {
+        const totalOrdenado = item.ordenCompraItems.reduce((sum, oci) => sum + (oci.cantidad || 0), 0)
+        const cantidadRestante = item.cantidadPedida - totalOrdenado
+        return { ...item, cantidadRestante }
+      })
+      .filter(item => item.cantidadRestante > 0)
+
     return NextResponse.json({
-      items: pedidoItems.map(item => ({
+      items: itemsConRestante.map(item => ({
         id: item.id,
         codigo: item.codigo,
         descripcion: item.descripcion,
         unidad: item.unidad,
-        cantidad: item.cantidadPedida,
+        cantidad: item.cantidadRestante,
         precioUnitario: item.precioUnitario || 0,
         proveedorId: item.proveedorId,
         proveedorNombre: item.proveedor?.nombre || item.proveedorNombre || null,
