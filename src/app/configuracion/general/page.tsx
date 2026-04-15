@@ -260,8 +260,9 @@ export default function ConfiguracionGeneralPage() {
                   type="number"
                   min="1"
                   max="5"
+                  step="0.01"
                   value={config.semanasxMes}
-                  onChange={(e) => setConfig({ ...config, semanasxMes: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => setConfig({ ...config, semanasxMes: parseFloat(e.target.value) || 0 })}
                   className="w-24 text-center font-mono"
                 />
               </div>
