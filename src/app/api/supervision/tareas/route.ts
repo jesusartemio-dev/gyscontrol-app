@@ -282,38 +282,60 @@ export async function POST(request: NextRequest) {
     if (!proyecto) return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 })
 
     // Para proyectos internos: el EDT es automático ("General"), no se requiere del usuario
-    let edtIdFinal: string
-    let cronogramaId: string
+    let edtIdFinal: string = ''
+    let cronogramaId: string = ''
 
     if (proyecto.esInterno) {
-      // Buscar el cronograma de ejecución del proyecto interno
-      const cronograma = await prisma.proyectoCronograma.findFirst({
+      // Buscar o auto-crear el cronograma de ejecución del proyecto interno
+      let cronograma = await prisma.proyectoCronograma.findFirst({
         where: { proyectoId, tipo: 'ejecucion' }
       })
       if (!cronograma) {
-        return NextResponse.json({ error: 'El proyecto interno no tiene cronograma de ejecución. Contacte al administrador.' }, { status: 400 })
+        cronograma = await prisma.proyectoCronograma.create({
+          data: {
+            id: randomUUID(),
+            proyectoId,
+            tipo: 'ejecucion',
+            nombre: 'Ejecución',
+            updatedAt: new Date(),
+          }
+        })
       }
       cronogramaId = cronograma.id
 
+      // Intentar usar el EDT seleccionado explícitamente
       if (proyectoEdtId) {
-        // Usar el EDT que el usuario seleccionó explícitamente
         const edtElegido = await prisma.proyectoEdt.findFirst({
           where: { id: proyectoEdtId, proyectoId, proyectoCronogramaId: cronograma.id }
         })
-        if (!edtElegido) {
-          return NextResponse.json({ error: 'El EDT seleccionado no pertenece a este proyecto interno.' }, { status: 400 })
-        }
-        edtIdFinal = edtElegido.id
-      } else {
-        // Fallback: primer EDT del cronograma (proyectos con un solo EDT "General")
-        const edtGeneral = await prisma.proyectoEdt.findFirst({
-          where: { proyectoId, proyectoCronogramaId: cronograma.id },
-          orderBy: { orden: 'asc' }
+        if (edtElegido) edtIdFinal = edtElegido.id
+      }
+
+      // Si no hay EDT resuelto, buscar o auto-crear el EDT "GEN" (convención de proyectos internos)
+      if (!edtIdFinal) {
+        let edtGen = await prisma.proyectoEdt.findFirst({
+          where: { proyectoId, proyectoCronogramaId: cronograma.id, nombre: 'GEN' }
         })
-        if (!edtGeneral) {
-          return NextResponse.json({ error: 'El proyecto interno no tiene EDT configurado. Contacte al administrador.' }, { status: 400 })
+        if (!edtGen) {
+          // Asegurar que exista "GEN" en el catálogo Edt
+          const edtCatalog = await prisma.edt.upsert({
+            where: { nombre: 'GEN' },
+            create: { nombre: 'GEN', updatedAt: new Date() },
+            update: {}
+          })
+          edtGen = await prisma.proyectoEdt.create({
+            data: {
+              id: randomUUID(),
+              proyectoId,
+              proyectoCronogramaId: cronograma.id,
+              edtId: edtCatalog.id,
+              nombre: 'GEN',
+              orden: 1,
+              updatedAt: new Date(),
+            }
+          })
         }
-        edtIdFinal = edtGeneral.id
+        edtIdFinal = edtGen.id
       }
     } else {
       // Proyecto regular: EDT requerido

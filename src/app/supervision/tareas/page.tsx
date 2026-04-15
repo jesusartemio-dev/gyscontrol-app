@@ -458,10 +458,14 @@ export default function SupervisionTareasPage() {
 
       // Buscar el cronograma de ejecución
       const cronogramaEjecucion = cronogramas.find((c: any) => c.tipo === 'ejecucion')
+      const esInterno = proyectosInternos.some(p => p.id === proyectoId)
 
       if (!cronogramaEjecucion) {
         setEdtsProyecto([])
-        setErrorCrearTarea('Este proyecto no tiene un Cronograma de Ejecución configurado. Debe crearlo primero en la sección de Cronograma del proyecto.')
+        // Para proyectos internos, la API crea automáticamente el cronograma + EDT "General"
+        if (!esInterno) {
+          setErrorCrearTarea('Este proyecto no tiene un Cronograma de Ejecución configurado. Debe crearlo primero en la sección de Cronograma del proyecto.')
+        }
         return
       }
 
@@ -474,7 +478,10 @@ export default function SupervisionTareasPage() {
 
         if (edts.length === 0) {
           setEdtsProyecto([])
-          setErrorCrearTarea('El Cronograma de Ejecución no tiene EDTs configurados. Debe agregar EDTs al cronograma primero.')
+          // Para proyectos internos sin EDTs, la API crea automáticamente el EDT "General"
+          if (!esInterno) {
+            setErrorCrearTarea('El Cronograma de Ejecución no tiene EDTs configurados. Debe agregar EDTs al cronograma primero.')
+          }
           return
         }
 
@@ -744,9 +751,10 @@ export default function SupervisionTareasPage() {
   // Abrir modal para crear
   const abrirCrearModal = () => {
     const proyectoIdInicial = filtroProyecto || ''
+    const esInterno = proyectosInternos.some(p => p.id === proyectoIdInicial)
     setErrorCrearTarea(null)
     setNuevaTarea({
-      modo: 'proyecto',
+      modo: esInterno ? 'interno' : 'proyecto',
       proyectoId: proyectoIdInicial,
       proyectoEdtId: '',
       nombre: '',
@@ -772,7 +780,8 @@ export default function SupervisionTareasPage() {
       toast({ title: 'Error', description: 'Debe seleccionar un proyecto', variant: 'destructive' })
       return
     }
-    if (!nuevaTarea.proyectoEdtId) {
+    // Para proyectos internos el EDT es opcional: la API auto-crea "General" si no existe
+    if (nuevaTarea.modo !== 'interno' && !nuevaTarea.proyectoEdtId) {
       toast({ title: 'Error', description: 'Debe seleccionar un EDT / Área', variant: 'destructive' })
       return
     }
@@ -1542,14 +1551,19 @@ export default function SupervisionTareasPage() {
                   )}
                 </div>
                 <div>
-                  <Label className="text-xs text-gray-500">Área (EDT) *</Label>
+                  <Label className="text-xs text-gray-500">Área (EDT)</Label>
                   <Select
                     value={nuevaTarea.proyectoEdtId || '__none__'}
                     onValueChange={(v) => setNuevaTarea({ ...nuevaTarea, proyectoEdtId: v === '__none__' ? '' : v })}
                     disabled={!nuevaTarea.proyectoId || cargandoEdts || edtsProyecto.length === 0}
                   >
                     <SelectTrigger className="h-9">
-                      <SelectValue placeholder={cargandoEdts ? 'Cargando...' : edtsProyecto.length === 0 ? 'Selecciona proyecto' : 'Área...'} />
+                      <SelectValue placeholder={
+                        cargandoEdts ? 'Cargando...' :
+                        !nuevaTarea.proyectoId ? 'Selecciona proyecto' :
+                        edtsProyecto.length === 0 ? 'GEN (automático)' :
+                        'Área...'
+                      } />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__none__">Seleccionar...</SelectItem>

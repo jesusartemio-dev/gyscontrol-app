@@ -111,14 +111,37 @@ export async function POST(req: NextRequest) {
       })
 
       // Auto-crear EDT "GEN" vinculado al catálogo
+      const edtId = randomUUID()
       await tx.proyectoEdt.create({
         data: {
-          id: randomUUID(),
+          id: edtId,
           proyectoId,
           proyectoCronogramaId: cronogramaId,
           edtId: edtCatalogo.id,
           nombre: 'GEN',
           orden: 1,
+          updatedAt: new Date(),
+        }
+      })
+
+      // Auto-crear tarea "Trabajo General" en el EDT GEN
+      const fechaFin = new Date(fechaInicio ? new Date(fechaInicio) : new Date())
+      fechaFin.setFullYear(fechaFin.getFullYear() + 1)
+      await tx.proyectoTarea.create({
+        data: {
+          id: randomUUID(),
+          proyectoEdtId: edtId,
+          proyectoCronogramaId: cronogramaId,
+          nombre: 'Trabajo General',
+          descripcion: '[EXTRA]',
+          fechaInicio: fechaInicio ? new Date(fechaInicio) : new Date(),
+          fechaFin,
+          horasEstimadas: 9999,
+          personasEstimadas: 1,
+          estado: 'en_progreso',
+          prioridad: 'media',
+          orden: 0,
+          creadoPorId: session.user.id,
           updatedAt: new Date(),
         }
       })
