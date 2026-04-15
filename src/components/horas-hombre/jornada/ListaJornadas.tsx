@@ -54,7 +54,9 @@ import {
   Loader2,
   X,
   RefreshCcw,
-  Trash2
+  Trash2,
+  CalendarCheck,
+  Plus
 } from 'lucide-react'
 
 type EstadoJornada = 'iniciado' | 'pendiente' | 'aprobado' | 'rechazado'
@@ -686,6 +688,10 @@ export function ListaJornadas({
                                     variant="outline"
                                     className={`text-[10px] px-1.5 py-0 font-normal w-fit cursor-default ${hasPct ? getProgresoColor(colorPct) : 'bg-gray-50 text-gray-600 border-gray-200'}`}
                                   >
+                                    {tarea.proyectoTareaId
+                                      ? <CalendarCheck size={9} className="mr-0.5 shrink-0 opacity-60" />
+                                      : <Plus size={9} className="mr-0.5 shrink-0 opacity-60" />
+                                    }
                                     <span className="truncate max-w-[140px]">{getNombreTareaCorto(tarea)}</span>
                                     {hasRange ? (
                                       <span className="ml-1 font-semibold">{pctInicial}%→{pctFinal}%</span>
@@ -696,6 +702,7 @@ export function ListaJornadas({
                                 </TooltipTrigger>
                                 <TooltipContent side="top" className="max-w-[250px]">
                                   <p className="font-medium">{nombreCompleto}</p>
+                                  <p className="text-[11px] opacity-60">{tarea.proyectoTareaId ? 'Tarea de cronograma' : 'Tarea extra'}</p>
                                   {hasRange ? (
                                     <p className="text-[11px] opacity-80">Progreso: {pctInicial}% → {pctFinal}%</p>
                                   ) : hasPct ? (
@@ -721,7 +728,7 @@ export function ListaJornadas({
                                     const hasR = pI !== null && pI !== undefined && pF !== null && pF !== undefined
                                     return (
                                       <p key={t.id} className="text-[11px]">
-                                        {nombre}{hasR ? ` · ${pI}%→${pF}%` : pF !== null && pF !== undefined ? ` · ${pF}%` : ''}
+                                        {t.proyectoTareaId ? '📅' : '➕'} {nombre}{hasR ? ` · ${pI}%→${pF}%` : pF !== null && pF !== undefined ? ` · ${pF}%` : ''}
                                       </p>
                                     )
                                   })}

@@ -163,7 +163,7 @@ export async function GET(request: NextRequest) {
     }))
 
     const todasLasTareas = [...tareasFormateadas, ...tareasFormateadasSimples]
-      .sort((a, b) => new Date(a.fechaFin).getTime() - new Date(b.fechaFin).getTime())
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }))
 
     const totalTareas = todasLasTareas.length
     const tareasCompletadas = todasLasTareas.filter(t => t.estado === 'completada').length
