@@ -48,7 +48,7 @@ export async function PUT(req: Request) {
         tipoCambio: body.tipoCambio !== undefined ? parseFloat(body.tipoCambio) : undefined,
         horasSemanales: body.horasSemanales !== undefined ? parseInt(body.horasSemanales) : undefined,
         diasLaborables: body.diasLaborables !== undefined ? parseInt(body.diasLaborables) : undefined,
-        semanasxMes: body.semanasxMes !== undefined ? parseInt(body.semanasxMes) : undefined,
+        semanasxMes: body.semanasxMes !== undefined ? parseFloat(body.semanasxMes) : undefined,
         horasMensuales,
         updatedBy: body.updatedBy || null,
       },
