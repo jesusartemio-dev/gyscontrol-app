@@ -1,6 +1,23 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -45,7 +62,8 @@ import {
   CalendarClock,
   Pencil,
   Loader2,
-  Trash2
+  Trash2,
+  GripVertical
 } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Info } from 'lucide-react'
@@ -136,6 +154,37 @@ interface Metricas {
   tareasProximasVencer: number
 }
 
+// Contexto para pasar listeners del drag handle hacia dentro de SortableRow
+const DragHandleContext = React.createContext<{ listeners: any; attributes: any } | null>(null)
+
+function DragHandle() {
+  const ctx = React.useContext(DragHandleContext)
+  if (!ctx) return null
+  return (
+    <span {...ctx.attributes} {...ctx.listeners} className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 flex items-center">
+      <GripVertical className="h-4 w-4" />
+    </span>
+  )
+}
+
+// Fila sortable con handle de arrastre
+function SortableRow({ id, isDragEnabled, children }: { id: string; isDragEnabled: boolean; children: React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id, disabled: !isDragEnabled })
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 1 : undefined
+  }
+  return (
+    <DragHandleContext.Provider value={{ listeners, attributes }}>
+      <TableRow ref={setNodeRef} style={style}>
+        {children}
+      </TableRow>
+    </DragHandleContext.Provider>
+  )
+}
+
 export default function SupervisionTareasPage() {
   const hasFetchedRef = useRef(false)
   const [tareas, setTareas] = useState<Tarea[]>([])
@@ -166,6 +215,18 @@ export default function SupervisionTareasPage() {
   const [showCrearModal, setShowCrearModal] = useState(false)
   const [creandoTarea, setCreandoTarea] = useState(false)
   const [errorCrearTarea, setErrorCrearTarea] = useState<string | null>(null)
+
+  // Drag & drop
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  )
+
+  // Detectar si el filtro actual es un proyecto interno
+  const proyectoInternoSeleccionado = filtroProyecto
+    ? proyectosInternos.find(p => p.id === filtroProyecto) ?? null
+    : null
+  const isDragEnabled = !!proyectoInternoSeleccionado
 
   // Modal de eliminar
   const [showEliminarModal, setShowEliminarModal] = useState(false)
@@ -204,6 +265,28 @@ export default function SupervisionTareasPage() {
 
   const { data: session, status } = useSession()
   const { toast } = useToast()
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    setTareasFiltradas(prev => {
+      const oldIndex = prev.findIndex(t => t.id === active.id)
+      const newIndex = prev.findIndex(t => t.id === over.id)
+      const reordenadas = arrayMove(prev, oldIndex, newIndex)
+      const ordenes = reordenadas.map((t, i) => ({ id: t.id, orden: i + 1 }))
+
+      fetch('/api/supervision/tareas/reordenar', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ proyectoId: filtroProyecto, ordenes })
+      }).catch(() => {
+        toast({ title: 'Error', description: 'No se pudo guardar el orden', variant: 'destructive' })
+      })
+
+      return reordenadas
+    })
+  }, [filtroProyecto, toast])
 
   // Cargar datos
   const cargarDatos = async () => {
@@ -966,6 +1049,7 @@ export default function SupervisionTareasPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    {isDragEnabled && <TableHead className="w-8" />}
                     <TableHead>Proyecto</TableHead>
                     <TableHead>Tarea</TableHead>
                     <TableHead>Responsable</TableHead>
@@ -1006,10 +1090,17 @@ export default function SupervisionTareasPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
+                  <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                  <SortableContext items={tareasFiltradas.map(t => t.id)} strategy={verticalListSortingStrategy}>
                   {tareasFiltradas.map((tarea) => {
                     const diasInfo = getDiasRestantes(tarea.fechaFin)
                     return (
-                      <TableRow key={`${tarea.tipo}-${tarea.id}`}>
+                      <SortableRow key={tarea.id} id={tarea.id} isDragEnabled={isDragEnabled}>
+                        {isDragEnabled && (
+                          <TableCell className="w-8 pr-0">
+                            <DragHandle />
+                          </TableCell>
+                        )}
                         <TableCell>
                           <div>
                             {tarea.esInterno ? (
@@ -1201,9 +1292,11 @@ export default function SupervisionTareasPage() {
                             </Button>
                           </div>
                         </TableCell>
-                      </TableRow>
+                      </SortableRow>
                     )
                   })}
+                  </SortableContext>
+                  </DndContext>
                 </TableBody>
               </Table>
             </div>
