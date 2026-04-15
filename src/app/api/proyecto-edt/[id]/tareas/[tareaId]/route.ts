@@ -255,6 +255,19 @@ export async function DELETE(
       )
     }
 
+    // Verificar si tiene horas registradas
+    const [horasRegistradas, horasCampo] = await Promise.all([
+      prisma.registroHoras.count({ where: { proyectoTareaId: tareaId } }),
+      prisma.registroHorasCampoTarea.count({ where: { proyectoTareaId: tareaId } })
+    ])
+
+    if (horasRegistradas > 0 || horasCampo > 0) {
+      return NextResponse.json(
+        { error: 'No se puede eliminar una tarea que ya tiene horas registradas' },
+        { status: 409 }
+      )
+    }
+
     await prisma.proyectoTarea.delete({
       where: { id: tareaId }
     })

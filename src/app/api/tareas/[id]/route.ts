@@ -397,7 +397,19 @@ export async function DELETE(
         { status: 409 }
       )
     }
-    
+
+    // Verificar si tiene horas registradas
+    const horasRegistradas = await prisma.registroHoras.count({
+      where: { proyectoTareaId: id }
+    })
+
+    if (horasRegistradas > 0) {
+      return NextResponse.json(
+        { error: 'No se puede eliminar una tarea que ya tiene horas registradas' },
+        { status: 409 }
+      )
+    }
+
     // 🗑️ Eliminar la tarea (Prisma manejará las relaciones en cascada)
     await prisma.tarea.delete({
       where: { id }

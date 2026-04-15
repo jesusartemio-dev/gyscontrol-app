@@ -44,7 +44,8 @@ import {
   Zap,
   CalendarClock,
   Pencil,
-  Loader2
+  Loader2,
+  Trash2
 } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Info } from 'lucide-react'
@@ -66,6 +67,7 @@ interface Tarea {
   esInterno: boolean
   centroCostoNombre?: string | null
   edtNombre: string
+  proyectoEdtId: string | null
   actividadNombre: string | null
   esExtra: boolean
   responsableId: string | null
@@ -164,6 +166,12 @@ export default function SupervisionTareasPage() {
   const [showCrearModal, setShowCrearModal] = useState(false)
   const [creandoTarea, setCreandoTarea] = useState(false)
   const [errorCrearTarea, setErrorCrearTarea] = useState<string | null>(null)
+
+  // Modal de eliminar
+  const [showEliminarModal, setShowEliminarModal] = useState(false)
+  const [tareaAEliminar, setTareaAEliminar] = useState<Tarea | null>(null)
+  const [eliminandoTarea, setEliminandoTarea] = useState(false)
+  const [errorEliminarTarea, setErrorEliminarTarea] = useState<string | null>(null)
 
   // Modal de edición
   const [showEditarModal, setShowEditarModal] = useState(false)
@@ -454,6 +462,35 @@ export default function SupervisionTareasPage() {
         description: 'No se pudo asignar la tarea',
         variant: 'destructive'
       })
+    }
+  }
+
+  // Eliminar tarea
+  const eliminarTarea = async () => {
+    if (!tareaAEliminar) return
+    setEliminandoTarea(true)
+    setErrorEliminarTarea(null)
+    try {
+      let url: string
+      if (tareaAEliminar.tipo === 'proyecto_tarea' && tareaAEliminar.proyectoEdtId) {
+        url = `/api/proyecto-edt/${tareaAEliminar.proyectoEdtId}/tareas/${tareaAEliminar.id}`
+      } else {
+        url = `/api/tareas/${tareaAEliminar.id}`
+      }
+      const response = await fetch(url, { method: 'DELETE' })
+      const data = await response.json()
+      if (!response.ok) {
+        setErrorEliminarTarea(data.error || 'No se pudo eliminar la tarea')
+        return
+      }
+      toast({ title: 'Tarea eliminada', description: 'La tarea fue eliminada correctamente' })
+      setShowEliminarModal(false)
+      setTareaAEliminar(null)
+      cargarDatos()
+    } catch {
+      setErrorEliminarTarea('Error al conectar con el servidor')
+    } finally {
+      setEliminandoTarea(false)
     }
   }
 
@@ -1153,6 +1190,15 @@ export default function SupervisionTareasPage() {
                               <UserPlus className="h-4 w-4 mr-1" />
                               {tarea.responsableId ? 'Cambiar' : 'Asignar'}
                             </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => { setTareaAEliminar(tarea); setErrorEliminarTarea(null); setShowEliminarModal(true) }}
+                              title="Eliminar tarea"
+                              className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -1561,6 +1607,37 @@ export default function SupervisionTareasPage() {
                 <Plus className="h-4 w-4 mr-1" />
               )}
               Crear
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Modal eliminar tarea */}
+      <Dialog open={showEliminarModal} onOpenChange={(open) => { if (!eliminandoTarea) { setShowEliminarModal(open); if (!open) setErrorEliminarTarea(null) } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <Trash2 className="h-5 w-5" />
+              Eliminar tarea
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-2 space-y-3">
+            <p className="text-sm text-muted-foreground">
+              ¿Estás seguro de que deseas eliminar la tarea <span className="font-semibold text-foreground">{tareaAEliminar?.nombre}</span>? Esta acción no se puede deshacer.
+            </p>
+            {errorEliminarTarea && (
+              <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                {errorEliminarTarea}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEliminarModal(false)} disabled={eliminandoTarea}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={eliminarTarea} disabled={eliminandoTarea}>
+              {eliminandoTarea ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Trash2 className="h-4 w-4 mr-1" />}
+              Eliminar
             </Button>
           </DialogFooter>
         </DialogContent>
