@@ -150,6 +150,7 @@ export async function GET(request: NextRequest) {
         totalHoras,
         tareas: j.tareas.map(t => ({
           id: t.id,
+          proyectoTareaId: t.proyectoTareaId,
           proyectoTarea: t.proyectoTarea,
           nombreTareaExtra: t.nombreTareaExtra,
           descripcion: t.descripcion,

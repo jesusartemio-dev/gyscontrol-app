@@ -83,6 +83,7 @@ interface PersonalPlanificado {
 
 interface TareaJornadaResumen {
   id: string
+  proyectoTareaId?: string | null
   proyectoTarea?: {
     id: string
     nombre: string
