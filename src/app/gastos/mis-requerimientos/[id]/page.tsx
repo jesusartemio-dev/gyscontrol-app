@@ -519,11 +519,17 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
   const canAvanzarDepositado = canDepositar && (hoja.depositos?.length ?? 0) > 0
   const canRendir = (hoja.estado === 'aprobado' && !hoja.requiereAnticipo) || hoja.estado === 'depositado'
   const canValidarLineas = hoja.estado === 'rendido' && ['admin', 'gerente', 'administracion'].includes(role || '')
-  // Solo contar las líneas que tienen UI de conformidad (excluir las vinculadas a materiales)
+  // Solo contar las líneas que tienen UI de conformidad (excluir las vinculadas a materiales en gastos)
   const lineasConformidad = hoja.tipoPropósito === 'compra_materiales'
     ? lineas.filter(l => !l.gastoComprobanteId)
     : lineas
-  const allLineasConforme = lineasConformidad.length > 0 && lineasConformidad.every(l => l.conformidad === 'conforme')
+  const itemsMaterialesConformidad = hoja.tipoPropósito === 'compra_materiales'
+    ? (hoja.itemsMateriales || [])
+    : []
+  const allLineasConforme =
+    (lineasConformidad.length > 0 || itemsMaterialesConformidad.length > 0) &&
+    lineasConformidad.every(l => l.conformidad === 'conforme') &&
+    itemsMaterialesConformidad.every(i => i.conformidad === 'conforme')
   const canValidar = canValidarLineas && allLineasConforme
   const canCerrar = hoja.estado === 'validado' && ['admin', 'gerente', 'coordinador', 'coordinador_logistico', 'administracion'].includes(role || '')
   const canRechazar = ['enviado', 'rendido', 'validado'].includes(hoja.estado) && ['admin', 'gerente', 'gestor', 'coordinador', 'coordinador_logistico', 'administracion'].includes(role || '')
@@ -627,7 +633,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
                   </Button>
                   {!allLineasConforme && (
                     <span className="text-xs text-amber-600">
-                      {lineasConformidad.filter(l => l.conformidad !== 'conforme').length} línea{lineasConformidad.filter(l => l.conformidad !== 'conforme').length !== 1 ? 's' : ''} pendiente{lineasConformidad.filter(l => l.conformidad !== 'conforme').length !== 1 ? 's' : ''}
+                      {lineasConformidad.filter(l => l.conformidad !== 'conforme').length + itemsMaterialesConformidad.filter(i => i.conformidad !== 'conforme').length} pendiente{(lineasConformidad.filter(l => l.conformidad !== 'conforme').length + itemsMaterialesConformidad.filter(i => i.conformidad !== 'conforme').length) !== 1 ? 's' : ''}
                     </span>
                   )}
                 </div>
@@ -846,6 +852,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
           onChanged={loadData}
           canAddItem={['borrador', 'aprobado', 'depositado'].includes(hoja.estado)}
           canAddComprobante={canRendir || hoja.estado === 'rendido'}
+          showConformidad={canValidarLineas}
         />
       )}
 

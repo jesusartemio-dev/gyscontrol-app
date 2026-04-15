@@ -15,6 +15,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import {
   Package, Receipt, Loader2, AlertCircle, CheckCircle2, Wand2,
   Paperclip, ExternalLink, FileText, X, Upload, ChevronDown, ChevronRight, Eye, Plus, Search, Pencil, Check,
+  CircleCheck, Circle, CircleAlert,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { HojaDeGastos } from '@/types'
@@ -44,6 +45,7 @@ interface Props {
   onChanged: () => void
   canAddComprobante: boolean
   canAddItem?: boolean
+  showConformidad?: boolean
 }
 
 interface ComprobanteLinea {
@@ -53,7 +55,7 @@ interface ComprobanteLinea {
   monto: number
 }
 
-export default function RequerimientoItemsCard({ hoja, onChanged, canAddComprobante, canAddItem }: Props) {
+export default function RequerimientoItemsCard({ hoja, onChanged, canAddComprobante, canAddItem, showConformidad }: Props) {
   const items = hoja.itemsMateriales || []
   const comprobantes = hoja.comprobantes || []
 
@@ -154,6 +156,37 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
   const [editCantidad, setEditCantidad] = useState('')
   const [editPrecio, setEditPrecio] = useState('')
   const [savingEdit, setSavingEdit] = useState(false)
+
+  // Conformidad
+  const [conformidadLoading, setConformidadLoading] = useState<string | null>(null)
+  const [observarTarget, setObservarTarget] = useState<string | null>(null)
+  const [observarComentario, setObservarComentario] = useState('')
+
+  const handleConformidadItem = async (itemId: string, estado: 'conforme' | 'observado', comentario?: string) => {
+    if (estado === 'observado' && !comentario?.trim()) {
+      setObservarTarget(itemId)
+      setObservarComentario('')
+      return
+    }
+    setConformidadLoading(itemId)
+    try {
+      const res = await fetch(`/api/requerimiento-material-item/${itemId}/conformidad`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conformidad: estado, comentario }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Error al marcar conformidad')
+      }
+      setObservarTarget(null)
+      onChanged()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al marcar conformidad')
+    } finally {
+      setConformidadLoading(null)
+    }
+  }
 
   const startEditItem = (item: NonNullable<HojaDeGastos['itemsMateriales']>[number]) => {
     setEditingItemId(item.id)
@@ -625,6 +658,7 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                       <th className="text-right pb-2 pr-3 font-medium">P.U. Real</th>
                       <th className="text-right pb-2 font-medium">Total Est.</th>
                       <th className="text-right pb-2 font-medium">Total Real</th>
+                      {showConformidad && <th className="text-left pb-2 pl-3 font-medium">Conformidad</th>}
                       {['borrador', 'depositado'].includes(hoja.estado) && <th className="pb-2 w-8" />}
                     </tr>
                   </thead>
@@ -707,6 +741,87 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                             ? <span className="text-green-700 font-medium">{fmt(item.totalReal)}</span>
                             : <span className="text-muted-foreground/50">—</span>}
                         </td>
+                        {showConformidad && (
+                          <td className="py-2 pl-3">
+                            {observarTarget === item.id ? (
+                              <div className="flex items-center gap-1">
+                                <input
+                                  autoFocus
+                                  type="text"
+                                  placeholder="Comentario..."
+                                  value={observarComentario}
+                                  onChange={e => setObservarComentario(e.target.value)}
+                                  className="border rounded px-1.5 py-0.5 text-xs w-32"
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter') handleConformidadItem(item.id, 'observado', observarComentario)
+                                    if (e.key === 'Escape') { setObservarTarget(null); setObservarComentario('') }
+                                  }}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleConformidadItem(item.id, 'observado', observarComentario)}
+                                  disabled={!observarComentario.trim() || conformidadLoading === item.id}
+                                  className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 hover:bg-amber-200 disabled:opacity-50"
+                                >
+                                  {conformidadLoading === item.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'OK'}
+                                </button>
+                                <button type="button" onClick={() => { setObservarTarget(null); setObservarComentario('') }} className="text-muted-foreground hover:text-foreground">
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </div>
+                            ) : item.conformidad === 'conforme' ? (
+                              <div className="flex items-center gap-1.5">
+                                <Badge className="text-[10px] px-1.5 py-0 h-4 bg-green-100 text-green-700 border-0 flex items-center gap-0.5">
+                                  <CircleCheck className="h-2.5 w-2.5" />
+                                  Conforme
+                                </Badge>
+                                <button
+                                  type="button"
+                                  onClick={e => { e.stopPropagation(); handleConformidadItem(item.id, 'observado') }}
+                                  disabled={conformidadLoading === item.id}
+                                  className="text-[10px] px-1 py-0 h-4 rounded text-amber-600 hover:bg-amber-50 disabled:opacity-50"
+                                  title="Cambiar a observado"
+                                >
+                                  Obs.
+                                </button>
+                              </div>
+                            ) : item.conformidad === 'observado' ? (
+                              <div className="flex items-center gap-1.5">
+                                <Badge className="text-[10px] px-1.5 py-0 h-4 bg-amber-100 text-amber-700 border-0 flex items-center gap-0.5" title={item.comentarioConformidad || ''}>
+                                  <CircleAlert className="h-2.5 w-2.5" />
+                                  Observado
+                                </Badge>
+                                <button
+                                  type="button"
+                                  onClick={() => handleConformidadItem(item.id, 'conforme')}
+                                  disabled={conformidadLoading === item.id}
+                                  className="text-[10px] px-1 py-0 h-4 rounded text-green-600 hover:bg-green-50 disabled:opacity-50"
+                                >
+                                  Conforme
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleConformidadItem(item.id, 'conforme')}
+                                  disabled={conformidadLoading === item.id}
+                                  className="text-[10px] px-1.5 py-0.5 rounded bg-green-50 text-green-700 hover:bg-green-100 border border-green-200 disabled:opacity-50"
+                                >
+                                  {conformidadLoading === item.id ? <Loader2 className="h-2.5 w-2.5 animate-spin inline" /> : 'Conforme'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={e => { e.stopPropagation(); handleConformidadItem(item.id, 'observado') }}
+                                  disabled={conformidadLoading === item.id}
+                                  className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 disabled:opacity-50"
+                                >
+                                  Observar
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        )}
                         {['borrador', 'depositado'].includes(hoja.estado) && (
                           <td className="py-2 pl-2">
                             <div className="flex items-center gap-1">

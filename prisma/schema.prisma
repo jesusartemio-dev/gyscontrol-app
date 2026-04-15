@@ -3529,6 +3529,11 @@ model RequerimientoMaterialItem {
   totalEstimado       Float?
   totalReal           Float?
 
+  // Conformidad
+  conformidad           String?   // conforme | observado | null
+  comentarioConformidad String?
+  conformadoEn          DateTime?
+
   createdAt           DateTime @default(now())
   updatedAt           DateTime
 

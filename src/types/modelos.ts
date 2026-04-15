@@ -2757,6 +2757,8 @@ export interface HojaDeGastos {
     pedidoEquipoItem?: { id: string; codigo: string; descripcion: string }
     proyecto?: Pick<Proyecto, 'id' | 'codigo' | 'nombre'>
     recepciones?: Array<{ id: string; estado: string }>
+    conformidad?: string | null
+    comentarioConformidad?: string | null
   }>
   comprobantes?: Array<{
     id: string
