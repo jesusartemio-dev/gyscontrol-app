@@ -1049,7 +1049,7 @@ export default function SupervisionTareasPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    {isDragEnabled && <TableHead className="w-8" />}
+                    {isDragEnabled && <TableHead className="w-12 text-center text-xs text-gray-400 font-normal">#</TableHead>}
                     <TableHead>Proyecto</TableHead>
                     <TableHead>Tarea</TableHead>
                     <TableHead>Responsable</TableHead>
@@ -1092,13 +1092,16 @@ export default function SupervisionTareasPage() {
                 <TableBody>
                   <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                   <SortableContext items={tareasFiltradas.map(t => t.id)} strategy={verticalListSortingStrategy}>
-                  {tareasFiltradas.map((tarea) => {
+                  {tareasFiltradas.map((tarea, idx) => {
                     const diasInfo = getDiasRestantes(tarea.fechaFin)
                     return (
                       <SortableRow key={tarea.id} id={tarea.id} isDragEnabled={isDragEnabled}>
                         {isDragEnabled && (
-                          <TableCell className="w-8 pr-0">
-                            <DragHandle />
+                          <TableCell className="w-12 pr-0">
+                            <div className="flex items-center gap-1">
+                              <DragHandle />
+                              <span className="text-[10px] font-mono text-gray-400 select-none">{idx + 1}</span>
+                            </div>
                           </TableCell>
                         )}
                         <TableCell>
