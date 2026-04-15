@@ -23,6 +23,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       where: {
         proyectoEdtId: edtId,
         proyectoActividadId: null,
+        estado: { not: 'completada' },
         proyectoEdt: { proyectoCronograma: { tipo: 'ejecucion' } }
       },
       include: {

@@ -26,6 +26,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           select: { id: true, name: true }
         },
         proyectoTarea: {
+          where: { estado: { not: 'completada' } },
           include: {
             user: {
               select: { id: true, name: true }
