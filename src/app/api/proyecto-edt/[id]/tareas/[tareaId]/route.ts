@@ -215,20 +215,25 @@ export async function DELETE(
 
     const { id, tareaId } = await params
 
+    const rolesSupervision = ['admin', 'coordinador', 'gestor']
+    const esRolSupervision = rolesSupervision.includes(session.user.role || '')
+
     // Verificar permisos y existencia
     const tarea = await prisma.proyectoTarea.findFirst({
-      where: {
-        id: tareaId,
-        proyectoEdtId: id,
-        proyectoEdt: {
-          proyecto: {
-            OR: [
-              { comercialId: session.user.id },
-              { gestorId: session.user.id }
-            ]
+      where: esRolSupervision
+        ? { id: tareaId, proyectoEdtId: id }
+        : {
+            id: tareaId,
+            proyectoEdtId: id,
+            proyectoEdt: {
+              proyecto: {
+                OR: [
+                  { comercialId: session.user.id },
+                  { gestorId: session.user.id }
+                ]
+              }
+            }
           }
-        }
-      }
     })
 
     if (!tarea) {
