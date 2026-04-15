@@ -86,12 +86,21 @@ export default function GastoLineaTable({
   const [deleteTarget, setDeleteTarget] = useState<GastoLinea | null>(null)
   const [loading, setLoading] = useState(false)
   const [conformidadLoading, setConformidadLoading] = useState<string | null>(null)
+  const [observarTarget, setObservarTarget] = useState<string | null>(null)
+  const [observarComentario, setObservarComentario] = useState('')
 
-  const handleConformidadRapida = async (lineaId: string, estado: 'conforme' | 'observado') => {
+  const handleConformidadRapida = async (lineaId: string, estado: 'conforme' | 'observado', comentario?: string) => {
+    if (estado === 'observado' && !comentario?.trim()) {
+      setObservarTarget(lineaId)
+      setObservarComentario('')
+      return
+    }
     setConformidadLoading(lineaId)
     try {
-      await marcarConformidad(lineaId, estado)
+      await marcarConformidad(lineaId, estado, comentario)
       onChanged()
+      setObservarTarget(null)
+      setObservarComentario('')
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Error al marcar conformidad')
     } finally {
@@ -501,16 +510,41 @@ export default function GastoLineaTable({
                               <CheckCircle2 className="h-3 w-3 mr-0.5" />
                               Conforme
                             </Badge>
-                            <button
-                              className="text-[10px] text-orange-600 hover:underline flex items-center gap-0.5 disabled:opacity-50"
-                              onClick={() => handleConformidadRapida(linea.id, 'observado')}
-                              disabled={conformidadLoading === linea.id}
-                            >
-                              {conformidadLoading === linea.id
-                                ? <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                                : <AlertCircle className="h-2.5 w-2.5" />}
-                              Observar
-                            </button>
+                            {observarTarget === linea.id ? (
+                              <div className="flex flex-col gap-1" onClick={e => e.stopPropagation()}>
+                                <input
+                                  autoFocus
+                                  className="text-[10px] border rounded px-1.5 py-0.5 w-36 outline-none focus:border-orange-400"
+                                  placeholder="Motivo..."
+                                  value={observarComentario}
+                                  onChange={e => setObservarComentario(e.target.value)}
+                                />
+                                <div className="flex gap-1">
+                                  <button
+                                    className="text-[10px] text-orange-700 bg-orange-50 border border-orange-200 rounded px-1.5 py-0.5 disabled:opacity-50"
+                                    onClick={() => handleConformidadRapida(linea.id, 'observado', observarComentario)}
+                                    disabled={!observarComentario.trim() || conformidadLoading === linea.id}
+                                  >
+                                    {conformidadLoading === linea.id ? <Loader2 className="h-2.5 w-2.5 animate-spin inline" /> : 'Confirmar'}
+                                  </button>
+                                  <button
+                                    className="text-[10px] text-gray-500 hover:underline"
+                                    onClick={() => setObservarTarget(null)}
+                                  >
+                                    Cancelar
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <button
+                                className="text-[10px] text-orange-600 hover:underline flex items-center gap-0.5 disabled:opacity-50"
+                                onClick={e => { e.stopPropagation(); handleConformidadRapida(linea.id, 'observado') }}
+                                disabled={conformidadLoading === linea.id}
+                              >
+                                <AlertCircle className="h-2.5 w-2.5" />
+                                Observar
+                              </button>
+                            )}
                           </div>
                         ) : linea.conformidad === 'observado' ? (
                           <div className="flex flex-col gap-1">
