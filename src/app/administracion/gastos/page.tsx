@@ -231,7 +231,24 @@ function GestionGastosContent() {
 
   const filtered = useMemo(() => {
     let result = hojas
-    // Exclude borradores from admin view
+
+    if (searchTerm) {
+      // Con búsqueda activa: buscar en todas (sin importar el tab), excepto borradores
+      const term = searchTerm.toLowerCase()
+      return result.filter(h =>
+        h.estado !== 'borrador' && (
+          h.numero.toLowerCase().includes(term) ||
+          h.motivo.toLowerCase().includes(term) ||
+          h.proyecto?.codigo?.toLowerCase().includes(term) ||
+          h.proyecto?.nombre?.toLowerCase().includes(term) ||
+          h.centroCosto?.nombre?.toLowerCase().includes(term) ||
+          h.empleado?.name?.toLowerCase().includes(term) ||
+          h.empleado?.email?.toLowerCase().includes(term)
+        )
+      )
+    }
+
+    // Sin búsqueda: filtrar por tab
     if (tab === 'todas') {
       result = result.filter(h => h.estado !== 'borrador')
     } else if (tab === 'aprobado') {
@@ -242,18 +259,6 @@ function GestionGastosContent() {
     }
     if (filtroTipo !== 'todas') {
       result = result.filter(h => h.tipoPropósito === filtroTipo)
-    }
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase()
-      result = result.filter(h =>
-        h.numero.toLowerCase().includes(term) ||
-        h.motivo.toLowerCase().includes(term) ||
-        h.proyecto?.codigo?.toLowerCase().includes(term) ||
-        h.proyecto?.nombre?.toLowerCase().includes(term) ||
-        h.centroCosto?.nombre?.toLowerCase().includes(term) ||
-        h.empleado?.name?.toLowerCase().includes(term) ||
-        h.empleado?.email?.toLowerCase().includes(term)
-      )
     }
     return result
   }, [hojas, tab, filtroTipo, searchTerm])
