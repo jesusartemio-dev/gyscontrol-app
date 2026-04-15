@@ -31,8 +31,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
-import { Plus, Loader2, Trash2, Edit, Receipt, ScanLine, ShieldCheck, FileSpreadsheet, Download, ArrowRightLeft, Search, AlertTriangle } from 'lucide-react'
-import { createGastoLinea, updateGastoLinea, deleteGastoLinea } from '@/lib/services/gastoLinea'
+import { Plus, Loader2, Trash2, Edit, Receipt, ScanLine, ShieldCheck, FileSpreadsheet, Download, ArrowRightLeft, Search, AlertTriangle, CheckCircle2, Circle, AlertCircle } from 'lucide-react'
+import { createGastoLinea, updateGastoLinea, deleteGastoLinea, marcarConformidad } from '@/lib/services/gastoLinea'
 import GastoAdjuntoUpload from './GastoAdjuntoUpload'
 import CargaMasivaComprobantes from './CargaMasivaComprobantes'
 import GastoLineaPreviewDrawer from './GastoLineaPreviewDrawer'
@@ -85,6 +85,19 @@ export default function GastoLineaTable({
   const [editLinea, setEditLinea] = useState<GastoLinea | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<GastoLinea | null>(null)
   const [loading, setLoading] = useState(false)
+  const [conformidadLoading, setConformidadLoading] = useState<string | null>(null)
+
+  const handleConformidadRapida = async (lineaId: string, estado: 'conforme' | 'observado') => {
+    setConformidadLoading(lineaId)
+    try {
+      await marcarConformidad(lineaId, estado)
+      onChanged()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Error al marcar conformidad')
+    } finally {
+      setConformidadLoading(null)
+    }
+  }
   const [showCargaMasiva, setShowCargaMasiva] = useState(false)
   const [showImportExcel, setShowImportExcel] = useState(false)
   const [exportingExcel, setExportingExcel] = useState(false)
@@ -399,13 +412,14 @@ export default function GastoLineaTable({
               <th className="text-left p-2 font-medium">Destino</th>
               <th className="text-right p-2 font-medium">Monto</th>
               <th className="text-left p-2 font-medium">Adjuntos</th>
+              {showConformidad && <th className="text-left p-2 font-medium">Conformidad</th>}
               {editable && <th className="w-[60px]"></th>}
             </tr>
           </thead>
           <tbody>
             {lineas.length === 0 ? (
               <tr>
-                <td colSpan={editable ? 8 : 7} className="text-center py-6 text-muted-foreground text-xs">
+                <td colSpan={(editable ? 8 : 7) + (showConformidad ? 1 : 0)} className="text-center py-6 text-muted-foreground text-xs">
                   Sin lineas de gasto
                 </td>
               </tr>
@@ -478,6 +492,52 @@ export default function GastoLineaTable({
                       compact
                     />
                   </td>
+                  {showConformidad && (
+                    <td className="p-2" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-1.5">
+                        {linea.conformidad === 'conforme' ? (
+                          <Badge className="bg-green-100 text-green-700 border-green-200 text-[10px] px-1.5 py-0 h-5 font-normal">
+                            <CheckCircle2 className="h-3 w-3 mr-0.5" />
+                            Conforme
+                          </Badge>
+                        ) : linea.conformidad === 'observado' ? (
+                          <div className="flex flex-col gap-1">
+                            <Badge className="bg-orange-100 text-orange-700 border-orange-200 text-[10px] px-1.5 py-0 h-5 font-normal">
+                              <AlertCircle className="h-3 w-3 mr-0.5" />
+                              Observado
+                            </Badge>
+                            <button
+                              className="text-[10px] text-green-700 hover:underline flex items-center gap-0.5 disabled:opacity-50"
+                              onClick={() => handleConformidadRapida(linea.id, 'conforme')}
+                              disabled={conformidadLoading === linea.id}
+                            >
+                              {conformidadLoading === linea.id
+                                ? <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                                : <CheckCircle2 className="h-2.5 w-2.5" />}
+                              Conforme
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 font-normal text-muted-foreground">
+                              <Circle className="h-2.5 w-2.5 mr-0.5" />
+                              Pendiente
+                            </Badge>
+                            <button
+                              className="text-[10px] text-green-700 hover:underline flex items-center gap-0.5 disabled:opacity-50"
+                              onClick={() => handleConformidadRapida(linea.id, 'conforme')}
+                              disabled={conformidadLoading === linea.id}
+                            >
+                              {conformidadLoading === linea.id
+                                ? <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                                : <CheckCircle2 className="h-2.5 w-2.5" />}
+                              Conforme
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  )}
                   {editable && (
                     <td className="p-2" onClick={(e) => e.stopPropagation()}>
                       <div className="flex gap-1">
@@ -503,7 +563,7 @@ export default function GastoLineaTable({
               <tr className="border-t bg-muted/30 font-medium">
                 <td colSpan={5} className="p-2 text-xs text-right">Total:</td>
                 <td className="p-2 text-right font-mono text-xs">{formatCurrency(total)}</td>
-                <td colSpan={editable ? 2 : 1}></td>
+                <td colSpan={(editable ? 2 : 1) + (showConformidad ? 1 : 0)}></td>
               </tr>
             )}
           </tbody>
