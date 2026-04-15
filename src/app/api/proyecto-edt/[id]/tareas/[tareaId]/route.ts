@@ -215,31 +215,25 @@ export async function DELETE(
 
     const { id, tareaId } = await params
 
-    const rolesSupervision = ['admin', 'coordinador', 'gestor']
-    const esRolSupervision = rolesSupervision.includes(session.user.role || '')
-
-    // Verificar permisos y existencia
+    // Verificar existencia
     const tarea = await prisma.proyectoTarea.findFirst({
-      where: esRolSupervision
-        ? { id: tareaId, proyectoEdtId: id }
-        : {
-            id: tareaId,
-            proyectoEdtId: id,
-            proyectoEdt: {
-              proyecto: {
-                OR: [
-                  { comercialId: session.user.id },
-                  { gestorId: session.user.id }
-                ]
-              }
-            }
-          }
+      where: { id: tareaId, proyectoEdtId: id }
     })
 
     if (!tarea) {
       return NextResponse.json(
-        { error: 'Tarea no encontrada o sin permisos' },
+        { error: 'Tarea no encontrada' },
         { status: 404 }
+      )
+    }
+
+    // Solo el creador o admin pueden eliminar
+    const esAdmin = session.user.role === 'admin'
+    const esCreador = tarea.creadoPorId === session.user.id
+    if (!esAdmin && !esCreador) {
+      return NextResponse.json(
+        { error: 'Solo el creador de la tarea o un administrador puede eliminarla' },
+        { status: 403 }
       )
     }
 
