@@ -54,9 +54,7 @@ import {
   Loader2,
   X,
   RefreshCcw,
-  Trash2,
-  CalendarCheck,
-  Plus
+  Trash2
 } from 'lucide-react'
 
 type EstadoJornada = 'iniciado' | 'pendiente' | 'aprobado' | 'rechazado'
@@ -689,8 +687,8 @@ export function ListaJornadas({
                                     className={`text-[10px] px-1.5 py-0 font-normal w-fit cursor-default ${hasPct ? getProgresoColor(colorPct) : 'bg-gray-50 text-gray-600 border-gray-200'}`}
                                   >
                                     {tarea.proyectoTareaId
-                                      ? <CalendarCheck size={9} className="mr-0.5 shrink-0 opacity-60" />
-                                      : <Plus size={9} className="mr-0.5 shrink-0 opacity-60" />
+                                      ? <span className="mr-1 shrink-0 rounded px-0.5 text-[8px] font-bold uppercase bg-blue-100 text-blue-600 border border-blue-200">CRON</span>
+                                      : <span className="mr-1 shrink-0 rounded px-0.5 text-[8px] font-bold uppercase bg-orange-100 text-orange-600 border border-orange-200">EXT</span>
                                     }
                                     <span className="truncate max-w-[140px]">{getNombreTareaCorto(tarea)}</span>
                                     {hasRange ? (
