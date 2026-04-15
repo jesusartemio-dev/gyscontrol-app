@@ -496,10 +496,22 @@ export default function GastoLineaTable({
                     <td className="p-2" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-1.5">
                         {linea.conformidad === 'conforme' ? (
-                          <Badge className="bg-green-100 text-green-700 border-green-200 text-[10px] px-1.5 py-0 h-5 font-normal">
-                            <CheckCircle2 className="h-3 w-3 mr-0.5" />
-                            Conforme
-                          </Badge>
+                          <div className="flex flex-col gap-1">
+                            <Badge className="bg-green-100 text-green-700 border-green-200 text-[10px] px-1.5 py-0 h-5 font-normal">
+                              <CheckCircle2 className="h-3 w-3 mr-0.5" />
+                              Conforme
+                            </Badge>
+                            <button
+                              className="text-[10px] text-orange-600 hover:underline flex items-center gap-0.5 disabled:opacity-50"
+                              onClick={() => handleConformidadRapida(linea.id, 'observado')}
+                              disabled={conformidadLoading === linea.id}
+                            >
+                              {conformidadLoading === linea.id
+                                ? <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                                : <AlertCircle className="h-2.5 w-2.5" />}
+                              Observar
+                            </button>
+                          </div>
                         ) : linea.conformidad === 'observado' ? (
                           <div className="flex flex-col gap-1">
                             <Badge className="bg-orange-100 text-orange-700 border-orange-200 text-[10px] px-1.5 py-0 h-5 font-normal">
