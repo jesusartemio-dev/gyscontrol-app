@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Edit, Trash2, Search, Eye, EyeOff, GripVertical } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -328,10 +328,10 @@ export default function CotizacionEquipoItemTable({
   const [showReferencia, setShowReferencia] = useState(false)
   const [localItems, setLocalItems] = useState<CotizacionEquipoItem[]>(items)
 
-  // Sync when parent changes items (e.g. after add/delete)
-  if (items !== localItems && items.length !== localItems.length) {
+  // Sync when parent changes items (add, delete, or update)
+  useEffect(() => {
     setLocalItems(items)
-  }
+  }, [items])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })

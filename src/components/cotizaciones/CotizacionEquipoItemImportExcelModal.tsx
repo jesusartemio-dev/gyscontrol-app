@@ -296,9 +296,12 @@ export default function CotizacionEquipoItemImportExcelModal({
     let catalogUpdates = 0
     let catalogCreates = 0
 
+    // Base de orden: continúa desde el último item existente en el grupo
+    const ordenBase = equipo.items?.length ?? 0
+
     try {
       // Crear nuevos items (incluyendo conflictos)
-      for (const item of allItemsToCreate) {
+      for (const [itemIndex, item] of allItemsToCreate.entries()) {
         const payload = {
           cotizacionEquipoId: equipo.id,
           catalogoEquipoId: item.catalogoEquipoId,
@@ -314,7 +317,8 @@ export default function CotizacionEquipoItemImportExcelModal({
           precioCliente: item.precioCliente,
           cantidad: item.cantidad,
           costoInterno: item.costoInterno,
-          costoCliente: item.costoCliente
+          costoCliente: item.costoCliente,
+          orden: ordenBase + itemIndex,
         }
 
         const res = await fetch('/api/cotizacion-equipo-item', {

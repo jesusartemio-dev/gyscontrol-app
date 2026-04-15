@@ -360,6 +360,7 @@ export interface CotizacionEquipoItemPayload {
   costoCliente: number
   precioGerencia?: number
   precioGerenciaEditado?: boolean
+  orden?: number
 }
 
 export interface CotizacionEquipoItemUpdatePayload extends Partial<CotizacionEquipoItemPayload> {}

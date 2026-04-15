@@ -213,7 +213,7 @@ export default function CotizacionEquiposPage() {
             >
               <div className="space-y-3">
                 {cotizacion.equipos.map((e) => (
-                  <div key={`${e.id}-${e.items?.length || 0}`} className="group/grupo">
+                  <div key={e.id} className="group/grupo">
                     <SortableGrupo equipo={e} isLocked={isLocked}>
                       <CotizacionEquipoAccordion
                         equipo={e}
