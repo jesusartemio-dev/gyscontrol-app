@@ -134,6 +134,7 @@ export async function POST(req: NextRequest) {
           proyectoCronogramaId: cronogramaId,
           nombre: 'Trabajo General',
           descripcion: '[EXTRA]',
+          esExtra: true,
           fechaInicio: fechaInicio ? new Date(fechaInicio) : new Date(),
           fechaFin,
           horasEstimadas: 9999,
