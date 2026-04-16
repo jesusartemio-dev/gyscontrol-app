@@ -101,8 +101,8 @@ export async function GET(request: NextRequest) {
     // Formatear tareas de ProyectoTarea
     const tareasFormateadas = proyectoTareas.map(t => {
       const edtNombre = t.proyectoEdt?.nombre || 'Sin EDT'
-      const esExtra = t.descripcion?.startsWith('[EXTRA]') || false
-      const descripcionLimpia = esExtra ? t.descripcion?.replace('[EXTRA]', '').trim() : t.descripcion
+      const esExtra = t.esExtra || t.descripcion?.startsWith('[EXTRA]') || false
+      const descripcionLimpia = t.descripcion?.replace('[EXTRA]', '').trim() || t.descripcion
       const esInterno = t.proyectoEdt?.proyecto?.esInterno || false
       return {
         id: t.id,
@@ -370,6 +370,7 @@ export async function POST(request: NextRequest) {
         proyectoCronogramaId: cronogramaId,
         nombre: nombre.trim(),
         descripcion: `[EXTRA]${descripcion?.trim() || ''}`,
+        esExtra: true,
         fechaInicio: new Date(fechaInicio),
         fechaFin: new Date(fechaFin),
         responsableId: responsableId || null,
