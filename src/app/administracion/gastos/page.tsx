@@ -96,19 +96,33 @@ export default function GestionGastosPage() {
 function GestionGastosContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const initialTab = (searchParams.get('estado') as TabFilter) || 'aprobado'
 
   const [hojas, setHojas] = useState<HojaDeGastos[]>([])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
-  const [tab, setTab] = useState<TabFilter>(initialTab)
-  const [searchTerm, setSearchTerm] = useState('')
+  const [tab, setTab] = useState<TabFilter>((searchParams.get('estado') as TabFilter) || 'aprobado')
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '')
+  const [filtroTipo, setFiltroTipo] = useState<TipoFilter>((searchParams.get('tipo') as TipoFilter) || 'todas')
+  const [filtroEmpleado, setFiltroEmpleado] = useState(searchParams.get('emp') || '')
+  const [filtroProyecto, setFiltroProyecto] = useState(searchParams.get('proy') || '')
+  const [filtroCentroCosto, setFiltroCentroCosto] = useState(searchParams.get('cc') || '')
+
+  // Sincronizar filtros al URL sin agregar al historial
+  useEffect(() => {
+    const params = new URLSearchParams()
+    if (tab !== 'aprobado') params.set('estado', tab)
+    if (searchTerm) params.set('q', searchTerm)
+    if (filtroTipo !== 'todas') params.set('tipo', filtroTipo)
+    if (filtroEmpleado) params.set('emp', filtroEmpleado)
+    if (filtroProyecto) params.set('proy', filtroProyecto)
+    if (filtroCentroCosto) params.set('cc', filtroCentroCosto)
+    const qs = params.toString()
+    router.replace(`/administracion/gastos${qs ? `?${qs}` : ''}`, { scroll: false })
+  }, [tab, searchTerm, filtroTipo, filtroEmpleado, filtroProyecto, filtroCentroCosto]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Dialog states
   const [rechazoTarget, setRechazoTarget] = useState<HojaDeGastos | null>(null)
   const [comentarioRechazo, setComentarioRechazo] = useState('')
-
-  const [filtroTipo, setFiltroTipo] = useState<TipoFilter>('todas')
 
   // Import/export state
   const [showImportDialog, setShowImportDialog] = useState(false)
@@ -187,39 +201,69 @@ function GestionGastosContent() {
     return c
   }, [hojas])
 
+  // Opciones de selects derivadas de hojas reales (solo las que tienen registros)
+  const opcionesEmpleado = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const h of hojas) {
+      if (h.empleado?.id) map.set(h.empleado.id, h.empleado.name || h.empleado.email || h.empleado.id)
+    }
+    return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1]))
+  }, [hojas])
+
+  const opcionesProyecto = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const h of hojas) {
+      if (h.proyecto?.id) map.set(h.proyecto.id, `${h.proyecto.codigo} - ${h.proyecto.nombre}`)
+    }
+    return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1]))
+  }, [hojas])
+
+  const opcionesCentroCosto = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const h of hojas) {
+      if (h.centroCosto?.id) map.set(h.centroCosto.id, h.centroCosto.nombre)
+    }
+    return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1]))
+  }, [hojas])
+
+  const hayFiltrosActivos = searchTerm || filtroEmpleado || filtroProyecto || filtroCentroCosto || filtroTipo !== 'todas'
+
   const filtered = useMemo(() => {
     let result = hojas
 
+    // Filtrar por tab (siempre aplica)
     if (searchTerm) {
-      // Con búsqueda activa: buscar en todas (sin importar el tab), excepto borradores
-      const term = searchTerm.toLowerCase()
-      return result.filter(h =>
-        h.estado !== 'borrador' && (
-          h.numero.toLowerCase().includes(term) ||
-          h.motivo.toLowerCase().includes(term) ||
-          h.proyecto?.codigo?.toLowerCase().includes(term) ||
-          h.proyecto?.nombre?.toLowerCase().includes(term) ||
-          h.centroCosto?.nombre?.toLowerCase().includes(term) ||
-          h.empleado?.name?.toLowerCase().includes(term) ||
-          h.empleado?.email?.toLowerCase().includes(term)
-        )
-      )
-    }
-
-    // Sin búsqueda: filtrar por tab
-    if (tab === 'todas') {
+      result = result.filter(h => h.estado !== 'borrador')
+    } else if (tab === 'todas') {
       result = result.filter(h => h.estado !== 'borrador')
     } else if (tab === 'aprobado') {
-      // "Por Depositar": solo aprobados que requieren anticipo
       result = result.filter(h => h.estado === 'aprobado' && h.requiereAnticipo)
     } else {
       result = result.filter(h => h.estado === tab)
     }
-    if (filtroTipo !== 'todas') {
-      result = result.filter(h => h.tipoPropósito === filtroTipo)
+
+    // Filtros de selects (siempre aplican)
+    if (filtroEmpleado) result = result.filter(h => h.empleado?.id === filtroEmpleado)
+    if (filtroProyecto) result = result.filter(h => h.proyecto?.id === filtroProyecto)
+    if (filtroCentroCosto) result = result.filter(h => h.centroCosto?.id === filtroCentroCosto)
+    if (filtroTipo !== 'todas') result = result.filter(h => h.tipoPropósito === filtroTipo)
+
+    // Búsqueda de texto (aplica sobre lo ya filtrado)
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase()
+      result = result.filter(h =>
+        h.numero.toLowerCase().includes(term) ||
+        h.motivo.toLowerCase().includes(term) ||
+        h.proyecto?.codigo?.toLowerCase().includes(term) ||
+        h.proyecto?.nombre?.toLowerCase().includes(term) ||
+        h.centroCosto?.nombre?.toLowerCase().includes(term) ||
+        h.empleado?.name?.toLowerCase().includes(term) ||
+        h.empleado?.email?.toLowerCase().includes(term)
+      )
     }
+
     return result
-  }, [hojas, tab, filtroTipo, searchTerm])
+  }, [hojas, tab, filtroTipo, searchTerm, filtroEmpleado, filtroProyecto, filtroCentroCosto])
 
   const totals = useMemo(() => {
     const totalAnticipo = filtered.filter(h => h.requiereAnticipo).reduce((s, h) => s + h.montoAnticipo, 0)
@@ -412,12 +456,13 @@ function GestionGastosContent() {
         })}
       </div>
 
-      {/* Search + filtro tipo */}
+      {/* Search + filtros */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative w-full sm:max-w-sm">
+        {/* Buscador de texto */}
+        <div className="relative w-full sm:max-w-xs">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar número, empleado, proyecto..."
+            placeholder="Número, motivo..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-8 h-9"
@@ -428,6 +473,8 @@ function GestionGastosContent() {
             </button>
           )}
         </div>
+
+        {/* Filtro tipo */}
         <div className="flex items-center gap-1">
           {([
             { key: 'todas', label: 'Todos' },
@@ -447,6 +494,64 @@ function GestionGastosContent() {
             </button>
           ))}
         </div>
+
+        {/* Filtro empleado */}
+        {opcionesEmpleado.length > 0 && (
+          <select
+            value={filtroEmpleado}
+            onChange={e => setFiltroEmpleado(e.target.value)}
+            className={`h-9 px-2 rounded-md border text-xs bg-white focus:outline-none focus:ring-1 focus:ring-ring ${
+              filtroEmpleado ? 'border-blue-400 text-blue-700 font-medium' : 'border-input text-muted-foreground'
+            }`}
+          >
+            <option value="">Empleado</option>
+            {opcionesEmpleado.map(([id, nombre]) => (
+              <option key={id} value={id}>{nombre}</option>
+            ))}
+          </select>
+        )}
+
+        {/* Filtro proyecto */}
+        {opcionesProyecto.length > 0 && (
+          <select
+            value={filtroProyecto}
+            onChange={e => setFiltroProyecto(e.target.value)}
+            className={`h-9 px-2 rounded-md border text-xs bg-white focus:outline-none focus:ring-1 focus:ring-ring ${
+              filtroProyecto ? 'border-blue-400 text-blue-700 font-medium' : 'border-input text-muted-foreground'
+            }`}
+          >
+            <option value="">Proyecto</option>
+            {opcionesProyecto.map(([id, nombre]) => (
+              <option key={id} value={id}>{nombre}</option>
+            ))}
+          </select>
+        )}
+
+        {/* Filtro centro de costo */}
+        {opcionesCentroCosto.length > 0 && (
+          <select
+            value={filtroCentroCosto}
+            onChange={e => setFiltroCentroCosto(e.target.value)}
+            className={`h-9 px-2 rounded-md border text-xs bg-white focus:outline-none focus:ring-1 focus:ring-ring ${
+              filtroCentroCosto ? 'border-blue-400 text-blue-700 font-medium' : 'border-input text-muted-foreground'
+            }`}
+          >
+            <option value="">Centro de costo</option>
+            {opcionesCentroCosto.map(([id, nombre]) => (
+              <option key={id} value={id}>{nombre}</option>
+            ))}
+          </select>
+        )}
+
+        {/* Limpiar filtros */}
+        {hayFiltrosActivos && (
+          <button
+            onClick={() => { setSearchTerm(''); setFiltroTipo('todas'); setFiltroEmpleado(''); setFiltroProyecto(''); setFiltroCentroCosto('') }}
+            className="h-9 px-2 text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+          >
+            <X className="h-3.5 w-3.5" /> Limpiar
+          </button>
+        )}
       </div>
 
       {/* Totales */}
