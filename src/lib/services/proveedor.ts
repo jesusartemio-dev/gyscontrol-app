@@ -57,16 +57,11 @@ export async function updateProveedor(id: string, payload: ProveedorUpdatePayloa
   }
 }
 
-export async function deleteProveedor(id: string): Promise<boolean> {
-  try {
-    const res = await fetch(`${BASE_URL}/${id}`, {
-      method: 'DELETE',
-    })
-    if (!res.ok) throw new Error('Error al eliminar proveedor')
-    return true
-  } catch {
-    return false
-  }
+export async function deleteProveedor(id: string): Promise<{ ok: true } | { ok: false; error: string; bloqueantes?: string[] }> {
+  const res = await fetch(`${BASE_URL}/${id}`, { method: 'DELETE' })
+  if (res.ok) return { ok: true }
+  const body = await res.json().catch(() => ({}))
+  return { ok: false, error: body.error || 'Error al eliminar proveedor', bloqueantes: body.bloqueantes }
 }
 
 // ===================================================

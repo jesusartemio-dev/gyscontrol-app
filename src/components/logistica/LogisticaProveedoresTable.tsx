@@ -59,6 +59,11 @@ export default function LogisticaProveedoresTable({
     proveedor: Proveedor | null
     isDeleting: boolean
   }>({ open: false, proveedor: null, isDeleting: false })
+  const [errorDialog, setErrorDialog] = useState<{
+    open: boolean
+    error: string
+    bloqueantes: string[]
+  }>({ open: false, error: '', bloqueantes: [] })
 
   // Sorting logic
   const sortedProveedores = useMemo(() => {
@@ -118,6 +123,22 @@ export default function LogisticaProveedoresTable({
   }
 
   const handleDeleteClick = (proveedor: Proveedor) => {
+    const c = (proveedor as any)._count
+    const totalUso = c
+      ? (c.cotizacionProveedor + c.listaEquipoItem + c.ordenesCompra + c.cuentasPorPagar + c.pedidoEquipoItems)
+      : 0
+
+    if (totalUso > 0) {
+      const bloqueantes: string[] = []
+      if (c.cotizacionProveedor > 0) bloqueantes.push(`${c.cotizacionProveedor} cotización${c.cotizacionProveedor > 1 ? 'es' : ''}`)
+      if (c.ordenesCompra > 0) bloqueantes.push(`${c.ordenesCompra} orden${c.ordenesCompra > 1 ? 'es' : ''} de compra`)
+      if (c.cuentasPorPagar > 0) bloqueantes.push(`${c.cuentasPorPagar} cuenta${c.cuentasPorPagar > 1 ? 's' : ''} por pagar`)
+      if (c.listaEquipoItem > 0) bloqueantes.push(`${c.listaEquipoItem} ítem${c.listaEquipoItem > 1 ? 's' : ''} en listas de equipo`)
+      if (c.pedidoEquipoItems > 0) bloqueantes.push(`${c.pedidoEquipoItems} ítem${c.pedidoEquipoItems > 1 ? 's' : ''} en pedidos de equipo`)
+      setErrorDialog({ open: true, error: 'No se puede eliminar este proveedor porque está siendo usado en:', bloqueantes })
+      return
+    }
+
     setDeleteDialog({ open: true, proveedor, isDeleting: false })
   }
 
@@ -126,19 +147,14 @@ export default function LogisticaProveedoresTable({
 
     setDeleteDialog(prev => ({ ...prev, isDeleting: true }))
 
-    try {
-      const success = await deleteProveedor(deleteDialog.proveedor.id)
-      if (success) {
-        toast.success('Proveedor eliminado')
-        onDelete?.(deleteDialog.proveedor.id)
-      } else {
-        toast.error('Error al eliminar proveedor')
-      }
-    } catch (error) {
-      console.error('Error deleting proveedor:', error)
-      toast.error('Error al eliminar proveedor')
-    } finally {
-      setDeleteDialog({ open: false, proveedor: null, isDeleting: false })
+    const result = await deleteProveedor(deleteDialog.proveedor.id)
+    setDeleteDialog({ open: false, proveedor: null, isDeleting: false })
+
+    if (result.ok) {
+      toast.success('Proveedor eliminado')
+      onDelete?.(deleteDialog.proveedor.id)
+    } else {
+      setErrorDialog({ open: true, error: result.error, bloqueantes: result.bloqueantes || [] })
     }
   }
 
@@ -191,6 +207,7 @@ export default function LogisticaProveedoresTable({
               <span className="flex items-center gap-1">Correo <SortIcon field="correo" /></span>
             </TableHead>
             <TableHead className="text-xs w-[150px]">Dirección</TableHead>
+            <TableHead className="text-xs w-[160px]">En uso</TableHead>
             <TableHead className="text-xs w-[80px]"></TableHead>
           </TableRow>
         </TableHeader>
@@ -252,6 +269,30 @@ export default function LogisticaProveedoresTable({
                 ) : (
                   <span className="text-[10px] text-muted-foreground">-</span>
                 )}
+              </TableCell>
+              <TableCell className="py-2">
+                {(() => {
+                  const c = (proveedor as any)._count
+                  if (!c) return <span className="text-[10px] text-muted-foreground">-</span>
+                  const badges = [
+                    { key: 'cotizacionProveedor', label: 'Cot.', count: c.cotizacionProveedor, color: 'bg-blue-100 text-blue-700' },
+                    { key: 'ordenesCompra', label: 'OC', count: c.ordenesCompra, color: 'bg-orange-100 text-orange-700' },
+                    { key: 'cuentasPorPagar', label: 'CxP', count: c.cuentasPorPagar, color: 'bg-red-100 text-red-700' },
+                    { key: 'listaEquipoItem', label: 'Lista', count: c.listaEquipoItem, color: 'bg-purple-100 text-purple-700' },
+                    { key: 'pedidoEquipoItems', label: 'Pedido', count: c.pedidoEquipoItems, color: 'bg-green-100 text-green-700' },
+                  ].filter(b => b.count > 0)
+                  if (badges.length === 0) return <span className="text-[10px] text-muted-foreground">Sin uso</span>
+                  return (
+                    <div className="flex flex-wrap gap-1">
+                      {badges.map(b => (
+                        <span key={b.key} title={`${b.count} ${b.label}`}
+                          className={`inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${b.color}`}>
+                          {b.label} <span className="font-bold">{b.count}</span>
+                        </span>
+                      ))}
+                    </div>
+                  )
+                })()}
               </TableCell>
               <TableCell className="py-2">
                 <div className="flex items-center gap-0.5">
@@ -339,6 +380,33 @@ export default function LogisticaProveedoresTable({
             >
               {deleteDialog.isDeleting ? 'Eliminando...' : 'Eliminar'}
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Error dialog — proveedor en uso */}
+      <AlertDialog open={errorDialog.open} onOpenChange={(open) => setErrorDialog(prev => ({ ...prev, open }))}>
+        <AlertDialogContent className="max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-base text-red-600">No se puede eliminar</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="text-sm space-y-2">
+                <p>{errorDialog.error}</p>
+                {errorDialog.bloqueantes.length > 0 && (
+                  <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                    {errorDialog.bloqueantes.map((b, i) => (
+                      <li key={i}>{b}</li>
+                    ))}
+                  </ul>
+                )}
+                <p className="text-xs text-muted-foreground pt-1">
+                  Para eliminarlo, primero desvincula o elimina esos registros.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction className="h-8 text-xs">Entendido</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
