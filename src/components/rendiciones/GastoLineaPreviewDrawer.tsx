@@ -1,13 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback, useEffect } from 'react'
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from '@/components/ui/sheet'
+import { useState, useRef, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -31,15 +24,13 @@ import {
   Pencil,
   Save,
   X,
-  ZoomIn,
-  ZoomOut,
-  RotateCcw,
   CheckCircle2,
   AlertCircle,
   AlertTriangle,
   Circle,
   Search,
 } from 'lucide-react'
+import ZoomableImage from './ZoomableImage'
 import { toast } from 'sonner'
 import { isImage, isPdf } from '@/types/drive'
 import { updateGastoLinea, marcarConformidad } from '@/lib/services/gastoLinea'
@@ -67,117 +58,6 @@ interface GastoLineaPreviewDrawerProps {
   showConformidad?: boolean
 }
 
-// ── Zoom/Pan Image Viewer ────────────────────────────
-
-function ZoomableImage({ src, alt }: { src: string; alt: string }) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [scale, setScale] = useState(1)
-  const [translate, setTranslate] = useState({ x: 0, y: 0 })
-  const [isDragging, setIsDragging] = useState(false)
-  const dragStart = useRef({ x: 0, y: 0 })
-  const translateStart = useRef({ x: 0, y: 0 })
-
-  const MIN_SCALE = 0.5
-  const MAX_SCALE = 5
-  const ZOOM_STEP = 0.3
-
-  const resetZoom = useCallback(() => {
-    setScale(1)
-    setTranslate({ x: 0, y: 0 })
-  }, [])
-
-  // Reset on src change
-  useEffect(() => {
-    resetZoom()
-  }, [src, resetZoom])
-
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault()
-    setScale((prev) => {
-      const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP
-      return Math.min(MAX_SCALE, Math.max(MIN_SCALE, prev + delta))
-    })
-  }, [])
-
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      if (scale <= 1) return
-      e.preventDefault()
-      setIsDragging(true)
-      dragStart.current = { x: e.clientX, y: e.clientY }
-      translateStart.current = { ...translate }
-    },
-    [scale, translate]
-  )
-
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent) => {
-      if (!isDragging) return
-      const dx = e.clientX - dragStart.current.x
-      const dy = e.clientY - dragStart.current.y
-      setTranslate({
-        x: translateStart.current.x + dx,
-        y: translateStart.current.y + dy,
-      })
-    },
-    [isDragging]
-  )
-
-  const handleMouseUp = useCallback(() => {
-    setIsDragging(false)
-  }, [])
-
-  const zoomIn = () => setScale((s) => Math.min(MAX_SCALE, s + ZOOM_STEP))
-  const zoomOut = () => setScale((s) => Math.max(MIN_SCALE, s - ZOOM_STEP))
-
-  const isZoomed = scale !== 1
-
-  return (
-    <div className="relative w-full h-full">
-      {/* Zoom controls */}
-      <div className="absolute top-2 right-2 z-10 flex items-center gap-1 bg-background/80 backdrop-blur-sm rounded-md border shadow-sm p-0.5">
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={zoomIn}>
-          <ZoomIn className="h-3.5 w-3.5" />
-        </Button>
-        <span className="text-[10px] text-muted-foreground w-10 text-center">
-          {Math.round(scale * 100)}%
-        </span>
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={zoomOut}>
-          <ZoomOut className="h-3.5 w-3.5" />
-        </Button>
-        {isZoomed && (
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={resetZoom}>
-            <RotateCcw className="h-3.5 w-3.5" />
-          </Button>
-        )}
-      </div>
-
-      <div
-        ref={containerRef}
-        className="w-full h-full overflow-hidden flex items-center justify-center"
-        style={{ cursor: isZoomed ? (isDragging ? 'grabbing' : 'grab') : 'default' }}
-        onWheel={handleWheel}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={src}
-          alt={alt}
-          className="max-w-full max-h-full object-contain rounded shadow-sm select-none"
-          style={{
-            transform: `scale(${scale}) translate(${translate.x / scale}px, ${translate.y / scale}px)`,
-            transition: isDragging ? 'none' : 'transform 0.15s ease-out',
-          }}
-          draggable={false}
-        />
-      </div>
-    </div>
-  )
-}
-
 // ── Main Component ───────────────────────────────────
 
 export default function GastoLineaPreviewDrawer({
@@ -196,6 +76,10 @@ export default function GastoLineaPreviewDrawer({
   const [conformidadLoading, setConformidadLoading] = useState(false)
   const [showObservacionInput, setShowObservacionInput] = useState(false)
   const [observacionText, setObservacionText] = useState('')
+  const [conformidadOverrides, setConformidadOverrides] = useState<
+    Record<string, { conformidad: string; comentarioConformidad?: string }>
+  >({})
+  const pendingRefreshRef = useRef(false)
 
   // RUC lookup state
   const [rucLookupLoading, setRucLookupLoading] = useState(false)
@@ -222,6 +106,12 @@ export default function GastoLineaPreviewDrawer({
   const adjuntos = linea?.adjuntos || []
   const adjunto = adjuntos[activeAdjuntoIdx] || null
 
+  // Use local overrides so conformidad updates don't close the drawer
+  const lineaOverride = linea ? conformidadOverrides[linea.id] : undefined
+  const lineaConformidad = lineaOverride?.conformidad ?? linea?.conformidad
+  const lineaComentarioConformidad =
+    lineaOverride?.comentarioConformidad ?? linea?.comentarioConformidad
+
   const handleOpenChange = (open: boolean) => {
     if (!open) {
       onIndexChange(null)
@@ -229,6 +119,11 @@ export default function GastoLineaPreviewDrawer({
       setIsEditing(false)
       setShowObservacionInput(false)
       setObservacionText('')
+      setConformidadOverrides({})
+      if (pendingRefreshRef.current) {
+        pendingRefreshRef.current = false
+        onChanged()
+      }
     }
   }
 
@@ -237,10 +132,14 @@ export default function GastoLineaPreviewDrawer({
     try {
       setConformidadLoading(true)
       await marcarConformidad(linea.id, estado, comentario)
-      toast.success(estado === 'conforme' ? 'Marcado como conforme' : 'Marcado como observado')
       setShowObservacionInput(false)
       setObservacionText('')
-      onChanged()
+      // Update local state so the drawer stays open showing the new conformidad
+      setConformidadOverrides((prev) => ({
+        ...prev,
+        [linea.id]: { conformidad: estado, comentarioConformidad: comentario },
+      }))
+      pendingRefreshRef.current = true
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Error al marcar conformidad')
     } finally {
@@ -385,114 +284,88 @@ export default function GastoLineaPreviewDrawer({
     setEditForm((prev) => ({ ...prev, [field]: value }))
   }
 
+  if (!isOpen || !linea) return null
+
   return (
-    <Sheet open={isOpen} onOpenChange={handleOpenChange}>
-      <SheetContent
-        side="right"
-        className="sm:max-w-5xl w-[95vw] p-0 flex flex-col [&>button[class*='absolute']]:hidden"
-      >
-        {linea && (
-          <>
-            {/* Header */}
-            <SheetHeader className="px-4 py-3 border-b shrink-0">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <SheetTitle className="text-sm font-semibold">
-                    Comprobante {(currentIndex ?? 0) + 1}/{lineas.length}
-                  </SheetTitle>
-                  <SheetDescription className="sr-only">
-                    Vista previa del comprobante
-                  </SheetDescription>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={goToPrev}
-                    disabled={currentIndex === 0 || saving}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={goToNext}
-                    disabled={currentIndex === lineas.length - 1 || saving}
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                  {downloadUrl && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={() => window.open(downloadUrl, '_blank')}
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                    </Button>
-                  )}
-                  {adjunto?.urlArchivo && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={() => window.open(adjunto.urlArchivo, '_blank')}
-                    >
-                      <ExternalLink className="h-3.5 w-3.5" />
-                    </Button>
-                  )}
-                </div>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999 }} className="flex flex-col bg-background">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-3 border-b bg-background shrink-0">
+        <div className="flex items-center gap-3">
+          <FileText className="h-4 w-4 text-orange-500 shrink-0" />
+          <span className="font-semibold text-sm">
+            {linea.tipoComprobante ? TIPOS_COMPROBANTE_MAP[linea.tipoComprobante] : 'Comprobante'}
+            {linea.numeroComprobante ? ` · ${linea.numeroComprobante}` : ''}
+          </span>
+          <span className="font-mono font-bold text-orange-600 text-sm">{formatCurrency(linea.monto, linea.moneda)}</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="text-xs text-muted-foreground mr-1">
+            {(currentIndex ?? 0) + 1}/{lineas.length}
+          </span>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={goToPrev} disabled={currentIndex === 0 || saving}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={goToNext} disabled={currentIndex === lineas.length - 1 || saving}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          {downloadUrl && (
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => window.open(downloadUrl, '_blank')}>
+              <Download className="h-3.5 w-3.5" />
+            </Button>
+          )}
+          {adjunto?.urlArchivo && (
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => window.open(adjunto.urlArchivo, '_blank')}>
+              <ExternalLink className="h-3.5 w-3.5" />
+            </Button>
+          )}
+          <button
+            type="button"
+            onClick={() => handleOpenChange(false)}
+            className="ml-1 p-1.5 rounded hover:bg-muted transition-colors"
+            aria-label="Cerrar"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Adjunto tabs (if multiple) */}
+      {adjuntos.length > 1 && (
+        <div className="flex gap-1 px-5 py-2 border-b shrink-0 bg-background">
+          {adjuntos.map((adj, idx) => (
+            <button
+              key={adj.id}
+              onClick={() => { setActiveAdjuntoIdx(idx); setIframeLoading(true) }}
+              className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] border transition-colors ${
+                idx === activeAdjuntoIdx
+                  ? 'bg-orange-50 border-orange-300 text-orange-700'
+                  : 'bg-muted/50 border-transparent text-muted-foreground hover:bg-muted'
+              }`}
+            >
+              {adj.tipoArchivo?.startsWith('image/') ? <ImageIcon className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
+              <span className="max-w-[100px] truncate">{adj.nombreArchivo}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Body split */}
+      <div className="flex flex-1 min-h-0">
+        {/* Data Panel (left) */}
+        <div className="w-[380px] shrink-0 border-r bg-background flex flex-col">
+          <div className="flex-1 overflow-y-auto px-5 py-5">
+            {/* Adjunto info */}
+            {adjunto && (
+              <div className="flex items-center gap-2 text-[10px] text-muted-foreground mb-4 pb-3 border-b">
+                {adjunto.tipoArchivo?.startsWith('image/') ? (
+                  <ImageIcon className="h-3 w-3 shrink-0" />
+                ) : (
+                  <FileText className="h-3 w-3 shrink-0" />
+                )}
+                <span className="truncate">{adjunto.nombreArchivo}</span>
+                {adjunto.tamano && <span className="shrink-0">{formatSize(adjunto.tamano)}</span>}
               </div>
-
-              {/* Adjunto tabs (if multiple) */}
-              {adjuntos.length > 1 && (
-                <div className="flex gap-1 mt-2">
-                  {adjuntos.map((adj, idx) => (
-                    <button
-                      key={adj.id}
-                      onClick={() => {
-                        setActiveAdjuntoIdx(idx)
-                        setIframeLoading(true)
-                      }}
-                      className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] border transition-colors ${
-                        idx === activeAdjuntoIdx
-                          ? 'bg-orange-50 border-orange-300 text-orange-700'
-                          : 'bg-muted/50 border-transparent text-muted-foreground hover:bg-muted'
-                      }`}
-                    >
-                      {adj.tipoArchivo?.startsWith('image/') ? (
-                        <ImageIcon className="h-3 w-3" />
-                      ) : (
-                        <FileText className="h-3 w-3" />
-                      )}
-                      <span className="max-w-[100px] truncate">{adj.nombreArchivo}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </SheetHeader>
-
-            {/* Content: Data left, Preview right */}
-            <div className="flex-1 min-h-0 flex">
-              {/* Data Panel (left) */}
-              <div className="w-[320px] shrink-0 border-r bg-background flex flex-col">
-                <div className="flex-1 overflow-y-auto px-4 py-4">
-                  {/* Adjunto info */}
-                  {adjunto && (
-                    <div className="flex items-center gap-2 text-[10px] text-muted-foreground mb-4 pb-3 border-b">
-                      {adjunto.tipoArchivo?.startsWith('image/') ? (
-                        <ImageIcon className="h-3 w-3 shrink-0" />
-                      ) : (
-                        <FileText className="h-3 w-3 shrink-0" />
-                      )}
-                      <span className="truncate">{adjunto.nombreArchivo}</span>
-                      {adjunto.tamano && (
-                        <span className="shrink-0">{formatSize(adjunto.tamano)}</span>
-                      )}
-                    </div>
-                  )}
+            )}
 
                   {isEditing ? (
                     /* ── Edit Mode ── */
@@ -684,7 +557,7 @@ export default function GastoLineaPreviewDrawer({
                         <span className="text-[10px] text-muted-foreground block mb-0.5">
                           RUC
                         </span>
-                        <span className="text-sm font-medium flex items-center gap-1">
+                        <span className="text-sm font-semibold flex items-center gap-1">
                           {linea.proveedorRuc || '-'}
                           {linea.sunatVerificado === true && (
                             <ShieldCheck className="h-3.5 w-3.5 text-green-600" />
@@ -733,12 +606,12 @@ export default function GastoLineaPreviewDrawer({
                         Conformidad
                       </span>
                       <div className="mb-2">
-                        {linea.conformidad === 'conforme' ? (
+                        {lineaConformidad === 'conforme' ? (
                           <Badge className="bg-green-100 text-green-700 text-[10px]">
                             <CheckCircle2 className="h-3 w-3 mr-1" />
                             Conforme
                           </Badge>
-                        ) : linea.conformidad === 'observado' ? (
+                        ) : lineaConformidad === 'observado' ? (
                           <Badge className="bg-orange-100 text-orange-700 text-[10px]">
                             <AlertCircle className="h-3 w-3 mr-1" />
                             Observado
@@ -750,9 +623,9 @@ export default function GastoLineaPreviewDrawer({
                           </Badge>
                         )}
                       </div>
-                      {linea.conformidad === 'observado' && linea.comentarioConformidad && (
+                      {lineaConformidad === 'observado' && lineaComentarioConformidad && (
                         <p className="text-xs text-orange-700 bg-orange-50 rounded p-2 mb-2">
-                          {linea.comentarioConformidad}
+                          {lineaComentarioConformidad}
                         </p>
                       )}
                       {showObservacionInput ? (
@@ -788,7 +661,7 @@ export default function GastoLineaPreviewDrawer({
                         </div>
                       ) : (
                         <div className="flex gap-1">
-                          {linea.conformidad !== 'conforme' && (
+                          {lineaConformidad !== 'conforme' && (
                             <Button
                               size="sm"
                               className="h-7 text-[11px] flex-1 bg-green-600 hover:bg-green-700"
@@ -800,7 +673,7 @@ export default function GastoLineaPreviewDrawer({
                               Conforme
                             </Button>
                           )}
-                          {linea.conformidad === 'conforme' ? (
+                          {lineaConformidad === 'conforme' ? (
                             <Button
                               size="sm"
                               variant="outline"
@@ -811,7 +684,7 @@ export default function GastoLineaPreviewDrawer({
                               <AlertCircle className="h-3 w-3 mr-1" />
                               Observar
                             </Button>
-                          ) : linea.conformidad !== 'observado' ? (
+                          ) : lineaConformidad !== 'observado' ? (
                             <Button
                               size="sm"
                               variant="outline"
@@ -823,7 +696,7 @@ export default function GastoLineaPreviewDrawer({
                               Observar
                             </Button>
                           ) : null}
-                          {linea.conformidad === 'observado' && (
+                          {lineaConformidad === 'observado' && (
                             <Button
                               size="sm"
                               className="h-7 text-[11px] flex-1 bg-green-600 hover:bg-green-700"
@@ -955,10 +828,7 @@ export default function GastoLineaPreviewDrawer({
                 )}
               </div>
             </div>
-          </>
-        )}
-      </SheetContent>
-    </Sheet>
+          </div>
   )
 }
 
@@ -974,7 +844,7 @@ function DataField({
   return (
     <div>
       <span className="text-[10px] text-muted-foreground block mb-0.5">{label}</span>
-      <span className={`text-sm font-medium ${className || ''}`}>{value}</span>
+      <span className={`text-sm font-semibold ${className || ''}`}>{value}</span>
     </div>
   )
 }

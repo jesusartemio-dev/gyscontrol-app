@@ -23,17 +23,50 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: 'Solo se puede validar desde estado rendido' }, { status: 400 })
     }
 
-    // Verificar que todas las líneas tengan conformidad = 'conforme'
-    const lineas = await prisma.gastoLinea.findMany({
-      where: { hojaDeGastosId: id },
-      select: { id: true, conformidad: true },
-    })
-    if (lineas.length > 0) {
-      const pendientes = lineas.filter(l => l.conformidad !== 'conforme')
-      if (pendientes.length > 0) {
+    // Verificar conformidad según el tipo de propósito
+    // Para compra_materiales: las líneas de comprobantes (gastoComprobanteId != null)
+    // se validan a través del RequerimientoMaterialItem, no de GastoLinea directamente.
+    const esMateriales = hoja.tipoPropósito === 'compra_materiales'
+
+    if (esMateriales) {
+      // Líneas libres (sin comprobante vinculado) deben ser conformes
+      const lineasLibres = await prisma.gastoLinea.findMany({
+        where: { hojaDeGastosId: id, gastoComprobanteId: null },
+        select: { id: true, conformidad: true },
+      })
+      const lineasPendientes = lineasLibres.filter(l => l.conformidad !== 'conforme')
+      if (lineasPendientes.length > 0) {
         return NextResponse.json({
-          error: `${pendientes.length} línea(s) sin conformidad. Revise todas las líneas antes de validar.`,
+          error: `${lineasPendientes.length} línea(s) sin conformidad. Revise todas las líneas antes de validar.`,
         }, { status: 400 })
+      }
+
+      // Ítems de materiales deben ser conformes
+      const items = await prisma.requerimientoMaterialItem.findMany({
+        where: { hojaDeGastosId: id },
+        select: { id: true, conformidad: true },
+      })
+      if (items.length > 0) {
+        const itemsPendientes = items.filter(i => i.conformidad !== 'conforme')
+        if (itemsPendientes.length > 0) {
+          return NextResponse.json({
+            error: `${itemsPendientes.length} ítem(s) de materiales sin conformidad. Revise todos los ítems antes de validar.`,
+          }, { status: 400 })
+        }
+      }
+    } else {
+      // Hoja de gastos normal: todas las líneas deben ser conformes
+      const lineas = await prisma.gastoLinea.findMany({
+        where: { hojaDeGastosId: id },
+        select: { id: true, conformidad: true },
+      })
+      if (lineas.length > 0) {
+        const pendientes = lineas.filter(l => l.conformidad !== 'conforme')
+        if (pendientes.length > 0) {
+          return NextResponse.json({
+            error: `${pendientes.length} línea(s) sin conformidad. Revise todas las líneas antes de validar.`,
+          }, { status: 400 })
+        }
       }
     }
 

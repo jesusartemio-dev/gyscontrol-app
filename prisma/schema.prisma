@@ -3417,6 +3417,7 @@ model DepositoHoja {
   monto          Float
   fecha          DateTime
   descripcion    String?
+  tipo           String   @default("anticipo") // "anticipo" | "devolucion"
   creadoPorId    String
   createdAt      DateTime @default(now())
   updatedAt      DateTime

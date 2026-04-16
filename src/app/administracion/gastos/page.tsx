@@ -22,14 +22,11 @@ import { toast } from 'sonner'
 import {
   getHojasDeGastos,
   aprobarHoja,
-  depositarHoja,
   validarHoja,
   cerrarHoja,
   rechazarHoja,
 } from '@/lib/services/hojaDeGastos'
 import { exportarRendicionesAExcel } from '@/lib/utils/rendicionExcel'
-import { uploadHojaAdjunto, deleteHojaAdjunto } from '@/lib/services/hojaDeGastosAdjunto'
-import type { HojaDeGastosAdjunto } from '@/types'
 import RendicionImportExcelModal from '@/components/administracion/RendicionImportExcelModal'
 import type { HojaDeGastos } from '@/types'
 
@@ -108,10 +105,6 @@ function GestionGastosContent() {
   const [searchTerm, setSearchTerm] = useState('')
 
   // Dialog states
-  const [depositoTarget, setDepositoTarget] = useState<HojaDeGastos | null>(null)
-  const [montoDeposito, setMontoDeposito] = useState('')
-  const [depositoAdjuntos, setDepositoAdjuntos] = useState<HojaDeGastosAdjunto[]>([])
-  const [uploadingFile, setUploadingFile] = useState(false)
   const [rechazoTarget, setRechazoTarget] = useState<HojaDeGastos | null>(null)
   const [comentarioRechazo, setComentarioRechazo] = useState('')
 
@@ -164,41 +157,6 @@ function GestionGastosContent() {
 
   const handleAprobar = (hoja: HojaDeGastos) => {
     executeAction(hoja.id, () => aprobarHoja(hoja.id), `${hoja.numero} aprobado`)
-  }
-
-  const handleDepositar = async () => {
-    if (!depositoTarget || !montoDeposito) return
-    await executeAction(
-      depositoTarget.id,
-      () => depositarHoja(depositoTarget.id, parseFloat(montoDeposito)),
-      `Depósito registrado para ${depositoTarget.numero}`
-    )
-    setDepositoTarget(null)
-    setMontoDeposito('')
-    setDepositoAdjuntos([])
-  }
-
-  const handleUploadConstancia = async (hojaId: string, file: File) => {
-    try {
-      setUploadingFile(true)
-      const adjunto = await uploadHojaAdjunto(hojaId, file)
-      setDepositoAdjuntos(prev => [...prev, adjunto])
-      toast.success('Constancia subida')
-    } catch (e: any) {
-      toast.error(e.message || 'Error al subir constancia')
-    } finally {
-      setUploadingFile(false)
-    }
-  }
-
-  const handleDeleteConstancia = async (adjuntoId: string) => {
-    try {
-      await deleteHojaAdjunto(adjuntoId)
-      setDepositoAdjuntos(prev => prev.filter(a => a.id !== adjuntoId))
-      toast.success('Constancia eliminada')
-    } catch (e: any) {
-      toast.error(e.message || 'Error al eliminar')
-    }
   }
 
   const handleValidar = (hoja: HojaDeGastos) => {
@@ -309,12 +267,9 @@ function GestionGastosContent() {
               size="sm"
               variant="outline"
               className="h-7 text-xs border-purple-300 text-purple-700 hover:bg-purple-50"
-              onClick={() => {
-                setDepositoTarget(hoja)
-                setMontoDeposito(String(hoja.montoAnticipo || ''))
-              }}
+              onClick={() => router.push(`/gastos/mis-requerimientos/${hoja.id}?from=administracion`)}
             >
-              <Banknote className="h-3 w-3 mr-1" /> Depositar
+              <Banknote className="h-3 w-3 mr-1" /> Gestionar depósito
             </Button>
           </div>
         ) : null
@@ -622,81 +577,6 @@ function GestionGastosContent() {
           )}
         </CardContent>
       </Card>
-
-      {/* Deposito dialog */}
-      <Dialog open={!!depositoTarget} onOpenChange={(open) => { if (!open) setDepositoTarget(null) }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Banknote className="h-5 w-5 text-purple-600" />
-              Registrar Depósito
-            </DialogTitle>
-            <DialogDescription>
-              Registre el monto depositado para {depositoTarget?.numero}.
-              Anticipo solicitado: {depositoTarget ? formatCurrency(depositoTarget.montoAnticipo) : ''}.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 pt-2">
-            <div>
-              <Label>Monto depositado (PEN) <span className="text-red-500">*</span></Label>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                value={montoDeposito}
-                onChange={(e) => setMontoDeposito(e.target.value)}
-                placeholder="0.00"
-              />
-            </div>
-            {depositoTarget && (
-              <div>
-                <Label>Constancia de depósito</Label>
-                <div className="mt-1 border-2 border-dashed border-gray-300 rounded-lg p-3 text-center">
-                  <input
-                    type="file"
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    className="hidden"
-                    id="constancia-upload"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (file && depositoTarget) handleUploadConstancia(depositoTarget.id, file)
-                      e.target.value = ''
-                    }}
-                  />
-                  <label htmlFor="constancia-upload" className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
-                    {uploadingFile ? (
-                      <span className="flex items-center justify-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Subiendo...</span>
-                    ) : (
-                      <span className="flex items-center justify-center gap-2"><Upload className="h-4 w-4" /> Subir constancia (PDF, JPG, PNG)</span>
-                    )}
-                  </label>
-                </div>
-                {depositoAdjuntos.length > 0 && (
-                  <div className="mt-2 space-y-1">
-                    {depositoAdjuntos.map(adj => (
-                      <div key={adj.id} className="flex items-center justify-between text-xs bg-green-50 border border-green-200 rounded px-2 py-1">
-                        <a href={adj.urlArchivo} target="_blank" rel="noopener noreferrer" className="text-green-700 hover:underline truncate">{adj.nombreArchivo}</a>
-                        <button onClick={() => handleDeleteConstancia(adj.id)} className="text-red-500 hover:text-red-700 ml-2"><X className="h-3 w-3" /></button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDepositoTarget(null)}>Cancelar</Button>
-            <Button
-              onClick={handleDepositar}
-              disabled={!!actionLoading || !montoDeposito}
-              className="bg-purple-600 hover:bg-purple-700"
-            >
-              {actionLoading && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-              Registrar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Rechazo dialog */}
       <Dialog open={!!rechazoTarget} onOpenChange={(open) => { if (!open) setRechazoTarget(null) }}>

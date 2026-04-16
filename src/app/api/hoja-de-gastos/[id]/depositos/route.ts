@@ -33,7 +33,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
 /**
  * POST /api/hoja-de-gastos/[id]/depositos
- * Agrega un depósito adicional (solo cuando la hoja está en estado depositado).
+ * - tipo "anticipo": solo admin/gerente/administracion, estados aprobado/depositado
+ * - tipo "devolucion": solo el empleado dueño de la hoja, estado rendido
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -42,22 +43,37 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    if (!['admin', 'gerente', 'administracion'].includes(session.user.role)) {
-      return NextResponse.json({ error: 'Sin permisos para registrar depósito' }, { status: 403 })
-    }
-
     const { id } = await params
     const hoja = await prisma.hojaDeGastos.findUnique({ where: { id } })
     if (!hoja) {
       return NextResponse.json({ error: 'Hoja de gastos no encontrada' }, { status: 404 })
     }
-    if (!['aprobado', 'depositado'].includes(hoja.estado)) {
-      return NextResponse.json({ error: 'Solo se pueden registrar depósitos cuando la hoja está en estado aprobado o depositado' }, { status: 400 })
-    }
 
-    const { monto, descripcion, adjuntoIds = [] } = await req.json()
+    const { monto, descripcion, adjuntoIds = [], tipo = 'anticipo' } = await req.json()
+
     if (!monto || monto <= 0) {
       return NextResponse.json({ error: 'El monto debe ser mayor a 0' }, { status: 400 })
+    }
+
+    // Validar permisos y estado según el tipo
+    if (tipo === 'anticipo') {
+      if (!['admin', 'gerente', 'administracion'].includes(session.user.role)) {
+        return NextResponse.json({ error: 'Sin permisos para registrar anticipo' }, { status: 403 })
+      }
+      if (!['aprobado', 'depositado'].includes(hoja.estado)) {
+        return NextResponse.json({
+          error: 'Solo se pueden registrar anticipos cuando la hoja está en estado aprobado o depositado',
+        }, { status: 400 })
+      }
+    } else if (tipo === 'devolucion') {
+      if (hoja.empleadoId !== session.user.id) {
+        return NextResponse.json({ error: 'Solo el empleado del requerimiento puede registrar una devolución' }, { status: 403 })
+      }
+      if (hoja.estado !== 'rendido') {
+        return NextResponse.json({ error: 'Solo se pueden registrar devoluciones cuando la hoja está en estado rendido' }, { status: 400 })
+      }
+    } else {
+      return NextResponse.json({ error: 'Tipo de depósito inválido' }, { status: 400 })
     }
 
     const deposito = await prisma.$transaction(async (tx) => {
@@ -67,6 +83,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           monto,
           fecha: new Date(),
           descripcion: descripcion || null,
+          tipo,
           creadoPorId: session.user.id,
           updatedAt: new Date(),
         },
@@ -80,26 +97,31 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         })
       }
 
-      // Recalcular montoDepositado como suma de todos los depósitos
-      const todos = await tx.depositoHoja.findMany({ where: { hojaDeGastosId: id } })
-      const nuevoTotal = todos.reduce((s, d) => s + d.monto, 0)
-
-      await tx.hojaDeGastos.update({
-        where: { id },
-        data: {
-          montoDepositado: nuevoTotal,
-          saldo: nuevoTotal - hoja.montoGastado,
-          updatedAt: new Date(),
-        },
-      })
+      // Solo los anticipos afectan montoDepositado/saldo
+      if (tipo === 'anticipo') {
+        const todos = await tx.depositoHoja.findMany({
+          where: { hojaDeGastosId: id, tipo: 'anticipo' },
+        })
+        const nuevoTotal = todos.reduce((s, d) => s + d.monto, 0)
+        await tx.hojaDeGastos.update({
+          where: { id },
+          data: {
+            montoDepositado: nuevoTotal,
+            saldo: nuevoTotal - hoja.montoGastado,
+            updatedAt: new Date(),
+          },
+        })
+      }
 
       await tx.hojaDeGastosEvento.create({
         data: {
           hojaDeGastosId: id,
-          tipo: 'depositado',
-          descripcion: `Depósito registrado: S/ ${monto.toFixed(2)}`,
+          tipo: tipo === 'devolucion' ? 'comentario' : 'depositado',
+          descripcion: tipo === 'devolucion'
+            ? `Devolución registrada: S/ ${monto.toFixed(2)}`
+            : `Anticipo registrado: S/ ${monto.toFixed(2)}`,
           usuarioId: session.user.id,
-          metadata: { monto, depositoId: dep.id },
+          metadata: { monto, depositoId: dep.id, tipoDeposito: tipo },
         },
       })
 

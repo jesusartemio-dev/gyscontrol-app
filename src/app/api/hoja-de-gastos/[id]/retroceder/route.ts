@@ -62,14 +62,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       extraData.fechaRendicion = null
     }
 
-    // Si el destino es un estado pre-rendido, limpiar precioReal/totalReal de todos los ítems
-    // (cubre retrocesos desde rendido, y también aprobado→borrador, depositado→aprobado, etc.)
+    // Si el destino es un estado pre-rendido, limpiar precioReal/totalReal de los ítems
+    // SOLO si no hay comprobantes registrados: si existen comprobantes, el precioReal fue asignado
+    // por ellos y debe conservarse (los comprobantes no se eliminan al retroceder).
     const ESTADOS_PRE_RENDIDO = ['borrador', 'enviado', 'aprobado', 'depositado']
     if (ESTADOS_PRE_RENDIDO.includes(estadoPrevio)) {
-      await prisma.requerimientoMaterialItem.updateMany({
-        where: { hojaDeGastosId: id },
-        data: { precioReal: null, totalReal: null, updatedAt: new Date() },
-      })
+      const comprobantesExistentes = await prisma.gastoComprobante.count({ where: { hojaDeGastosId: id } })
+      if (comprobantesExistentes === 0) {
+        await prisma.requerimientoMaterialItem.updateMany({
+          where: { hojaDeGastosId: id },
+          data: { precioReal: null, totalReal: null, updatedAt: new Date() },
+        })
+      }
     }
     if (estadoActual === 'validado') {
       extraData.fechaValidacion = null

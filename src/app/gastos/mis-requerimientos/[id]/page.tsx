@@ -91,12 +91,20 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
   const [showRechazo, setShowRechazo] = useState(false)
   const [comentarioRechazo, setComentarioRechazo] = useState('')
 
-  // Depósito dialog
-  const [showDepositoAdicional, setShowDepositoAdicional] = useState(false)
-  const [montoDepositoAdicional, setMontoDepositoAdicional] = useState('')
-  const [descripcionDepositoAdicional, setDescripcionDepositoAdicional] = useState('')
-  const [adjuntosAdicional, setAdjuntosAdicional] = useState<HojaDeGastosAdjunto[]>([])
-  const [uploadingAdicional, setUploadingAdicional] = useState(false)
+  // Anticipo dialog (admin)
+  const [showAnticipo, setShowAnticipo] = useState(false)
+  const [montoAnticipo, setMontoAnticipo] = useState('')
+  const [descripcionAnticipo, setDescripcionAnticipo] = useState('')
+  const [adjuntosAnticipo, setAdjuntosAnticipo] = useState<HojaDeGastosAdjunto[]>([])
+  const [uploadingAnticipo, setUploadingAnticipo] = useState(false)
+
+  // Devolución dialog (empleado)
+  const [showDevolucion, setShowDevolucion] = useState(false)
+  const [montoDevolucion, setMontoDevolucion] = useState('')
+  const [descripcionDevolucion, setDescripcionDevolucion] = useState('')
+  const [adjuntosDevolucion, setAdjuntosDevolucion] = useState<HojaDeGastosAdjunto[]>([])
+  const [uploadingDevolucion, setUploadingDevolucion] = useState(false)
+
   const [deletingDeposito, setDeletingDeposito] = useState<string | null>(null)
 
   const role = session?.user?.role
@@ -149,38 +157,44 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
   // Avanza el estado a "depositado" (requiere al menos un depósito registrado)
   const handleAvanzarDepositado = () => executeAction(() => depositarHoja(id), 'Avanzado a Depositado')
 
-  const handleUploadAdicional = async (file: File) => {
+  const handleUploadAdjuntoDeposito = async (
+    file: File,
+    setUploading: (v: boolean) => void,
+    setAdjuntos: React.Dispatch<React.SetStateAction<HojaDeGastosAdjunto[]>>
+  ) => {
     try {
-      setUploadingAdicional(true)
+      setUploading(true)
       const adjunto = await uploadHojaAdjunto(id, file)
-      setAdjuntosAdicional(prev => [...prev, adjunto])
+      setAdjuntos(prev => [...prev, adjunto])
     } catch (e: any) {
-      toast.error(e.message || 'Error al subir constancia')
+      toast.error(e.message || 'Error al subir archivo')
     } finally {
-      setUploadingAdicional(false)
+      setUploading(false)
     }
   }
 
-  const handleDepositoAdicional = async () => {
-    const monto = parseFloat(montoDepositoAdicional)
+  const handleRegistrarDeposito = async (tipo: 'anticipo' | 'devolucion') => {
+    const monto = parseFloat(tipo === 'anticipo' ? montoAnticipo : montoDevolucion)
     if (!monto || monto <= 0) { toast.error('Ingrese un monto válido'); return }
     try {
       setActionLoading(true)
-      const adjuntoIds = adjuntosAdicional.map(a => a.id)
+      const adjuntoIds = (tipo === 'anticipo' ? adjuntosAnticipo : adjuntosDevolucion).map(a => a.id)
+      const descripcion = tipo === 'anticipo' ? descripcionAnticipo : descripcionDevolucion
       const res = await fetch(`/api/hoja-de-gastos/${id}/depositos`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ monto, descripcion: descripcionDepositoAdicional || undefined, adjuntoIds }),
+        body: JSON.stringify({ monto, descripcion: descripcion || undefined, adjuntoIds, tipo }),
       })
       if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Error') }
-      toast.success('Depósito registrado')
-      setShowDepositoAdicional(false)
-      setMontoDepositoAdicional('')
-      setDescripcionDepositoAdicional('')
-      setAdjuntosAdicional([])
+      toast.success(tipo === 'anticipo' ? 'Anticipo registrado' : 'Devolución registrada')
+      if (tipo === 'anticipo') {
+        setShowAnticipo(false); setMontoAnticipo(''); setDescripcionAnticipo(''); setAdjuntosAnticipo([])
+      } else {
+        setShowDevolucion(false); setMontoDevolucion(''); setDescripcionDevolucion(''); setAdjuntosDevolucion([])
+      }
       await loadData()
     } catch (e: any) {
-      toast.error(e.message || 'Error al registrar depósito')
+      toast.error(e.message || 'Error al registrar')
     } finally {
       setActionLoading(false)
     }
@@ -518,6 +532,9 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
   const canActivarAnticipo = hoja.estado === 'aprobado' && !hoja.requiereAnticipo && ['admin', 'gerente', 'administracion'].includes(role || '')
   const canAvanzarDepositado = canDepositar && (hoja.depositos?.length ?? 0) > 0
   const canRendir = (hoja.estado === 'aprobado' && !hoja.requiereAnticipo) || hoja.estado === 'depositado'
+  const itemsPendientesRendicion = hoja.tipoPropósito === 'compra_materiales'
+    ? (hoja.itemsMateriales || []).filter(i => i.precioReal == null).length
+    : 0
   const canValidarLineas = hoja.estado === 'rendido' && ['admin', 'gerente', 'administracion'].includes(role || '')
   // Solo contar las líneas que tienen UI de conformidad (excluir las vinculadas a materiales en gastos)
   const lineasConformidad = hoja.tipoPropósito === 'compra_materiales'
@@ -535,6 +552,11 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
   const canRechazar = ['enviado', 'rendido', 'validado'].includes(hoja.estado) && ['admin', 'gerente', 'gestor', 'coordinador', 'coordinador_logistico', 'administracion'].includes(role || '')
   const canRetroceder = !['borrador', 'rechazado'].includes(hoja.estado) && ['admin', 'gerente', 'administracion'].includes(role || '')
   const canEliminar = hoja.estado === 'borrador' && role === 'admin'
+  const esEmpleado = session?.user?.id === hoja.empleadoId
+  const anticipos = (hoja.depositos || []).filter((d: any) => d.tipo !== 'devolucion')
+  const devoluciones = (hoja.depositos || []).filter((d: any) => d.tipo === 'devolucion')
+  const canRegistrarAnticipo = ['aprobado', 'depositado'].includes(hoja.estado) && ['admin', 'gerente', 'administracion'].includes(role || '')
+  const canRegistrarDevolucion = hoja.estado === 'rendido' && hoja.requiereAnticipo && esEmpleado
 
   return (
     <div className="container mx-auto p-4 sm:p-6 space-y-4 max-w-4xl">
@@ -620,10 +642,17 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
                 </Button>
               )}
               {canRendir && (
-                <Button size="sm" onClick={handleRendir} disabled={actionLoading || lineas.length === 0} className="bg-orange-600 hover:bg-orange-700">
-                  <FileCheck className="h-3.5 w-3.5 mr-1" />
-                  Rendir gastos
-                </Button>
+                <div className="flex items-center gap-1.5">
+                  <Button size="sm" onClick={handleRendir} disabled={actionLoading || lineas.length === 0 || itemsPendientesRendicion > 0} className="bg-orange-600 hover:bg-orange-700">
+                    <FileCheck className="h-3.5 w-3.5 mr-1" />
+                    Rendir gastos
+                  </Button>
+                  {itemsPendientesRendicion > 0 && (
+                    <span className="text-xs text-amber-600">
+                      {itemsPendientesRendicion} ítem{itemsPendientesRendicion !== 1 ? 's' : ''} sin comprobante
+                    </span>
+                  )}
+                </div>
               )}
               {canValidarLineas && (
                 <div className="flex items-center gap-1.5">
@@ -712,57 +741,132 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
         )
       })()}
 
-      {/* Depósitos registrados */}
+      {/* Depósitos y Devoluciones */}
       {hoja.requiereAnticipo && ['aprobado', 'depositado', 'rendido', 'validado', 'cerrado'].includes(hoja.estado) && (
         <Card>
-          <CardHeader className="py-3 px-4 flex flex-row items-center justify-between">
+          <CardHeader className="py-3 px-4">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Banknote className="h-4 w-4 text-purple-600" />
-              Depósitos ({(hoja.depositos || []).length})
+              Depósitos y devoluciones
             </CardTitle>
-            {['aprobado', 'depositado'].includes(hoja.estado) && ['admin', 'gerente', 'administracion'].includes(role || '') && (
-              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setMontoDepositoAdicional(''); setDescripcionDepositoAdicional(''); setAdjuntosAdicional([]); setShowDepositoAdicional(true) }}>
-                + Registrar depósito
-              </Button>
-            )}
           </CardHeader>
-          <CardContent className="px-4 pb-3 space-y-2">
-            {(hoja.depositos || []).map((dep: any, idx: number) => (
-              <div key={dep.id} className="border rounded-lg p-3 bg-purple-50/50">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground font-medium">#{idx + 1}</span>
-                    <span className="text-sm font-semibold text-purple-800">S/ {dep.monto.toFixed(2)}</span>
-                    {dep.descripcion && <span className="text-xs text-muted-foreground">· {dep.descripcion}</span>}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">{new Date(dep.fecha).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
-                    {['aprobado', 'depositado'].includes(hoja.estado) && ['admin', 'gerente', 'administracion'].includes(role || '') && (hoja.estado === 'aprobado' || idx > 0) && (
-                      <button
-                        onClick={() => handleEliminarDeposito(dep.id)}
-                        disabled={deletingDeposito === dep.id}
-                        className="text-red-400 hover:text-red-600 disabled:opacity-50"
-                        title="Eliminar depósito"
-                      >
-                        {deletingDeposito === dep.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
-                      </button>
-                    )}
-                  </div>
-                </div>
-                {dep.adjuntos && dep.adjuntos.length > 0 && (
-                  <div className="mt-2 space-y-1">
-                    {dep.adjuntos.map((adj: any) => (
-                      <div key={adj.id} className="flex items-center gap-1.5 text-xs">
-                        <FileText className="h-3 w-3 text-purple-500 shrink-0" />
-                        <a href={adj.urlArchivo} target="_blank" rel="noopener noreferrer" className="text-purple-700 hover:underline truncate">{adj.nombreArchivo}</a>
-                      </div>
-                    ))}
-                  </div>
+          <CardContent className="px-4 pb-4 space-y-4">
+
+            {/* ── ANTICIPOS (empresa → trabajador) ── */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-semibold text-purple-700 uppercase tracking-wide">
+                  Anticipos de la empresa ({anticipos.length})
+                </p>
+                {canRegistrarAnticipo && (
+                  <Button size="sm" variant="outline" className="h-7 text-xs border-purple-300 text-purple-700 hover:bg-purple-50"
+                    onClick={() => { setMontoAnticipo(''); setDescripcionAnticipo(''); setAdjuntosAnticipo([]); setShowAnticipo(true) }}>
+                    + Registrar anticipo
+                  </Button>
                 )}
               </div>
-            ))}
-            {(hoja.depositos || []).length === 0 && (
-              <p className="text-xs text-muted-foreground">Sin depósitos registrados aún.</p>
+              <div className="space-y-2">
+                {anticipos.length === 0 && (
+                  <p className="text-xs text-muted-foreground italic">Sin anticipos registrados.</p>
+                )}
+                {anticipos.map((dep: any, idx: number) => {
+                  const canEliminarDep = canRegistrarAnticipo && (hoja.estado === 'aprobado' || idx > 0)
+                  return (
+                    <div key={dep.id} className="border border-purple-200 rounded-lg p-3 bg-purple-50/40">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-purple-400 font-medium">#{idx + 1}</span>
+                          <span className="text-sm font-bold text-purple-800">S/ {dep.monto.toFixed(2)}</span>
+                          {dep.descripcion && <span className="text-xs text-muted-foreground">· {dep.descripcion}</span>}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">{new Date(dep.fecha).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                          {canEliminarDep && (
+                            <button onClick={() => handleEliminarDeposito(dep.id)} disabled={deletingDeposito === dep.id}
+                              className="text-red-400 hover:text-red-600 disabled:opacity-50" title="Eliminar">
+                              {deletingDeposito === dep.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      {dep.adjuntos?.length > 0 && (
+                        <div className="mt-2 space-y-1">
+                          {dep.adjuntos.map((adj: any) => (
+                            <div key={adj.id} className="flex items-center gap-1.5 text-xs">
+                              <FileText className="h-3 w-3 text-purple-400 shrink-0" />
+                              <a href={adj.urlArchivo} target="_blank" rel="noopener noreferrer" className="text-purple-700 hover:underline truncate">{adj.nombreArchivo}</a>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* ── DEVOLUCIONES (trabajador → empresa) ── */}
+            {(canRegistrarDevolucion || devoluciones.length > 0) && (
+              <div className="border-t pt-4">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-semibold text-teal-700 uppercase tracking-wide">
+                    Devoluciones al empresa ({devoluciones.length})
+                  </p>
+                  {canRegistrarDevolucion && (
+                    <Button size="sm" variant="outline" className="h-7 text-xs border-teal-300 text-teal-700 hover:bg-teal-50"
+                      onClick={() => { setMontoDevolucion(''); setDescripcionDevolucion(''); setAdjuntosDevolucion([]); setShowDevolucion(true) }}>
+                      + Registrar devolución
+                    </Button>
+                  )}
+                </div>
+                {canRegistrarDevolucion && devoluciones.length === 0 && (
+                  <div className="flex items-start gap-2 text-xs text-teal-700 bg-teal-50 border border-teal-200 rounded-lg p-2.5 mb-2">
+                    <Banknote className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                    <span>
+                      Saldo pendiente de devolver: <strong>S/ {Math.max(0, hoja.saldo).toFixed(2)}</strong>.
+                      Registre el depósito que realizó a la empresa y adjunte el voucher.
+                    </span>
+                  </div>
+                )}
+                <div className="space-y-2">
+                  {devoluciones.length === 0 && !canRegistrarDevolucion && (
+                    <p className="text-xs text-muted-foreground italic">Sin devoluciones registradas.</p>
+                  )}
+                  {devoluciones.map((dep: any, idx: number) => {
+                    const canEliminarDev = hoja.estado === 'rendido' && (esEmpleado || ['admin', 'gerente', 'administracion'].includes(role || ''))
+                    return (
+                      <div key={dep.id} className="border border-teal-200 rounded-lg p-3 bg-teal-50/40">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-teal-400 font-medium">#{idx + 1}</span>
+                            <span className="text-sm font-bold text-teal-800">S/ {dep.monto.toFixed(2)}</span>
+                            {dep.descripcion && <span className="text-xs text-muted-foreground">· {dep.descripcion}</span>}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">{new Date(dep.fecha).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                            {canEliminarDev && (
+                              <button onClick={() => handleEliminarDeposito(dep.id)} disabled={deletingDeposito === dep.id}
+                                className="text-red-400 hover:text-red-600 disabled:opacity-50" title="Eliminar">
+                                {deletingDeposito === dep.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        {dep.adjuntos?.length > 0 && (
+                          <div className="mt-2 space-y-1">
+                            {dep.adjuntos.map((adj: any) => (
+                              <div key={adj.id} className="flex items-center gap-1.5 text-xs">
+                                <FileText className="h-3 w-3 text-teal-500 shrink-0" />
+                                <a href={adj.urlArchivo} target="_blank" rel="noopener noreferrer" className="text-teal-700 hover:underline truncate">{adj.nombreArchivo}</a>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -937,42 +1041,42 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
         </DialogContent>
       </Dialog>
 
-      {/* Depósito Dialog */}
-      <Dialog open={showDepositoAdicional} onOpenChange={setShowDepositoAdicional}>
+      {/* Dialog: Registrar Anticipo (admin) */}
+      <Dialog open={showAnticipo} onOpenChange={setShowAnticipo}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Banknote className="h-5 w-5 text-purple-600" />
-              Registrar depósito
+              Registrar anticipo
             </DialogTitle>
-            <DialogDescription>Registre el monto depositado al empleado. Puede adjuntar la constancia de depósito.</DialogDescription>
+            <DialogDescription>Monto que la empresa deposita al empleado. Adjunte el comprobante bancario.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 pt-2">
             <div>
               <Label>Monto (PEN) <span className="text-red-500">*</span></Label>
-              <Input type="number" step="0.01" min="0" value={montoDepositoAdicional} onChange={(e) => setMontoDepositoAdicional(e.target.value)} placeholder="0.00" />
+              <Input type="number" step="0.01" min="0" value={montoAnticipo} onChange={e => setMontoAnticipo(e.target.value)} placeholder="0.00" />
             </div>
             <div>
               <Label>Descripción (opcional)</Label>
-              <Input value={descripcionDepositoAdicional} onChange={(e) => setDescripcionDepositoAdicional(e.target.value)} placeholder="Ej: Segundo depósito" />
+              <Input value={descripcionAnticipo} onChange={e => setDescripcionAnticipo(e.target.value)} placeholder="Ej: Segundo anticipo" />
             </div>
             <div>
               <Label>Constancia de depósito</Label>
-              <div className="mt-1 border-2 border-dashed border-gray-300 rounded-lg p-3 text-center">
-                <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" id="constancia-adicional-upload"
-                  onChange={(e) => { const file = e.target.files?.[0]; if (file) handleUploadAdicional(file); e.target.value = '' }} />
-                <label htmlFor="constancia-adicional-upload" className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
-                  {uploadingAdicional
+              <div className="mt-1 border-2 border-dashed border-purple-200 rounded-lg p-3 text-center">
+                <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden" id="anticipo-upload"
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleUploadAdjuntoDeposito(f, setUploadingAnticipo, setAdjuntosAnticipo); e.target.value = '' }} />
+                <label htmlFor="anticipo-upload" className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
+                  {uploadingAnticipo
                     ? <span className="flex items-center justify-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Subiendo...</span>
                     : <span className="flex items-center justify-center gap-2"><Upload className="h-4 w-4" /> Subir constancia (PDF, JPG, PNG)</span>}
                 </label>
               </div>
-              {adjuntosAdicional.length > 0 && (
+              {adjuntosAnticipo.length > 0 && (
                 <div className="mt-2 space-y-1">
-                  {adjuntosAdicional.map(adj => (
-                    <div key={adj.id} className="flex items-center justify-between text-xs bg-green-50 border border-green-200 rounded px-2 py-1">
-                      <a href={adj.urlArchivo} target="_blank" rel="noopener noreferrer" className="text-green-700 hover:underline truncate">{adj.nombreArchivo}</a>
-                      <button onClick={async () => { await deleteHojaAdjunto(adj.id); setAdjuntosAdicional(prev => prev.filter(a => a.id !== adj.id)) }} className="text-red-500 hover:text-red-700 ml-2"><X className="h-3 w-3" /></button>
+                  {adjuntosAnticipo.map(adj => (
+                    <div key={adj.id} className="flex items-center justify-between text-xs bg-purple-50 border border-purple-200 rounded px-2 py-1">
+                      <a href={adj.urlArchivo} target="_blank" rel="noopener noreferrer" className="text-purple-700 hover:underline truncate">{adj.nombreArchivo}</a>
+                      <button onClick={async () => { await deleteHojaAdjunto(adj.id); setAdjuntosAnticipo(prev => prev.filter(a => a.id !== adj.id)) }} className="text-red-500 hover:text-red-700 ml-2"><X className="h-3 w-3" /></button>
                     </div>
                   ))}
                 </div>
@@ -980,10 +1084,65 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDepositoAdicional(false)}>Cancelar</Button>
-            <Button onClick={handleDepositoAdicional} disabled={actionLoading || !montoDepositoAdicional} className="bg-purple-600 hover:bg-purple-700">
+            <Button variant="outline" onClick={() => setShowAnticipo(false)}>Cancelar</Button>
+            <Button onClick={() => handleRegistrarDeposito('anticipo')} disabled={actionLoading || !montoAnticipo} className="bg-purple-600 hover:bg-purple-700">
               {actionLoading && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-              Registrar
+              Registrar anticipo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Registrar Devolución (empleado) */}
+      <Dialog open={showDevolucion} onOpenChange={setShowDevolucion}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Banknote className="h-5 w-5 text-teal-600" />
+              Registrar devolución
+            </DialogTitle>
+            <DialogDescription>
+              Monto que usted depositó de vuelta a la empresa. Adjunte el voucher bancario como comprobante.
+              {hoja.saldo > 0 && <span className="block mt-1 font-medium text-teal-700">Saldo a devolver: S/ {hoja.saldo.toFixed(2)}</span>}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 pt-2">
+            <div>
+              <Label>Monto devuelto (PEN) <span className="text-red-500">*</span></Label>
+              <Input type="number" step="0.01" min="0" value={montoDevolucion} onChange={e => setMontoDevolucion(e.target.value)} placeholder="0.00" />
+            </div>
+            <div>
+              <Label>Descripción (opcional)</Label>
+              <Input value={descripcionDevolucion} onChange={e => setDescripcionDevolucion(e.target.value)} placeholder="Ej: Devolución saldo sobrante" />
+            </div>
+            <div>
+              <Label>Voucher de depósito <span className="text-red-500">*</span></Label>
+              <div className="mt-1 border-2 border-dashed border-teal-200 rounded-lg p-3 text-center">
+                <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden" id="devolucion-upload"
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleUploadAdjuntoDeposito(f, setUploadingDevolucion, setAdjuntosDevolucion); e.target.value = '' }} />
+                <label htmlFor="devolucion-upload" className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
+                  {uploadingDevolucion
+                    ? <span className="flex items-center justify-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Subiendo...</span>
+                    : <span className="flex items-center justify-center gap-2"><Upload className="h-4 w-4" /> Subir voucher (PDF, JPG, PNG)</span>}
+                </label>
+              </div>
+              {adjuntosDevolucion.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  {adjuntosDevolucion.map(adj => (
+                    <div key={adj.id} className="flex items-center justify-between text-xs bg-teal-50 border border-teal-200 rounded px-2 py-1">
+                      <a href={adj.urlArchivo} target="_blank" rel="noopener noreferrer" className="text-teal-700 hover:underline truncate">{adj.nombreArchivo}</a>
+                      <button onClick={async () => { await deleteHojaAdjunto(adj.id); setAdjuntosDevolucion(prev => prev.filter(a => a.id !== adj.id)) }} className="text-red-500 hover:text-red-700 ml-2"><X className="h-3 w-3" /></button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDevolucion(false)}>Cancelar</Button>
+            <Button onClick={() => handleRegistrarDeposito('devolucion')} disabled={actionLoading || !montoDevolucion} className="bg-teal-600 hover:bg-teal-700">
+              {actionLoading && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+              Registrar devolución
             </Button>
           </DialogFooter>
         </DialogContent>

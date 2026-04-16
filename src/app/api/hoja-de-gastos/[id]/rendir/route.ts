@@ -31,6 +31,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: 'Debe tener al menos una línea de gasto' }, { status: 400 })
     }
 
+    // Para compra de materiales: todos los items deben tener comprobante registrado
+    if (hoja.itemsMateriales.length > 0) {
+      const itemsSinComprobante = hoja.itemsMateriales.filter(i => i.precioReal == null)
+      if (itemsSinComprobante.length > 0) {
+        return NextResponse.json(
+          { error: `Hay ${itemsSinComprobante.length} ítem(s) sin comprobante registrado. Registre todos los comprobantes antes de rendir.` },
+          { status: 400 }
+        )
+      }
+    }
+
     // Recalcular montos
     const montoGastado = hoja.lineas.reduce((sum, l) => sum + l.monto, 0)
     const saldo = hoja.montoDepositado - montoGastado

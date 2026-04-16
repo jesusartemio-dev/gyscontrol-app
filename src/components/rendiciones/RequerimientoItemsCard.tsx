@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { HojaDeGastos } from '@/types'
+import ZoomableImage from './ZoomableImage'
 import {
   getItemsParaRequerimiento,
   type ProyectoParaRequerimiento,
@@ -161,6 +162,11 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
   const [conformidadLoading, setConformidadLoading] = useState<string | null>(null)
   const [observarTarget, setObservarTarget] = useState<string | null>(null)
   const [observarComentario, setObservarComentario] = useState('')
+  // Overrides locales para no cerrar el preview al marcar conformidad
+  const [conformidadOverrides, setConformidadOverrides] = useState<
+    Record<string, { conformidad: string; comentarioConformidad?: string }>
+  >({})
+  const pendingRefreshRef = useRef(false)
 
   const handleConformidadItem = async (itemId: string, estado: 'conforme' | 'observado', comentario?: string) => {
     if (estado === 'observado' && !comentario?.trim()) {
@@ -180,11 +186,29 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
         throw new Error(err.error || 'Error al marcar conformidad')
       }
       setObservarTarget(null)
-      onChanged()
+      if (previewing) {
+        // Preview abierto: actualizar override local y diferir el refresh al cerrar
+        setConformidadOverrides(prev => ({
+          ...prev,
+          [itemId]: { conformidad: estado, comentarioConformidad: comentario },
+        }))
+        pendingRefreshRef.current = true
+      } else {
+        onChanged()
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al marcar conformidad')
     } finally {
       setConformidadLoading(null)
+    }
+  }
+
+  const closePreviewing = () => {
+    setPreviewing(null)
+    setConformidadOverrides({})
+    if (pendingRefreshRef.current) {
+      pendingRefreshRef.current = false
+      onChanged()
     }
   }
 
@@ -511,7 +535,7 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
         const err = await res.json()
         throw new Error(err.error || 'Error al registrar comprobante')
       }
-      const comprobante = await res.json()
+      const { comprobante } = await res.json()
 
       // 2. Subir adjunto si hay archivo seleccionado
       let fileOk = true
@@ -743,82 +767,18 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                         </td>
                         {showConformidad && (
                           <td className="py-2 pl-3">
-                            {observarTarget === item.id ? (
-                              <div className="flex items-center gap-1">
-                                <input
-                                  autoFocus
-                                  type="text"
-                                  placeholder="Comentario..."
-                                  value={observarComentario}
-                                  onChange={e => setObservarComentario(e.target.value)}
-                                  className="border rounded px-1.5 py-0.5 text-xs w-32"
-                                  onKeyDown={e => {
-                                    if (e.key === 'Enter') handleConformidadItem(item.id, 'observado', observarComentario)
-                                    if (e.key === 'Escape') { setObservarTarget(null); setObservarComentario('') }
-                                  }}
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => handleConformidadItem(item.id, 'observado', observarComentario)}
-                                  disabled={!observarComentario.trim() || conformidadLoading === item.id}
-                                  className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 hover:bg-amber-200 disabled:opacity-50"
-                                >
-                                  {conformidadLoading === item.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'OK'}
-                                </button>
-                                <button type="button" onClick={() => { setObservarTarget(null); setObservarComentario('') }} className="text-muted-foreground hover:text-foreground">
-                                  <X className="h-3 w-3" />
-                                </button>
-                              </div>
-                            ) : item.conformidad === 'conforme' ? (
-                              <div className="flex items-center gap-1.5">
-                                <Badge className="text-[10px] px-1.5 py-0 h-4 bg-green-100 text-green-700 border-0 flex items-center gap-0.5">
-                                  <CircleCheck className="h-2.5 w-2.5" />
-                                  Conforme
-                                </Badge>
-                                <button
-                                  type="button"
-                                  onClick={e => { e.stopPropagation(); handleConformidadItem(item.id, 'observado') }}
-                                  disabled={conformidadLoading === item.id}
-                                  className="text-[10px] px-1 py-0 h-4 rounded text-amber-600 hover:bg-amber-50 disabled:opacity-50"
-                                  title="Cambiar a observado"
-                                >
-                                  Obs.
-                                </button>
-                              </div>
+                            {item.conformidad === 'conforme' ? (
+                              <Badge className="text-[10px] px-1.5 py-0 h-4 bg-green-100 text-green-700 border-0 flex items-center gap-0.5 w-fit">
+                                <CircleCheck className="h-2.5 w-2.5" /> Conforme
+                              </Badge>
                             ) : item.conformidad === 'observado' ? (
-                              <div className="flex items-center gap-1.5">
-                                <Badge className="text-[10px] px-1.5 py-0 h-4 bg-amber-100 text-amber-700 border-0 flex items-center gap-0.5" title={item.comentarioConformidad || ''}>
-                                  <CircleAlert className="h-2.5 w-2.5" />
-                                  Observado
-                                </Badge>
-                                <button
-                                  type="button"
-                                  onClick={() => handleConformidadItem(item.id, 'conforme')}
-                                  disabled={conformidadLoading === item.id}
-                                  className="text-[10px] px-1 py-0 h-4 rounded text-green-600 hover:bg-green-50 disabled:opacity-50"
-                                >
-                                  Conforme
-                                </button>
-                              </div>
+                              <Badge className="text-[10px] px-1.5 py-0 h-4 bg-amber-100 text-amber-700 border-0 flex items-center gap-0.5 w-fit" title={item.comentarioConformidad || ''}>
+                                <CircleAlert className="h-2.5 w-2.5" /> Observado
+                              </Badge>
                             ) : (
-                              <div className="flex items-center gap-1">
-                                <button
-                                  type="button"
-                                  onClick={() => handleConformidadItem(item.id, 'conforme')}
-                                  disabled={conformidadLoading === item.id}
-                                  className="text-[10px] px-1.5 py-0.5 rounded bg-green-50 text-green-700 hover:bg-green-100 border border-green-200 disabled:opacity-50"
-                                >
-                                  {conformidadLoading === item.id ? <Loader2 className="h-2.5 w-2.5 animate-spin inline" /> : 'Conforme'}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={e => { e.stopPropagation(); handleConformidadItem(item.id, 'observado') }}
-                                  disabled={conformidadLoading === item.id}
-                                  className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 disabled:opacity-50"
-                                >
-                                  Observar
-                                </button>
-                              </div>
+                              <Badge className="text-[10px] px-1.5 py-0 h-4 bg-gray-100 text-gray-500 border-0 flex items-center gap-0.5 w-fit">
+                                <Circle className="h-2.5 w-2.5" /> Pendiente
+                              </Badge>
                             )}
                           </td>
                         )}
@@ -1000,12 +960,25 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                         {/* Líneas expandibles */}
                         {expanded && c.lineas.length > 0 && (
                           <div className="border-t divide-y bg-background/60">
-                            {c.lineas.map(l => (
-                              <div key={l.id} className="flex items-center justify-between px-4 py-1.5 text-xs">
-                                <span className="truncate flex-1 text-muted-foreground">{l.descripcion}</span>
-                                <span className="font-mono text-right shrink-0 ml-4 font-medium">{fmt(l.monto)}</span>
-                              </div>
-                            ))}
+                            {c.lineas.map(l => {
+                              const itemLinea = findItemForLinea(l.descripcion)
+                              const conf = itemLinea?.conformidad
+                              return (
+                                <div key={l.id} className="flex items-center gap-2 px-4 py-1.5 text-xs">
+                                  <span className="truncate flex-1 text-muted-foreground">{l.descripcion}</span>
+                                  {showConformidad && (
+                                    conf === 'conforme' ? (
+                                      <span title="Conforme" className="shrink-0"><CircleCheck className="h-3.5 w-3.5 text-green-600" /></span>
+                                    ) : conf === 'observado' ? (
+                                      <span title={itemLinea?.comentarioConformidad || 'Observado'} className="shrink-0"><CircleAlert className="h-3.5 w-3.5 text-amber-500" /></span>
+                                    ) : (
+                                      <span title="Pendiente" className="shrink-0"><Circle className="h-3.5 w-3.5 text-muted-foreground/40" /></span>
+                                    )
+                                  )}
+                                  <span className="font-mono text-right shrink-0 font-medium">{fmt(l.monto)}</span>
+                                </div>
+                              )
+                            })}
                           </div>
                         )}
                       </div>
@@ -1044,7 +1017,7 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                 </span>
                 <button
                   type="button"
-                  onClick={() => setPreviewing(null)}
+                  onClick={closePreviewing}
                   className="p-1.5 rounded hover:bg-muted transition-colors"
                   aria-label="Cerrar"
                 >
@@ -1056,43 +1029,135 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
             {/* Body split */}
             <div className="flex flex-1 min-h-0">
               {/* ── Panel izquierdo: datos + items ── */}
-              <div className="w-[55%] shrink-0 border-r flex flex-col overflow-y-auto bg-background">
-                <div className="p-5 space-y-4 border-b">
+              <div className="w-[400px] shrink-0 border-r flex flex-col overflow-y-auto bg-background">
+                <div className="px-5 py-5 space-y-4 border-b">
                   {[
                     { label: 'Fecha', value: new Date(previewing.fecha).toLocaleDateString('es-PE', { timeZone: 'UTC', day: '2-digit', month: 'long', year: 'numeric' }) },
-                    { label: 'Monto', value: fmt(previewing.montoTotal), className: 'font-bold font-mono text-green-700' },
+                    { label: 'Monto', value: fmt(previewing.montoTotal), className: 'font-bold font-mono text-green-700 text-base' },
                     { label: 'Tipo comprobante', value: TIPO_LABELS[previewing.tipoComprobante] || previewing.tipoComprobante },
                     { label: 'Nº comprobante', value: previewing.numeroComprobante || '—', className: 'font-mono' },
                     { label: 'Proveedor', value: previewing.proveedorNombre || '—' },
                     { label: 'RUC', value: previewing.proveedorRuc || '—', className: 'font-mono' },
                   ].map(f => (
                     <div key={f.label}>
-                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">{f.label}</p>
-                      <p className={`text-sm ${f.className || ''}`}>{f.value}</p>
+                      <p className="text-[10px] text-muted-foreground mb-0.5">{f.label}</p>
+                      <p className={`text-sm font-semibold ${f.className || ''}`}>{f.value}</p>
                     </div>
                   ))}
                 </div>
 
-                <div className="p-5 flex-1">
-                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-3">
+                <div className="px-5 py-5 flex-1">
+                  <p className="text-[10px] text-muted-foreground mb-3">
                     Items incluidos ({previewing.lineas.length})
                   </p>
                   <div className="space-y-0">
-                    {previewing.lineas.map(l => (
-                      <div key={l.id} className="flex items-start justify-between gap-3 py-2 border-b last:border-0">
-                        <span className="text-xs text-foreground/80 flex-1 leading-snug">{l.descripcion}</span>
-                        <span className="text-xs font-mono font-semibold text-green-700 shrink-0">{fmt(l.monto)}</span>
-                      </div>
-                    ))}
-                    <div className="flex justify-between pt-3 text-xs font-bold">
-                      <span>Total</span>
-                      <span className="font-mono">{fmt(previewing.montoTotal)}</span>
+                    {previewing.lineas.map(l => {
+                      const itemLinea = findItemForLinea(l.descripcion)
+                      const override = itemLinea ? conformidadOverrides[itemLinea.id] : undefined
+                      const lineaConformidad = override?.conformidad ?? itemLinea?.conformidad
+                      const lineaComentario = override?.comentarioConformidad ?? itemLinea?.comentarioConformidad
+                      return (
+                        <div key={l.id} className="py-2.5 border-b last:border-0 space-y-1.5">
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="text-sm font-medium text-foreground flex-1 leading-snug">{l.descripcion}</span>
+                            <span className="text-sm font-mono font-bold text-green-700 shrink-0">{fmt(l.monto)}</span>
+                          </div>
+                          {showConformidad && itemLinea && (
+                            <div className="pl-0">
+                              {observarTarget === itemLinea.id ? (
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    autoFocus
+                                    type="text"
+                                    value={observarComentario}
+                                    className="h-6 text-[10px] border rounded px-1.5 flex-1 min-w-0"
+                                    placeholder="Motivo..."
+                                    onChange={e => setObservarComentario(e.target.value)}
+                                    onKeyDown={e => {
+                                      if (e.key === 'Enter') handleConformidadItem(itemLinea.id, 'observado', observarComentario)
+                                      if (e.key === 'Escape') { setObservarTarget(null); setObservarComentario('') }
+                                    }}
+                                  />
+                                  <button
+                                    type="button"
+                                    className="h-6 px-2 text-[10px] bg-orange-600 text-white rounded disabled:opacity-50"
+                                    onClick={() => handleConformidadItem(itemLinea.id, 'observado', observarComentario)}
+                                    disabled={!observarComentario.trim() || conformidadLoading === itemLinea.id}
+                                  >
+                                    {conformidadLoading === itemLinea.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'OK'}
+                                  </button>
+                                  <button type="button" onClick={() => { setObservarTarget(null); setObservarComentario('') }} className="text-muted-foreground hover:text-foreground">
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              ) : lineaConformidad === 'conforme' ? (
+                                <div className="flex items-center gap-1.5">
+                                  <span className="inline-flex items-center gap-1 text-[10px] text-green-700 font-medium">
+                                    <CircleCheck className="h-3 w-3" /> Conforme
+                                  </span>
+                                  <button
+                                    type="button"
+                                    className="text-[10px] text-orange-600 hover:text-orange-800 underline"
+                                    onClick={() => handleConformidadItem(itemLinea.id, 'observado')}
+                                    disabled={!!conformidadLoading}
+                                  >
+                                    Observar
+                                  </button>
+                                </div>
+                              ) : lineaConformidad === 'observado' ? (
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="inline-flex items-center gap-1 text-[10px] text-orange-600 font-medium">
+                                    <CircleAlert className="h-3 w-3" /> Observado
+                                  </span>
+                                  {lineaComentario && (
+                                    <span className="text-[10px] text-muted-foreground">— {lineaComentario}</span>
+                                  )}
+                                  <button
+                                    type="button"
+                                    className="text-[10px] text-green-700 hover:text-green-900 underline"
+                                    onClick={() => handleConformidadItem(itemLinea.id, 'conforme')}
+                                    disabled={!!conformidadLoading}
+                                  >
+                                    {conformidadLoading === itemLinea.id ? <Loader2 className="h-2.5 w-2.5 animate-spin inline" /> : 'Conforme'}
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1.5">
+                                  <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                                    <Circle className="h-3 w-3" /> Pendiente
+                                  </span>
+                                  <button
+                                    type="button"
+                                    className="text-[10px] text-green-700 hover:text-green-900 underline disabled:opacity-50"
+                                    onClick={() => handleConformidadItem(itemLinea.id, 'conforme')}
+                                    disabled={!!conformidadLoading}
+                                  >
+                                    {conformidadLoading === itemLinea.id ? <Loader2 className="h-2.5 w-2.5 animate-spin inline" /> : 'Conforme'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="text-[10px] text-orange-600 hover:text-orange-800 underline disabled:opacity-50"
+                                    onClick={() => handleConformidadItem(itemLinea.id, 'observado')}
+                                    disabled={!!conformidadLoading}
+                                  >
+                                    Observar
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                    <div className="flex justify-between pt-3 border-t mt-1">
+                      <span className="text-sm font-semibold">Total</span>
+                      <span className="text-sm font-mono font-bold text-green-700">{fmt(previewing.montoTotal)}</span>
                     </div>
                   </div>
                 </div>
 
                 <div className="p-4 border-t shrink-0">
-                  <Button variant="outline" size="sm" className="w-full" onClick={() => setPreviewing(null)}>
+                  <Button variant="outline" size="sm" className="w-full" onClick={closePreviewing}>
                     Cerrar
                   </Button>
                 </div>
@@ -1107,7 +1172,7 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                     {canAddComprobante && (
                       <button
                         type="button"
-                        onClick={() => { setPreviewing(null); handleAdjuntarAComprobante(previewing.id) }}
+                        onClick={() => { closePreviewing(); handleAdjuntarAComprobante(previewing.id) }}
                         className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 border border-blue-200 hover:border-blue-400 rounded px-3 py-1.5 transition-colors"
                       >
                         <Plus className="h-3.5 w-3.5" />Adjuntar archivo
@@ -1125,13 +1190,12 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                         <ExternalLink className="h-3.5 w-3.5" />Abrir en nueva pestaña
                       </a>
                     </div>
-                    <div className="flex-1 min-h-0 p-4">
+                    <div className="flex-1 min-h-0">
                       {esImagen && (
-                        <img src={previewUrl!} alt={adj.nombreArchivo}
-                          className="w-full h-full object-contain" />
+                        <ZoomableImage src={previewUrl!} alt={adj.nombreArchivo} />
                       )}
                       {esPdf && (
-                        <iframe src={`${previewUrl}#navpanes=0&toolbar=0`} className="w-full h-full border-0" title={adj.nombreArchivo} />
+                        <iframe src={`${previewUrl}#navpanes=0&zoom=page-width`} className="w-full h-full border-0" title={adj.nombreArchivo} />
                       )}
                       {!esImagen && !esPdf && (
                         <div className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground">

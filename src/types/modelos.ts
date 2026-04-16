@@ -2803,6 +2803,7 @@ export interface DepositoHoja {
   monto: number
   fecha: string
   descripcion?: string | null
+  tipo: 'anticipo' | 'devolucion'
   creadoPorId: string
   createdAt: string
   adjuntos?: HojaDeGastosAdjunto[]
