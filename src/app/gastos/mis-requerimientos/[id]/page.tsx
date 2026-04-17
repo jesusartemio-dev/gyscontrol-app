@@ -530,7 +530,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
 
   const isEditable = !['rendido', 'validado', 'cerrado'].includes(hoja.estado)
   const canEnviar = ['borrador', 'rechazado'].includes(hoja.estado)
-  const canAprobar = hoja.estado === 'enviado' && ['admin', 'gerente', 'gestor', 'coordinador', 'coordinador_logistico', 'administracion'].includes(role || '')
+  const canAprobar = hoja.estado === 'enviado' && ['admin', 'gerente', 'gestor', 'coordinador', 'administracion'].includes(role || '')
   const canDepositar = hoja.estado === 'aprobado' && hoja.requiereAnticipo && ['admin', 'gerente', 'administracion'].includes(role || '')
   const canActivarAnticipo = hoja.estado === 'aprobado' && !hoja.requiereAnticipo && ['admin', 'gerente', 'administracion'].includes(role || '')
   const canAvanzarDepositado = canDepositar && (hoja.depositos?.length ?? 0) > 0
@@ -551,8 +551,8 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
     lineasConformidad.every(l => l.conformidad === 'conforme') &&
     itemsMaterialesConformidad.every(i => i.conformidad === 'conforme')
   const canValidar = canValidarLineas && allLineasConforme
-  const canCerrar = hoja.estado === 'validado' && ['admin', 'gerente', 'coordinador', 'coordinador_logistico', 'administracion'].includes(role || '')
-  const canRechazar = ['enviado', 'rendido', 'validado'].includes(hoja.estado) && ['admin', 'gerente', 'gestor', 'coordinador', 'coordinador_logistico', 'administracion'].includes(role || '')
+  const canCerrar = hoja.estado === 'validado' && ['admin', 'gerente', 'coordinador', 'administracion'].includes(role || '')
+  const canRechazar = ['enviado', 'rendido', 'validado'].includes(hoja.estado) && ['admin', 'gerente', 'gestor', 'coordinador', 'administracion'].includes(role || '')
   const canRetroceder = !['borrador', 'rechazado'].includes(hoja.estado) && ['admin', 'gerente', 'administracion'].includes(role || '')
   const canEliminar = hoja.estado === 'borrador' && role === 'admin'
   const esEmpleado = session?.user?.id === hoja.empleadoId
