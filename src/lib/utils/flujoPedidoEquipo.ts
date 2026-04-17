@@ -6,6 +6,7 @@
 export type EstadoPedidoEquipo =
   | 'borrador'
   | 'enviado'
+  | 'aprobado'
   | 'atendido'
   | 'parcial'
   | 'entregado'
@@ -19,9 +20,10 @@ export interface FlujoPedidoEstado {
 
 export const flujoEstadosPedido: Record<EstadoPedidoEquipo, FlujoPedidoEstado> = {
   borrador:   { siguiente: 'enviado',    cancelar: 'cancelado', roles: ['proyectos', 'admin', 'gerente', 'gestor', 'coordinador', 'logistico', 'coordinador_logistico'] },
-  enviado:    { siguiente: 'atendido',   cancelar: 'cancelado', roles: ['logistico', 'admin'] },
-  atendido:   { siguiente: 'parcial',    cancelar: 'cancelado', roles: ['logistico', 'admin'] },
-  parcial:    { siguiente: 'entregado',  cancelar: 'cancelado', roles: ['logistico', 'admin'] },
+  enviado:    { siguiente: 'aprobado',   cancelar: 'cancelado', roles: ['admin', 'gerente', 'gestor', 'coordinador', 'coordinador_logistico'] },
+  aprobado:   { siguiente: 'atendido',   cancelar: 'cancelado', roles: ['logistico', 'coordinador_logistico', 'admin'] },
+  atendido:   { siguiente: 'parcial',    cancelar: 'cancelado', roles: ['logistico', 'coordinador_logistico', 'admin'] },
+  parcial:    { siguiente: 'entregado',  cancelar: 'cancelado', roles: ['logistico', 'coordinador_logistico', 'admin'] },
   entregado:  {                                                  roles: [] },
   cancelado:  {                                                  roles: [] },
 }
@@ -29,6 +31,7 @@ export const flujoEstadosPedido: Record<EstadoPedidoEquipo, FlujoPedidoEstado> =
 export const estadosPedidoList: { key: EstadoPedidoEquipo; label: string }[] = [
   { key: 'borrador',   label: 'Borrador' },
   { key: 'enviado',    label: 'Enviado' },
+  { key: 'aprobado',   label: 'Aprobado' },
   { key: 'atendido',   label: 'Atendido' },
   { key: 'parcial',    label: 'Parcial' },
   { key: 'entregado',  label: 'Entregado' },

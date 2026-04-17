@@ -29,6 +29,7 @@ const ESTADOS_PEDIDO = [
   { value: 'all', label: 'Todos' },
   { value: 'borrador', label: 'Borrador' },
   { value: 'enviado', label: 'Enviado' },
+  { value: 'aprobado', label: 'Aprobado' },
   { value: 'atendido', label: 'Atendido' },
   { value: 'parcial', label: 'Parcial' },
   { value: 'entregado', label: 'Entregado' },
@@ -91,7 +92,7 @@ export default function LogisticaPedidosPage() {
   const stats = {
     total: pedidos.length,
     items: pedidos.reduce((sum, p) => sum + (p.items?.length || 0), 0),
-    enProgreso: pedidos.filter(p => ['enviado', 'atendido', 'parcial'].includes(p.estado || '')).length,
+    enProgreso: pedidos.filter(p => ['enviado', 'aprobado', 'atendido', 'parcial'].includes(p.estado || '')).length,
     entregados: pedidos.filter(p => p.estado === 'entregado').length,
     retrasados: pedidos.filter(p => {
       if (!p.fechaNecesaria) return false

@@ -7,10 +7,11 @@ import { crearEvento } from '@/lib/utils/trazabilidad'
 
 // Roles permitidos por targetEstado — admin/gerente son superusuarios en todos
 const ROLES_POR_TARGET: Record<string, string[]> = {
-  borrador: ['admin', 'gerente', 'proyectos'],         // Proyectos retrocede su propio envío
-  enviado:  ['admin', 'gerente', 'logistico', 'coordinador_logistico'],          // Solo Logística
-  atendido: ['admin', 'gerente', 'logistico', 'coordinador_logistico'],          // Solo Logística
-  parcial:  ['admin', 'gerente'],                       // Solo admin/gerente (estado casi-terminal)
+  borrador: ['admin', 'gerente', 'proyectos', 'gestor', 'coordinador', 'coordinador_logistico'],
+  enviado:  ['admin', 'gerente', 'gestor', 'coordinador', 'coordinador_logistico'],
+  aprobado: ['admin', 'gerente', 'logistico', 'coordinador_logistico'],
+  atendido: ['admin', 'gerente', 'logistico', 'coordinador_logistico'],
+  parcial:  ['admin', 'gerente'],
 }
 
 // GET: pre-check sin ejecutar

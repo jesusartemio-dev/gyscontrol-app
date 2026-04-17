@@ -91,9 +91,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Pedido no encontrado' }, { status: 404 })
     }
 
-    if (!['enviado', 'atendido', 'parcial'].includes(pedido.estado)) {
+    if (!['enviado', 'aprobado', 'atendido', 'parcial'].includes(pedido.estado)) {
       return NextResponse.json(
-        { error: `No se pueden generar OCs para un pedido en estado "${pedido.estado}". El pedido debe estar enviado o atendido.` },
+        { error: `No se pueden generar OCs para un pedido en estado "${pedido.estado}". El pedido debe estar aprobado o atendido.` },
         { status: 400 }
       )
     }

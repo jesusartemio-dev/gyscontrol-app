@@ -60,7 +60,7 @@ const pedidoFormSchema = z.object({
   fechaNecesaria: z.string().min(1, 'La fecha necesaria es obligatoria'),
   fechaOC: z.string().optional(),
   responsableId: z.string().min(1, 'Debe seleccionar un responsable'),
-  estado: z.enum(['borrador', 'enviado', 'atendido', 'parcial', 'entregado', 'cancelado']),
+  estado: z.enum(['borrador', 'enviado', 'aprobado', 'atendido', 'parcial', 'entregado', 'cancelado']),
   observaciones: z.string().optional(),
 })
 
@@ -80,6 +80,7 @@ interface PedidoEquipoFormProps {
 const ESTADOS_PEDIDO = [
   { value: 'borrador', label: 'Borrador' },
   { value: 'enviado', label: 'Enviado' },
+  { value: 'aprobado', label: 'Aprobado' },
   { value: 'atendido', label: 'Atendido' },
   { value: 'parcial', label: 'Parcial' },
   { value: 'entregado', label: 'Entregado' },

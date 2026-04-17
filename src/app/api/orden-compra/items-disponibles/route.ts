@@ -24,12 +24,12 @@ export async function GET(req: Request) {
     }
     const proveedorId = searchParams.get('proveedorId') || undefined
 
-    // Items de pedidos elegibles (enviado/atendido/parcial) con cantidad restante > 0
+    // Items de pedidos elegibles (aprobado/atendido/parcial) con cantidad restante > 0
     const pedidoItems = await prisma.pedidoEquipoItem.findMany({
       where: {
         pedidoEquipo: {
           proyectoId,
-          estado: { in: ['enviado', 'atendido', 'parcial'] },
+          estado: { in: ['aprobado', 'atendido', 'parcial'] },
         },
         estado: { notIn: ['cancelado', 'entregado'] },
         ...(proveedorId ? { proveedorId } : {}),

@@ -23,7 +23,7 @@ import { useDeleteWithValidation } from '@/hooks/useDeleteWithValidation'
 import { DeleteWithValidationDialog } from '@/components/DeleteWithValidationDialog'
 import type { PedidoEquipo } from '@/types'
 
-type EstadoPedidoEquipo = 'borrador' | 'enviado' | 'atendido' | 'parcial' | 'entregado' | 'cancelado'
+type EstadoPedidoEquipo = 'borrador' | 'enviado' | 'aprobado' | 'atendido' | 'parcial' | 'entregado' | 'cancelado'
 import { formatCurrency } from '@/lib/utils'
 
 type SortField = 'codigo' | 'responsable' | 'fechaPedido' | 'fechaNecesaria' | 'estado' | 'itemsCount' | 'progreso' | 'monto'
@@ -40,6 +40,7 @@ interface LogisticaPedidosTableProps {
 const ESTADOS_CONFIG: Record<EstadoPedidoEquipo, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   borrador: { label: 'Borrador', variant: 'secondary' },
   enviado: { label: 'Enviado', variant: 'default' },
+  aprobado: { label: 'Aprobado', variant: 'default' },
   atendido: { label: 'Atendido', variant: 'default' },
   parcial: { label: 'Parcial', variant: 'outline' },
   entregado: { label: 'Entregado', variant: 'default' },

@@ -3107,6 +3107,7 @@ enum EstadoOportunidad {
 enum EstadoPedido {
   borrador
   enviado
+  aprobado
   atendido
   parcial
   entregado

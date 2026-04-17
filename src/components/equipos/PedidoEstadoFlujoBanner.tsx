@@ -36,11 +36,12 @@ interface PedidoEstadoFlujoBannerProps {
 }
 
 const ESTADOS_FLUJO = [
-  { key: 'borrador', label: 'Borrador', orden: 1 },
-  { key: 'enviado', label: 'Enviado', orden: 2 },
-  { key: 'atendido', label: 'Atendido', orden: 3 },
-  { key: 'parcial', label: 'Parcial', orden: 4 },
-  { key: 'entregado', label: 'Entregado', orden: 5 },
+  { key: 'borrador',  label: 'Borrador',  orden: 1 },
+  { key: 'enviado',   label: 'Enviado',   orden: 2 },
+  { key: 'aprobado',  label: 'Aprobado',  orden: 3 },
+  { key: 'atendido',  label: 'Atendido',  orden: 4 },
+  { key: 'parcial',   label: 'Parcial',   orden: 5 },
+  { key: 'entregado', label: 'Entregado', orden: 6 },
 ]
 
 const getEstadoLabel = (key: string) => {
@@ -52,8 +53,8 @@ const getEstadoOrden = (key: string) => {
 }
 
 const AVANZAR_POR_CONTEXTO: Record<string, string[]> = {
-  proyectos: ['enviado'],
-  logistica: ['atendido', 'parcial', 'entregado'],
+  proyectos: ['enviado', 'aprobado'],
+  logistica: ['aprobado', 'atendido', 'parcial', 'entregado'],
 }
 
 const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
@@ -157,7 +158,7 @@ const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
           </div>
 
           {/* Rollback buttons */}
-          {estado === 'enviado' && ['admin', 'gerente', 'gestor', 'coordinador'].includes(userRole) && (
+          {estado === 'enviado' && ['admin', 'gerente', 'gestor', 'coordinador', 'coordinador_logistico'].includes(userRole) && (
             <RollbackButton
               entityType="pedidoEquipo"
               entityId={pedidoId}
@@ -167,7 +168,7 @@ const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
               onSuccess={() => onUpdated?.('borrador')}
             />
           )}
-          {contexto === 'logistica' && estado === 'atendido' && ['admin', 'gerente', 'logistico', 'coordinador_logistico'].includes(userRole) && (
+          {estado === 'aprobado' && ['admin', 'gerente', 'gestor', 'coordinador', 'coordinador_logistico'].includes(userRole) && (
             <RollbackButton
               entityType="pedidoEquipo"
               entityId={pedidoId}
@@ -175,6 +176,16 @@ const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
               targetEstado="enviado"
               targetLabel="Volver a Enviado"
               onSuccess={() => onUpdated?.('enviado')}
+            />
+          )}
+          {contexto === 'logistica' && estado === 'atendido' && ['admin', 'gerente', 'logistico', 'coordinador_logistico'].includes(userRole) && (
+            <RollbackButton
+              entityType="pedidoEquipo"
+              entityId={pedidoId}
+              currentEstado={estado}
+              targetEstado="aprobado"
+              targetLabel="Volver a Aprobado"
+              onSuccess={() => onUpdated?.('aprobado')}
             />
           )}
           {contexto === 'logistica' && estado === 'parcial' && ['admin', 'gerente', 'logistico', 'coordinador_logistico'].includes(userRole) && (

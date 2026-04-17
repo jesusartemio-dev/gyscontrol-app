@@ -248,6 +248,7 @@ const PedidosTable = memo(function PedidosTable({
     const estados: Record<string, { icon: any; className: string; label: string }> = {
       borrador:  { icon: Clock, className: 'bg-gray-100 text-gray-700', label: 'Borrador' },
       enviado:   { icon: Send, className: 'bg-blue-100 text-blue-700', label: 'Enviado' },
+      aprobado:  { icon: CheckCircle2, className: 'bg-purple-100 text-purple-700', label: 'Aprobado' },
       atendido:  { icon: CheckCircle2, className: 'bg-amber-100 text-amber-700', label: 'Atendido' },
       parcial:   { icon: Package, className: 'bg-orange-100 text-orange-700', label: 'Parcial' },
       entregado: { icon: Truck, className: 'bg-green-100 text-green-700', label: 'Entregado' },
@@ -299,6 +300,7 @@ const PedidosTable = memo(function PedidosTable({
             <SelectItem value="all">Todos</SelectItem>
             <SelectItem value="borrador">Borrador</SelectItem>
             <SelectItem value="enviado">Enviado</SelectItem>
+            <SelectItem value="aprobado">Aprobado</SelectItem>
             <SelectItem value="atendido">Atendido</SelectItem>
             <SelectItem value="parcial">Parcial</SelectItem>
             <SelectItem value="entregado">Entregado</SelectItem>

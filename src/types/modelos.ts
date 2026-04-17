@@ -108,6 +108,7 @@ export type EstadoFase =
 export type EstadoPedido =
   | 'borrador'
   | 'enviado'
+  | 'aprobado'
   | 'atendido'
   | 'parcial'
   | 'entregado'

@@ -66,7 +66,7 @@ const filtrosSchema = z.object({
   busqueda: z.string().optional(),
   proyectoId: z.string().optional(),
   proveedorId: z.string().optional(),
-  estado: z.enum(['all', 'borrador', 'enviado', 'atendido', 'parcial', 'entregado', 'cancelado']).optional(),
+  estado: z.enum(['all', 'borrador', 'enviado', 'aprobado', 'atendido', 'parcial', 'entregado', 'cancelado']).optional(),
   fechaCreacion: z.object({
     from: z.date().optional(),
     to: z.date().optional()
@@ -117,6 +117,7 @@ interface PedidoEquipoFiltersClientProps {
 const ESTADOS_PEDIDO = [
   { value: 'borrador', label: 'Borrador', color: 'bg-gray-100 text-gray-800' },
   { value: 'enviado', label: 'Enviado', color: 'bg-blue-100 text-blue-800' },
+  { value: 'aprobado', label: 'Aprobado', color: 'bg-purple-100 text-purple-800' },
   { value: 'atendido', label: 'Atendido', color: 'bg-yellow-100 text-yellow-800' },
   { value: 'parcial', label: 'Parcial', color: 'bg-orange-100 text-orange-800' },
   { value: 'entregado', label: 'Entregado', color: 'bg-green-100 text-green-800' },

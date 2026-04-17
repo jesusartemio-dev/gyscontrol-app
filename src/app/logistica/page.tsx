@@ -66,7 +66,7 @@ export default function LogisticaPage() {
           },
           pedidos: {
             total: pedidos.length,
-            enProgreso: pedidos.filter((p: any) => ['enviado', 'atendido', 'parcial'].includes(p.estado || '')).length,
+            enProgreso: pedidos.filter((p: any) => ['enviado', 'aprobado', 'atendido', 'parcial'].includes(p.estado || '')).length,
             entregados: pedidos.filter((p: any) => p.estado === 'entregado').length,
             retrasados: pedidos.filter((p: any) => {
               if (!p.fechaNecesaria) return false

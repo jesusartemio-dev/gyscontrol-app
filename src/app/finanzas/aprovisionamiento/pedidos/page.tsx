@@ -294,6 +294,7 @@ function PedidosEquipoContent() {
               <SelectItem value="todos">Todos</SelectItem>
               <SelectItem value="borrador">Borrador</SelectItem>
               <SelectItem value="enviado">Enviado</SelectItem>
+              <SelectItem value="aprobado">Aprobado</SelectItem>
               <SelectItem value="atendido">Atendido</SelectItem>
               <SelectItem value="parcial">Parcial</SelectItem>
               <SelectItem value="entregado">Entregado</SelectItem>

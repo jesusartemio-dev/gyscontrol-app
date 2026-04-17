@@ -194,6 +194,12 @@ const ESTADOS_CONFIG = {
     icon: Truck,
     description: 'Pedido enviado al proveedor'
   },
+  aprobado: {
+    label: 'Aprobado',
+    color: 'bg-purple-100 text-purple-800 border-purple-200',
+    icon: CheckCircle,
+    description: 'Pedido aprobado por gerencia'
+  },
   atendido: {
     label: 'Atendido',
     color: 'bg-yellow-100 text-yellow-800 border-yellow-200',

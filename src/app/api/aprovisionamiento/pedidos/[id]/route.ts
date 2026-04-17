@@ -13,7 +13,7 @@ import { z } from 'zod'
 const ActualizarPedidoSchema = z.object({
   fechaEntregaEstimada: z.string().datetime().optional(),
   observacion: z.string().optional(),
-  estado: z.enum(['borrador', 'enviado', 'atendido', 'parcial', 'entregado', 'cancelado']).optional()
+  estado: z.enum(['borrador', 'enviado', 'aprobado', 'atendido', 'parcial', 'entregado', 'cancelado']).optional()
 })
 
 // 🔁 Función para recalcular datos de Gantt

@@ -39,7 +39,7 @@ export async function GET(req: Request) {
         estado: { notIn: ['cancelado', 'entregado'] },
         // Pedido en estado enviado o parcial
         pedidoEquipo: {
-          estado: { in: ['enviado', 'parcial'] },
+          estado: { in: ['aprobado', 'atendido', 'parcial'] },
           // Proyecto activo O pedido interno (sin proyecto)
           OR: [
             {

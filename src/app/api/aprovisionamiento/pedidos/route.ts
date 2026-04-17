@@ -15,8 +15,8 @@ const FiltrosPedidosSchema = z.object({
   listaId: z.string().optional(),
   proveedorId: z.string().optional(),
   estado: z.union([
-    z.enum(['borrador', 'enviado', 'atendido', 'parcial', 'entregado', 'cancelado']),
-    z.array(z.enum(['borrador', 'enviado', 'atendido', 'parcial', 'entregado', 'cancelado']))
+    z.enum(['borrador', 'enviado', 'aprobado', 'atendido', 'parcial', 'entregado', 'cancelado']),
+    z.array(z.enum(['borrador', 'enviado', 'aprobado', 'atendido', 'parcial', 'entregado', 'cancelado']))
   ]).optional(),
   responsable: z.string().optional(),
   fechaDesde: z.string().optional(),

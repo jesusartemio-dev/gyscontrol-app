@@ -33,6 +33,7 @@ import { getUsers } from '@/lib/services/user'
 const ESTADOS_PEDIDO = [
   { value: 'borrador', label: 'Borrador' },
   { value: 'enviado', label: 'Enviado' },
+  { value: 'aprobado', label: 'Aprobado' },
   { value: 'atendido', label: 'Atendido' },
   { value: 'parcial', label: 'Parcial' },
   { value: 'entregado', label: 'Entregado' },

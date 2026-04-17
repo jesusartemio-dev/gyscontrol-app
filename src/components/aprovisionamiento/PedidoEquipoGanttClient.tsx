@@ -137,6 +137,11 @@ const ESTADOS_GANTT_CONFIG = {
     textColor: 'text-white',
     borderColor: 'border-blue-600'
   },
+  aprobado: {
+    color: 'bg-purple-500',
+    textColor: 'text-white',
+    borderColor: 'border-purple-600'
+  },
   atendido: {
     color: 'bg-yellow-500',
     textColor: 'text-white',

@@ -249,7 +249,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         select: { estado: true }
       })
       const estados = allItems.map(i => i.estado)
-      let nuevoEstadoPedido: 'borrador' | 'enviado' | 'atendido' | 'parcial' | 'entregado' | 'cancelado' | null = null
+      let nuevoEstadoPedido: 'borrador' | 'enviado' | 'aprobado' | 'atendido' | 'parcial' | 'entregado' | 'cancelado' | null = null
       if (estados.every(e => e === 'cancelado')) {
         nuevoEstadoPedido = 'cancelado'
       } else if (estados.every(e => e === 'entregado' || e === 'cancelado')) {

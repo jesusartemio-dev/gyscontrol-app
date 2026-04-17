@@ -37,9 +37,10 @@ const VALID_ROLLBACKS: Record<RollbackEntity, Record<string, string[]>> = {
     aprobada:    ['por_aprobar'],
   },
   pedidoEquipo: {
-    enviado: ['borrador'],
-    atendido: ['enviado'],
-    parcial: ['atendido'],
+    enviado:  ['borrador'],
+    aprobado: ['enviado'],
+    atendido: ['aprobado'],
+    parcial:  ['atendido'],
     entregado: ['parcial'],
   },
   recepcionPendiente: {
@@ -238,7 +239,7 @@ async function checkPedidoEquipoRollback(id: string, targetEstado: string): Prom
 
   const blockers: RollbackBlocker[] = []
 
-  // enviado → borrador / atendido → enviado: bloquear si tiene OCs activas
+  // enviado → borrador / aprobado → enviado: bloquear si tiene OCs activas
   if (['borrador', 'enviado'].includes(targetEstado)) {
     const ocCount = await prisma.ordenCompra.count({
       where: {
@@ -296,9 +297,10 @@ async function checkPedidoEquipoRollback(id: string, targetEstado: string): Prom
 
   const targetLabels: Record<string, string> = {
     borrador: 'Borrador',
-    enviado: 'Enviado',
+    enviado:  'Enviado',
+    aprobado: 'Aprobado',
     atendido: 'Atendido',
-    parcial: 'Parcial',
+    parcial:  'Parcial',
   }
 
   const message = allowed
