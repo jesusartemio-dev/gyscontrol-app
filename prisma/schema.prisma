@@ -3516,7 +3516,7 @@ model RequerimientoMaterialItem {
   hojaDeGastosId      String
   pedidoEquipoItemId  String
   pedidoId            String
-  proyectoId          String
+  proyectoId          String?
 
   // Snapshot del item al momento de crear el requerimiento
   codigo              String
@@ -3542,7 +3542,7 @@ model RequerimientoMaterialItem {
   hojaDeGastos      HojaDeGastos      @relation(fields: [hojaDeGastosId], references: [id], onDelete: Cascade)
   pedidoEquipoItem  PedidoEquipoItem  @relation(fields: [pedidoEquipoItemId], references: [id])
   pedidoEquipo      PedidoEquipo      @relation(fields: [pedidoId], references: [id])
-  proyecto          Proyecto          @relation(fields: [proyectoId], references: [id])
+  proyecto          Proyecto?         @relation(fields: [proyectoId], references: [id])
   recepciones       RecepcionPendiente[]
 
   @@index([hojaDeGastosId])
