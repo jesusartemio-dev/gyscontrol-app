@@ -36,8 +36,10 @@ const CATEGORIAS = [
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' }).format(amount)
 
-const formatDate = (date: string) =>
-  new Date(date).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })
+const formatDate = (date: string) => {
+  const [year, month, day] = date.split('T')[0].split('-').map(Number)
+  return new Date(year, month - 1, day).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })
+}
 
 const estadoColor: Record<string, string> = {
   borrador: 'bg-gray-100 text-gray-700',
