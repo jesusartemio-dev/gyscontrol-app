@@ -116,6 +116,7 @@ const getEstadoBadgeClass = (estado: string): string => {
     pendiente: 'bg-gray-100 text-gray-700 border-gray-200',
     borrador: 'bg-gray-100 text-gray-600 border-gray-200',
     enviado: 'bg-blue-100 text-blue-700 border-blue-200',
+    aprobado: 'bg-purple-100 text-purple-700 border-purple-200',
     cancelado: 'bg-red-100 text-red-700 border-red-200',
     aprobada: 'bg-green-100 text-green-700 border-green-200',
     confirmada: 'bg-cyan-100 text-cyan-700 border-cyan-200',
@@ -642,7 +643,7 @@ export default function PedidoLogisticaDetailPage() {
   const userRole = session?.user?.role || ''
   const puedeGenerarOC = ['admin', 'gerente', 'logistico', 'coordinador_logistico'].includes(userRole)
     && pedido !== null
-    && ['enviado', 'atendido', 'parcial'].includes(pedido?.estado || '')
+    && ['aprobado', 'atendido', 'parcial'].includes(pedido?.estado || '')
   const puedeConfirmarRecepcion = ['admin', 'gerente', 'logistico', 'coordinador_logistico', 'gestor'].includes(userRole)
 
   // 🔄 Loading state

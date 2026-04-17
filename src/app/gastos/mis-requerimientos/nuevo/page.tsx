@@ -229,7 +229,7 @@ function ModalSelectorItems({
               <Package className="h-8 w-8 text-muted-foreground/30 mx-auto" />
               <p className="text-sm text-muted-foreground font-medium">No hay items disponibles para agregar</p>
               <p className="text-xs text-muted-foreground max-w-xs mx-auto">
-                Se muestran solo items de pedidos en estado <strong>Enviado</strong> o <strong>Parcial</strong>,
+                Se muestran solo items de pedidos en estado <strong>Aprobado</strong>, <strong>Atendido</strong> o <strong>Parcial</strong>,
                 sin OC activa y sin requerimiento en curso.
                 {busqueda && ' Prueba limpiando la búsqueda.'}
               </p>
