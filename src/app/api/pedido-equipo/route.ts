@@ -297,8 +297,7 @@ export async function POST(request: Request) {
         orderBy: { numeroSecuencia: 'desc' },
       })
       nuevoNumero = ultimoPedidoInt ? ultimoPedidoInt.numeroSecuencia + 1 : 1
-      const prefijo = centroCosto!.nombre.substring(0, 4).toUpperCase().replace(/\s/g, '')
-      codigoGenerado = `INT-${prefijo}-${String(nuevoNumero).padStart(3, '0')}`
+      codigoGenerado = `GYS-PED-${String(nuevoNumero).padStart(3, '0')}`
     }
 
     // 📦 Pre-cargar items de lista si hay seleccionados (para pricing fallback)

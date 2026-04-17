@@ -474,7 +474,7 @@ function ItemRow({ item, checked, onToggle, indent, showPedido }: ItemRowProps) 
           {item.precioUnitario != null && <span>P.U.: S/ {fmt(item.precioUnitario)}</span>}
           {showPedido && (
             <span className="text-muted-foreground/70">
-              {item.pedidoEquipo.proyecto.codigo} · {item.pedidoEquipo.codigo}
+              {item.pedidoEquipo.proyecto?.codigo ?? 'INT'} · {item.pedidoEquipo.codigo}
             </span>
           )}
         </div>
@@ -525,10 +525,10 @@ function NuevoRequerimientoPageInner() {
 
   // Auto-abrir modal cuando los items estén cargados y viene de un pedido
   useEffect(() => {
-    if (pedidoCodigoParam && tipo === 'compra_materiales' && !loadingItems && proyectos.length > 0 && !showModal) {
+    if (pedidoCodigoParam && tipo === 'compra_materiales' && !loadingItems && !showModal) {
       setShowModal(true)
     }
-  }, [pedidoCodigoParam, tipo, loadingItems, proyectos.length])
+  }, [pedidoCodigoParam, tipo, loadingItems])
 
   const loadItems = useCallback(async (q?: string) => {
     setLoadingItems(true)
@@ -845,7 +845,7 @@ function NuevoRequerimientoPageInner() {
                           <span className="text-muted-foreground ml-1">({item.unidad})</span>
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {item.pedidoEquipo.proyecto.codigo} · {item.pedidoEquipo.codigo}
+                          {item.pedidoEquipo.proyecto?.codigo ?? 'INT'} · {item.pedidoEquipo.codigo}
                         </p>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">

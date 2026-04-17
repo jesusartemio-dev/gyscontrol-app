@@ -40,10 +40,15 @@ export async function GET(req: Request) {
         // Pedido en estado enviado o parcial
         pedidoEquipo: {
           estado: { in: ['enviado', 'parcial'] },
-          // Proyecto activo
-          proyecto: {
-            estado: { notIn: ['cerrado', 'cancelado'] },
-          },
+          // Proyecto activo O pedido interno (sin proyecto)
+          OR: [
+            {
+              proyecto: {
+                estado: { notIn: ['cerrado', 'cancelado'] },
+              },
+            },
+            { proyectoId: null }, // Pedidos internos
+          ],
         },
         // Sin OC activa: no tiene ningún OrdenCompraItem cuya OC no sea cancelada
         ordenCompraItems: {
@@ -120,7 +125,9 @@ export async function GET(req: Request) {
       cantidadDisponible: Math.max(0, item.cantidadPedida - (item.cantidadAtendida || 0)),
     }))
 
-    // Agrupar por proyecto → pedido
+    // Agrupar por proyecto → pedido (pedidos internos bajo grupo especial)
+    const GRUPO_INTERNO_ID = '__interno__'
+
     type ItemOut = (typeof conDisponible)[number]
     type PedidoGroup = {
       id: string
@@ -143,19 +150,22 @@ export async function GET(req: Request) {
       const proy = item.pedidoEquipo.proyecto
       const ped = item.pedidoEquipo
 
-      // Skip internal pedidos (no project) in this requerimiento grouping
-      if (!proy) continue
+      // Para pedidos internos (sin proyecto) usar grupo especial
+      const proyId = proy ? proy.id : GRUPO_INTERNO_ID
+      const proyCodigo = proy ? proy.codigo : 'INT'
+      const proyNombre = proy ? proy.nombre : 'Pedidos Internos'
+      const proyEstado = proy ? proy.estado : 'activo'
 
-      if (!byProyecto.has(proy.id)) {
-        byProyecto.set(proy.id, {
-          id: proy.id,
-          codigo: proy.codigo,
-          nombre: proy.nombre,
-          estado: proy.estado,
+      if (!byProyecto.has(proyId)) {
+        byProyecto.set(proyId, {
+          id: proyId,
+          codigo: proyCodigo,
+          nombre: proyNombre,
+          estado: proyEstado,
           pedidos: new Map(),
         })
       }
-      const proyGroup = byProyecto.get(proy.id)!
+      const proyGroup = byProyecto.get(proyId)!
 
       if (!proyGroup.pedidos.has(ped.id)) {
         proyGroup.pedidos.set(ped.id, {

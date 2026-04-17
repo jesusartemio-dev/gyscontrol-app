@@ -104,8 +104,8 @@ export interface ItemParaRequerimiento {
     codigo: string
     estado: string
     fechaNecesaria: string
-    proyectoId: string
-    proyecto: { id: string; codigo: string; nombre: string; estado: string }
+    proyectoId: string | null
+    proyecto: { id: string; codigo: string; nombre: string; estado: string } | null
   }
 }
 
