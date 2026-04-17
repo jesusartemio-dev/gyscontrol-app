@@ -266,12 +266,14 @@ export default function GastoLineaPreviewDrawer({
       currency: moneda === 'USD' ? 'USD' : 'PEN',
     }).format(amount)
 
-  const formatDate = (date: string) =>
-    new Date(date).toLocaleDateString('es-PE', {
+  const formatDate = (date: string) => {
+    const [year, month, day] = date.split('T')[0].split('-').map(Number)
+    return new Date(year, month - 1, day).toLocaleDateString('es-PE', {
       day: '2-digit',
       month: 'long',
       year: 'numeric',
     })
+  }
 
   const formatSize = (bytes?: number | null) => {
     if (!bytes) return ''

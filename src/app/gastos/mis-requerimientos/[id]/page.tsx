@@ -67,8 +67,11 @@ import {
 import RequerimientoItemsCard from '@/components/rendiciones/RequerimientoItemsCard'
 import type { HojaDeGastos, GastoLinea, CategoriaGasto, HojaDeGastosAdjunto } from '@/types'
 
-const formatDate = (date: string | null | undefined) =>
-  date ? new Date(date).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'
+const formatDate = (date: string | null | undefined) => {
+  if (!date) return '-'
+  const [year, month, day] = date.split('T')[0].split('-').map(Number)
+  return new Date(year, month - 1, day).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })
+}
 
 export default function RequerimientoDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -388,7 +391,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
 
         const tableBody = lineas.map(l => {
           const row = [
-            l.fecha ? new Date(l.fecha).toLocaleDateString('es-PE') : '-',
+            l.fecha ? formatDate(l.fecha) : '-',
             l.descripcion,
             l.categoriaGasto?.nombre || '-',
             [l.tipoComprobante, l.numeroComprobante].filter(Boolean).join(' ') || '-',
@@ -780,7 +783,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
                           {dep.descripcion && <span className="text-xs text-muted-foreground">· {dep.descripcion}</span>}
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-muted-foreground">{new Date(dep.fecha).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                          <span className="text-xs text-muted-foreground">{formatDate(dep.fecha)}</span>
                           {canEliminarDep && (
                             <button onClick={() => handleEliminarDeposito(dep.id)} disabled={deletingDeposito === dep.id}
                               className="text-red-400 hover:text-red-600 disabled:opacity-50" title="Eliminar">
@@ -843,7 +846,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
                             {dep.descripcion && <span className="text-xs text-muted-foreground">· {dep.descripcion}</span>}
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="text-xs text-muted-foreground">{new Date(dep.fecha).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                            <span className="text-xs text-muted-foreground">{formatDate(dep.fecha)}</span>
                             {canEliminarDev && (
                               <button onClick={() => handleEliminarDeposito(dep.id)} disabled={deletingDeposito === dep.id}
                                 className="text-red-400 hover:text-red-600 disabled:opacity-50" title="Eliminar">
