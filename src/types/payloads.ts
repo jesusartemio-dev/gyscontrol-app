@@ -1386,7 +1386,7 @@ export interface CentroCostoUpdatePayload {
 export interface RequerimientoMaterialItemPayload {
   pedidoEquipoItemId: string
   pedidoId: string
-  proyectoId: string
+  proyectoId: string | null
   codigo: string
   descripcion: string
   unidad: string

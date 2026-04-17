@@ -1791,7 +1791,7 @@ function AddItemRow({
         <div className="flex gap-3 mt-0.5 text-xs text-muted-foreground flex-wrap">
           <span>Disp: <strong className="text-foreground">{item.cantidadDisponible}</strong></span>
           {item.precioUnitario != null && <span>P.U.: S/ {fmtLocal(item.precioUnitario)}</span>}
-          {showPedido && <span className="text-muted-foreground/70">{item.pedidoEquipo.proyecto.codigo} · {item.pedidoEquipo.codigo}</span>}
+          {showPedido && <span className="text-muted-foreground/70">{item.pedidoEquipo.proyecto?.codigo ?? 'INT'} · {item.pedidoEquipo.codigo}</span>}
         </div>
       </div>
       {checked && <span className="text-xs text-blue-600 font-medium shrink-0 self-center">✓</span>}
