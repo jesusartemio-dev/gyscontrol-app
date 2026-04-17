@@ -551,7 +551,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
     lineasConformidad.every(l => l.conformidad === 'conforme') &&
     itemsMaterialesConformidad.every(i => i.conformidad === 'conforme')
   const canValidar = canValidarLineas && allLineasConforme
-  const canCerrar = hoja.estado === 'validado' && ['admin', 'gerente', 'coordinador', 'administracion'].includes(role || '')
+  const canCerrar = hoja.estado === 'validado' && ['admin', 'gerente', 'administracion'].includes(role || '')
   const canRechazar = ['enviado', 'rendido', 'validado'].includes(hoja.estado) && ['admin', 'gerente', 'gestor', 'coordinador', 'administracion'].includes(role || '')
   const canRetroceder = !['borrador', 'rechazado'].includes(hoja.estado) && ['admin', 'gerente', 'administracion'].includes(role || '')
   const canEliminar = hoja.estado === 'borrador' && role === 'admin'
