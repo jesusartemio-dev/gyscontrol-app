@@ -15,7 +15,11 @@ export async function GET(req: Request) {
   if (desde || hasta) {
     where.fechaHora = {}
     if (desde) where.fechaHora.gte = new Date(desde)
-    if (hasta) where.fechaHora.lte = new Date(hasta)
+    if (hasta) {
+      const h = new Date(hasta)
+      if (/^\d{4}-\d{2}-\d{2}$/.test(hasta)) h.setHours(23, 59, 59, 999)
+      where.fechaHora.lte = h
+    }
   }
 
   const data = await prisma.asistencia.findMany({

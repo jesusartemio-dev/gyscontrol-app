@@ -39,7 +39,13 @@ export default function MarcarPage() {
   const [tipoSel, setTipoSel] = useState<TipoBotón | null>(null)
   const [scannerOpen, setScannerOpen] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [ultimoResultado, setUltimoResultado] = useState<null | { ok: boolean; mensaje: string; estado?: string }>(null)
+  const [ultimoResultado, setUltimoResultado] = useState<null | {
+    ok: boolean
+    titulo?: string
+    lineas?: string[]
+    mensaje: string
+    estado?: string
+  }>(null)
   const scannerElemId = 'qr-scanner-target'
   const deviceRef = useRef<Awaited<ReturnType<typeof getDeviceInfo>> | null>(null)
 
@@ -79,10 +85,12 @@ export default function MarcarPage() {
       } else {
         setUltimoResultado({
           ok: true,
+          titulo: json.titulo,
+          lineas: json.lineas,
           mensaje: json.mensaje,
           estado: json.asistencia.estado,
         })
-        toast.success(json.mensaje)
+        toast.success(`Marcaje guardado a las ${json.hora}`)
       }
     } catch (e) {
       toast.error('Error de red')
@@ -132,15 +140,27 @@ export default function MarcarPage() {
         >
           <CardContent className="flex items-start gap-3 py-4">
             {ultimoResultado.ok ? (
-              <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" />
+              <CheckCircle2 className="h-6 w-6 shrink-0 text-emerald-600" />
             ) : (
-              <AlertTriangle className="h-5 w-5 shrink-0 text-red-600" />
+              <AlertTriangle className="h-6 w-6 shrink-0 text-red-600" />
             )}
-            <div className="text-sm">
-              <p className="font-medium">{ultimoResultado.mensaje}</p>
+            <div className="flex-1 text-sm">
+              <p className="text-base font-bold">
+                {ultimoResultado.titulo ||
+                  (ultimoResultado.ok ? '✅ Marcaje guardado' : '❌ No se pudo marcar')}
+              </p>
+              {ultimoResultado.ok && ultimoResultado.lineas?.length ? (
+                <ul className="mt-2 space-y-1">
+                  {ultimoResultado.lineas.map((l, i) => (
+                    <li key={i}>{l}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-1 whitespace-pre-line">{ultimoResultado.mensaje}</p>
+              )}
               {ultimoResultado.estado && (
-                <Badge className="mt-2" variant="outline">
-                  {ultimoResultado.estado}
+                <Badge className="mt-3" variant="outline">
+                  Estado: {ultimoResultado.estado.replace('_', ' ')}
                 </Badge>
               )}
             </div>

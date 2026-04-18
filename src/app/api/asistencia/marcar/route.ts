@@ -144,17 +144,33 @@ export async function POST(req: Request) {
     },
   })
 
+  const horaLima = fechaHora.toLocaleTimeString('es-PE', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'America/Lima',
+  })
+  const tipoHumano =
+    body.tipo === 'ingreso'
+      ? 'Ingreso'
+      : body.tipo === 'salida'
+      ? 'Salida'
+      : body.tipo === 'inicio_almuerzo'
+      ? 'Inicio de almuerzo'
+      : 'Regreso de almuerzo'
+
+  const lineas: string[] = []
+  lineas.push(`${tipoHumano} registrado a las ${horaLima}`)
+  if (ubicacionDatos) lineas.push(`Ubicación: ${ubicacionDatos.nombre}`)
+  if (minutosTarde > 0) lineas.push(`Tardanza: ${minutosTarde} minutos`)
+  if (!dentroGeofence) lineas.push('⚠️ Fuera del área permitida (quedó en reporte)')
+  if (eraNuevo) lineas.push('⚠️ Dispositivo nuevo — requiere aprobación del supervisor')
+
   return NextResponse.json({
+    ok: true,
     asistencia,
-    mensaje:
-      estado === 'a_tiempo'
-        ? 'Marcaje registrado a tiempo'
-        : estado === 'tarde'
-        ? `Marcaje registrado con ${minutosTarde} min de tardanza`
-        : estado === 'muy_tarde'
-        ? `Marcaje registrado con ${minutosTarde} min (muy tarde)`
-        : estado === 'fuera_zona'
-        ? 'Marcaje registrado fuera de zona (bandera)'
-        : 'Marcaje registrado desde dispositivo nuevo (pendiente de aprobación)',
+    titulo: '✅ Marcaje guardado',
+    mensaje: lineas.join('\n'),
+    lineas,
+    hora: horaLima,
   })
 }
