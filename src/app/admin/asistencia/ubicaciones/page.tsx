@@ -1,11 +1,21 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+
+const MapPicker = dynamic(() => import('@/components/asistencia/MapPicker'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-80 items-center justify-center rounded-md border bg-muted/30">
+      Cargando mapa...
+    </div>
+  ),
+})
 import {
   Dialog,
   DialogContent,
@@ -182,7 +192,7 @@ export default function UbicacionesPage() {
               <Plus className="mr-2 h-4 w-4" /> Nueva ubicación
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{form.id ? 'Editar' : 'Nueva'} ubicación</DialogTitle>
             </DialogHeader>
@@ -273,6 +283,28 @@ export default function UbicacionesPage() {
               <Button variant="outline" type="button" onClick={usarMiUbicacion}>
                 <MapPin className="mr-2 h-4 w-4" /> Usar mi ubicación actual
               </Button>
+
+              <div>
+                <Label className="mb-2 block">Ajustar punto en el mapa</Label>
+                <MapPicker
+                  latitud={form.latitud ? parseFloat(form.latitud) : null}
+                  longitud={form.longitud ? parseFloat(form.longitud) : null}
+                  radioMetros={parseInt(form.radioMetros || '150')}
+                  onChange={(lat, lon) =>
+                    setForm((prev: any) => ({ ...prev, latitud: lat, longitud: lon }))
+                  }
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Círculo azul = geofence. Haz clic para mover el punto.
+                </p>
+              </div>
+
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                💡 <strong>Tip sobre precisión GPS:</strong> en plantas industriales con
+                techos metálicos el GPS puede tener 20-100m de error. Usa{' '}
+                <strong>radio 300-500m para plantas</strong> y 100-150m para oficinas.
+              </div>
+
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <Label>Radio (m)</Label>
