@@ -1583,6 +1583,12 @@ model User {
   // Solicitudes de recursos de ejecución
   solicitudesRecursoSolicitadas   SolicitudRecurso[]          @relation("SolicitudRecursoSolicitante")
   solicitudesRecursoAprobadas     SolicitudRecurso[]          @relation("SolicitudRecursoAprobador")
+  // Control de Asistencia (administrativo)
+  dispositivos                    Dispositivo[]               @relation("DispositivoUsuario")
+  dispositivosAprobados           Dispositivo[]               @relation("DispositivoAprobador")
+  jornadasAsistenciaSupervisor    JornadaAsistencia[]         @relation("JornadaAsistenciaSupervisor")
+  asistencias                     Asistencia[]                @relation("AsistenciaUser")
+  asistenciasSupervisadas         Asistencia[]                @relation("AsistenciaSupervisor")
 
   @@map("user")
 }
@@ -1644,6 +1650,7 @@ model Empleado {
   departamento         Departamento?        @relation(fields: [departamentoId], references: [id])
   user                 User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   recursoComposiciones RecursoComposicion[]
+  asistencias          Asistencia[]
 
   @@map("empleado")
 }
@@ -4188,4 +4195,139 @@ model SolicitudRecursoItem {
 
   @@index([solicitudId])
   @@map("solicitud_recurso_item")
+}
+
+// ============================================================
+// 📍 Módulo de Control de Asistencia (dominio administrativo)
+// Independiente de RegistroHoras / RegistroHorasCampo (proyectos)
+// ============================================================
+
+model Ubicacion {
+  id                 String              @id @default(cuid())
+  nombre             String              @unique
+  tipo               TipoUbicacion
+  direccion          String?
+  latitud            Float
+  longitud           Float
+  radioMetros        Int                 @default(150)
+  qrSecret           String              // HMAC secret para firmar QR estático
+  proyectoId         String?             // referencia informativa (planta de proyecto)
+  activo             Boolean             @default(true)
+  toleranciaMinutos  Int                 @default(5)   // hasta cuántos minutos se considera a_tiempo
+  limiteTardeMinutos Int                 @default(30)  // más de esto = muy_tarde
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  asistencias        Asistencia[]
+  jornadasAsistencia JornadaAsistencia[]
+
+  @@map("ubicacion")
+}
+
+model Dispositivo {
+  id             String       @id @default(cuid())
+  userId         String
+  fingerprint    String       // hash SHA-256 de userAgent+platform+screen+cpu+timezone
+  nombre         String?      // "Samsung A52 de Juan"
+  userAgent      String
+  plataforma     String       // Android | iOS | Windows | ...
+  modelo         String?      // parseado del userAgent
+  resolucion     String
+  aprobado       Boolean      @default(false)
+  aprobadoPorId  String?
+  aprobadoEn     DateTime?
+  primeraVez     DateTime     @default(now())
+  ultimaVez      DateTime     @updatedAt
+  user           User         @relation("DispositivoUsuario", fields: [userId], references: [id], onDelete: Cascade)
+  aprobadoPor    User?        @relation("DispositivoAprobador", fields: [aprobadoPorId], references: [id])
+  asistencias    Asistencia[]
+
+  @@unique([userId, fingerprint])
+  @@index([userId])
+  @@map("dispositivo")
+}
+
+// Jornada de asistencia que activa el supervisor para habilitar el marcaje del día.
+// Es INDEPENDIENTE de RegistroHorasCampo (jornada de proyecto).
+model JornadaAsistencia {
+  id             String       @id @default(cuid())
+  supervisorId   String
+  ubicacionId    String
+  fecha          DateTime     @db.Date
+  qrSecret       String       // secret HMAC para QR rotable (TOTP-like, 30s)
+  latitudInicio  Float
+  longitudInicio Float
+  activa         Boolean      @default(true)
+  iniciadaEn     DateTime     @default(now())
+  cerradaEn      DateTime?
+  updatedAt      DateTime     @updatedAt
+  supervisor     User         @relation("JornadaAsistenciaSupervisor", fields: [supervisorId], references: [id])
+  ubicacion      Ubicacion    @relation(fields: [ubicacionId], references: [id])
+  asistencias    Asistencia[]
+
+  @@unique([supervisorId, ubicacionId, fecha])
+  @@index([fecha, activa])
+  @@map("jornada_asistencia")
+}
+
+model Asistencia {
+  id                  String             @id @default(cuid())
+  userId              String
+  empleadoId          String?
+  ubicacionId         String?
+  jornadaAsistenciaId String?
+  tipo                TipoMarcaje
+  fechaHora           DateTime           @default(now())
+  fechaEsperada       DateTime
+  minutosTarde        Int                @default(0)
+  latitud             Float?
+  longitud            Float?
+  precisionGps        Float?
+  dentroGeofence      Boolean            @default(true)
+  metodoMarcaje       MetodoMarcaje
+  supervisorMarcoId   String?            // si lo marcó el supervisor manualmente
+  dispositivoId       String
+  dispositivoEraNuevo Boolean            @default(false)
+  estado              EstadoMarcaje
+  observacion         String?
+  banderas            String[]           @default([])
+  createdAt           DateTime           @default(now())
+  user                User               @relation("AsistenciaUser", fields: [userId], references: [id])
+  empleado            Empleado?          @relation(fields: [empleadoId], references: [id])
+  ubicacion           Ubicacion?         @relation(fields: [ubicacionId], references: [id])
+  jornadaAsistencia   JornadaAsistencia? @relation(fields: [jornadaAsistenciaId], references: [id])
+  supervisorMarco     User?              @relation("AsistenciaSupervisor", fields: [supervisorMarcoId], references: [id])
+  dispositivo         Dispositivo        @relation(fields: [dispositivoId], references: [id])
+
+  @@index([userId, fechaHora])
+  @@index([ubicacionId, fechaHora])
+  @@index([fechaHora])
+  @@map("asistencia")
+}
+
+enum TipoUbicacion {
+  oficina
+  planta
+  obra
+}
+
+enum TipoMarcaje {
+  ingreso
+  salida
+  inicio_almuerzo
+  fin_almuerzo
+}
+
+enum MetodoMarcaje {
+  qr_estatico
+  qr_supervisor
+  gps_directo
+  manual_supervisor
+}
+
+enum EstadoMarcaje {
+  a_tiempo
+  tarde
+  muy_tarde
+  fuera_zona
+  dispositivo_nuevo
 }

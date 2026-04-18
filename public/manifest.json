@@ -63,6 +63,18 @@
   ],
   "shortcuts": [
     {
+      "name": "Marcar Asistencia",
+      "short_name": "Marcar",
+      "description": "Marcar ingreso o salida",
+      "url": "/mi-trabajo/marcar",
+      "icons": [
+        {
+          "src": "/icons/icon-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
       "name": "Proyectos",
       "short_name": "Proyectos",
       "description": "Gestión de proyectos y aprovisionamiento",

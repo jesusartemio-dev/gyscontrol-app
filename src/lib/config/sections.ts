@@ -85,4 +85,5 @@ export const ROUTE_TO_SECTION: Record<string, SectionKey> = {
   '/configuracion': 'configuracion',
   '/catalogo': 'configuracion',
   '/admin': 'configuracion',
+  '/asistencia-supervisor': 'supervision',
 }
