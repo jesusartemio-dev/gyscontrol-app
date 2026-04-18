@@ -3,7 +3,19 @@
 import { useEffect, useMemo, useState } from 'react'
 import { MapContainer, TileLayer, Marker, Circle, useMapEvents, useMap } from 'react-leaflet'
 import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
+
+const LEAFLET_CSS = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
+const LEAFLET_CSS_ID = 'leaflet-css-cdn'
+
+function ensureLeafletCss() {
+  if (typeof document === 'undefined') return
+  if (document.getElementById(LEAFLET_CSS_ID)) return
+  const link = document.createElement('link')
+  link.id = LEAFLET_CSS_ID
+  link.rel = 'stylesheet'
+  link.href = LEAFLET_CSS
+  document.head.appendChild(link)
+}
 
 // Workaround para icono de Leaflet en Next.js (bundler)
 const iconDefault = L.icon({
@@ -41,6 +53,10 @@ function Recentrar({ lat, lon }: { lat: number; lon: number }) {
 }
 
 export default function MapPicker({ latitud, longitud, radioMetros = 150, onChange }: Props) {
+  useEffect(() => {
+    ensureLeafletCss()
+  }, [])
+
   const center = useMemo<[number, number]>(() => {
     if (latitud != null && longitud != null) return [latitud, longitud]
     return [-12.0464, -77.0428] // Lima por defecto
