@@ -30,7 +30,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { toast } from 'sonner'
-import { Loader2, MapPin, Plus, FileText, Edit, Power } from 'lucide-react'
+import { Loader2, MapPin, Plus, FileText, Edit, Power, Search } from 'lucide-react'
 
 interface Ubicacion {
   id: string
@@ -58,12 +58,21 @@ const vacia = {
   limiteTardeMinutos: 30,
 }
 
+interface GeocodeResult {
+  direccion: string
+  latitud: number
+  longitud: number
+  tipo: string
+}
+
 export default function UbicacionesPage() {
   const [data, setData] = useState<Ubicacion[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [form, setForm] = useState<any>(vacia)
   const [saving, setSaving] = useState(false)
+  const [geoResults, setGeoResults] = useState<GeocodeResult[]>([])
+  const [searching, setSearching] = useState(false)
 
   async function cargar() {
     setLoading(true)
@@ -83,6 +92,44 @@ export default function UbicacionesPage() {
       setForm({ ...form, latitud: pos.coords.latitude, longitud: pos.coords.longitude })
       toast.success('GPS capturado')
     })
+  }
+
+  async function buscarDireccion() {
+    if (!form.direccion || form.direccion.trim().length < 3) {
+      toast.error('Escribe al menos 3 caracteres en la dirección')
+      return
+    }
+    setSearching(true)
+    setGeoResults([])
+    try {
+      const r = await fetch(`/api/asistencia/geocode?q=${encodeURIComponent(form.direccion)}`)
+      const j = await r.json()
+      if (!r.ok) {
+        toast.error(j.message || 'Error al buscar')
+        return
+      }
+      if (j.length === 0) {
+        toast.error('No se encontraron resultados. Prueba con ciudad o distrito al final.')
+        return
+      }
+      setGeoResults(j)
+      if (j.length === 1) {
+        seleccionarResultado(j[0])
+      }
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  function seleccionarResultado(r: GeocodeResult) {
+    setForm((prev: any) => ({
+      ...prev,
+      direccion: r.direccion,
+      latitud: r.latitud,
+      longitud: r.longitud,
+    }))
+    setGeoResults([])
+    toast.success('Coordenadas obtenidas')
   }
 
   async function guardar() {
@@ -162,10 +209,46 @@ export default function UbicacionesPage() {
               </div>
               <div>
                 <Label>Dirección</Label>
-                <Input
-                  value={form.direccion}
-                  onChange={e => setForm({ ...form, direccion: e.target.value })}
-                />
+                <div className="flex gap-2">
+                  <Input
+                    value={form.direccion}
+                    onChange={e => setForm({ ...form, direccion: e.target.value })}
+                    placeholder="Av. Principal 123, Lima, Perú"
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        buscarDireccion()
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={buscarDireccion}
+                    disabled={searching}
+                  >
+                    {searching ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Search className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+                {geoResults.length > 1 && (
+                  <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto rounded-md border bg-muted/30 p-2">
+                    {geoResults.map((r, i) => (
+                      <li key={i}>
+                        <button
+                          type="button"
+                          className="w-full rounded px-2 py-1 text-left text-xs hover:bg-accent"
+                          onClick={() => seleccionarResultado(r)}
+                        >
+                          {r.direccion}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
