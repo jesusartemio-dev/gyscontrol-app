@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/table'
 import { Download, Loader2, ShieldCheck, FileSpreadsheet } from 'lucide-react'
 import * as XLSX from 'xlsx'
+import { formatearTardanza } from '@/lib/utils/formatTardanza'
 
 interface Fila {
   id: string
@@ -216,7 +217,7 @@ export default function SupervisionAsistencia() {
                     )}
                   </TableCell>
                   <TableCell>{f.ubicacion?.nombre || (f.metodoMarcaje === 'remoto' ? 'Casa' : '—')}</TableCell>
-                  <TableCell>{f.minutosTarde > 0 ? `${f.minutosTarde}` : '—'}</TableCell>
+                  <TableCell>{f.minutosTarde > 0 ? formatearTardanza(f.minutosTarde) : '—'}</TableCell>
                   <TableCell>
                     <Badge className={estadoColor(f.estado)} variant="outline">
                       {f.estado.replace('_', ' ')}

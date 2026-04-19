@@ -12,6 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Loader2, Clock, TrendingDown, CalendarDays } from 'lucide-react'
+import { formatearTardanza } from '@/lib/utils/formatTardanza'
 
 interface Marcaje {
   id: string
@@ -108,7 +109,7 @@ export default function MiAsistenciaPage() {
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold text-red-600">
-              {data.resumenMes.minutosTardeTotal}
+              {formatearTardanza(data.resumenMes.minutosTardeTotal)}
             </p>
           </CardContent>
         </Card>
@@ -137,7 +138,7 @@ export default function MiAsistenciaPage() {
                   </TableCell>
                   <TableCell>{m.tipo.replace('_', ' ')}</TableCell>
                   <TableCell>{m.ubicacion?.nombre || '—'}</TableCell>
-                  <TableCell>{m.minutosTarde > 0 ? `${m.minutosTarde} min` : '—'}</TableCell>
+                  <TableCell>{m.minutosTarde > 0 ? formatearTardanza(m.minutosTarde) : '—'}</TableCell>
                   <TableCell>
                     <Badge className={estadoColor(m.estado)} variant="outline">
                       {m.estado.replace('_', ' ')}

@@ -76,10 +76,21 @@ export async function calcularFechaEsperada(
   }
 
   const [h, m] = (hhmm || '08:00').split(':').map(Number)
-  const esperada = new Date(fechaMarcaje)
-  esperada.setHours(h, m, 0, 0)
+  // Construir fecha esperada en zona horaria Lima (UTC-5) para evitar
+  // que en el servidor (UTC) se interprete como UTC.
+  const fechaLima = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Lima',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(fechaMarcaje)
+  const esperada = new Date(
+    `${fechaLima}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00-05:00`,
+  )
   return esperada
 }
+
+export { formatearTardanza } from '@/lib/utils/formatTardanza'
 
 /**
  * Retrieve or create a Dispositivo for user+fingerprint.

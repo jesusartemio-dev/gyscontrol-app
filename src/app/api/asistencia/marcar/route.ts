@@ -8,6 +8,7 @@ import {
   determinarModoRemoto,
   upsertDispositivo,
 } from '@/lib/services/asistencia'
+import { formatearTardanza } from '@/lib/utils/formatTardanza'
 import { haversineMetros } from '@/lib/utils/geofence'
 import { parsearPayloadQr, validarQrDinamico, validarQrEstatico } from '@/lib/utils/qrTotp'
 import type { MetodoMarcaje, TipoMarcaje } from '@prisma/client'
@@ -195,7 +196,7 @@ export async function POST(req: Request) {
   } else if (ubicacionDatos) {
     lineas.push(`Ubicación: ${ubicacionDatos.nombre}`)
   }
-  if (minutosTarde > 0) lineas.push(`Tardanza: ${minutosTarde} minutos`)
+  if (minutosTarde > 0) lineas.push(`Tardanza: ${formatearTardanza(minutosTarde)}`)
   if (!dentroGeofence) lineas.push('⚠️ Fuera del área permitida (quedó en reporte)')
   if (eraNuevo) lineas.push('⚠️ Dispositivo nuevo — requiere aprobación del supervisor')
 

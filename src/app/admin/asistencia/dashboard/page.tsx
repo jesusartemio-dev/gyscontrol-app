@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/select'
 import { Progress } from '@/components/ui/progress'
 import { Loader2, TrendingUp, Clock, AlertTriangle, MapPinOff, Home } from 'lucide-react'
+import { formatearTardanza } from '@/lib/utils/formatTardanza'
 import {
   Bar,
   BarChart,
@@ -105,7 +106,7 @@ export default function DashboardAsistencia() {
           <CardContent>
             <p className="text-3xl font-bold text-amber-600">{kpis.tarde + kpis.muyTarde}</p>
             <p className="text-xs text-muted-foreground">
-              {kpis.minutosTardeTotales} min totales
+              {formatearTardanza(kpis.minutosTardeTotales)} totales
             </p>
           </CardContent>
         </Card>
@@ -220,7 +221,7 @@ export default function DashboardAsistencia() {
                       <p className="text-xs text-muted-foreground">{r.veces} veces tarde</p>
                     </div>
                   </div>
-                  <span className="font-semibold text-red-600">{r.minutos} min</span>
+                  <span className="font-semibold text-red-600">{formatearTardanza(r.minutos)}</span>
                 </li>
               ))}
               {data.ranking.length === 0 && (

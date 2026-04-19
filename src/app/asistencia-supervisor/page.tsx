@@ -16,6 +16,7 @@ import { toast } from 'sonner'
 import { Loader2, MapPin, Play, StopCircle, Users, Wifi } from 'lucide-react'
 import QRCode from 'qrcode'
 import { useGeolocation } from '@/lib/hooks/useGeolocation'
+import { formatearTardanza } from '@/lib/utils/formatTardanza'
 
 interface Ubicacion {
   id: string
@@ -299,7 +300,7 @@ export default function AsistenciaSupervisorPage() {
                           {a.estado.replace('_', ' ')}
                         </Badge>
                         {a.minutosTarde > 0 && (
-                          <span className="text-xs text-red-600">+{a.minutosTarde} min</span>
+                          <span className="text-xs text-red-600">+{formatearTardanza(a.minutosTarde)}</span>
                         )}
                       </div>
                     </li>
