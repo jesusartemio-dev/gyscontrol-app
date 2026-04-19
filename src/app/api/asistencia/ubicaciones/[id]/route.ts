@@ -28,6 +28,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         activo: body.activo,
         toleranciaMinutos: body.toleranciaMinutos,
         limiteTardeMinutos: body.limiteTardeMinutos,
+        horaIngreso: body.horaIngreso || null,
+        horaSalida: body.horaSalida || null,
       },
     })
     return NextResponse.json(ubicacion)

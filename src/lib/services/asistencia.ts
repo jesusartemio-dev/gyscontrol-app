@@ -50,27 +50,32 @@ export function calcularEstado(input: CalcularEstadoInput): CalcularEstadoResult
 }
 
 /**
- * Calcula la fecha esperada (hora de ingreso) para un marcaje según el
- * calendario laboral del proyecto/empresa.
+ * Calcula la fecha esperada (hora de ingreso/salida) para un marcaje.
+ * Prioridad: horario de la Ubicación (si está definido) > CalendarioLaboral > default hard-coded.
  */
 export async function calcularFechaEsperada(
   fechaMarcaje: Date,
   tipo: TipoMarcaje,
+  ubicacion?: { horaIngreso: string | null; horaSalida: string | null } | null,
   entidadTipo = 'empresa',
   entidadId = 'default',
 ): Promise<Date> {
-  const calendario = await obtenerCalendarioLaboral(entidadTipo, entidadId)
-  const horaDefault = tipo === 'ingreso' ? '08:00' : tipo === 'salida' ? '18:00' : '13:00'
-  const hhmm =
-    tipo === 'ingreso'
-      ? calendario?.horaInicioManana || horaDefault
-      : tipo === 'salida'
-      ? calendario?.horaFinTarde || horaDefault
-      : tipo === 'inicio_almuerzo'
-      ? calendario?.horaFinManana || '13:00'
-      : calendario?.horaInicioTarde || '14:00'
+  let hhmm: string | null = null
 
-  const [h, m] = hhmm.split(':').map(Number)
+  if (ubicacion) {
+    if (tipo === 'ingreso' && ubicacion.horaIngreso) hhmm = ubicacion.horaIngreso
+    if (tipo === 'salida' && ubicacion.horaSalida) hhmm = ubicacion.horaSalida
+  }
+
+  if (!hhmm) {
+    const calendario = await obtenerCalendarioLaboral(entidadTipo, entidadId)
+    if (tipo === 'ingreso') hhmm = calendario?.horaInicioManana || '08:00'
+    else if (tipo === 'salida') hhmm = calendario?.horaFinTarde || '18:00'
+    else if (tipo === 'inicio_almuerzo') hhmm = calendario?.horaFinManana || '13:00'
+    else hhmm = calendario?.horaInicioTarde || '14:00'
+  }
+
+  const [h, m] = (hhmm || '08:00').split(':').map(Number)
   const esperada = new Date(fechaMarcaje)
   esperada.setHours(h, m, 0, 0)
   return esperada

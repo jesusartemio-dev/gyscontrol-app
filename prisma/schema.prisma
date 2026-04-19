@@ -4215,6 +4215,8 @@ model Ubicacion {
   activo             Boolean             @default(true)
   toleranciaMinutos  Int                 @default(5)   // hasta cuántos minutos se considera a_tiempo
   limiteTardeMinutos Int                 @default(30)  // más de esto = muy_tarde
+  horaIngreso        String?             // "HH:MM" hora oficial ingreso; null = usa CalendarioLaboral
+  horaSalida         String?             // "HH:MM" hora oficial salida
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   asistencias        Asistencia[]

@@ -105,11 +105,10 @@ export async function POST(req: Request) {
   const empleado = await prisma.empleado.findUnique({ where: { userId } })
 
   const fechaHora = new Date()
-  const fechaEsperada = await calcularFechaEsperada(fechaHora, body.tipo)
-
   const ubicacionDatos = ubicacionId
     ? await prisma.ubicacion.findUnique({ where: { id: ubicacionId } })
     : null
+  const fechaEsperada = await calcularFechaEsperada(fechaHora, body.tipo, ubicacionDatos)
 
   const { estado, minutosTarde, banderas } = calcularEstado({
     fechaMarcaje: fechaHora,

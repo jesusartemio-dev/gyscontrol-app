@@ -41,6 +41,8 @@ export async function POST(req: Request) {
         activo: body.activo ?? true,
         toleranciaMinutos: body.toleranciaMinutos ?? 5,
         limiteTardeMinutos: body.limiteTardeMinutos ?? 30,
+        horaIngreso: body.horaIngreso || null,
+        horaSalida: body.horaSalida || null,
       },
     })
     return NextResponse.json(ubicacion)

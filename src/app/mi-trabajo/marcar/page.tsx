@@ -11,8 +11,6 @@ import {
   QrCode,
   LogIn,
   LogOut,
-  Utensils,
-  Coffee,
   Loader2,
   AlertTriangle,
   CheckCircle2,
@@ -28,8 +26,6 @@ type TipoBotón = TipoMarcaje
 
 const TIPOS: Array<{ value: TipoBotón; label: string; icon: any; color: string }> = [
   { value: 'ingreso', label: 'Ingreso', icon: LogIn, color: 'bg-emerald-600 hover:bg-emerald-700' },
-  { value: 'inicio_almuerzo', label: 'Salida almuerzo', icon: Coffee, color: 'bg-amber-600 hover:bg-amber-700' },
-  { value: 'fin_almuerzo', label: 'Regreso almuerzo', icon: Utensils, color: 'bg-amber-600 hover:bg-amber-700' },
   { value: 'salida', label: 'Salida', icon: LogOut, color: 'bg-blue-600 hover:bg-blue-700' },
 ]
 

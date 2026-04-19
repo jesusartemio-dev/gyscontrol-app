@@ -53,6 +53,8 @@ interface Ubicacion {
   activo: boolean
   toleranciaMinutos: number
   limiteTardeMinutos: number
+  horaIngreso: string | null
+  horaSalida: string | null
 }
 
 const vacia = {
@@ -66,6 +68,8 @@ const vacia = {
   activo: true,
   toleranciaMinutos: 5,
   limiteTardeMinutos: 30,
+  horaIngreso: '08:00',
+  horaSalida: '18:00',
 }
 
 interface GeocodeResult {
@@ -305,6 +309,28 @@ export default function UbicacionesPage() {
                 <strong>radio 300-500m para plantas</strong> y 100-150m para oficinas.
               </div>
 
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Hora de ingreso</Label>
+                  <Input
+                    type="time"
+                    value={form.horaIngreso || ''}
+                    onChange={e => setForm({ ...form, horaIngreso: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label>Hora de salida</Label>
+                  <Input
+                    type="time"
+                    value={form.horaSalida || ''}
+                    onChange={e => setForm({ ...form, horaSalida: e.target.value })}
+                  />
+                </div>
+              </div>
+              <p className="-mt-2 text-xs text-muted-foreground">
+                Horario oficial de esta ubicación. Se usa para calcular tardanzas.
+              </p>
+
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <Label>Radio (m)</Label>
@@ -362,7 +388,7 @@ export default function UbicacionesPage() {
                 <TableRow>
                   <TableHead>Nombre</TableHead>
                   <TableHead>Tipo</TableHead>
-                  <TableHead>Coordenadas</TableHead>
+                  <TableHead>Horario</TableHead>
                   <TableHead>Radio</TableHead>
                   <TableHead>Reglas</TableHead>
                   <TableHead>Estado</TableHead>
@@ -376,8 +402,10 @@ export default function UbicacionesPage() {
                     <TableCell>
                       <Badge variant="outline">{u.tipo}</Badge>
                     </TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {u.latitud.toFixed(5)}, {u.longitud.toFixed(5)}
+                    <TableCell className="text-xs">
+                      {u.horaIngreso && u.horaSalida
+                        ? `${u.horaIngreso} - ${u.horaSalida}`
+                        : <span className="text-muted-foreground">usa calendario</span>}
                     </TableCell>
                     <TableCell>{u.radioMetros} m</TableCell>
                     <TableCell className="text-xs">
@@ -400,7 +428,12 @@ export default function UbicacionesPage() {
                         size="sm"
                         variant="outline"
                         onClick={() => {
-                          setForm({ ...u, direccion: u.direccion || '' })
+                          setForm({
+                            ...u,
+                            direccion: u.direccion || '',
+                            horaIngreso: u.horaIngreso || '08:00',
+                            horaSalida: u.horaSalida || '18:00',
+                          })
                           setDialogOpen(true)
                         }}
                       >
