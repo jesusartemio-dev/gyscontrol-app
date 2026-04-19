@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import {
   calcularEstado,
   calcularFechaEsperada,
+  determinarModoRemoto,
   upsertDispositivo,
 } from '@/lib/services/asistencia'
 import { haversineMetros } from '@/lib/utils/geofence'
@@ -47,12 +48,15 @@ export async function POST(req: Request) {
     resolucion: body.device.resolucion,
   })
 
+  // Determinar si el usuario está en modo remoto hoy
+  const modoRemoto = await determinarModoRemoto(userId)
+
   let ubicacionId: string | null = null
   let jornadaAsistenciaId: string | null = null
-  let metodoMarcaje: MetodoMarcaje = 'gps_directo'
+  let metodoMarcaje: MetodoMarcaje = modoRemoto.esRemoto ? 'remoto' : 'gps_directo'
 
-  // Procesar QR si viene
-  if (body.qrPayload) {
+  // Procesar QR si viene (no aplica si es remoto — lo ignoramos)
+  if (body.qrPayload && !modoRemoto.esRemoto) {
     const parsed = parsearPayloadQr(body.qrPayload)
     if (!parsed) {
       return NextResponse.json({ message: 'Código QR inválido' }, { status: 400 })
@@ -91,9 +95,9 @@ export async function POST(req: Request) {
     }
   }
 
-  // Evaluar geofence
+  // Evaluar geofence (no aplica en modo remoto — se fuerza a true)
   let dentroGeofence = true
-  if (ubicacionId && body.latitud != null && body.longitud != null) {
+  if (!modoRemoto.esRemoto && ubicacionId && body.latitud != null && body.longitud != null) {
     const u = await prisma.ubicacion.findUnique({ where: { id: ubicacionId } })
     if (u) {
       const distancia = haversineMetros(body.latitud, body.longitud, u.latitud, u.longitud)
@@ -119,6 +123,11 @@ export async function POST(req: Request) {
     toleranciaMinutos: ubicacionDatos?.toleranciaMinutos ?? 5,
     limiteTardeMinutos: ubicacionDatos?.limiteTardeMinutos ?? 30,
   })
+
+  // Agregar bandera de trazabilidad cuando es remoto
+  if (modoRemoto.esRemoto && modoRemoto.origen) {
+    banderas.push(`remoto:${modoRemoto.origen}`)
+  }
 
   const asistencia = await prisma.asistencia.create({
     data: {
@@ -159,7 +168,11 @@ export async function POST(req: Request) {
 
   const lineas: string[] = []
   lineas.push(`${tipoHumano} registrado a las ${horaLima}`)
-  if (ubicacionDatos) lineas.push(`Ubicación: ${ubicacionDatos.nombre}`)
+  if (modoRemoto.esRemoto) {
+    lineas.push(`Modo: trabajo remoto (${modoRemoto.razon})`)
+  } else if (ubicacionDatos) {
+    lineas.push(`Ubicación: ${ubicacionDatos.nombre}`)
+  }
   if (minutosTarde > 0) lineas.push(`Tardanza: ${minutosTarde} minutos`)
   if (!dentroGeofence) lineas.push('⚠️ Fuera del área permitida (quedó en reporte)')
   if (eraNuevo) lineas.push('⚠️ Dispositivo nuevo — requiere aprobación del supervisor')

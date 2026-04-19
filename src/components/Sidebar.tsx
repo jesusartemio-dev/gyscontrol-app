@@ -55,6 +55,7 @@ import {
   Landmark,
   CheckCircle2,
   DollarSign,
+  Home,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -211,6 +212,7 @@ export default function Sidebar() {
       links: [
         { href: '/mi-trabajo/marcar', label: 'Marcar Asistencia', icon: MapPin },
         { href: '/mi-trabajo/mi-asistencia', label: 'Mi Asistencia', icon: Clock },
+        { href: '/mi-trabajo/solicitudes-remoto', label: 'Solicitudes Remoto', icon: Home },
         { href: '/mi-trabajo/timesheet', label: 'Mi Timesheet', icon: Calendar },
         { href: '/mi-trabajo/mi-jornada', label: 'Mi Jornada', icon: HardHat },
         { href: '/mi-trabajo/tareas', label: 'Mis Tareas', icon: CheckSquare },
@@ -228,6 +230,7 @@ export default function Sidebar() {
         { href: '/asistencia-supervisor', label: 'QR Asistencia del Día', icon: MapPin },
         { href: '/supervision/asistencia', label: 'Asistencia del Equipo', icon: ClipboardList },
         { href: '/supervision/asistencia/dispositivos', label: 'Aprobar Dispositivos', icon: ShieldAlert },
+        { href: '/supervision/solicitudes-remoto', label: 'Solicitudes Remoto', icon: Home },
         { href: '/supervision/timesheet', label: 'Timesheet', icon: ClipboardList },
         { href: '/supervision/jornada-campo', label: 'Jornada Campo', icon: MapPin },
         { href: '/supervision/bloqueos-campo', label: 'Bloqueos Campo', icon: ShieldAlert },
@@ -356,6 +359,7 @@ export default function Sidebar() {
         { href: '/configuracion/departamentos', label: 'Departamentos', icon: Building2 },
         // 📍 Control de asistencia (administrativo)
         { href: '/admin/asistencia/ubicaciones', label: 'Ubicaciones (Asistencia)', icon: MapPin },
+        { href: '/admin/asistencia/modalidades', label: 'Modalidades de Trabajo', icon: Home },
         { href: '/admin/asistencia/dashboard', label: 'Dashboard Asistencia', icon: BarChart3 },
         // 📋 Plantillas para cotizaciones
         { href: '/catalogo/exclusiones', label: 'Exclusiones', icon: FileText },

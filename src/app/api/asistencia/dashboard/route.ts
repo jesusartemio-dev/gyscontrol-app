@@ -24,6 +24,7 @@ export async function GET(req: Request) {
       fechaHora: true,
       estado: true,
       minutosTarde: true,
+      metodoMarcaje: true,
       empleado: {
         select: {
           departamento: { select: { id: true, nombre: true } },
@@ -38,6 +39,8 @@ export async function GET(req: Request) {
   const muyTarde = ingresos.filter(i => i.estado === 'muy_tarde').length
   const fueraZona = ingresos.filter(i => i.estado === 'fuera_zona').length
   const dispositivoNuevo = ingresos.filter(i => i.estado === 'dispositivo_nuevo').length
+  const remotos = ingresos.filter(i => i.metodoMarcaje === 'remoto').length
+  const presenciales = total - remotos
   const minutosTardeTotales = ingresos.reduce((acc, i) => acc + i.minutosTarde, 0)
 
   // Ranking usuarios más tarde
@@ -94,6 +97,8 @@ export async function GET(req: Request) {
       muyTarde,
       fueraZona,
       dispositivoNuevo,
+      remotos,
+      presenciales,
       porcentajePuntualidad: total > 0 ? Math.round((aTiempo / total) * 100) : 0,
       minutosTardeTotales,
     },

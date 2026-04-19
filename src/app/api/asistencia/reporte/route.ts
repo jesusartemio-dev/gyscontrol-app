@@ -18,6 +18,7 @@ export async function GET(req: Request) {
   const userId = url.searchParams.get('userId')
   const departamentoId = url.searchParams.get('departamentoId')
   const estado = url.searchParams.get('estado')
+  const metodoMarcaje = url.searchParams.get('metodoMarcaje')
 
   const where: any = {}
   if (desde || hasta) {
@@ -33,6 +34,7 @@ export async function GET(req: Request) {
   if (ubicacionId) where.ubicacionId = ubicacionId
   if (userId) where.userId = userId
   if (estado) where.estado = estado
+  if (metodoMarcaje) where.metodoMarcaje = metodoMarcaje
   if (departamentoId) where.empleado = { departamentoId }
 
   const data = await prisma.asistencia.findMany({

@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Progress } from '@/components/ui/progress'
-import { Loader2, TrendingUp, Clock, AlertTriangle, MapPinOff } from 'lucide-react'
+import { Loader2, TrendingUp, Clock, AlertTriangle, MapPinOff, Home } from 'lucide-react'
 import {
   Bar,
   BarChart,
@@ -32,6 +32,8 @@ interface DashData {
     muyTarde: number
     fueraZona: number
     dispositivoNuevo: number
+    remotos: number
+    presenciales: number
     porcentajePuntualidad: number
     minutosTardeTotales: number
   }
@@ -125,6 +127,32 @@ export default function DashboardAsistencia() {
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold text-blue-600">{kpis.dispositivoNuevo}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="mb-6 grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Home className="h-4 w-4" /> Marcajes remotos
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold text-purple-600">{kpis.remotos}</p>
+            <p className="text-xs text-muted-foreground">
+              {kpis.total > 0 ? Math.round((kpis.remotos / kpis.total) * 100) : 0}% del total
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm text-muted-foreground">
+              <TrendingUp className="h-4 w-4" /> Marcajes presenciales
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold">{kpis.presenciales}</p>
           </CardContent>
         </Card>
       </div>

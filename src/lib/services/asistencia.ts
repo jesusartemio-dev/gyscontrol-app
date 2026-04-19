@@ -130,3 +130,75 @@ export async function validarGeofenceUbicacion(
   const distancia = haversineMetros(lat, lon, u.latitud, u.longitud)
   return { dentro: distancia <= u.radioMetros, distanciaMetros: distancia }
 }
+
+export type OrigenRemoto = 'solicitud' | 'modalidad_fija' | 'modalidad_hibrida'
+
+export interface ModoRemotoResult {
+  esRemoto: boolean
+  origen?: OrigenRemoto
+  solicitudId?: string
+  razon?: string
+}
+
+const DIAS_ENUM: Array<'domingo' | 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | 'sabado'> = [
+  'domingo',
+  'lunes',
+  'martes',
+  'miercoles',
+  'jueves',
+  'viernes',
+  'sabado',
+]
+
+/**
+ * Determina si un usuario está en modo remoto para la fecha dada.
+ * Orden: 1) solicitud aprobada vigente, 2) modalidad=remoto, 3) hibrido con día en diasRemoto.
+ */
+export async function determinarModoRemoto(
+  userId: string,
+  fecha: Date = new Date(),
+): Promise<ModoRemotoResult> {
+  const inicioDia = new Date(fecha)
+  inicioDia.setHours(0, 0, 0, 0)
+
+  const solicitud = await prisma.solicitudTrabajoRemoto.findFirst({
+    where: {
+      solicitanteId: userId,
+      estado: 'aprobado',
+      fechaInicio: { lte: inicioDia },
+      fechaFin: { gte: inicioDia },
+    },
+    select: { id: true, descripcion: true },
+  })
+  if (solicitud) {
+    return {
+      esRemoto: true,
+      origen: 'solicitud',
+      solicitudId: solicitud.id,
+      razon: solicitud.descripcion || 'Solicitud aprobada',
+    }
+  }
+
+  const empleado = await prisma.empleado.findUnique({
+    where: { userId },
+    select: { modalidadTrabajo: true, diasRemoto: true },
+  })
+  if (!empleado) return { esRemoto: false }
+
+  if (empleado.modalidadTrabajo === 'remoto') {
+    return { esRemoto: true, origen: 'modalidad_fija', razon: '100% remoto' }
+  }
+
+  if (empleado.modalidadTrabajo === 'hibrido') {
+    const dia = DIAS_ENUM[fecha.getDay()]
+    if (empleado.diasRemoto.includes(dia as any)) {
+      return {
+        esRemoto: true,
+        origen: 'modalidad_hibrida',
+        razon: `Día remoto (${dia})`,
+      }
+    }
+  }
+
+  return { esRemoto: false }
+}

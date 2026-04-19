@@ -31,7 +31,7 @@ interface Fila {
   minutosTarde: number
   estado: string
   dentroGeofence: boolean
-  metodoMarcaje: string
+  metodoMarcaje: 'qr_estatico' | 'qr_supervisor' | 'gps_directo' | 'manual_supervisor' | 'remoto'
   banderas: string[]
   user: { name: string | null; email: string }
   empleado: { departamento: { nombre: string } | null; cargo: { nombre: string } | null } | null
@@ -71,11 +71,13 @@ export default function SupervisionAsistencia() {
   const [desde, setDesde] = useState(haceDias(7))
   const [hasta, setHasta] = useState(hoy())
   const [estado, setEstado] = useState('todos')
+  const [metodo, setMetodo] = useState('todos')
 
   async function cargar() {
     setLoading(true)
     const params = new URLSearchParams({ desde, hasta })
     if (estado !== 'todos') params.set('estado', estado)
+    if (metodo !== 'todos') params.set('metodoMarcaje', metodo)
     const r = await fetch(`/api/asistencia/reporte?${params}`)
     const j = await r.json()
     setData(j)
@@ -94,10 +96,11 @@ export default function SupervisionAsistencia() {
       Departamento: f.empleado?.departamento?.nombre || '',
       Cargo: f.empleado?.cargo?.nombre || '',
       Tipo: f.tipo,
-      Ubicación: f.ubicacion?.nombre || '',
+      Modo: f.metodoMarcaje === 'remoto' ? 'Remoto' : 'Presencial',
+      Ubicación: f.ubicacion?.nombre || (f.metodoMarcaje === 'remoto' ? 'Casa' : ''),
       'Min. tarde': f.minutosTarde,
       Estado: f.estado,
-      Geofence: f.dentroGeofence ? 'Dentro' : 'Fuera',
+      Geofence: f.metodoMarcaje === 'remoto' ? 'N/A' : f.dentroGeofence ? 'Dentro' : 'Fuera',
       Método: f.metodoMarcaje,
       Dispositivo: `${f.dispositivo.modelo || f.dispositivo.plataforma}${
         f.dispositivo.aprobado ? '' : ' (NUEVO)'
@@ -152,6 +155,22 @@ export default function SupervisionAsistencia() {
               </SelectContent>
             </Select>
           </div>
+          <div>
+            <label className="text-xs text-muted-foreground">Modo</label>
+            <Select value={metodo} onValueChange={setMetodo}>
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                <SelectItem value="remoto">Solo remoto</SelectItem>
+                <SelectItem value="qr_estatico">QR estático</SelectItem>
+                <SelectItem value="qr_supervisor">QR supervisor</SelectItem>
+                <SelectItem value="gps_directo">GPS sin QR</SelectItem>
+                <SelectItem value="manual_supervisor">Manual</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <Button onClick={cargar} disabled={loading}>
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             Filtrar
@@ -171,6 +190,7 @@ export default function SupervisionAsistencia() {
                 <TableHead>Trabajador</TableHead>
                 <TableHead>Dpto.</TableHead>
                 <TableHead>Tipo</TableHead>
+                <TableHead>Modo</TableHead>
                 <TableHead>Ubicación</TableHead>
                 <TableHead>Min tarde</TableHead>
                 <TableHead>Estado</TableHead>
@@ -186,7 +206,16 @@ export default function SupervisionAsistencia() {
                   <TableCell>{f.user.name || f.user.email}</TableCell>
                   <TableCell className="text-xs">{f.empleado?.departamento?.nombre || '—'}</TableCell>
                   <TableCell>{f.tipo.replace('_', ' ')}</TableCell>
-                  <TableCell>{f.ubicacion?.nombre || '—'}</TableCell>
+                  <TableCell>
+                    {f.metodoMarcaje === 'remoto' ? (
+                      <Badge variant="outline" className="bg-purple-100 text-purple-800">
+                        remoto
+                      </Badge>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">presencial</span>
+                    )}
+                  </TableCell>
+                  <TableCell>{f.ubicacion?.nombre || (f.metodoMarcaje === 'remoto' ? 'Casa' : '—')}</TableCell>
                   <TableCell>{f.minutosTarde > 0 ? `${f.minutosTarde}` : '—'}</TableCell>
                   <TableCell>
                     <Badge className={estadoColor(f.estado)} variant="outline">
@@ -205,7 +234,7 @@ export default function SupervisionAsistencia() {
               ))}
               {data.length === 0 && !loading && (
                 <TableRow>
-                  <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
+                  <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
                     Sin registros en el rango seleccionado.
                   </TableCell>
                 </TableRow>

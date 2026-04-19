@@ -1589,6 +1589,8 @@ model User {
   jornadasAsistenciaSupervisor    JornadaAsistencia[]         @relation("JornadaAsistenciaSupervisor")
   asistencias                     Asistencia[]                @relation("AsistenciaUser")
   asistenciasSupervisadas         Asistencia[]                @relation("AsistenciaSupervisor")
+  solicitudesRemotoPropias        SolicitudTrabajoRemoto[]    @relation("SolicitudRemotoSolicitante")
+  solicitudesRemotoAprobadas      SolicitudTrabajoRemoto[]    @relation("SolicitudRemotoAprobador")
 
   @@map("user")
 }
@@ -1644,6 +1646,9 @@ model Empleado {
   contactoEmergencia   String?
   telefonoEmergencia   String?
   observaciones        String?
+  // Modalidad de trabajo (control administrativo de asistencia)
+  modalidadTrabajo     ModalidadTrabajo     @default(presencial)
+  diasRemoto           DiaSemana[]          @default([]) // usado solo si modalidad=hibrido
   createdAt            DateTime             @default(now())
   updatedAt            DateTime             @updatedAt
   cargo                Cargo?               @relation(fields: [cargoId], references: [id])
@@ -4324,6 +4329,7 @@ enum MetodoMarcaje {
   qr_supervisor
   gps_directo
   manual_supervisor
+  remoto
 }
 
 enum EstadoMarcaje {
@@ -4332,4 +4338,39 @@ enum EstadoMarcaje {
   muy_tarde
   fuera_zona
   dispositivo_nuevo
+}
+
+enum ModalidadTrabajo {
+  presencial
+  remoto
+  hibrido
+}
+
+enum EstadoSolicitudRemoto {
+  pendiente
+  aprobado
+  rechazado
+  cancelado
+}
+
+// Solicitud puntual de trabajo remoto (home office) para una fecha o rango.
+// Empleados presenciales pueden solicitar excepciones. Supervisor aprueba.
+model SolicitudTrabajoRemoto {
+  id             String                @id @default(cuid())
+  solicitanteId  String
+  fechaInicio    DateTime              @db.Date
+  fechaFin       DateTime              @db.Date
+  descripcion    String?
+  estado         EstadoSolicitudRemoto @default(pendiente)
+  aprobadorId    String?
+  aprobadoEn     DateTime?
+  motivoRechazo  String?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  solicitante    User                  @relation("SolicitudRemotoSolicitante", fields: [solicitanteId], references: [id])
+  aprobador      User?                 @relation("SolicitudRemotoAprobador", fields: [aprobadorId], references: [id])
+
+  @@index([solicitanteId, estado])
+  @@index([fechaInicio, fechaFin])
+  @@map("solicitud_trabajo_remoto")
 }

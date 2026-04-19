@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   Camera,
   X,
+  Home,
 } from 'lucide-react'
 import { getDeviceInfo } from '@/lib/utils/deviceFingerprint'
 import { useGeolocation } from '@/lib/hooks/useGeolocation'
@@ -29,12 +30,19 @@ const TIPOS: Array<{ value: TipoBotón; label: string; icon: any; color: string 
   { value: 'salida', label: 'Salida', icon: LogOut, color: 'bg-blue-600 hover:bg-blue-700' },
 ]
 
+interface ModoHoy {
+  esRemoto: boolean
+  origen?: 'solicitud' | 'modalidad_fija' | 'modalidad_hibrida'
+  razon?: string
+}
+
 export default function MarcarPage() {
   const { status } = useSession()
   const geo = useGeolocation()
   const [tipoSel, setTipoSel] = useState<TipoBotón | null>(null)
   const [scannerOpen, setScannerOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [modoHoy, setModoHoy] = useState<ModoHoy | null>(null)
   const [ultimoResultado, setUltimoResultado] = useState<null | {
     ok: boolean
     titulo?: string
@@ -55,6 +63,10 @@ export default function MarcarPage() {
     getDeviceInfo().then(d => {
       deviceRef.current = d
     })
+    fetch('/api/asistencia/modo-hoy')
+      .then(r => r.json())
+      .then(setModoHoy)
+      .catch(() => setModoHoy({ esRemoto: false }))
   }, [])
 
   async function enviarMarcaje(tipo: TipoBotón, qrPayload?: string) {
@@ -97,6 +109,11 @@ export default function MarcarPage() {
 
   async function onClickTipo(tipo: TipoBotón) {
     setTipoSel(tipo)
+    // En modo remoto no pedimos GPS ni QR
+    if (modoHoy?.esRemoto) {
+      await enviarMarcaje(tipo)
+      return
+    }
     const c = geo.coords || (await geo.solicitar())
     if (!c) {
       toast.error('Se requiere permiso de ubicación')
@@ -127,6 +144,22 @@ export default function MarcarPage() {
           Control administrativo de ingreso y salida
         </p>
       </div>
+
+      {modoHoy?.esRemoto && (
+        <Card className="mb-6 border-2 border-purple-400 bg-purple-50">
+          <CardContent className="flex items-start gap-3 py-4">
+            <Home className="h-6 w-6 shrink-0 text-purple-600" />
+            <div className="text-sm">
+              <p className="text-base font-bold text-purple-900">
+                Hoy estás en modalidad remota
+              </p>
+              <p className="mt-1 text-purple-800">
+                {modoHoy.razon || 'Trabajo desde casa autorizado'} — marca sin QR ni ubicación.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {ultimoResultado && (
         <Card
@@ -168,10 +201,19 @@ export default function MarcarPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <MapPin className="h-4 w-4" />
-              {geo.coords
-                ? `GPS listo (±${Math.round(geo.coords.precision)}m)`
-                : 'Se solicitará GPS al marcar'}
+              {modoHoy?.esRemoto ? (
+                <>
+                  <Home className="h-4 w-4" />
+                  Marcaje remoto (sin GPS)
+                </>
+              ) : (
+                <>
+                  <MapPin className="h-4 w-4" />
+                  {geo.coords
+                    ? `GPS listo (±${Math.round(geo.coords.precision)}m)`
+                    : 'Se solicitará GPS al marcar'}
+                </>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
