@@ -15,6 +15,7 @@ export function useQrScanner(onScan: (text: string) => void): QrScannerState {
   const [error, setError] = useState<string | null>(null)
   const instRef = useRef<Html5Qrcode | null>(null)
   const onScanRef = useRef(onScan)
+  const yaDisparadoRef = useRef(false)
 
   useEffect(() => {
     onScanRef.current = onScan
@@ -23,16 +24,17 @@ export function useQrScanner(onScan: (text: string) => void): QrScannerState {
   const detener = useCallback(async () => {
     const inst = instRef.current
     if (!inst) return
+    instRef.current = null
     try {
       await inst.stop()
       await inst.clear()
     } catch {}
-    instRef.current = null
     setScanning(false)
   }, [])
 
   const iniciar = useCallback(async (elementId: string) => {
     setError(null)
+    yaDisparadoRef.current = false
     try {
       if (instRef.current) await detener()
       const inst = new Html5Qrcode(elementId)
@@ -41,6 +43,8 @@ export function useQrScanner(onScan: (text: string) => void): QrScannerState {
         { facingMode: 'environment' },
         { fps: 10, qrbox: { width: 240, height: 240 } },
         text => {
+          if (yaDisparadoRef.current) return
+          yaDisparadoRef.current = true
           onScanRef.current(text)
         },
         () => {},

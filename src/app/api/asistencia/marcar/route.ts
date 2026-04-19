@@ -39,6 +39,28 @@ export async function POST(req: Request) {
     return NextResponse.json({ message: 'Datos incompletos' }, { status: 400 })
   }
 
+  // Dedupe: si ya marcó el mismo tipo en los últimos 30 segundos, devolver el existente
+  const hace30s = new Date(Date.now() - 30_000)
+  const reciente = await prisma.asistencia.findFirst({
+    where: { userId, tipo: body.tipo, fechaHora: { gte: hace30s } },
+    orderBy: { fechaHora: 'desc' },
+  })
+  if (reciente) {
+    const horaPrev = reciente.fechaHora.toLocaleTimeString('es-PE', {
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'America/Lima',
+    })
+    return NextResponse.json({
+      ok: true,
+      asistencia: reciente,
+      titulo: 'ℹ️ Ya registrado',
+      mensaje: `Tu marcaje de ${body.tipo} ya fue registrado a las ${horaPrev}.`,
+      lineas: [`Tu marcaje de ${body.tipo} ya fue registrado a las ${horaPrev}.`],
+      hora: horaPrev,
+    })
+  }
+
   const { dispositivoId, eraNuevo } = await upsertDispositivo({
     userId,
     fingerprint: body.device.fingerprint,
