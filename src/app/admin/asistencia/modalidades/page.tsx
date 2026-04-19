@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import {
   Select,
   SelectContent,
@@ -19,7 +20,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { toast } from 'sonner'
-import { Loader2, Home } from 'lucide-react'
+import { Loader2, Home, Search } from 'lucide-react'
 
 type Modalidad = 'presencial' | 'remoto' | 'hibrido'
 type Dia = 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | 'sabado' | 'domingo'
@@ -39,6 +40,10 @@ export default function ModalidadesPage() {
   const [data, setData] = useState<EmpleadoRow[]>([])
   const [loading, setLoading] = useState(true)
   const [savingId, setSavingId] = useState<string | null>(null)
+  const [busqueda, setBusqueda] = useState('')
+  const [filtroDepartamento, setFiltroDepartamento] = useState('todos')
+  const [filtroCargo, setFiltroCargo] = useState('todos')
+  const [filtroModalidad, setFiltroModalidad] = useState('todos')
 
   async function cargar() {
     setLoading(true)
@@ -50,6 +55,32 @@ export default function ModalidadesPage() {
   useEffect(() => {
     cargar()
   }, [])
+
+  const departamentos = useMemo(() => {
+    const set = new Set(data.map(e => e.departamento?.nombre).filter(Boolean) as string[])
+    return Array.from(set).sort()
+  }, [data])
+
+  const cargos = useMemo(() => {
+    const set = new Set(
+      data
+        .filter(e => filtroDepartamento === 'todos' || e.departamento?.nombre === filtroDepartamento)
+        .map(e => e.cargo?.nombre)
+        .filter(Boolean) as string[],
+    )
+    return Array.from(set).sort()
+  }, [data, filtroDepartamento])
+
+  const datosFiltrados = useMemo(() => {
+    const q = busqueda.toLowerCase()
+    return data.filter(e => {
+      if (q && !(e.user.name?.toLowerCase().includes(q) || e.user.email.toLowerCase().includes(q))) return false
+      if (filtroDepartamento !== 'todos' && e.departamento?.nombre !== filtroDepartamento) return false
+      if (filtroCargo !== 'todos' && e.cargo?.nombre !== filtroCargo) return false
+      if (filtroModalidad !== 'todos' && e.modalidadTrabajo !== filtroModalidad) return false
+      return true
+    })
+  }, [data, busqueda, filtroDepartamento, filtroCargo, filtroModalidad])
 
   async function guardar(empleadoId: string, patch: Partial<Pick<EmpleadoRow, 'modalidadTrabajo' | 'diasRemoto'>>) {
     const empleado = data.find(e => e.id === empleadoId)
@@ -97,6 +128,77 @@ export default function ModalidadesPage() {
         </p>
       </div>
 
+      <Card className="mb-4">
+        <CardContent className="flex flex-wrap items-end gap-3 py-4">
+          <div className="flex-1 min-w-[180px]">
+            <label className="text-xs text-muted-foreground">Buscar empleado</label>
+            <div className="relative">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Nombre o email..."
+                value={busqueda}
+                onChange={e => setBusqueda(e.target.value)}
+                className="pl-8"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">Departamento</label>
+            <Select
+              value={filtroDepartamento}
+              onValueChange={v => { setFiltroDepartamento(v); setFiltroCargo('todos') }}
+            >
+              <SelectTrigger className="w-48">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                {departamentos.map(d => (
+                  <SelectItem key={d} value={d}>{d}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">Cargo</label>
+            <Select value={filtroCargo} onValueChange={setFiltroCargo}>
+              <SelectTrigger className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                {cargos.map(c => (
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">Modalidad</label>
+            <Select value={filtroModalidad} onValueChange={setFiltroModalidad}>
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todas</SelectItem>
+                <SelectItem value="presencial">Presencial</SelectItem>
+                <SelectItem value="remoto">100% Remoto</SelectItem>
+                <SelectItem value="hibrido">Híbrido</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {(busqueda || filtroDepartamento !== 'todos' || filtroCargo !== 'todos' || filtroModalidad !== 'todos') && (
+            <button
+              type="button"
+              className="text-xs text-muted-foreground underline"
+              onClick={() => { setBusqueda(''); setFiltroDepartamento('todos'); setFiltroCargo('todos'); setFiltroModalidad('todos') }}
+            >
+              Limpiar filtros
+            </button>
+          )}
+        </CardContent>
+      </Card>
+
       <Card>
         <CardContent className="p-0">
           {loading ? (
@@ -115,7 +217,7 @@ export default function ModalidadesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data.map(e => (
+                {datosFiltrados.map(e => (
                   <TableRow key={e.id}>
                     <TableCell>
                       <div>
@@ -173,10 +275,12 @@ export default function ModalidadesPage() {
                     </TableCell>
                   </TableRow>
                 ))}
-                {data.length === 0 && (
+                {datosFiltrados.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
-                      No hay empleados registrados. Ve a Configuración → Personal (RRHH).
+                      {data.length === 0
+                        ? 'No hay empleados registrados. Ve a Configuración → Personal (RRHH).'
+                        : 'Sin resultados para los filtros aplicados.'}
                     </TableCell>
                   </TableRow>
                 )}
