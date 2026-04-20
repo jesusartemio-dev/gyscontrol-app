@@ -146,6 +146,7 @@ export type OrigenRemoto = 'solicitud' | 'modalidad_fija' | 'modalidad_hibrida'
 
 export interface ModoRemotoResult {
   esRemoto: boolean
+  esConfianza?: boolean
   origen?: OrigenRemoto
   solicitudId?: string
   razon?: string
@@ -195,6 +196,10 @@ export async function determinarModoRemoto(
     select: { modalidadTrabajo: true, diasRemoto: true },
   })
   if (!empleado) return { esRemoto: false }
+
+  if (empleado.modalidadTrabajo === 'confianza') {
+    return { esRemoto: true, esConfianza: true, origen: 'modalidad_fija', razon: 'Personal de confianza' }
+  }
 
   if (empleado.modalidadTrabajo === 'remoto') {
     return { esRemoto: true, origen: 'modalidad_fija', razon: '100% remoto' }

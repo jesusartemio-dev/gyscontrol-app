@@ -23,7 +23,7 @@ import {
 import { toast } from 'sonner'
 import { Loader2, Home, Search, AlertTriangle } from 'lucide-react'
 
-type Modalidad = 'presencial' | 'remoto' | 'hibrido'
+type Modalidad = 'presencial' | 'remoto' | 'hibrido' | 'confianza'
 type Dia = 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | 'sabado' | 'domingo'
 
 interface EmpleadoRow {
@@ -205,6 +205,7 @@ export default function ModalidadesPage() {
                 <SelectItem value="presencial">Presencial</SelectItem>
                 <SelectItem value="remoto">100% Remoto</SelectItem>
                 <SelectItem value="hibrido">Híbrido</SelectItem>
+                <SelectItem value="confianza">Confianza</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -263,6 +264,7 @@ export default function ModalidadesPage() {
                           <SelectItem value="presencial">Presencial</SelectItem>
                           <SelectItem value="remoto">100% Remoto</SelectItem>
                           <SelectItem value="hibrido">Híbrido</SelectItem>
+                          <SelectItem value="confianza">Confianza</SelectItem>
                         </SelectContent>
                       </Select>
                     </TableCell>
@@ -290,7 +292,11 @@ export default function ModalidadesPage() {
                         </div>
                       ) : (
                         <Badge variant="outline" className="text-xs">
-                          {e.modalidadTrabajo === 'remoto' ? 'todos los días' : 'n/a'}
+                          {e.modalidadTrabajo === 'remoto'
+                            ? 'todos los días'
+                            : e.modalidadTrabajo === 'confianza'
+                            ? 'sin restricción'
+                            : 'n/a'}
                         </Badge>
                       )}
                     </TableCell>

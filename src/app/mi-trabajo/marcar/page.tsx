@@ -32,6 +32,7 @@ const TIPOS: Array<{ value: TipoBotón; label: string; icon: any; color: string 
 
 interface ModoHoy {
   esRemoto: boolean
+  esConfianza?: boolean
   origen?: 'solicitud' | 'modalidad_fija' | 'modalidad_hibrida'
   razon?: string
 }
@@ -145,7 +146,23 @@ export default function MarcarPage() {
         </p>
       </div>
 
-      {modoHoy?.esRemoto && (
+      {modoHoy?.esConfianza && (
+        <Card className="mb-6 border-2 border-slate-400 bg-slate-50">
+          <CardContent className="flex items-start gap-3 py-4">
+            <Home className="h-6 w-6 shrink-0 text-slate-600" />
+            <div className="text-sm">
+              <p className="text-base font-bold text-slate-900">
+                Personal de confianza
+              </p>
+              <p className="mt-1 text-slate-700">
+                Tu marcaje es voluntario — sin QR, sin GPS, sin cálculo de tardanza.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {modoHoy?.esRemoto && !modoHoy?.esConfianza && (
         <Card className="mb-6 border-2 border-purple-400 bg-purple-50">
           <CardContent className="flex items-start gap-3 py-4">
             <Home className="h-6 w-6 shrink-0 text-purple-600" />

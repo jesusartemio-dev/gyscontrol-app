@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const empleadosActivos = await prisma.empleado.findMany({
-      where: { activo: true },
+      where: { activo: true, modalidadTrabajo: { not: 'confianza' } },
       include: {
         user: { select: { id: true, name: true, email: true } },
         departamento: { select: { nombre: true } },

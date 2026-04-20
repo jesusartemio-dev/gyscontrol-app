@@ -137,18 +137,21 @@ export async function POST(req: Request) {
     : null
   const fechaEsperada = await calcularFechaEsperada(fechaHora, body.tipo, ubicacionDatos)
 
-  const { estado, minutosTarde, banderas } = calcularEstado({
-    fechaMarcaje: fechaHora,
-    fechaEsperada,
-    tipo: body.tipo,
-    dentroGeofence,
-    dispositivoEraNuevo: eraNuevo,
-    toleranciaMinutos: ubicacionDatos?.toleranciaMinutos ?? 5,
-    limiteTardeMinutos: ubicacionDatos?.limiteTardeMinutos ?? 30,
-  })
+  // Personal de confianza: siempre a_tiempo, sin tardanza
+  const { estado, minutosTarde, banderas } = modoRemoto.esConfianza
+    ? { estado: 'a_tiempo' as const, minutosTarde: 0, banderas: ['confianza'] }
+    : calcularEstado({
+        fechaMarcaje: fechaHora,
+        fechaEsperada,
+        tipo: body.tipo,
+        dentroGeofence,
+        dispositivoEraNuevo: eraNuevo,
+        toleranciaMinutos: ubicacionDatos?.toleranciaMinutos ?? 5,
+        limiteTardeMinutos: ubicacionDatos?.limiteTardeMinutos ?? 30,
+      })
 
-  // Agregar bandera de trazabilidad cuando es remoto
-  if (modoRemoto.esRemoto && modoRemoto.origen) {
+  // Agregar bandera de trazabilidad cuando es remoto/confianza
+  if (modoRemoto.esRemoto && modoRemoto.origen && !modoRemoto.esConfianza) {
     banderas.push(`remoto:${modoRemoto.origen}`)
   }
 

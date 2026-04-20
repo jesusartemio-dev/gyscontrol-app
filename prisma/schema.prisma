@@ -4344,6 +4344,7 @@ enum ModalidadTrabajo {
   presencial
   remoto
   hibrido
+  confianza
 }
 
 enum EstadoSolicitudRemoto {
