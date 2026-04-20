@@ -224,7 +224,11 @@ export default function SupervisionAsistencia() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-xs">
-                    {f.dispositivo.modelo || f.dispositivo.plataforma}
+                    {f.dispositivo.modelo
+                      ? f.dispositivo.modelo.includes(f.dispositivo.plataforma)
+                        ? f.dispositivo.modelo
+                        : `${f.dispositivo.plataforma} · ${f.dispositivo.modelo}`
+                      : f.dispositivo.plataforma}
                     {!f.dispositivo.aprobado && (
                       <Badge variant="outline" className="ml-1 bg-blue-50 text-blue-700">
                         nuevo
