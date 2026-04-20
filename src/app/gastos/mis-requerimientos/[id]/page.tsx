@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -646,15 +647,30 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
               )}
               {canRendir && (
                 <div className="flex items-center gap-1.5">
-                  <Button size="sm" onClick={handleRendir} disabled={actionLoading || lineas.length === 0 || itemsPendientesRendicion > 0} className="bg-orange-600 hover:bg-orange-700">
-                    <FileCheck className="h-3.5 w-3.5 mr-1" />
-                    Rendir gastos
-                  </Button>
-                  {itemsPendientesRendicion > 0 && (
-                    <span className="text-xs text-amber-600">
-                      {itemsPendientesRendicion} ítem{itemsPendientesRendicion !== 1 ? 's' : ''} sin comprobante
-                    </span>
-                  )}
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span tabIndex={0}>
+                          <Button
+                            size="sm"
+                            onClick={handleRendir}
+                            disabled={actionLoading || lineas.length === 0 || itemsPendientesRendicion > 0}
+                            className="bg-orange-600 hover:bg-orange-700 disabled:pointer-events-none"
+                          >
+                            <FileCheck className="h-3.5 w-3.5 mr-1" />
+                            Rendir gastos
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      {(lineas.length === 0 || itemsPendientesRendicion > 0) && (
+                        <TooltipContent side="bottom">
+                          {lineas.length === 0
+                            ? 'Agrega al menos una línea de gasto antes de rendir'
+                            : `${itemsPendientesRendicion} ítem${itemsPendientesRendicion !== 1 ? 's' : ''} sin comprobante registrado`}
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
               )}
               {canValidarLineas && (
