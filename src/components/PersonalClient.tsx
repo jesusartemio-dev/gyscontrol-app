@@ -17,7 +17,8 @@ import {
   FileSpreadsheet,
   Eye,
   EyeOff,
-  ArrowUpDown
+  ArrowUpDown,
+  AlertTriangle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -203,6 +204,12 @@ export default function PersonalClient() {
     return usuarios.filter(u => !empleadoUserIds.has(u.id) || (editingEmpleado && editingEmpleado.userId === u.id))
   }, [usuarios, empleados, editingEmpleado])
 
+  // Usuarios sin ficha de empleado (para el banner de alerta)
+  const usuariosSinFicha = useMemo(() => {
+    const empleadoUserIds = new Set(empleados.map(e => e.userId))
+    return usuarios.filter(u => !empleadoUserIds.has(u.id))
+  }, [usuarios, empleados])
+
   // Filtrar y ordenar empleados
   const filteredEmpleados = useMemo(() => {
     const filtered = empleados.filter(emp => {
@@ -259,6 +266,13 @@ export default function PersonalClient() {
   const handleOpenCreate = () => {
     setEditingEmpleado(null)
     setForm(defaultForm)
+    setErrors({})
+    setIsModalOpen(true)
+  }
+
+  const handleCrearFichaRapida = (userId: string) => {
+    setEditingEmpleado(null)
+    setForm({ ...defaultForm, userId })
     setErrors({})
     setIsModalOpen(true)
   }
@@ -622,6 +636,35 @@ export default function PersonalClient() {
             </span>
           )}
         </div>
+
+        {/* Banner: usuarios sin ficha de empleado */}
+        {usuariosSinFicha.length > 0 && (
+          <div className="rounded-lg border border-amber-300 bg-amber-50 p-3">
+            <div className="mb-2 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+              <span className="text-sm font-medium text-amber-800">
+                {usuariosSinFicha.length} usuario{usuariosSinFicha.length > 1 ? 's' : ''} sin ficha de empleado
+              </span>
+              <span className="text-xs text-amber-600">— no aparecen en Modalidades ni en reportes de asistencia</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {usuariosSinFicha.map(u => (
+                <div key={u.id} className="flex items-center gap-1.5 rounded-md border border-amber-200 bg-white px-2 py-1">
+                  <span className="text-xs text-gray-700">{u.name || u.email}</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-5 border-amber-400 px-1.5 text-[10px] text-amber-700 hover:bg-amber-100"
+                    onClick={() => handleCrearFichaRapida(u.id)}
+                  >
+                    <UserPlus className="mr-1 h-3 w-3" />
+                    Crear ficha
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Tabla de Costos Laborales (estilo Excel) */}
         <Card>

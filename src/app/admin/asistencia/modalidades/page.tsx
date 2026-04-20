@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -20,7 +21,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { toast } from 'sonner'
-import { Loader2, Home, Search } from 'lucide-react'
+import { Loader2, Home, Search, AlertTriangle } from 'lucide-react'
 
 type Modalidad = 'presencial' | 'remoto' | 'hibrido'
 type Dia = 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | 'sabado' | 'domingo'
@@ -44,11 +45,16 @@ export default function ModalidadesPage() {
   const [filtroDepartamento, setFiltroDepartamento] = useState('todos')
   const [filtroCargo, setFiltroCargo] = useState('todos')
   const [filtroModalidad, setFiltroModalidad] = useState('todos')
+  const [sinFicha, setSinFicha] = useState(0)
 
   async function cargar() {
     setLoading(true)
-    const r = await fetch('/api/asistencia/modalidades')
-    setData(await r.json())
+    const [modalidades, conteo] = await Promise.all([
+      fetch('/api/asistencia/modalidades').then(r => r.json()),
+      fetch('/api/asistencia/modalidades/sin-ficha').then(r => r.json()),
+    ])
+    setData(modalidades)
+    setSinFicha(conteo.total ?? 0)
     setLoading(false)
   }
 
@@ -127,6 +133,21 @@ export default function ModalidadesPage() {
           Configura qué empleados son presenciales, remotos o híbridos (días fijos)
         </p>
       </div>
+
+      {sinFicha > 0 && (
+        <div className="mb-4 flex items-center gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
+          <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+          <p className="text-sm text-amber-800">
+            <span className="font-semibold">{sinFicha} usuario{sinFicha > 1 ? 's' : ''}</span> no tienen ficha de empleado y no aparecen aquí.
+          </p>
+          <Link
+            href="/admin/personal"
+            className="ml-auto shrink-0 text-sm font-medium text-amber-700 underline hover:text-amber-900"
+          >
+            Ir a Personal (RRHH) →
+          </Link>
+        </div>
+      )}
 
       <Card className="mb-4">
         <CardContent className="flex flex-wrap items-end gap-3 py-4">
