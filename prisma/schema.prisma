@@ -59,6 +59,9 @@ model CatalogoEquipo {
   plantillaEquipoItemIndependiente PlantillaEquipoItemIndependiente[]
   listaEquipoItem                  ListaEquipoItem[]
   pedidoEquipoItems                PedidoEquipoItem[]
+  stockAlmacen                     StockAlmacen[]
+  movimientosAlmacen               MovimientoAlmacen[]
+  devolucionMaterialItems          DevolucionMaterialItem[]
 
   @@map("catalogo_equipo")
 }
@@ -1076,6 +1079,8 @@ model Proyecto {
   cartasFianza             CartaFianza[]
   ssomaExpediente          SsomaExpediente?
   solicitudesRecurso       SolicitudRecurso[]
+  prestamosHerramienta     PrestamoHerramienta[]
+  devolucionesMaterial     DevolucionMaterial[]
 
   @@index([clienteId, estado, createdAt(sort: Desc)], map: "idx_proyecto_cliente_estado_fecha")
   @@index([comercialId, estado, fechaInicio], map: "idx_proyecto_comercial_estado_inicio")
@@ -1591,6 +1596,13 @@ model User {
   asistenciasSupervisadas         Asistencia[]                @relation("AsistenciaSupervisor")
   solicitudesRemotoPropias        SolicitudTrabajoRemoto[]    @relation("SolicitudRemotoSolicitante")
   solicitudesRemotoAprobadas      SolicitudTrabajoRemoto[]    @relation("SolicitudRemotoAprobador")
+  // Almacén
+  movimientosAlmacen              MovimientoAlmacen[]
+  prestamosComoUsuario            PrestamoHerramienta[]       @relation("PrestamoUsuario")
+  prestamosEntregados             PrestamoHerramienta[]       @relation("PrestamoEntregadoPor")
+  prestamosRecibidos              PrestamoHerramienta[]       @relation("PrestamoRecibidoPor")
+  devolucionesRegistradas         DevolucionMaterial[]        @relation("DevolucionRegistradoPor")
+  devolucionesDevueltas           DevolucionMaterial[]        @relation("DevolucionDevueltoPor")
 
   @@map("user")
 }
@@ -3682,6 +3694,7 @@ model RecepcionPendiente {
   entregadoPor              User?                      @relation("RecepcionEntregador", fields: [entregadoPorId], references: [id])
   rechazadoPor              User?                      @relation("RecepcionRechazador", fields: [rechazadoPorId], references: [id])
   entregasItem              EntregaItem[]
+  movimientosAlmacen        MovimientoAlmacen[]
 
   @@index([pedidoEquipoItemId])
   @@index([ordenCompraItemId])
@@ -4374,4 +4387,220 @@ model SolicitudTrabajoRemoto {
   @@index([solicitanteId, estado])
   @@index([fechaInicio, fechaFin])
   @@map("solicitud_trabajo_remoto")
+}
+
+// ======================
+// 🏭 ALMACÉN
+// ======================
+
+model Almacen {
+  id                  String              @id @default(cuid())
+  nombre              String
+  direccion           String?
+  activo              Boolean             @default(true)
+  stock               StockAlmacen[]
+  movimientos         MovimientoAlmacen[]
+  unidadesHerramienta HerramientaUnidad[]
+  createdAt           DateTime            @default(now())
+
+  @@map("almacen")
+}
+
+model StockAlmacen {
+  id                    String               @id @default(cuid())
+  almacenId             String
+  catalogoEquipoId      String?
+  catalogoHerramientaId String?
+  cantidadDisponible    Float                @default(0)
+  cantidadReservada     Float                @default(0)
+  updatedAt             DateTime             @updatedAt
+  almacen               Almacen              @relation(fields: [almacenId], references: [id])
+  catalogoEquipo        CatalogoEquipo?      @relation(fields: [catalogoEquipoId], references: [id])
+  catalogoHerramienta   CatalogoHerramienta? @relation(fields: [catalogoHerramientaId], references: [id])
+
+  @@unique([almacenId, catalogoEquipoId])
+  @@unique([almacenId, catalogoHerramientaId])
+  @@map("stock_almacen")
+}
+
+model MovimientoAlmacen {
+  id                    String             @id @default(cuid())
+  almacenId             String
+  tipo                  TipoMovimiento
+  catalogoEquipoId      String?
+  catalogoHerramientaId String?
+  herramientaUnidadId   String?
+  cantidad              Float
+  usuarioId             String
+  fechaMovimiento       DateTime           @default(now())
+  recepcionPendienteId  String?
+  entregaItemId         String?
+  prestamoHerramientaId String?
+  devolucionMaterialId  String?
+  observaciones         String?
+  almacen               Almacen            @relation(fields: [almacenId], references: [id])
+  usuario               User               @relation(fields: [usuarioId], references: [id])
+  catalogoEquipo        CatalogoEquipo?    @relation(fields: [catalogoEquipoId], references: [id])
+  catalogoHerramienta   CatalogoHerramienta? @relation(fields: [catalogoHerramientaId], references: [id])
+  herramientaUnidad     HerramientaUnidad? @relation(fields: [herramientaUnidadId], references: [id])
+  recepcionPendiente    RecepcionPendiente? @relation(fields: [recepcionPendienteId], references: [id])
+  prestamoHerramienta   PrestamoHerramienta? @relation(fields: [prestamoHerramientaId], references: [id])
+  devolucionMaterial    DevolucionMaterial? @relation(fields: [devolucionMaterialId], references: [id])
+
+  @@index([almacenId, fechaMovimiento])
+  @@index([catalogoEquipoId])
+  @@index([catalogoHerramientaId])
+  @@index([tipo, fechaMovimiento])
+  @@map("movimiento_almacen")
+}
+
+enum TipoMovimiento {
+  entrada_recepcion
+  salida_proyecto
+  devolucion_proyecto
+  alta_herramienta
+  prestamo_herramienta
+  devolucion_herramienta
+  baja_herramienta
+  ajuste_inventario
+}
+
+model CatalogoHerramienta {
+  id               String                   @id @default(cuid())
+  codigo           String                   @unique
+  nombre           String
+  categoria        String
+  descripcion      String?
+  fotoUrl          String?
+  gestionPorUnidad Boolean                  @default(false)
+  unidadMedida     String                   @default("unidad")
+  activo           Boolean                  @default(true)
+  unidades         HerramientaUnidad[]
+  stock            StockAlmacen[]
+  prestamoItems    PrestamoHerramientaItem[]
+  movimientos      MovimientoAlmacen[]
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+
+  @@map("catalogo_herramienta")
+}
+
+model HerramientaUnidad {
+  id                    String                   @id @default(cuid())
+  catalogoHerramientaId String
+  serie                 String
+  codigoQR              String?                  @unique
+  almacenId             String
+  estado                EstadoHerramientaUnidad  @default(disponible)
+  observaciones         String?
+  catalogoHerramienta   CatalogoHerramienta      @relation(fields: [catalogoHerramientaId], references: [id])
+  almacen               Almacen                  @relation(fields: [almacenId], references: [id])
+  prestamoItems         PrestamoHerramientaItem[]
+  movimientos           MovimientoAlmacen[]
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+
+  @@unique([catalogoHerramientaId, serie])
+  @@map("herramienta_unidad")
+}
+
+enum EstadoHerramientaUnidad {
+  disponible
+  prestada
+  en_reparacion
+  dada_de_baja
+}
+
+model PrestamoHerramienta {
+  id                      String                    @id @default(cuid())
+  usuarioId               String
+  proyectoId              String?
+  fechaPrestamo           DateTime                  @default(now())
+  fechaDevolucionEstimada DateTime?
+  fechaDevolucionReal     DateTime?
+  estado                  EstadoPrestamo            @default(activo)
+  entregadoPorId          String
+  recibidoPorId           String?
+  observaciones           String?
+  usuario                 User                      @relation("PrestamoUsuario", fields: [usuarioId], references: [id])
+  proyecto                Proyecto?                 @relation(fields: [proyectoId], references: [id])
+  entregadoPor            User                      @relation("PrestamoEntregadoPor", fields: [entregadoPorId], references: [id])
+  recibidoPor             User?                     @relation("PrestamoRecibidoPor", fields: [recibidoPorId], references: [id])
+  items                   PrestamoHerramientaItem[]
+  movimientos             MovimientoAlmacen[]
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+
+  @@index([usuarioId, estado])
+  @@index([estado, fechaDevolucionEstimada])
+  @@map("prestamo_herramienta")
+}
+
+enum EstadoPrestamo {
+  activo
+  devuelto
+  devuelto_parcial
+  vencido
+  perdido
+}
+
+model PrestamoHerramientaItem {
+  id                    String               @id @default(cuid())
+  prestamoId            String
+  herramientaUnidadId   String?
+  catalogoHerramientaId String?
+  cantidadPrestada      Float                @default(1)
+  cantidadDevuelta      Float                @default(0)
+  fechaDevolucionItem   DateTime?
+  estado                EstadoPrestamoItem   @default(prestado)
+  prestamo              PrestamoHerramienta  @relation(fields: [prestamoId], references: [id], onDelete: Cascade)
+  herramientaUnidad     HerramientaUnidad?   @relation(fields: [herramientaUnidadId], references: [id])
+  catalogoHerramienta   CatalogoHerramienta? @relation(fields: [catalogoHerramientaId], references: [id])
+
+  @@map("prestamo_herramienta_item")
+}
+
+enum EstadoPrestamoItem {
+  prestado
+  devuelto
+  perdido
+}
+
+model DevolucionMaterial {
+  id              String                  @id @default(cuid())
+  proyectoId      String
+  fechaDevolucion DateTime                @default(now())
+  registradoPorId String
+  devueltoPorId   String?
+  observaciones   String?
+  estado          EstadoDevolucion        @default(registrada)
+  proyecto        Proyecto                @relation(fields: [proyectoId], references: [id])
+  registradoPor   User                    @relation("DevolucionRegistradoPor", fields: [registradoPorId], references: [id])
+  devueltoPor     User?                   @relation("DevolucionDevueltoPor", fields: [devueltoPorId], references: [id])
+  items           DevolucionMaterialItem[]
+  movimientos     MovimientoAlmacen[]
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  @@index([proyectoId, fechaDevolucion])
+  @@map("devolucion_material")
+}
+
+enum EstadoDevolucion {
+  registrada
+  anulada
+}
+
+model DevolucionMaterialItem {
+  id                 String             @id @default(cuid())
+  devolucionId       String
+  catalogoEquipoId   String
+  cantidad           Float
+  pedidoEquipoItemId String?
+  observacionesItem  String?
+  estadoItem         String             @default("bueno")
+  devolucion         DevolucionMaterial  @relation(fields: [devolucionId], references: [id], onDelete: Cascade)
+  catalogoEquipo     CatalogoEquipo     @relation(fields: [catalogoEquipoId], references: [id])
+
+  @@map("devolucion_material_item")
 }

@@ -14,6 +14,7 @@ import { EntregaItemSchema } from '@/lib/validators/trazabilidad';
 import type { EntregaItemPayload } from '@/lib/validators/trazabilidad';
 import { propagarPrecioRealCatalogo } from '@/lib/services/catalogoPrecioSync';
 import { logger } from '@/lib/logger';
+import { registrarMovimiento, getAlmacenCentral } from '@/lib/services/almacen';
 
 // ✅ Registrar nueva entrega
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -35,6 +36,9 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         { status: 400 }
       );
     }
+
+    // Pre-fetch almacén para stock_almacen (fuera de la tx, falla suavemente)
+    const almacen = await getAlmacenCentral().catch(() => null)
 
     const itemExistente = await prisma.pedidoEquipoItem.findUnique({
       where: { id },
@@ -241,6 +245,19 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
             }
           })
         }
+      }
+
+      // 6b. Hook de stock: salida desde almacén (NO crea CxP)
+      if (data.motivoAtencionDirecta === 'stock_almacen' && almacen && itemExistente.catalogoEquipoId) {
+        await registrarMovimiento({
+          almacenId: almacen.id,
+          tipo: 'salida_proyecto',
+          catalogoEquipoId: itemExistente.catalogoEquipoId,
+          cantidad: data.cantidadAtendida || 0,
+          usuarioId: userId,
+          entregaItemId: entregaItemId,
+          observaciones: `Atención desde stock — Pedido ${pedido.codigo}`,
+        }, tx as any)
       }
 
       // 7. Auto-derive parent pedido state

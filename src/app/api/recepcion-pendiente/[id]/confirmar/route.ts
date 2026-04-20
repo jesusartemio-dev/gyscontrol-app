@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { crearNotificacion } from '@/lib/utils/notificaciones'
+import { registrarMovimiento, getAlmacenCentral } from '@/lib/services/almacen'
 
 export async function POST(
   req: Request,
@@ -29,6 +30,8 @@ export async function POST(
       return NextResponse.json({ error: 'Sin permisos para confirmar entrega a proyecto' }, { status: 403 })
     }
 
+    const almacen = await getAlmacenCentral().catch(() => null)
+
     const recepcion = await prisma.recepcionPendiente.findUnique({
       where: { id },
       include: {
@@ -41,7 +44,8 @@ export async function POST(
         },
         ordenCompraItem: {
           include: {
-            ordenCompra: { select: { numero: true, proyectoId: true, proyecto: { select: { nombre: true, gestorId: true } } } }
+            ordenCompra: { select: { numero: true, proyectoId: true, proyecto: { select: { nombre: true, gestorId: true } } } },
+            pedidoEquipoItem: { select: { catalogoEquipoId: true } },
           }
         },
         requerimientoMaterialItem: {
@@ -77,6 +81,9 @@ export async function POST(
     const pedido = pedidoItem?.pedidoEquipo || null
     const ocItem = recepcion.ordenCompraItem || null
     const reqItem = recepcion.requerimientoMaterialItem || null
+    const catalogoEquipoId = pedidoItem?.catalogoEquipoId
+      || ocItem?.pedidoEquipoItem?.catalogoEquipoId
+      || null
     const ocNumero = ocItem?.ordenCompra.numero || reqItem?.hojaDeGastos.numero || 'REQ'
     const proyectoId = pedido?.proyectoId || ocItem?.ordenCompra.proyectoId || reqItem?.proyectoId || null
     const proyectoNombre = pedido?.proyecto?.nombre || ocItem?.ordenCompra.proyecto?.nombre || reqItem?.proyecto?.nombre || null
@@ -128,6 +135,19 @@ export async function POST(
             updatedAt: new Date(),
           }
         })
+
+        // Hook de stock: registrar entrada al almacén
+        if (almacen && catalogoEquipoId) {
+          await registrarMovimiento({
+            almacenId: almacen.id,
+            tipo: 'entrada_recepcion',
+            catalogoEquipoId,
+            cantidad: cantidadConfirmada,
+            usuarioId: session.user.id,
+            recepcionPendienteId: id,
+            observaciones: `Recepción OC ${ocNumero}`,
+          }, tx)
+        }
 
         return { recepcionId: id, paso: 'almacen', nuevoEstado: 'en_almacen' }
       })
@@ -288,6 +308,20 @@ export async function POST(
           updatedAt: new Date()
         }
       })
+
+      // Hook de stock: registrar salida hacia proyecto
+      if (almacen && catalogoEquipoId) {
+        await registrarMovimiento({
+          almacenId: almacen.id,
+          tipo: 'salida_proyecto',
+          catalogoEquipoId,
+          cantidad: recepcion.cantidadRecibida,
+          usuarioId: session.user.id,
+          recepcionPendienteId: id,
+          entregaItemId: entregaItemId ?? undefined,
+          observaciones: `Entrega a proyecto desde almacén (OC ${ocNumero})`,
+        }, tx)
+      }
 
       return {
         recepcionId: id,
