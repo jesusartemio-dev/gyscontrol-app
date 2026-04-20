@@ -13,10 +13,11 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from 'sonner'
-import { Loader2, MapPin, Play, StopCircle, Users, Wifi } from 'lucide-react'
+import { Loader2, MapPin, Play, StopCircle, Users, Wifi, LogIn, LogOut, CheckCircle2, AlertTriangle } from 'lucide-react'
 import QRCode from 'qrcode'
 import { useGeolocation } from '@/lib/hooks/useGeolocation'
 import { formatearTardanza } from '@/lib/utils/formatTardanza'
+import { getDeviceInfo } from '@/lib/utils/deviceFingerprint'
 
 interface Ubicacion {
   id: string
@@ -56,6 +57,9 @@ export default function AsistenciaSupervisorPage() {
   const [now, setNow] = useState(Date.now())
   const [loading, setLoading] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const deviceRef = useRef<Awaited<ReturnType<typeof getDeviceInfo>> | null>(null)
+  const [loadingMiMarcaje, setLoadingMiMarcaje] = useState(false)
+  const [miMarcaje, setMiMarcaje] = useState<{ ok: boolean; mensaje: string; estado?: string } | null>(null)
 
   useEffect(() => {
     if (status !== 'authenticated') return
@@ -160,6 +164,42 @@ export default function AsistenciaSupervisorPage() {
     }
   }
 
+  async function marcarPropio(tipo: 'ingreso' | 'salida') {
+    if (!jornada) return
+    if (!deviceRef.current) deviceRef.current = await getDeviceInfo()
+    setLoadingMiMarcaje(true)
+    setMiMarcaje(null)
+    try {
+      const tokenRes = await fetch(`/api/asistencia/jornada/${jornada.id}/token`)
+      const { payload } = await tokenRes.json()
+      const coords = geo.coords || (await geo.solicitar())
+      const res = await fetch('/api/asistencia/marcar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tipo,
+          qrPayload: payload,
+          latitud: coords?.latitud,
+          longitud: coords?.longitud,
+          precisionGps: coords?.precision,
+          device: deviceRef.current,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        setMiMarcaje({ ok: false, mensaje: json.message || 'Error al marcar' })
+        toast.error(json.message || 'Error al marcar')
+      } else {
+        setMiMarcaje({ ok: true, mensaje: json.mensaje, estado: json.asistencia?.estado })
+        toast.success(`Marcaje guardado a las ${json.hora}`)
+      }
+    } catch {
+      toast.error('Error de red')
+    } finally {
+      setLoadingMiMarcaje(false)
+    }
+  }
+
   if (status === 'loading') {
     return (
       <div className="flex h-[60vh] items-center justify-center">
@@ -257,6 +297,41 @@ export default function AsistenciaSupervisorPage() {
             </CardContent>
           </Card>
 
+          <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-semibold">Mi asistencia</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {miMarcaje && (
+                <div className={`flex items-start gap-2 rounded-md border p-3 text-sm ${miMarcaje.ok ? 'border-emerald-400 bg-emerald-50' : 'border-red-400 bg-red-50'}`}>
+                  {miMarcaje.ok
+                    ? <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 mt-0.5" />
+                    : <AlertTriangle className="h-4 w-4 shrink-0 text-red-600 mt-0.5" />}
+                  <span>{miMarcaje.mensaje}</span>
+                </div>
+              )}
+              <div className="flex gap-2">
+                <Button
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                  disabled={loadingMiMarcaje}
+                  onClick={() => marcarPropio('ingreso')}
+                >
+                  {loadingMiMarcaje ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogIn className="mr-2 h-4 w-4" />}
+                  Marcar ingreso
+                </Button>
+                <Button
+                  className="flex-1 bg-blue-600 hover:bg-blue-700"
+                  disabled={loadingMiMarcaje}
+                  onClick={() => marcarPropio('salida')}
+                >
+                  {loadingMiMarcaje ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogOut className="mr-2 h-4 w-4" />}
+                  Marcar salida
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -309,6 +384,7 @@ export default function AsistenciaSupervisorPage() {
               )}
             </CardContent>
           </Card>
+          </div>
         </div>
       )}
     </div>
