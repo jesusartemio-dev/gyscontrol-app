@@ -203,7 +203,7 @@ export default function ModalidadesPage() {
               <SelectContent>
                 <SelectItem value="todos">Todas</SelectItem>
                 <SelectItem value="presencial">Presencial</SelectItem>
-                <SelectItem value="remoto">100% Remoto</SelectItem>
+                <SelectItem value="remoto">Remoto</SelectItem>
                 <SelectItem value="hibrido">Híbrido</SelectItem>
                 <SelectItem value="confianza">Confianza</SelectItem>
               </SelectContent>
@@ -262,7 +262,7 @@ export default function ModalidadesPage() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="presencial">Presencial</SelectItem>
-                          <SelectItem value="remoto">100% Remoto</SelectItem>
+                          <SelectItem value="remoto">Remoto</SelectItem>
                           <SelectItem value="hibrido">Híbrido</SelectItem>
                           <SelectItem value="confianza">Confianza</SelectItem>
                         </SelectContent>
