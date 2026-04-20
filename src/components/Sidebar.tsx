@@ -56,6 +56,9 @@ import {
   CheckCircle2,
   DollarSign,
   Home,
+  ArrowLeftRight,
+  RotateCcw,
+  Warehouse,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -270,6 +273,17 @@ export default function Sidebar() {
         { href: '/logistica/catalogo-recursos', label: 'Catálogo Recursos', icon: Wrench },
         { href: '/logistica/ordenes-compra', label: 'Órdenes de Compra', icon: FileText },
         { href: '/logistica/recepciones', label: 'Recepciones', icon: Package, badge: 'recepciones-pendientes' as NotificationBadgeType },
+        {
+          href: '#almacen-logistica', label: 'Almacén', icon: Warehouse,
+          submenu: [
+            { href: '/logistica/almacen', label: 'Dashboard', icon: LayoutDashboard },
+            { href: '/logistica/almacen/materiales', label: 'Materiales / Equipos', icon: Package },
+            { href: '/logistica/almacen/herramientas', label: 'Herramientas', icon: Wrench },
+            { href: '/logistica/almacen/prestamos', label: 'Préstamos', icon: ArrowLeftRight },
+            { href: '/logistica/almacen/devoluciones', label: 'Devoluciones', icon: RotateCcw },
+            { href: '/logistica/almacen/movimientos', label: 'Movimientos (Kardex)', icon: TrendingUp },
+          ],
+        },
         { href: '/logistica/proveedores', label: 'Proveedores', icon: Building2 },
         { href: '/logistica/cotizaciones', label: 'Cotizaciones Proveedor', icon: Calculator },
         { href: '/logistica/catalogo', label: 'Catálogo Equipos', icon: Wrench },

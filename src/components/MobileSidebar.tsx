@@ -58,6 +58,9 @@ import {
   Landmark,
   CheckCircle2,
   Home,
+  ArrowLeftRight,
+  RotateCcw,
+  Warehouse,
 } from 'lucide-react'
 import type { RolUsuario, SidebarSection, NotificationBadgeType } from '@/types/modelos'
 
@@ -248,6 +251,17 @@ export default function MobileSidebar() {
         { href: '/logistica/pedidos', label: 'Gestión de Pedidos', icon: Package, badge: 'pedidos-pendientes' as NotificationBadgeType },
         { href: '/logistica/ordenes-compra', label: 'Órdenes de Compra', icon: FileText },
         { href: '/logistica/recepciones', label: 'Recepciones', icon: Package },
+        {
+          href: '#almacen-logistica', label: 'Almacén', icon: Warehouse,
+          submenu: [
+            { href: '/logistica/almacen', label: 'Dashboard', icon: LayoutDashboard },
+            { href: '/logistica/almacen/materiales', label: 'Materiales / Equipos', icon: Package },
+            { href: '/logistica/almacen/herramientas', label: 'Herramientas', icon: Wrench },
+            { href: '/logistica/almacen/prestamos', label: 'Préstamos', icon: ArrowLeftRight },
+            { href: '/logistica/almacen/devoluciones', label: 'Devoluciones', icon: RotateCcw },
+            { href: '/logistica/almacen/movimientos', label: 'Movimientos (Kardex)', icon: TrendingUp },
+          ],
+        },
         { href: '/logistica/proveedores', label: 'Proveedores', icon: Building2 },
         { href: '/logistica/cotizaciones', label: 'Cotizaciones Proveedor', icon: Calculator },
         { href: '/logistica/catalogo', label: 'Catálogo Equipos', icon: Wrench },
