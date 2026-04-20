@@ -388,6 +388,7 @@ export default function UbicacionesPage() {
                 <TableRow>
                   <TableHead>Nombre</TableHead>
                   <TableHead>Tipo</TableHead>
+                  <TableHead>Dirección</TableHead>
                   <TableHead>Horario</TableHead>
                   <TableHead>Radio</TableHead>
                   <TableHead>Reglas</TableHead>
@@ -401,6 +402,9 @@ export default function UbicacionesPage() {
                     <TableCell className="font-medium">{u.nombre}</TableCell>
                     <TableCell>
                       <Badge variant="outline">{u.tipo}</Badge>
+                    </TableCell>
+                    <TableCell className="max-w-[200px] truncate text-xs text-muted-foreground" title={u.direccion || ''}>
+                      {u.direccion || <span className="italic">—</span>}
                     </TableCell>
                     <TableCell className="text-xs">
                       {u.horaIngreso && u.horaSalida
