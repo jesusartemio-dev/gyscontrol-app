@@ -96,6 +96,9 @@ export default function MobileSidebar() {
     administracion: false,
     gestion: false,
   })
+  const [openSubmenus, setOpenSubmenus] = React.useState<Record<string, boolean>>({})
+  const toggleSubmenu = (href: string) =>
+    setOpenSubmenus(prev => ({ ...prev, [href]: !prev[href] }))
 
   // Accordion: only one section open at a time
   const toggleSection = (key: string) =>
@@ -190,9 +193,16 @@ export default function MobileSidebar() {
       color: 'text-emerald-400',
       roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos', 'colaborador', 'comercial', 'seguridad', 'presupuestos', 'logistico', 'coordinador_logistico'],
       links: [
-        { href: '/mi-trabajo/marcar', label: 'Marcar Asistencia', icon: MapPin },
-        { href: '/mi-trabajo/mi-asistencia', label: 'Mi Asistencia', icon: Clock },
-        { href: '/mi-trabajo/solicitudes-remoto', label: 'Solicitudes Remoto', icon: Home },
+        {
+          href: '#asistencia-mi-trabajo',
+          label: 'Asistencia',
+          icon: ClipboardList,
+          submenu: [
+            { href: '/mi-trabajo/marcar', label: 'Marcar Asistencia', icon: MapPin },
+            { href: '/mi-trabajo/mi-asistencia', label: 'Mi Asistencia', icon: Clock },
+            { href: '/mi-trabajo/solicitudes-remoto', label: 'Solicitudes Remoto', icon: Home },
+          ],
+        },
         { href: '/mi-trabajo/timesheet', label: 'Mi Timesheet', icon: Calendar },
         { href: '/mi-trabajo/mi-jornada', label: 'Mi Jornada', icon: HardHat },
         { href: '/mi-trabajo/tareas', label: 'Mis Tareas', icon: CheckSquare },
@@ -206,10 +216,17 @@ export default function MobileSidebar() {
       color: 'text-red-400',
       roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos'],
       links: [
-        { href: '/asistencia-supervisor', label: 'QR Asistencia del Día', icon: MapPin },
-        { href: '/supervision/asistencia', label: 'Asistencia del Equipo', icon: ClipboardList },
-        { href: '/supervision/asistencia/dispositivos', label: 'Aprobar Dispositivos', icon: ClipboardList },
-        { href: '/supervision/solicitudes-remoto', label: 'Solicitudes Remoto', icon: Home },
+        {
+          href: '#asistencia-supervision',
+          label: 'Asistencia',
+          icon: ClipboardList,
+          submenu: [
+            { href: '/asistencia-supervisor', label: 'QR del Día', icon: MapPin },
+            { href: '/supervision/asistencia', label: 'Asistencia del Equipo', icon: ClipboardList },
+            { href: '/supervision/asistencia/dispositivos', label: 'Aprobar Dispositivos', icon: ClipboardList },
+            { href: '/supervision/solicitudes-remoto', label: 'Solicitudes Remoto', icon: Home },
+          ],
+        },
         { href: '/supervision/timesheet', label: 'Timesheet', icon: ClipboardList },
         { href: '/supervision/jornada-campo', label: 'Jornada Campo', icon: MapPin },
         { href: '/supervision/tareas', label: 'Gestión de Tareas', icon: CheckSquare },
@@ -303,9 +320,16 @@ export default function MobileSidebar() {
       links: [
         { href: '/admin/usuarios', label: 'Usuarios', icon: Users },
         { href: '/admin/personal', label: 'Personal (RRHH)', icon: UserCheck },
-        { href: '/admin/asistencia/ubicaciones', label: 'Ubicaciones (Asistencia)', icon: MapPin },
-        { href: '/admin/asistencia/modalidades', label: 'Modalidades de Trabajo', icon: Home },
-        { href: '/admin/asistencia/dashboard', label: 'Dashboard Asistencia', icon: BarChart3 },
+        {
+          href: '#asistencia-configuracion',
+          label: 'Asistencia',
+          icon: ClipboardList,
+          submenu: [
+            { href: '/admin/asistencia/ubicaciones', label: 'Ubicaciones', icon: MapPin },
+            { href: '/admin/asistencia/modalidades', label: 'Modalidades de Trabajo', icon: Home },
+            { href: '/admin/asistencia/dashboard', label: 'Dashboard', icon: BarChart3 },
+          ],
+        },
         { href: '/admin/permisos', label: 'Permisos', icon: Shield },
         { href: '/admin/actividad', label: 'Actividad Sistema', icon: Activity },
         { href: '/configuracion/notificaciones', label: 'Notificaciones', icon: AlertCircle },
@@ -363,7 +387,8 @@ export default function MobileSidebar() {
     const currentSection = allSections.find(section =>
       section.links.some(link =>
         pathname === link.href ||
-        pathname.startsWith(link.href + '/')
+        pathname.startsWith(link.href + '/') ||
+        link.submenu?.some(s => pathname === s.href || pathname.startsWith(s.href + '/'))
       )
     )
     if (currentSection) {
@@ -371,6 +396,13 @@ export default function MobileSidebar() {
         const allClosed = Object.keys(prev).reduce((acc, k) => ({ ...acc, [k]: false }), {} as Record<string, boolean>)
         return { ...allClosed, [currentSection.key]: true }
       })
+    }
+    for (const section of allSections) {
+      for (const link of section.links) {
+        if (link.submenu?.some(s => pathname === s.href || pathname.startsWith(s.href + '/'))) {
+          setOpenSubmenus(prev => (prev[link.href] ? prev : { ...prev, [link.href]: true }))
+        }
+      }
     }
   }, [pathname])
 
@@ -454,8 +486,85 @@ export default function MobileSidebar() {
                     <div className="space-y-1">
                       {section.links.map((link) => {
                         const LinkIcon = link.icon
-                        const isActive = pathname === link.href
+                        const hasSubmenu = link.submenu && link.submenu.length > 0
+                        const hasActiveChild = hasSubmenu && link.submenu!.some(
+                          s => pathname === s.href || pathname.startsWith(s.href + '/')
+                        )
+                        const isActive = pathname === link.href || hasActiveChild
                         const badgeCount = link.badge ? getBadgeCount(link.badge) : 0
+                        const submenuOpen = openSubmenus[link.href] || false
+
+                        if (hasSubmenu) {
+                          return (
+                            <div key={link.href}>
+                              <Button
+                                variant="ghost"
+                                onClick={() => toggleSubmenu(link.href)}
+                                className={clsx(
+                                  'group w-full justify-start gap-3 px-4 py-2.5 ml-2 rounded-lg text-sm transition-all duration-200 border-l-2',
+                                  isActive
+                                    ? 'bg-gradient-to-r from-blue-600/20 to-purple-600/20 text-white font-medium border-l-blue-400'
+                                    : 'text-gray-400 hover:text-white hover:bg-gray-700/40 border-l-gray-600/50 hover:border-l-gray-400'
+                                )}
+                              >
+                                <LinkIcon
+                                  size={16}
+                                  className={clsx(
+                                    'transition-colors flex-shrink-0',
+                                    isActive ? 'text-blue-400' : 'text-gray-400 group-hover:text-white'
+                                  )}
+                                />
+                                <span className="truncate flex-1 text-left">{link.label}</span>
+                                <ChevronDown
+                                  size={14}
+                                  className={clsx(
+                                    'transition-transform duration-200',
+                                    submenuOpen && 'rotate-180'
+                                  )}
+                                />
+                              </Button>
+                              {submenuOpen && (
+                                <div className="ml-6 mt-1 space-y-1">
+                                  {link.submenu!.map((sublink) => {
+                                    const SubIcon = sublink.icon
+                                    const isSubActive = pathname === sublink.href
+                                    const subBadge = sublink.badge ? getBadgeCount(sublink.badge) : 0
+                                    return (
+                                      <Link
+                                        key={sublink.href}
+                                        href={sublink.href}
+                                        onClick={handleLinkClick}
+                                        className={clsx(
+                                          'group flex items-center gap-3 px-4 py-2 ml-2 rounded-lg text-xs transition-all duration-200 border-l-2',
+                                          isSubActive
+                                            ? 'bg-gradient-to-r from-purple-600/20 to-blue-600/20 text-white font-medium border-l-purple-400'
+                                            : 'text-gray-500 hover:text-white hover:bg-gray-700/30 border-l-gray-700/50 hover:border-l-gray-500'
+                                        )}
+                                      >
+                                        <SubIcon
+                                          size={14}
+                                          className={clsx(
+                                            'transition-colors flex-shrink-0',
+                                            isSubActive ? 'text-purple-400' : 'text-gray-500 group-hover:text-white'
+                                          )}
+                                        />
+                                        <span className="truncate flex-1">{sublink.label}</span>
+                                        {subBadge > 0 && (
+                                          <Badge
+                                            variant={subBadge > 5 ? 'destructive' : 'secondary'}
+                                            className="text-xs px-1.5 py-0.5 min-w-[16px] h-4 flex items-center justify-center bg-orange-500/90 text-white"
+                                          >
+                                            {subBadge > 99 ? '99+' : subBadge}
+                                          </Badge>
+                                        )}
+                                      </Link>
+                                    )
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        }
 
                         return (
                           <Link

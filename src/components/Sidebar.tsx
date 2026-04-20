@@ -210,9 +210,16 @@ export default function Sidebar() {
       color: 'text-emerald-400',
       roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos', 'colaborador', 'comercial', 'seguridad', 'presupuestos', 'logistico', 'coordinador_logistico'],
       links: [
-        { href: '/mi-trabajo/marcar', label: 'Marcar Asistencia', icon: MapPin },
-        { href: '/mi-trabajo/mi-asistencia', label: 'Mi Asistencia', icon: Clock },
-        { href: '/mi-trabajo/solicitudes-remoto', label: 'Solicitudes Remoto', icon: Home },
+        {
+          href: '#asistencia-mi-trabajo',
+          label: 'Asistencia',
+          icon: ClipboardList,
+          submenu: [
+            { href: '/mi-trabajo/marcar', label: 'Marcar Asistencia', icon: MapPin },
+            { href: '/mi-trabajo/mi-asistencia', label: 'Mi Asistencia', icon: Clock },
+            { href: '/mi-trabajo/solicitudes-remoto', label: 'Solicitudes Remoto', icon: Home },
+          ],
+        },
         { href: '/mi-trabajo/timesheet', label: 'Mi Timesheet', icon: Calendar },
         { href: '/mi-trabajo/mi-jornada', label: 'Mi Jornada', icon: HardHat },
         { href: '/mi-trabajo/tareas', label: 'Mis Tareas', icon: CheckSquare },
@@ -227,10 +234,17 @@ export default function Sidebar() {
       color: 'text-red-400',
       roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos'],
       links: [
-        { href: '/asistencia-supervisor', label: 'QR Asistencia del Día', icon: MapPin },
-        { href: '/supervision/asistencia', label: 'Asistencia del Equipo', icon: ClipboardList },
-        { href: '/supervision/asistencia/dispositivos', label: 'Aprobar Dispositivos', icon: ShieldAlert },
-        { href: '/supervision/solicitudes-remoto', label: 'Solicitudes Remoto', icon: Home },
+        {
+          href: '#asistencia-supervision',
+          label: 'Asistencia',
+          icon: ClipboardList,
+          submenu: [
+            { href: '/asistencia-supervisor', label: 'QR del Día', icon: MapPin },
+            { href: '/supervision/asistencia', label: 'Asistencia del Equipo', icon: ClipboardList },
+            { href: '/supervision/asistencia/dispositivos', label: 'Aprobar Dispositivos', icon: ShieldAlert },
+            { href: '/supervision/solicitudes-remoto', label: 'Solicitudes Remoto', icon: Home },
+          ],
+        },
         { href: '/supervision/timesheet', label: 'Timesheet', icon: ClipboardList },
         { href: '/supervision/jornada-campo', label: 'Jornada Campo', icon: MapPin },
         { href: '/supervision/bloqueos-campo', label: 'Bloqueos Campo', icon: ShieldAlert },
@@ -358,9 +372,16 @@ export default function Sidebar() {
         { href: '/configuracion/cargos', label: 'Cargos', icon: Briefcase },
         { href: '/configuracion/departamentos', label: 'Departamentos', icon: Building2 },
         // 📍 Control de asistencia (administrativo)
-        { href: '/admin/asistencia/ubicaciones', label: 'Ubicaciones (Asistencia)', icon: MapPin },
-        { href: '/admin/asistencia/modalidades', label: 'Modalidades de Trabajo', icon: Home },
-        { href: '/admin/asistencia/dashboard', label: 'Dashboard Asistencia', icon: BarChart3 },
+        {
+          href: '#asistencia-configuracion',
+          label: 'Asistencia',
+          icon: ClipboardList,
+          submenu: [
+            { href: '/admin/asistencia/ubicaciones', label: 'Ubicaciones', icon: MapPin },
+            { href: '/admin/asistencia/modalidades', label: 'Modalidades de Trabajo', icon: Home },
+            { href: '/admin/asistencia/dashboard', label: 'Dashboard', icon: BarChart3 },
+          ],
+        },
         // 📋 Plantillas para cotizaciones
         { href: '/catalogo/exclusiones', label: 'Exclusiones', icon: FileText },
         { href: '/catalogo/condiciones', label: 'Condiciones', icon: FileCheck },
@@ -416,7 +437,8 @@ export default function Sidebar() {
     const currentSection = allSections.find(section =>
       section.links.some(link =>
         pathname === link.href ||
-        pathname.startsWith(link.href + '/')
+        pathname.startsWith(link.href + '/') ||
+        link.submenu?.some(s => pathname === s.href || pathname.startsWith(s.href + '/'))
       )
     )
 
@@ -429,6 +451,17 @@ export default function Sidebar() {
       }
     }
   }, [pathname, sectionsCollapsed])
+
+  // ✅ Abrir submenú automáticamente cuando un hijo está activo
+  React.useEffect(() => {
+    for (const section of allSections) {
+      for (const link of section.links) {
+        if (link.submenu?.some(s => pathname === s.href || pathname.startsWith(s.href + '/'))) {
+          setOpenSubmenus(prev => (prev[link.href] ? prev : { ...prev, [link.href]: true }))
+        }
+      }
+    }
+  }, [pathname])
 
   return (
     <motion.aside 
@@ -589,11 +622,13 @@ export default function Sidebar() {
                     >
                       {section.links.map((link, linkIndex) => {
                         const LinkIcon = link.icon
-                        // ✅ Fix: More precise route matching to prevent multiple highlights
-                        // Only highlight exact matches - no parent/child path matching
-                        const isActive = pathname === link.href
-                        const badgeCount = link.badge ? getBadgeCount(link.badge) : 0
                         const hasSubmenu = link.submenu && link.submenu.length > 0
+                        const hasActiveChild = hasSubmenu && link.submenu!.some(
+                          s => pathname === s.href || pathname.startsWith(s.href + '/')
+                        )
+                        // ✅ Fix: More precise route matching to prevent multiple highlights
+                        const isActive = pathname === link.href || hasActiveChild
+                        const badgeCount = link.badge ? getBadgeCount(link.badge) : 0
                         const submenuOpen = openSubmenus[link.href] || false
                         
                         return (
