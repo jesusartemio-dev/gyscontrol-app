@@ -69,7 +69,7 @@ const vacia = {
   toleranciaMinutos: 5,
   limiteTardeMinutos: 30,
   horaIngreso: '08:00',
-  horaSalida: '18:00',
+  horaSalida: '18:30',
 }
 
 interface GeocodeResult {
@@ -432,7 +432,7 @@ export default function UbicacionesPage() {
                             ...u,
                             direccion: u.direccion || '',
                             horaIngreso: u.horaIngreso || '08:00',
-                            horaSalida: u.horaSalida || '18:00',
+                            horaSalida: u.horaSalida || '18:30',
                           })
                           setDialogOpen(true)
                         }}
