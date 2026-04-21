@@ -188,7 +188,7 @@ export default function PedidoLogisticaDetailPage() {
       r => REQ_ESTADOS_ACTIVOS.includes(r.hojaDeGastos?.estado)
     )
 
-  // Inicializar items del modal al abrirlo
+  // Inicializar items del modal al abrirlo o al cambiar de modo
   useEffect(() => {
     if (showGenerarOC && pedido?.items) {
       const initial: Record<string, { selected: boolean; proveedorId: string; proveedorNombre: string }> = {}
@@ -203,10 +203,21 @@ export default function PedidoLogisticaDetailPage() {
           initial[item.id] = { selected: !!provId, proveedorId: provId, proveedorNombre: provNombre }
         }
       }
-      setOcItemsState(initial)
-      setOcProveedorFiltro('__all__')
+
+      if (usarPrecioCotizacion) {
+        // Modo automática = 1 OC = 1 proveedor. Elegimos el primero disponible y marcamos solo sus items.
+        const primerProv = Object.values(initial).find(s => s.proveedorNombre)?.proveedorNombre || '__sin__'
+        for (const id of Object.keys(initial)) {
+          initial[id].selected = (initial[id].proveedorNombre || '__sin__') === primerProv
+        }
+        setOcItemsState(initial)
+        setOcProveedorFiltro(primerProv)
+      } else {
+        setOcItemsState(initial)
+        setOcProveedorFiltro('__all__')
+      }
     }
-  }, [showGenerarOC])
+  }, [showGenerarOC, usarPrecioCotizacion])
 
   // 📦 Estado para edición de items
   const [editingItem, setEditingItem] = useState<{
@@ -2562,7 +2573,8 @@ export default function PedidoLogisticaDetailPage() {
               provMap.set(key, { nombre: label, count: (provMap.get(key)?.count || 0) + 1 })
             }
             const provPills = [
-              { key: '__all__', nombre: 'Todos', count: itemsSinOC.length },
+              // En automática: 1 OC = 1 proveedor, sin pill "Todos".
+              ...(usarPrecioCotizacion ? [] : [{ key: '__all__', nombre: 'Todos', count: itemsSinOC.length }]),
               ...Array.from(provMap.entries()).map(([key, v]) => ({ key, ...v }))
             ]
 
@@ -2594,7 +2606,6 @@ export default function PedidoLogisticaDetailPage() {
                           key={pill.key}
                           onClick={() => {
                             setOcProveedorFiltro(pill.key)
-                            // Seleccionar todos los items de ese proveedor automáticamente
                             if (pill.key !== '__all__') {
                               setOcItemsState(prev => {
                                 const next = { ...prev }
@@ -2603,7 +2614,12 @@ export default function PedidoLogisticaDetailPage() {
                                   if (!item) continue
                                   const provNombre = item.proveedor?.nombre || item.proveedorNombre || item.listaEquipoItem?.proveedor?.nombre || ''
                                   const matchKey = provNombre || '__sin__'
-                                  if (matchKey === pill.key) next[itemId] = { ...next[itemId], selected: true }
+                                  if (matchKey === pill.key) {
+                                    next[itemId] = { ...next[itemId], selected: true }
+                                  } else if (usarPrecioCotizacion) {
+                                    // Automática: 1 OC = 1 proveedor. Deseleccionar los de otros proveedores.
+                                    next[itemId] = { ...next[itemId], selected: false }
+                                  }
                                 }
                                 return next
                               })
@@ -2741,7 +2757,7 @@ export default function PedidoLogisticaDetailPage() {
                           ) : (
                             <ShoppingCart className="h-3 w-3 mr-1" />
                           )}
-                          Generar {seleccionados.length} OC automática{seleccionados.length !== 1 ? 's' : ''}
+                          Generar 1 OC automática ({seleccionados.length} item{seleccionados.length !== 1 ? 's' : ''})
                         </Button>
                       ) : (
                         <Button

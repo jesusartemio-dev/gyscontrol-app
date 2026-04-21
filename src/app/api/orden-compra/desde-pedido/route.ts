@@ -4,14 +4,16 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { crearNotificacion } from '@/lib/utils/notificaciones'
 
-async function generarNumeroOC(): Promise<string> {
+async function generarNumeroOC(client: any = prisma): Promise<string> {
   const now = new Date()
   const yy = String(now.getFullYear()).slice(-2)
   const mm = String(now.getMonth() + 1).padStart(2, '0')
   const dd = String(now.getDate()).padStart(2, '0')
   const prefix = `OC-${yy}${mm}${dd}`
 
-  const ultimo = await prisma.ordenCompra.findFirst({
+  // Usamos el client (tx cuando aplica) para ver OCs ya creadas en la misma transacción
+  // y evitar colisiones del índice único `numero` si se generan varias OCs seguidas.
+  const ultimo = await client.ordenCompra.findFirst({
     where: { numero: { startsWith: prefix } },
     orderBy: { numero: 'desc' },
   })
@@ -147,7 +149,7 @@ export async function POST(req: Request) {
       const ocs = []
 
       for (const [proveedorId, grupoItems] of gruposPorProveedor) {
-        const numero = await generarNumeroOC()
+        const numero = await generarNumeroOC(tx)
 
         // Obtener condiciones comerciales de la cotización seleccionada del primer ítem con cotización
         const condCot = grupoItems
