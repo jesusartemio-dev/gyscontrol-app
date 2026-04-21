@@ -110,20 +110,20 @@ export default function DashboardAsistencia() {
             </p>
           </CardContent>
         </Card>
-        <Card>
+        <Card title="Marcajes que quedaron fuera del área permitida (alerta, no afecta puntualidad)">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm text-muted-foreground">
-              <MapPinOff className="h-4 w-4" /> Fuera zona
+              <MapPinOff className="h-4 w-4" /> Alertas: fuera zona
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold text-orange-600">{kpis.fueraZona}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card title="Marcajes desde un celular nuevo, pendiente de aprobación">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm text-muted-foreground">
-              <AlertTriangle className="h-4 w-4" /> Dispositivos nuevos
+              <AlertTriangle className="h-4 w-4" /> Alertas: disp. nuevos
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -184,11 +184,18 @@ export default function DashboardAsistencia() {
             <CardTitle>Por departamento</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={data.departamentos}>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={data.departamentos} margin={{ bottom: 40 }}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="nombre" />
-                <YAxis />
+                <XAxis
+                  dataKey="nombre"
+                  interval={0}
+                  angle={-30}
+                  textAnchor="end"
+                  height={60}
+                  tick={{ fontSize: 11 }}
+                />
+                <YAxis allowDecimals={false} />
                 <Tooltip />
                 <Legend />
                 <Bar dataKey="aTiempo" stackId="a" fill="#10b981" name="A tiempo" />

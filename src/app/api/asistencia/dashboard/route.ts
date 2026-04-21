@@ -25,6 +25,8 @@ export async function GET(req: Request) {
       estado: true,
       minutosTarde: true,
       metodoMarcaje: true,
+      banderas: true,
+      dentroGeofence: true,
       // Resolver departamento vía user → empleado (ficha actual),
       // no vía asistencia.empleado (que puede ser null si la ficha se
       // creó después del marcaje).
@@ -40,12 +42,25 @@ export async function GET(req: Request) {
     },
   })
 
+  // Helpers para evaluar alertas tanto en registros nuevos (vía banderas[])
+  // como en registros legacy (vía estado directo antes del backfill).
+  const esFueraZona = (i: { estado: string; banderas: string[]; dentroGeofence: boolean; metodoMarcaje: string }) =>
+    i.banderas.includes('fuera_zona') ||
+    i.estado === 'fuera_zona' ||
+    (!i.dentroGeofence && i.metodoMarcaje !== 'remoto')
+  const esDispositivoNuevo = (i: { estado: string; banderas: string[] }) =>
+    i.banderas.includes('dispositivo_nuevo') || i.estado === 'dispositivo_nuevo'
+
   const total = ingresos.length
-  const aTiempo = ingresos.filter(i => i.estado === 'a_tiempo').length
+  // Puntualidad: los estados legacy 'fuera_zona'/'dispositivo_nuevo' cuentan como a_tiempo
+  const aTiempo = ingresos.filter(i =>
+    i.estado === 'a_tiempo' || i.estado === 'fuera_zona' || i.estado === 'dispositivo_nuevo'
+  ).length
   const tarde = ingresos.filter(i => i.estado === 'tarde').length
   const muyTarde = ingresos.filter(i => i.estado === 'muy_tarde').length
-  const fueraZona = ingresos.filter(i => i.estado === 'fuera_zona').length
-  const dispositivoNuevo = ingresos.filter(i => i.estado === 'dispositivo_nuevo').length
+  // Alertas (pueden convivir con cualquier puntualidad)
+  const fueraZona = ingresos.filter(esFueraZona).length
+  const dispositivoNuevo = ingresos.filter(esDispositivoNuevo).length
   const remotos = ingresos.filter(i => i.metodoMarcaje === 'remoto').length
   const presenciales = total - remotos
   const minutosTardeTotales = ingresos.reduce((acc, i) => acc + i.minutosTarde, 0)
@@ -70,14 +85,16 @@ export async function GET(req: Request) {
     user: users.find(u => u.id === r.userId),
   }))
 
-  // Tendencia por día
+  // Tendencia por día.
+  // Nota: 'fuera_zona' y 'dispositivo_nuevo' son estados que reemplazan a 'a_tiempo'
+  // cuando hay una bandera adicional (sin tardanza real). Los contamos como a tiempo.
   const tendenciaMap = new Map<string, { fecha: string; aTiempo: number; tarde: number; muyTarde: number }>()
   for (const i of ingresos) {
     const f = i.fechaHora.toISOString().slice(0, 10)
     const t = tendenciaMap.get(f) || { fecha: f, aTiempo: 0, tarde: 0, muyTarde: 0 }
-    if (i.estado === 'a_tiempo') t.aTiempo += 1
-    else if (i.estado === 'tarde') t.tarde += 1
+    if (i.estado === 'tarde') t.tarde += 1
     else if (i.estado === 'muy_tarde') t.muyTarde += 1
+    else t.aTiempo += 1
     tendenciaMap.set(f, t)
   }
   const tendencia = Array.from(tendenciaMap.values()).sort((a, b) => a.fecha.localeCompare(b.fecha))
@@ -100,9 +117,10 @@ export async function GET(req: Request) {
       nombre: d?.nombre || 'Sin departamento',
       aTiempo: 0, tarde: 0, muyTarde: 0,
     }
-    if (i.estado === 'a_tiempo') existente.aTiempo += 1
-    else if (i.estado === 'tarde') existente.tarde += 1
+    // 'fuera_zona' y 'dispositivo_nuevo' se cuentan como a tiempo (no tienen tardanza real).
+    if (i.estado === 'tarde') existente.tarde += 1
     else if (i.estado === 'muy_tarde') existente.muyTarde += 1
+    else existente.aTiempo += 1
     porDepto.set(key, existente)
   }
   const departamentos = Array.from(porDepto.values())

@@ -16,7 +16,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
-import { Loader2, ShieldCheck, FileSpreadsheet, Trash2, Search, ArrowUp, ArrowDown, MapPin } from 'lucide-react'
+import { Loader2, ShieldCheck, FileSpreadsheet, Trash2, Search, ArrowUp, ArrowDown, MapPin, Smartphone, MapPinOff, Moon, Home } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { toast } from 'sonner'
 import { formatearTardanza } from '@/lib/utils/formatTardanza'
@@ -106,6 +106,7 @@ function estadoColor(e: string) {
     case 'a_tiempo': return 'bg-emerald-100 text-emerald-700'
     case 'tarde': return 'bg-amber-100 text-amber-700'
     case 'muy_tarde': return 'bg-red-100 text-red-700'
+    // Legacy (registros viejos que aún no han sido migrados)
     case 'fuera_zona': return 'bg-orange-100 text-orange-700'
     case 'dispositivo_nuevo': return 'bg-blue-100 text-blue-700'
     default: return 'bg-gray-100 text-gray-700'
@@ -195,7 +196,13 @@ export default function SupervisionAsistencia() {
     const c = { total: 0, a_tiempo: 0, tarde: 0, muy_tarde: 0, fuera_zona: 0, dispositivo_nuevo: 0, sin_qr: 0 }
     for (const f of dataFiltrada) {
       c.total++
-      if (f.estado in c) (c as any)[f.estado]++
+      // Puntualidad
+      if (f.estado === 'a_tiempo') c.a_tiempo++
+      else if (f.estado === 'tarde') c.tarde++
+      else if (f.estado === 'muy_tarde') c.muy_tarde++
+      // Alertas (pueden convivir con cualquier puntualidad)
+      if (f.banderas?.includes('fuera_zona') || (!f.dentroGeofence && f.metodoMarcaje !== 'remoto')) c.fuera_zona++
+      if (f.banderas?.includes('dispositivo_nuevo')) c.dispositivo_nuevo++
       if (f.metodoMarcaje === 'gps_directo') c.sin_qr++
     }
     return c
@@ -301,8 +308,6 @@ export default function SupervisionAsistencia() {
                 <SelectItem value="a_tiempo">A tiempo</SelectItem>
                 <SelectItem value="tarde">Tarde</SelectItem>
                 <SelectItem value="muy_tarde">Muy tarde</SelectItem>
-                <SelectItem value="fuera_zona">Fuera zona</SelectItem>
-                <SelectItem value="dispositivo_nuevo">Dispositivo nuevo</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -409,6 +414,7 @@ export default function SupervisionAsistencia() {
                   </button>
                 </TableHead>
                 <TableHead>Estado</TableHead>
+                <TableHead>Alertas</TableHead>
                 <TableHead>Dispositivo</TableHead>
                 {esAdmin && <TableHead className="text-right">Acciones</TableHead>}
               </TableRow>
@@ -449,6 +455,42 @@ export default function SupervisionAsistencia() {
                       {f.estado.replace('_', ' ')}
                     </Badge>
                   </TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      {(f.banderas?.includes('dispositivo_nuevo') || f.estado === 'dispositivo_nuevo') && (
+                        <span
+                          title="Dispositivo nuevo"
+                          className="inline-flex items-center gap-0.5 rounded bg-blue-100 px-1.5 py-0.5 text-[10px] text-blue-700"
+                        >
+                          <Smartphone className="h-3 w-3" /> nuevo
+                        </span>
+                      )}
+                      {(f.banderas?.includes('fuera_zona') || f.estado === 'fuera_zona' || (!f.dentroGeofence && f.metodoMarcaje !== 'remoto')) && (
+                        <span
+                          title="Fuera de zona"
+                          className="inline-flex items-center gap-0.5 rounded bg-orange-100 px-1.5 py-0.5 text-[10px] text-orange-700"
+                        >
+                          <MapPinOff className="h-3 w-3" /> fuera
+                        </span>
+                      )}
+                      {f.banderas?.includes('auto_cierre') && (
+                        <span
+                          title="Salida cerrada automáticamente"
+                          className="inline-flex items-center gap-0.5 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600"
+                        >
+                          <Moon className="h-3 w-3" /> auto
+                        </span>
+                      )}
+                      {f.banderas?.some(b => b.startsWith('remoto:')) && (
+                        <span
+                          title="Origen remoto"
+                          className="inline-flex items-center gap-0.5 rounded bg-purple-100 px-1.5 py-0.5 text-[10px] text-purple-700"
+                        >
+                          <Home className="h-3 w-3" /> remoto
+                        </span>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell className="text-xs">
                     {f.dispositivo.modelo
                       ? f.dispositivo.modelo.includes(f.dispositivo.plataforma)
@@ -475,7 +517,7 @@ export default function SupervisionAsistencia() {
               ))}
               {dataFiltrada.length === 0 && !loading && (
                 <TableRow>
-                  <TableCell colSpan={esAdmin ? 11 : 10} className="py-8 text-center text-muted-foreground">
+                  <TableCell colSpan={esAdmin ? 12 : 11} className="py-8 text-center text-muted-foreground">
                     Sin registros en el rango seleccionado.
                   </TableCell>
                 </TableRow>

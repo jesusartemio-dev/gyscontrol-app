@@ -20,6 +20,8 @@ export interface CalcularEstadoResult {
 }
 
 export function calcularEstado(input: CalcularEstadoInput): CalcularEstadoResult {
+  // `estado` SOLO refleja puntualidad (a_tiempo / tarde / muy_tarde).
+  // Las alertas (fuera_zona, dispositivo_nuevo) van exclusivamente en `banderas[]`.
   const banderas: string[] = []
   const diffMs = input.fechaMarcaje.getTime() - input.fechaEsperada.getTime()
   const minutosTarde = Math.max(0, Math.round(diffMs / 60000))
@@ -27,12 +29,9 @@ export function calcularEstado(input: CalcularEstadoInput): CalcularEstadoResult
   if (!input.dentroGeofence) banderas.push('fuera_zona')
   if (input.dispositivoEraNuevo) banderas.push('dispositivo_nuevo')
 
-  // Para salida, no se calcula "tarde" — queda a_tiempo si marcó.
+  // Para salida y almuerzos, no se calcula "tarde" — queda a_tiempo si marcó.
   if (input.tipo === 'salida' || input.tipo === 'inicio_almuerzo' || input.tipo === 'fin_almuerzo') {
-    let estado: EstadoMarcaje = 'a_tiempo'
-    if (!input.dentroGeofence) estado = 'fuera_zona'
-    else if (input.dispositivoEraNuevo) estado = 'dispositivo_nuevo'
-    return { estado, minutosTarde: 0, banderas }
+    return { estado: 'a_tiempo', minutosTarde: 0, banderas }
   }
 
   let estado: EstadoMarcaje
@@ -41,10 +40,6 @@ export function calcularEstado(input: CalcularEstadoInput): CalcularEstadoResult
   else estado = 'muy_tarde'
 
   if (minutosTarde > input.toleranciaMinutos) banderas.push('tarde')
-
-  // Si hay fuera_zona o dispositivo_nuevo y el estado base era a_tiempo, degradar a la bandera
-  if (!input.dentroGeofence && estado === 'a_tiempo') estado = 'fuera_zona'
-  else if (input.dispositivoEraNuevo && estado === 'a_tiempo') estado = 'dispositivo_nuevo'
 
   return { estado, minutosTarde, banderas }
 }
