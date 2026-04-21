@@ -46,6 +46,7 @@ interface Proyecto {
 interface SolicitudItem {
   id: string
   cantidad: number
+  cantidadEntregada: number
   catalogoHerramienta: {
     id: string
     codigo: string
@@ -58,7 +59,7 @@ interface SolicitudItem {
 interface Solicitud {
   id: string
   numero: string
-  estado: 'borrador' | 'enviado' | 'atendida' | 'cancelada'
+  estado: 'borrador' | 'enviado' | 'atendida_parcial' | 'atendida' | 'cancelada'
   observaciones: string | null
   notaAtencion: string | null
   fechaAtencion: string | null
@@ -67,6 +68,7 @@ interface Solicitud {
   fechaDevolucionEstimada: string | null
   proyecto: Proyecto | null
   atendidaPor: { name: string | null; email: string } | null
+  prestamos: { id: string; fechaPrestamo: string; estado: string }[]
   items: SolicitudItem[]
 }
 
@@ -76,12 +78,14 @@ interface ItemCarrito {
   nombre: string
   unidadMedida: string
   cantidad: number
+  cantidadEntregada: number
   disponible: number
 }
 
 const ESTADO_META = {
   borrador: { label: 'Borrador', classes: 'bg-gray-200 text-gray-700', icon: Pencil },
   enviado: { label: 'Enviado', classes: 'bg-blue-100 text-blue-700', icon: Send },
+  atendida_parcial: { label: 'Entrega parcial', classes: 'bg-purple-100 text-purple-700', icon: CheckCircle2 },
   atendida: { label: 'Atendida', classes: 'bg-emerald-100 text-emerald-700', icon: CheckCircle2 },
   cancelada: { label: 'Cancelada', classes: 'bg-gray-100 text-gray-500', icon: XCircle },
 } as const
@@ -147,6 +151,7 @@ export default function DetalleSolicitudHerramientaPage({ params }: { params: Pr
           nombre: it.catalogoHerramienta.nombre,
           unidadMedida: it.catalogoHerramienta.unidadMedida,
           cantidad: it.cantidad,
+          cantidadEntregada: it.cantidadEntregada || 0,
           disponible: it.catalogoHerramienta.stock[0]?.cantidadDisponible ?? 0,
         })))
 
@@ -231,6 +236,7 @@ export default function DetalleSolicitudHerramientaPage({ params }: { params: Pr
           nombre: h.nombre,
           unidadMedida: h.unidadMedida,
           cantidad: cant,
+          cantidadEntregada: 0,
           disponible: disponibleDe(h),
         })
       }
@@ -496,6 +502,9 @@ export default function DetalleSolicitudHerramientaPage({ params }: { params: Pr
                   <TableHead>Herramienta</TableHead>
                   <TableHead className="w-24 text-right">Stock</TableHead>
                   <TableHead className="w-32 text-right">Cantidad</TableHead>
+                  {readOnly && solicitud.estado !== 'cancelada' && (
+                    <TableHead className="w-32 text-right">Entregado</TableHead>
+                  )}
                   {!readOnly && <TableHead className="w-12" />}
                 </TableRow>
               </TableHeader>
@@ -541,6 +550,31 @@ export default function DetalleSolicitudHerramientaPage({ params }: { params: Pr
                           </p>
                         )}
                       </TableCell>
+                      {readOnly && solicitud.estado !== 'cancelada' && (
+                        <TableCell className="text-right">
+                          {(() => {
+                            const entregada = it.cantidadEntregada ?? 0
+                            const completo = entregada >= it.cantidad
+                            const pct = it.cantidad > 0 ? Math.round((entregada / it.cantidad) * 100) : 0
+                            return (
+                              <div className="flex flex-col items-end gap-0.5">
+                                <span className={cn(
+                                  'text-sm tabular-nums',
+                                  completo ? 'text-emerald-700 font-medium' : entregada > 0 ? 'text-purple-700' : 'text-gray-500'
+                                )}>
+                                  {entregada}/{it.cantidad}
+                                </span>
+                                <div className="h-1 w-16 overflow-hidden rounded-full bg-gray-200">
+                                  <div
+                                    className={cn('h-full', completo ? 'bg-emerald-500' : entregada > 0 ? 'bg-purple-500' : 'bg-gray-300')}
+                                    style={{ width: `${pct}%` }}
+                                  />
+                                </div>
+                              </div>
+                            )
+                          })()}
+                        </TableCell>
+                      )}
                       {!readOnly && (
                         <TableCell className="text-right">
                           <Button
@@ -562,6 +596,33 @@ export default function DetalleSolicitudHerramientaPage({ params }: { params: Pr
           )}
         </CardContent>
       </Card>
+
+      {/* Card de préstamos asociados (si hay entregas hechas) */}
+      {solicitud.prestamos.length > 0 && (
+        <Card className="mt-4">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">
+              Entregas realizadas ({solicitud.prestamos.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-1">
+              {solicitud.prestamos.map(p => (
+                <li
+                  key={p.id}
+                  className="flex items-center justify-between rounded border px-3 py-2 text-sm"
+                >
+                  <div className="flex items-center gap-2">
+                    <FileCheck2 className="h-4 w-4 text-emerald-600" />
+                    <span>Préstamo del {new Date(p.fechaPrestamo).toLocaleDateString('es-PE')}</span>
+                  </div>
+                  <Badge variant="outline" className="text-xs capitalize">{p.estado.replace('_', ' ')}</Badge>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Modal: Agregar herramienta */}
       <Dialog open={agregarOpen} onOpenChange={setAgregarOpen}>

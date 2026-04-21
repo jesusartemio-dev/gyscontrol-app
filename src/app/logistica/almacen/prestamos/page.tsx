@@ -33,6 +33,7 @@ interface Prestamo {
 interface SolicitudPendiente {
   id: string
   numero: string
+  estado: 'enviado' | 'atendida_parcial'
   observaciones: string | null
   createdAt: string
   fechaEnvio: string | null
@@ -43,6 +44,7 @@ interface SolicitudPendiente {
   items: {
     id: string
     cantidad: number
+    cantidadEntregada: number
     catalogoHerramienta: {
       id: string
       codigo: string
@@ -70,9 +72,12 @@ export default function PrestamosPage() {
   const [devolviendoSol, setDevolviendoSol] = useState<SolicitudPendiente | null>(null)
   const [devolverNota, setDevolverNota] = useState('')
   const [devolverEnviando, setDevolverEnviando] = useState(false)
+  const [cerrandoSol, setCerrandoSol] = useState<SolicitudPendiente | null>(null)
+  const [cerrarNota, setCerrarNota] = useState('')
+  const [cerrarEnviando, setCerrarEnviando] = useState(false)
 
   async function cargarPendientes() {
-    const r = await fetch('/api/solicitud-herramienta?estado=enviado')
+    const r = await fetch('/api/solicitud-herramienta?abiertas=true')
     const json = await r.json()
     const solicitudes: SolicitudPendiente[] = json.solicitudes || []
     // Ordenar por urgencia: las que tienen fecha requerida más próxima primero.
@@ -120,6 +125,32 @@ export default function PrestamosPage() {
       cargarPendientes()
     } finally {
       setDevolverEnviando(false)
+    }
+  }
+
+  function abrirCerrar(s: SolicitudPendiente) {
+    setCerrandoSol(s)
+    setCerrarNota('')
+  }
+
+  async function confirmarCerrar() {
+    if (!cerrandoSol) return
+    const nota = cerrarNota.trim()
+    if (!nota) { toast.error('Indica un motivo para cerrar'); return }
+    setCerrarEnviando(true)
+    try {
+      const r = await fetch(`/api/solicitud-herramienta/${cerrandoSol.id}/cerrar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nota }),
+      })
+      const json = await r.json()
+      if (!r.ok) { toast.error(json.error || 'Error al cerrar'); return }
+      toast.success(`Solicitud ${cerrandoSol.numero} cerrada`)
+      setCerrandoSol(null)
+      cargarPendientes()
+    } finally {
+      setCerrarEnviando(false)
     }
   }
 
@@ -194,6 +225,11 @@ export default function PrestamosPage() {
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-mono text-xs font-semibold">{s.numero}</span>
+                      {s.estado === 'atendida_parcial' && (
+                        <Badge variant="outline" className="bg-purple-100 text-purple-700 border-purple-300 text-[10px]">
+                          Entrega parcial
+                        </Badge>
+                      )}
                       {urg && (
                         <Badge variant="outline" className={cn('text-[10px]', urg.classes)}>
                           {urg.label}
@@ -221,31 +257,56 @@ export default function PrestamosPage() {
                         <CheckCircle2 className="mr-1 h-3 w-3" /> Convertir en préstamo
                       </Button>
                     </Link>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-8 text-amber-700 hover:bg-amber-50"
-                      onClick={() => abrirDevolver(s)}
-                    >
-                      <RotateCcw className="mr-1 h-3 w-3" />
-                      Devolver para editar
-                    </Button>
+                    {s.estado === 'enviado' && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 text-amber-700 hover:bg-amber-50"
+                        onClick={() => abrirDevolver(s)}
+                      >
+                        <RotateCcw className="mr-1 h-3 w-3" />
+                        Devolver para editar
+                      </Button>
+                    )}
+                    {s.estado === 'atendida_parcial' && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 text-gray-700 hover:bg-gray-50"
+                        onClick={() => abrirCerrar(s)}
+                      >
+                        <XCircle className="mr-1 h-3 w-3" />
+                        Cerrar sin completar
+                      </Button>
+                    )}
                   </div>
                 </div>
                 <ul className="mt-2 space-y-1 text-xs">
                   {s.items.map(it => {
                     const disp = it.catalogoHerramienta.stock[0]?.cantidadDisponible ?? 0
-                    const falta = disp < it.cantidad
+                    const entregada = it.cantidadEntregada || 0
+                    const falta = it.cantidad - entregada
+                    const stockInsuficiente = disp < falta
+                    const completo = falta <= 0
                     return (
-                      <li key={it.id} className="flex items-center justify-between rounded border px-2 py-1">
+                      <li
+                        key={it.id}
+                        className={cn(
+                          'flex items-center justify-between rounded border px-2 py-1',
+                          completo && 'bg-emerald-50 text-muted-foreground line-through decoration-emerald-400'
+                        )}
+                      >
                         <span>
                           <span className="font-mono text-[10px] text-muted-foreground mr-1.5">{it.catalogoHerramienta.codigo}</span>
                           {it.catalogoHerramienta.nombre}
                         </span>
-                        <span className={`flex items-center gap-2 ${falta ? 'text-amber-700' : ''}`}>
-                          {falta && <AlertTriangle className="h-3 w-3" />}
-                          <span>pide {it.cantidad}</span>
-                          <span className="text-muted-foreground">/ disp. {disp}</span>
+                        <span className={cn('flex items-center gap-2', stockInsuficiente && !completo ? 'text-amber-700' : '')}>
+                          {stockInsuficiente && !completo && <AlertTriangle className="h-3 w-3" />}
+                          {entregada > 0 && (
+                            <span className="text-[10px] text-purple-700">entregado {entregada}</span>
+                          )}
+                          <span>{completo ? 'completo' : `falta ${falta}`}</span>
+                          {!completo && <span className="text-muted-foreground">/ disp. {disp}</span>}
                         </span>
                       </li>
                     )
@@ -384,6 +445,44 @@ export default function PrestamosPage() {
             >
               {devolverEnviando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RotateCcw className="mr-2 h-4 w-4" />}
               Devolver
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!cerrandoSol} onOpenChange={(open) => { if (!open) setCerrandoSol(null) }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <XCircle className="h-5 w-5 text-gray-700" />
+              Cerrar solicitud sin completar
+            </DialogTitle>
+            <DialogDescription>
+              Solicitud <span className="font-mono font-semibold">{cerrandoSol?.numero}</span>.
+              Se marcará como atendida aunque no se haya entregado todo. Úsalo cuando ya no habrá más stock disponible.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <label className="text-xs font-medium">Motivo (visible para el solicitante) *</label>
+            <Textarea
+              rows={3}
+              value={cerrarNota}
+              onChange={e => setCerrarNota(e.target.value)}
+              placeholder="Ej: ya no se va a comprar más stock, descatalogado, etc."
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCerrandoSol(null)} disabled={cerrarEnviando}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={confirmarCerrar}
+              disabled={cerrarEnviando || !cerrarNota.trim()}
+              className="bg-gray-700 hover:bg-gray-800"
+            >
+              {cerrarEnviando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <XCircle className="mr-2 h-4 w-4" />}
+              Cerrar solicitud
             </Button>
           </DialogFooter>
         </DialogContent>

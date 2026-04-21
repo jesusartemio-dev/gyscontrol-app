@@ -4579,7 +4579,8 @@ model PrestamoHerramienta {
   recibidoPor             User?                     @relation("PrestamoRecibidoPor", fields: [recibidoPorId], references: [id])
   items                   PrestamoHerramientaItem[]
   movimientos             MovimientoAlmacen[]
-  solicitudHerramienta    SolicitudHerramienta?
+  solicitudHerramientaId  String?
+  solicitudHerramienta    SolicitudHerramienta?     @relation(fields: [solicitudHerramientaId], references: [id])
   createdAt               DateTime                  @default(now())
   updatedAt               DateTime                  @updatedAt
 
@@ -4628,17 +4629,16 @@ model SolicitudHerramienta {
   fechaEnvio              DateTime?
   fechaRequerida          DateTime?
   fechaDevolucionEstimada DateTime?
-  prestamoId     String?                    @unique
-  atendidaPorId  String?
-  fechaAtencion  DateTime?
-  notaAtencion   String?
-  createdAt      DateTime                   @default(now())
-  updatedAt      DateTime                   @updatedAt
+  atendidaPorId           String?
+  fechaAtencion           DateTime?
+  notaAtencion            String?
+  createdAt               DateTime                   @default(now())
+  updatedAt               DateTime                   @updatedAt
 
   solicitante    User                       @relation("SolicitudHerramientaSolicitante", fields: [solicitanteId], references: [id])
   proyecto       Proyecto?                  @relation(fields: [proyectoId], references: [id])
   atendidaPor    User?                      @relation("SolicitudHerramientaAtendidaPor", fields: [atendidaPorId], references: [id])
-  prestamo       PrestamoHerramienta?       @relation(fields: [prestamoId], references: [id])
+  prestamos      PrestamoHerramienta[]
   items          SolicitudHerramientaItem[]
 
   @@index([solicitanteId, estado])
@@ -4649,6 +4649,7 @@ model SolicitudHerramienta {
 enum EstadoSolicitudHerramienta {
   borrador
   enviado
+  atendida_parcial
   atendida
   cancelada
 }
@@ -4658,6 +4659,7 @@ model SolicitudHerramientaItem {
   solicitudId           String
   catalogoHerramientaId String
   cantidad              Float                @default(1)
+  cantidadEntregada     Float                @default(0)
 
   solicitud             SolicitudHerramienta @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
   catalogoHerramienta   CatalogoHerramienta  @relation(fields: [catalogoHerramientaId], references: [id])

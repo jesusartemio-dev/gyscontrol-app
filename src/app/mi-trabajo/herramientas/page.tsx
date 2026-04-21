@@ -15,14 +15,14 @@ import {
 } from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
 import {
-  Loader2, Plus, CheckCircle2, XCircle, Pencil, Send, RotateCcw, Trash2, Eye, Search,
+  Loader2, Plus, CheckCircle2, XCircle, Pencil, Send, RotateCcw, Trash2, Eye, Search, PackageCheck,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface Solicitud {
   id: string
   numero: string
-  estado: 'borrador' | 'enviado' | 'atendida' | 'cancelada'
+  estado: 'borrador' | 'enviado' | 'atendida_parcial' | 'atendida' | 'cancelada'
   observaciones: string | null
   notaAtencion: string | null
   fechaEnvio: string | null
@@ -32,10 +32,11 @@ interface Solicitud {
   createdAt: string
   proyecto: { id: string; codigo: string; nombre: string } | null
   atendidaPor: { name: string | null; email: string } | null
-  prestamo: { id: string; estado: string } | null
+  prestamos: { id: string; estado: string }[]
   items: {
     id: string
     cantidad: number
+    cantidadEntregada: number
     catalogoHerramienta: {
       id: string
       codigo: string
@@ -49,6 +50,7 @@ interface Solicitud {
 const ESTADO_META = {
   borrador: { label: 'Borrador', classes: 'bg-gray-200 text-gray-700 border-gray-300', icon: Pencil },
   enviado: { label: 'Enviado', classes: 'bg-blue-100 text-blue-700 border-blue-300', icon: Send },
+  atendida_parcial: { label: 'Parcial', classes: 'bg-purple-100 text-purple-700 border-purple-300', icon: PackageCheck },
   atendida: { label: 'Atendida', classes: 'bg-emerald-100 text-emerald-700 border-emerald-300', icon: CheckCircle2 },
   cancelada: { label: 'Cancelada', classes: 'bg-gray-100 text-gray-500 border-gray-200', icon: XCircle },
 } as const
@@ -66,7 +68,7 @@ function urgenciaFecha(iso: string | null): { label: string; classes: string } |
   return null
 }
 
-type FiltroEstado = 'todos' | 'borrador' | 'enviado' | 'atendida' | 'cancelada'
+type FiltroEstado = 'todos' | 'borrador' | 'enviado' | 'atendida_parcial' | 'atendida' | 'cancelada'
 
 export default function MisSolicitudesHerramientasPage() {
   const router = useRouter()
@@ -150,7 +152,7 @@ export default function MisSolicitudesHerramientasPage() {
     return {
       total: data.length,
       borradores: data.filter(s => s.estado === 'borrador').length,
-      enviadas: data.filter(s => s.estado === 'enviado').length,
+      abiertas: data.filter(s => s.estado === 'enviado' || s.estado === 'atendida_parcial').length,
       atendidas: data.filter(s => s.estado === 'atendida').length,
     }
   }, [data])
@@ -174,7 +176,7 @@ export default function MisSolicitudesHerramientasPage() {
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard label="Total" value={stats.total} />
         <StatCard label="Borradores" value={stats.borradores} color="text-gray-600" />
-        <StatCard label="Enviadas" value={stats.enviadas} color="text-blue-600" />
+        <StatCard label="En proceso" value={stats.abiertas} color="text-blue-600" />
         <StatCard label="Atendidas" value={stats.atendidas} color="text-emerald-600" />
       </div>
 
@@ -198,6 +200,7 @@ export default function MisSolicitudesHerramientasPage() {
               <SelectItem value="todos">Todos los estados</SelectItem>
               <SelectItem value="borrador">Borradores</SelectItem>
               <SelectItem value="enviado">Enviadas</SelectItem>
+              <SelectItem value="atendida_parcial">Parciales</SelectItem>
               <SelectItem value="atendida">Atendidas</SelectItem>
               {verCanceladas && <SelectItem value="cancelada">Canceladas</SelectItem>}
             </SelectContent>
@@ -233,9 +236,9 @@ export default function MisSolicitudesHerramientasPage() {
                   <TableHead className="w-32">Estado</TableHead>
                   <TableHead>Proyecto</TableHead>
                   <TableHead className="w-24 text-center">Items</TableHead>
+                  <TableHead className="w-32 text-center">Entregado</TableHead>
                   <TableHead className="w-28">Enviada</TableHead>
                   <TableHead className="w-28">Para</TableHead>
-                  <TableHead className="w-28">Devuelve</TableHead>
                   <TableHead className="w-24 text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -279,11 +282,26 @@ export default function MisSolicitudesHerramientasPage() {
                         )}
                       </TableCell>
                       <TableCell className="text-center text-sm tabular-nums">{s.items.length}</TableCell>
+                      <TableCell className="text-center">
+                        {(() => {
+                          const totalPedido = s.items.reduce((t, i) => t + i.cantidad, 0)
+                          const totalEntregado = s.items.reduce((t, i) => t + (i.cantidadEntregada || 0), 0)
+                          const pct = totalPedido > 0 ? Math.round((totalEntregado / totalPedido) * 100) : 0
+                          const color = pct === 100 ? 'bg-emerald-500' : pct > 0 ? 'bg-purple-500' : 'bg-gray-300'
+                          return (
+                            <div className="flex flex-col items-center gap-0.5">
+                              <span className="text-xs tabular-nums">{totalEntregado}/{totalPedido}</span>
+                              <div className="h-1 w-16 overflow-hidden rounded-full bg-gray-200">
+                                <div className={cn('h-full', color)} style={{ width: `${pct}%` }} />
+                              </div>
+                            </div>
+                          )
+                        })()}
+                      </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         {s.fechaEnvio ? fmtDate(s.fechaEnvio) : '—'}
                       </TableCell>
                       <TableCell className="text-xs">{fmtDate(s.fechaRequerida)}</TableCell>
-                      <TableCell className="text-xs">{fmtDate(s.fechaDevolucionEstimada)}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
                           <Link href={`/mi-trabajo/herramientas/${s.id}`}>

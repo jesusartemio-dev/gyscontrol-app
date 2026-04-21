@@ -33,6 +33,7 @@ export async function GET(req: Request) {
 
   const { searchParams } = new URL(req.url)
   const estado = searchParams.get('estado')
+  const abiertas = searchParams.get('abiertas') === 'true'
   const mias = searchParams.get('mias') === 'true'
   const incluirCanceladas = searchParams.get('incluirCanceladas') === 'true'
   const limit = Math.min(parseInt(searchParams.get('limit') || '100'), 500)
@@ -41,7 +42,10 @@ export async function GET(req: Request) {
   const vistaTrabajador = !esLogistica || mias
 
   const where: any = {}
-  if (estado) {
+  if (abiertas) {
+    // Solicitudes pendientes de surtir total o parcialmente.
+    where.estado = { in: ['enviado', 'atendida_parcial'] }
+  } else if (estado) {
     where.estado = estado
   } else if (vistaTrabajador && !incluirCanceladas) {
     // En la vista del trabajador, por defecto se ocultan las canceladas.
@@ -61,7 +65,7 @@ export async function GET(req: Request) {
       solicitante: { select: { id: true, name: true, email: true } },
       proyecto: { select: { id: true, codigo: true, nombre: true } },
       atendidaPor: { select: { id: true, name: true, email: true } },
-      prestamo: { select: { id: true, fechaPrestamo: true, estado: true } },
+      prestamos: { select: { id: true, fechaPrestamo: true, estado: true } },
       items: {
         include: {
           catalogoHerramienta: {

@@ -66,14 +66,22 @@ export default function NuevoPrestamoPage() {
         observaciones: sol.observaciones || '',
         fechaDevolucionEstimada: sol.fechaDevolucionEstimada ? sol.fechaDevolucionEstimada.slice(0, 10) : f.fechaDevolucionEstimada,
       }))
+      // Pre-llenar solo con items que aún tienen faltantes por entregar (soporta atendida_parcial).
       setItems(
-        sol.items.map((it: any) => ({
-          key: Date.now() + Math.random(),
-          tipo: 'cantidad' as const,
-          catalogoHerramientaId: it.catalogoHerramienta.id,
-          herramientaUnidadId: '',
-          cantidadPrestada: it.cantidad,
-        }))
+        sol.items
+          .map((it: any) => {
+            const falta = (it.cantidad || 0) - (it.cantidadEntregada || 0)
+            return falta > 0
+              ? {
+                  key: Date.now() + Math.random(),
+                  tipo: 'cantidad' as const,
+                  catalogoHerramientaId: it.catalogoHerramienta.id,
+                  herramientaUnidadId: '',
+                  cantidadPrestada: falta,
+                }
+              : null
+          })
+          .filter((x: any): x is NonNullable<typeof x> => x !== null)
       )
     }).catch(() => toast.error('Error al cargar solicitud'))
   }, [solicitudId])

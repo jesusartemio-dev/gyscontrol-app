@@ -17,7 +17,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       solicitante: { select: { id: true, name: true, email: true } },
       proyecto: { select: { id: true, codigo: true, nombre: true } },
       atendidaPor: { select: { id: true, name: true, email: true } },
-      prestamo: { select: { id: true, fechaPrestamo: true, estado: true } },
+      prestamos: { select: { id: true, fechaPrestamo: true, estado: true } },
       items: {
         include: {
           catalogoHerramienta: {

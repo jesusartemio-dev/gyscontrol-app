@@ -57,16 +57,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'usuarioId e items son requeridos' }, { status: 400 })
     }
 
-    // Si viene de una solicitud, validar que exista y esté enviada (no borrador ni ya atendida).
+    // Si viene de una solicitud, validar que esté activa (enviado o atendida_parcial — no cerrada).
     if (solicitudHerramientaId) {
       const sol = await prisma.solicitudHerramienta.findUnique({
         where: { id: solicitudHerramientaId },
         select: { id: true, estado: true, fechaDevolucionEstimada: true },
       })
       if (!sol) return NextResponse.json({ error: 'Solicitud no encontrada' }, { status: 404 })
-      if (sol.estado !== 'enviado') {
+      if (sol.estado !== 'enviado' && sol.estado !== 'atendida_parcial') {
         return NextResponse.json(
-          { error: `La solicitud no está enviada (estado: ${sol.estado})` },
+          { error: `La solicitud no está activa (estado: ${sol.estado})` },
           { status: 400 }
         )
       }
@@ -141,13 +141,43 @@ export async function POST(req: Request) {
         }
       }
 
-      // Enlazar solicitud (si aplica) y marcarla como atendida dentro de la misma tx
+      // Enlazar préstamo → solicitud, acumular cantidadEntregada por item y recalcular estado.
       if (solicitudHerramientaId) {
+        // 1) Link del préstamo a la solicitud.
+        await tx.prestamoHerramienta.update({
+          where: { id: prest.id },
+          data: { solicitudHerramientaId },
+        })
+
+        // 2) Acumular cantidadEntregada por cada item del préstamo que matchee un item de la solicitud
+        //    (solo para préstamos por cantidad — bulk; unidades serializadas no acumulan aquí).
+        const itemsSolicitud = await tx.solicitudHerramientaItem.findMany({
+          where: { solicitudId: solicitudHerramientaId },
+          select: { id: true, catalogoHerramientaId: true, cantidad: true, cantidadEntregada: true },
+        })
+        const mapSolicitudItems = new Map(
+          itemsSolicitud.map(i => [i.catalogoHerramientaId, i])
+        )
+        for (const pItem of prest.items) {
+          if (!pItem.catalogoHerramientaId) continue
+          const sItem = mapSolicitudItems.get(pItem.catalogoHerramientaId)
+          if (!sItem) continue
+          const nuevaEntregada = Math.min(sItem.cantidad, sItem.cantidadEntregada + pItem.cantidadPrestada)
+          await tx.solicitudHerramientaItem.update({
+            where: { id: sItem.id },
+            data: { cantidadEntregada: nuevaEntregada },
+          })
+          // Reflejarlo en el map local para cálculo siguiente.
+          sItem.cantidadEntregada = nuevaEntregada
+        }
+
+        // 3) Recalcular estado: si TODOS los items llegaron al tope pedido → 'atendida'; si no → 'atendida_parcial'.
+        const completa = Array.from(mapSolicitudItems.values())
+          .every(i => i.cantidadEntregada >= i.cantidad)
         await tx.solicitudHerramienta.update({
           where: { id: solicitudHerramientaId },
           data: {
-            estado: 'atendida',
-            prestamoId: prest.id,
+            estado: completa ? 'atendida' : 'atendida_parcial',
             atendidaPorId: session.user.id,
             fechaAtencion: new Date(),
           },
@@ -157,23 +187,28 @@ export async function POST(req: Request) {
       return prest
     })
 
-    // Notificar al solicitante si la solicitud quedó atendida
+    // Notificación al solicitante según si quedó completa o parcial.
     if (solicitudHerramientaId) {
       const sol = await prisma.solicitudHerramienta.findUnique({
         where: { id: solicitudHerramientaId },
-        select: { numero: true, solicitanteId: true },
+        select: { numero: true, solicitanteId: true, estado: true },
       })
       if (sol) {
+        const esParcial = sol.estado === 'atendida_parcial'
         crearNotificacion(prisma, {
           usuarioId: sol.solicitanteId,
-          titulo: `Tu solicitud ${sol.numero} fue atendida`,
-          mensaje: `Se generó el préstamo de herramientas. Pasa a recogerlas por el almacén.`,
-          tipo: 'success',
+          titulo: esParcial
+            ? `Entrega parcial de ${sol.numero}`
+            : `Tu solicitud ${sol.numero} fue atendida`,
+          mensaje: esParcial
+            ? 'Se entregó parte de tu solicitud. Logística completará el resto cuando haya stock.'
+            : 'Se generó el préstamo de herramientas. Pasa a recogerlas por el almacén.',
+          tipo: esParcial ? 'warning' : 'success',
           prioridad: 'media',
           entidadTipo: 'SolicitudHerramienta',
           entidadId: solicitudHerramientaId,
-          accionUrl: '/mi-trabajo/herramientas',
-          accionTexto: 'Ver mis solicitudes',
+          accionUrl: `/mi-trabajo/herramientas/${solicitudHerramientaId}`,
+          accionTexto: 'Ver solicitud',
         })
       }
     }
