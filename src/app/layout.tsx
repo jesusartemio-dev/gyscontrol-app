@@ -9,8 +9,43 @@ import Providers from '@/components/Providers'
 import { ChatButton } from '@/components/agente/ChatButton'
 
 export const metadata = {
-  title: 'Sistema GYS',
-  description: 'Gestión de proyectos: Comercial, Proyectos y Logística',
+  metadataBase: new URL('https://app.gyscontrol.com'),
+  title: {
+    default: 'GyS Control — Sistema de gestión',
+    template: '%s · GyS Control',
+  },
+  description: 'Plataforma integral para Comercial, Proyectos, Logística, Almacén y Asistencia de GyS Control Industrial.',
+  applicationName: 'GyS Control',
+  keywords: ['GyS Control', 'gestión', 'proyectos', 'logística', 'almacén', 'comercial'],
+  authors: [{ name: 'GyS Control Industrial' }],
+  openGraph: {
+    type: 'website',
+    locale: 'es_PE',
+    url: 'https://app.gyscontrol.com',
+    siteName: 'GyS Control',
+    title: 'GyS Control — Sistema de gestión',
+    description: 'Plataforma integral para Comercial, Proyectos, Logística, Almacén y Asistencia.',
+    images: [
+      {
+        url: '/logo.png',
+        width: 286,
+        height: 80,
+        alt: 'GyS Control Industrial',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary',
+    title: 'GyS Control — Sistema de gestión',
+    description: 'Plataforma integral para Comercial, Proyectos, Logística, Almacén y Asistencia.',
+    images: ['/logo.png'],
+  },
+  icons: {
+    icon: '/favicon.ico',
+    apple: '/logo.png',
+  },
+  manifest: '/manifest.json',
+  themeColor: '#1e40af',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
