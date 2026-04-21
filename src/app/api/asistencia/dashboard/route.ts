@@ -75,16 +75,28 @@ export async function GET(req: Request) {
   }
   const tendencia = Array.from(tendenciaMap.values()).sort((a, b) => a.fecha.localeCompare(b.fecha))
 
-  // Por departamento
+  // Por departamento: inicializar TODOS los departamentos activos (aunque no tengan marcajes)
+  const deptosActivos = await prisma.departamento.findMany({
+    where: { activo: true },
+    select: { id: true, nombre: true },
+    orderBy: { nombre: 'asc' },
+  })
   const porDepto = new Map<string, { nombre: string; aTiempo: number; tarde: number; muyTarde: number }>()
+  for (const d of deptosActivos) {
+    porDepto.set(d.id, { nombre: d.nombre, aTiempo: 0, tarde: 0, muyTarde: 0 })
+  }
+  const SIN_DEPTO_KEY = '__sin_depto__'
   for (const i of ingresos) {
     const d = i.empleado?.departamento
-    if (!d) continue
-    const existente = porDepto.get(d.id) || { nombre: d.nombre, aTiempo: 0, tarde: 0, muyTarde: 0 }
+    const key = d?.id || SIN_DEPTO_KEY
+    const existente = porDepto.get(key) || {
+      nombre: d?.nombre || 'Sin departamento',
+      aTiempo: 0, tarde: 0, muyTarde: 0,
+    }
     if (i.estado === 'a_tiempo') existente.aTiempo += 1
     else if (i.estado === 'tarde') existente.tarde += 1
     else if (i.estado === 'muy_tarde') existente.muyTarde += 1
-    porDepto.set(d.id, existente)
+    porDepto.set(key, existente)
   }
   const departamentos = Array.from(porDepto.values())
 
