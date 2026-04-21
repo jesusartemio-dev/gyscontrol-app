@@ -21,6 +21,8 @@ import { useSession } from 'next-auth/react'
 import { getOrdenCompraById, aprobarOC, enviarOC, confirmarOC, cancelarOC, deleteOrdenCompra, registrarRecepcionOC, completarOC } from '@/lib/services/ordenCompra'
 import OCEstadoStepper from '@/components/logistica/OCEstadoStepper'
 import { RollbackButton } from '@/components/RollbackButton'
+import { useDeleteWithValidation } from '@/hooks/useDeleteWithValidation'
+import { DeleteWithValidationDialog } from '@/components/DeleteWithValidationDialog'
 import dynamic from 'next/dynamic'
 import type { OrdenCompra } from '@/types'
 
@@ -96,7 +98,6 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [showCancel, setShowCancel] = useState(false)
-  const [showDelete, setShowDelete] = useState(false)
   const [recepcion, setRecepcion] = useState<Record<string, number>>({})
   const [editingRecepcion, setEditingRecepcion] = useState(false)
   const [showFacturaModal, setShowFacturaModal] = useState(false)
@@ -360,16 +361,17 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
     }
   }
 
-  const handleDelete = async () => {
-    if (!oc) return
-    try {
-      await deleteOrdenCompra(oc.id)
-      toast.success(`OC ${oc.numero} eliminada`)
+  const deleteValidation = useDeleteWithValidation({
+    entity: 'ordenCompra',
+    onConfirmDelete: async (id) => {
+      await deleteOrdenCompra(id)
+    },
+    onSuccess: () => {
+      toast.success(`OC ${oc?.numero ?? ''} eliminada`)
       router.push('/logistica/ordenes-compra')
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Error al eliminar')
-    }
-  }
+    },
+    onError: (message) => toast.error(message),
+  })
 
   const calcularFechaVencimientoFromForm = (fechaRecepcion: string, formaPago: string, diasPago: string, diasPagoCustom: string): string => {
     if (!fechaRecepcion) return ''
@@ -537,7 +539,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
             <Button
               size="sm"
               variant="destructive"
-              onClick={() => setShowDelete(true)}
+              onClick={() => deleteValidation.requestDelete(oc.id)}
               disabled={!!actionLoading}
             >
               Eliminar
@@ -1133,23 +1135,19 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Delete Dialog */}
-      <AlertDialog open={showDelete} onOpenChange={setShowDelete}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Eliminar Orden de Compra</AlertDialogTitle>
-            <AlertDialogDescription>
-              ¿Eliminar la OC {oc.numero}? Esta acción no se puede deshacer.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700 text-white">
-              Eliminar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Delete Dialog con pre-validación de dependencias */}
+      <DeleteWithValidationDialog
+        open={deleteValidation.dialogOpen}
+        onOpenChange={(open) => !open && deleteValidation.cancelDelete()}
+        checking={deleteValidation.checking}
+        deleting={deleteValidation.deleting}
+        allowed={deleteValidation.canDeleteResult?.allowed ?? null}
+        blockers={deleteValidation.canDeleteResult?.blockers ?? []}
+        message={deleteValidation.canDeleteResult?.message ?? ''}
+        onConfirm={deleteValidation.confirmDelete}
+        onCancel={deleteValidation.cancelDelete}
+        entityLabel="orden de compra"
+      />
 
       {/* ── Catálogo Selector Dialog ────────────────────────── */}
       <Dialog open={catalogoOpen} onOpenChange={setCatalogoOpen}>
