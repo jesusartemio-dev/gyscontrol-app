@@ -6,6 +6,7 @@ import {
   calcularEstado,
   calcularFechaEsperada,
   determinarModoRemoto,
+  obtenerSedeRemotaActiva,
   upsertDispositivo,
 } from '@/lib/services/asistencia'
 import { formatearTardanza } from '@/lib/utils/formatTardanza'
@@ -76,6 +77,7 @@ export async function POST(req: Request) {
 
   let ubicacionId: string | null = null
   let jornadaAsistenciaId: string | null = null
+  let jornadaOverride: { horaIngresoOverride: string | null; horaSalidaOverride: string | null } | null = null
   let metodoMarcaje: MetodoMarcaje = modoRemoto.esRemoto ? 'remoto' : 'gps_directo'
 
   // Procesar QR si viene (no aplica si es remoto — lo ignoramos)
@@ -114,17 +116,36 @@ export async function POST(req: Request) {
       }
       ubicacionId = jornada.ubicacionId
       jornadaAsistenciaId = jornada.id
+      jornadaOverride = {
+        horaIngresoOverride: jornada.horaIngresoOverride,
+        horaSalidaOverride: jornada.horaSalidaOverride,
+      }
       metodoMarcaje = 'qr_supervisor'
     }
   }
 
-  // Evaluar geofence (no aplica en modo remoto — se fuerza a true)
+  // Evaluar geofence + distancia
   let dentroGeofence = true
-  if (!modoRemoto.esRemoto && ubicacionId && body.latitud != null && body.longitud != null) {
+  let distanciaMetros: number | null = null
+  let ubicacionRemotaId: string | null = null
+  let sedeRemotaNombre: string | null = null
+
+  if (modoRemoto.esRemoto && !modoRemoto.esConfianza && body.latitud != null && body.longitud != null) {
+    // Validar contra la sede remota personal aprobada (si tiene)
+    const sedeRemota = await obtenerSedeRemotaActiva(userId)
+    if (sedeRemota) {
+      distanciaMetros = haversineMetros(body.latitud, body.longitud, sedeRemota.latitud, sedeRemota.longitud)
+      dentroGeofence = distanciaMetros <= sedeRemota.radioMetros
+      ubicacionRemotaId = sedeRemota.id
+      sedeRemotaNombre = sedeRemota.nombre
+    }
+    // Sin sede remota aprobada: se permite marcar pero queda como dentroGeofence=true
+    // (no hay referencia contra qué validar). El admin debería pedirle que registre sede.
+  } else if (!modoRemoto.esRemoto && ubicacionId && body.latitud != null && body.longitud != null) {
     const u = await prisma.ubicacion.findUnique({ where: { id: ubicacionId } })
     if (u) {
-      const distancia = haversineMetros(body.latitud, body.longitud, u.latitud, u.longitud)
-      dentroGeofence = distancia <= u.radioMetros
+      distanciaMetros = haversineMetros(body.latitud, body.longitud, u.latitud, u.longitud)
+      dentroGeofence = distanciaMetros <= u.radioMetros
     }
   }
 
@@ -135,7 +156,14 @@ export async function POST(req: Request) {
   const ubicacionDatos = ubicacionId
     ? await prisma.ubicacion.findUnique({ where: { id: ubicacionId } })
     : null
-  const fechaEsperada = await calcularFechaEsperada(fechaHora, body.tipo, ubicacionDatos)
+  const fechaEsperada = await calcularFechaEsperada(
+    fechaHora,
+    body.tipo,
+    ubicacionDatos,
+    'empresa',
+    'default',
+    jornadaOverride,
+  )
 
   // Personal de confianza: siempre a_tiempo, sin tardanza
   const { estado, minutosTarde, banderas } = modoRemoto.esConfianza
@@ -169,6 +197,8 @@ export async function POST(req: Request) {
       longitud: body.longitud ?? null,
       precisionGps: body.precisionGps ?? null,
       dentroGeofence,
+      distanciaMetros,
+      ubicacionRemotaId,
       metodoMarcaje,
       dispositivoId,
       dispositivoEraNuevo: eraNuevo,
@@ -196,8 +226,16 @@ export async function POST(req: Request) {
   lineas.push(`${tipoHumano} registrado a las ${horaLima}`)
   if (modoRemoto.esRemoto) {
     lineas.push(`Modo: trabajo remoto (${modoRemoto.razon})`)
+    if (sedeRemotaNombre) {
+      lineas.push(`Sede remota: ${sedeRemotaNombre}`)
+    } else if (!modoRemoto.esConfianza) {
+      lineas.push('ℹ️ No tienes una sede remota aprobada — registra una desde "Mi sede remota"')
+    }
   } else if (ubicacionDatos) {
     lineas.push(`Ubicación: ${ubicacionDatos.nombre}`)
+  }
+  if (distanciaMetros != null) {
+    lineas.push(`Distancia a sede: ${Math.round(distanciaMetros)} m`)
   }
   if (minutosTarde > 0) lineas.push(`Tardanza: ${formatearTardanza(minutosTarde)}`)
   if (!dentroGeofence) lineas.push('⚠️ Fuera del área permitida (quedó en reporte)')

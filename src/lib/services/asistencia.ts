@@ -51,7 +51,7 @@ export function calcularEstado(input: CalcularEstadoInput): CalcularEstadoResult
 
 /**
  * Calcula la fecha esperada (hora de ingreso/salida) para un marcaje.
- * Prioridad: horario de la Ubicación (si está definido) > CalendarioLaboral > default hard-coded.
+ * Prioridad: override de jornada > horario de la Ubicación > CalendarioLaboral > default.
  */
 export async function calcularFechaEsperada(
   fechaMarcaje: Date,
@@ -59,10 +59,18 @@ export async function calcularFechaEsperada(
   ubicacion?: { horaIngreso: string | null; horaSalida: string | null } | null,
   entidadTipo = 'empresa',
   entidadId = 'default',
+  jornadaOverride?: { horaIngresoOverride: string | null; horaSalidaOverride: string | null } | null,
 ): Promise<Date> {
   let hhmm: string | null = null
 
-  if (ubicacion) {
+  // Prioridad 1: override de la jornada del supervisor (turno B excepcional)
+  if (jornadaOverride) {
+    if (tipo === 'ingreso' && jornadaOverride.horaIngresoOverride) hhmm = jornadaOverride.horaIngresoOverride
+    if (tipo === 'salida' && jornadaOverride.horaSalidaOverride) hhmm = jornadaOverride.horaSalidaOverride
+  }
+
+  // Prioridad 2: horario de la ubicación
+  if (!hhmm && ubicacion) {
     if (tipo === 'ingreso' && ubicacion.horaIngreso) hhmm = ubicacion.horaIngreso
     if (tipo === 'salida' && ubicacion.horaSalida) hhmm = ubicacion.horaSalida
   }
@@ -140,6 +148,20 @@ export async function validarGeofenceUbicacion(
   if (!u) return { dentro: false, distanciaMetros: Infinity }
   const distancia = haversineMetros(lat, lon, u.latitud, u.longitud)
   return { dentro: distancia <= u.radioMetros, distanciaMetros: distancia }
+}
+
+/**
+ * Obtiene la sede remota aprobada y vigente de un usuario (si existe).
+ * Se usa para validar geofence en marcajes remotos.
+ */
+export async function obtenerSedeRemotaActiva(userId: string) {
+  return prisma.ubicacionRemotaPersonal.findFirst({
+    where: {
+      userId,
+      estado: 'aprobada',
+    },
+    orderBy: { vigenciaDesde: 'desc' },
+  })
 }
 
 export type OrigenRemoto = 'solicitud' | 'modalidad_fija' | 'modalidad_hibrida'

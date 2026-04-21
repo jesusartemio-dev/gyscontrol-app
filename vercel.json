@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/asistencia-reporte",
       "schedule": "0 19 * * *"
+    },
+    {
+      "path": "/api/cron/cerrar-asistencia",
+      "schedule": "59 4 * * *"
     }
   ]
 }

@@ -203,6 +203,7 @@ export default function MobileSidebar() {
           submenu: [
             { href: '/mi-trabajo/marcar', label: 'Marcar Asistencia', icon: MapPin },
             { href: '/mi-trabajo/mi-asistencia', label: 'Mi Asistencia', icon: Clock },
+            { href: '/mi-trabajo/sede-remota', label: 'Mi Sede Remota', icon: Home },
             { href: '/mi-trabajo/solicitudes-remoto', label: 'Solicitudes Remoto', icon: Home },
           ],
         },
@@ -340,6 +341,7 @@ export default function MobileSidebar() {
           icon: ClipboardList,
           submenu: [
             { href: '/admin/asistencia/ubicaciones', label: 'Ubicaciones', icon: MapPin },
+            { href: '/admin/asistencia/sedes-remotas', label: 'Sedes Remotas', icon: Home },
             { href: '/admin/asistencia/modalidades', label: 'Modalidades de Trabajo', icon: Home },
             { href: '/admin/asistencia/dashboard', label: 'Dashboard', icon: BarChart3 },
           ],

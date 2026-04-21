@@ -400,29 +400,29 @@ model CotizacionEquipo {
 }
 
 model CotizacionEquipoItem {
-  id                 String           @id
-  cotizacionEquipoId String
-  catalogoEquipoId   String?
-  codigo             String
-  descripcion        String
-  categoria          String
-  unidad             String
-  marca              String
-  precioLista        Float
-  precioInterno      Float
-  factorCosto        Float            @default(1.00)
-  factorVenta        Float            @default(1.15)
-  precioCliente      Float
-  cantidad           Float
-  costoInterno       Float
-  costoCliente       Float
+  id                    String           @id
+  cotizacionEquipoId    String
+  catalogoEquipoId      String?
+  codigo                String
+  descripcion           String
+  categoria             String
+  unidad                String
+  marca                 String
+  precioLista           Float
+  precioInterno         Float
+  factorCosto           Float            @default(1.00)
+  factorVenta           Float            @default(1.15)
+  precioCliente         Float
+  cantidad              Float
+  costoInterno          Float
+  costoCliente          Float
   precioGerencia        Float?
   precioGerenciaEditado Boolean          @default(false)
   orden                 Int              @default(0)
-  createdAt          DateTime         @default(now())
-  updatedAt          DateTime
-  catalogoEquipo     CatalogoEquipo?  @relation(fields: [catalogoEquipoId], references: [id])
-  cotizacionEquipo   CotizacionEquipo @relation(fields: [cotizacionEquipoId], references: [id], onDelete: Cascade)
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime
+  catalogoEquipo        CatalogoEquipo?  @relation(fields: [catalogoEquipoId], references: [id])
+  cotizacionEquipo      CotizacionEquipo @relation(fields: [cotizacionEquipoId], references: [id], onDelete: Cascade)
 
   @@map("cotizacion_equipo_item")
 }
@@ -573,26 +573,26 @@ model CotizacionServicioItem {
 }
 
 model EntregaItem {
-  id                    String               @id @default(cuid())
-  pedidoEquipoItemId    String
-  listaEquipoItemId     String?
-  recepcionPendienteId  String?
-  proyectoId            String
-  fechaEntrega          DateTime
-  estado                EstadoEntregaItem    @default(pendiente)
-  cantidad              Float
-  cantidadEntregada     Float?               @default(0)
-  observaciones         String?
-  fechaRegistro         DateTime             @default(now())
-  usuarioId             String?
-  createdAt             DateTime             @default(now())
-  updatedAt             DateTime             @updatedAt
-  listaEquipoItem       ListaEquipoItem?     @relation(fields: [listaEquipoItemId], references: [id])
-  pedidoEquipoItem      PedidoEquipoItem     @relation(fields: [pedidoEquipoItemId], references: [id])
-  recepcion             RecepcionPendiente?  @relation(fields: [recepcionPendienteId], references: [id], onDelete: SetNull)
-  proyecto              Proyecto             @relation(fields: [proyectoId], references: [id])
-  user                  User?                @relation(fields: [usuarioId], references: [id])
-  eventoTrazabilidad    EventoTrazabilidad[]
+  id                   String               @id @default(cuid())
+  pedidoEquipoItemId   String
+  listaEquipoItemId    String?
+  recepcionPendienteId String?
+  proyectoId           String
+  fechaEntrega         DateTime
+  estado               EstadoEntregaItem    @default(pendiente)
+  cantidad             Float
+  cantidadEntregada    Float?               @default(0)
+  observaciones        String?
+  fechaRegistro        DateTime             @default(now())
+  usuarioId            String?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  listaEquipoItem      ListaEquipoItem?     @relation(fields: [listaEquipoItemId], references: [id])
+  pedidoEquipoItem     PedidoEquipoItem     @relation(fields: [pedidoEquipoItemId], references: [id])
+  recepcion            RecepcionPendiente?  @relation(fields: [recepcionPendienteId], references: [id], onDelete: SetNull)
+  proyecto             Proyecto             @relation(fields: [proyectoId], references: [id])
+  user                 User?                @relation(fields: [usuarioId], references: [id])
+  eventoTrazabilidad   EventoTrazabilidad[]
 
   @@index([fechaEntrega])
   @@index([pedidoEquipoItemId])
@@ -727,36 +727,36 @@ model ListaEquipoItem {
 }
 
 model PedidoEquipo {
-  id                   String               @id
-  proyectoId           String?
-  centroCostoId        String?
-  responsableId        String
-  listaId              String?
-  codigo               String               @unique
-  numeroSecuencia      Int
-  nombre               String?
-  estado               EstadoPedido         @default(borrador)
-  orden                Int                  @default(0)
-  fechaPedido          DateTime             @default(now())
-  observacion          String?
-  fechaEntregaEstimada DateTime?
-  fechaEntregaReal     DateTime?
-  createdAt            DateTime             @default(now())
-  updatedAt            DateTime             @updatedAt
-  fechaNecesaria       DateTime
-  costoRealTotal       Float                @default(0)
-  esUrgente            Boolean              @default(false)
-  presupuestoTotal     Float                @default(0)
-  prioridad            String?              @default("media")
-  listaEquipo          ListaEquipo?         @relation(fields: [listaId], references: [id])
-  proyecto             Proyecto?            @relation(fields: [proyectoId], references: [id])
-  centroCosto          CentroCosto?         @relation(fields: [centroCostoId], references: [id])
-  user                 User                 @relation(fields: [responsableId], references: [id])
-  pedidoEquipoItem            PedidoEquipoItem[]
-  ordenesCompra               OrdenCompra[]
-  eventosTrazabilidad         EventoTrazabilidad[]
-  cuentasPorPagar             CuentaPorPagar[]
-  requerimientoMaterialItems  RequerimientoMaterialItem[]
+  id                         String                      @id
+  proyectoId                 String?
+  centroCostoId              String?
+  responsableId              String
+  listaId                    String?
+  codigo                     String                      @unique
+  numeroSecuencia            Int
+  nombre                     String?
+  estado                     EstadoPedido                @default(borrador)
+  orden                      Int                         @default(0)
+  fechaPedido                DateTime                    @default(now())
+  observacion                String?
+  fechaEntregaEstimada       DateTime?
+  fechaEntregaReal           DateTime?
+  createdAt                  DateTime                    @default(now())
+  updatedAt                  DateTime                    @updatedAt
+  fechaNecesaria             DateTime
+  costoRealTotal             Float                       @default(0)
+  esUrgente                  Boolean                     @default(false)
+  presupuestoTotal           Float                       @default(0)
+  prioridad                  String?                     @default("media")
+  listaEquipo                ListaEquipo?                @relation(fields: [listaId], references: [id])
+  proyecto                   Proyecto?                   @relation(fields: [proyectoId], references: [id])
+  centroCosto                CentroCosto?                @relation(fields: [centroCostoId], references: [id])
+  user                       User                        @relation(fields: [responsableId], references: [id])
+  pedidoEquipoItem           PedidoEquipoItem[]
+  ordenesCompra              OrdenCompra[]
+  eventosTrazabilidad        EventoTrazabilidad[]
+  cuentasPorPagar            CuentaPorPagar[]
+  requerimientoMaterialItems RequerimientoMaterialItem[]
 
   @@index([estado, prioridad, createdAt(sort: Desc)], map: "idx_pedido_estado_prioridad_fecha")
   @@index([proyectoId, estado, createdAt(sort: Desc)], map: "idx_pedido_proyecto_estado_fecha")
@@ -767,25 +767,25 @@ model PedidoEquipo {
 }
 
 model PedidoEquipoItem {
-  id                          String               @id
+  id                          String                      @id
   pedidoId                    String
   listaEquipoItemId           String?
   cantidadPedida              Float
   precioUnitario              Float?
   costoTotal                  Float?
-  estado                      EstadoPedidoItem     @default(pendiente)
+  estado                      EstadoPedidoItem            @default(pendiente)
   cantidadAtendida            Float?
   comentarioLogistica         String?
   comentarioLogisticaPorId    String?
   comentarioLogisticaAt       DateTime?
-  createdAt                   DateTime             @default(now())
-  updatedAt                   DateTime             @updatedAt
-  orden                       Int                  @default(0)
+  createdAt                   DateTime                    @default(now())
+  updatedAt                   DateTime                    @updatedAt
+  orden                       Int                         @default(0)
   listaId                     String?
   codigo                      String
   descripcion                 String
   categoria                   String?
-  tipoItem                    String               @default("equipo")
+  tipoItem                    String                      @default("equipo")
   marca                       String?
   catalogoEquipoId            String?
   tiempoEntrega               String?
@@ -795,7 +795,7 @@ model PedidoEquipoItem {
   responsableId               String
   fechaEntregaEstimada        DateTime?
   fechaEntregaReal            DateTime?
-  estadoEntrega               EstadoEntregaItem    @default(pendiente)
+  estadoEntrega               EstadoEntregaItem           @default(pendiente)
   observacionesEntrega        String?
   proveedorId                 String?
   proveedorNombre             String?
@@ -805,17 +805,17 @@ model PedidoEquipoItem {
   precioUnitarioMoneda        String?
   tipoCambioEntrega           Float?
   entregaItem                 EntregaItem[]
-  listaEquipoItem             ListaEquipoItem?     @relation(fields: [listaEquipoItemId], references: [id])
-  listaEquipo                 ListaEquipo?         @relation(fields: [listaId], references: [id])
-  pedidoEquipo                PedidoEquipo         @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
-  proveedor                   Proveedor?           @relation(fields: [proveedorId], references: [id], onDelete: SetNull)
-  catalogoEquipo              CatalogoEquipo?      @relation(fields: [catalogoEquipoId], references: [id], onDelete: SetNull)
-  user                        User                 @relation(fields: [responsableId], references: [id])
-  comentarioLogisticaPor      User?                @relation("PedidoEquipoItemComentarioLogistica", fields: [comentarioLogisticaPorId], references: [id])
-  ordenCompraItems             OrdenCompraItem[]
-  recepcionesPendientes        RecepcionPendiente[]
-  cuentasPorPagar              CuentaPorPagar[]
-  requerimientoMaterialItems   RequerimientoMaterialItem[]
+  listaEquipoItem             ListaEquipoItem?            @relation(fields: [listaEquipoItemId], references: [id])
+  listaEquipo                 ListaEquipo?                @relation(fields: [listaId], references: [id])
+  pedidoEquipo                PedidoEquipo                @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  proveedor                   Proveedor?                  @relation(fields: [proveedorId], references: [id], onDelete: SetNull)
+  catalogoEquipo              CatalogoEquipo?             @relation(fields: [catalogoEquipoId], references: [id], onDelete: SetNull)
+  user                        User                        @relation(fields: [responsableId], references: [id])
+  comentarioLogisticaPor      User?                       @relation("PedidoEquipoItemComentarioLogistica", fields: [comentarioLogisticaPorId], references: [id])
+  ordenCompraItems            OrdenCompraItem[]
+  recepcionesPendientes       RecepcionPendiente[]
+  cuentasPorPagar             CuentaPorPagar[]
+  requerimientoMaterialItems  RequerimientoMaterialItem[]
 
   @@map("pedido_equipo_item")
 }
@@ -996,91 +996,91 @@ model Proveedor {
 }
 
 model Proyecto {
-  id                       String                     @id
-  clienteId                String?
-  comercialId              String?
-  gestorId                 String
-  esInterno                Boolean                    @default(false)
-  centroCostoId            String?
-  supervisorId             String?
-  liderId                  String?
-  cotizacionId             String?
-  nombre                   String
-  descripcion              String?
-  totalEquiposInterno      Float                      @default(0)
-  totalServiciosInterno    Float                      @default(0)
-  totalGastosInterno       Float                      @default(0)
-  totalInterno             Float                      @default(0)
-  totalCliente             Float                      @default(0)
-  descuento                Float                      @default(0)
-  grandTotal               Float                      @default(0)
-  codigo                   String
-  estado                   ProyectoEstado             @default(creado)
-  fechaInicio              DateTime
-  fechaFin                 DateTime?
-  totalRealEquipos         Float                      @default(0)
-  totalRealServicios       Float                      @default(0)
-  totalRealGastos          Float                      @default(0)
-  totalReal                Float                      @default(0)
-  moneda                   String?                    @default("USD")
-  tipoCambio               Float?
-  diasGarantia             Int                        @default(365)
-  adelantoPorcentaje       Float                      @default(0)
-  adelantoMonto            Float                      @default(0)
-  adelantoAmortizado       Float                      @default(0)
+  id                         String                      @id
+  clienteId                  String?
+  comercialId                String?
+  gestorId                   String
+  esInterno                  Boolean                     @default(false)
+  centroCostoId              String?
+  supervisorId               String?
+  liderId                    String?
+  cotizacionId               String?
+  nombre                     String
+  descripcion                String?
+  totalEquiposInterno        Float                       @default(0)
+  totalServiciosInterno      Float                       @default(0)
+  totalGastosInterno         Float                       @default(0)
+  totalInterno               Float                       @default(0)
+  totalCliente               Float                       @default(0)
+  descuento                  Float                       @default(0)
+  grandTotal                 Float                       @default(0)
+  codigo                     String
+  estado                     ProyectoEstado              @default(creado)
+  fechaInicio                DateTime
+  fechaFin                   DateTime?
+  totalRealEquipos           Float                       @default(0)
+  totalRealServicios         Float                       @default(0)
+  totalRealGastos            Float                       @default(0)
+  totalReal                  Float                       @default(0)
+  moneda                     String?                     @default("USD")
+  tipoCambio                 Float?
+  diasGarantia               Int                         @default(365)
+  adelantoPorcentaje         Float                       @default(0)
+  adelantoMonto              Float                       @default(0)
+  adelantoAmortizado         Float                       @default(0)
   // Contrato
-  numeroContrato           String?
-  fechaFirmaContrato       DateTime?
-  fechaInicioContrato      DateTime?
-  fechaFinContrato         DateTime?
-  fondoGarantiaPct         Float                      @default(0)
-  descuentoComercialPct    Float                      @default(0)
-  igvPct                   Float                      @default(18)
-  condicionPago            String?
-  diasCredito              Int?
-  createdAt                DateTime                   @default(now())
-  updatedAt                DateTime
-  deletedAt                DateTime?
-  progresoGeneral          Int                        @default(0)
-  cotizacionProveedor      CotizacionProveedor[]
-  entregaItem              EntregaItem[]
-  eventoTrazabilidad       EventoTrazabilidad[]
-  listaEquipo              ListaEquipo[]
-  pedidoEquipo             PedidoEquipo[]
-  cliente                  Cliente?                   @relation(fields: [clienteId], references: [id])
-  comercial                User?                      @relation("ProyectoComercial", fields: [comercialId], references: [id])
-  centroCosto              CentroCosto?               @relation(fields: [centroCostoId], references: [id])
-  cotizacion               Cotizacion?                @relation(fields: [cotizacionId], references: [id])
-  gestor                   User                       @relation("ProyectoGestor", fields: [gestorId], references: [id])
-  supervisor               User?                      @relation("ProyectoSupervisor", fields: [supervisorId], references: [id])
-  lider                    User?                      @relation("ProyectoLider", fields: [liderId], references: [id])
-  personalProyecto         PersonalProyecto[]
-  proyectoEquipoCotizado   ProyectoEquipoCotizado[]
-  proyectoGastoCotizado    ProyectoGastoCotizado[]
-  proyectoServicioCotizado ProyectoServicioCotizado[]
-  registroHoras            RegistroHoras[]
-  valorizacion             Valorizacion[]
-  crmHistorialProyecto     CrmHistorialProyecto[]
-  crmOportunidad           CrmOportunidad[]
-  proyectoCronograma       ProyectoCronograma[]
-  proyectoEdt              ProyectoEdt[]
-  proyectoFase             ProyectoFase[]
-  registrosCampo           RegistroHorasCampo[]
-  proyectoCondicion        ProyectoCondicion[]
-  proyectoExclusion        ProyectoExclusion[]
+  numeroContrato             String?
+  fechaFirmaContrato         DateTime?
+  fechaInicioContrato        DateTime?
+  fechaFinContrato           DateTime?
+  fondoGarantiaPct           Float                       @default(0)
+  descuentoComercialPct      Float                       @default(0)
+  igvPct                     Float                       @default(18)
+  condicionPago              String?
+  diasCredito                Int?
+  createdAt                  DateTime                    @default(now())
+  updatedAt                  DateTime
+  deletedAt                  DateTime?
+  progresoGeneral            Int                         @default(0)
+  cotizacionProveedor        CotizacionProveedor[]
+  entregaItem                EntregaItem[]
+  eventoTrazabilidad         EventoTrazabilidad[]
+  listaEquipo                ListaEquipo[]
+  pedidoEquipo               PedidoEquipo[]
+  cliente                    Cliente?                    @relation(fields: [clienteId], references: [id])
+  comercial                  User?                       @relation("ProyectoComercial", fields: [comercialId], references: [id])
+  centroCosto                CentroCosto?                @relation(fields: [centroCostoId], references: [id])
+  cotizacion                 Cotizacion?                 @relation(fields: [cotizacionId], references: [id])
+  gestor                     User                        @relation("ProyectoGestor", fields: [gestorId], references: [id])
+  supervisor                 User?                       @relation("ProyectoSupervisor", fields: [supervisorId], references: [id])
+  lider                      User?                       @relation("ProyectoLider", fields: [liderId], references: [id])
+  personalProyecto           PersonalProyecto[]
+  proyectoEquipoCotizado     ProyectoEquipoCotizado[]
+  proyectoGastoCotizado      ProyectoGastoCotizado[]
+  proyectoServicioCotizado   ProyectoServicioCotizado[]
+  registroHoras              RegistroHoras[]
+  valorizacion               Valorizacion[]
+  crmHistorialProyecto       CrmHistorialProyecto[]
+  crmOportunidad             CrmOportunidad[]
+  proyectoCronograma         ProyectoCronograma[]
+  proyectoEdt                ProyectoEdt[]
+  proyectoFase               ProyectoFase[]
+  registrosCampo             RegistroHorasCampo[]
+  proyectoCondicion          ProyectoCondicion[]
+  proyectoExclusion          ProyectoExclusion[]
   // Documentos financieros imputados al proyecto
-  hojasDeGastos               HojaDeGastos[]
-  gastoLineas                 GastoLinea[]          @relation("GastoLineaProyecto")
-  ordenesCompra               OrdenCompra[]
-  cuentasPorCobrar            CuentaPorCobrar[]
-  cuentasPorPagar             CuentaPorPagar[]
-  requerimientoMaterialItems  RequerimientoMaterialItem[]
-  lineasHH                 LineaHH[]
-  cartasFianza             CartaFianza[]
-  ssomaExpediente          SsomaExpediente?
-  solicitudesRecurso       SolicitudRecurso[]
-  prestamosHerramienta     PrestamoHerramienta[]
-  devolucionesMaterial     DevolucionMaterial[]
+  hojasDeGastos              HojaDeGastos[]
+  gastoLineas                GastoLinea[]                @relation("GastoLineaProyecto")
+  ordenesCompra              OrdenCompra[]
+  cuentasPorCobrar           CuentaPorCobrar[]
+  cuentasPorPagar            CuentaPorPagar[]
+  requerimientoMaterialItems RequerimientoMaterialItem[]
+  lineasHH                   LineaHH[]
+  cartasFianza               CartaFianza[]
+  ssomaExpediente            SsomaExpediente?
+  solicitudesRecurso         SolicitudRecurso[]
+  prestamosHerramienta       PrestamoHerramienta[]
+  devolucionesMaterial       DevolucionMaterial[]
 
   @@index([clienteId, estado, createdAt(sort: Desc)], map: "idx_proyecto_cliente_estado_fecha")
   @@index([comercialId, estado, fechaInicio], map: "idx_proyecto_comercial_estado_inicio")
@@ -1124,25 +1124,25 @@ enum RolPersonalProyecto {
 }
 
 model CartaFianza {
-  id                String             @id @default(cuid())
+  id                String            @id @default(cuid())
   proyectoId        String
   tipo              TipoCartaFianza
-  estado            EstadoCartaFianza  @default(vigente)
+  estado            EstadoCartaFianza @default(vigente)
   entidadFinanciera String
   numeroCarta       String?
-  moneda            String             @default("USD")
+  moneda            String            @default("USD")
   monto             Float
   fechaEmision      DateTime
   fechaVencimiento  DateTime
   notas             String?
   cartaRenovadaId   String?
-  createdAt         DateTime           @default(now())
+  createdAt         DateTime          @default(now())
   updatedAt         DateTime
 
-  proyecto       Proyecto              @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
-  cartaRenovada  CartaFianza?          @relation("CartaRenovacion", fields: [cartaRenovadaId], references: [id])
-  renovaciones   CartaFianza[]         @relation("CartaRenovacion")
-  adjuntos       CartaFianzaAdjunto[]
+  proyecto      Proyecto             @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  cartaRenovada CartaFianza?         @relation("CartaRenovacion", fields: [cartaRenovadaId], references: [id])
+  renovaciones  CartaFianza[]        @relation("CartaRenovacion")
+  adjuntos      CartaFianzaAdjunto[]
 
   @@index([proyectoId, estado])
   @@index([fechaVencimiento, estado])
@@ -1150,14 +1150,14 @@ model CartaFianza {
 }
 
 model CartaFianzaAdjunto {
-  id             String   @id @default(cuid())
-  cartaFianzaId  String
-  nombreArchivo  String
-  urlArchivo     String
-  driveFileId    String?
-  tipoArchivo    String?
-  tamano         Int?
-  createdAt      DateTime @default(now())
+  id            String   @id @default(cuid())
+  cartaFianzaId String
+  nombreArchivo String
+  urlArchivo    String
+  driveFileId   String?
+  tipoArchivo   String?
+  tamano        Int?
+  createdAt     DateTime @default(now())
 
   cartaFianza CartaFianza @relation(fields: [cartaFianzaId], references: [id], onDelete: Cascade)
 
@@ -1221,13 +1221,13 @@ model ProyectoEquipoCotizadoItem {
 }
 
 model DesgloseEquipoItem {
-  id                             String                     @id @default(cuid())
-  proyectoEquipoCotizadoItemId   String
-  listaEquipoId                  String
-  nota                           String?
-  createdAt                      DateTime                   @default(now())
-  proyectoEquipoCotizadoItem     ProyectoEquipoCotizadoItem @relation(fields: [proyectoEquipoCotizadoItemId], references: [id], onDelete: Cascade)
-  listaEquipo                    ListaEquipo                @relation(fields: [listaEquipoId], references: [id], onDelete: Cascade)
+  id                           String                     @id @default(cuid())
+  proyectoEquipoCotizadoItemId String
+  listaEquipoId                String
+  nota                         String?
+  createdAt                    DateTime                   @default(now())
+  proyectoEquipoCotizadoItem   ProyectoEquipoCotizadoItem @relation(fields: [proyectoEquipoCotizadoItemId], references: [id], onDelete: Cascade)
+  listaEquipo                  ListaEquipo                @relation(fields: [listaEquipoId], references: [id], onDelete: Cascade)
 
   @@unique([proyectoEquipoCotizadoItemId, listaEquipoId])
   @@map("desglose_equipo_item")
@@ -1596,6 +1596,8 @@ model User {
   asistenciasSupervisadas         Asistencia[]                @relation("AsistenciaSupervisor")
   solicitudesRemotoPropias        SolicitudTrabajoRemoto[]    @relation("SolicitudRemotoSolicitante")
   solicitudesRemotoAprobadas      SolicitudTrabajoRemoto[]    @relation("SolicitudRemotoAprobador")
+  ubicacionesRemotasPropias       UbicacionRemotaPersonal[]   @relation("UbicacionRemotaUsuario")
+  ubicacionesRemotasAprobadas     UbicacionRemotaPersonal[]   @relation("UbicacionRemotaAprobador")
   // Almacén
   movimientosAlmacen              MovimientoAlmacen[]
   prestamosComoUsuario            PrestamoHerramienta[]       @relation("PrestamoUsuario")
@@ -2995,7 +2997,7 @@ model ConfiguracionGeneral {
   semanasxMes            Float    @default(4) // Semanas por mes para cálculo (permite decimales, ej: 4.34)
   horasMensuales         Float    @default(192) // Calculado: horasSemanales * semanasxMes
   agenteLimiteMensualUsd Float    @default(25) // Limite mensual de gasto del agente IA (USD)
-  iaFeatures             Json?    // Feature flags IA: { chatGeneral, chatCotizacion, analisisTdr, importacionExcel, ocrComprobantes }
+  iaFeatures             Json? // Feature flags IA: { chatGeneral, chatCotizacion, analisisTdr, importacionExcel, ocrComprobantes }
   limiteMateriales       Float    @default(500) // Monto máx para compra materiales sin pedido vinculado
   updatedAt              DateTime @updatedAt
   updatedBy              String?
@@ -3336,11 +3338,11 @@ model CentroCosto {
   createdAt   DateTime @default(now())
   updatedAt   DateTime
 
-  hojas            HojaDeGastos[]
-  ordenesCompra    OrdenCompra[]
-  gastoLineas      GastoLinea[]
+  hojas             HojaDeGastos[]
+  ordenesCompra     OrdenCompra[]
+  gastoLineas       GastoLinea[]
   proyectosInternos Proyecto[]
-  pedidosEquipo    PedidoEquipo[]
+  pedidosEquipo     PedidoEquipo[]
 
   @@index([tipo, activo])
   @@map("centro_costo")
@@ -3350,46 +3352,46 @@ model CentroCosto {
 // Exactamente UNO debe estar presente: proyecto (para gastos de proyecto)
 // o centroCosto (para gastos administrativos/departamento). Validación en API.
 model HojaDeGastos {
-  id                String         @id @default(cuid())
-  numero            String         @unique
-  proyectoId        String?
-  centroCostoId     String?
-  categoriaCosto    CategoriaCosto @default(gastos)
-  empleadoId        String
-  aprobadorId       String?
-  motivo            String
-  observaciones     String?
-  requiereAnticipo  Boolean        @default(false)
-  estado            String         @default("borrador")
-  rechazadoEn       String?
-  comentarioRechazo String?
-  montoAnticipo     Float          @default(0)
-  montoDepositado   Float          @default(0)
-  montoGastado      Float          @default(0)
-  saldo             Float          @default(0)
-  fechaEnvio        DateTime?
-  fechaAprobacion   DateTime?
-  fechaDeposito     DateTime?
-  fechaRendicion    DateTime?
-  fechaValidacion   DateTime?
-  fechaCierre       DateTime?
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime
+  id                      String         @id @default(cuid())
+  numero                  String         @unique
+  proyectoId              String?
+  centroCostoId           String?
+  categoriaCosto          CategoriaCosto @default(gastos)
+  empleadoId              String
+  aprobadorId             String?
+  motivo                  String
+  observaciones           String?
+  requiereAnticipo        Boolean        @default(false)
+  estado                  String         @default("borrador")
+  rechazadoEn             String?
+  comentarioRechazo       String?
+  montoAnticipo           Float          @default(0)
+  montoDepositado         Float          @default(0)
+  montoGastado            Float          @default(0)
+  saldo                   Float          @default(0)
+  fechaEnvio              DateTime?
+  fechaAprobacion         DateTime?
+  fechaDeposito           DateTime?
+  fechaRendicion          DateTime?
+  fechaValidacion         DateTime?
+  fechaCierre             DateTime?
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime
   // Tipo de requerimiento
-  tipoPropósito              String   @default("gastos_viaticos") @map("tipo_proposito")
+  tipoPropósito          String         @default("gastos_viaticos") @map("tipo_proposito")
   // "gastos_viaticos" | "compra_materiales"
-  justificacionMateriales    String?  @map("justificacion_materiales")
+  justificacionMateriales String?        @map("justificacion_materiales")
 
-  proyecto          Proyecto?                  @relation(fields: [proyectoId], references: [id])
-  centroCosto       CentroCosto?               @relation(fields: [centroCostoId], references: [id])
-  empleado          User                       @relation("HojaEmpleado", fields: [empleadoId], references: [id])
-  aprobador         User?                      @relation("HojaAprobador", fields: [aprobadorId], references: [id])
-  lineas            GastoLinea[]
-  adjuntos          HojaDeGastosAdjunto[]
-  eventos           HojaDeGastosEvento[]
-  itemsMateriales   RequerimientoMaterialItem[]
-  comprobantes      GastoComprobante[]
-  depositos         DepositoHoja[]
+  proyecto        Proyecto?                   @relation(fields: [proyectoId], references: [id])
+  centroCosto     CentroCosto?                @relation(fields: [centroCostoId], references: [id])
+  empleado        User                        @relation("HojaEmpleado", fields: [empleadoId], references: [id])
+  aprobador       User?                       @relation("HojaAprobador", fields: [aprobadorId], references: [id])
+  lineas          GastoLinea[]
+  adjuntos        HojaDeGastosAdjunto[]
+  eventos         HojaDeGastosEvento[]
+  itemsMateriales RequerimientoMaterialItem[]
+  comprobantes    GastoComprobante[]
+  depositos       DepositoHoja[]
 
   @@index([proyectoId, estado])
   @@index([centroCostoId, estado])
@@ -3447,8 +3449,8 @@ model DepositoHoja {
   createdAt      DateTime @default(now())
   updatedAt      DateTime
 
-  hojaDeGastos HojaDeGastos        @relation(fields: [hojaDeGastosId], references: [id], onDelete: Cascade)
-  creadoPor    User                @relation("DepositoCreadoPor", fields: [creadoPorId], references: [id])
+  hojaDeGastos HojaDeGastos          @relation(fields: [hojaDeGastosId], references: [id], onDelete: Cascade)
+  creadoPor    User                  @relation("DepositoCreadoPor", fields: [creadoPorId], references: [id])
   adjuntos     HojaDeGastosAdjunto[]
 
   @@index([hojaDeGastosId])
@@ -3481,12 +3483,12 @@ model GastoLinea {
   createdAt             DateTime        @default(now())
   updatedAt             DateTime
 
-  hojaDeGastos    HojaDeGastos     @relation(fields: [hojaDeGastosId], references: [id], onDelete: Cascade)
-  categoriaGasto  CategoriaGasto?  @relation(fields: [categoriaGastoId], references: [id])
-  proyecto        Proyecto?        @relation("GastoLineaProyecto", fields: [proyectoId], references: [id])
-  centroCosto     CentroCosto?     @relation(fields: [centroCostoId], references: [id])
+  hojaDeGastos     HojaDeGastos      @relation(fields: [hojaDeGastosId], references: [id], onDelete: Cascade)
+  categoriaGasto   CategoriaGasto?   @relation(fields: [categoriaGastoId], references: [id])
+  proyecto         Proyecto?         @relation("GastoLineaProyecto", fields: [proyectoId], references: [id])
+  centroCosto      CentroCosto?      @relation(fields: [centroCostoId], references: [id])
   gastoComprobante GastoComprobante? @relation(fields: [gastoComprobanteId], references: [id])
-  adjuntos        GastoAdjunto[]
+  adjuntos         GastoAdjunto[]
 
   @@index([hojaDeGastosId])
   @@index([gastoComprobanteId])
@@ -3494,15 +3496,15 @@ model GastoLinea {
 }
 
 model GastoAdjunto {
-  id                  String   @id @default(cuid())
-  gastoLineaId        String?
-  gastoComprobanteId  String?
-  nombreArchivo       String
-  urlArchivo          String
-  driveFileId         String?
-  tipoArchivo         String?
-  tamano              Int?
-  createdAt           DateTime @default(now())
+  id                 String   @id @default(cuid())
+  gastoLineaId       String?
+  gastoComprobanteId String?
+  nombreArchivo      String
+  urlArchivo         String
+  driveFileId        String?
+  tipoArchivo        String?
+  tamano             Int?
+  createdAt          DateTime @default(now())
 
   gastoLinea       GastoLinea?       @relation(fields: [gastoLineaId], references: [id], onDelete: Cascade)
   gastoComprobante GastoComprobante? @relation(fields: [gastoComprobanteId], references: [id], onDelete: Cascade)
@@ -3516,7 +3518,7 @@ model GastoAdjunto {
 model GastoComprobante {
   id                String   @id @default(cuid())
   hojaDeGastosId    String
-  tipoComprobante   String   // factura | boleta | recibo | ticket
+  tipoComprobante   String // factura | boleta | recibo | ticket
   numeroComprobante String
   proveedorNombre   String?
   proveedorRuc      String?
@@ -3526,7 +3528,7 @@ model GastoComprobante {
   createdAt         DateTime @default(now())
   updatedAt         DateTime
 
-  hojaDeGastos HojaDeGastos @relation(fields: [hojaDeGastosId], references: [id], onDelete: Cascade)
+  hojaDeGastos HojaDeGastos   @relation(fields: [hojaDeGastosId], references: [id], onDelete: Cascade)
   lineas       GastoLinea[]
   adjuntos     GastoAdjunto[]
 
@@ -3536,38 +3538,38 @@ model GastoComprobante {
 
 // Items del requerimiento de materiales: vincula HojaDeGastos con PedidoEquipoItems
 model RequerimientoMaterialItem {
-  id                  String   @id @default(cuid())
-  hojaDeGastosId      String
-  pedidoEquipoItemId  String
-  pedidoId            String
-  proyectoId          String?
+  id                 String  @id @default(cuid())
+  hojaDeGastosId     String
+  pedidoEquipoItemId String
+  pedidoId           String
+  proyectoId         String?
 
   // Snapshot del item al momento de crear el requerimiento
-  codigo              String
-  descripcion         String
-  unidad              String
-  categoriaCosto      String   @default("equipos")
+  codigo         String
+  descripcion    String
+  unidad         String
+  categoriaCosto String @default("equipos")
 
   // Cantidades y precios
-  cantidadSolicitada  Float
-  precioEstimado      Float?
-  precioReal          Float?
-  totalEstimado       Float?
-  totalReal           Float?
+  cantidadSolicitada Float
+  precioEstimado     Float?
+  precioReal         Float?
+  totalEstimado      Float?
+  totalReal          Float?
 
   // Conformidad
-  conformidad           String?   // conforme | observado | null
+  conformidad           String? // conforme | observado | null
   comentarioConformidad String?
   conformadoEn          DateTime?
 
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime
 
-  hojaDeGastos      HojaDeGastos      @relation(fields: [hojaDeGastosId], references: [id], onDelete: Cascade)
-  pedidoEquipoItem  PedidoEquipoItem  @relation(fields: [pedidoEquipoItemId], references: [id])
-  pedidoEquipo      PedidoEquipo      @relation(fields: [pedidoId], references: [id])
-  proyecto          Proyecto?         @relation(fields: [proyectoId], references: [id])
-  recepciones       RecepcionPendiente[]
+  hojaDeGastos     HojaDeGastos         @relation(fields: [hojaDeGastosId], references: [id], onDelete: Cascade)
+  pedidoEquipoItem PedidoEquipoItem     @relation(fields: [pedidoEquipoItemId], references: [id])
+  pedidoEquipo     PedidoEquipo         @relation(fields: [pedidoId], references: [id])
+  proyecto         Proyecto?            @relation(fields: [proyectoId], references: [id])
+  recepciones      RecepcionPendiente[]
 
   @@index([hojaDeGastosId])
   @@index([pedidoEquipoItemId])
@@ -3669,13 +3671,13 @@ model OrdenCompraItem {
 }
 
 model RecepcionPendiente {
-  id                          String           @id @default(cuid())
+  id                          String          @id @default(cuid())
   pedidoEquipoItemId          String?
   ordenCompraItemId           String?
   requerimientoMaterialItemId String?
   cantidadRecibida            Float
-  fechaRecepcion              DateTime         @default(now())
-  estado                      EstadoRecepcion  @default(pendiente)
+  fechaRecepcion              DateTime        @default(now())
+  estado                      EstadoRecepcion @default(pendiente)
   confirmadoPorId             String?
   fechaConfirmacion           DateTime?
   entregadoPorId              String?
@@ -3684,8 +3686,8 @@ model RecepcionPendiente {
   fechaRechazo                DateTime?
   motivoRechazo               String?
   observaciones               String?
-  createdAt                   DateTime         @default(now())
-  updatedAt                   DateTime         @updatedAt
+  createdAt                   DateTime        @default(now())
+  updatedAt                   DateTime        @updatedAt
 
   pedidoEquipoItem          PedidoEquipoItem?          @relation(fields: [pedidoEquipoItemId], references: [id], onDelete: Cascade)
   ordenCompraItem           OrdenCompraItem?           @relation(fields: [ordenCompraItemId], references: [id], onDelete: Cascade)
@@ -4057,7 +4059,7 @@ model SsomaExpediente {
 }
 
 model SsomaDocumento {
-  id           String          @id @default(cuid())
+  id           String           @id @default(cuid())
   expedienteId String
   tipo         SsomaDocTipo
   parSubtipo   SsomaParSubtipo?
@@ -4065,7 +4067,7 @@ model SsomaDocumento {
   estado SsomaDocEstado @default(borrador)
 
   codigoDocumento String
-  revision        String  @default("01")
+  revision        String @default("01")
   titulo          String
 
   contenidoTexto String? @db.Text
@@ -4080,7 +4082,7 @@ model SsomaDocumento {
   fechaEnvioCliente DateTime?
   fechaAprobacion   DateTime?
   fechaVigencia     DateTime?
-  observaciones     String? @db.Text
+  observaciones     String?   @db.Text
 
   agenteUsageId String?
 
@@ -4138,11 +4140,11 @@ model SsomaPersonalHabilitado {
 // ═══════════════════════════════════════════════════════════
 
 model CatalogoRecurso {
-  id             String   @id @default(cuid())
-  nombre         String   @unique
-  categoria      String   // "maquinaria" | "andamios" | "herramientas" | "vehiculos" | "otros"
-  unidad         String   // "día" | "semana" | "mes" | "hora" | "global"
-  descripcion    String?
+  id          String  @id @default(cuid())
+  nombre      String  @unique
+  categoria   String // "maquinaria" | "andamios" | "herramientas" | "vehiculos" | "otros"
+  unidad      String // "día" | "semana" | "mes" | "hora" | "global"
+  descripcion String?
 
   // Datos para análisis comprar vs. alquilar
   precioCompra   Decimal? @db.Decimal(12, 2)
@@ -4166,22 +4168,22 @@ model CatalogoRecurso {
 // ═══════════════════════════════════════════════════════════
 
 model SolicitudRecurso {
-  id             String    @id @default(cuid())
-  proyectoId     String
-  solicitanteId  String
-  estado         String    @default("borrador")
-  titulo         String?
-  fechaNecesaria DateTime?
-  observaciones  String?
-  motivoRechazo  String?
-  aprobadorId    String?
+  id              String    @id @default(cuid())
+  proyectoId      String
+  solicitanteId   String
+  estado          String    @default("borrador")
+  titulo          String?
+  fechaNecesaria  DateTime?
+  observaciones   String?
+  motivoRechazo   String?
+  aprobadorId     String?
   fechaAprobacion DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  proyecto    Proyecto @relation(fields: [proyectoId], references: [id])
-  solicitante User     @relation("SolicitudRecursoSolicitante", fields: [solicitanteId], references: [id])
-  aprobador   User?    @relation("SolicitudRecursoAprobador", fields: [aprobadorId], references: [id])
+  proyecto    Proyecto               @relation(fields: [proyectoId], references: [id])
+  solicitante User                   @relation("SolicitudRecursoSolicitante", fields: [solicitanteId], references: [id])
+  aprobador   User?                  @relation("SolicitudRecursoAprobador", fields: [aprobadorId], references: [id])
   items       SolicitudRecursoItem[]
 
   @@index([proyectoId, estado])
@@ -4190,26 +4192,26 @@ model SolicitudRecurso {
 }
 
 model SolicitudRecursoItem {
-  id                String   @id @default(cuid())
+  id                String    @id @default(cuid())
   solicitudId       String
   catalogoRecursoId String?
   descripcion       String
   unidad            String
-  cantidad          Decimal  @db.Decimal(10, 2)
-  precioEstimado    Decimal? @db.Decimal(12, 2)
-  totalEstimado     Decimal? @db.Decimal(12, 2)
-  precioReal        Decimal? @db.Decimal(12, 2)
-  totalReal         Decimal? @db.Decimal(12, 2)
+  cantidad          Decimal   @db.Decimal(10, 2)
+  precioEstimado    Decimal?  @db.Decimal(12, 2)
+  totalEstimado     Decimal?  @db.Decimal(12, 2)
+  precioReal        Decimal?  @db.Decimal(12, 2)
+  totalReal         Decimal?  @db.Decimal(12, 2)
   fechaInicio       DateTime?
   fechaFin          DateTime?
   edtId             String?
-  estado            String   @default("pendiente")
+  estado            String    @default("pendiente")
   observaciones     String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
-  solicitud       SolicitudRecurso  @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
-  catalogoRecurso CatalogoRecurso?  @relation(fields: [catalogoRecursoId], references: [id])
+  solicitud       SolicitudRecurso @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
+  catalogoRecurso CatalogoRecurso? @relation(fields: [catalogoRecursoId], references: [id])
 
   @@index([solicitudId])
   @@map("solicitud_recurso_item")
@@ -4228,13 +4230,13 @@ model Ubicacion {
   latitud            Float
   longitud           Float
   radioMetros        Int                 @default(150)
-  qrSecret           String              // HMAC secret para firmar QR estático
-  proyectoId         String?             // referencia informativa (planta de proyecto)
+  qrSecret           String // HMAC secret para firmar QR estático
+  proyectoId         String? // referencia informativa (planta de proyecto)
   activo             Boolean             @default(true)
-  toleranciaMinutos  Int                 @default(5)   // hasta cuántos minutos se considera a_tiempo
-  limiteTardeMinutos Int                 @default(30)  // más de esto = muy_tarde
-  horaIngreso        String?             // "HH:MM" hora oficial ingreso; null = usa CalendarioLaboral
-  horaSalida         String?             // "HH:MM" hora oficial salida
+  toleranciaMinutos  Int                 @default(5) // hasta cuántos minutos se considera a_tiempo
+  limiteTardeMinutos Int                 @default(30) // más de esto = muy_tarde
+  horaIngreso        String? // "HH:MM" hora oficial ingreso; null = usa CalendarioLaboral
+  horaSalida         String? // "HH:MM" hora oficial salida
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   asistencias        Asistencia[]
@@ -4244,22 +4246,22 @@ model Ubicacion {
 }
 
 model Dispositivo {
-  id             String       @id @default(cuid())
-  userId         String
-  fingerprint    String       // hash SHA-256 de userAgent+platform+screen+cpu+timezone
-  nombre         String?      // "Samsung A52 de Juan"
-  userAgent      String
-  plataforma     String       // Android | iOS | Windows | ...
-  modelo         String?      // parseado del userAgent
-  resolucion     String
-  aprobado       Boolean      @default(false)
-  aprobadoPorId  String?
-  aprobadoEn     DateTime?
-  primeraVez     DateTime     @default(now())
-  ultimaVez      DateTime     @updatedAt
-  user           User         @relation("DispositivoUsuario", fields: [userId], references: [id], onDelete: Cascade)
-  aprobadoPor    User?        @relation("DispositivoAprobador", fields: [aprobadoPorId], references: [id])
-  asistencias    Asistencia[]
+  id            String       @id @default(cuid())
+  userId        String
+  fingerprint   String // hash SHA-256 de userAgent+platform+screen+cpu+timezone
+  nombre        String? // "Samsung A52 de Juan"
+  userAgent     String
+  plataforma    String // Android | iOS | Windows | ...
+  modelo        String? // parseado del userAgent
+  resolucion    String
+  aprobado      Boolean      @default(false)
+  aprobadoPorId String?
+  aprobadoEn    DateTime?
+  primeraVez    DateTime     @default(now())
+  ultimaVez     DateTime     @updatedAt
+  user          User         @relation("DispositivoUsuario", fields: [userId], references: [id], onDelete: Cascade)
+  aprobadoPor   User?        @relation("DispositivoAprobador", fields: [aprobadoPorId], references: [id])
+  asistencias   Asistencia[]
 
   @@unique([userId, fingerprint])
   @@index([userId])
@@ -4269,20 +4271,25 @@ model Dispositivo {
 // Jornada de asistencia que activa el supervisor para habilitar el marcaje del día.
 // Es INDEPENDIENTE de RegistroHorasCampo (jornada de proyecto).
 model JornadaAsistencia {
-  id             String       @id @default(cuid())
-  supervisorId   String
-  ubicacionId    String
-  fecha          DateTime     @db.Date
-  qrSecret       String       // secret HMAC para QR rotable (TOTP-like, 30s)
-  latitudInicio  Float
-  longitudInicio Float
-  activa         Boolean      @default(true)
-  iniciadaEn     DateTime     @default(now())
-  cerradaEn      DateTime?
-  updatedAt      DateTime     @updatedAt
-  supervisor     User         @relation("JornadaAsistenciaSupervisor", fields: [supervisorId], references: [id])
-  ubicacion      Ubicacion    @relation(fields: [ubicacionId], references: [id])
-  asistencias    Asistencia[]
+  id                  String       @id @default(cuid())
+  supervisorId        String
+  ubicacionId         String
+  fecha               DateTime     @db.Date
+  qrSecret            String // secret HMAC para QR rotable (TOTP-like, 30s)
+  latitudInicio       Float
+  longitudInicio      Float
+  activa              Boolean      @default(true)
+  // Override excepcional del horario oficial de la ubicación (turno B, caso puntual).
+  // Si está seteado, se usa para calcular fechaEsperada en lugar de Ubicacion.horaIngreso/horaSalida.
+  horaIngresoOverride String? // "HH:MM"
+  horaSalidaOverride  String? // "HH:MM"
+  motivoOverride      String? // razón del horario excepcional
+  iniciadaEn          DateTime     @default(now())
+  cerradaEn           DateTime?
+  updatedAt           DateTime     @updatedAt
+  supervisor          User         @relation("JornadaAsistenciaSupervisor", fields: [supervisorId], references: [id])
+  ubicacion           Ubicacion    @relation(fields: [ubicacionId], references: [id])
+  asistencias         Asistencia[]
 
   @@unique([supervisorId, ubicacionId, fecha])
   @@index([fecha, activa])
@@ -4303,8 +4310,10 @@ model Asistencia {
   longitud            Float?
   precisionGps        Float?
   dentroGeofence      Boolean            @default(true)
+  distanciaMetros     Float? // distancia real en metros a la sede (presencial o remota)
+  ubicacionRemotaId   String? // sede remota personal contra la que se validó (si aplica)
   metodoMarcaje       MetodoMarcaje
-  supervisorMarcoId   String?            // si lo marcó el supervisor manualmente
+  supervisorMarcoId   String? // si lo marcó el supervisor manualmente
   dispositivoId       String
   dispositivoEraNuevo Boolean            @default(false)
   estado              EstadoMarcaje
@@ -4367,22 +4376,56 @@ enum EstadoSolicitudRemoto {
   cancelado
 }
 
+enum EstadoUbicacionRemota {
+  pendiente // registrada por el trabajador, esperando aprobación
+  aprobada // activa — se valida geofence contra esta sede
+  rechazada // no aprobada, no se usa
+  reemplazada // tuvo una sede posterior aprobada; queda en histórico
+}
+
+// Sede remota personal registrada por cada trabajador (casa, coworking, etc.)
+// Se valida geofence contra la sede aprobada al marcar asistencia remota.
+// Flujo: trabajador crea (pendiente) → admin/supervisor aprueba/rechaza.
+model UbicacionRemotaPersonal {
+  id            String                @id @default(cuid())
+  userId        String
+  nombre        String // "Casa - Miraflores", "Coworking - San Isidro"
+  latitud       Float
+  longitud      Float
+  radioMetros   Int                   @default(100)
+  estado        EstadoUbicacionRemota @default(pendiente)
+  aprobadoPorId String?
+  aprobadoEn    DateTime?
+  motivoRechazo String?
+  vigenciaDesde DateTime? // se setea al aprobar
+  vigenciaHasta DateTime? // se setea cuando se reemplaza por una nueva
+  observaciones String?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  user          User                  @relation("UbicacionRemotaUsuario", fields: [userId], references: [id], onDelete: Cascade)
+  aprobadoPor   User?                 @relation("UbicacionRemotaAprobador", fields: [aprobadoPorId], references: [id])
+
+  @@index([userId, estado])
+  @@index([estado])
+  @@map("ubicacion_remota_personal")
+}
+
 // Solicitud puntual de trabajo remoto (home office) para una fecha o rango.
 // Empleados presenciales pueden solicitar excepciones. Supervisor aprueba.
 model SolicitudTrabajoRemoto {
-  id             String                @id @default(cuid())
-  solicitanteId  String
-  fechaInicio    DateTime              @db.Date
-  fechaFin       DateTime              @db.Date
-  descripcion    String?
-  estado         EstadoSolicitudRemoto @default(pendiente)
-  aprobadorId    String?
-  aprobadoEn     DateTime?
-  motivoRechazo  String?
-  createdAt      DateTime              @default(now())
-  updatedAt      DateTime              @updatedAt
-  solicitante    User                  @relation("SolicitudRemotoSolicitante", fields: [solicitanteId], references: [id])
-  aprobador      User?                 @relation("SolicitudRemotoAprobador", fields: [aprobadorId], references: [id])
+  id            String                @id @default(cuid())
+  solicitanteId String
+  fechaInicio   DateTime              @db.Date
+  fechaFin      DateTime              @db.Date
+  descripcion   String?
+  estado        EstadoSolicitudRemoto @default(pendiente)
+  aprobadorId   String?
+  aprobadoEn    DateTime?
+  motivoRechazo String?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  solicitante   User                  @relation("SolicitudRemotoSolicitante", fields: [solicitanteId], references: [id])
+  aprobador     User?                 @relation("SolicitudRemotoAprobador", fields: [aprobadorId], references: [id])
 
   @@index([solicitanteId, estado])
   @@index([fechaInicio, fechaFin])
@@ -4424,7 +4467,7 @@ model StockAlmacen {
 }
 
 model MovimientoAlmacen {
-  id                    String             @id @default(cuid())
+  id                    String               @id @default(cuid())
   almacenId             String
   tipo                  TipoMovimiento
   catalogoEquipoId      String?
@@ -4432,20 +4475,20 @@ model MovimientoAlmacen {
   herramientaUnidadId   String?
   cantidad              Float
   usuarioId             String
-  fechaMovimiento       DateTime           @default(now())
+  fechaMovimiento       DateTime             @default(now())
   recepcionPendienteId  String?
   entregaItemId         String?
   prestamoHerramientaId String?
   devolucionMaterialId  String?
   observaciones         String?
-  almacen               Almacen            @relation(fields: [almacenId], references: [id])
-  usuario               User               @relation(fields: [usuarioId], references: [id])
-  catalogoEquipo        CatalogoEquipo?    @relation(fields: [catalogoEquipoId], references: [id])
+  almacen               Almacen              @relation(fields: [almacenId], references: [id])
+  usuario               User                 @relation(fields: [usuarioId], references: [id])
+  catalogoEquipo        CatalogoEquipo?      @relation(fields: [catalogoEquipoId], references: [id])
   catalogoHerramienta   CatalogoHerramienta? @relation(fields: [catalogoHerramientaId], references: [id])
-  herramientaUnidad     HerramientaUnidad? @relation(fields: [herramientaUnidadId], references: [id])
-  recepcionPendiente    RecepcionPendiente? @relation(fields: [recepcionPendienteId], references: [id])
+  herramientaUnidad     HerramientaUnidad?   @relation(fields: [herramientaUnidadId], references: [id])
+  recepcionPendiente    RecepcionPendiente?  @relation(fields: [recepcionPendienteId], references: [id])
   prestamoHerramienta   PrestamoHerramienta? @relation(fields: [prestamoHerramientaId], references: [id])
-  devolucionMaterial    DevolucionMaterial? @relation(fields: [devolucionMaterialId], references: [id])
+  devolucionMaterial    DevolucionMaterial?  @relation(fields: [devolucionMaterialId], references: [id])
 
   @@index([almacenId, fechaMovimiento])
   @@index([catalogoEquipoId])
@@ -4466,39 +4509,39 @@ enum TipoMovimiento {
 }
 
 model CatalogoHerramienta {
-  id               String                   @id @default(cuid())
-  codigo           String                   @unique
+  id               String                    @id @default(cuid())
+  codigo           String                    @unique
   nombre           String
   categoria        String
   descripcion      String?
   fotoUrl          String?
-  gestionPorUnidad Boolean                  @default(false)
-  unidadMedida     String                   @default("unidad")
-  activo           Boolean                  @default(true)
+  gestionPorUnidad Boolean                   @default(false)
+  unidadMedida     String                    @default("unidad")
+  activo           Boolean                   @default(true)
   unidades         HerramientaUnidad[]
   stock            StockAlmacen[]
   prestamoItems    PrestamoHerramientaItem[]
   movimientos      MovimientoAlmacen[]
-  createdAt        DateTime                 @default(now())
-  updatedAt        DateTime                 @updatedAt
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
 
   @@map("catalogo_herramienta")
 }
 
 model HerramientaUnidad {
-  id                    String                   @id @default(cuid())
+  id                    String                    @id @default(cuid())
   catalogoHerramientaId String
   serie                 String
-  codigoQR              String?                  @unique
+  codigoQR              String?                   @unique
   almacenId             String
-  estado                EstadoHerramientaUnidad  @default(disponible)
+  estado                EstadoHerramientaUnidad   @default(disponible)
   observaciones         String?
-  catalogoHerramienta   CatalogoHerramienta      @relation(fields: [catalogoHerramientaId], references: [id])
-  almacen               Almacen                  @relation(fields: [almacenId], references: [id])
+  catalogoHerramienta   CatalogoHerramienta       @relation(fields: [catalogoHerramientaId], references: [id])
+  almacen               Almacen                   @relation(fields: [almacenId], references: [id])
   prestamoItems         PrestamoHerramientaItem[]
   movimientos           MovimientoAlmacen[]
-  createdAt             DateTime                 @default(now())
-  updatedAt             DateTime                 @updatedAt
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
 
   @@unique([catalogoHerramientaId, serie])
   @@map("herramienta_unidad")
@@ -4567,20 +4610,20 @@ enum EstadoPrestamoItem {
 }
 
 model DevolucionMaterial {
-  id              String                  @id @default(cuid())
+  id              String                   @id @default(cuid())
   proyectoId      String
-  fechaDevolucion DateTime                @default(now())
+  fechaDevolucion DateTime                 @default(now())
   registradoPorId String
   devueltoPorId   String?
   observaciones   String?
-  estado          EstadoDevolucion        @default(registrada)
-  proyecto        Proyecto                @relation(fields: [proyectoId], references: [id])
-  registradoPor   User                    @relation("DevolucionRegistradoPor", fields: [registradoPorId], references: [id])
-  devueltoPor     User?                   @relation("DevolucionDevueltoPor", fields: [devueltoPorId], references: [id])
+  estado          EstadoDevolucion         @default(registrada)
+  proyecto        Proyecto                 @relation(fields: [proyectoId], references: [id])
+  registradoPor   User                     @relation("DevolucionRegistradoPor", fields: [registradoPorId], references: [id])
+  devueltoPor     User?                    @relation("DevolucionDevueltoPor", fields: [devueltoPorId], references: [id])
   items           DevolucionMaterialItem[]
   movimientos     MovimientoAlmacen[]
-  createdAt       DateTime                @default(now())
-  updatedAt       DateTime                @updatedAt
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
 
   @@index([proyectoId, fechaDevolucion])
   @@map("devolucion_material")
@@ -4599,7 +4642,7 @@ model DevolucionMaterialItem {
   pedidoEquipoItemId String?
   observacionesItem  String?
   estadoItem         String             @default("bueno")
-  devolucion         DevolucionMaterial  @relation(fields: [devolucionId], references: [id], onDelete: Cascade)
+  devolucion         DevolucionMaterial @relation(fields: [devolucionId], references: [id], onDelete: Cascade)
   catalogoEquipo     CatalogoEquipo     @relation(fields: [catalogoEquipoId], references: [id])
 
   @@map("devolucion_material_item")

@@ -13,11 +13,14 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from 'sonner'
-import { Loader2, MapPin, Play, StopCircle, Users, Wifi, LogIn, LogOut, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { Loader2, MapPin, Play, StopCircle, Users, Wifi, LogIn, LogOut, CheckCircle2, AlertTriangle, Settings, Clock } from 'lucide-react'
 import QRCode from 'qrcode'
 import { useGeolocation } from '@/lib/hooks/useGeolocation'
 import { formatearTardanza } from '@/lib/utils/formatTardanza'
 import { getDeviceInfo } from '@/lib/utils/deviceFingerprint'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 interface Ubicacion {
   id: string
@@ -30,6 +33,9 @@ interface Jornada {
   ubicacionId: string
   fecha: string
   activa: boolean
+  horaIngresoOverride: string | null
+  horaSalidaOverride: string | null
+  motivoOverride: string | null
   ubicacion: Ubicacion
 }
 
@@ -41,6 +47,7 @@ interface Asistencia {
   estado: string
   minutosTarde: number
   dentroGeofence: boolean
+  distanciaMetros: number | null
   user: { id: string; name: string | null; email: string }
   dispositivo: { nombre: string | null; modelo: string | null; plataforma: string; aprobado: boolean }
 }
@@ -60,6 +67,9 @@ export default function AsistenciaSupervisorPage() {
   const deviceRef = useRef<Awaited<ReturnType<typeof getDeviceInfo>> | null>(null)
   const [loadingMiMarcaje, setLoadingMiMarcaje] = useState(false)
   const [miMarcaje, setMiMarcaje] = useState<{ ok: boolean; mensaje: string; estado?: string } | null>(null)
+  const [dialogHorario, setDialogHorario] = useState(false)
+  const [horarioForm, setHorarioForm] = useState({ horaIngresoOverride: '', horaSalidaOverride: '', motivoOverride: '' })
+  const [guardandoHorario, setGuardandoHorario] = useState(false)
 
   useEffect(() => {
     if (status !== 'authenticated') return
@@ -146,6 +156,42 @@ export default function AsistenciaSupervisorPage() {
       toast.success('Jornada activa. Comparte el QR con tu equipo.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  function abrirDialogHorario() {
+    if (!jornada) return
+    setHorarioForm({
+      horaIngresoOverride: jornada.horaIngresoOverride || '',
+      horaSalidaOverride: jornada.horaSalidaOverride || '',
+      motivoOverride: jornada.motivoOverride || '',
+    })
+    setDialogHorario(true)
+  }
+
+  async function guardarHorario() {
+    if (!jornada) return
+    setGuardandoHorario(true)
+    try {
+      const r = await fetch(`/api/asistencia/jornada/${jornada.id}/horario`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          horaIngresoOverride: horarioForm.horaIngresoOverride || null,
+          horaSalidaOverride: horarioForm.horaSalidaOverride || null,
+          motivoOverride: horarioForm.motivoOverride || null,
+        }),
+      })
+      const j = await r.json()
+      if (!r.ok) {
+        toast.error(j.error || 'Error')
+        return
+      }
+      setJornada(prev => prev ? { ...prev, ...j } : prev)
+      toast.success('Horario actualizado')
+      setDialogHorario(false)
+    } finally {
+      setGuardandoHorario(false)
     }
   }
 
@@ -276,6 +322,13 @@ export default function AsistenciaSupervisorPage() {
               <p className="text-xs text-muted-foreground">
                 Rota en {segundosRestantes}s
               </p>
+              {(jornada.horaIngresoOverride || jornada.horaSalidaOverride) && (
+                <div className="mt-1 rounded bg-amber-50 px-2 py-1 text-xs text-amber-700">
+                  <Clock className="mr-1 inline h-3 w-3" />
+                  Horario excepcional: {jornada.horaIngresoOverride || '—'} a {jornada.horaSalidaOverride || '—'}
+                  {jornada.motivoOverride && ` · ${jornada.motivoOverride}`}
+                </div>
+              )}
             </CardHeader>
             <CardContent className="flex flex-col items-center">
               {qrImg ? (
@@ -286,8 +339,17 @@ export default function AsistenciaSupervisorPage() {
                 </div>
               )}
               <Button
-                variant="destructive"
+                variant="outline"
+                size="sm"
                 className="mt-4 w-full"
+                onClick={abrirDialogHorario}
+              >
+                <Settings className="mr-2 h-4 w-4" />
+                Horario excepcional (Turno B)
+              </Button>
+              <Button
+                variant="destructive"
+                className="mt-2 w-full"
                 onClick={cerrarJornada}
                 disabled={loading}
               >
@@ -358,6 +420,15 @@ export default function AsistenciaSupervisorPage() {
                             <> · {a.dispositivo.modelo || a.dispositivo.plataforma}</>
                           )}
                         </p>
+                        {a.distanciaMetros != null && (
+                          <p className={`text-xs font-medium ${a.dentroGeofence ? 'text-emerald-600' : 'text-red-600'}`}>
+                            <MapPin className="mr-0.5 inline h-3 w-3" />
+                            {a.distanciaMetros < 1000
+                              ? `${Math.round(a.distanciaMetros)}m`
+                              : `${(a.distanciaMetros / 1000).toFixed(2)}km`}
+                            {!a.dentroGeofence && ' fuera de sede'}
+                          </p>
+                        )}
                       </div>
                       <div className="flex flex-col items-end gap-1">
                         <Badge
@@ -387,6 +458,53 @@ export default function AsistenciaSupervisorPage() {
           </div>
         </div>
       )}
+
+      <Dialog open={dialogHorario} onOpenChange={setDialogHorario}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Horario excepcional de la jornada</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Sobrescribe el horario oficial de la ubicación solo para esta jornada (ej. Turno B,
+              reunión temprana, obra nocturna). Déjalo vacío para usar el horario normal.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs">Hora de ingreso</Label>
+                <Input
+                  type="time"
+                  value={horarioForm.horaIngresoOverride}
+                  onChange={e => setHorarioForm(f => ({ ...f, horaIngresoOverride: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Hora de salida</Label>
+                <Input
+                  type="time"
+                  value={horarioForm.horaSalidaOverride}
+                  onChange={e => setHorarioForm(f => ({ ...f, horaSalidaOverride: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">Motivo del horario excepcional</Label>
+              <Input
+                placeholder="Ej. Turno B - tarde"
+                value={horarioForm.motivoOverride}
+                onChange={e => setHorarioForm(f => ({ ...f, motivoOverride: e.target.value }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogHorario(false)}>Cancelar</Button>
+            <Button onClick={guardarHorario} disabled={guardandoHorario}>
+              {guardandoHorario && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
