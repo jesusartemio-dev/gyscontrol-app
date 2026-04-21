@@ -4456,6 +4456,8 @@ model StockAlmacen {
   catalogoHerramientaId String?
   cantidadDisponible    Float                @default(0)
   cantidadReservada     Float                @default(0)
+  costoUnitarioPromedio Float? // Promedio ponderado del costo por unidad (se recalcula en cada entrada)
+  costoMoneda           String               @default("PEN") // Moneda del costo ('PEN' | 'USD')
   updatedAt             DateTime             @updatedAt
   almacen               Almacen              @relation(fields: [almacenId], references: [id])
   catalogoEquipo        CatalogoEquipo?      @relation(fields: [catalogoEquipoId], references: [id])
@@ -4474,6 +4476,8 @@ model MovimientoAlmacen {
   catalogoHerramientaId String?
   herramientaUnidadId   String?
   cantidad              Float
+  costoUnitario         Float? // Costo unitario de esta entrada (para entradas) / costo aplicado al salir (para salidas)
+  costoMoneda           String               @default("PEN")
   usuarioId             String
   fechaMovimiento       DateTime             @default(now())
   recepcionPendienteId  String?

@@ -14,6 +14,7 @@ import {
   TrendingUp,
   Loader2,
   ArrowRight,
+  DollarSign,
 } from 'lucide-react'
 
 interface KPIs {
@@ -25,6 +26,7 @@ interface KPIs {
   prestamosVencidos: number
   devolucionesEsteMes: number
   movimientosHoy: number
+  valorInventario: Record<string, number>
 }
 
 export default function AlmacenDashboard() {
@@ -50,6 +52,15 @@ export default function AlmacenDashboard() {
         const equiposStock = stock.filter((s: any) => s.catalogoEquipoId)
         const herrStock = stock.filter((s: any) => s.catalogoHerramientaId)
 
+        // Valor del inventario por moneda (cantidad × costo promedio)
+        const valorInventario: Record<string, number> = {}
+        for (const s of stock) {
+          if (s.cantidadDisponible > 0 && s.costoUnitarioPromedio && s.costoUnitarioPromedio > 0) {
+            const moneda = s.costoMoneda || 'PEN'
+            valorInventario[moneda] = (valorInventario[moneda] || 0) + s.cantidadDisponible * s.costoUnitarioPromedio
+          }
+        }
+
         setKpis({
           totalItemsConStock: equiposStock.length,
           itemsConStockPositivo: equiposStock.filter((s: any) => s.cantidadDisponible > 0).length,
@@ -61,6 +72,7 @@ export default function AlmacenDashboard() {
           prestamosVencidos: prestamos.filter((p: any) => p.estado === 'vencido').length,
           devolucionesEsteMes: 0,
           movimientosHoy: movsData.total || 0,
+          valorInventario,
         })
       } finally {
         setLoading(false)
@@ -92,6 +104,28 @@ export default function AlmacenDashboard() {
           <CardContent>
             <p className="text-3xl font-bold">{kpis?.itemsConStockPositivo ?? 0}</p>
             <p className="text-xs text-muted-foreground">{kpis?.totalItemsConStock ?? 0} ítems registrados</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+              <DollarSign className="h-4 w-4" /> Valor del inventario
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {kpis && Object.keys(kpis.valorInventario).length > 0 ? (
+              <div className="space-y-0.5">
+                {Object.entries(kpis.valorInventario).map(([moneda, valor]) => (
+                  <p key={moneda} className="text-xl font-bold text-emerald-700">
+                    {moneda === 'USD' ? 'US$' : 'S/'} {valor.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xl text-muted-foreground">—</p>
+            )}
+            <p className="text-xs text-muted-foreground">costos promedio ponderados</p>
           </CardContent>
         </Card>
 

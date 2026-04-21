@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState, useCallback } from 'react'
+import { useSession } from 'next-auth/react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -13,13 +14,16 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
-import { Loader2, Search, FileSpreadsheet } from 'lucide-react'
+import { Loader2, Search, FileSpreadsheet, Plus } from 'lucide-react'
 import * as XLSX from 'xlsx'
+import { IngresoManualModal } from './IngresoManualModal'
 
 interface StockRow {
   id: string
   cantidadDisponible: number
   cantidadReservada: number
+  costoUnitarioPromedio: number | null
+  costoMoneda: string
   catalogoEquipo: {
     id: string
     codigo: string
@@ -30,12 +34,18 @@ interface StockRow {
   almacen: { nombre: string }
 }
 
+const ROLES_INGRESO = ['admin', 'gerente', 'coordinador_logistico', 'logistico']
+
 export default function MaterialesAlmacen() {
+  const { data: session } = useSession()
+  const puedeIngresar = ROLES_INGRESO.includes(session?.user?.role || '')
+
   const [data, setData] = useState<StockRow[]>([])
   const [loading, setLoading] = useState(false)
   const [busqueda, setBusqueda] = useState('')
   const [soloConStock, setSoloConStock] = useState(true)
   const [filtroCategoria, setFiltroCategoria] = useState('todos')
+  const [modalIngresoAbierto, setModalIngresoAbierto] = useState(false)
 
   const cargar = useCallback(async (q = '') => {
     setLoading(true)
@@ -70,6 +80,27 @@ export default function MaterialesAlmacen() {
   const conStock = useMemo(() => data.filter(s => s.cantidadDisponible > 0).length, [data])
   const sinStock = data.length - conStock
 
+  // Totales por moneda
+  const totales = useMemo(() => {
+    const porMoneda: Record<string, number> = {}
+    const porCategoria = new Map<string, { nombre: string; valor: number; moneda: string }>()
+    for (const s of dataFiltrada) {
+      if (s.cantidadDisponible > 0 && s.costoUnitarioPromedio && s.costoUnitarioPromedio > 0) {
+        const valor = s.cantidadDisponible * s.costoUnitarioPromedio
+        porMoneda[s.costoMoneda] = (porMoneda[s.costoMoneda] || 0) + valor
+        const catNombre = s.catalogoEquipo?.categoriaEquipo?.nombre || 'Sin categoría'
+        const existente = porCategoria.get(catNombre) || { nombre: catNombre, valor: 0, moneda: s.costoMoneda }
+        existente.valor += valor
+        porCategoria.set(catNombre, existente)
+      }
+    }
+    return { porMoneda, porCategoria: Array.from(porCategoria.values()).sort((a, b) => b.valor - a.valor) }
+  }, [dataFiltrada])
+
+  function formatMoneda(valor: number, moneda: string) {
+    return `${moneda === 'USD' ? 'US$' : 'S/'} ${valor.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  }
+
   function exportar() {
     const rows = dataFiltrada.map(s => ({
       Código: s.catalogoEquipo?.codigo,
@@ -78,6 +109,9 @@ export default function MaterialesAlmacen() {
       Marca: s.catalogoEquipo?.marca,
       'Disponible': s.cantidadDisponible,
       'Reservado': s.cantidadReservada,
+      'Costo unitario': s.costoUnitarioPromedio ?? '',
+      'Moneda': s.costoMoneda,
+      'Valor en stock': s.costoUnitarioPromedio ? s.cantidadDisponible * s.costoUnitarioPromedio : '',
       Almacén: s.almacen.nombre,
     }))
     const ws = XLSX.utils.json_to_sheet(rows)
@@ -91,12 +125,48 @@ export default function MaterialesAlmacen() {
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Materiales / Equipos — Stock</h1>
-          <p className="text-sm text-muted-foreground">Saldo actual por ítem de catálogo</p>
+          <p className="text-sm text-muted-foreground">Saldo actual y valor del inventario</p>
         </div>
-        <Button variant="outline" onClick={exportar} disabled={dataFiltrada.length === 0}>
-          <FileSpreadsheet className="mr-2 h-4 w-4" /> Exportar Excel
-        </Button>
+        <div className="flex gap-2">
+          {puedeIngresar && (
+            <Button onClick={() => setModalIngresoAbierto(true)}>
+              <Plus className="mr-2 h-4 w-4" /> Ingreso manual
+            </Button>
+          )}
+          <Button variant="outline" onClick={exportar} disabled={dataFiltrada.length === 0}>
+            <FileSpreadsheet className="mr-2 h-4 w-4" /> Exportar Excel
+          </Button>
+        </div>
       </div>
+
+      {/* KPIs de valor */}
+      {Object.keys(totales.porMoneda).length > 0 && (
+        <div className="mb-4 grid gap-3 md:grid-cols-3">
+          {Object.entries(totales.porMoneda).map(([moneda, valor]) => (
+            <Card key={moneda}>
+              <CardContent className="py-3">
+                <p className="text-xs text-muted-foreground">Valor total en {moneda}</p>
+                <p className="text-2xl font-bold text-emerald-700">{formatMoneda(valor, moneda)}</p>
+              </CardContent>
+            </Card>
+          ))}
+          {totales.porCategoria.length > 0 && (
+            <Card>
+              <CardContent className="py-3">
+                <p className="mb-1 text-xs text-muted-foreground">Valor por categoría (top 3)</p>
+                <div className="space-y-0.5 text-xs">
+                  {totales.porCategoria.slice(0, 3).map(c => (
+                    <div key={c.nombre} className="flex items-center justify-between">
+                      <span className="truncate">{c.nombre}</span>
+                      <span className="font-semibold">{formatMoneda(c.valor, c.moneda)}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
 
       <Card className="mb-4">
         <CardContent className="flex flex-wrap items-end gap-3 py-4">
@@ -132,7 +202,7 @@ export default function MaterialesAlmacen() {
               Solo con stock
             </Label>
           </div>
-          <Button onClick={() => cargar(busqueda)} disabled={loading}>
+          <Button onClick={() => cargar(busqueda)} disabled={loading} variant="outline">
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             Actualizar
           </Button>
@@ -158,48 +228,64 @@ export default function MaterialesAlmacen() {
                 <TableHead>Código</TableHead>
                 <TableHead>Descripción</TableHead>
                 <TableHead>Categoría</TableHead>
-                <TableHead>Marca</TableHead>
                 <TableHead className="text-right">Disponible</TableHead>
-                <TableHead className="text-right">Reservado</TableHead>
+                <TableHead className="text-right">Costo unit.</TableHead>
+                <TableHead className="text-right">Valor en stock</TableHead>
                 <TableHead>Estado</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {dataFiltrada.map(s => (
-                <TableRow key={s.id}>
-                  <TableCell className="font-mono text-xs">{s.catalogoEquipo?.codigo}</TableCell>
-                  <TableCell>{s.catalogoEquipo?.descripcion}</TableCell>
-                  <TableCell className="text-xs">
-                    {s.catalogoEquipo?.categoriaEquipo?.nombre ? (
-                      <Badge variant="outline" className="bg-blue-50 text-blue-700">
-                        {s.catalogoEquipo.categoriaEquipo.nombre}
-                      </Badge>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{s.catalogoEquipo?.marca}</TableCell>
-                  <TableCell className="text-right font-semibold">
-                    {s.cantidadDisponible.toLocaleString('es-PE', { maximumFractionDigits: 2 })}
-                  </TableCell>
-                  <TableCell className="text-right text-muted-foreground">
-                    {s.cantidadReservada > 0 ? s.cantidadReservada : '—'}
-                  </TableCell>
-                  <TableCell>
-                    {s.cantidadDisponible > 0 ? (
-                      <Badge variant="outline" className="bg-emerald-100 text-emerald-700">En stock</Badge>
-                    ) : (
-                      <Badge variant="outline" className="bg-gray-100 text-gray-600">Sin stock</Badge>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
+              {dataFiltrada.map(s => {
+                const valor = s.cantidadDisponible > 0 && s.costoUnitarioPromedio
+                  ? s.cantidadDisponible * s.costoUnitarioPromedio
+                  : null
+                return (
+                  <TableRow key={s.id}>
+                    <TableCell className="font-mono text-xs">{s.catalogoEquipo?.codigo}</TableCell>
+                    <TableCell>
+                      <div>
+                        <p className="text-sm">{s.catalogoEquipo?.descripcion}</p>
+                        {s.catalogoEquipo?.marca && (
+                          <p className="text-xs text-muted-foreground">{s.catalogoEquipo.marca}</p>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      {s.catalogoEquipo?.categoriaEquipo?.nombre ? (
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                          {s.catalogoEquipo.categoriaEquipo.nombre}
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold">
+                      {s.cantidadDisponible.toLocaleString('es-PE', { maximumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-xs">
+                      {s.costoUnitarioPromedio
+                        ? formatMoneda(s.costoUnitarioPromedio, s.costoMoneda)
+                        : <span className="text-muted-foreground">—</span>}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold text-emerald-700">
+                      {valor != null ? formatMoneda(valor, s.costoMoneda) : <span className="text-muted-foreground font-normal">—</span>}
+                    </TableCell>
+                    <TableCell>
+                      {s.cantidadDisponible > 0 ? (
+                        <Badge variant="outline" className="bg-emerald-100 text-emerald-700">En stock</Badge>
+                      ) : (
+                        <Badge variant="outline" className="bg-gray-100 text-gray-600">Sin stock</Badge>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
               {dataFiltrada.length === 0 && !loading && (
                 <TableRow>
                   <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
                     {soloConStock && conStock === 0
                       ? 'No hay ítems con stock. Desactiva "Solo con stock" para ver el histórico.'
-                      : 'Sin ítems. El stock se actualiza automáticamente con las recepciones.'}
+                      : 'Sin ítems. Usa "Ingreso manual" para cargar tu inventario actual.'}
                   </TableCell>
                 </TableRow>
               )}
@@ -207,6 +293,12 @@ export default function MaterialesAlmacen() {
           </Table>
         </CardContent>
       </Card>
+
+      <IngresoManualModal
+        open={modalIngresoAbierto}
+        onOpenChange={setModalIngresoAbierto}
+        onSuccess={() => cargar(busqueda)}
+      />
     </div>
   )
 }

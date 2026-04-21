@@ -237,6 +237,7 @@ export default function PedidoLogisticaDetailPage() {
 
   // Stock de almacén del item en edición (para motivo 'stock_almacen')
   const [stockItem, setStockItem] = useState<number | null>(null)
+  const [costoStockItem, setCostoStockItem] = useState<{ costo: number; moneda: string } | null>(null)
   const [cargandoStock, setCargandoStock] = useState(false)
 
   const resetEditingItem = () => setEditingItem({ item: null, cantidadAtendida: 0, estado: 'pendiente', fechaEntregaReal: '', observacionesEntrega: '', motivoAtencionDirecta: '', costoRealUnitario: '', costoRealMoneda: 'USD', precioUnitario: '', precioMoneda: 'USD', tipoCambio: '', tiempoEntregaDias: '' })
@@ -390,13 +391,25 @@ export default function PedidoLogisticaDetailPage() {
     // Cargar stock del almacén para este item (si tiene catalogoEquipoId)
     const catalogoEquipoId = (item as any).catalogoEquipoId
     setStockItem(null)
+    setCostoStockItem(null)
     if (catalogoEquipoId) {
       setCargandoStock(true)
       fetch(`/api/logistica/almacen/stock?catalogoEquipoId=${catalogoEquipoId}`)
         .then(r => r.json())
         .then((data: any[]) => {
-          const total = Array.isArray(data) ? data.reduce((sum, s) => sum + (s.cantidadDisponible || 0), 0) : 0
+          const filas = Array.isArray(data) ? data : []
+          const total = filas.reduce((sum, s) => sum + (s.cantidadDisponible || 0), 0)
           setStockItem(total)
+          // Costo promedio disponible (ponderado entre almacenes)
+          const filasConCosto = filas.filter(s => s.cantidadDisponible > 0 && s.costoUnitarioPromedio > 0)
+          if (filasConCosto.length > 0) {
+            const suma = filasConCosto.reduce((acc, s) => acc + s.cantidadDisponible * s.costoUnitarioPromedio, 0)
+            const cant = filasConCosto.reduce((acc, s) => acc + s.cantidadDisponible, 0)
+            setCostoStockItem({
+              costo: cant > 0 ? suma / cant : 0,
+              moneda: filasConCosto[0].costoMoneda || 'PEN',
+            })
+          }
         })
         .catch(() => setStockItem(0))
         .finally(() => setCargandoStock(false))
@@ -2161,7 +2174,18 @@ export default function PedidoLogisticaDetailPage() {
                           <label className="text-xs font-medium mb-1 block">Motivo de atención directa *</label>
                           <select
                             value={editingItem.motivoAtencionDirecta}
-                            onChange={(e) => setEditingItem(prev => ({ ...prev, motivoAtencionDirecta: e.target.value }))}
+                            onChange={(e) => {
+                              const nuevoMotivo = e.target.value
+                              setEditingItem(prev => {
+                                const nuevoEstado = { ...prev, motivoAtencionDirecta: nuevoMotivo }
+                                // Si se eligió stock_almacen y hay costo del stock, pre-llenar precio
+                                if (nuevoMotivo === 'stock_almacen' && costoStockItem && !prev.precioUnitario) {
+                                  nuevoEstado.precioUnitario = costoStockItem.costo.toFixed(4)
+                                  nuevoEstado.precioMoneda = costoStockItem.moneda
+                                }
+                                return nuevoEstado
+                              })
+                            }}
                             className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           >
                             <option value="">Seleccionar motivo...</option>
@@ -2193,6 +2217,9 @@ export default function PedidoLogisticaDetailPage() {
                                 <p className="font-semibold">
                                   Stock disponible: {stockItem} unidades
                                 </p>
+                                {costoStockItem && (
+                                  <p>Costo promedio en stock: {costoStockItem.moneda === 'USD' ? 'US$' : 'S/'} {costoStockItem.costo.toFixed(4)}</p>
+                                )}
                                 {stockItem === 0 && <p>No hay stock. No se puede atender desde almacén.</p>}
                                 {stockItem > 0 && editingItem.cantidadAtendida > stockItem && (
                                   <p>Requerido ({editingItem.cantidadAtendida}) supera el stock disponible.</p>

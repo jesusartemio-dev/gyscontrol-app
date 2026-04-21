@@ -249,11 +249,18 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 
       // 6b. Hook de stock: salida desde almacén (NO crea CxP)
       if (data.motivoAtencionDirecta === 'stock_almacen' && almacen && itemExistente.catalogoEquipoId) {
+        // Consultar costo promedio del stock para dejarlo como evidencia en el movimiento
+        const stockActual = await tx.stockAlmacen.findUnique({
+          where: { almacenId_catalogoEquipoId: { almacenId: almacen.id, catalogoEquipoId: itemExistente.catalogoEquipoId } },
+          select: { costoUnitarioPromedio: true, costoMoneda: true },
+        })
         await registrarMovimiento({
           almacenId: almacen.id,
           tipo: 'salida_proyecto',
           catalogoEquipoId: itemExistente.catalogoEquipoId,
           cantidad: data.cantidadAtendida || 0,
+          costoUnitario: stockActual?.costoUnitarioPromedio ?? undefined,
+          costoMoneda: stockActual?.costoMoneda ?? 'PEN',
           usuarioId: userId,
           entregaItemId: entregaItemId,
           observaciones: `Atención desde stock — Pedido ${pedido.codigo}`,
