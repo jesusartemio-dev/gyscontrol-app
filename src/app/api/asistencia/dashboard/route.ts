@@ -25,9 +25,16 @@ export async function GET(req: Request) {
       estado: true,
       minutosTarde: true,
       metodoMarcaje: true,
-      empleado: {
+      // Resolver departamento vía user → empleado (ficha actual),
+      // no vía asistencia.empleado (que puede ser null si la ficha se
+      // creó después del marcaje).
+      user: {
         select: {
-          departamento: { select: { id: true, nombre: true } },
+          empleado: {
+            select: {
+              departamento: { select: { id: true, nombre: true } },
+            },
+          },
         },
       },
     },
@@ -87,7 +94,7 @@ export async function GET(req: Request) {
   }
   const SIN_DEPTO_KEY = '__sin_depto__'
   for (const i of ingresos) {
-    const d = i.empleado?.departamento
+    const d = i.user?.empleado?.departamento
     const key = d?.id || SIN_DEPTO_KEY
     const existente = porDepto.get(key) || {
       nombre: d?.nombre || 'Sin departamento',
