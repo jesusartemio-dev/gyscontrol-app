@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -24,6 +24,14 @@ interface Herramienta {
 interface Unidad { id: string; serie: string; estado: string }
 
 export default function NuevoPrestamoPage() {
+  return (
+    <Suspense fallback={<div className="container mx-auto max-w-2xl px-4 py-6"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></div>}>
+      <NuevoPrestamoForm />
+    </Suspense>
+  )
+}
+
+function NuevoPrestamoForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const solicitudId = searchParams.get('solicitudId') || null
