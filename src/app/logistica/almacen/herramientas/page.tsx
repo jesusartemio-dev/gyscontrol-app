@@ -14,7 +14,8 @@ import {
 } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Loader2, Plus, Wrench, Search, LayoutGrid, List, Pencil } from 'lucide-react'
+import { Loader2, Plus, Wrench, Search, LayoutGrid, List, Pencil, PackagePlus } from 'lucide-react'
+import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
@@ -49,6 +50,11 @@ export default function HerramientasPage() {
   const [editando, setEditando] = useState<Herramienta | null>(null)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState(FORM_VACIO)
+  const [ajustando, setAjustando] = useState<Herramienta | null>(null)
+  const [ajusteForm, setAjusteForm] = useState<{ accion: 'sumar' | 'restar'; cantidad: string; motivo: string }>({
+    accion: 'sumar', cantidad: '', motivo: '',
+  })
+  const [ajustando_guardando, setAjustandoGuardando] = useState(false)
 
   async function cargar(q = '') {
     setLoading(true)
@@ -63,6 +69,34 @@ export default function HerramientasPage() {
     setEditando(null)
     setForm(FORM_VACIO)
     setDialogOpen(true)
+  }
+
+  function abrirAjustar(h: Herramienta) {
+    setAjustando(h)
+    setAjusteForm({ accion: 'sumar', cantidad: '', motivo: '' })
+  }
+
+  async function guardarAjuste() {
+    if (!ajustando) return
+    const cantidad = Number(ajusteForm.cantidad)
+    if (!Number.isFinite(cantidad) || cantidad <= 0) { toast.error('Cantidad debe ser mayor a 0'); return }
+    if (!ajusteForm.motivo.trim()) { toast.error('Indica el motivo del ajuste'); return }
+    const delta = ajusteForm.accion === 'sumar' ? cantidad : -cantidad
+    setAjustandoGuardando(true)
+    try {
+      const r = await fetch(`/api/logistica/almacen/herramientas/${ajustando.id}/ajustar-stock`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ delta, motivo: ajusteForm.motivo.trim() }),
+      })
+      const json = await r.json()
+      if (!r.ok) { toast.error(json.error || 'Error'); return }
+      toast.success(ajusteForm.accion === 'sumar' ? 'Stock incrementado' : 'Stock reducido')
+      setAjustando(null)
+      cargar(busqueda)
+    } finally {
+      setAjustandoGuardando(false)
+    }
   }
 
   function abrirEditar(h: Herramienta) {
@@ -186,7 +220,7 @@ export default function HerramientasPage() {
                   <TableHead className="w-24 text-right">Disponible</TableHead>
                   <TableHead className="w-24 text-right">Prestados</TableHead>
                   <TableHead className="w-20 text-right">Total</TableHead>
-                  <TableHead className="w-16 text-right">Acciones</TableHead>
+                  <TableHead className="w-24 text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -224,9 +258,22 @@ export default function HerramientasPage() {
                       </TableCell>
                       <TableCell className="text-right text-sm">{total}</TableCell>
                       <TableCell className="text-right">
-                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => abrirEditar(h)}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
+                        <div className="flex items-center justify-end gap-0.5">
+                          {!h.gestionPorUnidad && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7"
+                              title="Ajustar stock"
+                              onClick={() => abrirAjustar(h)}
+                            >
+                              <PackagePlus className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                          <Button size="icon" variant="ghost" className="h-7 w-7" title="Editar" onClick={() => abrirEditar(h)}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   )
@@ -249,7 +296,12 @@ export default function HerramientasPage() {
                     </span>
                     <div className="flex items-center gap-1">
                       <Badge variant="outline" className="text-xs">{h.codigo}</Badge>
-                      <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => abrirEditar(h)}>
+                      {!h.gestionPorUnidad && (
+                        <Button size="icon" variant="ghost" className="h-6 w-6" title="Ajustar stock" onClick={() => abrirAjustar(h)}>
+                          <PackagePlus className="h-3 w-3" />
+                        </Button>
+                      )}
+                      <Button size="icon" variant="ghost" className="h-6 w-6" title="Editar" onClick={() => abrirEditar(h)}>
                         <Pencil className="h-3 w-3" />
                       </Button>
                     </div>
@@ -277,6 +329,81 @@ export default function HerramientasPage() {
           })}
         </div>
       )}
+
+      <Dialog open={!!ajustando} onOpenChange={(open) => { if (!open) setAjustando(null) }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Ajustar stock — {ajustando?.nombre}</DialogTitle>
+          </DialogHeader>
+          {ajustando && (() => {
+            const disp = ajustando.stock[0]?.cantidadDisponible ?? 0
+            const cant = Number(ajusteForm.cantidad) || 0
+            const nuevoStock = ajusteForm.accion === 'sumar' ? disp + cant : disp - cant
+            const invalido = ajusteForm.accion === 'restar' && cant > disp
+            return (
+              <div className="space-y-3">
+                <div className="rounded-md border bg-gray-50 px-3 py-2 text-sm">
+                  Stock actual: <span className="font-semibold">{disp}</span> {ajustando.unidadMedida}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAjusteForm(f => ({ ...f, accion: 'sumar' }))}
+                    className={cn(
+                      'flex-1 rounded-md border px-3 py-2 text-sm transition-colors',
+                      ajusteForm.accion === 'sumar' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-gray-200 text-gray-600'
+                    )}
+                  >
+                    + Agregar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAjusteForm(f => ({ ...f, accion: 'restar' }))}
+                    className={cn(
+                      'flex-1 rounded-md border px-3 py-2 text-sm transition-colors',
+                      ajusteForm.accion === 'restar' ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 text-gray-600'
+                    )}
+                  >
+                    − Reducir
+                  </button>
+                </div>
+                <div>
+                  <Label>Cantidad</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max={ajusteForm.accion === 'restar' ? disp : undefined}
+                    value={ajusteForm.cantidad}
+                    onChange={e => setAjusteForm(f => ({ ...f, cantidad: e.target.value }))}
+                    className={invalido ? 'border-red-500' : ''}
+                  />
+                </div>
+                <div>
+                  <Label>Motivo *</Label>
+                  <Textarea
+                    rows={2}
+                    value={ajusteForm.motivo}
+                    onChange={e => setAjusteForm(f => ({ ...f, motivo: e.target.value }))}
+                    placeholder={ajusteForm.accion === 'sumar' ? 'Compra nueva, hallazgo físico...' : 'Extravío, baja por daño, ajuste físico...'}
+                  />
+                </div>
+                {cant > 0 && !invalido && (
+                  <div className="rounded-md border bg-blue-50 px-3 py-2 text-sm text-blue-800">
+                    Nuevo stock: <span className="font-semibold">{nuevoStock}</span> {ajustando.unidadMedida}
+                  </div>
+                )}
+                {invalido && (
+                  <p className="text-xs text-red-600">No puedes reducir más de {disp} unidades (stock actual).</p>
+                )}
+                <Button className="w-full" onClick={guardarAjuste} disabled={ajustando_guardando || invalido}>
+                  {ajustando_guardando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Registrar ajuste
+                </Button>
+              </div>
+            )
+          })()}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditando(null) }}>
         <DialogContent className="max-w-lg">

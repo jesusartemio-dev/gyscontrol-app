@@ -6,7 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Loader2, Plus, ArrowLeftRight, AlertTriangle } from 'lucide-react'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Textarea } from '@/components/ui/textarea'
+import { cn } from '@/lib/utils'
+import { Loader2, Plus, ArrowLeftRight, AlertTriangle, Inbox, CheckCircle2, XCircle, RotateCcw, User as UserIcon } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface Prestamo {
@@ -27,6 +30,29 @@ interface Prestamo {
   }[]
 }
 
+interface SolicitudPendiente {
+  id: string
+  numero: string
+  observaciones: string | null
+  createdAt: string
+  fechaEnvio: string | null
+  fechaRequerida: string | null
+  fechaDevolucionEstimada: string | null
+  solicitante: { id: string; name: string | null; email: string }
+  proyecto: { codigo: string; nombre: string } | null
+  items: {
+    id: string
+    cantidad: number
+    catalogoHerramienta: {
+      id: string
+      codigo: string
+      nombre: string
+      unidadMedida: string
+      stock: { cantidadDisponible: number }[]
+    }
+  }[]
+}
+
 const ESTADO_COLORS: Record<string, string> = {
   activo: 'bg-emerald-100 text-emerald-700',
   devuelto: 'bg-gray-100 text-gray-600',
@@ -40,6 +66,62 @@ export default function PrestamosPage() {
   const [loading, setLoading] = useState(false)
   const [filtroEstado, setFiltroEstado] = useState('todos')
   const [devolviendo, setDevolviendo] = useState<string | null>(null)
+  const [pendientes, setPendientes] = useState<SolicitudPendiente[]>([])
+  const [devolviendoSol, setDevolviendoSol] = useState<SolicitudPendiente | null>(null)
+  const [devolverNota, setDevolverNota] = useState('')
+  const [devolverEnviando, setDevolverEnviando] = useState(false)
+
+  async function cargarPendientes() {
+    const r = await fetch('/api/solicitud-herramienta?estado=enviado')
+    const json = await r.json()
+    const solicitudes: SolicitudPendiente[] = json.solicitudes || []
+    // Ordenar por urgencia: las que tienen fecha requerida más próxima primero.
+    solicitudes.sort((a, b) => {
+      const ta = a.fechaRequerida ? new Date(a.fechaRequerida).getTime() : Infinity
+      const tb = b.fechaRequerida ? new Date(b.fechaRequerida).getTime() : Infinity
+      return ta - tb
+    })
+    setPendientes(solicitudes)
+  }
+
+  function fmtFecha(iso: string | null): string {
+    if (!iso) return ''
+    return new Date(iso).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: '2-digit' })
+  }
+
+  function urgenciaDe(iso: string | null): { label: string; classes: string } | null {
+    if (!iso) return null
+    const dias = Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000)
+    if (dias < 1) return { label: 'Urgente', classes: 'bg-red-100 text-red-700 border-red-300' }
+    if (dias < 3) return { label: 'Próximo', classes: 'bg-amber-100 text-amber-700 border-amber-300' }
+    return null
+  }
+
+  function abrirDevolver(s: SolicitudPendiente) {
+    setDevolviendoSol(s)
+    setDevolverNota('')
+  }
+
+  async function confirmarDevolucion() {
+    if (!devolviendoSol) return
+    const nota = devolverNota.trim()
+    if (!nota) { toast.error('Indica un motivo para devolver'); return }
+    setDevolverEnviando(true)
+    try {
+      const r = await fetch(`/api/solicitud-herramienta/${devolviendoSol.id}/devolver`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nota }),
+      })
+      const json = await r.json()
+      if (!r.ok) { toast.error(json.error || 'Error al devolver'); return }
+      toast.success(`Solicitud ${devolviendoSol.numero} devuelta al solicitante`)
+      setDevolviendoSol(null)
+      cargarPendientes()
+    } finally {
+      setDevolverEnviando(false)
+    }
+  }
 
   async function cargar() {
     setLoading(true)
@@ -52,6 +134,7 @@ export default function PrestamosPage() {
   }
 
   useEffect(() => { cargar() }, [filtroEstado])
+  useEffect(() => { cargarPendientes() }, [])
 
   async function devolverTodo(prestamoId: string, items: Prestamo['items']) {
     if (!confirm('¿Confirmar devolución total de este préstamo?')) return
@@ -89,6 +172,94 @@ export default function PrestamosPage() {
           <Button><Plus className="mr-2 h-4 w-4" /> Nuevo préstamo</Button>
         </Link>
       </div>
+
+      {pendientes.length > 0 && (
+        <Card className="mb-4 border-amber-300 bg-amber-50/30">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Inbox className="h-4 w-4 text-amber-700" />
+              Solicitudes enviadas
+              <Badge variant="outline" className="ml-1 bg-amber-100 text-amber-700">{pendientes.length}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {pendientes.map(s => {
+              const urg = urgenciaDe(s.fechaRequerida)
+              return (
+              <div key={s.id} className={cn(
+                'rounded-lg border bg-white p-3',
+                urg && urg.label === 'Urgente' && 'border-red-300 ring-1 ring-red-100'
+              )}>
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-mono text-xs font-semibold">{s.numero}</span>
+                      {urg && (
+                        <Badge variant="outline" className={cn('text-[10px]', urg.classes)}>
+                          {urg.label}
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-2 text-sm">
+                      <UserIcon className="h-3 w-3 text-muted-foreground" />
+                      <span>{s.solicitante.name || s.solicitante.email}</span>
+                      {s.proyecto && (
+                        <Badge variant="outline" className="text-[10px]">
+                          {s.proyecto.codigo}
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+                      {s.fechaEnvio && <span>Enviada: {new Date(s.fechaEnvio).toLocaleString('es-PE')}</span>}
+                      {s.fechaRequerida && <span>📅 Para: <strong className="text-gray-700">{fmtFecha(s.fechaRequerida)}</strong></span>}
+                      {s.fechaDevolucionEstimada && <span>↩️ Devuelve: <strong className="text-gray-700">{fmtFecha(s.fechaDevolucionEstimada)}</strong></span>}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Link href={`/logistica/almacen/prestamos/nuevo?solicitudId=${s.id}`}>
+                      <Button size="sm" className="h-8">
+                        <CheckCircle2 className="mr-1 h-3 w-3" /> Convertir en préstamo
+                      </Button>
+                    </Link>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 text-amber-700 hover:bg-amber-50"
+                      onClick={() => abrirDevolver(s)}
+                    >
+                      <RotateCcw className="mr-1 h-3 w-3" />
+                      Devolver para editar
+                    </Button>
+                  </div>
+                </div>
+                <ul className="mt-2 space-y-1 text-xs">
+                  {s.items.map(it => {
+                    const disp = it.catalogoHerramienta.stock[0]?.cantidadDisponible ?? 0
+                    const falta = disp < it.cantidad
+                    return (
+                      <li key={it.id} className="flex items-center justify-between rounded border px-2 py-1">
+                        <span>
+                          <span className="font-mono text-[10px] text-muted-foreground mr-1.5">{it.catalogoHerramienta.codigo}</span>
+                          {it.catalogoHerramienta.nombre}
+                        </span>
+                        <span className={`flex items-center gap-2 ${falta ? 'text-amber-700' : ''}`}>
+                          {falta && <AlertTriangle className="h-3 w-3" />}
+                          <span>pide {it.cantidad}</span>
+                          <span className="text-muted-foreground">/ disp. {disp}</span>
+                        </span>
+                      </li>
+                    )
+                  })}
+                </ul>
+                {s.observaciones && (
+                  <p className="mt-2 text-[11px] text-muted-foreground">💬 {s.observaciones}</p>
+                )}
+              </div>
+              )
+            })}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="mb-4 flex gap-3">
         <Select value={filtroEstado} onValueChange={setFiltroEstado}>
@@ -178,6 +349,45 @@ export default function PrestamosPage() {
           })}
         </div>
       )}
+
+      <Dialog open={!!devolviendoSol} onOpenChange={(open) => { if (!open) setDevolviendoSol(null) }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RotateCcw className="h-5 w-5 text-amber-600" />
+              Devolver solicitud al solicitante
+            </DialogTitle>
+            <DialogDescription>
+              Solicitud <span className="font-mono font-semibold">{devolviendoSol?.numero}</span> de{' '}
+              <strong>{devolviendoSol?.solicitante.name || devolviendoSol?.solicitante.email}</strong>.
+              Al devolver, vuelve a borrador para que el solicitante pueda ajustar los ítems o descartarla.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <label className="text-xs font-medium">Motivo (visible para el solicitante) *</label>
+            <Textarea
+              rows={3}
+              value={devolverNota}
+              onChange={e => setDevolverNota(e.target.value)}
+              placeholder="Ej: ya tenemos 2 de esos prestados al proyecto X, considera otro modelo. / No contamos con stock, pide cuando vuelvan del proyecto Y."
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDevolviendoSol(null)} disabled={devolverEnviando}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={confirmarDevolucion}
+              disabled={devolverEnviando || !devolverNota.trim()}
+              className="bg-amber-600 hover:bg-amber-700"
+            >
+              {devolverEnviando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RotateCcw className="mr-2 h-4 w-4" />}
+              Devolver
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

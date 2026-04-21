@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,10 +25,13 @@ interface Unidad { id: string; serie: string; estado: string }
 
 export default function NuevoPrestamoPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const solicitudId = searchParams.get('solicitudId') || null
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [herramientas, setHerramientas] = useState<Herramienta[]>([])
   const [unidades, setUnidades] = useState<Record<string, Unidad[]>>({})
   const [saving, setSaving] = useState(false)
+  const [solicitudNumero, setSolicitudNumero] = useState<string | null>(null)
 
   const [form, setForm] = useState({
     usuarioId: '',
@@ -49,6 +52,31 @@ export default function NuevoPrestamoPage() {
     fetch('/api/admin/usuarios').then(r => r.json()).then((d: any) => setUsuarios(d.usuarios || d || [])).catch(() => {})
     fetch('/api/logistica/almacen/herramientas').then(r => r.json()).then(setHerramientas).catch(() => {})
   }, [])
+
+  // Si viene de una solicitud, pre-llenar form con sus datos
+  useEffect(() => {
+    if (!solicitudId) return
+    fetch(`/api/solicitud-herramienta/${solicitudId}`).then(r => r.json()).then((sol: any) => {
+      if (!sol?.id) { toast.error('No se pudo cargar la solicitud'); return }
+      setSolicitudNumero(sol.numero)
+      setForm(f => ({
+        ...f,
+        usuarioId: sol.solicitante.id,
+        proyectoId: sol.proyecto?.id || '',
+        observaciones: sol.observaciones || '',
+        fechaDevolucionEstimada: sol.fechaDevolucionEstimada ? sol.fechaDevolucionEstimada.slice(0, 10) : f.fechaDevolucionEstimada,
+      }))
+      setItems(
+        sol.items.map((it: any) => ({
+          key: Date.now() + Math.random(),
+          tipo: 'cantidad' as const,
+          catalogoHerramientaId: it.catalogoHerramienta.id,
+          herramientaUnidadId: '',
+          cantidadPrestada: it.cantidad,
+        }))
+      )
+    }).catch(() => toast.error('Error al cargar solicitud'))
+  }, [solicitudId])
 
   async function cargarUnidades(herramientaId: string) {
     if (unidades[herramientaId]) return
@@ -92,6 +120,7 @@ export default function NuevoPrestamoPage() {
           ...form,
           proyectoId: form.proyectoId || null,
           fechaDevolucionEstimada: form.fechaDevolucionEstimada || null,
+          solicitudHerramientaId: solicitudId,
           items: items.map(i => ({
             catalogoHerramientaId: i.tipo === 'cantidad' ? i.catalogoHerramientaId : null,
             herramientaUnidadId: i.tipo === 'unidad' ? i.herramientaUnidadId : null,
@@ -110,7 +139,13 @@ export default function NuevoPrestamoPage() {
 
   return (
     <div className="container mx-auto max-w-2xl px-4 py-6">
-      <h1 className="mb-6 text-2xl font-bold">Nuevo Préstamo</h1>
+      <h1 className="mb-2 text-2xl font-bold">Nuevo Préstamo</h1>
+      {solicitudNumero && (
+        <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+          Atendiendo solicitud <span className="font-mono font-semibold">{solicitudNumero}</span>.
+          Al guardar, la solicitud quedará marcada como <strong>atendida</strong>.
+        </div>
+      )}
 
       <Card className="mb-4">
         <CardHeader><CardTitle className="text-sm">Destinatario</CardTitle></CardHeader>

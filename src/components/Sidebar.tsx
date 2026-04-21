@@ -228,6 +228,7 @@ export default function Sidebar() {
         { href: '/mi-trabajo/mi-jornada', label: 'Mi Jornada', icon: HardHat },
         { href: '/mi-trabajo/tareas', label: 'Mis Tareas', icon: CheckSquare },
         { href: '/mi-trabajo/progreso', label: 'Mi Progreso', icon: TrendingUp },
+        { href: '/mi-trabajo/herramientas', label: 'Mis Herramientas', icon: Wrench },
       ]
     },
     // 2.2. Supervisión - Vista de equipo y análisis (solo supervisores)

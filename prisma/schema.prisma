@@ -1080,6 +1080,7 @@ model Proyecto {
   ssomaExpediente            SsomaExpediente?
   solicitudesRecurso         SolicitudRecurso[]
   prestamosHerramienta       PrestamoHerramienta[]
+  solicitudesHerramienta     SolicitudHerramienta[]
   devolucionesMaterial       DevolucionMaterial[]
 
   @@index([clienteId, estado, createdAt(sort: Desc)], map: "idx_proyecto_cliente_estado_fecha")
@@ -1603,6 +1604,8 @@ model User {
   prestamosComoUsuario            PrestamoHerramienta[]       @relation("PrestamoUsuario")
   prestamosEntregados             PrestamoHerramienta[]       @relation("PrestamoEntregadoPor")
   prestamosRecibidos              PrestamoHerramienta[]       @relation("PrestamoRecibidoPor")
+  solicitudesHerramienta          SolicitudHerramienta[]      @relation("SolicitudHerramientaSolicitante")
+  solicitudesHerramientaAtendidas SolicitudHerramienta[]      @relation("SolicitudHerramientaAtendidaPor")
   devolucionesRegistradas         DevolucionMaterial[]        @relation("DevolucionRegistradoPor")
   devolucionesDevueltas           DevolucionMaterial[]        @relation("DevolucionDevueltoPor")
 
@@ -4525,6 +4528,7 @@ model CatalogoHerramienta {
   unidades         HerramientaUnidad[]
   stock            StockAlmacen[]
   prestamoItems    PrestamoHerramientaItem[]
+  solicitudItems   SolicitudHerramientaItem[]
   movimientos      MovimientoAlmacen[]
   createdAt        DateTime                  @default(now())
   updatedAt        DateTime                  @updatedAt
@@ -4575,6 +4579,7 @@ model PrestamoHerramienta {
   recibidoPor             User?                     @relation("PrestamoRecibidoPor", fields: [recibidoPorId], references: [id])
   items                   PrestamoHerramientaItem[]
   movimientos             MovimientoAlmacen[]
+  solicitudHerramienta    SolicitudHerramienta?
   createdAt               DateTime                  @default(now())
   updatedAt               DateTime                  @updatedAt
 
@@ -4611,6 +4616,53 @@ enum EstadoPrestamoItem {
   prestado
   devuelto
   perdido
+}
+
+model SolicitudHerramienta {
+  id             String                     @id @default(cuid())
+  numero         String                     @unique
+  solicitanteId  String
+  proyectoId     String?
+  observaciones  String?
+  estado                  EstadoSolicitudHerramienta @default(borrador)
+  fechaEnvio              DateTime?
+  fechaRequerida          DateTime?
+  fechaDevolucionEstimada DateTime?
+  prestamoId     String?                    @unique
+  atendidaPorId  String?
+  fechaAtencion  DateTime?
+  notaAtencion   String?
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+
+  solicitante    User                       @relation("SolicitudHerramientaSolicitante", fields: [solicitanteId], references: [id])
+  proyecto       Proyecto?                  @relation(fields: [proyectoId], references: [id])
+  atendidaPor    User?                      @relation("SolicitudHerramientaAtendidaPor", fields: [atendidaPorId], references: [id])
+  prestamo       PrestamoHerramienta?       @relation(fields: [prestamoId], references: [id])
+  items          SolicitudHerramientaItem[]
+
+  @@index([solicitanteId, estado])
+  @@index([estado, createdAt])
+  @@map("solicitud_herramienta")
+}
+
+enum EstadoSolicitudHerramienta {
+  borrador
+  enviado
+  atendida
+  cancelada
+}
+
+model SolicitudHerramientaItem {
+  id                    String               @id @default(cuid())
+  solicitudId           String
+  catalogoHerramientaId String
+  cantidad              Float                @default(1)
+
+  solicitud             SolicitudHerramienta @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
+  catalogoHerramienta   CatalogoHerramienta  @relation(fields: [catalogoHerramientaId], references: [id])
+
+  @@map("solicitud_herramienta_item")
 }
 
 model DevolucionMaterial {

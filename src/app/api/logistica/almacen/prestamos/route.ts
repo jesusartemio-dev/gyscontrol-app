@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { registrarMovimiento, getAlmacenCentral } from '@/lib/services/almacen'
+import { crearNotificacion } from '@/lib/utils/notificaciones'
 
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions)
@@ -49,10 +50,30 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json()
-    const { usuarioId, proyectoId, fechaDevolucionEstimada, observaciones, items } = body
+    const { usuarioId, proyectoId, observaciones, items, solicitudHerramientaId } = body
+    let { fechaDevolucionEstimada } = body
 
     if (!usuarioId || !items?.length) {
       return NextResponse.json({ error: 'usuarioId e items son requeridos' }, { status: 400 })
+    }
+
+    // Si viene de una solicitud, validar que exista y esté enviada (no borrador ni ya atendida).
+    if (solicitudHerramientaId) {
+      const sol = await prisma.solicitudHerramienta.findUnique({
+        where: { id: solicitudHerramientaId },
+        select: { id: true, estado: true, fechaDevolucionEstimada: true },
+      })
+      if (!sol) return NextResponse.json({ error: 'Solicitud no encontrada' }, { status: 404 })
+      if (sol.estado !== 'enviado') {
+        return NextResponse.json(
+          { error: `La solicitud no está enviada (estado: ${sol.estado})` },
+          { status: 400 }
+        )
+      }
+      // Heredar fecha de devolución de la solicitud si el body no la trae explícita.
+      if (!fechaDevolucionEstimada && sol.fechaDevolucionEstimada) {
+        fechaDevolucionEstimada = sol.fechaDevolucionEstimada.toISOString()
+      }
     }
 
     const almacen = await getAlmacenCentral()
@@ -120,8 +141,42 @@ export async function POST(req: Request) {
         }
       }
 
+      // Enlazar solicitud (si aplica) y marcarla como atendida dentro de la misma tx
+      if (solicitudHerramientaId) {
+        await tx.solicitudHerramienta.update({
+          where: { id: solicitudHerramientaId },
+          data: {
+            estado: 'atendida',
+            prestamoId: prest.id,
+            atendidaPorId: session.user.id,
+            fechaAtencion: new Date(),
+          },
+        })
+      }
+
       return prest
     })
+
+    // Notificar al solicitante si la solicitud quedó atendida
+    if (solicitudHerramientaId) {
+      const sol = await prisma.solicitudHerramienta.findUnique({
+        where: { id: solicitudHerramientaId },
+        select: { numero: true, solicitanteId: true },
+      })
+      if (sol) {
+        crearNotificacion(prisma, {
+          usuarioId: sol.solicitanteId,
+          titulo: `Tu solicitud ${sol.numero} fue atendida`,
+          mensaje: `Se generó el préstamo de herramientas. Pasa a recogerlas por el almacén.`,
+          tipo: 'success',
+          prioridad: 'media',
+          entidadTipo: 'SolicitudHerramienta',
+          entidadId: solicitudHerramientaId,
+          accionUrl: '/mi-trabajo/herramientas',
+          accionTexto: 'Ver mis solicitudes',
+        })
+      }
+    }
 
     return NextResponse.json(prestamo, { status: 201 })
   } catch (error: any) {
