@@ -27,7 +27,9 @@ interface Herramienta {
   unidadMedida: string
   activo: boolean
   stock: { cantidadDisponible: number }[]
+  unidades: { id: string; estado: string; serie: string }[]
   _count: { unidades: number }
+  prestadosActivos: number
 }
 
 const CATEGORIAS = ['electricas', 'manuales', 'medicion', 'proteccion', 'computo', 'otro']
@@ -146,8 +148,10 @@ export default function HerramientasPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {data.map(h => {
           const disponible = h.gestionPorUnidad
-            ? h._count.unidades
+            ? h.unidades.filter(u => u.estado === 'disponible').length
             : (h.stock[0]?.cantidadDisponible ?? 0)
+          const prestados = h.prestadosActivos ?? 0
+          const total = disponible + prestados
           return (
             <Card key={h.id}>
               <CardHeader className="pb-2">
@@ -163,12 +167,17 @@ export default function HerramientasPage() {
               <CardContent>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">
-                    {h.gestionPorUnidad ? 'Por unidad serializada' : `${h.unidadMedida}`}
+                    {h.gestionPorUnidad ? 'Por unidad serializada' : h.unidadMedida}
                   </span>
                   <span className={`font-semibold ${disponible > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                    {disponible} disponible{disponible !== 1 ? 's' : ''}
+                    {disponible}/{total} disp.
                   </span>
                 </div>
+                {prestados > 0 && (
+                  <div className="mt-1 flex items-center justify-end text-xs text-amber-700">
+                    {prestados} prestad{prestados !== 1 ? 'os' : 'o'}
+                  </div>
+                )}
                 {h.descripcion && <p className="mt-1 text-xs text-muted-foreground">{h.descripcion}</p>}
               </CardContent>
             </Card>

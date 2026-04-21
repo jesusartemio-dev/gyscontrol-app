@@ -34,7 +34,34 @@ export async function GET(req: Request) {
     orderBy: { nombre: 'asc' },
   })
 
-  return NextResponse.json(herramientas)
+  // Cantidad prestada actual (solo bulk): suma de (prestada - devuelta) en items aún no cerrados.
+  // Para herramientas serializadas, el estado de cada unidad ya refleja si está prestada.
+  const bulkIds = herramientas.filter(h => !h.gestionPorUnidad).map(h => h.id)
+  const prestadosMap = new Map<string, number>()
+  if (bulkIds.length > 0) {
+    const grupos = await prisma.prestamoHerramientaItem.groupBy({
+      by: ['catalogoHerramientaId'],
+      where: {
+        catalogoHerramientaId: { in: bulkIds },
+        estado: 'prestado',
+      },
+      _sum: { cantidadPrestada: true, cantidadDevuelta: true },
+    })
+    for (const g of grupos) {
+      if (!g.catalogoHerramientaId) continue
+      const pendiente = (g._sum.cantidadPrestada || 0) - (g._sum.cantidadDevuelta || 0)
+      if (pendiente > 0) prestadosMap.set(g.catalogoHerramientaId, pendiente)
+    }
+  }
+
+  const enriquecidas = herramientas.map(h => ({
+    ...h,
+    prestadosActivos: h.gestionPorUnidad
+      ? h.unidades.filter(u => u.estado === 'prestada').length
+      : (prestadosMap.get(h.id) || 0),
+  }))
+
+  return NextResponse.json(enriquecidas)
 }
 
 export async function POST(req: Request) {

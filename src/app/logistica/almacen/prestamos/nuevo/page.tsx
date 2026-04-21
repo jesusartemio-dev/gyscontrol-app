@@ -11,7 +11,16 @@ import { Loader2, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface Usuario { id: string; name: string | null; email: string }
-interface Herramienta { id: string; codigo: string; nombre: string; gestionPorUnidad: boolean }
+interface Herramienta {
+  id: string
+  codigo: string
+  nombre: string
+  gestionPorUnidad: boolean
+  unidadMedida: string
+  stock: { cantidadDisponible: number }[]
+  unidades: { id: string; estado: string; serie: string }[]
+  prestadosActivos: number
+}
 interface Unidad { id: string; serie: string; estado: string }
 
 export default function NuevoPrestamoPage() {
@@ -60,6 +69,19 @@ export default function NuevoPrestamoPage() {
     if (!form.usuarioId) { toast.error('Selecciona un destinatario'); return }
     if (!items.length) { toast.error('Agrega al menos una herramienta'); return }
     if (items.some(i => !i.catalogoHerramientaId)) { toast.error('Completa todas las herramientas'); return }
+    for (const i of items) {
+      const h = herramientas.find(x => x.id === i.catalogoHerramientaId)
+      if (!h) continue
+      if (i.tipo === 'unidad' && !i.herramientaUnidadId) {
+        toast.error(`Selecciona la serie para "${h.nombre}"`); return
+      }
+      if (i.tipo === 'cantidad') {
+        const stock = h.stock[0]?.cantidadDisponible ?? 0
+        if (i.cantidadPrestada > stock) {
+          toast.error(`"${h.nombre}": stock disponible ${stock}, pides ${i.cantidadPrestada}`); return
+        }
+      }
+    }
 
     setSaving(true)
     try {
@@ -123,46 +145,72 @@ export default function NuevoPrestamoPage() {
         <CardContent className="space-y-3">
           {items.map((item, idx) => {
             const herr = herramientas.find(h => h.id === item.catalogoHerramientaId)
+            const stockBulk = herr && !herr.gestionPorUnidad ? (herr.stock[0]?.cantidadDisponible ?? 0) : 0
+            const unidadesDisp = herr?.gestionPorUnidad ? herr.unidades.filter(u => u.estado === 'disponible').length : 0
+            const excedeStock = !herr?.gestionPorUnidad && item.cantidadPrestada > stockBulk
             return (
-              <div key={item.key} className="flex items-end gap-2 rounded border p-2">
-                <div className="flex-1">
-                  <Label className="text-xs">Herramienta</Label>
-                  <Select value={item.catalogoHerramientaId} onValueChange={v => {
-                    const h = herramientas.find(x => x.id === v)
-                    const tipo = h?.gestionPorUnidad ? 'unidad' : 'cantidad'
-                    if (h?.gestionPorUnidad) cargarUnidades(v)
-                    setItems(prev => prev.map((i, ii) => ii === idx ? { ...i, catalogoHerramientaId: v, tipo, herramientaUnidadId: '' } : i))
-                  }}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Seleccionar" /></SelectTrigger>
-                    <SelectContent>
-                      {herramientas.map(h => <SelectItem key={h.id} value={h.id}>{h.codigo} — {h.nombre}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {herr?.gestionPorUnidad ? (
-                  <div className="w-40">
-                    <Label className="text-xs">Serie</Label>
-                    <Select value={item.herramientaUnidadId} onValueChange={v =>
-                      setItems(prev => prev.map((i, ii) => ii === idx ? { ...i, herramientaUnidadId: v } : i))
-                    }>
-                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Serie" /></SelectTrigger>
+              <div key={item.key} className="rounded border p-2">
+                <div className="flex items-end gap-2">
+                  <div className="flex-1">
+                    <Label className="text-xs">Herramienta</Label>
+                    <Select value={item.catalogoHerramientaId} onValueChange={v => {
+                      const h = herramientas.find(x => x.id === v)
+                      const tipo = h?.gestionPorUnidad ? 'unidad' : 'cantidad'
+                      if (h?.gestionPorUnidad) cargarUnidades(v)
+                      setItems(prev => prev.map((i, ii) => ii === idx ? { ...i, catalogoHerramientaId: v, tipo, herramientaUnidadId: '', cantidadPrestada: 1 } : i))
+                    }}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Seleccionar" /></SelectTrigger>
                       <SelectContent>
-                        {(unidades[item.catalogoHerramientaId] || []).map(u =>
-                          <SelectItem key={u.id} value={u.id}>{u.serie}</SelectItem>
-                        )}
+                        {herramientas.map(h => {
+                          const disp = h.gestionPorUnidad
+                            ? h.unidades.filter(u => u.estado === 'disponible').length
+                            : (h.stock[0]?.cantidadDisponible ?? 0)
+                          return (
+                            <SelectItem key={h.id} value={h.id} disabled={disp === 0}>
+                              {h.codigo} — {h.nombre} <span className="text-muted-foreground">({disp} disp.)</span>
+                            </SelectItem>
+                          )
+                        })}
                       </SelectContent>
                     </Select>
                   </div>
-                ) : (
-                  <div className="w-24">
-                    <Label className="text-xs">Cantidad</Label>
-                    <Input type="number" min="1" className="h-8 text-xs" value={item.cantidadPrestada}
-                      onChange={e => setItems(prev => prev.map((i, ii) => ii === idx ? { ...i, cantidadPrestada: Number(e.target.value) } : i))} />
-                  </div>
+                  {herr?.gestionPorUnidad ? (
+                    <div className="w-40">
+                      <Label className="text-xs">Serie</Label>
+                      <Select value={item.herramientaUnidadId} onValueChange={v =>
+                        setItems(prev => prev.map((i, ii) => ii === idx ? { ...i, herramientaUnidadId: v } : i))
+                      }>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Serie" /></SelectTrigger>
+                        <SelectContent>
+                          {(unidades[item.catalogoHerramientaId] || []).map(u =>
+                            <SelectItem key={u.id} value={u.id}>{u.serie}</SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : (
+                    <div className="w-24">
+                      <Label className="text-xs">Cantidad</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        max={stockBulk || undefined}
+                        className={`h-8 text-xs ${excedeStock ? 'border-red-500' : ''}`}
+                        value={item.cantidadPrestada}
+                        onChange={e => setItems(prev => prev.map((i, ii) => ii === idx ? { ...i, cantidadPrestada: Number(e.target.value) } : i))}
+                      />
+                    </div>
+                  )}
+                  <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500" onClick={() => removeItem(item.key)}>
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+                {herr && (
+                  <p className={`mt-1 text-[11px] ${excedeStock ? 'text-red-600' : 'text-muted-foreground'}`}>
+                    Stock disponible: {herr.gestionPorUnidad ? unidadesDisp : stockBulk}
+                    {excedeStock && ' — la cantidad excede el stock'}
+                  </p>
                 )}
-                <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500" onClick={() => removeItem(item.key)}>
-                  <Trash2 className="h-3 w-3" />
-                </Button>
               </div>
             )
           })}
