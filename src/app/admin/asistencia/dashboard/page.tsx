@@ -78,6 +78,7 @@ export default function DashboardAsistencia() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="0">Hoy</SelectItem>
             <SelectItem value="7">Últimos 7 días</SelectItem>
             <SelectItem value="30">Últimos 30 días</SelectItem>
             <SelectItem value="90">Últimos 90 días</SelectItem>
