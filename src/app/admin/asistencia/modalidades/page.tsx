@@ -21,7 +21,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { toast } from 'sonner'
-import { Loader2, Home, Search, AlertTriangle } from 'lucide-react'
+import { Loader2, Home, Search, AlertTriangle, ChevronDown, ChevronUp, UserPlus } from 'lucide-react'
 
 type Modalidad = 'presencial' | 'remoto' | 'hibrido' | 'confianza'
 type Dia = 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | 'sabado' | 'domingo'
@@ -35,6 +35,14 @@ interface EmpleadoRow {
   departamento: { nombre: string } | null
 }
 
+interface UsuarioSinFicha {
+  id: string
+  name: string | null
+  email: string
+  role: string
+  lastLoginAt: string | null
+}
+
 const DIAS: Dia[] = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo']
 
 export default function ModalidadesPage() {
@@ -46,15 +54,18 @@ export default function ModalidadesPage() {
   const [filtroCargo, setFiltroCargo] = useState('todos')
   const [filtroModalidad, setFiltroModalidad] = useState('todos')
   const [sinFicha, setSinFicha] = useState(0)
+  const [usuariosSinFicha, setUsuariosSinFicha] = useState<UsuarioSinFicha[]>([])
+  const [mostrarSinFicha, setMostrarSinFicha] = useState(false)
 
   async function cargar() {
     setLoading(true)
-    const [modalidades, conteo] = await Promise.all([
+    const [modalidades, sinFichaData] = await Promise.all([
       fetch('/api/asistencia/modalidades').then(r => r.json()),
       fetch('/api/asistencia/modalidades/sin-ficha').then(r => r.json()),
     ])
     setData(modalidades)
-    setSinFicha(conteo.total ?? 0)
+    setSinFicha(sinFichaData.total ?? 0)
+    setUsuariosSinFicha(sinFichaData.usuarios ?? [])
     setLoading(false)
   }
 
@@ -135,17 +146,69 @@ export default function ModalidadesPage() {
       </div>
 
       {sinFicha > 0 && (
-        <div className="mb-4 flex items-center gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
-          <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
-          <p className="text-sm text-amber-800">
-            <span className="font-semibold">{sinFicha} usuario{sinFicha > 1 ? 's' : ''}</span> no tienen ficha de empleado y no aparecen aquí.
-          </p>
-          <Link
-            href="/admin/personal"
-            className="ml-auto shrink-0 text-sm font-medium text-amber-700 underline hover:text-amber-900"
-          >
-            Ir a Personal (RRHH) →
-          </Link>
+        <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50">
+          <div className="flex items-center gap-3 px-4 py-3">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+            <p className="text-sm text-amber-800">
+              <span className="font-semibold">{sinFicha} usuario{sinFicha > 1 ? 's' : ''}</span> no tienen ficha de empleado y no aparecen aquí.
+            </p>
+            <button
+              type="button"
+              className="ml-auto flex items-center gap-1 text-sm font-medium text-amber-800 underline hover:text-amber-900"
+              onClick={() => setMostrarSinFicha(v => !v)}
+            >
+              {mostrarSinFicha ? (
+                <>Ocultar lista <ChevronUp className="h-3 w-3" /></>
+              ) : (
+                <>Ver quiénes <ChevronDown className="h-3 w-3" /></>
+              )}
+            </button>
+            <Link
+              href="/admin/personal"
+              className="shrink-0 text-sm font-medium text-amber-700 underline hover:text-amber-900"
+            >
+              Ir a Personal (RRHH) →
+            </Link>
+          </div>
+          {mostrarSinFicha && (
+            <div className="border-t border-amber-200 bg-white">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">#</TableHead>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Rol</TableHead>
+                    <TableHead>Último acceso</TableHead>
+                    <TableHead></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {usuariosSinFicha.map((u, i) => (
+                    <TableRow key={u.id}>
+                      <TableCell className="text-xs font-mono text-muted-foreground">{i + 1}</TableCell>
+                      <TableCell className="text-sm font-medium">{u.name || '—'}</TableCell>
+                      <TableCell className="text-xs">{u.email}</TableCell>
+                      <TableCell className="text-xs">
+                        <Badge variant="outline">{u.role}</Badge>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString('es-PE') : 'Nunca'}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Link
+                          href="/admin/personal"
+                          className="inline-flex items-center gap-1 text-xs text-amber-700 underline hover:text-amber-900"
+                        >
+                          <UserPlus className="h-3 w-3" /> Crear ficha
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </div>
       )}
 
@@ -221,6 +284,12 @@ export default function ModalidadesPage() {
         </CardContent>
       </Card>
 
+      {!loading && data.length > 0 && (
+        <p className="mb-2 text-xs text-muted-foreground">
+          Mostrando <span className="font-semibold">{datosFiltrados.length}</span> de {data.length} empleados
+        </p>
+      )}
+
       <Card>
         <CardContent className="p-0">
           {loading ? (
@@ -231,6 +300,7 @@ export default function ModalidadesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-12">#</TableHead>
                   <TableHead>Empleado</TableHead>
                   <TableHead>Departamento</TableHead>
                   <TableHead>Cargo</TableHead>
@@ -239,8 +309,9 @@ export default function ModalidadesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {datosFiltrados.map(e => (
+                {datosFiltrados.map((e, i) => (
                   <TableRow key={e.id}>
+                    <TableCell className="text-xs font-mono text-muted-foreground">{i + 1}</TableCell>
                     <TableCell>
                       <div>
                         <p className="text-sm font-medium">{e.user.name || e.user.email}</p>
@@ -304,7 +375,7 @@ export default function ModalidadesPage() {
                 ))}
                 {datosFiltrados.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                    <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
                       {data.length === 0
                         ? 'No hay empleados registrados. Ve a Configuración → Personal (RRHH).'
                         : 'Sin resultados para los filtros aplicados.'}

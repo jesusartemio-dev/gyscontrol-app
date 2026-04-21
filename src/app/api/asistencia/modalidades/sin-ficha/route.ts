@@ -11,9 +11,17 @@ export async function GET() {
     return NextResponse.json({ message: 'No autorizado' }, { status: 403 })
   }
 
-  const total = await prisma.user.count({
+  const usuarios = await prisma.user.findMany({
     where: { empleado: null },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      lastLoginAt: true,
+    },
+    orderBy: [{ name: 'asc' }],
   })
 
-  return NextResponse.json({ total })
+  return NextResponse.json({ total: usuarios.length, usuarios })
 }
