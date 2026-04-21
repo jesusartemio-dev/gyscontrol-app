@@ -19,6 +19,10 @@ interface CatalogoItem {
   codigo: string
   descripcion: string
   marca: string
+  precioInterno?: number | null
+  precioReal?: number | null
+  precioLogistica?: number | null
+  unidad?: { nombre: string } | null
 }
 
 interface Props {
@@ -134,9 +138,21 @@ export function IngresoManualModal({ open, onOpenChange, onSuccess }: Props) {
             <Label className="text-xs">Ítem del catálogo *</Label>
             {seleccionado ? (
               <div className="flex items-center justify-between rounded border bg-muted px-3 py-2 text-sm">
-                <div>
+                <div className="flex-1">
                   <p className="font-mono text-xs font-semibold">{seleccionado.codigo}</p>
                   <p className="text-xs text-muted-foreground">{seleccionado.descripcion}</p>
+                  <div className="mt-1 flex flex-wrap gap-2 text-[10px]">
+                    {seleccionado.unidad && (
+                      <span className="rounded bg-blue-100 px-1.5 py-0.5 text-blue-700">
+                        Unidad: {seleccionado.unidad.nombre}
+                      </span>
+                    )}
+                    {seleccionado.precioInterno && seleccionado.precioInterno > 0 && (
+                      <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-emerald-700">
+                        Precio catálogo: {seleccionado.precioInterno.toFixed(2)}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <Button size="sm" variant="ghost" onClick={() => setSeleccionado(null)}>
                   Cambiar
@@ -164,10 +180,22 @@ export function IngresoManualModal({ open, onOpenChange, onSuccess }: Props) {
                         key={item.id}
                         type="button"
                         className="flex w-full flex-col items-start gap-0.5 border-b px-3 py-2 text-left text-xs last:border-b-0 hover:bg-muted"
-                        onClick={() => { setSeleccionado(item); setResultados([]); setBusqueda('') }}
+                        onClick={() => {
+                          setSeleccionado(item)
+                          setResultados([])
+                          setBusqueda('')
+                          // Pre-llenar costo con precio del catálogo (prioridad: interno → real → logística)
+                          const precio = item.precioInterno || item.precioReal || item.precioLogistica
+                          if (precio && precio > 0) {
+                            setCosto(String(precio))
+                          }
+                        }}
                       >
                         <span className="font-mono font-semibold">{item.codigo}</span>
                         <span className="text-muted-foreground">{item.descripcion}</span>
+                        {item.unidad && (
+                          <span className="text-[10px] text-blue-600">Unidad: {item.unidad.nombre}</span>
+                        )}
                       </button>
                     ))}
                   </div>
@@ -183,21 +211,41 @@ export function IngresoManualModal({ open, onOpenChange, onSuccess }: Props) {
 
           {/* Cantidad */}
           <div>
-            <Label className="text-xs">Cantidad *</Label>
-            <Input
-              type="number"
-              min="0.01"
-              step="0.01"
-              value={cantidad}
-              onChange={e => setCantidad(e.target.value)}
-              placeholder="Ej. 50"
-            />
+            <Label className="text-xs">
+              Cantidad *
+              {seleccionado?.unidad && (
+                <span className="ml-1 font-normal text-muted-foreground">
+                  (en {seleccionado.unidad.nombre})
+                </span>
+              )}
+            </Label>
+            <div className="relative">
+              <Input
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={cantidad}
+                onChange={e => setCantidad(e.target.value)}
+                placeholder="Ej. 50"
+                className={seleccionado?.unidad ? 'pr-14' : ''}
+              />
+              {seleccionado?.unidad && (
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                  {seleccionado.unidad.nombre}
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Costo + moneda */}
           <div className="grid grid-cols-3 gap-2">
             <div className="col-span-2">
-              <Label className="text-xs">Costo unitario *</Label>
+              <Label className="text-xs">
+                Costo unitario *
+                {seleccionado && costo && seleccionado.precioInterno && Math.abs(Number(costo) - seleccionado.precioInterno) < 0.001 && (
+                  <span className="ml-1 font-normal text-muted-foreground">(del catálogo — ajústalo si es distinto)</span>
+                )}
+              </Label>
               <Input
                 type="number"
                 min="0.01"

@@ -30,6 +30,7 @@ interface StockRow {
     descripcion: string
     marca: string
     categoriaEquipo: { id: string; nombre: string } | null
+    unidad: { id: string; nombre: string } | null
   } | null
   almacen: { nombre: string }
 }
@@ -46,6 +47,25 @@ export default function MaterialesAlmacen() {
   const [soloConStock, setSoloConStock] = useState(true)
   const [filtroCategoria, setFiltroCategoria] = useState('todos')
   const [modalIngresoAbierto, setModalIngresoAbierto] = useState(false)
+  const [tipoCambio, setTipoCambio] = useState<number>(3.8)
+
+  // Cargar TC guardado (persiste entre sesiones)
+  useEffect(() => {
+    const tc = localStorage.getItem('almacen-tipoCambio')
+    if (tc) setTipoCambio(Number(tc) || 3.8)
+  }, [])
+
+  function actualizarTipoCambio(valor: number) {
+    setTipoCambio(valor)
+    if (valor > 0) localStorage.setItem('almacen-tipoCambio', String(valor))
+  }
+
+  // Convierte cualquier costo a USD
+  function aUSD(valor: number, moneda: string): number {
+    if (moneda === 'USD') return valor
+    if (moneda === 'PEN' && tipoCambio > 0) return valor / tipoCambio
+    return valor
+  }
 
   const cargar = useCallback(async (q = '') => {
     setLoading(true)
@@ -80,22 +100,33 @@ export default function MaterialesAlmacen() {
   const conStock = useMemo(() => data.filter(s => s.cantidadDisponible > 0).length, [data])
   const sinStock = data.length - conStock
 
-  // Totales por moneda
+  // Totales consolidados en USD
   const totales = useMemo(() => {
-    const porMoneda: Record<string, number> = {}
-    const porCategoria = new Map<string, { nombre: string; valor: number; moneda: string }>()
+    let valorTotalUSD = 0
+    let valorOriginalPEN = 0
+    let valorOriginalUSD = 0
+    const porCategoria = new Map<string, number>()
     for (const s of dataFiltrada) {
       if (s.cantidadDisponible > 0 && s.costoUnitarioPromedio && s.costoUnitarioPromedio > 0) {
-        const valor = s.cantidadDisponible * s.costoUnitarioPromedio
-        porMoneda[s.costoMoneda] = (porMoneda[s.costoMoneda] || 0) + valor
+        const valorOriginal = s.cantidadDisponible * s.costoUnitarioPromedio
+        const valorUSD = aUSD(valorOriginal, s.costoMoneda)
+        valorTotalUSD += valorUSD
+        if (s.costoMoneda === 'USD') valorOriginalUSD += valorOriginal
+        else if (s.costoMoneda === 'PEN') valorOriginalPEN += valorOriginal
         const catNombre = s.catalogoEquipo?.categoriaEquipo?.nombre || 'Sin categoría'
-        const existente = porCategoria.get(catNombre) || { nombre: catNombre, valor: 0, moneda: s.costoMoneda }
-        existente.valor += valor
-        porCategoria.set(catNombre, existente)
+        porCategoria.set(catNombre, (porCategoria.get(catNombre) || 0) + valorUSD)
       }
     }
-    return { porMoneda, porCategoria: Array.from(porCategoria.values()).sort((a, b) => b.valor - a.valor) }
-  }, [dataFiltrada])
+    return {
+      valorTotalUSD,
+      valorOriginalPEN,
+      valorOriginalUSD,
+      porCategoria: Array.from(porCategoria.entries())
+        .map(([nombre, valor]) => ({ nombre, valor }))
+        .sort((a, b) => b.valor - a.valor),
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataFiltrada, tipoCambio])
 
   function formatMoneda(valor: number, moneda: string) {
     return `${moneda === 'USD' ? 'US$' : 'S/'} ${valor.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -107,6 +138,7 @@ export default function MaterialesAlmacen() {
       Descripción: s.catalogoEquipo?.descripcion,
       Categoría: s.catalogoEquipo?.categoriaEquipo?.nombre || '',
       Marca: s.catalogoEquipo?.marca,
+      Unidad: s.catalogoEquipo?.unidad?.nombre || '',
       'Disponible': s.cantidadDisponible,
       'Reservado': s.cantidadReservada,
       'Costo unitario': s.costoUnitarioPromedio ?? '',
@@ -139,26 +171,46 @@ export default function MaterialesAlmacen() {
         </div>
       </div>
 
-      {/* KPIs de valor */}
-      {Object.keys(totales.porMoneda).length > 0 && (
+      {/* KPIs de valor consolidados en USD */}
+      {totales.valorTotalUSD > 0 && (
         <div className="mb-4 grid gap-3 md:grid-cols-3">
-          {Object.entries(totales.porMoneda).map(([moneda, valor]) => (
-            <Card key={moneda}>
-              <CardContent className="py-3">
-                <p className="text-xs text-muted-foreground">Valor total en {moneda}</p>
-                <p className="text-2xl font-bold text-emerald-700">{formatMoneda(valor, moneda)}</p>
-              </CardContent>
-            </Card>
-          ))}
+          <Card>
+            <CardContent className="py-3">
+              <p className="text-xs text-muted-foreground">Valor total (consolidado en USD)</p>
+              <p className="text-2xl font-bold text-emerald-700">{formatMoneda(totales.valorTotalUSD, 'USD')}</p>
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                TC PEN/USD: {tipoCambio.toFixed(2)}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="py-3">
+              <p className="mb-1 text-xs text-muted-foreground">Desglose por moneda original</p>
+              <div className="space-y-0.5 text-xs">
+                {totales.valorOriginalUSD > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span>En USD</span>
+                    <span className="font-semibold">{formatMoneda(totales.valorOriginalUSD, 'USD')}</span>
+                  </div>
+                )}
+                {totales.valorOriginalPEN > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span>En PEN</span>
+                    <span className="font-semibold">{formatMoneda(totales.valorOriginalPEN, 'PEN')}</span>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
           {totales.porCategoria.length > 0 && (
             <Card>
               <CardContent className="py-3">
-                <p className="mb-1 text-xs text-muted-foreground">Valor por categoría (top 3)</p>
+                <p className="mb-1 text-xs text-muted-foreground">Top 3 categorías (en USD)</p>
                 <div className="space-y-0.5 text-xs">
                   {totales.porCategoria.slice(0, 3).map(c => (
                     <div key={c.nombre} className="flex items-center justify-between">
                       <span className="truncate">{c.nombre}</span>
-                      <span className="font-semibold">{formatMoneda(c.valor, c.moneda)}</span>
+                      <span className="font-semibold">{formatMoneda(c.valor, 'USD')}</span>
                     </div>
                   ))}
                 </div>
@@ -191,6 +243,17 @@ export default function MaterialesAlmacen() {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground">TC PEN/USD</Label>
+            <Input
+              type="number"
+              step="0.01"
+              min="0.01"
+              value={tipoCambio}
+              onChange={e => actualizarTipoCambio(Number(e.target.value) || 0)}
+              className="w-24"
+            />
           </div>
           <div className="flex items-center gap-2 pb-1">
             <Switch
@@ -261,14 +324,28 @@ export default function MaterialesAlmacen() {
                     </TableCell>
                     <TableCell className="text-right font-semibold">
                       {s.cantidadDisponible.toLocaleString('es-PE', { maximumFractionDigits: 2 })}
+                      {s.catalogoEquipo?.unidad && (
+                        <span className="ml-1 text-[10px] font-normal text-muted-foreground">
+                          {s.catalogoEquipo.unidad.nombre}
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell className="text-right font-mono text-xs">
                       {s.costoUnitarioPromedio
                         ? formatMoneda(s.costoUnitarioPromedio, s.costoMoneda)
                         : <span className="text-muted-foreground">—</span>}
                     </TableCell>
-                    <TableCell className="text-right font-semibold text-emerald-700">
-                      {valor != null ? formatMoneda(valor, s.costoMoneda) : <span className="text-muted-foreground font-normal">—</span>}
+                    <TableCell className="text-right">
+                      {valor != null ? (
+                        <div>
+                          <p className="font-semibold text-emerald-700">{formatMoneda(valor, s.costoMoneda)}</p>
+                          {s.costoMoneda === 'PEN' && tipoCambio > 0 && (
+                            <p className="text-[10px] text-muted-foreground">
+                              ≈ {formatMoneda(aUSD(valor, s.costoMoneda), 'USD')}
+                            </p>
+                          )}
+                        </div>
+                      ) : <span className="text-muted-foreground">—</span>}
                     </TableCell>
                     <TableCell>
                       {s.cantidadDisponible > 0 ? (

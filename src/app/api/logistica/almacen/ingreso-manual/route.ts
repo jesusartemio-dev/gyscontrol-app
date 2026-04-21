@@ -64,6 +64,15 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, movimiento }, { status: 201 })
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Error al registrar' }, { status: 500 })
+    console.error('[ingreso-manual] error:', error)
+    // Mensaje amigable para el usuario; detalles técnicos van al log del servidor
+    const mensaje = error?.code === 'P2002'
+      ? 'Ya existe un registro duplicado'
+      : error?.code === 'P2025'
+      ? 'El ítem del catálogo no existe'
+      : error?.message?.includes('Unknown argument') || error?.message?.includes('Prisma')
+      ? 'El servidor necesita reiniciarse para aplicar cambios recientes. Reinicia el dev server.'
+      : 'No se pudo registrar el ingreso. Intenta nuevamente o contacta a soporte.'
+    return NextResponse.json({ error: mensaje }, { status: 500 })
   }
 }

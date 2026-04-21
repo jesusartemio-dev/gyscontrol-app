@@ -38,6 +38,7 @@ export async function GET(req: Request) {
           descripcion: true,
           marca: true,
           categoriaEquipo: { select: { id: true, nombre: true } },
+          unidad: { select: { id: true, nombre: true } },
         },
       },
       catalogoHerramienta: { select: { id: true, codigo: true, nombre: true, categoria: true, gestionPorUnidad: true } },
