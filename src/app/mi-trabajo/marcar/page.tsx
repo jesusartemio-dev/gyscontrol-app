@@ -129,6 +129,18 @@ export default function MarcarPage() {
     await enviarMarcaje(tipoSel)
   }
 
+  // Para remotos que van a oficina: abrir el scanner aunque su modalidad sea remota.
+  async function abrirScannerDesdeRemoto(tipo: TipoBotón) {
+    setTipoSel(tipo)
+    const c = geo.coords || (await geo.solicitar())
+    if (!c) {
+      toast.error('Se requiere permiso de ubicación para marcar desde oficina')
+      return
+    }
+    setScannerOpen(true)
+    setTimeout(() => iniciar(scannerElemId), 100)
+  }
+
   if (status === 'loading') {
     return (
       <div className="flex h-[60vh] items-center justify-center">
@@ -248,6 +260,20 @@ export default function MarcarPage() {
                 </Button>
               )
             })}
+            {modoHoy?.esRemoto && !modoHoy?.esConfianza && (
+              <div className="rounded border border-dashed border-muted-foreground/30 p-3 text-center text-xs text-muted-foreground">
+                <p className="mb-2">¿Hoy viniste a oficina en lugar de trabajar remoto?</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={loading}
+                  onClick={() => abrirScannerDesdeRemoto('ingreso')}
+                >
+                  <QrCode className="mr-2 h-4 w-4" />
+                  Escanear QR de oficina
+                </Button>
+              </div>
+            )}
             {geo.error && (
               <p className="pt-2 text-center text-sm text-red-600">{geo.error}</p>
             )}

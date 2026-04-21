@@ -80,8 +80,11 @@ export async function POST(req: Request) {
   let jornadaOverride: { horaIngresoOverride: string | null; horaSalidaOverride: string | null } | null = null
   let metodoMarcaje: MetodoMarcaje = modoRemoto.esRemoto ? 'remoto' : 'gps_directo'
 
-  // Procesar QR si viene (no aplica si es remoto — lo ignoramos)
-  if (body.qrPayload && !modoRemoto.esRemoto) {
+  // Si el usuario escanea un QR, prevalece sobre la modalidad remota.
+  // Un remoto que va a oficina y escanea QR queda registrado como presencial
+  // (el QR es evidencia física — mayor autoridad que la modalidad declarada).
+  let qrOverrideRemoto = false
+  if (body.qrPayload) {
     const parsed = parsearPayloadQr(body.qrPayload)
     if (!parsed) {
       return NextResponse.json({ message: 'Código QR inválido' }, { status: 400 })
@@ -99,6 +102,7 @@ export async function POST(req: Request) {
       }
       ubicacionId = u.id
       metodoMarcaje = 'qr_estatico'
+      if (modoRemoto.esRemoto) qrOverrideRemoto = true
     } else if (parsed.tipo === 'supervisor') {
       const [jornadaId, token] = parsed.payload.split('.')
       if (!jornadaId || !token) {
@@ -121,8 +125,13 @@ export async function POST(req: Request) {
         horaSalidaOverride: jornada.horaSalidaOverride,
       }
       metodoMarcaje = 'qr_supervisor'
+      if (modoRemoto.esRemoto) qrOverrideRemoto = true
     }
   }
+
+  // Si escaneó QR y originalmente era remoto, anular el modo remoto para
+  // que la validación y los cálculos siguientes lo traten como presencial.
+  const esRemotoEfectivo = modoRemoto.esRemoto && !qrOverrideRemoto
 
   // Si no escaneó QR pero es presencial y tiene GPS, auto-asignar la
   // ubicación activa más cercana dentro de un radio razonable (500m).
@@ -130,7 +139,7 @@ export async function POST(req: Request) {
   const RADIO_AUTO_ASIGNACION = 500
   if (
     !ubicacionId &&
-    !modoRemoto.esRemoto &&
+    !esRemotoEfectivo &&
     body.latitud != null &&
     body.longitud != null
   ) {
@@ -160,7 +169,7 @@ export async function POST(req: Request) {
   let ubicacionRemotaId: string | null = null
   let sedeRemotaNombre: string | null = null
 
-  if (modoRemoto.esRemoto && !modoRemoto.esConfianza && body.latitud != null && body.longitud != null) {
+  if (esRemotoEfectivo && !modoRemoto.esConfianza && body.latitud != null && body.longitud != null) {
     // Validar contra la sede remota personal aprobada (si tiene)
     const sedeRemota = await obtenerSedeRemotaActiva(userId)
     if (sedeRemota) {
@@ -171,7 +180,7 @@ export async function POST(req: Request) {
     }
     // Sin sede remota aprobada: se permite marcar pero queda como dentroGeofence=true
     // (no hay referencia contra qué validar). El admin debería pedirle que registre sede.
-  } else if (!modoRemoto.esRemoto && ubicacionId && body.latitud != null && body.longitud != null) {
+  } else if (!esRemotoEfectivo && ubicacionId && body.latitud != null && body.longitud != null) {
     const u = await prisma.ubicacion.findUnique({ where: { id: ubicacionId } })
     if (u) {
       distanciaMetros = haversineMetros(body.latitud, body.longitud, u.latitud, u.longitud)
@@ -209,8 +218,12 @@ export async function POST(req: Request) {
       })
 
   // Agregar bandera de trazabilidad cuando es remoto/confianza
-  if (modoRemoto.esRemoto && modoRemoto.origen && !modoRemoto.esConfianza) {
+  if (esRemotoEfectivo && modoRemoto.origen && !modoRemoto.esConfianza) {
     banderas.push(`remoto:${modoRemoto.origen}`)
+  }
+  // Trazabilidad: remoto que vino a oficina y escaneó QR
+  if (qrOverrideRemoto) {
+    banderas.push('asistio_oficina_siendo_remoto')
   }
 
   const asistencia = await prisma.asistencia.create({
@@ -254,7 +267,10 @@ export async function POST(req: Request) {
 
   const lineas: string[] = []
   lineas.push(`${tipoHumano} registrado a las ${horaLima}`)
-  if (modoRemoto.esRemoto) {
+  if (qrOverrideRemoto && ubicacionDatos) {
+    lineas.push(`Ubicación: ${ubicacionDatos.nombre}`)
+    lineas.push('ℹ️ Eras remoto hoy, pero escaneaste QR — quedaste como presencial')
+  } else if (esRemotoEfectivo) {
     lineas.push(`Modo: trabajo remoto (${modoRemoto.razon})`)
     if (sedeRemotaNombre) {
       lineas.push(`Sede remota: ${sedeRemotaNombre}`)
