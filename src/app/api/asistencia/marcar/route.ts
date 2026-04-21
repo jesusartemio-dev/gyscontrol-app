@@ -124,6 +124,36 @@ export async function POST(req: Request) {
     }
   }
 
+  // Si no escaneó QR pero es presencial y tiene GPS, auto-asignar la
+  // ubicación activa más cercana dentro de un radio razonable (500m).
+  // Así evitamos que queden sin ubicación cuando marcan "sin QR".
+  const RADIO_AUTO_ASIGNACION = 500
+  if (
+    !ubicacionId &&
+    !modoRemoto.esRemoto &&
+    body.latitud != null &&
+    body.longitud != null
+  ) {
+    const ubicacionesActivas = await prisma.ubicacion.findMany({
+      where: { activo: true },
+      select: { id: true, latitud: true, longitud: true, radioMetros: true },
+    })
+    let mejor: { id: string; distancia: number } | null = null
+    for (const u of ubicacionesActivas) {
+      const d = haversineMetros(body.latitud, body.longitud, u.latitud, u.longitud)
+      // Aceptar si está dentro del radio de la ubicación O dentro de 500m
+      // (lo que sea mayor — obras con radio amplio también aplican).
+      const umbral = Math.max(u.radioMetros, RADIO_AUTO_ASIGNACION)
+      if (d <= umbral && (!mejor || d < mejor.distancia)) {
+        mejor = { id: u.id, distancia: d }
+      }
+    }
+    if (mejor) {
+      ubicacionId = mejor.id
+      // El método sigue siendo gps_directo (para distinguir de los que sí escanearon QR).
+    }
+  }
+
   // Evaluar geofence + distancia
   let dentroGeofence = true
   let distanciaMetros: number | null = null

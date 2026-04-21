@@ -192,10 +192,11 @@ export default function SupervisionAsistencia() {
   }, [data, busqueda, sortKey, sortDir])
 
   const contadores = useMemo(() => {
-    const c = { total: 0, a_tiempo: 0, tarde: 0, muy_tarde: 0, fuera_zona: 0, dispositivo_nuevo: 0 }
+    const c = { total: 0, a_tiempo: 0, tarde: 0, muy_tarde: 0, fuera_zona: 0, dispositivo_nuevo: 0, sin_qr: 0 }
     for (const f of dataFiltrada) {
       c.total++
       if (f.estado in c) (c as any)[f.estado]++
+      if (f.metodoMarcaje === 'gps_directo') c.sin_qr++
     }
     return c
   }, [dataFiltrada])
@@ -342,7 +343,7 @@ export default function SupervisionAsistencia() {
       </Card>
 
       {/* Contadores */}
-      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-6">
+      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-7">
         <Card><CardContent className="py-3">
           <p className="text-xs text-muted-foreground">Total</p>
           <p className="text-2xl font-bold">{contadores.total}</p>
@@ -366,6 +367,10 @@ export default function SupervisionAsistencia() {
         <Card><CardContent className="py-3">
           <p className="text-xs text-muted-foreground">Disp. nuevo</p>
           <p className="text-2xl font-bold text-blue-700">{contadores.dispositivo_nuevo}</p>
+        </CardContent></Card>
+        <Card><CardContent className="py-3">
+          <p className="text-xs text-muted-foreground" title="Marcajes sin escanear QR">Sin QR</p>
+          <p className="text-2xl font-bold text-amber-700">{contadores.sin_qr}</p>
         </CardContent></Card>
       </div>
 
@@ -420,6 +425,12 @@ export default function SupervisionAsistencia() {
                   <TableCell>
                     {f.metodoMarcaje === 'remoto' ? (
                       <Badge variant="outline" className="bg-purple-100 text-purple-800">remoto</Badge>
+                    ) : f.metodoMarcaje === 'gps_directo' ? (
+                      <Badge variant="outline" className="bg-amber-100 text-amber-800" title="Marcó sin escanear el QR">
+                        sin QR
+                      </Badge>
+                    ) : f.metodoMarcaje === 'manual_supervisor' ? (
+                      <Badge variant="outline" className="bg-slate-100 text-slate-700">manual</Badge>
                     ) : (
                       <span className="text-xs text-muted-foreground">presencial</span>
                     )}
