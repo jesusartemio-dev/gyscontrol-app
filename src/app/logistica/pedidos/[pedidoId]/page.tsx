@@ -235,6 +235,10 @@ export default function PedidoLogisticaDetailPage() {
     tiempoEntregaDias: string
   }>({ item: null, cantidadAtendida: 0, estado: 'pendiente', fechaEntregaReal: '', observacionesEntrega: '', motivoAtencionDirecta: '', costoRealUnitario: '', costoRealMoneda: 'USD', precioUnitario: '', precioMoneda: 'USD', tipoCambio: '', tiempoEntregaDias: '' })
 
+  // Stock de almacén del item en edición (para motivo 'stock_almacen')
+  const [stockItem, setStockItem] = useState<number | null>(null)
+  const [cargandoStock, setCargandoStock] = useState(false)
+
   const resetEditingItem = () => setEditingItem({ item: null, cantidadAtendida: 0, estado: 'pendiente', fechaEntregaReal: '', observacionesEntrega: '', motivoAtencionDirecta: '', costoRealUnitario: '', costoRealMoneda: 'USD', precioUnitario: '', precioMoneda: 'USD', tipoCambio: '', tiempoEntregaDias: '' })
 
   // ✏️ Estado para edición inline de T.Entrega y F.Entrega
@@ -382,6 +386,21 @@ export default function PedidoLogisticaDetailPage() {
       tipoCambio: (item as any).tipoCambioEntrega ? String((item as any).tipoCambioEntrega) : '',
       tiempoEntregaDias: (item as any).tiempoEntregaDias ? String((item as any).tiempoEntregaDias) : '',
     })
+
+    // Cargar stock del almacén para este item (si tiene catalogoEquipoId)
+    const catalogoEquipoId = (item as any).catalogoEquipoId
+    setStockItem(null)
+    if (catalogoEquipoId) {
+      setCargandoStock(true)
+      fetch(`/api/logistica/almacen/stock?catalogoEquipoId=${catalogoEquipoId}`)
+        .then(r => r.json())
+        .then((data: any[]) => {
+          const total = Array.isArray(data) ? data.reduce((sum, s) => sum + (s.cantidadDisponible || 0), 0) : 0
+          setStockItem(total)
+        })
+        .catch(() => setStockItem(0))
+        .finally(() => setCargandoStock(false))
+    }
   }
 
   // Allow values above cantidadPedida (excess delivery) but not below 0
@@ -406,6 +425,13 @@ export default function PedidoLogisticaDetailPage() {
     if (editingItem.motivoAtencionDirecta === 'importacion_gerencia' && editingItem.cantidadAtendida > 0) {
       if (!editingItem.costoRealUnitario || parseFloat(editingItem.costoRealUnitario) <= 0) {
         toast.error('El costo real de adquisición es obligatorio para importaciones de gerencia')
+        return
+      }
+    }
+    // Validar stock disponible cuando se atiende desde almacén
+    if (editingItem.motivoAtencionDirecta === 'stock_almacen' && editingItem.cantidadAtendida > 0) {
+      if (stockItem == null || stockItem < editingItem.cantidadAtendida) {
+        toast.error(`Stock insuficiente en almacén. Disponible: ${stockItem ?? 0}, requerido: ${editingItem.cantidadAtendida}`)
         return
       }
     }
@@ -1517,7 +1543,10 @@ export default function PedidoLogisticaDetailPage() {
                                 }
                                 if (atendido && motivo) {
                                   const motivoLabels: Record<string, string> = {
+                                    'stock_almacen': 'Atendido desde stock del almacén',
+                                    'compra_caja_chica': 'Compra directa en tienda / caja chica',
                                     'compra_directa': 'Compra directa en tienda / caja chica',
+                                    'urgencia_proyecto': 'Urgencia — sin tiempo para OC',
                                     'urgencia': 'Urgencia — sin tiempo para OC',
                                     'otro': 'Otro motivo',
                                   }
@@ -2136,12 +2165,45 @@ export default function PedidoLogisticaDetailPage() {
                             className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           >
                             <option value="">Seleccionar motivo...</option>
+                            <option value="stock_almacen">📦 Atender desde stock del almacén</option>
                             <option value="compra_caja_chica">Compra directa en tienda / caja chica</option>
                             <option value="urgencia_proyecto">Urgencia — sin tiempo para OC</option>
                             <option value="importacion_gerencia">Compra directa por gerencia / importación</option>
                             <option value="otro">Otro</option>
                           </select>
                         </div>
+
+                        {/* Info de stock disponible al seleccionar stock_almacen */}
+                        {editingItem.motivoAtencionDirecta === 'stock_almacen' && (
+                          <div className={`rounded-md border p-2 text-xs ${
+                            cargandoStock
+                              ? 'border-gray-200 bg-gray-50 text-gray-600'
+                              : stockItem == null || stockItem === 0
+                              ? 'border-red-300 bg-red-50 text-red-700'
+                              : stockItem >= editingItem.cantidadAtendida
+                              ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                              : 'border-amber-300 bg-amber-50 text-amber-700'
+                          }`}>
+                            {cargandoStock ? (
+                              'Consultando stock...'
+                            ) : stockItem == null ? (
+                              'Este ítem no tiene código de catálogo — no se puede atender desde stock.'
+                            ) : (
+                              <>
+                                <p className="font-semibold">
+                                  Stock disponible: {stockItem} unidades
+                                </p>
+                                {stockItem === 0 && <p>No hay stock. No se puede atender desde almacén.</p>}
+                                {stockItem > 0 && editingItem.cantidadAtendida > stockItem && (
+                                  <p>Requerido ({editingItem.cantidadAtendida}) supera el stock disponible.</p>
+                                )}
+                                {stockItem > 0 && editingItem.cantidadAtendida > 0 && editingItem.cantidadAtendida <= stockItem && (
+                                  <p>Se descontará {editingItem.cantidadAtendida} del stock al registrar.</p>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        )}
 
                         {/* Costo real para importación gerencia */}
                         {editingItem.motivoAtencionDirecta === 'importacion_gerencia' && (

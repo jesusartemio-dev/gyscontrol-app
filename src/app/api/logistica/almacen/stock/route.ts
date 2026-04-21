@@ -31,7 +31,15 @@ export async function GET(req: Request) {
     where,
     include: {
       almacen: { select: { id: true, nombre: true } },
-      catalogoEquipo: { select: { id: true, codigo: true, descripcion: true, marca: true } },
+      catalogoEquipo: {
+        select: {
+          id: true,
+          codigo: true,
+          descripcion: true,
+          marca: true,
+          categoriaEquipo: { select: { id: true, nombre: true } },
+        },
+      },
       catalogoHerramienta: { select: { id: true, codigo: true, nombre: true, categoria: true, gestionPorUnidad: true } },
     },
     orderBy: { cantidadDisponible: 'desc' },
