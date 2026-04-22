@@ -177,7 +177,7 @@ const ListaEquipoHistorial: React.FC<ListaEquipoHistorialProps> = ({
                       <span className="text-[10px] text-muted-foreground">
                         {log.usuario.name || log.usuario.email}
                       </span>
-                      <span className="text-[10px] text-gray-300 font-mono ml-auto">
+                      <span className="text-[10px] text-muted-foreground font-mono ml-auto">
                         {formatDateTime(log.createdAt)}
                       </span>
                       <button
