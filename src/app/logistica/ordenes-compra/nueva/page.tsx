@@ -667,8 +667,10 @@ function NuevaOrdenCompraContent() {
               </div>
             ) : pedidoItemsDisp.length === 0 ? (
               <div className="text-center py-10 text-muted-foreground text-sm">
-                No hay items de pedidos disponibles para este proyecto
-                {proveedorId && <span className="block text-xs mt-1">Filtrado por proveedor seleccionado. Cambia el proveedor para ver más items.</span>}
+                No hay items disponibles para generar OC.
+                <span className="block text-xs mt-2 max-w-md mx-auto">
+                  Posibles razones: (1) todos los items del pedido ya tienen OC generada, o (2) están asignados a otro proveedor distinto del seleccionado.
+                </span>
               </div>
             ) : (
               <Table>
