@@ -335,19 +335,39 @@ export function TreeNode({
               )
             ) : (
               (node.metadata.recursosTotales ?? 0) > 0 ? (
-                <span className={`inline-flex items-center gap-0.5 border rounded px-1 py-0 text-[10px] font-medium ${
-                  (() => {
-                    const assigned = node.metadata.recursosAsignados ?? 0
-                    const total = node.metadata.recursosTotales ?? 0
-                    const ratio = total > 0 ? assigned / total : 0
+                (() => {
+                  const extrasTotal = node.metadata.recursosExtrasTotales ?? 0
+                  const extrasAssigned = node.metadata.recursosExtrasAsignados ?? 0
+                  const planTotal = (node.metadata.recursosTotales ?? 0) - extrasTotal
+                  const planAssigned = (node.metadata.recursosAsignados ?? 0) - extrasAssigned
+                  const badgeColor = (ass: number, tot: number) => {
+                    const ratio = tot > 0 ? ass / tot : 0
                     if (ratio >= 1) return 'bg-green-50 text-green-700 border-green-200'
                     if (ratio > 0) return 'bg-amber-50 text-amber-700 border-amber-200'
                     return 'bg-red-50 text-red-600 border-red-200'
-                  })()
-                }`}>
-                  <Users className="h-2.5 w-2.5" />
-                  {node.metadata.recursosAsignados}/{node.metadata.recursosTotales}
-                </span>
+                  }
+                  return (
+                    <span className="inline-flex items-center gap-1">
+                      {planTotal > 0 && (
+                        <span
+                          className={`inline-flex items-center gap-0.5 border rounded px-1 py-0 text-[10px] font-medium ${badgeColor(planAssigned, planTotal)}`}
+                          title={`Plan: ${planAssigned} de ${planTotal} con recurso`}
+                        >
+                          <Users className="h-2.5 w-2.5" />
+                          {planAssigned}/{planTotal}
+                        </span>
+                      )}
+                      {extrasTotal > 0 && (
+                        <span
+                          className={`inline-flex items-center gap-0.5 border rounded px-1 py-0 text-[10px] font-medium border-dashed ${badgeColor(extrasAssigned, extrasTotal)}`}
+                          title={`Extras: ${extrasAssigned} de ${extrasTotal} con recurso`}
+                        >
+                          ✨{extrasAssigned}/{extrasTotal}
+                        </span>
+                      )}
+                    </span>
+                  )
+                })()
               ) : null
             )}
           </div>
@@ -364,19 +384,39 @@ export function TreeNode({
               <span className="text-red-400 text-[10px]">Sin asignar</span>
             ) : (
               (node.metadata.responsablesTotales ?? 0) > 0 ? (
-                <span className={`inline-flex items-center gap-0.5 border rounded px-1 py-0 text-[10px] font-medium ${
-                  (() => {
-                    const assigned = node.metadata.responsablesAsignados ?? 0
-                    const total = node.metadata.responsablesTotales ?? 0
-                    const ratio = total > 0 ? assigned / total : 0
+                (() => {
+                  const extrasTotal = node.metadata.responsablesExtrasTotales ?? 0
+                  const extrasAssigned = node.metadata.responsablesExtrasAsignados ?? 0
+                  const planTotal = (node.metadata.responsablesTotales ?? 0) - extrasTotal
+                  const planAssigned = (node.metadata.responsablesAsignados ?? 0) - extrasAssigned
+                  const badgeColor = (ass: number, tot: number) => {
+                    const ratio = tot > 0 ? ass / tot : 0
                     if (ratio >= 1) return 'bg-blue-50 text-blue-700 border-blue-200'
                     if (ratio > 0) return 'bg-amber-50 text-amber-700 border-amber-200'
                     return 'bg-red-50 text-red-600 border-red-200'
-                  })()
-                }`}>
-                  <Users className="h-2.5 w-2.5" />
-                  {node.metadata.responsablesAsignados}/{node.metadata.responsablesTotales}
-                </span>
+                  }
+                  return (
+                    <span className="inline-flex items-center gap-1">
+                      {planTotal > 0 && (
+                        <span
+                          className={`inline-flex items-center gap-0.5 border rounded px-1 py-0 text-[10px] font-medium ${badgeColor(planAssigned, planTotal)}`}
+                          title={`Plan: ${planAssigned} de ${planTotal} con responsable`}
+                        >
+                          <Users className="h-2.5 w-2.5" />
+                          {planAssigned}/{planTotal}
+                        </span>
+                      )}
+                      {extrasTotal > 0 && (
+                        <span
+                          className={`inline-flex items-center gap-0.5 border rounded px-1 py-0 text-[10px] font-medium border-dashed ${badgeColor(extrasAssigned, extrasTotal)}`}
+                          title={`Extras: ${extrasAssigned} de ${extrasTotal} con responsable`}
+                        >
+                          ✨{extrasAssigned}/{extrasTotal}
+                        </span>
+                      )}
+                    </span>
+                  )
+                })()
               ) : null
             )}
           </div>

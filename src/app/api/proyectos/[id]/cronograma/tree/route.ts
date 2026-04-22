@@ -364,8 +364,12 @@ export async function GET(
                       status: tarea.estado || 'pendiente',
                       recursosTotales: 1,
                       recursosAsignados: tarea.recursoId ? 1 : 0,
+                      recursosExtrasTotales: 0,
+                      recursosExtrasAsignados: 0,
                       responsablesTotales: 1,
-                      responsablesAsignados: tarea.responsableId ? 1 : 0
+                      responsablesAsignados: tarea.responsableId ? 1 : 0,
+                      responsablesExtrasTotales: 0,
+                      responsablesExtrasAsignados: 0
                     },
                     children: []
                   }))
@@ -427,10 +431,15 @@ export async function GET(
                           totalChildren: 0,
                           progressPercentage: tarea.porcentajeCompletado || 0,
                           status: tarea.estado || 'pendiente',
+                          // Las tareas extras cuentan en el subset de extras, no en el plan
                           recursosTotales: 1,
                           recursosAsignados: tarea.recursoId ? 1 : 0,
+                          recursosExtrasTotales: 1,
+                          recursosExtrasAsignados: tarea.recursoId ? 1 : 0,
                           responsablesTotales: 1,
-                          responsablesAsignados: tarea.responsableId ? 1 : 0
+                          responsablesAsignados: tarea.responsableId ? 1 : 0,
+                          responsablesExtrasTotales: 1,
+                          responsablesExtrasAsignados: tarea.responsableId ? 1 : 0
                         },
                         children: []
                       }))
@@ -442,48 +451,58 @@ export async function GET(
       }
     })
 
-    // ✅ Propagar conteo de recursos de abajo hacia arriba
-    const propagateResources = (node: any): { total: number; assigned: number } => {
+    // ✅ Propagar conteo de recursos de abajo hacia arriba (incluye subset de extras)
+    const propagateResources = (node: any): { total: number; assigned: number; extrasTotal: number; extrasAssigned: number } => {
       if (!node.children || node.children.length === 0) {
         return {
           total: node.metadata.recursosTotales || 0,
-          assigned: node.metadata.recursosAsignados || 0
+          assigned: node.metadata.recursosAsignados || 0,
+          extrasTotal: node.metadata.recursosExtrasTotales || 0,
+          extrasAssigned: node.metadata.recursosExtrasAsignados || 0
         }
       }
-      let total = 0
-      let assigned = 0
+      let total = 0, assigned = 0, extrasTotal = 0, extrasAssigned = 0
       for (const child of node.children) {
         const childRes = propagateResources(child)
         total += childRes.total
         assigned += childRes.assigned
+        extrasTotal += childRes.extrasTotal
+        extrasAssigned += childRes.extrasAssigned
       }
       node.metadata.recursosTotales = total
       node.metadata.recursosAsignados = assigned
-      return { total, assigned }
+      node.metadata.recursosExtrasTotales = extrasTotal
+      node.metadata.recursosExtrasAsignados = extrasAssigned
+      return { total, assigned, extrasTotal, extrasAssigned }
     }
 
     for (const fase of faseNodes) {
       propagateResources(fase)
     }
 
-    // ✅ Propagar conteo de responsables de abajo hacia arriba
-    const propagateResponsables = (node: any): { total: number; assigned: number } => {
+    // ✅ Propagar conteo de responsables de abajo hacia arriba (incluye subset de extras)
+    const propagateResponsables = (node: any): { total: number; assigned: number; extrasTotal: number; extrasAssigned: number } => {
       if (!node.children || node.children.length === 0) {
         return {
           total: node.metadata.responsablesTotales || 0,
-          assigned: node.metadata.responsablesAsignados || 0
+          assigned: node.metadata.responsablesAsignados || 0,
+          extrasTotal: node.metadata.responsablesExtrasTotales || 0,
+          extrasAssigned: node.metadata.responsablesExtrasAsignados || 0
         }
       }
-      let total = 0
-      let assigned = 0
+      let total = 0, assigned = 0, extrasTotal = 0, extrasAssigned = 0
       for (const child of node.children) {
         const childRes = propagateResponsables(child)
         total += childRes.total
         assigned += childRes.assigned
+        extrasTotal += childRes.extrasTotal
+        extrasAssigned += childRes.extrasAssigned
       }
       node.metadata.responsablesTotales = total
       node.metadata.responsablesAsignados = assigned
-      return { total, assigned }
+      node.metadata.responsablesExtrasTotales = extrasTotal
+      node.metadata.responsablesExtrasAsignados = extrasAssigned
+      return { total, assigned, extrasTotal, extrasAssigned }
     }
 
     for (const fase of faseNodes) {
@@ -494,17 +513,21 @@ export async function GET(
     const proyectoRecursos = faseNodes.reduce(
       (acc: any, f: any) => ({
         total: acc.total + (f.metadata.recursosTotales || 0),
-        assigned: acc.assigned + (f.metadata.recursosAsignados || 0)
+        assigned: acc.assigned + (f.metadata.recursosAsignados || 0),
+        extrasTotal: acc.extrasTotal + (f.metadata.recursosExtrasTotales || 0),
+        extrasAssigned: acc.extrasAssigned + (f.metadata.recursosExtrasAsignados || 0)
       }),
-      { total: 0, assigned: 0 }
+      { total: 0, assigned: 0, extrasTotal: 0, extrasAssigned: 0 }
     )
 
     const proyectoResponsables = faseNodes.reduce(
       (acc: any, f: any) => ({
         total: acc.total + (f.metadata.responsablesTotales || 0),
-        assigned: acc.assigned + (f.metadata.responsablesAsignados || 0)
+        assigned: acc.assigned + (f.metadata.responsablesAsignados || 0),
+        extrasTotal: acc.extrasTotal + (f.metadata.responsablesExtrasTotales || 0),
+        extrasAssigned: acc.extrasAssigned + (f.metadata.responsablesExtrasAsignados || 0)
       }),
-      { total: 0, assigned: 0 }
+      { total: 0, assigned: 0, extrasTotal: 0, extrasAssigned: 0 }
     )
 
     const projectNode = {
@@ -525,8 +548,12 @@ export async function GET(
         status: 'pendiente',
         recursosTotales: proyectoRecursos.total,
         recursosAsignados: proyectoRecursos.assigned,
+        recursosExtrasTotales: proyectoRecursos.extrasTotal,
+        recursosExtrasAsignados: proyectoRecursos.extrasAssigned,
         responsablesTotales: proyectoResponsables.total,
-        responsablesAsignados: proyectoResponsables.assigned
+        responsablesAsignados: proyectoResponsables.assigned,
+        responsablesExtrasTotales: proyectoResponsables.extrasTotal,
+        responsablesExtrasAsignados: proyectoResponsables.extrasAssigned
       },
       children: faseNodes,
     }

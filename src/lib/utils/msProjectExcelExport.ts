@@ -18,6 +18,8 @@ interface TreeNode {
     recursoId?: string | null
     recursoNombre?: string | null
     recursoTipo?: string | null
+    isExtrasGroup?: boolean
+    esExtra?: boolean
   }
   children?: TreeNode[]
 }
@@ -65,6 +67,11 @@ function flattenTree(node: TreeNode, horasPorDia: number): FlatRow[] {
 
   function visit(n: TreeNode) {
     const data = n.data || {}
+
+    // Excluir el grupo "Tareas Extras" (pseudo-actividad) y las tareas extras
+    // del export de cronograma: las extras son fuera-de-plan, no pertenecen al cronograma
+    if (data.isExtrasGroup || data.esExtra) return
+
     const fechaInicio = data.fechaInicio || data.fechaInicioComercial
     const fechaFin = data.fechaFin || data.fechaFinComercial
     const horas = Number(data.horasEstimadas || 0)
@@ -175,6 +182,10 @@ function collectTareaRecursos(tree: TreeNode[]): TareaRecursoRow[] {
 
   function visit(n: TreeNode) {
     const data = n.data || {}
+
+    // Excluir tareas extras y el pseudo-grupo "Tareas Extras"
+    if (data.isExtrasGroup || data.esExtra) return
+
     const outlineLevel = n.level + 1
     const hasChildren = n.children && n.children.length > 0
 

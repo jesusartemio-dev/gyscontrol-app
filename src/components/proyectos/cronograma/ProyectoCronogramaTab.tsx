@@ -68,6 +68,7 @@ interface CronogramaStats {
   actividades: number
   tareas: number
   tareasExtras: number
+  horasExtras: number
 }
 
 interface ProyectoCronogramaTabProps {
@@ -100,7 +101,7 @@ export function ProyectoCronogramaTab({
   const [proyectoData, setProyectoData] = useState<any>(null) // Datos originales del proyecto
   const [fechaInicio, setFechaInicio] = useState('')
   const [fechaFin, setFechaFin] = useState('')
-  const [stats, setStats] = useState<CronogramaStats>({ fases: 0, edts: 0, actividades: 0, tareas: 0, tareasExtras: 0 })
+  const [stats, setStats] = useState<CronogramaStats>({ fases: 0, edts: 0, actividades: 0, tareas: 0, tareasExtras: 0, horasExtras: 0 })
 
   // Estado del calendario laboral
   const [calendarioAsignado, setCalendarioAsignado] = useState<{ id: string; nombre: string; horasPorDia: number } | null>(null)
@@ -248,7 +249,7 @@ export function ProyectoCronogramaTab({
         const data = await response.json()
         if (data?.data?.tree) {
           const tree = data.data.tree
-          let fases = 0, edts = 0, actividades = 0, tareas = 0, tareasExtras = 0
+          let fases = 0, edts = 0, actividades = 0, tareas = 0, tareasExtras = 0, horasExtras = 0
 
           // tree[0] es el nodo proyecto (nivel 0). Sus children son fases.
           tree.forEach((proyecto: any) => {
@@ -260,6 +261,7 @@ export function ProyectoCronogramaTab({
                   if (actividad.data?.isExtrasGroup) {
                     // Pseudo-grupo de extras: sus hijos son tareas extras
                     tareasExtras += actividad.children?.length || 0
+                    horasExtras += Number(actividad.data?.horasEstimadas || 0)
                   } else {
                     actividades++
                     tareas += actividad.children?.length || 0
@@ -269,7 +271,7 @@ export function ProyectoCronogramaTab({
             })
           })
 
-          setStats({ fases, edts, actividades, tareas, tareasExtras })
+          setStats({ fases, edts, actividades, tareas, tareasExtras, horasExtras })
         }
       }
     } catch (error) {
@@ -863,8 +865,8 @@ export function ProyectoCronogramaTab({
                 {stats.tareas} tareas
               </Badge>
               {stats.tareasExtras > 0 && (
-                <Badge variant="outline" className="text-xs font-normal border-amber-400 text-amber-700 bg-amber-50">
-                  +{stats.tareasExtras} extras
+                <Badge variant="outline" className="text-xs font-normal border-amber-400 text-amber-700 bg-amber-50" title="Tareas añadidas durante la ejecución, fuera del plan original">
+                  +{stats.tareasExtras} extras{stats.horasExtras > 0 ? ` (${stats.horasExtras}h)` : ''}
                 </Badge>
               )}
             </>

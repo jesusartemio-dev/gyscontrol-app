@@ -25,8 +25,12 @@ export interface TreeNode {
     status: 'pending' | 'in_progress' | 'completed' | 'paused' | 'cancelled'
     recursosTotales?: number
     recursosAsignados?: number
+    recursosExtrasTotales?: number
+    recursosExtrasAsignados?: number
     responsablesTotales?: number
     responsablesAsignados?: number
+    responsablesExtrasTotales?: number
+    responsablesExtrasAsignados?: number
   }
 }
 
