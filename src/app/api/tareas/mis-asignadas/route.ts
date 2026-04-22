@@ -111,6 +111,7 @@ export async function GET(request: NextRequest) {
         proyectoNombre: tarea.proyectoEdt?.proyecto
           ? `${tarea.proyectoEdt.proyecto.codigo} - ${tarea.proyectoEdt.proyecto.nombre}`
           : 'Sin proyecto',
+        proyectoEdtId: tarea.proyectoEdtId || null,
         edtNombre: tarea.proyectoEdt?.nombre || 'Sin EDT',
         actividadNombre: tarea.proyectoActividad?.nombre || null,
         responsableId: tarea.responsableId,

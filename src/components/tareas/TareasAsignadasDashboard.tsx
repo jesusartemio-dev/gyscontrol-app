@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -45,6 +45,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select'
+import { Slider } from '@/components/ui/slider'
 import { useToast } from '@/hooks/use-toast'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -57,6 +58,7 @@ interface TareaAsignada {
   tipo: 'proyecto_tarea' | 'tarea'
   proyectoId: string
   proyectoNombre: string
+  proyectoEdtId?: string | null
   edtNombre: string
   actividadNombre?: string | null
   responsableId?: string
@@ -106,7 +108,16 @@ export function TareasAsignadasDashboard({
   const [nuevoProgreso, setNuevoProgreso] = useState<number>(0)
   const [actualizando, setActualizando] = useState(false)
   const [actualizandoEstado, setActualizandoEstado] = useState<string | null>(null)
+  // Slider de progreso en el modal de detalle
+  const [progresoModal, setProgresoModal] = useState<number>(0)
   const { toast } = useToast()
+
+  // Sincronizar el slider del modal cuando cambia la tarea seleccionada
+  useEffect(() => {
+    if (tareaSeleccionada) {
+      setProgresoModal(tareaSeleccionada.progreso)
+    }
+  }, [tareaSeleccionada])
 
   // Calcular eficiencia (solo cuando la tarea está completada)
   const calcularEficiencia = (horasPlan: number, horasReales: number, estado: string): number | null => {
@@ -508,8 +519,12 @@ export function TareasAsignadasDashboard({
                               <Button variant="ghost" size="sm" onClick={() => setTareaSeleccionada(tarea)} className="h-7 px-2">
                                 <Eye className="h-3.5 w-3.5" />
                               </Button>
-                              <Link href="/mi-trabajo/timesheet">
-                                <Button variant="ghost" size="sm" className="h-7 px-2">
+                              <Link
+                                href={`/mi-trabajo/timesheet?tareaId=${tarea.id}&proyectoId=${tarea.proyectoId}${tarea.proyectoEdtId ? `&edtId=${tarea.proyectoEdtId}` : ''}&tipo=${tarea.tipo}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <Button variant="ghost" size="sm" className="h-7 px-2" title="Registrar horas (nueva pestaña)">
                                   <Plus className="h-3.5 w-3.5" />
                                 </Button>
                               </Link>
@@ -652,8 +667,13 @@ export function TareasAsignadasDashboard({
                         <Eye className="h-3 w-3 mr-1" />
                         Detalles
                       </Button>
-                      <Link href="/mi-trabajo/timesheet" className="flex-1">
-                        <Button size="sm" className="w-full h-8 text-xs">
+                      <Link
+                        href={`/mi-trabajo/timesheet?tareaId=${tarea.id}&proyectoId=${tarea.proyectoId}${tarea.proyectoEdtId ? `&edtId=${tarea.proyectoEdtId}` : ''}&tipo=${tarea.tipo}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1"
+                      >
+                        <Button size="sm" className="w-full h-8 text-xs" title="Registrar horas (nueva pestaña)">
                           <Plus className="h-3 w-3 mr-1" />
                           Horas
                         </Button>
@@ -762,9 +782,61 @@ export function TareasAsignadasDashboard({
 
               <div>
                 <p className="text-sm font-medium text-gray-500 mb-2">Progreso</p>
-                <div className="flex items-center gap-2">
-                  <Progress value={tareaSeleccionada.progreso} className="h-3 flex-1" />
-                  <span className="text-sm font-medium">{tareaSeleccionada.progreso}%</span>
+                <div className="rounded-lg border px-3 py-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-500">Arrastra el slider para actualizar</span>
+                    <span className={`text-sm font-bold px-2 py-0.5 rounded ${
+                      progresoModal >= 100 ? 'bg-green-100 text-green-700' :
+                      progresoModal >= 50 ? 'bg-blue-100 text-blue-700' :
+                      progresoModal > 0 ? 'bg-yellow-100 text-yellow-700' :
+                      'bg-gray-100 text-gray-500'
+                    }`}>
+                      {progresoModal}%
+                    </span>
+                  </div>
+                  <Slider
+                    value={[progresoModal]}
+                    onValueChange={([v]) => setProgresoModal(v)}
+                    max={100}
+                    step={5}
+                    disabled={actualizando}
+                  />
+                  {progresoModal !== tareaSeleccionada.progreso && (() => {
+                    const delta = progresoModal - tareaSeleccionada.progreso
+                    const isAvance = delta > 0
+                    return (
+                      <div className="flex items-center justify-between gap-2 pt-1">
+                        <div className="text-[11px] flex items-center gap-1.5">
+                          <span className={`font-semibold px-1.5 py-0.5 rounded ${isAvance ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                            {isAvance ? '+' : ''}{delta}% {isAvance ? 'avanzado' : 'retrocedido'}
+                          </span>
+                          <span className="text-gray-400">{tareaSeleccionada.progreso}% → {progresoModal}%</span>
+                        </div>
+                        <div className="flex gap-1.5">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setProgresoModal(tareaSeleccionada.progreso)}
+                            disabled={actualizando}
+                            className="h-7 px-2 text-xs"
+                          >
+                            Deshacer
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={async () => {
+                              await actualizarProgreso(tareaSeleccionada, progresoModal)
+                            }}
+                            disabled={actualizando}
+                            className="h-7 px-2 text-xs"
+                          >
+                            <Check className="h-3.5 w-3.5 mr-1" />
+                            Guardar
+                          </Button>
+                        </div>
+                      </div>
+                    )
+                  })()}
                 </div>
               </div>
 
@@ -780,7 +852,11 @@ export function TareasAsignadasDashboard({
                   <X className="h-4 w-4 mr-1" />
                   Cerrar
                 </Button>
-                <Link href="/mi-trabajo/timesheet">
+                <Link
+                  href={`/mi-trabajo/timesheet?tareaId=${tareaSeleccionada.id}&proyectoId=${tareaSeleccionada.proyectoId}${tareaSeleccionada.proyectoEdtId ? `&edtId=${tareaSeleccionada.proyectoEdtId}` : ''}&tipo=${tareaSeleccionada.tipo}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   <Button>
                     <Plus className="h-4 w-4 mr-1" />
                     Registrar Horas

@@ -42,6 +42,7 @@ import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, getISOWeek, getISOW
 import { es } from 'date-fns/locale'
 import { TimesheetSemanal } from '@/components/horas-hombre/TimesheetSemanal'
 import { RegistroHorasWizard } from '@/components/horas-hombre/RegistroHorasWizard'
+import { useSearchParams } from 'next/navigation'
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -102,6 +103,20 @@ export default function TimesheetPage() {
   const [showWizard, setShowWizard] = useState(false)
   const [aprobacionesMapa, setAprobacionesMapa] = useState<Record<string, string>>({})
   const [semanasPendientes, setSemanasPendientes] = useState<{ semana: string; horas: number; estado: string }[]>([])
+
+  // Pre-seleccion desde URL (?tareaId=xxx&proyectoId=xxx&edtId=xxx&tipo=proyecto_tarea)
+  const searchParams = useSearchParams()
+  const preselectTareaId = searchParams.get('tareaId')
+  const preselectProyectoId = searchParams.get('proyectoId')
+  const preselectEdtId = searchParams.get('edtId')
+  const preselectTipo = (searchParams.get('tipo') as 'proyecto_tarea' | 'tarea' | null)
+
+  // Si llegamos con params de preseleccion, abrimos el wizard automaticamente
+  useEffect(() => {
+    if (preselectTareaId && preselectProyectoId && preselectEdtId) {
+      setShowWizard(true)
+    }
+  }, [preselectTareaId, preselectProyectoId, preselectEdtId])
 
   // ── Semana tab state ──
   const [semanaActual, setSemanaActual] = useState(new Date())
@@ -866,6 +881,10 @@ export default function TimesheetPage() {
         open={showWizard}
         onOpenChange={setShowWizard}
         onSuccess={handleRegistroExitoso}
+        preselectTareaId={preselectTareaId || undefined}
+        preselectProyectoId={preselectProyectoId || undefined}
+        preselectEdtId={preselectEdtId || undefined}
+        preselectTipo={preselectTipo || undefined}
       />
     </div>
   )

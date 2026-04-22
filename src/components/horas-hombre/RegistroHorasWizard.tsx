@@ -43,6 +43,12 @@ interface RegistroHorasWizardProps {
   open?: boolean
   onOpenChange?: (open: boolean) => void
   fechaInicial?: string
+  // Pre-selección: cuando estos 3 vienen definidos, el wizard salta directo al paso 5
+  // con la tarea ya elegida (viene del flujo "Registrar Horas" desde el detalle de una tarea).
+  preselectTareaId?: string
+  preselectProyectoId?: string
+  preselectEdtId?: string
+  preselectTipo?: 'proyecto_tarea' | 'tarea'
 }
 
 interface Proyecto {
@@ -91,9 +97,13 @@ export function RegistroHorasWizard({
   onSuccess,
   open,
   onOpenChange,
-  fechaInicial
+  fechaInicial,
+  preselectTareaId,
+  preselectProyectoId,
+  preselectEdtId,
+  preselectTipo
 }: RegistroHorasWizardProps) {
-  console.log('🧙 WIZARD: Props recibidas:', { open, fechaInicial })
+  console.log('🧙 WIZARD: Props recibidas:', { open, fechaInicial, preselectTareaId })
   
   const [pasoActual, setPasoActual] = useState(1)
   const [fecha, setFecha] = useState(fechaInicial || format(new Date(), 'yyyy-MM-dd'))
@@ -234,6 +244,82 @@ export function RegistroHorasWizard({
       limpiarFormulario()
     }
   }, [open, fechaInicial])
+
+  // ✅ Preselección: cuando llegan params (tareaId, proyectoId, edtId) desde URL,
+  // pre-cargamos proyecto + EDT + tarea y saltamos al paso 5 (Registrar horas)
+  useEffect(() => {
+    if (!open || !preselectTareaId || !preselectProyectoId || !preselectEdtId) return
+
+    let cancelado = false
+    const init = async () => {
+      try {
+        setLoadingData(true)
+
+        // 1. Cargar EDTs del proyecto y elegir el que viene
+        const edtsResp = await fetch(`/api/edts-proyecto-simple?proyectoId=${preselectProyectoId}`)
+        const edtsData = await edtsResp.json()
+        if (cancelado) return
+        if (!edtsData?.success || !edtsData.edts?.length) {
+          toast({ title: 'Error', description: 'No se pudieron cargar los EDTs del proyecto.', variant: 'destructive' })
+          return
+        }
+        const targetEdt = edtsData.edts.find((e: any) => e.id === preselectEdtId)
+        if (!targetEdt) {
+          toast({ title: 'Error', description: 'No se encontró el EDT de la tarea.', variant: 'destructive' })
+          return
+        }
+
+        // 2. Buscar datos de la tarea (opcionalmente enriquecer con nombre/horas)
+        let tareaFull: any = null
+        try {
+          const misResp = await fetch('/api/tareas/mis-asignadas')
+          if (misResp.ok) {
+            const misData = await misResp.json()
+            const list = Array.isArray(misData) ? misData : (misData?.tareas || [])
+            tareaFull = list.find((t: any) => t.id === preselectTareaId)
+          }
+        } catch { /* no-op: el stub alcanza */ }
+
+        if (cancelado) return
+
+        // 3. Construir estado y saltar al paso 5
+        const proyectoStub: Proyecto = {
+          id: preselectProyectoId,
+          nombre: tareaFull?.proyectoNombre || '',
+          codigo: '',
+          estado: 'en_progreso',
+          responsableNombre: ''
+        }
+        const elemento: Elemento = {
+          id: preselectTareaId,
+          nombre: tareaFull?.nombre || 'Tarea',
+          tipo: 'tarea',
+          responsableNombre: tareaFull?.responsableNombre || '',
+          horasPlan: Number(tareaFull?.horasPlan || 0),
+          horasReales: Number(tareaFull?.horasReales || 0),
+          estado: tareaFull?.estado || 'en_progreso',
+          progreso: Number(tareaFull?.progreso || 0),
+          descripcion: tareaFull?.descripcion || ''
+        }
+
+        setProyectoSeleccionado(proyectoStub)
+        setEdts(edtsData.edts)
+        setEdtSeleccionado(targetEdt)
+        setNivelSeleccionado('tarea')
+        setTareasDirectas([elemento])
+        setElementoSeleccionado(elemento)
+        setCreandoTarea(false)
+        setPasoActual(5)
+      } catch (error) {
+        console.error('❌ Error en preselección de tarea:', error)
+      } finally {
+        if (!cancelado) setLoadingData(false)
+      }
+    }
+    init()
+    return () => { cancelado = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, preselectTareaId, preselectProyectoId, preselectEdtId])
 
   const cargarProyectos = async () => {
     try {
