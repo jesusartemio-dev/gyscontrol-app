@@ -197,6 +197,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
             proyectoCronogramaId: cronogramaEjecucion.id,
             nombre: nombreTareaExtra.trim(),
             descripcion: '[EXTRA]',
+            esExtra: true,
             fechaInicio: fechaInicio ? new Date(fechaInicio + 'T00:00:00') : hoy,
             fechaFin: fechaFin ? new Date(fechaFin + 'T00:00:00') : hoy,
             horasEstimadas: horasEstimadas || undefined,
