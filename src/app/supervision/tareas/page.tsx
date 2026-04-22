@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import {
   DndContext,
   closestCenter,
@@ -200,7 +200,7 @@ function SortableRow({ id, isDragEnabled, highlight, children }: { id: string; i
   )
 }
 
-export default function SupervisionTareasPage() {
+function SupervisionTareasContent() {
   const hasFetchedRef = useRef(false)
   const [tareas, setTareas] = useState<Tarea[]>([])
   const [tareasFiltradas, setTareasFiltradas] = useState<Tarea[]>([])
@@ -1796,5 +1796,13 @@ export default function SupervisionTareasPage() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+export default function SupervisionTareasPage() {
+  return (
+    <Suspense fallback={<div className="p-6"><Loader2 className="h-6 w-6 animate-spin" /></div>}>
+      <SupervisionTareasContent />
+    </Suspense>
   )
 }
