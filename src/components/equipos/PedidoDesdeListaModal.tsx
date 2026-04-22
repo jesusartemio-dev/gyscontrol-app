@@ -109,7 +109,9 @@ export default function PedidoDesdeListaModal({
         selections[item.id] = {
           itemId: item.id,
           selected: previousSelection?.selected || false,
-          cantidadPedida: Math.min(previousSelection?.cantidadPedida || 1, cantidadDisponible),
+          cantidadPedida: previousSelection?.cantidadPedida
+            ? Math.min(previousSelection.cantidadPedida, cantidadDisponible)
+            : cantidadDisponible,
           cantidadDisponible,
         }
       }
@@ -219,7 +221,7 @@ export default function PedidoDesdeListaModal({
         selections[item.id] = {
           itemId: item.id,
           selected: false,
-          cantidadPedida: 1,
+          cantidadPedida: cantidadDisponible,
           cantidadDisponible,
         }
       }
@@ -349,18 +351,22 @@ export default function PedidoDesdeListaModal({
                             value={selection.cantidadPedida}
                             onChange={(e) => {
                               e.stopPropagation()
-                              handleItemSelectionChange(
-                                item.id,
-                                'cantidadPedida',
-                                Math.min(Math.max(1, parseInt(e.target.value) || 1), selection.cantidadDisponible)
+                              const nuevaCantidad = Math.min(
+                                Math.max(1, parseInt(e.target.value) || 1),
+                                selection.cantidadDisponible
                               )
+                              setItemSelections((prev) => ({
+                                ...prev,
+                                [item.id]: {
+                                  ...prev[item.id],
+                                  cantidadPedida: nuevaCantidad,
+                                  selected: true,
+                                },
+                              }))
                             }}
                             onClick={(e) => e.stopPropagation()}
-                            disabled={loading || !selection.selected}
-                            className={cn(
-                              'w-14 h-7 text-xs text-center',
-                              !selection.selected && 'opacity-40'
-                            )}
+                            disabled={loading}
+                            className="w-14 h-7 text-xs text-center font-semibold"
                           />
                         </div>
                       </div>
