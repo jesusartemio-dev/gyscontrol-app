@@ -12,6 +12,7 @@ import type { ListaEquipoPayload } from '@/types'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { registrarCreacion } from '@/lib/services/audit'
+import { crearEvento } from '@/lib/utils/trazabilidad'
 
 // ✅ Obtener todas las listas
 export async function GET() {
@@ -70,6 +71,16 @@ export async function POST(request: Request) {
       } catch (auditError) {
         console.error('Error al registrar auditoría:', auditError)
       }
+
+      // 🕑 Evento de trazabilidad
+      crearEvento(prisma, {
+        listaEquipoId: creada.id,
+        proyectoId: payload.proyectoId,
+        tipo: 'lista_creada',
+        descripcion: `Lista ${creada.codigo} creada: ${creada.nombre}`,
+        usuarioId,
+        metadata: { codigo: creada.codigo, origen: 'lista-requerimiento' },
+      }).catch(() => {})
     }
 
     return NextResponse.json(creada)

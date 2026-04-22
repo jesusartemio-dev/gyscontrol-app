@@ -19,6 +19,7 @@ import {
   PAGINATION_CONFIGS
 } from '@/lib/utils/pagination'
 import { registrarCreacion } from '@/lib/services/audit'
+import { crearEvento } from '@/lib/utils/trazabilidad'
 
 // GET /api/listas-equipo - Obtener listas de equipos con paginación y búsqueda
 export async function GET(request: NextRequest) {
@@ -246,6 +247,16 @@ export async function POST(request: NextRequest) {
     } catch (auditError) {
       console.error('Error al registrar auditoría:', auditError)
     }
+
+    // 🕑 Evento de trazabilidad
+    crearEvento(prisma, {
+      listaEquipoId: nuevaLista.id,
+      proyectoId: body.proyectoId,
+      tipo: 'lista_creada',
+      descripcion: `Lista ${nuevaLista.codigo} creada: ${nuevaLista.nombre}`,
+      usuarioId: session.user.id,
+      metadata: { codigo: nuevaLista.codigo, proyectoCodigo: nuevaLista.proyecto?.codigo },
+    }).catch(() => {})
 
     return NextResponse.json(nuevaLista, { status: 201 })
   } catch (error) {

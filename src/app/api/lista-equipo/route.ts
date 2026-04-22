@@ -14,6 +14,7 @@ import { z } from 'zod'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { registrarCreacion } from '@/lib/services/audit'
+import { crearEvento } from '@/lib/utils/trazabilidad'
 
 const listaEquipoSchema = z.object({
   proyectoId: z.string().min(1, 'El proyectoId es obligatorio'),
@@ -213,6 +214,16 @@ export async function POST(request: Request) {
       console.error('Error al registrar auditoría:', auditError)
       // No fallar la creación por error de auditoría
     }
+
+    // 🕑 Evento de trazabilidad
+    crearEvento(prisma, {
+      listaEquipoId: nuevaLista.id,
+      proyectoId: parsed.data.proyectoId,
+      tipo: 'lista_creada',
+      descripcion: `Lista ${nuevaLista.codigo} creada: ${nuevaLista.nombre}`,
+      usuarioId: session.user.id,
+      metadata: { codigo: nuevaLista.codigo, proyectoCodigo: proyecto.codigo },
+    }).catch(() => {})
 
     return NextResponse.json(nuevaLista)
   } catch (error) {

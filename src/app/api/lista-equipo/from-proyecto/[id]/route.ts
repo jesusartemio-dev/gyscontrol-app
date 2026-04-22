@@ -11,6 +11,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { registrarCreacion } from '@/lib/services/audit'
+import { crearEvento } from '@/lib/utils/trazabilidad'
 
 export const dynamic = 'force-dynamic'
 
@@ -100,6 +101,16 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
     } catch (auditError) {
       console.error('Error al registrar auditoría:', auditError)
     }
+
+    // 🕑 Evento de trazabilidad
+    crearEvento(prisma, {
+      listaEquipoId: resultado.id,
+      proyectoId,
+      tipo: 'lista_creada',
+      descripcion: `Lista ${resultado.codigo} creada desde cotización (${items.length} items)`,
+      usuarioId: session.user.id,
+      metadata: { codigo: resultado.codigo, origen: 'from-proyecto', totalItems: items.length },
+    }).catch(() => {})
 
     return NextResponse.json(resultado)
   } catch (error) {

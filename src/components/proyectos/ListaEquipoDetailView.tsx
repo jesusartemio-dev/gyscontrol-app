@@ -38,6 +38,7 @@ import ListaEquipoItemList from '@/components/equipos/ListaEquipoItemList';
 import ListaEquipoEditModal from '@/components/equipos/ListaEquipoEditModal';
 import ListaEstadoFlujoBanner from '@/components/equipos/ListaEstadoFlujoBanner';
 import ListaEquipoHistorial from '@/components/equipos/ListaEquipoHistorial';
+import ListaEquipoTimeline from '@/components/equipos/ListaEquipoTimeline';
 import PedidoDesdeListaModal from '@/components/equipos/PedidoDesdeListaModal';
 import { formatCurrency, formatDate, cn } from '@/lib/utils';
 import { createPedidoDesdeListaContextual } from '@/lib/services/pedidoEquipo';
@@ -305,6 +306,11 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
           </CollapsibleContent>
         </Collapsible>
       </div>
+
+      {/* Timeline de Trazabilidad */}
+      {(lista as any)?.eventosTrazabilidad?.length > 0 && (
+        <ListaEquipoTimeline eventos={(lista as any).eventosTrazabilidad} />
+      )}
 
       {/* Modal de Edición */}
       <ListaEquipoEditModal

@@ -18,6 +18,7 @@ import { validarTransicion, getFechasPorTransicion, type EstadoListaEquipo } fro
 import { sincronizarRealesProyecto } from '@/lib/utils/syncReales'
 import { registrarActualizacion } from '@/lib/services/audit'
 import { canDelete } from '@/lib/utils/deleteValidation'
+import { crearEvento } from '@/lib/utils/trazabilidad'
 
 // ✅ Obtener ListaEquipo por ID (GET)
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
@@ -176,6 +177,35 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
         })
       } catch (auditError) {
         console.error('Error logging status change:', auditError)
+      }
+
+      // 🕑 Evento de trazabilidad para transiciones clave
+      const motivo = motivoAnulacion || motivoRechazo
+      const tipoEvento =
+        body.estado === 'aprobada' ? 'lista_aprobada' :
+        body.estado === 'anulada' ? 'lista_anulada' :
+        body.estado === 'por_aprobar' ? 'lista_cotizada' :
+        null
+
+      if (tipoEvento) {
+        const labels: Record<string, string> = {
+          lista_aprobada: 'aprobada',
+          lista_anulada: 'anulada',
+          lista_cotizada: 'cotizada (lista para aprobar)',
+        }
+        crearEvento(prisma, {
+          listaEquipoId: id,
+          proyectoId: existe.proyectoId,
+          tipo: tipoEvento,
+          descripcion: `Lista ${data.codigo || id} ${labels[tipoEvento]}${motivo ? `: ${motivo}` : ''}`,
+          usuarioId: session.user.id,
+          metadata: {
+            codigo: data.codigo,
+            estadoAnterior: existe.estado,
+            estadoNuevo: body.estado,
+            ...(motivo ? { motivo } : {}),
+          },
+        }).catch(() => {})
       }
     }
 

@@ -13,6 +13,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { registrarCreacion } from '@/lib/services/audit'
+import { crearEvento } from '@/lib/utils/trazabilidad'
 
 interface ListaDistribucionPayload {
   proyectoId: string
@@ -184,6 +185,16 @@ export async function POST(req: Request) {
     } catch (auditError) {
       console.error('Error al registrar auditoría:', auditError)
     }
+
+    // 🕑 Evento de trazabilidad
+    crearEvento(prisma, {
+      listaEquipoId: nuevaLista.id,
+      proyectoId,
+      tipo: 'lista_creada',
+      descripcion: `Lista ${nuevaLista.codigo} creada por distribución: ${nombre} (${itemsIds.length} items)`,
+      usuarioId: session.user.id,
+      metadata: { codigo: nuevaLista.codigo, origen: 'distribucion', totalItems: itemsIds.length },
+    }).catch(() => {})
 
     return NextResponse.json({
       ...listaCompleta,

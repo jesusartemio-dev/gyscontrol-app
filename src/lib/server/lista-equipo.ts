@@ -112,6 +112,13 @@ export async function getListaEquipoDetail(proyectoId: string, listaId: string) 
           orderBy: {
             createdAt: 'asc'
           }
+        },
+        // 🕑 Eventos de trazabilidad (para el Timeline)
+        eventosTrazabilidad: {
+          orderBy: { fechaEvento: 'desc' },
+          include: {
+            user: { select: { id: true, name: true } },
+          },
         }
       }
     }).catch((error) => {

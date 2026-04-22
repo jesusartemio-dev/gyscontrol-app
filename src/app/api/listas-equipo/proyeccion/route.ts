@@ -12,6 +12,7 @@ import { z } from 'zod';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { registrarCreacion } from '@/lib/services/audit';
+import { crearEvento } from '@/lib/utils/trazabilidad';
 
 // ✅ Esquemas de validación
 const FiltrosProyeccionSchema = z.object({
@@ -258,6 +259,16 @@ export async function POST(request: NextRequest) {
       } catch (auditError) {
         console.error('Error al registrar auditoría:', auditError);
       }
+
+      // 🕑 Evento de trazabilidad
+      crearEvento(prisma, {
+        listaEquipoId: nuevaLista.id,
+        proyectoId: datosValidados.proyectoId,
+        tipo: 'lista_creada',
+        descripcion: `Lista ${nuevaLista.codigo} creada en proyección (${datosValidados.items.length} items)`,
+        usuarioId: session.user.id,
+        metadata: { codigo: nuevaLista.codigo, origen: 'proyeccion', totalItems: datosValidados.items.length },
+      }).catch(() => {});
     }
 
     return NextResponse.json({

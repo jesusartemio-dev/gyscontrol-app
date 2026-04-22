@@ -13,6 +13,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { registrarCreacion } from '@/lib/services/audit'
+import { crearEvento } from '@/lib/utils/trazabilidad'
 
 interface SugerenciaInteligentePayload {
   proyectoId: string
@@ -213,6 +214,21 @@ export async function POST(req: Request) {
       } catch (auditError) {
         console.error('Error al registrar auditoría:', auditError)
       }
+
+      // 🕑 Evento de trazabilidad
+      crearEvento(prisma, {
+        listaEquipoId: lista.id,
+        proyectoId,
+        tipo: 'lista_creada',
+        descripcion: `Lista ${lista.codigo} creada por distribución inteligente (${lista.categoriaPrincipal}): ${lista.nombre}`,
+        usuarioId: session.user.id,
+        metadata: {
+          codigo: lista.codigo,
+          origen: 'distribucion_inteligente',
+          categoriaPrincipal: lista.categoriaPrincipal,
+          totalItems: lista.itemsCount,
+        },
+      }).catch(() => {})
     }
 
     // ✅ Retornar las listas creadas con estadísticas

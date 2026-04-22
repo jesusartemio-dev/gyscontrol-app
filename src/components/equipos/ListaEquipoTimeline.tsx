@@ -1,148 +1,186 @@
 'use client'
 
+import { useState } from 'react'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Badge } from '@/components/ui/badge'
 import {
-  CheckCircle,
-  Clock,
-  AlertTriangle,
-  Calendar,
-  Send,
-  FileCheck,
-  ThumbsUp,
-  Truck,
-  Calculator,
-  DollarSign,
-  Target
+  History, ChevronDown, ShoppingCart, Warehouse, Package, PackageCheck, X, RefreshCw,
+  Activity, FileCheck, Send, ArrowLeftRight, CheckCircle2, Ban, DollarSign, FileX, Sparkles,
 } from 'lucide-react'
-import { ListaEquipo } from '@/types'
-import { getTimelineFechas, calcularDiasRestantes, getEstadoTiempo } from '@/lib/services/listaEquipo'
-import { formatDate, cn } from '@/lib/utils'
+import { cn, formatDate } from '@/lib/utils'
+
+interface Evento {
+  id: string
+  tipo: string
+  descripcion: string
+  fechaEvento: string | Date
+  user?: { name: string | null } | null
+}
 
 interface Props {
-  lista: ListaEquipo | null | undefined
+  eventos: Evento[]
   className?: string
+  title?: string
+  /** Agrupar eventos del mismo tipo + usuario + día cuando hay 3 o más consecutivos */
+  groupRepeated?: boolean
 }
 
-const iconMap = {
-  creado: Calendar,
-  enviado_revision: Send,
-  por_aprobar: FileCheck,
-  aprobado: ThumbsUp,
-  enviado_logistica: Truck,
-  en_cotizacion: Calculator,
-  cotizado: DollarSign,
-  aprobado_final: CheckCircle,
-  fecha_limite: Target
+const iconMap: Record<string, { icon: any; color: string }> = {
+  // Pedido / OC / Recepción
+  oc_generada: { icon: ShoppingCart, color: 'text-blue-500' },
+  oc_completada: { icon: CheckCircle2, color: 'text-emerald-500' },
+  oc_retrocedida: { icon: ArrowLeftRight, color: 'text-amber-500' },
+  recepcion_en_almacen: { icon: Warehouse, color: 'text-green-500' },
+  recepcion_confirmada: { icon: PackageCheck, color: 'text-green-600' },
+  recepcion_eliminada: { icon: X, color: 'text-red-500' },
+  entrega_a_proyecto: { icon: Package, color: 'text-purple-500' },
+  rechazo_recepcion: { icon: X, color: 'text-red-600' },
+  rechazo_revertido: { icon: RefreshCw, color: 'text-amber-500' },
+  pedido_creado: { icon: ShoppingCart, color: 'text-blue-600' },
+  pedido_retrocedido: { icon: ArrowLeftRight, color: 'text-amber-600' },
+  // Lista
+  lista_creada: { icon: Sparkles, color: 'text-indigo-500' },
+  lista_enviada: { icon: Send, color: 'text-blue-500' },
+  lista_aprobada: { icon: FileCheck, color: 'text-emerald-600' },
+  lista_anulada: { icon: Ban, color: 'text-red-600' },
+  lista_cotizada: { icon: DollarSign, color: 'text-emerald-500' },
+  lista_retrocedida: { icon: ArrowLeftRight, color: 'text-amber-600' },
+  cotizacion_seleccionada: { icon: DollarSign, color: 'text-emerald-500' },
+  cotizacion_deseleccionada: { icon: FileX, color: 'text-orange-500' },
 }
 
-const estadoColorMap = {
-  critico: 'bg-red-500 border-red-500 text-white',
-  urgente: 'bg-orange-500 border-orange-500 text-white',
-  normal: 'bg-green-500 border-green-500 text-white'
+function getDayKey(fecha: string | Date): string {
+  const d = typeof fecha === 'string' ? new Date(fecha) : fecha
+  return d.toISOString().slice(0, 10)
 }
 
-export default function ListaEquipoTimeline({ lista, className }: Props) {
-  if (!lista) {
-    return (
-      <p className="text-xs text-muted-foreground text-center py-4">
-        No hay información de timeline disponible
-      </p>
-    )
+type DisplayRow =
+  | { kind: 'single'; evento: Evento }
+  | { kind: 'group'; tipo: string; eventos: Evento[]; usuario: string; fecha: string | Date }
+
+function groupEventos(eventos: Evento[]): DisplayRow[] {
+  const rows: DisplayRow[] = []
+  let i = 0
+  while (i < eventos.length) {
+    const ev = eventos[i]
+    // Solo se agrupa `cotizacion_seleccionada` del mismo usuario y día
+    if (ev.tipo === 'cotizacion_seleccionada') {
+      let j = i + 1
+      while (
+        j < eventos.length &&
+        eventos[j].tipo === 'cotizacion_seleccionada' &&
+        eventos[j].user?.name === ev.user?.name &&
+        getDayKey(eventos[j].fechaEvento) === getDayKey(ev.fechaEvento)
+      ) {
+        j++
+      }
+      const bloque = eventos.slice(i, j)
+      if (bloque.length >= 3) {
+        rows.push({
+          kind: 'group',
+          tipo: 'cotizacion_seleccionada',
+          eventos: bloque,
+          usuario: ev.user?.name ?? 'Sistema',
+          fecha: ev.fechaEvento,
+        })
+        i = j
+        continue
+      }
+    }
+    rows.push({ kind: 'single', evento: ev })
+    i++
   }
+  return rows
+}
 
-  const timeline = getTimelineFechas(lista)
-  const diasRestantes = calcularDiasRestantes(lista.fechaNecesaria || null)
-  const estadoTiempo = getEstadoTiempo(diasRestantes)
+export default function ListaEquipoTimeline({
+  eventos,
+  className,
+  title = 'Timeline de Trazabilidad',
+  groupRepeated = true,
+}: Props) {
+  const [expandedGroups, setExpandedGroups] = useState<Record<number, boolean>>({})
 
-  if (timeline.length === 0) {
-    return (
-      <p className="text-xs text-muted-foreground py-2">No hay fechas de seguimiento registradas.</p>
-    )
-  }
+  if (!eventos || eventos.length === 0) return null
+
+  const rows = groupRepeated ? groupEventos(eventos) : eventos.map((e) => ({ kind: 'single' as const, evento: e }))
+
+  const toggleGroup = (idx: number) =>
+    setExpandedGroups((prev) => ({ ...prev, [idx]: !prev[idx] }))
 
   return (
-    <div className={cn('space-y-2', className)}>
-      {/* Header with deadline info */}
-      {diasRestantes !== null && estadoTiempo && (
-        <div className="flex items-center justify-between">
-          <Badge
-            variant={estadoTiempo === 'critico' ? 'destructive' : estadoTiempo === 'urgente' ? 'secondary' : 'default'}
-            className="text-[10px] px-1.5 py-0"
-          >
-            <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />
-            {diasRestantes < 0
-              ? `${Math.abs(diasRestantes)} días vencido`
-              : `${diasRestantes} días restantes`
-            }
-          </Badge>
-          {lista.fechaNecesaria && (
-            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-              <Target className="h-2.5 w-2.5" />
-              Objetivo: {formatDate(lista.fechaNecesaria)}
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* Timeline */}
-      <div className="relative">
-        <div className="absolute left-3 top-0 bottom-0 w-px bg-gray-200" />
-
-        <div className="space-y-2">
-          {timeline.map((item, index) => {
-            const Icon = iconMap[item.estado as keyof typeof iconMap] || Calendar
-            const isLimit = item.esLimite
-
-            return (
-              <div
-                key={`${item.estado}-${item.fecha}`}
-                className="relative flex items-center gap-3"
-              >
-                <div className={cn(
-                  'relative z-10 flex h-6 w-6 items-center justify-center rounded-full border flex-shrink-0',
-                  item.completado
-                    ? 'bg-green-500 border-green-500 text-white'
-                    : isLimit && estadoTiempo
-                      ? estadoColorMap[estadoTiempo]
-                      : 'bg-white border-gray-300 text-gray-400'
-                )}>
-                  <Icon className="h-3 w-3" />
-                </div>
-
-                <div className="flex items-center justify-between flex-1 min-w-0 py-0.5">
-                  <span className={cn(
-                    'text-xs',
-                    item.completado ? 'text-gray-800' : 'text-gray-400'
-                  )}>
-                    {item.descripcion}
-                  </span>
-                  <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
-                    <span className={cn(
-                      'text-[10px] font-mono',
-                      item.completado ? 'text-gray-500' : 'text-gray-300'
-                    )}>
-                      {formatDate(item.fecha)}
-                    </span>
-                    {isLimit && !item.completado && diasRestantes !== null && (
-                      <span className={cn(
-                        'text-[10px]',
-                        estadoTiempo === 'critico' ? 'text-red-600' : estadoTiempo === 'urgente' ? 'text-orange-600' : 'text-green-600'
-                      )}>
-                        {diasRestantes < 0 ? `${Math.abs(diasRestantes)}d vencido` : diasRestantes === 0 ? 'hoy' : `${diasRestantes}d`}
-                      </span>
-                    )}
+    <Collapsible defaultOpen className={className}>
+      <div className="bg-white rounded-lg border">
+        <CollapsibleTrigger asChild>
+          <button className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50/50 transition-colors">
+            <div className="flex items-center gap-2">
+              <History className="h-4 w-4 text-blue-600" />
+              <span className="text-sm font-medium">{title}</span>
+              <Badge variant="outline" className="text-[10px] h-5 ml-1">
+                {eventos.length} eventos
+              </Badge>
+            </div>
+            <ChevronDown className="h-4 w-4 text-gray-400" />
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="px-4 pb-4 border-t">
+            <div className="pt-4 space-y-3">
+              {rows.map((row, idx) => {
+                if (row.kind === 'group') {
+                  const { icon: Icon, color } = iconMap[row.tipo] ?? { icon: Activity, color: 'text-gray-500' }
+                  const open = !!expandedGroups[idx]
+                  return (
+                    <div key={idx} className="space-y-2">
+                      <button
+                        onClick={() => toggleGroup(idx)}
+                        className="flex items-start gap-3 text-xs w-full text-left hover:bg-gray-50 rounded p-1 -m-1"
+                      >
+                        <Icon className={cn('h-3.5 w-3.5 flex-shrink-0 mt-0.5', color)} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-gray-700">
+                            <strong>{row.eventos.length} cotizaciones seleccionadas</strong>
+                          </p>
+                          <p className="text-muted-foreground text-[10px]">
+                            {formatDate(row.fecha)} • {row.usuario}
+                          </p>
+                        </div>
+                        <ChevronDown className={cn('h-3 w-3 text-gray-400 transition-transform', open && 'rotate-180')} />
+                      </button>
+                      {open && (
+                        <div className="pl-6 space-y-2 border-l-2 border-gray-100 ml-1.5">
+                          {row.eventos.map((evento) => (
+                            <div key={evento.id} className="flex items-start gap-3 text-xs">
+                              <Icon className={cn('h-3 w-3 flex-shrink-0 mt-0.5 opacity-70', color)} />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-gray-600">{evento.descripcion}</p>
+                                <p className="text-muted-foreground text-[10px]">{formatDate(evento.fechaEvento)}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                }
+                const { evento } = row
+                const { icon: Icon, color } = iconMap[evento.tipo] ?? { icon: Activity, color: 'text-gray-500' }
+                return (
+                  <div key={evento.id} className="flex items-start gap-3 text-xs">
+                    <Icon className={cn('h-3.5 w-3.5 flex-shrink-0 mt-0.5', color)} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-gray-700">{evento.descripcion}</p>
+                      <p className="text-muted-foreground text-[10px]">
+                        {formatDate(evento.fechaEvento)} • {evento.user?.name ?? 'Sistema'}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
+                )
+              })}
+            </div>
+          </div>
+        </CollapsibleContent>
       </div>
-
-      {/* Summary */}
-      <div className="text-[10px] text-muted-foreground pt-1 border-t">
-        {timeline.filter(item => item.completado).length}/{timeline.length} hitos completados
-      </div>
-    </div>
+    </Collapsible>
   )
 }
