@@ -86,6 +86,7 @@ export async function GET(request: NextRequest) {
                 id: true,
                 nombre: true,
                 porcentajeCompletado: true,
+                esExtra: true,
                 proyectoActividad: { select: { id: true, nombre: true } }
               }
             },

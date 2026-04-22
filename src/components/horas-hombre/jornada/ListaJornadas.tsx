@@ -88,6 +88,7 @@ interface TareaJornadaResumen {
     id: string
     nombre: string
     porcentajeCompletado?: number | null
+    esExtra?: boolean | null
   } | null
   nombreTareaExtra?: string | null
   porcentajeInicial?: number | null
@@ -683,25 +684,50 @@ export function ListaJornadas({
                             return (
                               <Tooltip key={tarea.id}>
                                 <TooltipTrigger asChild>
-                                  <Badge
-                                    variant="outline"
-                                    className={`text-[10px] px-1.5 py-0 font-normal w-fit cursor-default ${hasPct ? getProgresoColor(colorPct) : 'bg-gray-50 text-gray-600 border-gray-200'}`}
-                                  >
-                                    {tarea.proyectoTareaId
-                                      ? <span className="mr-1 shrink-0 rounded px-0.5 text-[8px] font-bold uppercase bg-blue-100 text-blue-600 border border-blue-200">CRON</span>
-                                      : <span className="mr-1 shrink-0 rounded px-0.5 text-[8px] font-bold uppercase bg-orange-100 text-orange-600 border border-orange-200">EXT</span>
-                                    }
-                                    <span className="truncate max-w-[140px]">{getNombreTareaCorto(tarea)}</span>
-                                    {hasRange ? (
-                                      <span className="ml-1 font-semibold">{pctInicial}%→{pctFinal}%</span>
-                                    ) : hasPct ? (
-                                      <span className="ml-1 font-semibold">{pctFinal}%</span>
-                                    ) : null}
-                                  </Badge>
+                                  {tarea.proyectoTareaId ? (
+                                    <a
+                                      href={`/supervision/tareas?tareaId=${tarea.proyectoTareaId}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <Badge
+                                        variant="outline"
+                                        className={`text-[10px] px-1.5 py-0 font-normal w-fit cursor-pointer hover:shadow-sm transition-shadow ${hasPct ? getProgresoColor(colorPct) : 'bg-gray-50 text-gray-600 border-gray-200'}`}
+                                      >
+                                        {tarea.proyectoTarea?.esExtra
+                                          ? <span className="mr-1 shrink-0 rounded px-0.5 text-[8px] font-bold uppercase bg-orange-100 text-orange-600 border border-orange-200">EXT</span>
+                                          : <span className="mr-1 shrink-0 rounded px-0.5 text-[8px] font-bold uppercase bg-blue-100 text-blue-600 border border-blue-200">CRON</span>
+                                        }
+                                        <span className="truncate max-w-[140px]">{getNombreTareaCorto(tarea)}</span>
+                                        {hasRange ? (
+                                          <span className="ml-1 font-semibold">{pctInicial}%→{pctFinal}%</span>
+                                        ) : hasPct ? (
+                                          <span className="ml-1 font-semibold">{pctFinal}%</span>
+                                        ) : null}
+                                      </Badge>
+                                    </a>
+                                  ) : (
+                                    <Badge
+                                      variant="outline"
+                                      className={`text-[10px] px-1.5 py-0 font-normal w-fit cursor-default ${hasPct ? getProgresoColor(colorPct) : 'bg-gray-50 text-gray-600 border-gray-200'}`}
+                                    >
+                                      <span className="mr-1 shrink-0 rounded px-0.5 text-[8px] font-bold uppercase bg-orange-100 text-orange-600 border border-orange-200">EXT</span>
+                                      <span className="truncate max-w-[140px]">{getNombreTareaCorto(tarea)}</span>
+                                      {hasRange ? (
+                                        <span className="ml-1 font-semibold">{pctInicial}%→{pctFinal}%</span>
+                                      ) : hasPct ? (
+                                        <span className="ml-1 font-semibold">{pctFinal}%</span>
+                                      ) : null}
+                                    </Badge>
+                                  )}
                                 </TooltipTrigger>
                                 <TooltipContent side="top" className="max-w-[250px]">
                                   <p className="font-medium">{nombreCompleto}</p>
-                                  <p className="text-[11px] opacity-60">{tarea.proyectoTareaId ? 'Tarea de cronograma' : 'Tarea extra'}</p>
+                                  <p className="text-[11px] opacity-60">
+                                    {(!tarea.proyectoTareaId || tarea.proyectoTarea?.esExtra) ? 'Tarea extra' : 'Tarea de cronograma'}
+                                    {tarea.proyectoTareaId ? ' · click para ver detalle' : ''}
+                                  </p>
                                   {hasRange ? (
                                     <p className="text-[11px] opacity-80">Progreso: {pctInicial}% → {pctFinal}%</p>
                                   ) : hasPct ? (
@@ -725,9 +751,21 @@ export function ListaJornadas({
                                     const pF = t.porcentajeFinal ?? t.proyectoTarea?.porcentajeCompletado
                                     const pI = t.porcentajeInicial
                                     const hasR = pI !== null && pI !== undefined && pF !== null && pF !== undefined
-                                    return (
+                                    const icono = (!t.proyectoTareaId || t.proyectoTarea?.esExtra) ? '➕' : '📅'
+                                    const sufijo = hasR ? ` · ${pI}%→${pF}%` : pF !== null && pF !== undefined ? ` · ${pF}%` : ''
+                                    return t.proyectoTareaId ? (
+                                      <a
+                                        key={t.id}
+                                        href={`/supervision/tareas?tareaId=${t.proyectoTareaId}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="block text-[11px] hover:underline"
+                                      >
+                                        {icono} {nombre}{sufijo}
+                                      </a>
+                                    ) : (
                                       <p key={t.id} className="text-[11px]">
-                                        {t.proyectoTareaId ? '📅' : '➕'} {nombre}{hasR ? ` · ${pI}%→${pF}%` : pF !== null && pF !== undefined ? ` · ${pF}%` : ''}
+                                        {icono} {nombre}{sufijo}
                                       </p>
                                     )
                                   })}
@@ -934,23 +972,47 @@ export function ListaJornadas({
                         const hasPct = pctFinal !== null && pctFinal !== undefined
                         const colorPct = hasPct ? pctFinal! : 0
                         const nombreCompleto = tarea.proyectoTarea?.nombre || tarea.nombreTareaExtra || 'Tarea'
+                        const badgeContent = (
+                          <>
+                            <span className="truncate max-w-[100px]">{getNombreTareaCorto(tarea)}</span>
+                            {hasRange ? (
+                              <span className="ml-1 font-semibold">{pctInicial}%→{pctFinal}%</span>
+                            ) : hasPct ? (
+                              <span className="ml-1 font-semibold">{pctFinal}%</span>
+                            ) : null}
+                          </>
+                        )
                         return (
                           <Tooltip key={tarea.id}>
                             <TooltipTrigger asChild>
-                              <Badge
-                                variant="outline"
-                                className={`text-[10px] px-1.5 py-0 font-normal cursor-default ${hasPct ? getProgresoColor(colorPct) : 'bg-gray-50 text-gray-600 border-gray-200'}`}
-                              >
-                                <span className="truncate max-w-[100px]">{getNombreTareaCorto(tarea)}</span>
-                                {hasRange ? (
-                                  <span className="ml-1 font-semibold">{pctInicial}%→{pctFinal}%</span>
-                                ) : hasPct ? (
-                                  <span className="ml-1 font-semibold">{pctFinal}%</span>
-                                ) : null}
-                              </Badge>
+                              {tarea.proyectoTareaId ? (
+                                <a
+                                  href={`/supervision/tareas?tareaId=${tarea.proyectoTareaId}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <Badge
+                                    variant="outline"
+                                    className={`text-[10px] px-1.5 py-0 font-normal cursor-pointer hover:shadow-sm transition-shadow ${hasPct ? getProgresoColor(colorPct) : 'bg-gray-50 text-gray-600 border-gray-200'}`}
+                                  >
+                                    {badgeContent}
+                                  </Badge>
+                                </a>
+                              ) : (
+                                <Badge
+                                  variant="outline"
+                                  className={`text-[10px] px-1.5 py-0 font-normal cursor-default ${hasPct ? getProgresoColor(colorPct) : 'bg-gray-50 text-gray-600 border-gray-200'}`}
+                                >
+                                  {badgeContent}
+                                </Badge>
+                              )}
                             </TooltipTrigger>
                             <TooltipContent side="top" className="max-w-[250px]">
                               <p className="font-medium">{nombreCompleto}</p>
+                              {tarea.proyectoTareaId && (
+                                <p className="text-[11px] opacity-60">click para ver detalle</p>
+                              )}
                               {hasRange ? (
                                 <p className="text-[11px] opacity-80">Progreso: {pctInicial}% → {pctFinal}%</p>
                               ) : hasPct ? (
@@ -974,9 +1036,20 @@ export function ListaJornadas({
                                 const pF = t.porcentajeFinal ?? t.proyectoTarea?.porcentajeCompletado
                                 const pI = t.porcentajeInicial
                                 const hasR = pI !== null && pI !== undefined && pF !== null && pF !== undefined
-                                return (
+                                const sufijo = hasR ? ` · ${pI}%→${pF}%` : pF !== null && pF !== undefined ? ` · ${pF}%` : ''
+                                return t.proyectoTareaId ? (
+                                  <a
+                                    key={t.id}
+                                    href={`/supervision/tareas?tareaId=${t.proyectoTareaId}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="block text-[11px] hover:underline"
+                                  >
+                                    {nombre}{sufijo}
+                                  </a>
+                                ) : (
                                   <p key={t.id} className="text-[11px]">
-                                    {nombre}{hasR ? ` · ${pI}%→${pF}%` : pF !== null && pF !== undefined ? ` · ${pF}%` : ''}
+                                    {nombre}{sufijo}
                                   </p>
                                 )
                               })}

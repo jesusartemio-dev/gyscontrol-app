@@ -70,6 +70,7 @@ import { Info } from 'lucide-react'
 import { Label } from '@/components/ui/label'
 import { Textarea as TextareaComponent } from '@/components/ui/textarea'
 import { useSession } from 'next-auth/react'
+import { useSearchParams } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
 import { format, differenceInDays } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -168,17 +169,31 @@ function DragHandle() {
 }
 
 // Fila sortable con handle de arrastre
-function SortableRow({ id, isDragEnabled, children }: { id: string; isDragEnabled: boolean; children: React.ReactNode }) {
+function SortableRow({ id, isDragEnabled, highlight, children }: { id: string; isDragEnabled: boolean; highlight?: boolean; children: React.ReactNode }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id, disabled: !isDragEnabled })
+  const localRef = useRef<HTMLTableRowElement | null>(null)
+
+  const setRefs = useCallback((node: HTMLTableRowElement | null) => {
+    setNodeRef(node)
+    localRef.current = node
+  }, [setNodeRef])
+
+  useEffect(() => {
+    if (highlight && localRef.current) {
+      localRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [highlight])
+
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition,
+    transition: highlight ? 'background-color 1.5s' : transition,
     opacity: isDragging ? 0.5 : 1,
-    zIndex: isDragging ? 1 : undefined
+    zIndex: isDragging ? 1 : undefined,
+    backgroundColor: highlight ? 'rgb(254 240 138)' : undefined
   }
   return (
     <DragHandleContext.Provider value={{ listeners, attributes }}>
-      <TableRow ref={setNodeRef} style={style}>
+      <TableRow ref={setRefs} style={style}>
         {children}
       </TableRow>
     </DragHandleContext.Provider>
@@ -204,6 +219,12 @@ export default function SupervisionTareasPage() {
   const [filtroTipo, setFiltroTipo] = useState<string>('')
   const [filtroEdt, setFiltroEdt] = useState<string>('')
   const [filtrosRestaurados, setFiltrosRestaurados] = useState(false)
+
+  // Deep-link: tarea a resaltar (via ?tareaId=xxx)
+  const searchParams = useSearchParams()
+  const deepLinkTareaId = searchParams?.get('tareaId') ?? null
+  const [highlightedTareaId, setHighlightedTareaId] = useState<string | null>(null)
+  const deepLinkAppliedRef = useRef(false)
 
   // Modal de asignacion
   const [showAsignarModal, setShowAsignarModal] = useState(false)
@@ -357,6 +378,28 @@ export default function SupervisionTareasPage() {
     } catch {}
     setFiltrosRestaurados(true)
   }, [])
+
+  // Deep-link via ?tareaId=xxx: cuando llegan las tareas, aplicar filtros para que
+  // la tarea sea visible, hacer scroll y resaltar por ~3s.
+  useEffect(() => {
+    if (!deepLinkTareaId) return
+    if (deepLinkAppliedRef.current) return
+    if (tareas.length === 0) return
+    const tarea = tareas.find(t => t.id === deepLinkTareaId)
+    if (!tarea) return
+    deepLinkAppliedRef.current = true
+    // Limpiar filtros que podrían ocultar la fila y fijar solo el proyecto correspondiente.
+    setFiltroProyecto(tarea.proyectoId ?? '')
+    setFiltroResponsable('')
+    setFiltroEstado('')
+    setFiltroBusqueda('')
+    setFiltroSinAsignar(false)
+    setFiltroTipo('')
+    setFiltroEdt('')
+    setHighlightedTareaId(deepLinkTareaId)
+    const timer = setTimeout(() => setHighlightedTareaId(null), 3000)
+    return () => clearTimeout(timer)
+  }, [deepLinkTareaId, tareas])
 
   // Guardar filtros en localStorage cuando cambian
   useEffect(() => {
@@ -1104,7 +1147,7 @@ export default function SupervisionTareasPage() {
                   {tareasFiltradas.map((tarea, idx) => {
                     const diasInfo = getDiasRestantes(tarea.fechaFin)
                     return (
-                      <SortableRow key={tarea.id} id={tarea.id} isDragEnabled={isDragEnabled}>
+                      <SortableRow key={tarea.id} id={tarea.id} isDragEnabled={isDragEnabled} highlight={tarea.id === highlightedTareaId}>
                         {isDragEnabled && (
                           <TableCell className="w-12 pr-0">
                             <div className="flex items-center gap-1">
