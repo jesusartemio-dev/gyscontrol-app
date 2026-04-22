@@ -67,6 +67,7 @@ interface CronogramaStats {
   edts: number
   actividades: number
   tareas: number
+  tareasExtras: number
 }
 
 interface ProyectoCronogramaTabProps {
@@ -99,7 +100,7 @@ export function ProyectoCronogramaTab({
   const [proyectoData, setProyectoData] = useState<any>(null) // Datos originales del proyecto
   const [fechaInicio, setFechaInicio] = useState('')
   const [fechaFin, setFechaFin] = useState('')
-  const [stats, setStats] = useState<CronogramaStats>({ fases: 0, edts: 0, actividades: 0, tareas: 0 })
+  const [stats, setStats] = useState<CronogramaStats>({ fases: 0, edts: 0, actividades: 0, tareas: 0, tareasExtras: 0 })
 
   // Estado del calendario laboral
   const [calendarioAsignado, setCalendarioAsignado] = useState<{ id: string; nombre: string; horasPorDia: number } | null>(null)
@@ -247,20 +248,28 @@ export function ProyectoCronogramaTab({
         const data = await response.json()
         if (data?.data?.tree) {
           const tree = data.data.tree
-          let fases = 0, edts = 0, actividades = 0, tareas = 0
+          let fases = 0, edts = 0, actividades = 0, tareas = 0, tareasExtras = 0
 
-          tree.forEach((fase: any) => {
-            fases++
-            fase.children?.forEach((edt: any) => {
-              edts++
-              edt.children?.forEach((actividad: any) => {
-                actividades++
-                tareas += actividad.children?.length || 0
+          // tree[0] es el nodo proyecto (nivel 0). Sus children son fases.
+          tree.forEach((proyecto: any) => {
+            proyecto.children?.forEach((fase: any) => {
+              fases++
+              fase.children?.forEach((edt: any) => {
+                edts++
+                edt.children?.forEach((actividad: any) => {
+                  if (actividad.data?.isExtrasGroup) {
+                    // Pseudo-grupo de extras: sus hijos son tareas extras
+                    tareasExtras += actividad.children?.length || 0
+                  } else {
+                    actividades++
+                    tareas += actividad.children?.length || 0
+                  }
+                })
               })
             })
           })
 
-          setStats({ fases, edts, actividades, tareas })
+          setStats({ fases, edts, actividades, tareas, tareasExtras })
         }
       }
     } catch (error) {
@@ -736,7 +745,7 @@ export function ProyectoCronogramaTab({
     }
   }
 
-  const totalItems = stats.fases + stats.edts + stats.actividades + stats.tareas
+  const totalItems = stats.fases + stats.edts + stats.actividades + stats.tareas + stats.tareasExtras
   const hasCronograma = totalItems > 0
   const tieneLineaBase = cronogramas.some(c => c.tipo === 'planificacion')
   const tieneBaseline = cronogramas.some(c => c.esBaseline)
@@ -848,8 +857,16 @@ export function ProyectoCronogramaTab({
                 {stats.edts} EDTs
               </Badge>
               <Badge variant="outline" className="text-xs font-normal">
+                {stats.actividades} actividades
+              </Badge>
+              <Badge variant="outline" className="text-xs font-normal">
                 {stats.tareas} tareas
               </Badge>
+              {stats.tareasExtras > 0 && (
+                <Badge variant="outline" className="text-xs font-normal border-amber-400 text-amber-700 bg-amber-50">
+                  +{stats.tareasExtras} extras
+                </Badge>
+              )}
             </>
           ) : (
             <Badge variant="outline" className="text-xs font-normal text-muted-foreground">

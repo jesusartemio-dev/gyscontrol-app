@@ -99,6 +99,15 @@ export async function GET(
                   }
                 },
                 orderBy: { orden: 'asc' }
+              },
+              // Tareas extras (sin actividad) — se agrupan aparte bajo cada EDT
+              proyectoTarea: {
+                where: { proyectoActividadId: null },
+                include: {
+                  user: { select: { id: true, name: true, email: true } },
+                  recurso: { select: { id: true, nombre: true, tipo: true, costoHoraProyecto: true } }
+                },
+                orderBy: { orden: 'asc' }
               }
             },
             orderBy: { orden: 'asc' }
@@ -156,6 +165,15 @@ export async function GET(
                     }
                   },
                   orderBy: { orden: 'asc' }
+                },
+                // Tareas extras (sin actividad) — se agrupan aparte bajo cada EDT
+                proyectoTarea: {
+                  where: { proyectoActividadId: null },
+                  include: {
+                    user: { select: { id: true, name: true, email: true } },
+                    recurso: { select: { id: true, nombre: true, tipo: true, costoHoraProyecto: true } }
+                  },
+                  orderBy: { orden: 'asc' }
                 }
               },
               orderBy: { orden: 'asc' }
@@ -190,6 +208,15 @@ export async function GET(
                       },
                       orderBy: { orden: 'asc' }
                     }
+                  },
+                  orderBy: { orden: 'asc' }
+                },
+                // Tareas extras (sin actividad) — se agrupan aparte bajo cada EDT
+                proyectoTarea: {
+                  where: { proyectoActividadId: null },
+                  include: {
+                    user: { select: { id: true, name: true, email: true } },
+                    recurso: { select: { id: true, nombre: true, tipo: true, costoHoraProyecto: true } }
                   },
                   orderBy: { orden: 'asc' }
                 }
@@ -240,6 +267,8 @@ export async function GET(
           .sort((a: any, b: any) => (a.orden || 0) - (b.orden || 0))
           .map((edt: any) => {
             const edtActividades = edt.proyectoActividad || []
+            const edtExtras = edt.proyectoTarea || []
+            const edtExtrasGroupCount = edtExtras.length > 0 ? 1 : 0
 
           return {
             id: `edt-${edt.id}`,
@@ -262,8 +291,8 @@ export async function GET(
               responsableNombre: edt.user?.name || null
             },
             metadata: {
-              hasChildren: edtActividades.length > 0,
-              totalChildren: edtActividades.length,
+              hasChildren: edtActividades.length > 0 || edtExtras.length > 0,
+              totalChildren: edtActividades.length + edtExtrasGroupCount,
               progressPercentage: edt.porcentajeAvance || 0,
               status: edt.estado || 'pendiente'
             },
@@ -325,7 +354,8 @@ export async function GET(
                       responsableNombre: tarea.user?.name || null,
                       recursoId: tarea.recursoId,
                       recursoNombre: tarea.recurso?.nombre,
-                      recursoTipo: tarea.recurso?.tipo
+                      recursoTipo: tarea.recurso?.tipo,
+                      esExtra: tarea.esExtra || false
                     },
                     metadata: {
                       hasChildren: false,
@@ -341,6 +371,72 @@ export async function GET(
                   }))
               }
             })
+            // 🆕 Agregar pseudo-actividad "Tareas Extras" si el EDT tiene tareas sin actividad
+            .concat(
+              (edt.proyectoTarea || []).length > 0
+                ? [{
+                    id: `extras-group-${edt.id}`,
+                    type: 'actividad',
+                    nombre: 'Tareas Extras',
+                    level: 3,
+                    expanded: expandedNodes.includes(`extras-group-${edt.id}`),
+                    data: {
+                      isExtrasGroup: true,
+                      orden: 9999,
+                      horasEstimadas: (edt.proyectoTarea || []).reduce((s: number, t: any) => s + Number(t.horasEstimadas || 0), 0),
+                      horasReales: (edt.proyectoTarea || []).reduce((s: number, t: any) => s + Number(t.horasReales || 0), 0),
+                      estado: 'en_progreso',
+                    },
+                    metadata: {
+                      hasChildren: edt.proyectoTarea.length > 0,
+                      totalChildren: edt.proyectoTarea.length,
+                      progressPercentage: 0,
+                      status: 'en_progreso',
+                    },
+                    children: edt.proyectoTarea
+                      .sort((a: any, b: any) => (a.orden || 0) - (b.orden || 0))
+                      .map((tarea: any) => ({
+                        id: `tarea-${tarea.id}`,
+                        type: 'tarea',
+                        nombre: tarea.nombre,
+                        level: 4,
+                        expanded: false,
+                        data: {
+                          descripcion: tarea.descripcion,
+                          fechaInicio: tarea.fechaInicio,
+                          fechaFin: tarea.fechaFin,
+                          fechaInicioReal: tarea.fechaInicioReal,
+                          fechaFinReal: tarea.fechaFinReal,
+                          estado: tarea.estado,
+                          progreso: tarea.porcentajeCompletado,
+                          horasEstimadas: tarea.horasEstimadas,
+                          horasReales: tarea.horasReales,
+                          personasEstimadas: tarea.personasEstimadas || 1,
+                          prioridad: tarea.prioridad,
+                          orden: tarea.orden,
+                          responsable: tarea.user,
+                          responsableId: tarea.responsableId,
+                          responsableNombre: tarea.user?.name || null,
+                          recursoId: tarea.recursoId,
+                          recursoNombre: tarea.recurso?.nombre,
+                          recursoTipo: tarea.recurso?.tipo,
+                          esExtra: true
+                        },
+                        metadata: {
+                          hasChildren: false,
+                          totalChildren: 0,
+                          progressPercentage: tarea.porcentajeCompletado || 0,
+                          status: tarea.estado || 'pendiente',
+                          recursosTotales: 1,
+                          recursosAsignados: tarea.recursoId ? 1 : 0,
+                          responsablesTotales: 1,
+                          responsablesAsignados: tarea.responsableId ? 1 : 0
+                        },
+                        children: []
+                      }))
+                  }]
+                : []
+            )
           }
         })
       }

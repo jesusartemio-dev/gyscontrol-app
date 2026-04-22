@@ -250,8 +250,12 @@ export function TreeNode({
           </Button>
 
           {/* Node icon and name */}
-          <span className="text-xs shrink-0">{config.icon}</span>
-          <span className="text-xs font-medium text-gray-900 truncate">{node.nombre}</span>
+          <span className="text-xs shrink-0">
+            {node.data?.isExtrasGroup ? '✨' : node.data?.esExtra ? '➕' : config.icon}
+          </span>
+          <span className={`text-xs font-medium truncate ${node.data?.isExtrasGroup ? 'text-amber-700 italic' : 'text-gray-900'}`}>
+            {node.nombre}
+          </span>
 
           {/* Children count inline */}
           {hasChildren && (
@@ -262,6 +266,20 @@ export function TreeNode({
           {node.data?.esHito && (
             <Badge variant="outline" className="text-[10px] leading-none px-1 py-0 h-4 bg-green-50 text-green-700 border-green-200 shrink-0">
               Hito
+            </Badge>
+          )}
+
+          {/* Badge "Extra" para tareas fuera del cronograma planificado */}
+          {node.type === 'tarea' && node.data?.esExtra && (
+            <Badge variant="outline" className="text-[10px] leading-none px-1 py-0 h-4 bg-amber-50 text-amber-700 border-amber-300 shrink-0">
+              Extra
+            </Badge>
+          )}
+
+          {/* Badge para el grupo "Tareas Extras" */}
+          {node.data?.isExtrasGroup && (
+            <Badge variant="outline" className="text-[10px] leading-none px-1 py-0 h-4 bg-amber-50 text-amber-700 border-amber-300 shrink-0">
+              Fuera del plan
             </Badge>
           )}
 
@@ -278,9 +296,15 @@ export function TreeNode({
 
         {/* Columna 3: Tipo */}
         <div className="flex justify-center">
-          <Badge variant="outline" className={`text-[9px] leading-none px-1 py-0 h-4 shrink-0 ${config.color}`}>
-            {config.label}
-          </Badge>
+          {node.data?.isExtrasGroup ? (
+            <Badge variant="outline" className="text-[9px] leading-none px-1 py-0 h-4 shrink-0 bg-amber-50 text-amber-700 border-amber-300">
+              Extras
+            </Badge>
+          ) : (
+            <Badge variant="outline" className={`text-[9px] leading-none px-1 py-0 h-4 shrink-0 ${config.color}`}>
+              {config.label}
+            </Badge>
+          )}
         </div>
 
         {/* Columna 4: Fechas */}
@@ -360,6 +384,10 @@ export function TreeNode({
 
         {/* Columna 8: Acciones */}
         <div className="flex justify-center">
+          {node.data?.isExtrasGroup ? (
+            // Pseudo-nodo: no se edita ni se borra, solo muestra sus hijos
+            <span className="w-5 h-5" />
+          ) : (
           <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-gray-400 hover:text-gray-700 transition-colors">
@@ -459,6 +487,7 @@ export function TreeNode({
               )}
             </DropdownMenuContent>
           </DropdownMenu>
+          )}
         </div>
       </div>
 
