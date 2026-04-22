@@ -69,6 +69,7 @@ import {
 import Link from 'next/link'
 import type { Proyecto, PedidoEquipo } from '@/types'
 import PedidoEquipoHistorial from '@/components/equipos/PedidoEquipoHistorial'
+import PedidoEquipoTimeline from '@/components/equipos/PedidoEquipoTimeline'
 import PedidoEstadoFlujoBanner from '@/components/equipos/PedidoEstadoFlujoBanner'
 import TipoItemBadge from '@/components/shared/TipoItemBadge'
 import PedidoEquipoEditModal from '@/components/equipos/PedidoEquipoEditModal'
@@ -141,6 +142,7 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
   const [pedidoId, setPedidoId] = useState('')
   const [showEditModal, setShowEditModal] = useState(false)
   const [showItemDirectoModal, setShowItemDirectoModal] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
   const [rechazarDialog, setRechazarDialog] = useState<{ open: boolean; recepcionId: string | null }>({ open: false, recepcionId: null })
   const [rechazarObservaciones, setRechazarObservaciones] = useState('')
   const [procesandoRecepcion, setProcesandoRecepcion] = useState<string | null>(null)
@@ -889,62 +891,28 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
           )}
         </div>
 
-        {/* Historial */}
-        <PedidoEquipoHistorial pedidoId={pedidoId} className="w-full" />
+        {/* Historial Colapsable */}
+        <div className="space-y-1 pt-3 border-t">
+          <Collapsible open={showHistory} onOpenChange={setShowHistory}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="w-full justify-between h-8 px-2 text-xs">
+                <span className="flex items-center gap-1.5">
+                  <History className="h-3.5 w-3.5 text-orange-600" />
+                  Historial de Cambios
+                </span>
+                <ChevronRight className={cn('h-3.5 w-3.5 transition-transform', showHistory && 'rotate-90')} />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pt-2">
+              <PedidoEquipoHistorial pedidoId={pedidoId} className="w-full" />
+            </CollapsibleContent>
+          </Collapsible>
+        </div>
 
         {/* Timeline de Trazabilidad */}
-        {(() => {
-          const eventos = (pedido as any)?.eventosTrazabilidad || []
-          if (eventos.length === 0) return null
-          return (
-            <Collapsible defaultOpen>
-              <div className="bg-white rounded-lg border">
-                <CollapsibleTrigger asChild>
-                  <button className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50/50 transition-colors">
-                    <div className="flex items-center gap-2">
-                      <History className="h-4 w-4 text-blue-600" />
-                      <span className="text-sm font-medium">Timeline de Trazabilidad</span>
-                      <Badge variant="outline" className="text-[10px] h-5 ml-1">
-                        {eventos.length} eventos
-                      </Badge>
-                    </div>
-                    <ChevronDown className="h-4 w-4 text-gray-400" />
-                  </button>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <div className="px-4 pb-4 border-t">
-                    <div className="pt-4 space-y-3">
-                      {eventos.map((evento: any, idx: number) => {
-                        const tipo = evento.tipo || ''
-                        const iconMap: Record<string, { icon: typeof ShoppingCart; color: string }> = {
-                          'oc_generada': { icon: ShoppingCart, color: 'text-blue-500' },
-                          'recepcion_en_almacen': { icon: Warehouse, color: 'text-green-500' },
-                          'entrega_a_proyecto': { icon: Package, color: 'text-purple-500' },
-                          'recepcion_confirmada': { icon: PackageCheck, color: 'text-green-600' },
-                          'rechazo_recepcion': { icon: X, color: 'text-red-600' },
-                          'rechazo_revertido': { icon: RefreshCw, color: 'text-amber-500' },
-                        }
-                        const { icon: Icon, color } = iconMap[tipo] || { icon: Activity, color: 'text-gray-500' }
-
-                        return (
-                          <div key={evento.id || idx} className="flex items-start gap-3 text-xs">
-                            <Icon className={cn('h-3.5 w-3.5 flex-shrink-0 mt-0.5', color)} />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-gray-700">{evento.descripcion}</p>
-                              <p className="text-muted-foreground text-[10px]">
-                                {formatDate(evento.fechaEvento)} • {evento.user?.name || 'Sistema'}
-                              </p>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                </CollapsibleContent>
-              </div>
-            </Collapsible>
-          )
-        })()}
+        {(pedido as any)?.eventosTrazabilidad?.length > 0 && (
+          <PedidoEquipoTimeline eventos={(pedido as any).eventosTrazabilidad} />
+        )}
       </div>
 
       {/* Modal de edición */}
