@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { Loader2, MapPin, Trash2, Home, CheckCircle2, Clock, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
+import { MiModalidadCard } from '@/components/asistencia/MiModalidadCard'
 
 interface Sede {
   id: string
@@ -198,6 +199,8 @@ export default function SedeRemotaPage() {
           remotos se validen contra ella.
         </p>
       </div>
+
+      <MiModalidadCard mostrarCtaSede={false} />
 
       <div className="space-y-4">
         {activa && renderSedeCard(activa, 'Sede activa')}

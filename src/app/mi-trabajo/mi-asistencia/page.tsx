@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/table'
 import { Loader2, Clock, TrendingDown, CalendarDays } from 'lucide-react'
 import { formatearTardanza } from '@/lib/utils/formatTardanza'
+import { MiModalidadCard } from '@/components/asistencia/MiModalidadCard'
 
 interface Marcaje {
   id: string
@@ -77,6 +78,8 @@ export default function MiAsistenciaPage() {
   return (
     <div className="container mx-auto max-w-5xl px-4 py-6">
       <h1 className="mb-6 text-2xl font-bold">Mi Asistencia</h1>
+
+      <MiModalidadCard />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
         <Card>
