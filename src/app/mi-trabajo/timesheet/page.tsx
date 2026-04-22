@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, Suspense } from 'react'
 import { useSession } from 'next-auth/react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -91,7 +91,7 @@ function getWeekKey(fecha: string): string {
 
 // ── Component ──────────────────────────────────────────────────────────
 
-export default function TimesheetPage() {
+function TimesheetContent() {
   const { data: session, status } = useSession()
   const { toast } = useToast()
   const [activeTab, setActiveTab] = useState('semana')
@@ -887,5 +887,13 @@ export default function TimesheetPage() {
         preselectTipo={preselectTipo || undefined}
       />
     </div>
+  )
+}
+
+export default function TimesheetPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Cargando...</div>}>
+      <TimesheetContent />
+    </Suspense>
   )
 }
