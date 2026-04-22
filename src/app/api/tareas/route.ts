@@ -13,7 +13,8 @@ const crearTareaSchema = z.object({
   proyectoEdtId: z.string(),
   proyectoId: z.string(),
   horasEstimadas: z.number().positive(),
-  estado: z.enum(['pendiente', 'en_progreso', 'completada', 'pausada', 'cancelada'])
+  estado: z.enum(['pendiente', 'en_progreso', 'completada', 'pausada', 'cancelada']),
+  responsableId: z.string().optional().nullable()
 });
 
 export async function POST(request: NextRequest) {
@@ -33,15 +34,16 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validatedData = crearTareaSchema.parse(body);
 
-    const { 
-      nombre, 
-      descripcion, 
-      fechaInicio, 
-      fechaFin, 
-      proyectoEdtId, 
-      proyectoId, 
-      horasEstimadas, 
-      estado 
+    const {
+      nombre,
+      descripcion,
+      fechaInicio,
+      fechaFin,
+      proyectoEdtId,
+      proyectoId,
+      horasEstimadas,
+      estado,
+      responsableId
     } = validatedData;
 
     console.log('🆕 CREAR TAREA: Creando nueva tarea:', { nombre, proyectoEdtId, proyectoId });
@@ -98,6 +100,7 @@ export async function POST(request: NextRequest) {
         orden: 999,
         esExtra: true,
         creadoPorId: session.user.id,
+        responsableId: responsableId || null,
         updatedAt: new Date()
       }
     });

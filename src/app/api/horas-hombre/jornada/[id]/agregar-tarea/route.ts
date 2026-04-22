@@ -25,6 +25,7 @@ interface AgregarTareaPayload {
   fechaFin?: string
   horasEstimadas?: number
   personasEstimadas?: number
+  responsableId?: string | null
   miembros: MiembroTarea[]
 }
 
@@ -46,7 +47,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const { id: jornadaId } = await context.params
     const body: AgregarTareaPayload = await request.json()
 
-    const { proyectoTareaId, nombreTareaExtra, descripcion, fechaInicio, fechaFin, horasEstimadas, personasEstimadas, miembros } = body
+    const { proyectoTareaId, nombreTareaExtra, descripcion, fechaInicio, fechaFin, horasEstimadas, personasEstimadas, responsableId, miembros } = body
 
     // Verificar que la jornada existe y está en estado 'iniciado'
     const jornada = await prisma.registroHorasCampo.findUnique({
@@ -203,6 +204,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
             horasEstimadas: horasEstimadas || undefined,
             personasEstimadas: personasEstimadas && personasEstimadas > 0 ? personasEstimadas : miembros.length,
             creadoPorId: session.user.id,
+            responsableId: responsableId || null,
             estado: 'en_progreso',
             orden: 0,
             updatedAt: new Date()

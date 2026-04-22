@@ -75,8 +75,6 @@ interface AgregarTareaModalProps {
   onSuccess: () => void
 }
 
-const CREAR_NUEVA = '__crear_nueva__'
-
 export function AgregarTareaModal({
   open,
   onOpenChange,
@@ -102,12 +100,14 @@ export function AgregarTareaModal({
   const [tipoTarea, setTipoTarea] = useState<'cronograma' | 'extra'>('cronograma')
   const [actividadId, setActividadId] = useState('')
   const [tareaId, setTareaId] = useState('')
-  // Extra: selector de existente o crear nueva
-  const [extraSeleccion, setExtraSeleccion] = useState(CREAR_NUEVA)
+  // Extra: puede estar en modo "seleccionar existente" o "crear nueva"
+  const [creandoNuevaExtra, setCreandoNuevaExtra] = useState(false)
+  const [extraSeleccion, setExtraSeleccion] = useState('') // id del extra existente seleccionado
   const [nombreTareaExtra, setNombreTareaExtra] = useState('')
   const [extraFechaInicio, setExtraFechaInicio] = useState('')
   const [extraFechaFin, setExtraFechaFin] = useState('')
   const [extraHorasPorPersona, setExtraHorasPorPersona] = useState<number | ''>('')
+  const [extraResponsableId, setExtraResponsableId] = useState<string>('') // '' = sin responsable
   const [miembrosSeleccionados, setMiembrosSeleccionados] = useState<MiembroSeleccionado[]>([])
 
   // Reset al abrir
@@ -116,13 +116,15 @@ export function AgregarTareaModal({
       setTipoTarea('cronograma')
       setActividadId('')
       setTareaId('')
-      setExtraSeleccion(CREAR_NUEVA)
+      setCreandoNuevaExtra(false)
+      setExtraSeleccion('')
       setNombreTareaExtra('')
       // Default dates to fechaTrabajo (YYYY-MM-DD)
       const defaultDate = fechaTrabajo ? fechaTrabajo.slice(0, 10) : new Date().toISOString().slice(0, 10)
       setExtraFechaInicio(defaultDate)
       setExtraFechaFin(defaultDate)
       setExtraHorasPorPersona('')
+      setExtraResponsableId('')
       setMiembrosSeleccionados([])
       if (proyectoEdtId) {
         cargarActividades()
@@ -195,24 +197,25 @@ export function AgregarTareaModal({
     if (tipoTarea === 'cronograma') {
       return { proyectoTareaId: tareaId }
     }
-    // Extra: existente o nueva
-    if (extraSeleccion !== CREAR_NUEVA) {
-      return { proyectoTareaId: extraSeleccion }
+    // Extra: crear nueva vs seleccionar existente
+    if (creandoNuevaExtra) {
+      const personas = miembrosSeleccionados.length || 1
+      const horasPP = extraHorasPorPersona || undefined
+      return {
+        nombreTareaExtra: nombreTareaExtra.trim(),
+        fechaInicio: extraFechaInicio || undefined,
+        fechaFin: extraFechaFin || undefined,
+        horasEstimadas: horasPP ? horasPP * personas : undefined,
+        personasEstimadas: personas,
+        responsableId: extraResponsableId || null
+      }
     }
-    const personas = miembrosSeleccionados.length || 1
-    const horasPP = extraHorasPorPersona || undefined
-    return {
-      nombreTareaExtra: nombreTareaExtra.trim(),
-      fechaInicio: extraFechaInicio || undefined,
-      fechaFin: extraFechaFin || undefined,
-      horasEstimadas: horasPP ? horasPP * personas : undefined,
-      personasEstimadas: personas
-    }
+    return { proyectoTareaId: extraSeleccion }
   }
 
   const isExtraValid = () => {
-    if (extraSeleccion !== CREAR_NUEVA) return true
-    return nombreTareaExtra.trim().length > 0
+    if (creandoNuevaExtra) return nombreTareaExtra.trim().length > 0
+    return extraSeleccion.length > 0
   }
 
   const handleSubmit = async () => {
@@ -352,32 +355,71 @@ export function AgregarTareaModal({
             </TabsContent>
 
             <TabsContent value="extra" className="space-y-2.5 mt-3">
-              {/* Selector de tarea extra existente o crear nueva */}
-              <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2">
-                <Label className="text-xs text-gray-600 shrink-0 sm:w-16">Extra</Label>
-                <Select value={extraSeleccion} onValueChange={(v) => { setExtraSeleccion(v); if (v !== CREAR_NUEVA) setNombreTareaExtra('') }}>
-                  <SelectTrigger className="h-auto min-h-8 py-1 !whitespace-normal [&_[data-slot=select-value]]:!line-clamp-2 text-sm flex-1">
-                    <SelectValue placeholder="Seleccionar o crear" />
-                  </SelectTrigger>
-                  <SelectContent position="popper" className="max-h-[250px] max-w-[calc(100vw-4rem)]">
-                    <SelectItem value={CREAR_NUEVA}>
-                      <span className="flex items-center gap-1.5 text-blue-600 font-medium">
-                        <Plus className="h-3.5 w-3.5" />
-                        Crear nueva tarea extra
-                      </span>
-                    </SelectItem>
-                    {tareasExtra.map(t => (
-                      <SelectItem key={t.id} value={t.id}>
-                        {t.nombre} <span className="text-gray-400 text-xs ml-1">({t.porcentaje}%)</span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Campos para crear nueva tarea extra */}
-              {extraSeleccion === CREAR_NUEVA && (
+              {!creandoNuevaExtra ? (
                 <>
+                  {/* Selector de tarea extra existente */}
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2">
+                    <Label className="text-xs text-gray-600 shrink-0 sm:w-16">Extra</Label>
+                    <Select value={extraSeleccion} onValueChange={(v) => setExtraSeleccion(v)}>
+                      <SelectTrigger className="h-auto min-h-8 py-1 !whitespace-normal [&_[data-slot=select-value]]:!line-clamp-2 text-sm flex-1">
+                        <SelectValue placeholder={tareasExtra.length === 0 ? 'No hay tareas extras' : 'Seleccionar tarea extra...'} />
+                      </SelectTrigger>
+                      <SelectContent position="popper" className="max-h-[250px] max-w-[calc(100vw-4rem)]">
+                        {tareasExtra.length === 0 ? (
+                          <div className="px-2 py-2 text-xs text-gray-400 text-center">No hay tareas extras</div>
+                        ) : (
+                          tareasExtra.map(t => (
+                            <SelectItem key={t.id} value={t.id}>
+                              {t.nombre} <span className="text-gray-400 text-xs ml-1">({t.porcentaje}%)</span>
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Botón separado para crear nueva */}
+                  <div className="flex justify-center">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setCreandoNuevaExtra(true)
+                        setExtraSeleccion('')
+                        setNombreTareaExtra('')
+                      }}
+                      className="text-blue-600 border-blue-300 hover:bg-blue-50"
+                    >
+                      <Plus className="h-3.5 w-3.5 mr-1" />
+                      Crear nueva tarea extra
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                /* Formulario de creación de nueva tarea extra */
+                <div className="border-2 border-blue-200 rounded-lg bg-blue-50/40 p-3 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-blue-700 flex items-center gap-1">
+                      <FileText className="h-3.5 w-3.5" />
+                      Datos de la nueva tarea extra
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setCreandoNuevaExtra(false)
+                        setNombreTareaExtra('')
+                        setExtraResponsableId('')
+                      }}
+                      className="h-6 px-2 text-xs text-gray-500 hover:text-gray-700"
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+
+                  {/* Nombre */}
                   <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2">
                     <Label className="text-xs text-gray-600 shrink-0 sm:w-16">Nombre *</Label>
                     <Input
@@ -420,13 +462,29 @@ export function AgregarTareaModal({
                     />
                   </div>
 
+                  {/* Responsable (opcional) */}
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2">
+                    <Label className="text-xs text-gray-600 shrink-0 sm:w-16">Resp.</Label>
+                    <Select value={extraResponsableId || '__none__'} onValueChange={(v) => setExtraResponsableId(v === '__none__' ? '' : v)}>
+                      <SelectTrigger className="h-8 text-sm flex-1">
+                        <SelectValue placeholder="Sin responsable" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Sin responsable</SelectItem>
+                        {personalPlanificado.map((p) => (
+                          <SelectItem key={p.userId} value={p.userId}>{p.nombre}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
                   {/* Total HH calculado */}
                   {extraHorasPorPersona && miembrosSeleccionados.length > 0 && (
                     <p className="text-xs text-gray-500 text-right">
                       {extraHorasPorPersona}h/pers × {miembrosSeleccionados.length} pers = <span className="font-medium text-gray-700">{extraHorasPorPersona * miembrosSeleccionados.length} HH</span>
                     </p>
                   )}
-                </>
+                </div>
               )}
             </TabsContent>
           </Tabs>

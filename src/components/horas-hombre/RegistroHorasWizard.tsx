@@ -121,6 +121,8 @@ export function RegistroHorasWizard({
   const [fechaInicioTarea, setFechaInicioTarea] = useState('')
   const [fechaFinTarea, setFechaFinTarea] = useState('')
   const [horasEstimadasNuevaTarea, setHorasEstimadasNuevaTarea] = useState('')
+  const [responsableNuevaTarea, setResponsableNuevaTarea] = useState<string>('') // '' = sin responsable
+  const [personalProyecto, setPersonalProyecto] = useState<{ id: string; name: string }[]>([])
 
   // Datos disponibles
   const [proyectos, setProyectos] = useState<Proyecto[]>([])
@@ -309,6 +311,32 @@ export function RegistroHorasWizard({
     }
   }
 
+  const cargarPersonalProyecto = async (proyectoId: string) => {
+    try {
+      const response = await fetch(`/api/proyecto/${proyectoId}/personal`)
+      if (!response.ok) return
+      const data = await response.json()
+      const rolesFijos = data?.data?.rolesFijos || {}
+      const personalDinamico = data?.data?.personalDinamico || []
+      // Combinar roles fijos (comercial, gestor, supervisor, lider) y personal dinámico
+      const usuarios = new Map<string, { id: string; name: string }>()
+      for (const rolFijo of Object.values(rolesFijos) as any[]) {
+        if (rolFijo?.id && rolFijo?.name) {
+          usuarios.set(rolFijo.id, { id: rolFijo.id, name: rolFijo.name })
+        }
+      }
+      for (const pd of personalDinamico) {
+        if (pd?.user?.id && pd?.user?.name) {
+          usuarios.set(pd.user.id, { id: pd.user.id, name: pd.user.name })
+        }
+      }
+      setPersonalProyecto(Array.from(usuarios.values()).sort((a, b) => a.name.localeCompare(b.name)))
+    } catch (error) {
+      console.error('Error cargando personal del proyecto:', error)
+      setPersonalProyecto([])
+    }
+  }
+
   const cargarEdts = async (proyectoId: string) => {
     try {
       setLoadingData(true)
@@ -448,7 +476,8 @@ export function RegistroHorasWizard({
           proyectoEdtId: edtSeleccionado.id,
           proyectoId: proyectoSeleccionado.id,
           horasEstimadas: horasEst,
-          estado: 'pendiente'
+          estado: 'pendiente',
+          responsableId: responsableNuevaTarea || null
         })
       })
 
@@ -629,6 +658,7 @@ export function RegistroHorasWizard({
       // Cargar datos necesarios para el siguiente paso
       if (nuevoPaso === 2 && proyectoSeleccionado) {
         cargarEdts(proyectoSeleccionado.id)
+        cargarPersonalProyecto(proyectoSeleccionado.id)
       } else if (nuevoPaso === 4 && edtSeleccionado) {
         cargarElementos(edtSeleccionado.id)
         setCreandoTarea(false)
@@ -945,7 +975,7 @@ export function RegistroHorasWizard({
           </div>
         </div>
 
-        {/* Opción Tarea Directa */}
+        {/* Opción Tarea Extra */}
         <div
           onClick={() => handleNivelChange('tarea')}
           className={`flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all select-none ${
@@ -966,10 +996,10 @@ export function RegistroHorasWizard({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <CheckSquare className="h-4 w-4 text-orange-600 shrink-0" />
-              <span className="font-medium text-orange-800">Tarea Directa</span>
+              <span className="font-medium text-orange-800">Tarea Extra</span>
             </div>
             <p className="text-xs text-gray-600 mt-1">
-              Registra directamente en una tarea sin actividad padre
+              Crea o selecciona una tarea fuera del cronograma planificado
             </p>
           </div>
         </div>
@@ -1207,6 +1237,22 @@ export function RegistroHorasWizard({
                   </div>
                 </div>
 
+                {/* Responsable (opcional) */}
+                <div>
+                  <Label htmlFor="responsableTarea" className="text-xs text-gray-600">Responsable (opcional)</Label>
+                  <Select value={responsableNuevaTarea || '__none__'} onValueChange={(v) => setResponsableNuevaTarea(v === '__none__' ? '' : v)}>
+                    <SelectTrigger id="responsableTarea" className="mt-1 h-9 text-sm">
+                      <SelectValue placeholder="Sin responsable" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Sin responsable</SelectItem>
+                      {personalProyecto.map((u) => (
+                        <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 {/* Botones */}
                 <div className="flex gap-2 pt-1">
                   <Button
@@ -1232,6 +1278,7 @@ export function RegistroHorasWizard({
                       setFechaInicioTarea('')
                       setFechaFinTarea('')
                       setHorasEstimadasNuevaTarea('')
+                      setResponsableNuevaTarea('')
                     }}
                   >
                     Cancelar
