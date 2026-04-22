@@ -800,26 +800,31 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                                   {cantidadPedida >= cantidadTotal ? 'Completo' : `${cantidadPedida}/${cantidadTotal} ped.`}
                                 </span>
                               )}
-                              {pedidos.map((codigo, index) => (
-                                <Tooltip key={index}>
-                                  <TooltipTrigger asChild>
-                                    <button
-                                      className="text-[10px] font-mono text-blue-600/80 hover:text-blue-700 hover:underline text-left truncate"
-                                      onClick={() => {
-                                        const pedidoItem = item.pedidos?.find(p => p.pedido?.codigo === codigo)
-                                        if (pedidoItem?.pedido?.id) {
-                                          router.push(`/proyectos/${proyectoId}/pedidos/${pedidoItem.pedido.id}`)
-                                        }
-                                      }}
-                                    >
-                                      {codigo}
-                                    </button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p>Ver pedido {codigo}</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              ))}
+                              {pedidos.map((codigo, index) => {
+                                const pedidoItem = item.pedidos?.find(p => p.pedido?.codigo === codigo)
+                                const pedidoId = pedidoItem?.pedido?.id
+                                return (
+                                  <Tooltip key={index}>
+                                    <TooltipTrigger asChild>
+                                      {pedidoId ? (
+                                        <a
+                                          href={`/proyectos/${proyectoId}/pedidos/${pedidoId}`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-[10px] font-mono text-blue-600/80 hover:text-blue-700 hover:underline text-left truncate"
+                                        >
+                                          {codigo}
+                                        </a>
+                                      ) : (
+                                        <span className="text-[10px] font-mono text-muted-foreground truncate">{codigo}</span>
+                                      )}
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Abrir pedido {codigo} en nueva pestaña</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                )
+                              })}
                             </>
                           )
                         })()}
