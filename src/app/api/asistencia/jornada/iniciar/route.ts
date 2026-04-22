@@ -4,12 +4,10 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { generarSecret } from '@/lib/utils/qrTotp'
 
-const ROLES_SUPERVISION = ['admin', 'gerente', 'coordinador', 'gestor', 'proyectos']
-
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions)
-  if (!session || !ROLES_SUPERVISION.includes(session.user.role)) {
-    return NextResponse.json({ message: 'No autorizado' }, { status: 403 })
+  if (!session) {
+    return NextResponse.json({ message: 'No autorizado' }, { status: 401 })
   }
 
   const body = await req.json()

@@ -59,6 +59,7 @@ import {
   ArrowLeftRight,
   RotateCcw,
   Warehouse,
+  QrCode,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -219,6 +220,7 @@ export default function Sidebar() {
           icon: ClipboardList,
           submenu: [
             { href: '/mi-trabajo/marcar', label: 'Marcar Asistencia', icon: MapPin },
+            { href: '/mi-trabajo/asistencia-campo', label: 'Abrir Asistencia de Campo', icon: QrCode },
             { href: '/mi-trabajo/mi-asistencia', label: 'Mi Asistencia', icon: Clock },
             { href: '/mi-trabajo/sede-remota', label: 'Mi Sede Remota', icon: Home },
             { href: '/mi-trabajo/solicitudes-remoto', label: 'Solicitudes Remoto', icon: Home },
@@ -244,7 +246,7 @@ export default function Sidebar() {
           label: 'Asistencia',
           icon: ClipboardList,
           submenu: [
-            { href: '/asistencia-supervisor', label: 'QR del Día', icon: MapPin },
+            { href: '/mi-trabajo/asistencia-campo', label: 'QR del Día', icon: QrCode },
             { href: '/supervision/asistencia', label: 'Asistencia del Equipo', icon: ClipboardList },
             { href: '/supervision/asistencia/dispositivos', label: 'Aprobar Dispositivos', icon: ShieldAlert },
             { href: '/supervision/solicitudes-remoto', label: 'Solicitudes Remoto', icon: Home },
