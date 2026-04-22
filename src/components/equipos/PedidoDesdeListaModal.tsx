@@ -30,6 +30,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import {
@@ -304,76 +310,102 @@ export default function PedidoDesdeListaModal({
                 <p className="text-xs text-amber-600">Todos los items ya fueron pedidos</p>
               </div>
             ) : (
-              <ScrollArea className="h-[200px] border rounded-lg">
-                <div className="p-2 space-y-1">
-                  {itemsDisponibles.map((item) => {
-                    const selection = itemSelections[item.id]
-                    if (!selection) return null
+              <TooltipProvider delayDuration={200}>
+                <ScrollArea className="h-[240px] border rounded-lg">
+                  <div className="p-2 space-y-1.5">
+                    {itemsDisponibles.map((item) => {
+                      const selection = itemSelections[item.id]
+                      if (!selection) return null
 
-                    return (
-                      <div
-                        key={item.id}
-                        className={cn(
-                          'flex items-center gap-3 p-2 rounded-lg border transition-all cursor-pointer',
-                          selection.selected
-                            ? 'bg-green-50 border-green-300'
-                            : 'bg-white border-gray-200 hover:border-gray-300'
-                        )}
-                        onClick={() => handleItemSelectionChange(item.id, 'selected', !selection.selected)}
-                      >
-                        <Checkbox
-                          checked={selection.selected}
-                          onCheckedChange={(checked) => handleItemSelectionChange(item.id, 'selected', checked)}
-                          disabled={loading}
-                          onClick={(e) => e.stopPropagation()}
-                          className="data-[state=checked]:bg-green-600 data-[state=checked]:border-green-600"
-                        />
-
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-mono font-medium text-gray-900 truncate">
-                              {item.codigo}
-                            </span>
-                          </div>
-                          <p className="text-[10px] text-gray-500 truncate" title={item.descripcion}>{item.descripcion}</p>
-                        </div>
-
-                        <div className="flex items-center gap-2 shrink-0">
-                          <div className="text-right">
-                            <p className="text-xs font-medium">${(item.precioElegido || 0).toLocaleString()}</p>
-                            <p className="text-[10px] text-gray-500">Disp: {selection.cantidadDisponible}</p>
-                          </div>
-
-                          <Input
-                            type="number"
-                            min="1"
-                            max={selection.cantidadDisponible}
-                            value={selection.cantidadPedida}
-                            onChange={(e) => {
-                              e.stopPropagation()
-                              const nuevaCantidad = Math.min(
-                                Math.max(1, parseInt(e.target.value) || 1),
-                                selection.cantidadDisponible
-                              )
-                              setItemSelections((prev) => ({
-                                ...prev,
-                                [item.id]: {
-                                  ...prev[item.id],
-                                  cantidadPedida: nuevaCantidad,
-                                  selected: true,
-                                },
-                              }))
-                            }}
-                            onClick={(e) => e.stopPropagation()}
+                      return (
+                        <div
+                          key={item.id}
+                          className={cn(
+                            'flex items-start gap-3 p-2.5 rounded-lg border transition-all cursor-pointer',
+                            selection.selected
+                              ? 'bg-green-50 border-green-300'
+                              : 'bg-white border-gray-200 hover:border-gray-300'
+                          )}
+                          onClick={() => handleItemSelectionChange(item.id, 'selected', !selection.selected)}
+                        >
+                          <Checkbox
+                            checked={selection.selected}
+                            onCheckedChange={(checked) => handleItemSelectionChange(item.id, 'selected', checked)}
                             disabled={loading}
-                            className="w-14 h-7 text-xs text-center font-semibold"
+                            onClick={(e) => e.stopPropagation()}
+                            className="mt-0.5 data-[state=checked]:bg-green-600 data-[state=checked]:border-green-600"
                           />
+
+                          <div className="flex-1 min-w-0">
+                            {/* Fila 1: código + precio */}
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-xs font-mono font-semibold text-gray-900 truncate">
+                                {item.codigo}
+                              </span>
+                              <span className="text-xs font-semibold text-gray-900 shrink-0">
+                                ${(item.precioElegido || 0).toLocaleString()}
+                              </span>
+                            </div>
+
+                            {/* Fila 2: descripción (con tooltip) */}
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <p className="text-[11px] text-gray-600 line-clamp-2 leading-snug mt-0.5 cursor-help">
+                                  {item.descripcion}
+                                </p>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-xs text-xs">
+                                {item.descripcion}
+                              </TooltipContent>
+                            </Tooltip>
+
+                            {/* Fila 3: cantidad a pedir + disponible */}
+                            <div className="flex items-center justify-between gap-2 mt-1.5">
+                              <div className="flex items-center gap-1.5">
+                                <label className="text-[10px] text-gray-500" onClick={(e) => e.stopPropagation()}>
+                                  Cantidad:
+                                </label>
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  max={selection.cantidadDisponible}
+                                  value={selection.cantidadPedida}
+                                  onChange={(e) => {
+                                    e.stopPropagation()
+                                    const nuevaCantidad = Math.min(
+                                      Math.max(1, parseInt(e.target.value) || 1),
+                                      selection.cantidadDisponible
+                                    )
+                                    setItemSelections((prev) => ({
+                                      ...prev,
+                                      [item.id]: {
+                                        ...prev[item.id],
+                                        cantidadPedida: nuevaCantidad,
+                                        selected: true,
+                                      },
+                                    }))
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                  disabled={loading}
+                                  className="w-16 h-6 text-xs text-center font-semibold"
+                                />
+                                <span className="text-[10px] text-gray-500">
+                                  / {selection.cantidadDisponible} disp.
+                                </span>
+                              </div>
+                              {item.unidad && (
+                                <span className="text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
+                                  {item.unidad}
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </ScrollArea>
+                      )
+                    })}
+                  </div>
+                </ScrollArea>
+              </TooltipProvider>
             )}
           </div>
 
