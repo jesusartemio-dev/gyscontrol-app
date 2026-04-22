@@ -529,8 +529,11 @@ export function useProyectoCronogramaTree(proyectoId: string, cronogramaId?: str
     setState(prev => ({ ...prev, selectedNodeId: nodeId }))
   }, [])
 
-  // Cargar datos iniciales
+  // Cargar datos iniciales. Esperar a que haya cronogramaId para evitar
+  // una carga prematura que use el fallback del API (otro cronograma) y
+  // luego sea sobreescrita/confundida cuando el padre resuelve el seleccionado.
   useEffect(() => {
+    if (!cronogramaId) return
     loadTree()
   }, [loadTree, cronogramaId])
 

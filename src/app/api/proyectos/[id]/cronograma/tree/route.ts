@@ -109,22 +109,28 @@ export async function GET(
 
       console.log('📊 [TREE API] Fases found for cronograma:', fases.length)
     } else {
-      // Fallback: si no hay cronogramaId, obtener del cronograma de planificación baseline
-      console.log('🔍 [TREE API] No cronogramaId specified, using baseline planificacion')
+      // Fallback: si no hay cronogramaId, elegir por prioridad igual que la UI
+      // (ejecucion > planificacion baseline > cualquiera) para que el default
+      // coincida con lo que el usuario espera ver.
+      console.log('🔍 [TREE API] No cronogramaId specified, picking default by priority (ejecucion > planificacion baseline > any)')
 
-      const cronogramaPlanificacion = await prisma.proyectoCronograma.findFirst({
-        where: {
-          proyectoId: id,
-          tipo: 'planificacion',
-          esBaseline: true
-        }
-      })
+      const fallbackCronograma =
+        (await prisma.proyectoCronograma.findFirst({
+          where: { proyectoId: id, tipo: 'ejecucion' }
+        })) ||
+        (await prisma.proyectoCronograma.findFirst({
+          where: { proyectoId: id, tipo: 'planificacion', esBaseline: true }
+        })) ||
+        (await prisma.proyectoCronograma.findFirst({
+          where: { proyectoId: id }
+        }))
 
-      if (cronogramaPlanificacion) {
+      if (fallbackCronograma) {
+        console.log('✅ [TREE API] Fallback cronograma seleccionado:', { id: fallbackCronograma.id, tipo: fallbackCronograma.tipo })
         fases = await prisma.proyectoFase.findMany({
           where: {
             proyectoId: id,
-            proyectoCronogramaId: cronogramaPlanificacion.id
+            proyectoCronogramaId: fallbackCronograma.id
           },
           include: {
             proyectoEdt: {
