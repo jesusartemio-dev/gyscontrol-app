@@ -12,6 +12,7 @@ import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { registrarCreacion } from '@/lib/services/audit'
 
 interface ListaDistribucionPayload {
   proyectoId: string
@@ -165,6 +166,24 @@ export async function POST(req: Request) {
         }
       }
     })
+
+    // ✅ Registrar en auditoría
+    try {
+      await registrarCreacion(
+        'LISTA_EQUIPO',
+        nuevaLista.id,
+        session.user.id,
+        nombre,
+        {
+          proyecto: proyectoEquipo.proyecto?.nombre,
+          codigo: nuevaLista.codigo,
+          origen: 'distribucion',
+          totalItems: itemsIds.length,
+        }
+      )
+    } catch (auditError) {
+      console.error('Error al registrar auditoría:', auditError)
+    }
 
     return NextResponse.json({
       ...listaCompleta,

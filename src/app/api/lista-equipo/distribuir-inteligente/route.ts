@@ -12,6 +12,7 @@ import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { registrarCreacion } from '@/lib/services/audit'
 
 interface SugerenciaInteligentePayload {
   proyectoId: string
@@ -192,6 +193,27 @@ export async function POST(req: Request) {
         })
       }
     })
+
+    // ✅ Registrar en auditoría cada lista creada
+    for (const lista of listasCreadas) {
+      try {
+        await registrarCreacion(
+          'LISTA_EQUIPO',
+          lista.id,
+          session.user.id,
+          lista.nombre,
+          {
+            proyecto: proyectoEquipo.proyecto?.nombre,
+            codigo: lista.codigo,
+            origen: 'distribucion_inteligente',
+            categoriaPrincipal: lista.categoriaPrincipal,
+            totalItems: lista.itemsCount,
+          }
+        )
+      } catch (auditError) {
+        console.error('Error al registrar auditoría:', auditError)
+      }
+    }
 
     // ✅ Retornar las listas creadas con estadísticas
     const estadisticas = {

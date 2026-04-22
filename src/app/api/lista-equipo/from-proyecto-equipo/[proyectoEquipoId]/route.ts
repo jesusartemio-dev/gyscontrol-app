@@ -12,6 +12,7 @@ import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { registrarCreacion } from '@/lib/services/audit'
 
 // ✅ POST: Convertir ProyectoEquipo en ListaEquipo
 export async function POST(req: Request, context: { params: Promise<{ proyectoEquipoId: string }> }) {
@@ -181,6 +182,24 @@ export async function POST(req: Request, context: { params: Promise<{ proyectoEq
         }
       }
     })
+
+    // ✅ Registrar en auditoría
+    try {
+      await registrarCreacion(
+        'LISTA_EQUIPO',
+        nuevaLista.id,
+        session.user.id,
+        nuevaLista.nombre,
+        {
+          proyecto: proyectoEquipo.proyecto?.nombre,
+          codigo: nuevaLista.codigo,
+          origen: 'from-proyecto-equipo',
+          totalItems: proyectoEquipoItems.length,
+        }
+      )
+    } catch (auditError) {
+      console.error('Error al registrar auditoría:', auditError)
+    }
 
     return NextResponse.json({
       ...listaCompleta,

@@ -9,6 +9,9 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import type { ListaEquipoPayload } from '@/types'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { registrarCreacion } from '@/lib/services/audit'
 
 // ✅ Obtener todas las listas
 export async function GET() {
@@ -34,6 +37,7 @@ export async function GET() {
 // ✅ Crear nueva lista
 export async function POST(request: Request) {
   try {
+    const session = await getServerSession(authOptions)
     const payload: ListaEquipoPayload = await request.json()
 
     const creada = await prisma.listaEquipo.create({
@@ -48,6 +52,25 @@ export async function POST(request: Request) {
         updatedAt: new Date()
       }
     })
+
+    // ✅ Registrar en auditoría
+    const usuarioId = session?.user?.id || payload.responsableId
+    if (usuarioId) {
+      try {
+        await registrarCreacion(
+          'LISTA_EQUIPO',
+          creada.id,
+          usuarioId,
+          creada.nombre,
+          {
+            codigo: creada.codigo,
+            origen: 'lista-requerimiento',
+          }
+        )
+      } catch (auditError) {
+        console.error('Error al registrar auditoría:', auditError)
+      }
+    }
 
     return NextResponse.json(creada)
   } catch (error) {

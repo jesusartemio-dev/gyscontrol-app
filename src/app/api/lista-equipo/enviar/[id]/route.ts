@@ -11,6 +11,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { notificarPorRol } from '@/lib/utils/notificaciones'
 import { crearEvento } from '@/lib/utils/trazabilidad'
+import { logStatusChange } from '@/lib/services/auditLogger'
 
 export async function POST(_: Request, context: { params: Promise<{ id: string }> }) {
   const { id: listaId } = await context.params
@@ -23,6 +24,8 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
       where: { id: listaId },
       select: {
         codigo: true,
+        nombre: true,
+        estado: true,
         responsableId: true,
         proyecto: { select: { id: true, codigo: true, nombre: true } },
         _count: { select: { listaEquipoItem: true } },
@@ -82,6 +85,20 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
         totalItems: lista?._count?.listaEquipoItem || 0,
       },
     })
+
+    // 7. Registrar cambio de estado en auditoría
+    try {
+      await logStatusChange({
+        userId,
+        entityType: 'LISTA_EQUIPO',
+        entityId: listaId,
+        oldStatus: lista?.estado,
+        newStatus: 'por_revisar',
+        description: `Lista ${lista?.nombre || lista?.codigo || 'sin nombre'}`,
+      })
+    } catch (auditError) {
+      console.error('Error logging status change:', auditError)
+    }
 
     return NextResponse.json({ ok: true })
   } catch (error) {

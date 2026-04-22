@@ -9,6 +9,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { registrarCreacion } from '@/lib/services/audit';
 
 // ✅ Esquemas de validación
 const FiltrosProyeccionSchema = z.object({
@@ -163,6 +166,7 @@ export async function GET(request: NextRequest) {
 // 📝 POST - Crear nueva lista de proyección
 export async function POST(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
     const body = await request.json();
     const datosValidados = CrearListaProyeccionSchema.parse(body);
 
@@ -235,6 +239,26 @@ export async function POST(request: NextRequest) {
       proyectoId: datosValidados.proyectoId,
       totalItems: datosValidados.items.length
     });
+
+    // ✅ Registrar en auditoría
+    if (session?.user?.id) {
+      try {
+        await registrarCreacion(
+          'LISTA_EQUIPO',
+          nuevaLista.id,
+          session.user.id,
+          nuevaLista.nombre,
+          {
+            proyecto: proyecto.nombre,
+            codigo: nuevaLista.codigo,
+            origen: 'proyeccion',
+            totalItems: datosValidados.items.length,
+          }
+        );
+      } catch (auditError) {
+        console.error('Error al registrar auditoría:', auditError);
+      }
+    }
 
     return NextResponse.json({
       success: true,

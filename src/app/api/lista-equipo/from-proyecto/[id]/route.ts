@@ -10,6 +10,7 @@ import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { registrarCreacion } from '@/lib/services/audit'
 
 export const dynamic = 'force-dynamic'
 
@@ -82,6 +83,23 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
 
       return nuevaLista
     })
+
+    // ✅ Registrar en auditoría
+    try {
+      await registrarCreacion(
+        'LISTA_EQUIPO',
+        resultado.id,
+        session.user.id,
+        resultado.nombre,
+        {
+          codigo: resultado.codigo,
+          origen: 'from-proyecto',
+          totalItems: items.length,
+        }
+      )
+    } catch (auditError) {
+      console.error('Error al registrar auditoría:', auditError)
+    }
 
     return NextResponse.json(resultado)
   } catch (error) {

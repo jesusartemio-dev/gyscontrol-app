@@ -13,11 +13,12 @@ import { prisma } from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { EstadoListaEquipo } from '@prisma/client'
 import type { PaginatedResponse, ListasEquipoPaginationParams } from '@/types/payloads'
-import { 
-  parsePaginationParams, 
-  paginateQuery, 
-  PAGINATION_CONFIGS 
+import {
+  parsePaginationParams,
+  paginateQuery,
+  PAGINATION_CONFIGS
 } from '@/lib/utils/pagination'
+import { registrarCreacion } from '@/lib/services/audit'
 
 // GET /api/listas-equipo - Obtener listas de equipos con paginación y búsqueda
 export async function GET(request: NextRequest) {
@@ -228,6 +229,23 @@ export async function POST(request: NextRequest) {
         }
       }
     })
+
+    // ✅ Registrar en auditoría
+    try {
+      await registrarCreacion(
+        'LISTA_EQUIPO',
+        nuevaLista.id,
+        session.user.id,
+        nuevaLista.nombre,
+        {
+          proyecto: nuevaLista.proyecto?.nombre,
+          codigo: nuevaLista.codigo,
+          fechaNecesaria: body.fechaNecesaria,
+        }
+      )
+    } catch (auditError) {
+      console.error('Error al registrar auditoría:', auditError)
+    }
 
     return NextResponse.json(nuevaLista, { status: 201 })
   } catch (error) {
