@@ -607,11 +607,22 @@ export function CerrarJornadaModal({
                             max={100}
                             step={5}
                           />
-                          {changed && (
-                            <div className="text-[11px] text-gray-400">
-                              {tarea.porcentajeActual}% → {progreso}%
-                            </div>
-                          )}
+                          {changed && (() => {
+                            const delta = progreso - (tarea.porcentajeActual ?? 0)
+                            const isAvance = delta > 0
+                            return (
+                              <div className="text-[11px] flex items-center gap-1.5">
+                                <span className={`font-semibold px-1.5 py-0.5 rounded ${
+                                  isAvance ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                }`}>
+                                  {isAvance ? '+' : ''}{delta}% {isAvance ? 'avanzado' : 'retrocedido'}
+                                </span>
+                                <span className="text-gray-400">
+                                  {tarea.porcentajeActual}% → {progreso}%
+                                </span>
+                              </div>
+                            )
+                          })()}
                         </div>
                       )
                     })}
