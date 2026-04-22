@@ -162,6 +162,7 @@ export async function POST(
         horasEstimadas: data.horasEstimadas,
         responsableId: data.responsableId,
         prioridad: data.prioridad || 'media',
+        creadoPorId: session.user.id,
         updatedAt: new Date()
       },
       include: {

@@ -309,6 +309,7 @@ export async function POST(
       dependenciaId: validatedData.dependenciaId,
       responsableId: validatedData.responsableId,
       recursoId: validatedData.recursoId,
+      creadoPorId: session.user.id,
       estado: 'pendiente' as const,
       porcentajeCompletado: 0,
       esExtra: cronograma.tipo === 'ejecucion'

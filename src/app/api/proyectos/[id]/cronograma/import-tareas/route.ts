@@ -264,6 +264,7 @@ export async function POST(
             estado: 'pendiente',
             prioridad: 'media',
             orden: servicio.orden || 0,
+            creadoPorId: session?.user?.id || null,
             updatedAt: new Date()
           }
         })

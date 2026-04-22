@@ -729,9 +729,10 @@ export function TreeNodeForm({
               )}
 
               {/* ── TAREA (edit): Creado por ── */}
-              {isTarea && mode === 'edit' && creadoPorNombre && (
+              {isTarea && mode === 'edit' && (
                 <div className="text-xs text-muted-foreground bg-gray-50 border rounded px-2 py-1.5">
-                  <span className="font-medium">Creado por:</span> {creadoPorNombre}
+                  <span className="font-medium">Creado por:</span>{' '}
+                  {creadoPorNombre || <span className="italic text-gray-400">No registrado</span>}
                 </div>
               )}
 

@@ -364,6 +364,7 @@ export async function POST(
                 estado: 'pendiente',
                 prioridad: 'media',
                 porcentajeCompletado: 0,
+                creadoPorId: session.user?.id || null,
                 updatedAt: new Date(),
               },
             })

@@ -122,7 +122,8 @@ export async function POST(
       return await ejecutarImportacion(tx, {
         proyectoId,
         cotizacion,
-        config: validatedData
+        config: validatedData,
+        creadoPorId: session.user.id
       })
     })
 
@@ -160,9 +161,10 @@ async function ejecutarImportacion(
     proyectoId: string
     cotizacion: any
     config: z.infer<typeof importSchema>
+    creadoPorId?: string
   }
 ): Promise<ImportResult> {
-  const { proyectoId, cotizacion, config } = params
+  const { proyectoId, cotizacion, config, creadoPorId } = params
 
   // 1. Crear cronograma base
   const cronograma = await tx.proyectoCronograma.create({
@@ -230,7 +232,8 @@ async function ejecutarImportacion(
     tx,
     edtsCreados,
     cronograma.id,
-    config.fechasAutomaticas
+    config.fechasAutomaticas,
+    creadoPorId
   )
 
   return {
@@ -298,7 +301,8 @@ async function crearActividadesYTareas(
   tx: any,
   edtsCreados: any[],
   cronogramaId: string,
-  fechasAutomaticas: boolean
+  fechasAutomaticas: boolean,
+  creadoPorId?: string
 ): Promise<{ actividadesCreadas: number; tareasCreadas: number }> {
   let actividadesCreadas = 0
   let tareasCreadas = 0
@@ -336,7 +340,8 @@ async function crearActividadesYTareas(
           horasReales: 0,
           estado: 'pendiente',
           porcentajeCompletado: 0,
-          prioridad: 'media'
+          prioridad: 'media',
+          creadoPorId: creadoPorId || null
         }
       })
 
