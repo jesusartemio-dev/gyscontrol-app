@@ -93,7 +93,8 @@ export async function GET(
                       },
                       recurso: {
                         select: { id: true, nombre: true, tipo: true, costoHoraProyecto: true }
-                      }
+                      },
+                      creadoPor: { select: { id: true, name: true } }
                     },
                     orderBy: { orden: 'asc' }
                   }
@@ -105,7 +106,8 @@ export async function GET(
                 where: { proyectoActividadId: null },
                 include: {
                   user: { select: { id: true, name: true, email: true } },
-                  recurso: { select: { id: true, nombre: true, tipo: true, costoHoraProyecto: true } }
+                  recurso: { select: { id: true, nombre: true, tipo: true, costoHoraProyecto: true } },
+                  creadoPor: { select: { id: true, name: true } }
                 },
                 orderBy: { orden: 'asc' }
               }
@@ -355,7 +357,9 @@ export async function GET(
                       recursoId: tarea.recursoId,
                       recursoNombre: tarea.recurso?.nombre,
                       recursoTipo: tarea.recurso?.tipo,
-                      esExtra: tarea.esExtra || false
+                      esExtra: tarea.esExtra || false,
+                      creadoPorId: tarea.creadoPorId,
+                      creadoPorNombre: (tarea as any).creadoPor?.name || null
                     },
                     metadata: {
                       hasChildren: false,
@@ -424,7 +428,9 @@ export async function GET(
                           recursoId: tarea.recursoId,
                           recursoNombre: tarea.recurso?.nombre,
                           recursoTipo: tarea.recurso?.tipo,
-                          esExtra: true
+                          esExtra: true,
+                          creadoPorId: tarea.creadoPorId,
+                          creadoPorNombre: (tarea as any).creadoPor?.name || null
                         },
                         metadata: {
                           hasChildren: false,

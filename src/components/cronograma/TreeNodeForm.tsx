@@ -29,6 +29,7 @@ interface TreeNodeFormProps {
   onSubmit: (data: any) => void
   onCancel: () => void
   nodes?: Map<string, TreeNode>
+  proyectoId?: string
 }
 
 const NODE_TYPE_LABELS: Record<string, string> = {
@@ -63,7 +64,8 @@ export function TreeNodeForm({
   isOpen,
   onSubmit,
   onCancel,
-  nodes = new Map()
+  nodes = new Map(),
+  proyectoId
 }: TreeNodeFormProps) {
   // Función para obtener el estado por defecto según el tipo de nodo
   const getDefaultStatus = (nodeType?: NodeType): 'pendiente' | 'en_progreso' | 'completada' | 'pausada' | 'cancelada' | 'planificado' => {
@@ -83,11 +85,17 @@ export function TreeNodeForm({
     horasEstimadas: '',
     personasEstimadas: '1',
     recursoId: '',
+    responsableId: '',
     orden: '',
     prioridad: 'media' as const,
     estado: getDefaultStatus(nodeType),
     posicionamiento: 'despues_ultima' as PositioningMode
   })
+
+  // Tarea: personal del proyecto (para el select de responsable) + info de creadoPor
+  const [personalProyecto, setPersonalProyecto] = useState<{ id: string; name: string }[]>([])
+  const [creadoPorNombre, setCreadoPorNombre] = useState<string | null>(null)
+  const [autoLlenandoRecurso, setAutoLlenandoRecurso] = useState(false)
 
   // Función para calcular fechas según posicionamiento
   const calculateDatesFromPositioning = async (posicionamiento: PositioningMode, parentId?: string) => {
@@ -341,6 +349,7 @@ export function TreeNodeForm({
           horasEstimadas: node.data.horasEstimadas?.toString() || '',
           personasEstimadas: node.data.personasEstimadas?.toString() || '1',
           recursoId: node.data.recursoId || '',
+          responsableId: node.data.responsableId || '',
           orden: node.data.orden?.toString() || '',
           prioridad: node.data.prioridad || 'media',
           estado: node.metadata.status === 'pending' ? 'pendiente' :
@@ -359,9 +368,77 @@ export function TreeNodeForm({
             totalPersonas: node.data.personasEstimadas || 1
           })
         }
+
+        // Creado por (solo tareas)
+        setCreadoPorNombre(node.data.creadoPorNombre || null)
       }
     }
   }, [mode, nodeId, nodes, nodeType])
+
+  // Tarea: cargar personal del proyecto para el Select de Responsable
+  useEffect(() => {
+    if (!isOpen || !proyectoId) return
+    const effectiveType = nodeType || (nodeId ? nodes.get(nodeId)?.type : undefined)
+    if (effectiveType !== 'tarea') return
+
+    let cancelado = false
+    ;(async () => {
+      try {
+        const resp = await fetch(`/api/proyecto/${proyectoId}/personal`)
+        if (!resp.ok) return
+        const data = await resp.json()
+        if (cancelado) return
+        const rolesFijos = data?.data?.rolesFijos || {}
+        const personalDinamico = data?.data?.personalDinamico || []
+        const usuarios = new Map<string, { id: string; name: string }>()
+        for (const rol of Object.values(rolesFijos) as any[]) {
+          if (rol?.id && rol?.name) usuarios.set(rol.id, { id: rol.id, name: rol.name })
+        }
+        for (const pd of personalDinamico) {
+          if (pd?.user?.id && pd?.user?.name) usuarios.set(pd.user.id, { id: pd.user.id, name: pd.user.name })
+        }
+        setPersonalProyecto(Array.from(usuarios.values()).sort((a, b) => a.name.localeCompare(b.name)))
+      } catch (e) {
+        console.error('Error cargando personal del proyecto:', e)
+      }
+    })()
+    return () => { cancelado = true }
+  }, [isOpen, proyectoId, nodeType, nodeId, nodes])
+
+  // Tarea: al cambiar el responsable, auto-llenar el recurso si el usuario tiene uno asociado
+  const handleResponsableChange = async (nuevoResponsableId: string) => {
+    setFormData(prev => ({ ...prev, responsableId: nuevoResponsableId }))
+    if (!nuevoResponsableId || nuevoResponsableId === '__none__') {
+      return
+    }
+    // Si ya hay recurso seleccionado, no lo sobreescribimos
+    if (formData.recursoId) return
+
+    try {
+      setAutoLlenandoRecurso(true)
+      const resp = await fetch(`/api/recursos/por-usuario/${nuevoResponsableId}`)
+      if (!resp.ok) return
+      const data = await resp.json()
+      const recursos = data?.recursos || []
+      if (recursos.length === 0) return
+      // Heurística: preferir el que tenga rol "Líder", sino el primero
+      const lider = recursos.find((r: any) => (r.rol || '').toLowerCase().includes('lider'))
+      const elegido = lider || recursos[0]
+      setFormData(prev => ({
+        ...prev,
+        recursoId: elegido.id,
+        personasEstimadas: '1' // RecursoSelect recalculará si es cuadrilla al cargar
+      }))
+      setRecursoInfo({
+        tipo: elegido.tipo,
+        totalPersonas: 1
+      })
+    } catch (e) {
+      console.error('Error auto-llenando recurso:', e)
+    } finally {
+      setAutoLlenandoRecurso(false)
+    }
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -372,6 +449,7 @@ export function TreeNodeForm({
       horasEstimadas: formData.horasEstimadas ? parseFloat(formData.horasEstimadas) : undefined,
       personasEstimadas: formData.personasEstimadas ? parseInt(formData.personasEstimadas) : undefined,
       recursoId: formData.recursoId || null,
+      responsableId: formData.responsableId || null,
       orden: formData.orden ? parseInt(formData.orden) : undefined,
       // Incluir configuración de posicionamiento para creación
       ...(mode === 'create' && {
@@ -620,6 +698,40 @@ export function TreeNodeForm({
                       }
                     </p>
                   )}
+                </div>
+              )}
+
+              {/* ── TAREA: Responsable (opcional, con auto-llenar recurso) ── */}
+              {isTarea && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="responsableId" className="flex items-center gap-1">
+                    Responsable
+                    {autoLlenandoRecurso && <span className="text-xs text-blue-500">(autocompletando recurso...)</span>}
+                  </Label>
+                  <Select
+                    value={formData.responsableId || '__none__'}
+                    onValueChange={(v) => handleResponsableChange(v === '__none__' ? '' : v)}
+                  >
+                    <SelectTrigger id="responsableId">
+                      <SelectValue placeholder="Sin responsable" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Sin responsable</SelectItem>
+                      {personalProyecto.map((u) => (
+                        <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[11px] text-muted-foreground">
+                    Al seleccionar, se autocompleta el recurso asociado al usuario (si existe).
+                  </p>
+                </div>
+              )}
+
+              {/* ── TAREA (edit): Creado por ── */}
+              {isTarea && mode === 'edit' && creadoPorNombre && (
+                <div className="text-xs text-muted-foreground bg-gray-50 border rounded px-2 py-1.5">
+                  <span className="font-medium">Creado por:</span> {creadoPorNombre}
                 </div>
               )}
 

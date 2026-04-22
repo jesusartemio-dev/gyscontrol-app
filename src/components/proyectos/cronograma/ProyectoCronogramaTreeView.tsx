@@ -659,6 +659,7 @@ export function ProyectoCronogramaTreeView({
               setFormContext(null)
             }}
             nodes={state.nodes}
+            proyectoId={proyectoId}
           />
         )}
 
