@@ -60,17 +60,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       if (!['admin', 'gerente', 'administracion'].includes(session.user.role)) {
         return NextResponse.json({ error: 'Sin permisos para registrar anticipo' }, { status: 403 })
       }
-      if (!['aprobado', 'depositado'].includes(hoja.estado)) {
+      if (!['aprobado', 'depositado', 'rendido'].includes(hoja.estado)) {
         return NextResponse.json({
-          error: 'Solo se pueden registrar anticipos cuando la hoja está en estado aprobado o depositado',
+          error: 'Solo se pueden registrar anticipos cuando la hoja está en estado aprobado, depositado o rendido',
         }, { status: 400 })
       }
     } else if (tipo === 'devolucion') {
-      if (hoja.empleadoId !== session.user.id) {
-        return NextResponse.json({ error: 'Solo el empleado del requerimiento puede registrar una devolución' }, { status: 403 })
+      const esEmpleado = hoja.empleadoId === session.user.id
+      const esAdmin = ['admin', 'gerente', 'administracion'].includes(session.user.role)
+      if (!esEmpleado && !esAdmin) {
+        return NextResponse.json({ error: 'Sin permisos para registrar esta devolución' }, { status: 403 })
       }
-      if (hoja.estado !== 'rendido') {
-        return NextResponse.json({ error: 'Solo se pueden registrar devoluciones cuando la hoja está en estado rendido' }, { status: 400 })
+      if (!['depositado', 'rendido'].includes(hoja.estado)) {
+        return NextResponse.json({ error: 'Solo se pueden registrar devoluciones cuando la hoja está en estado depositado o rendido' }, { status: 400 })
       }
     } else {
       return NextResponse.json({ error: 'Tipo de depósito inválido' }, { status: 400 })
@@ -97,21 +99,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         })
       }
 
-      // Solo los anticipos afectan montoDepositado/saldo
-      if (tipo === 'anticipo') {
-        const todos = await tx.depositoHoja.findMany({
-          where: { hojaDeGastosId: id, tipo: 'anticipo' },
-        })
-        const nuevoTotal = todos.reduce((s, d) => s + d.monto, 0)
-        await tx.hojaDeGastos.update({
-          where: { id },
-          data: {
-            montoDepositado: nuevoTotal,
-            saldo: nuevoTotal - hoja.montoGastado,
-            updatedAt: new Date(),
-          },
-        })
-      }
+      // Recalcular saldo = anticipos - gastos - devoluciones
+      const [anticipos, devoluciones] = await Promise.all([
+        tx.depositoHoja.findMany({ where: { hojaDeGastosId: id, tipo: 'anticipo' } }),
+        tx.depositoHoja.findMany({ where: { hojaDeGastosId: id, tipo: 'devolucion' } }),
+      ])
+      const totalAnticipos = anticipos.reduce((s, d) => s + d.monto, 0)
+      const totalDevoluciones = devoluciones.reduce((s, d) => s + d.monto, 0)
+      await tx.hojaDeGastos.update({
+        where: { id },
+        data: {
+          montoDepositado: totalAnticipos,
+          saldo: totalAnticipos - hoja.montoGastado - totalDevoluciones,
+          updatedAt: new Date(),
+        },
+      })
 
       await tx.hojaDeGastosEvento.create({
         data: {

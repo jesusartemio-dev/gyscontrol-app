@@ -559,8 +559,8 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
   const esEmpleado = session?.user?.id === hoja.empleadoId
   const anticipos = (hoja.depositos || []).filter((d: any) => d.tipo !== 'devolucion')
   const devoluciones = (hoja.depositos || []).filter((d: any) => d.tipo === 'devolucion')
-  const canRegistrarAnticipo = ['aprobado', 'depositado'].includes(hoja.estado) && ['admin', 'gerente', 'administracion'].includes(role || '')
-  const canRegistrarDevolucion = hoja.estado === 'rendido' && hoja.requiereAnticipo && esEmpleado
+  const canRegistrarAnticipo = ['aprobado', 'depositado', 'rendido'].includes(hoja.estado) && ['admin', 'gerente', 'administracion'].includes(role || '')
+  const canRegistrarDevolucion = ['depositado', 'rendido'].includes(hoja.estado) && hoja.requiereAnticipo && (esEmpleado || ['admin', 'gerente', 'administracion'].includes(role || ''))
 
   return (
     <div className="container mx-auto p-4 sm:p-6 space-y-4 max-w-4xl">
@@ -852,7 +852,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
                     <p className="text-xs text-muted-foreground italic">Sin devoluciones registradas.</p>
                   )}
                   {devoluciones.map((dep: any, idx: number) => {
-                    const canEliminarDev = hoja.estado === 'rendido' && (esEmpleado || ['admin', 'gerente', 'administracion'].includes(role || ''))
+                    const canEliminarDev = ['depositado', 'rendido'].includes(hoja.estado) && (esEmpleado || ['admin', 'gerente', 'administracion'].includes(role || ''))
                     return (
                       <div key={dep.id} className="border border-teal-200 rounded-lg p-3 bg-teal-50/40">
                         <div className="flex items-center justify-between">

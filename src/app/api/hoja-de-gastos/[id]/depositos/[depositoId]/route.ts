@@ -35,13 +35,13 @@ export async function DELETE(
       if (!['admin', 'gerente', 'administracion'].includes(session.user.role)) {
         return NextResponse.json({ error: 'Sin permisos para eliminar este anticipo' }, { status: 403 })
       }
-      if (!['aprobado', 'depositado'].includes(hoja.estado)) {
+      if (!['aprobado', 'depositado', 'rendido'].includes(hoja.estado)) {
         return NextResponse.json({
-          error: 'Solo se pueden eliminar anticipos cuando la hoja está en estado aprobado o depositado',
+          error: 'Solo se pueden eliminar anticipos cuando la hoja está en estado aprobado, depositado o rendido',
         }, { status: 400 })
       }
-      // En estado depositado no se puede eliminar el único anticipo
-      if (hoja.estado === 'depositado') {
+      // En estados depositado/rendido no se puede eliminar el único anticipo
+      if (['depositado', 'rendido'].includes(hoja.estado)) {
         const totalAnticipos = await prisma.depositoHoja.count({
           where: { hojaDeGastosId: id, tipo: 'anticipo' },
         })
@@ -55,9 +55,9 @@ export async function DELETE(
       if (hoja.empleadoId !== session.user.id && !['admin', 'gerente', 'administracion'].includes(session.user.role)) {
         return NextResponse.json({ error: 'Sin permisos para eliminar esta devolución' }, { status: 403 })
       }
-      if (hoja.estado !== 'rendido') {
+      if (!['depositado', 'rendido'].includes(hoja.estado)) {
         return NextResponse.json({
-          error: 'Solo se pueden eliminar devoluciones cuando la hoja está en estado rendido',
+          error: 'Solo se pueden eliminar devoluciones cuando la hoja está en estado depositado o rendido',
         }, { status: 400 })
       }
     }
@@ -71,21 +71,21 @@ export async function DELETE(
 
       await tx.depositoHoja.delete({ where: { id: depositoId } })
 
-      // Solo los anticipos afectan montoDepositado/saldo
-      if (deposito.tipo === 'anticipo') {
-        const restantes = await tx.depositoHoja.findMany({
-          where: { hojaDeGastosId: id, tipo: 'anticipo' },
-        })
-        const nuevoTotal = restantes.reduce((s, d) => s + d.monto, 0)
-        await tx.hojaDeGastos.update({
-          where: { id },
-          data: {
-            montoDepositado: nuevoTotal,
-            saldo: nuevoTotal - hoja.montoGastado,
-            updatedAt: new Date(),
-          },
-        })
-      }
+      // Recalcular saldo = anticipos - gastos - devoluciones
+      const [anticipos, devoluciones] = await Promise.all([
+        tx.depositoHoja.findMany({ where: { hojaDeGastosId: id, tipo: 'anticipo' } }),
+        tx.depositoHoja.findMany({ where: { hojaDeGastosId: id, tipo: 'devolucion' } }),
+      ])
+      const totalAnticipos = anticipos.reduce((s, d) => s + d.monto, 0)
+      const totalDevoluciones = devoluciones.reduce((s, d) => s + d.monto, 0)
+      await tx.hojaDeGastos.update({
+        where: { id },
+        data: {
+          montoDepositado: totalAnticipos,
+          saldo: totalAnticipos - hoja.montoGastado - totalDevoluciones,
+          updatedAt: new Date(),
+        },
+      })
 
       await tx.hojaDeGastosEvento.create({
         data: {
