@@ -88,6 +88,7 @@ import {
   FileText,
   Warehouse,
   Wrench,
+  Download,
 } from 'lucide-react'
 import TipoItemBadge from '@/components/shared/TipoItemBadge'
 
@@ -245,6 +246,36 @@ export default function PedidoLogisticaDetailPage() {
   // ✏️ Estado para edición inline de T.Entrega y F.Entrega
   const [inlineEdit, setInlineEdit] = useState<{ itemId: string; field: 'tiempoEntrega' | 'fechaEntregaEstimada'; value: string } | null>(null)
   const [savingInline, setSavingInline] = useState(false)
+
+  // 📥 Descarga Excel
+  const [downloadingExcel, setDownloadingExcel] = useState(false)
+
+  const handleDownloadExcel = async () => {
+    if (!pedido) return
+    try {
+      setDownloadingExcel(true)
+      const res = await fetch(`/api/pedido-equipo/${pedido.id}/exportar`)
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Error al descargar' }))
+        throw new Error(err.error || 'Error al descargar')
+      }
+      const blob = await res.blob()
+      const filename = res.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1]
+        || `Pedido_${pedido.codigo.replace(/[\/\\]/g, '-')}.xlsx`
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al descargar Excel')
+    } finally {
+      setDownloadingExcel(false)
+    }
+  }
 
   const startInlineEdit = (itemId: string, field: 'tiempoEntrega' | 'fechaEntregaEstimada', currentValue: string) => {
     setInlineEdit({ itemId, field, value: currentValue })
@@ -795,6 +826,16 @@ export default function PedidoLogisticaDetailPage() {
                   </Button>
                 </>
               )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadExcel}
+                disabled={downloadingExcel}
+                className="h-7 text-xs"
+              >
+                <Download className={cn('h-3 w-3 mr-1', downloadingExcel && 'animate-pulse')} />
+                Excel
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
