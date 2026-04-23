@@ -8,7 +8,7 @@ ALTER TABLE "pedido_equipo_item" ADD COLUMN "centroCostoId" TEXT;
 
 -- AddForeignKey
 ALTER TABLE "pedido_equipo_item" ADD CONSTRAINT "pedido_equipo_item_proyectoId_fkey"
-    FOREIGN KEY ("proyectoId") REFERENCES "Proyecto"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+    FOREIGN KEY ("proyectoId") REFERENCES "proyecto"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 ALTER TABLE "pedido_equipo_item" ADD CONSTRAINT "pedido_equipo_item_centroCostoId_fkey"
     FOREIGN KEY ("centroCostoId") REFERENCES "centro_costo"("id") ON DELETE SET NULL ON UPDATE CASCADE;
