@@ -26,6 +26,8 @@ interface ProyectoOpcion {
   nombre: string
 }
 
+type CategoriaCostoStr = 'equipos' | 'servicios' | 'gastos'
+
 interface ItemDraft {
   codigo: string
   descripcion: string
@@ -34,6 +36,7 @@ interface ItemDraft {
   precioUnitario: number
   proyectoIdOverride: string | null
   centroCostoIdOverride: string | null
+  categoriaCostoOverride: CategoriaCostoStr | null
 }
 
 const ITEM_VACIO: ItemDraft = {
@@ -44,6 +47,7 @@ const ITEM_VACIO: ItemDraft = {
   precioUnitario: 0,
   proyectoIdOverride: null,
   centroCostoIdOverride: null,
+  categoriaCostoOverride: null,
 }
 
 const formatCurrency = (amount: number) =>
@@ -125,6 +129,7 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
       precioUnitario: item.precioUnitario ?? 0,
       proyectoIdOverride: item.proyectoId ?? null,
       centroCostoIdOverride: item.centroCostoId ?? null,
+      categoriaCostoOverride: (item.categoriaCosto as CategoriaCostoStr | null | undefined) ?? null,
     })
     setEditingItem(item)
     setModalOpen(true)
@@ -135,6 +140,10 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
     if (!draft.descripcion.trim()) return toast.error('La descripción es obligatoria')
     if (draft.cantidadPedida <= 0) return toast.error('La cantidad debe ser mayor a 0')
     if (!pedido) return
+    const tieneOverride = !!(draft.proyectoIdOverride || draft.centroCostoIdOverride)
+    if (tieneOverride && !draft.categoriaCostoOverride) {
+      return toast.error('Selecciona la categoría de costo para el destino asignado')
+    }
 
     try {
       setSavingItem(true)
@@ -153,6 +162,7 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
             costoTotal: draft.precioUnitario ? draft.cantidadPedida * draft.precioUnitario : null,
             proyectoId: draft.proyectoIdOverride,
             centroCostoId: draft.centroCostoIdOverride,
+            categoriaCosto: draft.categoriaCostoOverride,
           }),
         })
         if (!res.ok) {
@@ -173,6 +183,7 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
               costoTotal: updated.costoTotal,
               proyectoId: updated.proyectoId ?? null,
               centroCostoId: updated.centroCostoId ?? null,
+              categoriaCosto: updated.categoriaCosto ?? null,
             } : i
           )
         } : prev)
@@ -192,6 +203,7 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
             costoTotal: draft.precioUnitario ? draft.cantidadPedida * draft.precioUnitario : null,
             proyectoId: draft.proyectoIdOverride,
             centroCostoId: draft.centroCostoIdOverride,
+            categoriaCosto: draft.categoriaCostoOverride,
           }),
         })
         if (!res.ok) {
@@ -212,6 +224,7 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
             estado: created.estado,
             proyectoId: created.proyectoId ?? null,
             centroCostoId: created.centroCostoId ?? null,
+            categoriaCosto: created.categoriaCosto ?? null,
           }]
         } : prev)
         toast.success('Ítem agregado')
@@ -576,11 +589,21 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
                 }
                 onValueChange={v => {
                   if (v === '__heredar__') {
-                    setDraft(d => ({ ...d, proyectoIdOverride: null, centroCostoIdOverride: null }))
+                    setDraft(d => ({ ...d, proyectoIdOverride: null, centroCostoIdOverride: null, categoriaCostoOverride: null }))
                   } else if (v.startsWith('proyecto:')) {
-                    setDraft(d => ({ ...d, proyectoIdOverride: v.slice(9), centroCostoIdOverride: null }))
+                    setDraft(d => ({
+                      ...d,
+                      proyectoIdOverride: v.slice(9),
+                      centroCostoIdOverride: null,
+                      categoriaCostoOverride: d.categoriaCostoOverride ?? 'gastos',
+                    }))
                   } else if (v.startsWith('centro:')) {
-                    setDraft(d => ({ ...d, proyectoIdOverride: null, centroCostoIdOverride: v.slice(7) }))
+                    setDraft(d => ({
+                      ...d,
+                      proyectoIdOverride: null,
+                      centroCostoIdOverride: v.slice(7),
+                      categoriaCostoOverride: d.categoriaCostoOverride ?? 'gastos',
+                    }))
                   }
                 }}
               >
@@ -614,9 +637,27 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
                 </SelectContent>
               </Select>
               {(draft.proyectoIdOverride || draft.centroCostoIdOverride) && (
-                <p className="text-[11px] text-muted-foreground">
-                  Este ítem se imputará al destino seleccionado, no al centro del pedido.
-                </p>
+                <>
+                  <div className="space-y-1.5 mt-2">
+                    <Label className="text-xs">Categoría de costo *</Label>
+                    <Select
+                      value={draft.categoriaCostoOverride ?? ''}
+                      onValueChange={v => setDraft(d => ({ ...d, categoriaCostoOverride: v as CategoriaCostoStr }))}
+                    >
+                      <SelectTrigger className="h-8 text-sm">
+                        <SelectValue placeholder="Seleccionar categoría" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="gastos">Gastos (EPPs, capacitaciones, suministros)</SelectItem>
+                        <SelectItem value="equipos">Equipos</SelectItem>
+                        <SelectItem value="servicios">Servicios</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Se imputará en "{draft.categoriaCostoOverride ?? '…'}" del destino seleccionado.
+                  </p>
+                </>
               )}
             </div>
           </div>

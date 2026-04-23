@@ -11,6 +11,7 @@ import { Progress } from '@/components/ui/progress'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 import { useProyectoContext } from '../ProyectoContext'
+import { PedidoItemsOverrideSection } from '@/components/proyectos/PedidoItemsOverrideSection'
 
 function ServiciosSkeleton() {
   return (
@@ -414,6 +415,8 @@ export default function ProyectoServiciosPage() {
           )}
         </div>
       )}
+
+      {proyecto && <PedidoItemsOverrideSection proyectoId={proyecto.id} categoria="servicios" />}
     </div>
   )
 }

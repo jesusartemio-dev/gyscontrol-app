@@ -808,6 +808,9 @@ model PedidoEquipoItem {
   // Son mutuamente excluyentes: máximo UNO debe estar presente.
   proyectoId                  String?
   centroCostoId               String?
+  // Bucket contable dentro del destino (Equipos/Servicios/Gastos).
+  // Requerido cuando hay override; null cuando se hereda del padre.
+  categoriaCosto              CategoriaCosto?
   entregaItem                 EntregaItem[]
   listaEquipoItem             ListaEquipoItem?            @relation(fields: [listaEquipoItemId], references: [id])
   listaEquipo                 ListaEquipo?                @relation(fields: [listaId], references: [id])

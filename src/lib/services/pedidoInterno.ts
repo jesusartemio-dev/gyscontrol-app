@@ -36,6 +36,7 @@ export interface PedidoInternoItem {
   // Override de imputación (ambos null = hereda del pedido)
   proyectoId?: string | null
   centroCostoId?: string | null
+  categoriaCosto?: 'equipos' | 'servicios' | 'gastos' | null
 }
 
 export async function getMisPedidosInternos(params?: {

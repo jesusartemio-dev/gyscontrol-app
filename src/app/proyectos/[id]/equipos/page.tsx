@@ -13,6 +13,7 @@ import EquiposCardView from '@/components/proyectos/equipos/EquiposCardView'
 import CrearListaMultipleModal from '@/components/proyectos/equipos/CrearListaMultipleModal'
 
 import { useProyectoContext } from '../ProyectoContext'
+import { PedidoItemsOverrideSection } from '@/components/proyectos/PedidoItemsOverrideSection'
 import type { ProyectoEquipoCotizado } from '@/types'
 
 const formatCurrency = (amount: number): string => {
@@ -183,6 +184,9 @@ export default function ProyectoEquiposPage() {
           onCreateList={handleOpenModal}
         />
       )}
+
+      {/* Items imputados desde pedidos internos (override) */}
+      <PedidoItemsOverrideSection proyectoId={proyecto.id} categoria="equipos" />
 
       {/* Modal */}
       {selectedEquipo && (

@@ -23,6 +23,8 @@ interface ProyectoOpcion {
   nombre: string
 }
 
+type CategoriaCostoStr = 'equipos' | 'servicios' | 'gastos'
+
 interface ItemLibre {
   codigo: string
   descripcion: string
@@ -32,6 +34,8 @@ interface ItemLibre {
   // Override de imputación (mutuamente excluyentes)
   proyectoIdOverride: string | null
   centroCostoIdOverride: string | null
+  // Bucket contable (requerido cuando hay override)
+  categoriaCostoOverride: CategoriaCostoStr | null
 }
 
 const ITEM_VACIO: ItemLibre = {
@@ -42,6 +46,7 @@ const ITEM_VACIO: ItemLibre = {
   precioUnitario: 0,
   proyectoIdOverride: null,
   centroCostoIdOverride: null,
+  categoriaCostoOverride: null,
 }
 const UNIDADES = ['und', 'par', 'm', 'm²', 'm³', 'kg', 'lt', 'caja', 'bolsa', 'rollo', 'juego', 'set']
 
@@ -102,6 +107,11 @@ export default function NuevoPedidoInternoPage() {
   const handleSaveItem = () => {
     if (!draft.descripcion.trim()) return toast.error('La descripción es obligatoria')
     if (draft.cantidadPedida <= 0) return toast.error('La cantidad debe ser mayor a 0')
+    // Si hay override, la categoría es obligatoria
+    const tieneOverride = !!(draft.proyectoIdOverride || draft.centroCostoIdOverride)
+    if (tieneOverride && !draft.categoriaCostoOverride) {
+      return toast.error('Selecciona la categoría de costo (Equipos/Servicios/Gastos) para el destino asignado')
+    }
 
     if (editIndex !== null) {
       setItems(prev => prev.map((item, i) => i === editIndex ? { ...draft } : item))
@@ -141,6 +151,7 @@ export default function NuevoPedidoInternoPage() {
           precioUnitario: item.precioUnitario || undefined,
           proyectoId: item.proyectoIdOverride,
           centroCostoId: item.centroCostoIdOverride,
+          categoriaCosto: item.categoriaCostoOverride,
         })),
       })
       toast.success(`Pedido ${pedido.codigo} creado`)
@@ -478,11 +489,21 @@ export default function NuevoPedidoInternoPage() {
                 }
                 onValueChange={v => {
                   if (v === '__heredar__') {
-                    setDraft(d => ({ ...d, proyectoIdOverride: null, centroCostoIdOverride: null }))
+                    setDraft(d => ({ ...d, proyectoIdOverride: null, centroCostoIdOverride: null, categoriaCostoOverride: null }))
                   } else if (v.startsWith('proyecto:')) {
-                    setDraft(d => ({ ...d, proyectoIdOverride: v.slice(9), centroCostoIdOverride: null }))
+                    setDraft(d => ({
+                      ...d,
+                      proyectoIdOverride: v.slice(9),
+                      centroCostoIdOverride: null,
+                      categoriaCostoOverride: d.categoriaCostoOverride ?? 'gastos',
+                    }))
                   } else if (v.startsWith('centro:')) {
-                    setDraft(d => ({ ...d, proyectoIdOverride: null, centroCostoIdOverride: v.slice(7) }))
+                    setDraft(d => ({
+                      ...d,
+                      proyectoIdOverride: null,
+                      centroCostoIdOverride: v.slice(7),
+                      categoriaCostoOverride: d.categoriaCostoOverride ?? 'gastos',
+                    }))
                   }
                 }}
               >
@@ -516,9 +537,27 @@ export default function NuevoPedidoInternoPage() {
                 </SelectContent>
               </Select>
               {(draft.proyectoIdOverride || draft.centroCostoIdOverride) && (
-                <p className="text-[11px] text-muted-foreground">
-                  Este ítem se imputará contablemente al destino seleccionado, aunque el pedido en conjunto se gestione bajo otro centro de costo.
-                </p>
+                <>
+                  <div className="space-y-1.5 mt-2">
+                    <Label className="text-xs">Categoría de costo *</Label>
+                    <Select
+                      value={draft.categoriaCostoOverride ?? ''}
+                      onValueChange={v => setDraft(d => ({ ...d, categoriaCostoOverride: v as CategoriaCostoStr }))}
+                    >
+                      <SelectTrigger className="h-8 text-sm">
+                        <SelectValue placeholder="Seleccionar categoría" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="gastos">Gastos (EPPs, capacitaciones, suministros)</SelectItem>
+                        <SelectItem value="equipos">Equipos</SelectItem>
+                        <SelectItem value="servicios">Servicios</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    El ítem se imputará al destino seleccionado en la categoría "{draft.categoriaCostoOverride ?? '…'}".
+                  </p>
+                </>
               )}
             </div>
           </div>

@@ -31,6 +31,7 @@ import {
 } from 'lucide-react'
 
 import ProyectoGastoAccordion from '@/components/proyectos/ProyectoGastoAccordion'
+import { PedidoItemsOverrideSection } from '@/components/proyectos/PedidoItemsOverrideSection'
 
 export default function GastosProyectoPage() {
   const { id: proyectoId } = useParams<{ id: string }>()
@@ -204,6 +205,8 @@ export default function GastosProyectoPage() {
             </CardContent>
           </Card>
         )}
+
+        {proyectoId && <PedidoItemsOverrideSection proyectoId={proyectoId} categoria="gastos" />}
       </motion.div>
     </motion.div>
   )

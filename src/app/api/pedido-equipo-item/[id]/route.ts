@@ -77,6 +77,13 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
         { status: 400 }
       )
     }
+    // Si hay override, la categoría de costo es obligatoria
+    if ((body.proyectoId || body.centroCostoId) && !body.categoriaCosto) {
+      return NextResponse.json(
+        { error: 'Al asignar override a otro destino se requiere una categoría de costo (Equipos/Servicios/Gastos)' },
+        { status: 400 }
+      )
+    }
 
     // 🔍 Buscar el ítem anterior
     const itemAnterior = await prisma.pedidoEquipoItem.findUnique({
@@ -160,6 +167,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
          // 💼 Override de imputación (usa `=== undefined` para permitir poner null explícito)
          ...(body.proyectoId !== undefined ? { proyectoId: body.proyectoId || null } : {}),
          ...(body.centroCostoId !== undefined ? { centroCostoId: body.centroCostoId || null } : {}),
+         ...(body.categoriaCosto !== undefined ? { categoriaCosto: body.categoriaCosto || null } : {}),
        },
      })
 

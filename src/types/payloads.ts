@@ -732,6 +732,7 @@ export interface PedidoEquipoPayload {
     // Override de imputación (mutuamente excluyentes)
     proyectoId?: string | null
     centroCostoId?: string | null
+    categoriaCosto?: 'equipos' | 'servicios' | 'gastos' | null
   }>
 }
 
@@ -791,6 +792,8 @@ export interface PedidoEquipoItemPayload {
   // Son mutuamente excluyentes: máximo UNO debe estar presente.
   proyectoId?: string | null
   centroCostoId?: string | null
+  // Bucket contable (requerido cuando hay override, null si se hereda)
+  categoriaCosto?: 'equipos' | 'servicios' | 'gastos' | null
 }
 
 

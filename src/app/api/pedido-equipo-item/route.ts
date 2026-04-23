@@ -79,6 +79,13 @@ export async function POST(request: Request) {
         { status: 400 }
       )
     }
+    // Si hay override, la categoría de costo es obligatoria (Equipos/Servicios/Gastos)
+    if ((body.proyectoId || body.centroCostoId) && !body.categoriaCosto) {
+      return NextResponse.json(
+        { error: 'Al asignar override a otro destino se requiere una categoría de costo (Equipos/Servicios/Gastos)' },
+        { status: 400 }
+      )
+    }
 
     // ✅ Obtener datos del pedido (incluye fechaNecesaria)
     const pedido = await prisma.pedidoEquipo.findUnique({
@@ -178,6 +185,7 @@ export async function POST(request: Request) {
         catalogoEquipoId: body.catalogoEquipoId ?? null,
         proyectoId: body.proyectoId ?? null,
         centroCostoId: body.centroCostoId ?? null,
+        categoriaCosto: body.categoriaCosto ?? null,
       },
     })
 
