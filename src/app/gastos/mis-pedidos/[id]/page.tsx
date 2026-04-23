@@ -648,7 +648,7 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
                         <SelectValue placeholder="Seleccionar categoría" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="gastos">Gastos (EPPs, capacitaciones, suministros)</SelectItem>
+                        <SelectItem value="gastos">Gastos (viáticos, EPPs, capacitaciones)</SelectItem>
                         <SelectItem value="equipos">Equipos</SelectItem>
                         <SelectItem value="servicios">Servicios</SelectItem>
                       </SelectContent>
