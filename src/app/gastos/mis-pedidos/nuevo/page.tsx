@@ -107,10 +107,10 @@ export default function NuevoPedidoInternoPage() {
   const handleSaveItem = () => {
     if (!draft.descripcion.trim()) return toast.error('La descripción es obligatoria')
     if (draft.cantidadPedida <= 0) return toast.error('La cantidad debe ser mayor a 0')
-    // Si hay override, la categoría es obligatoria
-    const tieneOverride = !!(draft.proyectoIdOverride || draft.centroCostoIdOverride)
-    if (tieneOverride && !draft.categoriaCostoOverride) {
-      return toast.error('Selecciona la categoría de costo (Equipos/Servicios/Gastos) para el destino asignado')
+    // La categoría es obligatoria solo cuando el override es a un proyecto
+    // (los centros de costo no tienen sub-buckets Equipos/Servicios/Gastos).
+    if (draft.proyectoIdOverride && !draft.categoriaCostoOverride) {
+      return toast.error('Selecciona la categoría de costo (Equipos/Servicios/Gastos) para el proyecto destino')
     }
 
     if (editIndex !== null) {
@@ -498,11 +498,13 @@ export default function NuevoPedidoInternoPage() {
                       categoriaCostoOverride: d.categoriaCostoOverride ?? 'gastos',
                     }))
                   } else if (v.startsWith('centro:')) {
+                    // Los centros de costo no tienen tabs Equipos/Servicios/Gastos:
+                    // la categoría no aplica, la limpiamos.
                     setDraft(d => ({
                       ...d,
                       proyectoIdOverride: null,
                       centroCostoIdOverride: v.slice(7),
-                      categoriaCostoOverride: d.categoriaCostoOverride ?? 'gastos',
+                      categoriaCostoOverride: null,
                     }))
                   }
                 }}
@@ -536,7 +538,7 @@ export default function NuevoPedidoInternoPage() {
                     ))}
                 </SelectContent>
               </Select>
-              {(draft.proyectoIdOverride || draft.centroCostoIdOverride) && (
+              {draft.proyectoIdOverride && (
                 <>
                   <div className="space-y-1.5 mt-2">
                     <Label className="text-xs">Categoría de costo *</Label>
@@ -555,9 +557,14 @@ export default function NuevoPedidoInternoPage() {
                     </Select>
                   </div>
                   <p className="text-[11px] text-muted-foreground">
-                    El ítem se imputará al destino seleccionado en la categoría "{draft.categoriaCostoOverride ?? '…'}".
+                    Se imputará en la pestaña "{draft.categoriaCostoOverride ?? '…'}" del proyecto destino.
                   </p>
                 </>
+              )}
+              {draft.centroCostoIdOverride && (
+                <p className="text-[11px] text-muted-foreground mt-2">
+                  El ítem se imputará al centro de costo seleccionado (gasto operativo).
+                </p>
               )}
             </div>
           </div>

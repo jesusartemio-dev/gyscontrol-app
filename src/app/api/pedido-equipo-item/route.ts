@@ -79,10 +79,11 @@ export async function POST(request: Request) {
         { status: 400 }
       )
     }
-    // Si hay override, la categoría de costo es obligatoria (Equipos/Servicios/Gastos)
-    if ((body.proyectoId || body.centroCostoId) && !body.categoriaCosto) {
+    // Categoría obligatoria solo con override a proyecto (los centros de costo
+    // son gasto operativo sin sub-buckets).
+    if (body.proyectoId && !body.categoriaCosto) {
       return NextResponse.json(
-        { error: 'Al asignar override a otro destino se requiere una categoría de costo (Equipos/Servicios/Gastos)' },
+        { error: 'Al asignar override a un proyecto se requiere una categoría de costo (Equipos/Servicios/Gastos)' },
         { status: 400 }
       )
     }

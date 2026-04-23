@@ -140,9 +140,8 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
     if (!draft.descripcion.trim()) return toast.error('La descripción es obligatoria')
     if (draft.cantidadPedida <= 0) return toast.error('La cantidad debe ser mayor a 0')
     if (!pedido) return
-    const tieneOverride = !!(draft.proyectoIdOverride || draft.centroCostoIdOverride)
-    if (tieneOverride && !draft.categoriaCostoOverride) {
-      return toast.error('Selecciona la categoría de costo para el destino asignado')
+    if (draft.proyectoIdOverride && !draft.categoriaCostoOverride) {
+      return toast.error('Selecciona la categoría de costo para el proyecto destino')
     }
 
     try {
@@ -598,11 +597,12 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
                       categoriaCostoOverride: d.categoriaCostoOverride ?? 'gastos',
                     }))
                   } else if (v.startsWith('centro:')) {
+                    // Los centros de costo no tienen tabs Equipos/Servicios/Gastos.
                     setDraft(d => ({
                       ...d,
                       proyectoIdOverride: null,
                       centroCostoIdOverride: v.slice(7),
-                      categoriaCostoOverride: d.categoriaCostoOverride ?? 'gastos',
+                      categoriaCostoOverride: null,
                     }))
                   }
                 }}
@@ -636,7 +636,7 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
                     ))}
                 </SelectContent>
               </Select>
-              {(draft.proyectoIdOverride || draft.centroCostoIdOverride) && (
+              {draft.proyectoIdOverride && (
                 <>
                   <div className="space-y-1.5 mt-2">
                     <Label className="text-xs">Categoría de costo *</Label>
@@ -655,9 +655,14 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
                     </Select>
                   </div>
                   <p className="text-[11px] text-muted-foreground">
-                    Se imputará en "{draft.categoriaCostoOverride ?? '…'}" del destino seleccionado.
+                    Se imputará en la pestaña "{draft.categoriaCostoOverride ?? '…'}" del proyecto destino.
                   </p>
                 </>
+              )}
+              {draft.centroCostoIdOverride && (
+                <p className="text-[11px] text-muted-foreground mt-2">
+                  El ítem se imputará al centro de costo seleccionado (gasto operativo).
+                </p>
               )}
             </div>
           </div>

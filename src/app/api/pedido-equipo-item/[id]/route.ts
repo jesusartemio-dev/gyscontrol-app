@@ -77,10 +77,10 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
         { status: 400 }
       )
     }
-    // Si hay override, la categoría de costo es obligatoria
-    if ((body.proyectoId || body.centroCostoId) && !body.categoriaCosto) {
+    // Categoría obligatoria solo con override a proyecto.
+    if (body.proyectoId && !body.categoriaCosto) {
       return NextResponse.json(
-        { error: 'Al asignar override a otro destino se requiere una categoría de costo (Equipos/Servicios/Gastos)' },
+        { error: 'Al asignar override a un proyecto se requiere una categoría de costo (Equipos/Servicios/Gastos)' },
         { status: 400 }
       )
     }

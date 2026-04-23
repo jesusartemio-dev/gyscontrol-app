@@ -436,9 +436,9 @@ export async function POST(request: Request) {
           if (itemLibre.proyectoId && itemLibre.centroCostoId) {
             throw new Error(`Item "${itemLibre.descripcion}": no puede tener override a Proyecto y a CentroCosto simultáneamente`)
           }
-          // Si hay override, la categoría es obligatoria
-          if ((itemLibre.proyectoId || itemLibre.centroCostoId) && !itemLibre.categoriaCosto) {
-            throw new Error(`Item "${itemLibre.descripcion}": override requiere una categoría de costo (Equipos/Servicios/Gastos)`)
+          // Categoría obligatoria solo con override a proyecto.
+          if (itemLibre.proyectoId && !itemLibre.categoriaCosto) {
+            throw new Error(`Item "${itemLibre.descripcion}": override a proyecto requiere categoría de costo (Equipos/Servicios/Gastos)`)
           }
           await tx.pedidoEquipoItem.create({
             data: {
