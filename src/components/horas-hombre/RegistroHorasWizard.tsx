@@ -36,6 +36,7 @@ import {
 } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useToast } from '@/hooks/use-toast'
+import { useSession } from 'next-auth/react'
 import { format } from 'date-fns'
 
 interface RegistroHorasWizardProps {
@@ -77,6 +78,7 @@ interface Elemento {
   id: string
   nombre: string
   tipo: 'actividad' | 'tarea'
+  responsableId?: string | null
   responsableNombre: string
   horasPlan: number
   horasReales: number
@@ -105,11 +107,15 @@ export function RegistroHorasWizard({
 }: RegistroHorasWizardProps) {
   console.log('🧙 WIZARD: Props recibidas:', { open, fechaInicial, preselectTareaId })
   
+  const { data: session } = useSession()
   const [pasoActual, setPasoActual] = useState(1)
   const [fecha, setFecha] = useState(fechaInicial || format(new Date(), 'yyyy-MM-dd'))
   const [horas, setHoras] = useState('')
   const [descripcion, setDescripcion] = useState('')
   const [loading, setLoading] = useState(false)
+  // Actualizar avance desde el wizard (solo para el responsable de la tarea)
+  const [progresoNuevo, setProgresoNuevo] = useState<number>(0)
+  const [marcarCompletada, setMarcarCompletada] = useState(false)
   const [loadingData, setLoadingData] = useState(false)
   const [semanaValidando, setSemanaValidando] = useState(false)
   const [semanaError, setSemanaError] = useState<string | null>(null)
@@ -119,6 +125,17 @@ export function RegistroHorasWizard({
   const [edtSeleccionado, setEdtSeleccionado] = useState<Edt | null>(null)
   const [nivelSeleccionado, setNivelSeleccionado] = useState<'actividad' | 'tarea' | ''>('')
   const [elementoSeleccionado, setElementoSeleccionado] = useState<Elemento | null>(null)
+
+  // Inicializar controles de avance cuando cambia la tarea seleccionada
+  useEffect(() => {
+    if (elementoSeleccionado) {
+      setProgresoNuevo(elementoSeleccionado.progreso ?? 0)
+      setMarcarCompletada(elementoSeleccionado.estado === 'completada')
+    } else {
+      setProgresoNuevo(0)
+      setMarcarCompletada(false)
+    }
+  }, [elementoSeleccionado?.id, elementoSeleccionado?.progreso, elementoSeleccionado?.estado])
   
   // Nuevos estados para jerarquía mejorada
   const [actividadSeleccionada, setActividadSeleccionada] = useState<any>(null)
@@ -818,9 +835,62 @@ export function RegistroHorasWizard({
 
       const data = await response.json()
 
+      // Si el usuario es responsable de la tarea y cambió el avance, persistirlo.
+      // Se hace después del registro de horas: si falla, las horas ya quedaron guardadas
+      // y solo mostramos advertencia (no se revierte).
+      const esResponsableDeEsta =
+        !!session?.user?.id &&
+        !!elementoSeleccionado?.responsableId &&
+        session.user.id === elementoSeleccionado.responsableId
+      const estadoActual = elementoSeleccionado.estado
+      const progresoActual = elementoSeleccionado.progreso ?? 0
+      const estadoSiCompleta = marcarCompletada ? 'completada' : null
+      const cambioProgreso = !marcarCompletada && progresoNuevo !== progresoActual
+      const cambioACompletada = marcarCompletada && estadoActual !== 'completada'
+      const debeActualizarAvance =
+        esResponsableDeEsta &&
+        elementoSeleccionado.tipo === 'tarea' &&
+        (cambioProgreso || cambioACompletada)
+
+      if (debeActualizarAvance) {
+        try {
+          const patchBody: Record<string, unknown> = {
+            tareaId: elementoSeleccionado.id,
+            tipo: 'proyecto_tarea',
+          }
+          if (estadoSiCompleta) {
+            patchBody.estado = estadoSiCompleta
+          } else {
+            patchBody.progreso = progresoNuevo
+          }
+          const patchRes = await fetch('/api/tareas/mis-asignadas', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(patchBody),
+          })
+          if (!patchRes.ok) {
+            const err = await patchRes.json().catch(() => ({}))
+            throw new Error(err?.error || 'No se pudo actualizar el avance')
+          }
+        } catch (updateError) {
+          console.warn('⚠️ Registro guardado, pero falló el update de avance:', updateError)
+          toast({
+            title: 'Horas guardadas — avance no actualizado',
+            description: updateError instanceof Error ? updateError.message : 'Vuelve a intentar el avance desde Mis Tareas.',
+            variant: 'destructive',
+          })
+          limpiarFormulario()
+          onSuccess()
+          onOpenChange?.(false)
+          return
+        }
+      }
+
       toast({
         title: 'Horas registradas',
-        description: `Se registraron ${horas}h en ${elementoSeleccionado.nombre}`
+        description: debeActualizarAvance
+          ? `Se registraron ${horas}h y se actualizó el avance de ${elementoSeleccionado.nombre}`
+          : `Se registraron ${horas}h en ${elementoSeleccionado.nombre}`,
       })
 
       limpiarFormulario()
@@ -1414,6 +1484,18 @@ export function RegistroHorasWizard({
   }
 
   const renderPaso5 = () => {
+    const horasNum = parseFloat(horas) || 0
+    const horasReales = elementoSeleccionado?.horasReales ?? 0
+    const horasPlan = elementoSeleccionado?.horasPlan ?? 0
+    const horasTotalProyectado = horasReales + horasNum
+    const pctActual = horasPlan > 0 ? Math.min(100, (horasReales / horasPlan) * 100) : 0
+    const pctProyectado = horasPlan > 0 ? Math.min(100, (horasTotalProyectado / horasPlan) * 100) : 0
+    const esResponsable =
+      !!session?.user?.id &&
+      !!elementoSeleccionado?.responsableId &&
+      session.user.id === elementoSeleccionado.responsableId
+    const tipoTarea = elementoSeleccionado?.tipo === 'actividad' ? 'actividad' : 'tarea'
+
     return (
       <div className="space-y-4">
         {/* Resumen compacto de lo seleccionado */}
@@ -1424,6 +1506,30 @@ export function RegistroHorasWizard({
             <span><strong>Tarea:</strong> {elementoSeleccionado?.nombre}</span>
           </div>
         </div>
+
+        {/* KPI de horas acumuladas + proyección */}
+        {elementoSeleccionado && (
+          <div className="p-3 bg-blue-50/60 rounded-lg border border-blue-200 text-sm space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-blue-900">
+                Horas acumuladas: <strong>{horasReales}h</strong>
+                {horasPlan > 0 && <span className="text-blue-700"> / {horasPlan}h</span>}
+              </span>
+              {horasPlan > 0 && (
+                <span className="text-xs text-blue-700">{Math.round(pctActual)}%</span>
+              )}
+            </div>
+            {horasPlan > 0 && <Progress value={pctActual} className="h-1.5" />}
+            {horasNum > 0 && (
+              <div className="text-xs text-blue-800 pt-1 border-t border-blue-200">
+                + Tus horas a registrar: <strong>{horasNum}h</strong>
+                {' → '}
+                Total tras registrar: <strong>{horasTotalProyectado}h</strong>
+                {horasPlan > 0 && <> ({Math.round(pctProyectado)}%)</>}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Campos de registro */}
         <div className="grid grid-cols-2 gap-3">
@@ -1472,6 +1578,50 @@ export function RegistroHorasWizard({
             className="mt-1"
           />
         </div>
+
+        {/* Avance de la tarea (solo para el responsable) */}
+        {elementoSeleccionado && tipoTarea === 'tarea' && (
+          esResponsable ? (
+            <div className="p-3 rounded-lg border bg-emerald-50/50 border-emerald-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium text-emerald-900">
+                  Avance de la {tipoTarea}
+                </Label>
+                <span className="text-xs text-emerald-700">
+                  {marcarCompletada ? '100%' : `${progresoNuevo}%`}
+                </span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={5}
+                value={marcarCompletada ? 100 : progresoNuevo}
+                disabled={marcarCompletada}
+                onChange={(e) => setProgresoNuevo(parseInt(e.target.value, 10))}
+                className="w-full accent-emerald-600 disabled:opacity-50"
+              />
+              <label className="flex items-center gap-2 text-sm text-emerald-900 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={marcarCompletada}
+                  onChange={(e) => setMarcarCompletada(e.target.checked)}
+                  className="accent-emerald-600"
+                />
+                <span>Marcar como completada (pone 100% y cierra la tarea)</span>
+              </label>
+              <p className="text-[11px] text-emerald-700/80">
+                Se actualizará al guardar, junto con el registro de horas.
+              </p>
+            </div>
+          ) : (
+            <p className="text-[11px] text-muted-foreground">
+              Para ajustar el avance de esta tarea, ve a
+              <span className="mx-1 font-medium">Mis Tareas</span>
+              (solo el responsable puede modificarlo).
+            </p>
+          )
+        )}
       </div>
     )
   }

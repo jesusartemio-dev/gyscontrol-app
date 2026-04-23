@@ -41,6 +41,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       id: tarea.id,
       nombre: tarea.nombre,
       tipo: 'tarea' as const,
+      responsableId: tarea.responsableId,
       responsableNombre: tarea.user?.name || 'Sin responsable',
       horasPlan: Number(tarea.horasEstimadas || 0),
       horasReales: Number(tarea.horasReales || 0),
