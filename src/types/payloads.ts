@@ -729,6 +729,9 @@ export interface PedidoEquipoPayload {
     unidad: string
     cantidadPedida: number
     precioUnitario?: number
+    // Override de imputación (mutuamente excluyentes)
+    proyectoId?: string | null
+    centroCostoId?: string | null
   }>
 }
 
@@ -784,6 +787,10 @@ export interface PedidoEquipoItemPayload {
   fechaEntregaReal?: string
   estadoEntrega?: EstadoEntregaItem
   observacionesEntrega?: string
+  // 💼 Override de imputación (ambos null = hereda del pedido padre)
+  // Son mutuamente excluyentes: máximo UNO debe estar presente.
+  proyectoId?: string | null
+  centroCostoId?: string | null
 }
 
 

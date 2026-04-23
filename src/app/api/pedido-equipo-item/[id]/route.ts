@@ -70,6 +70,14 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     const { id } = await context.params
     const body: PedidoEquipoItemUpdatePayload = await request.json()
 
+    // Validar exclusividad del override de imputación
+    if (body.proyectoId && body.centroCostoId) {
+      return NextResponse.json(
+        { error: 'Un ítem no puede tener override a Proyecto y a CentroCosto simultáneamente' },
+        { status: 400 }
+      )
+    }
+
     // 🔍 Buscar el ítem anterior
     const itemAnterior = await prisma.pedidoEquipoItem.findUnique({
       where: { id },
@@ -149,7 +157,10 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
          fechaEntregaReal: body.fechaEntregaReal ? new Date(body.fechaEntregaReal) : undefined,
          estadoEntrega: body.estadoEntrega,
          observacionesEntrega: body.observacionesEntrega,
-       }, 
+         // 💼 Override de imputación (usa `=== undefined` para permitir poner null explícito)
+         ...(body.proyectoId !== undefined ? { proyectoId: body.proyectoId || null } : {}),
+         ...(body.centroCostoId !== undefined ? { centroCostoId: body.centroCostoId || null } : {}),
+       },
      })
 
     // 🔄 Recalcular cantidadPedida después de actualizar para asegurar consistencia

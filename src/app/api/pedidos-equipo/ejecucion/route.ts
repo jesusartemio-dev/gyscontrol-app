@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { itemPerteneceAlProyecto } from '@/lib/utils/pedidoItemImputacion'
 
 // ✅ Types
 interface PedidoEjecucion {
@@ -85,11 +86,15 @@ export async function GET(request: NextRequest) {
 
     // 🔍 Build filters
     const whereClause: any = {}
-    
+
+    // Si se filtra por proyecto, incluir también pedidos con items de override a ese proyecto.
     if (proyectoId && proyectoId !== 'todos') {
-      whereClause.proyectoId = proyectoId
+      whereClause.OR = [
+        { proyectoId },
+        { pedidoEquipoItem: { some: { proyectoId } } },
+      ]
     }
-    
+
     if (estado && estado !== 'todos') {
       whereClause.estado = estado
     }
@@ -113,13 +118,20 @@ export async function GET(request: NextRequest) {
     }
     
     if (search) {
-      whereClause.OR = [
-        { codigo: { contains: search, mode: 'insensitive' } },
-        { proyecto: { nombre: { contains: search, mode: 'insensitive' } } },
-        { proyecto: { codigo: { contains: search, mode: 'insensitive' } } },
-        { listaEquipo: { nombre: { contains: search, mode: 'insensitive' } } },
-        { listaEquipo: { codigo: { contains: search, mode: 'insensitive' } } }
+      const searchOr = [
+        { codigo: { contains: search, mode: 'insensitive' as const } },
+        { proyecto: { nombre: { contains: search, mode: 'insensitive' as const } } },
+        { proyecto: { codigo: { contains: search, mode: 'insensitive' as const } } },
+        { listaEquipo: { nombre: { contains: search, mode: 'insensitive' as const } } },
+        { listaEquipo: { codigo: { contains: search, mode: 'insensitive' as const } } }
       ]
+      // Si ya había un OR (por filtro de proyecto), combinamos con AND.
+      if (whereClause.OR) {
+        whereClause.AND = [{ OR: whereClause.OR }, { OR: searchOr }]
+        delete whereClause.OR
+      } else {
+        whereClause.OR = searchOr
+      }
     }
 
     // 📊 Fetch pedidos
@@ -157,7 +169,9 @@ export async function GET(request: NextRequest) {
             precioUnitario: true,
             costoTotal: true,
             estado: true,
-            tiempoEntrega: true
+            tiempoEntrega: true,
+            proyectoId: true,
+            centroCostoId: true,
           }
         }
       },
@@ -196,6 +210,21 @@ export async function GET(request: NextRequest) {
       ).length
       const progreso = totalItems > 0 ? (itemsCompletados / totalItems) * 100 : 0
 
+      // Si se filtra por proyecto, recomputar totales considerando SOLO los items
+      // que pertenecen a ese proyecto (override o herencia). Si no hay filtro de
+      // proyecto, usar los totales agregados del pedido tal cual.
+      let presupuestoTotal = pedido.presupuestoTotal
+      let costoRealTotal = pedido.costoRealTotal || 0
+      if (proyectoId && proyectoId !== 'todos') {
+        presupuestoTotal = 0
+        costoRealTotal = 0
+        for (const item of pedido.pedidoEquipoItem) {
+          if (!itemPerteneceAlProyecto(item, pedido, proyectoId)) continue
+          presupuestoTotal += item.costoTotal ?? 0
+          costoRealTotal += (item.precioUnitario ?? 0) * (item.cantidadAtendida ?? 0)
+        }
+      }
+
       return {
         id: pedido.id,
         codigo: pedido.codigo,
@@ -212,8 +241,8 @@ export async function GET(request: NextRequest) {
         fechaNecesaria: pedido.fechaNecesaria,
         fechaEntregaEstimada: pedido.fechaEntregaEstimada,
         fechaEntregaReal: pedido.fechaEntregaReal,
-        presupuestoTotal: pedido.presupuestoTotal,
-        costoRealTotal: pedido.costoRealTotal || 0,
+        presupuestoTotal,
+        costoRealTotal,
         items: pedido.pedidoEquipoItem,
         tiempoEntrega,
         diasRetraso,

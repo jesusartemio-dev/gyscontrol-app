@@ -195,11 +195,34 @@ export default function ProyectoHubPage() {
     ? { porcentaje: (listasAprobadas / totalListas) * 100, estado: 'ok' as const }
     : null
 
-  const totalPedidos = proyecto.pedidos?.length || 0
-  const pedidosEntregados = proyecto.pedidos?.filter(p => p.estado === 'entregado').length || 0
-  const pedidosUrgentes = proyecto.pedidos?.filter(p => p.esUrgente).length || 0
-  const pedidosCostoReal = proyecto.pedidos?.reduce((acc, p) => acc + (p.costoRealTotal || 0), 0) || 0
-  const pedidosPresupuesto = proyecto.pedidos?.reduce((acc, p) => acc + (p.presupuestoTotal || 0), 0) || 0
+  // Totales de pedidos. Para pedidos directos (pedido.proyectoId === proyecto.id) se
+  // descuentan los items con override saliente; para pedidos externos (override hacia
+  // este proyecto) se suman solo los items con override entrante. Los conteos de
+  // "entregados" y "urgentes" siguen contando solo los pedidos directos para evitar
+  // inflar métricas con pedidos que sólo contribuyen parcialmente.
+  const pedidosDirectos = proyecto.pedidos?.filter((p: any) => !p._overrideExterno) || []
+  const totalPedidos = pedidosDirectos.length
+  const pedidosEntregados = pedidosDirectos.filter(p => p.estado === 'entregado').length
+  const pedidosUrgentes = pedidosDirectos.filter(p => p.esUrgente).length
+  const itemPerteneceAEsteProyecto = (item: any, padreProyectoId: string | null | undefined) => {
+    if (item.proyectoId === proyecto.id) return true
+    if (item.proyectoId === null && item.centroCostoId === null && padreProyectoId === proyecto.id) return true
+    return false
+  }
+  const pedidosCostoReal = (proyecto.pedidos || []).reduce((acc: number, p: any) => {
+    const items = p.items || p.pedidoEquipoItem || []
+    return acc + items.reduce((s: number, item: any) => {
+      if (!itemPerteneceAEsteProyecto(item, p.proyectoId)) return s
+      return s + ((item.precioUnitario ?? 0) * (item.cantidadAtendida ?? 0))
+    }, 0)
+  }, 0)
+  const pedidosPresupuesto = (proyecto.pedidos || []).reduce((acc: number, p: any) => {
+    const items = p.items || p.pedidoEquipoItem || []
+    return acc + items.reduce((s: number, item: any) => {
+      if (!itemPerteneceAEsteProyecto(item, p.proyectoId)) return s
+      return s + (item.costoTotal ?? 0)
+    }, 0)
+  }, 0)
   const progresoPedidosEntrega = totalPedidos > 0
     ? { porcentaje: (pedidosEntregados / totalPedidos) * 100, estado: 'ok' as const }
     : null

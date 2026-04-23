@@ -11,12 +11,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { ArrowLeft, Loader2, Building2, Calendar, User, AlertTriangle, Package, Plus, Pencil, Trash2 } from 'lucide-react'
+import { ArrowLeft, Loader2, Building2, Calendar, User, AlertTriangle, Package, Plus, Pencil, Trash2, ArrowRightLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { getPedidoInternoById, deletePedidoInterno, type PedidoInterno, type PedidoInternoItem } from '@/lib/services/pedidoInterno'
+import { getCentrosCosto } from '@/lib/services/centroCosto'
+import type { CentroCosto } from '@/types'
 import PedidoEstadoFlujoBanner from '@/components/equipos/PedidoEstadoFlujoBanner'
 
 const UNIDADES = ['und', 'par', 'm', 'm²', 'm³', 'kg', 'lt', 'caja', 'bolsa', 'rollo', 'juego', 'set']
+
+interface ProyectoOpcion {
+  id: string
+  codigo: string
+  nombre: string
+}
 
 interface ItemDraft {
   codigo: string
@@ -24,9 +32,19 @@ interface ItemDraft {
   unidad: string
   cantidadPedida: number
   precioUnitario: number
+  proyectoIdOverride: string | null
+  centroCostoIdOverride: string | null
 }
 
-const ITEM_VACIO: ItemDraft = { codigo: '', descripcion: '', unidad: 'und', cantidadPedida: 1, precioUnitario: 0 }
+const ITEM_VACIO: ItemDraft = {
+  codigo: '',
+  descripcion: '',
+  unidad: 'und',
+  cantidadPedida: 1,
+  precioUnitario: 0,
+  proyectoIdOverride: null,
+  centroCostoIdOverride: null,
+}
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' }).format(amount)
@@ -67,11 +85,22 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null)
   const [confirmDeleteItem, setConfirmDeleteItem] = useState<PedidoInternoItem | null>(null)
 
+  // Catálogos para override de imputación por ítem
+  const [centros, setCentros] = useState<CentroCosto[]>([])
+  const [proyectos, setProyectos] = useState<ProyectoOpcion[]>([])
+
   useEffect(() => {
     getPedidoInternoById(id)
       .then(setPedido)
       .catch(() => toast.error('Error al cargar el pedido'))
       .finally(() => setLoading(false))
+
+    // Cargar catálogos en paralelo (para el selector de override)
+    getCentrosCosto({ activo: true }).then(setCentros).catch(() => {/* silencioso */})
+    fetch('/api/proyectos?fields=id,codigo,nombre&estadosActivos=true')
+      .then(r => r.ok ? r.json() : [])
+      .then((data: ProyectoOpcion[]) => setProyectos(data))
+      .catch(() => {/* silencioso */})
   }, [id])
 
   const handleEstadoUpdated = (nuevoEstado: string) => {
@@ -94,6 +123,8 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
       unidad: item.unidad,
       cantidadPedida: item.cantidadPedida,
       precioUnitario: item.precioUnitario ?? 0,
+      proyectoIdOverride: item.proyectoId ?? null,
+      centroCostoIdOverride: item.centroCostoId ?? null,
     })
     setEditingItem(item)
     setModalOpen(true)
@@ -120,6 +151,8 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
             cantidadPedida: draft.cantidadPedida,
             precioUnitario: draft.precioUnitario || null,
             costoTotal: draft.precioUnitario ? draft.cantidadPedida * draft.precioUnitario : null,
+            proyectoId: draft.proyectoIdOverride,
+            centroCostoId: draft.centroCostoIdOverride,
           }),
         })
         if (!res.ok) {
@@ -138,6 +171,8 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
               cantidadPedida: updated.cantidadPedida,
               precioUnitario: updated.precioUnitario,
               costoTotal: updated.costoTotal,
+              proyectoId: updated.proyectoId ?? null,
+              centroCostoId: updated.centroCostoId ?? null,
             } : i
           )
         } : prev)
@@ -155,6 +190,8 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
             cantidadPedida: draft.cantidadPedida,
             precioUnitario: draft.precioUnitario || null,
             costoTotal: draft.precioUnitario ? draft.cantidadPedida * draft.precioUnitario : null,
+            proyectoId: draft.proyectoIdOverride,
+            centroCostoId: draft.centroCostoIdOverride,
           }),
         })
         if (!res.ok) {
@@ -173,6 +210,8 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
             precioUnitario: created.precioUnitario,
             costoTotal: created.costoTotal,
             estado: created.estado,
+            proyectoId: created.proyectoId ?? null,
+            centroCostoId: created.centroCostoId ?? null,
           }]
         } : prev)
         toast.success('Ítem agregado')
@@ -382,6 +421,17 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
                     <TableCell>
                       <p className="text-sm font-medium">{item.descripcion}</p>
                       {item.codigo && <p className="text-[10px] text-muted-foreground font-mono">{item.codigo}</p>}
+                      {(item.proyectoId || item.centroCostoId) && (() => {
+                        const label = item.proyectoId
+                          ? proyectos.find(p => p.id === item.proyectoId)?.codigo
+                          : centros.find(c => c.id === item.centroCostoId)?.nombre
+                        return (
+                          <span className="inline-flex items-center gap-1 mt-0.5 px-1.5 py-0 rounded text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                            <ArrowRightLeft className="h-2.5 w-2.5" />
+                            {label ?? 'Override'}
+                          </span>
+                        )
+                      })()}
                     </TableCell>
                     <TableCell className="text-center text-sm">{item.cantidadPedida}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{item.unidad}</TableCell>
@@ -508,6 +558,67 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
                 Total estimado: <span className="font-semibold text-foreground">{formatCurrency(draft.cantidadPedida * draft.precioUnitario)}</span>
               </p>
             )}
+
+            {/* Override de imputación por ítem */}
+            <div className="border-t pt-3 space-y-2">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <ArrowRightLeft className="h-3.5 w-3.5" />
+                <span className="font-medium">Asignar a otro proyecto / centro de costo</span>
+                <span className="text-[10px]">(opcional)</span>
+              </div>
+              <Select
+                value={
+                  draft.proyectoIdOverride
+                    ? `proyecto:${draft.proyectoIdOverride}`
+                    : draft.centroCostoIdOverride
+                    ? `centro:${draft.centroCostoIdOverride}`
+                    : '__heredar__'
+                }
+                onValueChange={v => {
+                  if (v === '__heredar__') {
+                    setDraft(d => ({ ...d, proyectoIdOverride: null, centroCostoIdOverride: null }))
+                  } else if (v.startsWith('proyecto:')) {
+                    setDraft(d => ({ ...d, proyectoIdOverride: v.slice(9), centroCostoIdOverride: null }))
+                  } else if (v.startsWith('centro:')) {
+                    setDraft(d => ({ ...d, proyectoIdOverride: null, centroCostoIdOverride: v.slice(7) }))
+                  }
+                }}
+              >
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue placeholder="Heredar del pedido" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__heredar__">
+                    <span className="text-muted-foreground">Heredar del pedido (por defecto)</span>
+                  </SelectItem>
+                  {proyectos.length > 0 && (
+                    <div className="px-2 py-1 text-[10px] font-semibold text-blue-700 uppercase">Proyectos</div>
+                  )}
+                  {proyectos.map(p => (
+                    <SelectItem key={`p-${p.id}`} value={`proyecto:${p.id}`}>
+                      <span className="font-medium">{p.codigo}</span>
+                      <span className="text-xs text-muted-foreground ml-1">— {p.nombre}</span>
+                    </SelectItem>
+                  ))}
+                  {centros.length > 0 && (
+                    <div className="px-2 py-1 text-[10px] font-semibold text-emerald-700 uppercase">Centros de costo</div>
+                  )}
+                  {centros
+                    .filter(cc => cc.id !== pedido?.centroCostoId)
+                    .map(cc => (
+                      <SelectItem key={`c-${cc.id}`} value={`centro:${cc.id}`}>
+                        <span className="font-medium">{cc.nombre}</span>
+                        <span className="text-xs text-muted-foreground ml-1 capitalize">({cc.tipo})</span>
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              {(draft.proyectoIdOverride || draft.centroCostoIdOverride) && (
+                <p className="text-[11px] text-muted-foreground">
+                  Este ítem se imputará al destino seleccionado, no al centro del pedido.
+                </p>
+              )}
+            </div>
           </div>
           <DialogFooter className="gap-2 mt-1">
             <Button variant="ghost" size="sm" onClick={() => setModalOpen(false)} disabled={savingItem}>

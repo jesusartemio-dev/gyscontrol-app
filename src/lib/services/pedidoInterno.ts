@@ -33,6 +33,9 @@ export interface PedidoInternoItem {
   precioUnitario?: number
   costoTotal?: number
   estado: string
+  // Override de imputación (ambos null = hereda del pedido)
+  proyectoId?: string | null
+  centroCostoId?: string | null
 }
 
 export async function getMisPedidosInternos(params?: {

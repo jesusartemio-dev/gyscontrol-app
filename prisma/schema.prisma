@@ -804,6 +804,10 @@ model PedidoEquipoItem {
   motivoAtencionDirecta       String?
   precioUnitarioMoneda        String?
   tipoCambioEntrega           Float?
+  // Override de imputación (si ambos null, hereda del PedidoEquipo padre).
+  // Son mutuamente excluyentes: máximo UNO debe estar presente.
+  proyectoId                  String?
+  centroCostoId               String?
   entregaItem                 EntregaItem[]
   listaEquipoItem             ListaEquipoItem?            @relation(fields: [listaEquipoItemId], references: [id])
   listaEquipo                 ListaEquipo?                @relation(fields: [listaId], references: [id])
@@ -812,11 +816,15 @@ model PedidoEquipoItem {
   catalogoEquipo              CatalogoEquipo?             @relation(fields: [catalogoEquipoId], references: [id], onDelete: SetNull)
   user                        User                        @relation(fields: [responsableId], references: [id])
   comentarioLogisticaPor      User?                       @relation("PedidoEquipoItemComentarioLogistica", fields: [comentarioLogisticaPorId], references: [id])
+  proyecto                    Proyecto?                   @relation("PedidoItemProyectoOverride", fields: [proyectoId], references: [id], onDelete: SetNull)
+  centroCosto                 CentroCosto?                @relation("PedidoItemCentroCostoOverride", fields: [centroCostoId], references: [id], onDelete: SetNull)
   ordenCompraItems            OrdenCompraItem[]
   recepcionesPendientes       RecepcionPendiente[]
   cuentasPorPagar             CuentaPorPagar[]
   requerimientoMaterialItems  RequerimientoMaterialItem[]
 
+  @@index([proyectoId], map: "idx_pedido_item_proyecto_override")
+  @@index([centroCostoId], map: "idx_pedido_item_centro_costo_override")
   @@map("pedido_equipo_item")
 }
 
@@ -1047,6 +1055,7 @@ model Proyecto {
   eventoTrazabilidad         EventoTrazabilidad[]
   listaEquipo                ListaEquipo[]
   pedidoEquipo               PedidoEquipo[]
+  pedidoEquipoItemsOverride  PedidoEquipoItem[]          @relation("PedidoItemProyectoOverride")
   cliente                    Cliente?                    @relation(fields: [clienteId], references: [id])
   comercial                  User?                       @relation("ProyectoComercial", fields: [comercialId], references: [id])
   centroCosto                CentroCosto?                @relation(fields: [centroCostoId], references: [id])
@@ -3347,6 +3356,7 @@ model CentroCosto {
   gastoLineas       GastoLinea[]
   proyectosInternos Proyecto[]
   pedidosEquipo     PedidoEquipo[]
+  pedidoEquipoItemsOverride PedidoEquipoItem[] @relation("PedidoItemCentroCostoOverride")
 
   @@index([tipo, activo])
   @@map("centro_costo")

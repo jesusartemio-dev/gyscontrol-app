@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { itemPerteneceAlProyecto } from '@/lib/utils/pedidoItemImputacion'
 
 export const dynamic = 'force-dynamic'
 
@@ -50,10 +51,16 @@ export async function GET(request: Request) {
       }
     })
 
-    // 2. Get all pedidos for the project
+    // 2. Get pedidos that contribute to this project:
+    //    - pedidos whose parent proyectoId matches (classic case), OR
+    //    - pedidos that contain AT LEAST ONE item with proyectoId override = this project
+    //      (even if the pedido's parent is another project or a cost center).
     const pedidos = await prisma.pedidoEquipo.findMany({
       where: {
-        proyectoId,
+        OR: [
+          { proyectoId },
+          { pedidoEquipoItem: { some: { proyectoId } } },
+        ],
         ...(fechaDesde && fechaHasta ? {
           fechaEntregaEstimada: {
             gte: new Date(fechaDesde),
@@ -67,15 +74,17 @@ export async function GET(request: Request) {
         estado: true,
         fechaEntregaEstimada: true,
         fechaPedido: true,
-        presupuestoTotal: true,
-        costoRealTotal: true,
+        proyectoId: true,
+        centroCostoId: true,
         pedidoEquipoItem: {
           select: {
             precioUnitario: true,
             cantidadPedida: true,
             cantidadAtendida: true,
             costoTotal: true,
-            estado: true
+            estado: true,
+            proyectoId: true,
+            centroCostoId: true,
           }
         }
       }
@@ -145,8 +154,18 @@ export async function GET(request: Request) {
     }
 
     for (const [semana, pedidosDeSemana] of Array.from(pedidosPorSemana.entries()).sort()) {
-      const costoPresupuestado = pedidosDeSemana.reduce((sum, p) => sum + (p.presupuestoTotal || 0), 0)
-      const costoReal = pedidosDeSemana.reduce((sum, p) => sum + (p.costoRealTotal || 0), 0)
+      // Recomputar sumando solo los items que pertenecen al proyecto (con override o por herencia).
+      // No se pueden usar pedido.presupuestoTotal / costoRealTotal porque incluirían items con
+      // override a otros destinos.
+      let costoPresupuestado = 0
+      let costoReal = 0
+      for (const p of pedidosDeSemana) {
+        for (const item of p.pedidoEquipoItem) {
+          if (!itemPerteneceAlProyecto(item, p, proyectoId)) continue
+          costoPresupuestado += item.costoTotal ?? 0
+          costoReal += (item.precioUnitario ?? 0) * (item.cantidadAtendida ?? 0)
+        }
+      }
 
       const [year, weekPart] = semana.split('-W')
       const semanaLabel = `Semana ${weekPart}, ${year}`

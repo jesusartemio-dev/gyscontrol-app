@@ -72,6 +72,14 @@ export async function POST(request: Request) {
 
     const body: PedidoEquipoItemPayload = await request.json()
 
+    // Validar exclusividad del override de imputación
+    if (body.proyectoId && body.centroCostoId) {
+      return NextResponse.json(
+        { error: 'Un ítem no puede tener override a Proyecto y a CentroCosto simultáneamente' },
+        { status: 400 }
+      )
+    }
+
     // ✅ Obtener datos del pedido (incluye fechaNecesaria)
     const pedido = await prisma.pedidoEquipo.findUnique({
       where: { id: body.pedidoId },
@@ -168,6 +176,8 @@ export async function POST(request: Request) {
         tipoItem: body.tipoItem || 'equipo',
         marca: body.marca ?? null,
         catalogoEquipoId: body.catalogoEquipoId ?? null,
+        proyectoId: body.proyectoId ?? null,
+        centroCostoId: body.centroCostoId ?? null,
       },
     })
 

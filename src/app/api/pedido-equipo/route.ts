@@ -432,6 +432,10 @@ export async function POST(request: Request) {
         for (const itemLibre of body.itemsLibres) {
           const costoTotal = (itemLibre.precioUnitario ?? 0) * itemLibre.cantidadPedida
           presupuestoLibres += costoTotal
+          // Validar exclusividad del override
+          if (itemLibre.proyectoId && itemLibre.centroCostoId) {
+            throw new Error(`Item "${itemLibre.descripcion}": no puede tener override a Proyecto y a CentroCosto simultáneamente`)
+          }
           await tx.pedidoEquipoItem.create({
             data: {
               id: randomUUID(),
@@ -446,6 +450,8 @@ export async function POST(request: Request) {
               estado: 'pendiente',
               estadoEntrega: 'pendiente',
               tipoItem: 'equipo',
+              proyectoId: itemLibre.proyectoId ?? null,
+              centroCostoId: itemLibre.centroCostoId ?? null,
               updatedAt: now,
             },
           })

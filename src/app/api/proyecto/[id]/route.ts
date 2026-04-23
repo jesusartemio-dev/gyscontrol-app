@@ -55,6 +55,19 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
       return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 })
     }
 
+    // Traer pedidos de OTROS proyectos que contengan al menos un ítem con override
+    // hacia este proyecto (caso: pedido interno de EPPs imputados a este proyecto).
+    // Se marcan con `_overrideExterno: true` para que el frontend los trate distinto.
+    const pedidosOverrideExternos = await prisma.pedidoEquipo.findMany({
+      where: {
+        proyectoId: { not: id },
+        pedidoEquipoItem: { some: { proyectoId: id } },
+      },
+      include: {
+        pedidoEquipoItem: true,
+      },
+    })
+
     // Map relation names for frontend compatibility
     const proyectoFormatted = {
       ...proyecto,
@@ -76,10 +89,18 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
         ...lista,
         items: lista.listaEquipoItem || []
       })),
-      pedidos: proyecto.pedidoEquipo.map((pedido: any) => ({
-        ...pedido,
-        items: pedido.pedidoEquipoItem || []
-      }))
+      pedidos: [
+        ...proyecto.pedidoEquipo.map((pedido: any) => ({
+          ...pedido,
+          items: pedido.pedidoEquipoItem || [],
+          _overrideExterno: false,
+        })),
+        ...pedidosOverrideExternos.map((pedido: any) => ({
+          ...pedido,
+          items: pedido.pedidoEquipoItem || [],
+          _overrideExterno: true,
+        })),
+      ],
     }
 
     return NextResponse.json(proyectoFormatted)
