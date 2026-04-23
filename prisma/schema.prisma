@@ -1493,121 +1493,122 @@ model UnidadServicio {
 }
 
 model User {
-  id                              String                      @id @default(cuid())
-  name                            String?
-  email                           String                      @unique
-  emailVerified                   DateTime?
-  password                        String?
-  role                            Role                        @default(colaborador)
-  image                           String?
-  lastLoginAt                     DateTime?
-  lastActivityAt                  DateTime?
-  metaMensual                     Float?
-  metaTrimestral                  Float?
-  Account                         Account[]
-  cotizacion                      Cotizacion[]
-  entregaItem                     EntregaItem[]
-  eventoTrazabilidad              EventoTrazabilidad[]
-  listaEquipo                     ListaEquipo[]
-  listaEquipoItem                 ListaEquipoItem[]
-  pedidoEquipo                    PedidoEquipo[]
-  pedidoEquipoItem                PedidoEquipoItem[]
-  proyectosComoComercial          Proyecto[]                  @relation("ProyectoComercial")
-  proyectosComoGestor             Proyecto[]                  @relation("ProyectoGestor")
-  proyectosComoSupervisor         Proyecto[]                  @relation("ProyectoSupervisor")
-  proyectosComoLider              Proyecto[]                  @relation("ProyectoLider")
-  personalProyecto                PersonalProyecto[]
-  proyectoEquipoCotizado          ProyectoEquipoCotizado[]
-  proyectoServicioCotizado        ProyectoServicioCotizado[]
-  registroHoras                   RegistroHoras[]
-  Session                         Session[]
-  asignacionesRecurso             AsignacionRecurso[]
-  auditLog                        AuditLog[]
-  cotizacionEdt                   CotizacionEdt[]
-  cotizacionPlantillaImport       CotizacionPlantillaImport[]
-  cotizacionTarea                 CotizacionTarea[]
-  cotizacionVersion               CotizacionVersion[]
-  crmActividad                    CrmActividad[]
-  crmMetricaComercial             CrmMetricaComercial[]
-  crmOportunidadComercial         CrmOportunidad[]            @relation("CrmOportunidadComercial")
-  crmOportunidadResponsable       CrmOportunidad[]            @relation("CrmOportunidadResponsable")
-  metricaComercial                MetricaComercial[]
-  notificaciones                  Notificacion[]
-  proyectoActividad               ProyectoActividad[]
-  proyectoEdt                     ProyectoEdt[]
-  proyectoSubtarea                ProyectoSubtarea[]
-  tareasAsignadas                 ProyectoTarea[]             @relation("TareaResponsable")
-  tareasCreadas                   ProyectoTarea[]             @relation("TareaCreadaPor")
-  registrosProgreso               RegistroProgreso[]
-  subtareas                       Subtarea[]
-  tareas                          Tarea[]
-  userPermissions                 UserPermission[]
-  empleado                        Empleado?
-  departamentosResponsable        Departamento[]              @relation("DepartamentoResponsable")
-  configuracionGeneral            ConfiguracionGeneral[]
+  id                                       String                      @id @default(cuid())
+  name                                     String?
+  email                                    String                      @unique
+  emailVerified                            DateTime?
+  password                                 String?
+  role                                     Role                        @default(colaborador)
+  image                                    String?
+  lastLoginAt                              DateTime?
+  lastActivityAt                           DateTime?
+  metaMensual                              Float?
+  metaTrimestral                           Float?
+  Account                                  Account[]
+  cotizacion                               Cotizacion[]
+  entregaItem                              EntregaItem[]
+  eventoTrazabilidad                       EventoTrazabilidad[]
+  listaEquipo                              ListaEquipo[]
+  listaEquipoItem                          ListaEquipoItem[]
+  pedidoEquipo                             PedidoEquipo[]
+  pedidoEquipoItem                         PedidoEquipoItem[]
+  proyectosComoComercial                   Proyecto[]                  @relation("ProyectoComercial")
+  proyectosComoGestor                      Proyecto[]                  @relation("ProyectoGestor")
+  proyectosComoSupervisor                  Proyecto[]                  @relation("ProyectoSupervisor")
+  proyectosComoLider                       Proyecto[]                  @relation("ProyectoLider")
+  personalProyecto                         PersonalProyecto[]
+  proyectoEquipoCotizado                   ProyectoEquipoCotizado[]
+  proyectoServicioCotizado                 ProyectoServicioCotizado[]
+  registroHoras                            RegistroHoras[]
+  Session                                  Session[]
+  asignacionesRecurso                      AsignacionRecurso[]
+  auditLog                                 AuditLog[]
+  cotizacionEdt                            CotizacionEdt[]
+  cotizacionPlantillaImport                CotizacionPlantillaImport[]
+  cotizacionTarea                          CotizacionTarea[]
+  cotizacionVersion                        CotizacionVersion[]
+  crmActividad                             CrmActividad[]
+  crmMetricaComercial                      CrmMetricaComercial[]
+  crmOportunidadComercial                  CrmOportunidad[]            @relation("CrmOportunidadComercial")
+  crmOportunidadResponsable                CrmOportunidad[]            @relation("CrmOportunidadResponsable")
+  metricaComercial                         MetricaComercial[]
+  notificaciones                           Notificacion[]
+  proyectoActividad                        ProyectoActividad[]
+  proyectoEdt                              ProyectoEdt[]
+  proyectoSubtarea                         ProyectoSubtarea[]
+  tareasAsignadas                          ProyectoTarea[]             @relation("TareaResponsable")
+  tareasCreadas                            ProyectoTarea[]             @relation("TareaCreadaPor")
+  registrosProgreso                        RegistroProgreso[]
+  subtareas                                Subtarea[]
+  tareas                                   Tarea[]
+  userPermissions                          UserPermission[]
+  empleado                                 Empleado?
+  departamentosResponsable                 Departamento[]              @relation("DepartamentoResponsable")
+  configuracionGeneral                     ConfiguracionGeneral[]
   // Registro de horas en campo
-  registrosCampoSupervisor        RegistroHorasCampo[]        @relation("RegistrosCampoSupervisor")
-  registrosCampoAprobador         RegistroHorasCampo[]        @relation("RegistrosCampoAprobador")
-  miembrosCuadrilla               RegistroHorasCampoMiembro[]
+  registrosCampoSupervisor                 RegistroHorasCampo[]        @relation("RegistrosCampoSupervisor")
+  registrosCampoAprobador                  RegistroHorasCampo[]        @relation("RegistrosCampoAprobador")
+  miembrosCuadrilla                        RegistroHorasCampoMiembro[]
   // Trazabilidad
-  listaEquipoItemsVerificados     ListaEquipoItem[]           @relation("ListaEquipoItemVerificador")
-  pedidoEquipoItemsComentados     PedidoEquipoItem[]          @relation("PedidoEquipoItemComentarioLogistica")
+  listaEquipoItemsVerificados              ListaEquipoItem[]           @relation("ListaEquipoItemVerificador")
+  pedidoEquipoItemsComentados              PedidoEquipoItem[]          @relation("PedidoEquipoItemComentarioLogistica")
   // Descuentos cotización
-  cotizacionDescuentosSolicitados Cotizacion[]                @relation("CotizacionDescuentoSolicitante")
-  cotizacionDescuentosAprobados   Cotizacion[]                @relation("CotizacionDescuentoAprobador")
+  cotizacionDescuentosSolicitados          Cotizacion[]                @relation("CotizacionDescuentoSolicitante")
+  cotizacionDescuentosAprobados            Cotizacion[]                @relation("CotizacionDescuentoAprobador")
   // Hojas de gastos
-  hojasComoEmpleado               HojaDeGastos[]              @relation("HojaEmpleado")
-  hojasComoAprobador              HojaDeGastos[]              @relation("HojaAprobador")
-  hojasEventos                    HojaDeGastosEvento[]        @relation("HojaEventoUsuario")
-  depositosCreados                DepositoHoja[]              @relation("DepositoCreadoPor")
+  hojasComoEmpleado                        HojaDeGastos[]              @relation("HojaEmpleado")
+  hojasComoAprobador                       HojaDeGastos[]              @relation("HojaAprobador")
+  hojasEventos                             HojaDeGastosEvento[]        @relation("HojaEventoUsuario")
+  depositosCreados                         DepositoHoja[]              @relation("DepositoCreadoPor")
+  itemsRequerimientoCerradosSinComprobante RequerimientoMaterialItem[] @relation("ItemCerradoSinComprobante")
   // Órdenes de compra
-  ordenesCompraSolicitante        OrdenCompra[]               @relation("OCsolicitante")
-  ordenesCompraAprobador          OrdenCompra[]               @relation("OCaprobador")
+  ordenesCompraSolicitante                 OrdenCompra[]               @relation("OCsolicitante")
+  ordenesCompraAprobador                   OrdenCompra[]               @relation("OCaprobador")
   // Timesheet aprobación
-  timesheetsEnviados              TimesheetAprobacion[]       @relation("TimesheetUsuario")
-  timesheetsAprobados             TimesheetAprobacion[]       @relation("TimesheetAprobador")
+  timesheetsEnviados                       TimesheetAprobacion[]       @relation("TimesheetUsuario")
+  timesheetsAprobados                      TimesheetAprobacion[]       @relation("TimesheetAprobador")
   // Agente IA conversaciones
-  agenteConversaciones            AgenteConversacion[]
-  agenteConversacionMensajes      AgenteConversacionMensaje[]
-  agenteUsage                     AgenteUsage[]
+  agenteConversaciones                     AgenteConversacion[]
+  agenteConversacionMensajes               AgenteConversacionMensaje[]
+  agenteUsage                              AgenteUsage[]
   // Catálogo equipos tracking
-  equiposCreadosPor               CatalogoEquipo[]            @relation("EquipoCreadoPor")
-  equiposActualizadosPor          CatalogoEquipo[]            @relation("EquipoActualizadoPor")
+  equiposCreadosPor                        CatalogoEquipo[]            @relation("EquipoCreadoPor")
+  equiposActualizadosPor                   CatalogoEquipo[]            @relation("EquipoActualizadoPor")
   // Recepciones pendientes
-  recepcionesConfirmadas          RecepcionPendiente[]        @relation("RecepcionConfirmador")
-  recepcionesEntregadas           RecepcionPendiente[]        @relation("RecepcionEntregador")
-  recepcionesRechazadas           RecepcionPendiente[]        @relation("RecepcionRechazador")
-  cxpAdjuntos                     CxPAdjunto[]                @relation("CxPAdjuntoSubidoPor")
-  cxcAdjuntos                     CxCAdjunto[]                @relation("CxCAdjuntoSubidoPor")
+  recepcionesConfirmadas                   RecepcionPendiente[]        @relation("RecepcionConfirmador")
+  recepcionesEntregadas                    RecepcionPendiente[]        @relation("RecepcionEntregador")
+  recepcionesRechazadas                    RecepcionPendiente[]        @relation("RecepcionRechazador")
+  cxpAdjuntos                              CxPAdjunto[]                @relation("CxPAdjuntoSubidoPor")
+  cxcAdjuntos                              CxCAdjunto[]                @relation("CxCAdjuntoSubidoPor")
   // Selección cotización ganadora
-  seleccionesRealizadas           ListaEquipoItem[]           @relation("ListaEquipoItemSeleccionador")
+  seleccionesRealizadas                    ListaEquipoItem[]           @relation("ListaEquipoItemSeleccionador")
   // SSOMA
-  ssomaDocsGenerados              SsomaDocumento[]            @relation("SsomaDocGenerado")
-  ssomaDocsAprobados              SsomaDocumento[]            @relation("SsomaDocAprobado")
-  ssomaPersonal                   SsomaPersonalHabilitado[]   @relation("SsomaPersonalUser")
-  ssomaHabilitadosPor             SsomaPersonalHabilitado[]   @relation("SsomaPersonalHabilitador")
+  ssomaDocsGenerados                       SsomaDocumento[]            @relation("SsomaDocGenerado")
+  ssomaDocsAprobados                       SsomaDocumento[]            @relation("SsomaDocAprobado")
+  ssomaPersonal                            SsomaPersonalHabilitado[]   @relation("SsomaPersonalUser")
+  ssomaHabilitadosPor                      SsomaPersonalHabilitado[]   @relation("SsomaPersonalHabilitador")
   // Solicitudes de recursos de ejecución
-  solicitudesRecursoSolicitadas   SolicitudRecurso[]          @relation("SolicitudRecursoSolicitante")
-  solicitudesRecursoAprobadas     SolicitudRecurso[]          @relation("SolicitudRecursoAprobador")
+  solicitudesRecursoSolicitadas            SolicitudRecurso[]          @relation("SolicitudRecursoSolicitante")
+  solicitudesRecursoAprobadas              SolicitudRecurso[]          @relation("SolicitudRecursoAprobador")
   // Control de Asistencia (administrativo)
-  dispositivos                    Dispositivo[]               @relation("DispositivoUsuario")
-  dispositivosAprobados           Dispositivo[]               @relation("DispositivoAprobador")
-  jornadasAsistenciaSupervisor    JornadaAsistencia[]         @relation("JornadaAsistenciaSupervisor")
-  asistencias                     Asistencia[]                @relation("AsistenciaUser")
-  asistenciasSupervisadas         Asistencia[]                @relation("AsistenciaSupervisor")
-  solicitudesRemotoPropias        SolicitudTrabajoRemoto[]    @relation("SolicitudRemotoSolicitante")
-  solicitudesRemotoAprobadas      SolicitudTrabajoRemoto[]    @relation("SolicitudRemotoAprobador")
-  ubicacionesRemotasPropias       UbicacionRemotaPersonal[]   @relation("UbicacionRemotaUsuario")
-  ubicacionesRemotasAprobadas     UbicacionRemotaPersonal[]   @relation("UbicacionRemotaAprobador")
+  dispositivos                             Dispositivo[]               @relation("DispositivoUsuario")
+  dispositivosAprobados                    Dispositivo[]               @relation("DispositivoAprobador")
+  jornadasAsistenciaSupervisor             JornadaAsistencia[]         @relation("JornadaAsistenciaSupervisor")
+  asistencias                              Asistencia[]                @relation("AsistenciaUser")
+  asistenciasSupervisadas                  Asistencia[]                @relation("AsistenciaSupervisor")
+  solicitudesRemotoPropias                 SolicitudTrabajoRemoto[]    @relation("SolicitudRemotoSolicitante")
+  solicitudesRemotoAprobadas               SolicitudTrabajoRemoto[]    @relation("SolicitudRemotoAprobador")
+  ubicacionesRemotasPropias                UbicacionRemotaPersonal[]   @relation("UbicacionRemotaUsuario")
+  ubicacionesRemotasAprobadas              UbicacionRemotaPersonal[]   @relation("UbicacionRemotaAprobador")
   // Almacén
-  movimientosAlmacen              MovimientoAlmacen[]
-  prestamosComoUsuario            PrestamoHerramienta[]       @relation("PrestamoUsuario")
-  prestamosEntregados             PrestamoHerramienta[]       @relation("PrestamoEntregadoPor")
-  prestamosRecibidos              PrestamoHerramienta[]       @relation("PrestamoRecibidoPor")
-  solicitudesHerramienta          SolicitudHerramienta[]      @relation("SolicitudHerramientaSolicitante")
-  solicitudesHerramientaAtendidas SolicitudHerramienta[]      @relation("SolicitudHerramientaAtendidaPor")
-  devolucionesRegistradas         DevolucionMaterial[]        @relation("DevolucionRegistradoPor")
-  devolucionesDevueltas           DevolucionMaterial[]        @relation("DevolucionDevueltoPor")
+  movimientosAlmacen                       MovimientoAlmacen[]
+  prestamosComoUsuario                     PrestamoHerramienta[]       @relation("PrestamoUsuario")
+  prestamosEntregados                      PrestamoHerramienta[]       @relation("PrestamoEntregadoPor")
+  prestamosRecibidos                       PrestamoHerramienta[]       @relation("PrestamoRecibidoPor")
+  solicitudesHerramienta                   SolicitudHerramienta[]      @relation("SolicitudHerramientaSolicitante")
+  solicitudesHerramientaAtendidas          SolicitudHerramienta[]      @relation("SolicitudHerramientaAtendidaPor")
+  devolucionesRegistradas                  DevolucionMaterial[]        @relation("DevolucionRegistradoPor")
+  devolucionesDevueltas                    DevolucionMaterial[]        @relation("DevolucionDevueltoPor")
 
   @@map("user")
 }
@@ -3461,40 +3462,44 @@ model DepositoHoja {
 }
 
 model GastoLinea {
-  id                    String          @id @default(cuid())
-  hojaDeGastosId        String
-  categoriaGastoId      String?
-  descripcion           String
-  fecha                 DateTime
-  monto                 Float
-  moneda                String          @default("PEN")
-  tipoComprobante       String?
-  numeroComprobante     String?
-  proveedorNombre       String?
-  proveedorRuc          String?
-  observaciones         String?
-  sunatVerificado       Boolean?
-  conformidad           String?
-  comentarioConformidad String?
-  conformadoEn          DateTime?
+  id                          String          @id @default(cuid())
+  hojaDeGastosId              String
+  categoriaGastoId            String?
+  descripcion                 String
+  fecha                       DateTime
+  monto                       Float
+  moneda                      String          @default("PEN")
+  tipoComprobante             String?
+  numeroComprobante           String?
+  proveedorNombre             String?
+  proveedorRuc                String?
+  observaciones               String?
+  sunatVerificado             Boolean?
+  conformidad                 String?
+  comentarioConformidad       String?
+  conformadoEn                DateTime?
   // Override de imputación (si null, hereda de la cabecera HojaDeGastos)
-  proyectoId            String?
-  centroCostoId         String?
-  categoriaCosto        CategoriaCosto?
+  proyectoId                  String?
+  centroCostoId               String?
+  categoriaCosto              CategoriaCosto?
   // Factura dividida: si pertenece a un comprobante compartido
-  gastoComprobanteId    String?
-  createdAt             DateTime        @default(now())
-  updatedAt             DateTime
+  gastoComprobanteId          String?
+  // Cierre sin comprobante: línea auto-generada cuando se cierra un ítem de material sin documento
+  requerimientoMaterialItemId String?
+  createdAt                   DateTime        @default(now())
+  updatedAt                   DateTime
 
-  hojaDeGastos     HojaDeGastos      @relation(fields: [hojaDeGastosId], references: [id], onDelete: Cascade)
-  categoriaGasto   CategoriaGasto?   @relation(fields: [categoriaGastoId], references: [id])
-  proyecto         Proyecto?         @relation("GastoLineaProyecto", fields: [proyectoId], references: [id])
-  centroCosto      CentroCosto?      @relation(fields: [centroCostoId], references: [id])
-  gastoComprobante GastoComprobante? @relation(fields: [gastoComprobanteId], references: [id])
-  adjuntos         GastoAdjunto[]
+  hojaDeGastos              HojaDeGastos               @relation(fields: [hojaDeGastosId], references: [id], onDelete: Cascade)
+  categoriaGasto            CategoriaGasto?            @relation(fields: [categoriaGastoId], references: [id])
+  proyecto                  Proyecto?                  @relation("GastoLineaProyecto", fields: [proyectoId], references: [id])
+  centroCosto               CentroCosto?               @relation(fields: [centroCostoId], references: [id])
+  gastoComprobante          GastoComprobante?          @relation(fields: [gastoComprobanteId], references: [id])
+  requerimientoMaterialItem RequerimientoMaterialItem? @relation("GastoLineaItemRequerimiento", fields: [requerimientoMaterialItemId], references: [id], onDelete: SetNull)
+  adjuntos                  GastoAdjunto[]
 
   @@index([hojaDeGastosId])
   @@index([gastoComprobanteId])
+  @@index([requerimientoMaterialItemId])
   @@map("gasto_linea")
 }
 
@@ -3565,14 +3570,22 @@ model RequerimientoMaterialItem {
   comentarioConformidad String?
   conformadoEn          DateTime?
 
+  // Cierre sin comprobante: permite rendir un ítem cuyo pago no tiene factura/boleta
+  sinComprobante       Boolean   @default(false)
+  motivoSinComprobante String?
+  cerradoSinCompEn     DateTime?
+  cerradoSinCompPorId  String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime
 
-  hojaDeGastos     HojaDeGastos         @relation(fields: [hojaDeGastosId], references: [id], onDelete: Cascade)
-  pedidoEquipoItem PedidoEquipoItem     @relation(fields: [pedidoEquipoItemId], references: [id])
-  pedidoEquipo     PedidoEquipo         @relation(fields: [pedidoId], references: [id])
-  proyecto         Proyecto?            @relation(fields: [proyectoId], references: [id])
-  recepciones      RecepcionPendiente[]
+  hojaDeGastos      HojaDeGastos         @relation(fields: [hojaDeGastosId], references: [id], onDelete: Cascade)
+  pedidoEquipoItem  PedidoEquipoItem     @relation(fields: [pedidoEquipoItemId], references: [id])
+  pedidoEquipo      PedidoEquipo         @relation(fields: [pedidoId], references: [id])
+  proyecto          Proyecto?            @relation(fields: [proyectoId], references: [id])
+  cerradoSinCompPor User?                @relation("ItemCerradoSinComprobante", fields: [cerradoSinCompPorId], references: [id])
+  recepciones       RecepcionPendiente[]
+  gastoLineas       GastoLinea[]         @relation("GastoLineaItemRequerimiento")
 
   @@index([hojaDeGastosId])
   @@index([pedidoEquipoItemId])
@@ -4516,22 +4529,22 @@ enum TipoMovimiento {
 }
 
 model CatalogoHerramienta {
-  id               String                    @id @default(cuid())
-  codigo           String                    @unique
+  id               String                     @id @default(cuid())
+  codigo           String                     @unique
   nombre           String
   categoria        String
   descripcion      String?
   fotoUrl          String?
-  gestionPorUnidad Boolean                   @default(false)
-  unidadMedida     String                    @default("unidad")
-  activo           Boolean                   @default(true)
+  gestionPorUnidad Boolean                    @default(false)
+  unidadMedida     String                     @default("unidad")
+  activo           Boolean                    @default(true)
   unidades         HerramientaUnidad[]
   stock            StockAlmacen[]
   prestamoItems    PrestamoHerramientaItem[]
   solicitudItems   SolicitudHerramientaItem[]
   movimientos      MovimientoAlmacen[]
-  createdAt        DateTime                  @default(now())
-  updatedAt        DateTime                  @updatedAt
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
 
   @@map("catalogo_herramienta")
 }
@@ -4620,11 +4633,11 @@ enum EstadoPrestamoItem {
 }
 
 model SolicitudHerramienta {
-  id             String                     @id @default(cuid())
-  numero         String                     @unique
-  solicitanteId  String
-  proyectoId     String?
-  observaciones  String?
+  id                      String                     @id @default(cuid())
+  numero                  String                     @unique
+  solicitanteId           String
+  proyectoId              String?
+  observaciones           String?
   estado                  EstadoSolicitudHerramienta @default(borrador)
   fechaEnvio              DateTime?
   fechaRequerida          DateTime?
@@ -4635,11 +4648,11 @@ model SolicitudHerramienta {
   createdAt               DateTime                   @default(now())
   updatedAt               DateTime                   @updatedAt
 
-  solicitante    User                       @relation("SolicitudHerramientaSolicitante", fields: [solicitanteId], references: [id])
-  proyecto       Proyecto?                  @relation(fields: [proyectoId], references: [id])
-  atendidaPor    User?                      @relation("SolicitudHerramientaAtendidaPor", fields: [atendidaPorId], references: [id])
-  prestamos      PrestamoHerramienta[]
-  items          SolicitudHerramientaItem[]
+  solicitante User                       @relation("SolicitudHerramientaSolicitante", fields: [solicitanteId], references: [id])
+  proyecto    Proyecto?                  @relation(fields: [proyectoId], references: [id])
+  atendidaPor User?                      @relation("SolicitudHerramientaAtendidaPor", fields: [atendidaPorId], references: [id])
+  prestamos   PrestamoHerramienta[]
+  items       SolicitudHerramientaItem[]
 
   @@index([solicitanteId, estado])
   @@index([estado, createdAt])
@@ -4655,14 +4668,14 @@ enum EstadoSolicitudHerramienta {
 }
 
 model SolicitudHerramientaItem {
-  id                    String               @id @default(cuid())
+  id                    String @id @default(cuid())
   solicitudId           String
   catalogoHerramientaId String
-  cantidad              Float                @default(1)
-  cantidadEntregada     Float                @default(0)
+  cantidad              Float  @default(1)
+  cantidadEntregada     Float  @default(0)
 
-  solicitud             SolicitudHerramienta @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
-  catalogoHerramienta   CatalogoHerramienta  @relation(fields: [catalogoHerramientaId], references: [id])
+  solicitud           SolicitudHerramienta @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
+  catalogoHerramienta CatalogoHerramienta  @relation(fields: [catalogoHerramientaId], references: [id])
 
   @@map("solicitud_herramienta_item")
 }

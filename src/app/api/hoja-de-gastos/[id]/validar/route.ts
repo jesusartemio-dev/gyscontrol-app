@@ -29,9 +29,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const esMateriales = hoja.tipoPropósito === 'compra_materiales'
 
     if (esMateriales) {
-      // Líneas libres (sin comprobante vinculado) deben ser conformes
+      // Líneas libres: sin comprobante compartido y sin ítem de material (sin-documento).
+      // Las líneas de comprobante se validan vía item; las sin-documento via item.conformidad.
       const lineasLibres = await prisma.gastoLinea.findMany({
-        where: { hojaDeGastosId: id, gastoComprobanteId: null },
+        where: {
+          hojaDeGastosId: id,
+          gastoComprobanteId: null,
+          requerimientoMaterialItemId: null,
+        },
         select: { id: true, conformidad: true },
       })
       const lineasPendientes = lineasLibres.filter(l => l.conformidad !== 'conforme')

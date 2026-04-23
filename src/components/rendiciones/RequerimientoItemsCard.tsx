@@ -15,8 +15,9 @@ import { Checkbox } from '@/components/ui/checkbox'
 import {
   Package, Receipt, Loader2, AlertCircle, CheckCircle2, Wand2,
   Paperclip, ExternalLink, FileText, X, Upload, ChevronDown, ChevronRight, Eye, Plus, Search, Pencil, Check,
-  CircleCheck, Circle, CircleAlert,
+  CircleCheck, Circle, CircleAlert, FileX, RotateCcw,
 } from 'lucide-react'
+import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
 import type { HojaDeGastos } from '@/types'
 import ZoomableImage from './ZoomableImage'
@@ -263,6 +264,84 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
       toast.error(err instanceof Error ? err.message : 'Error al eliminar')
     } finally {
       setDeletingItem(null)
+    }
+  }
+
+  // Cerrar sin comprobante — estados y handlers
+  const canCerrarSinComp = ['aprobado', 'depositado'].includes(hoja.estado)
+  const [sinCompDialog, setSinCompDialog] = useState<{
+    item: NonNullable<HojaDeGastos['itemsMateriales']>[number]
+  } | null>(null)
+  const [sinCompPrecio, setSinCompPrecio] = useState('')
+  const [sinCompMotivo, setSinCompMotivo] = useState('')
+  const [sinCompSaving, setSinCompSaving] = useState(false)
+  const [revirtiendoSinComp, setRevirtiendoSinComp] = useState<string | null>(null)
+
+  const openSinCompDialog = (item: NonNullable<HojaDeGastos['itemsMateriales']>[number]) => {
+    setSinCompDialog({ item })
+    setSinCompPrecio(item.precioEstimado != null ? String(item.precioEstimado) : '')
+    setSinCompMotivo('')
+  }
+
+  const closeSinCompDialog = () => {
+    setSinCompDialog(null)
+    setSinCompPrecio('')
+    setSinCompMotivo('')
+  }
+
+  const submitCerrarSinComp = async () => {
+    if (!sinCompDialog) return
+    const precio = parseFloat(sinCompPrecio)
+    const motivo = sinCompMotivo.trim()
+    if (!Number.isFinite(precio) || precio <= 0) {
+      toast.error('Ingrese un precio real válido')
+      return
+    }
+    if (motivo.length < 10) {
+      toast.error('El motivo debe tener al menos 10 caracteres')
+      return
+    }
+    setSinCompSaving(true)
+    try {
+      const res = await fetch(
+        `/api/requerimiento-material-item/${sinCompDialog.item.id}/cerrar-sin-comprobante`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ precioReal: precio, motivo }),
+        }
+      )
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Error al cerrar sin comprobante')
+      }
+      toast.success('Ítem cerrado sin documento')
+      closeSinCompDialog()
+      onChanged()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al cerrar sin comprobante')
+    } finally {
+      setSinCompSaving(false)
+    }
+  }
+
+  const handleRevertirSinComp = async (itemId: string) => {
+    setRevirtiendoSinComp(itemId)
+    try {
+      const res = await fetch(
+        `/api/requerimiento-material-item/${itemId}/cerrar-sin-comprobante`,
+        { method: 'DELETE' }
+      )
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Error al revertir')
+      }
+      toast.success('Ítem revertido a pendiente')
+      onChanged()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al revertir')
+    } finally {
+      setRevirtiendoSinComp(null)
     }
   }
   // Confirmación modal para eliminar item o comprobante
@@ -683,14 +762,21 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                       <th className="text-right pb-2 font-medium">Total Est.</th>
                       <th className="text-right pb-2 font-medium">Total Real</th>
                       {showConformidad && <th className="text-left pb-2 pl-3 font-medium">Conformidad</th>}
-                      {['borrador', 'depositado'].includes(hoja.estado) && <th className="pb-2 w-8" />}
+                      {['borrador', 'aprobado', 'depositado'].includes(hoja.estado) && <th className="pb-2 w-8" />}
                     </tr>
                   </thead>
                   <tbody className="divide-y">
                     {items.map(item => (
                       <tr key={item.id} className={`transition-colors ${itemsCubiertos.has(item.id) ? 'bg-green-50/50 dark:bg-green-950/5' : 'hover:bg-muted/30'}`}>
                         <td className="py-2 pr-3">
-                          {itemsCubiertos.has(item.id) && ['rendido', 'validado', 'cerrado'].includes(hoja.estado)
+                          {item.sinComprobante
+                            ? <Badge
+                                className="text-[10px] px-1.5 py-0 h-4 bg-orange-100 text-orange-700 border-0 font-medium flex items-center gap-0.5 w-fit"
+                                title={item.motivoSinComprobante || 'Cerrado sin documento'}
+                              >
+                                <FileX className="h-2.5 w-2.5" /> Sin documento
+                              </Badge>
+                            : itemsCubiertos.has(item.id) && ['rendido', 'validado', 'cerrado'].includes(hoja.estado)
                             ? <Badge className="text-[10px] px-1.5 py-0 h-4 bg-green-100 text-green-700 border-0 font-medium">Rendido</Badge>
                             : itemsCubiertos.has(item.id)
                             ? <Badge className={`text-[10px] px-1.5 py-0 h-4 border-0 font-medium flex items-center gap-0.5 ${itemComprobanteMap.get(item.id)?.hasAdjunto ? 'bg-blue-100 text-blue-700' : 'bg-blue-50 text-blue-600'}`}>
@@ -717,6 +803,15 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                                 </button>
                               )
                             })()}
+                            {item.sinComprobante && item.motivoSinComprobante && (
+                              <span
+                                className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0 h-4 rounded bg-orange-50 text-orange-700 border border-orange-200 font-medium leading-none max-w-[180px] truncate"
+                                title={item.motivoSinComprobante}
+                              >
+                                <FileX className="h-2.5 w-2.5 shrink-0" />
+                                {item.motivoSinComprobante}
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td className="py-2 pr-3">
@@ -782,7 +877,7 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                             )}
                           </td>
                         )}
-                        {['borrador', 'depositado'].includes(hoja.estado) && (
+                        {['borrador', 'aprobado', 'depositado'].includes(hoja.estado) && (
                           <td className="py-2 pl-2">
                             <div className="flex items-center gap-1">
                               {editingItemId === item.id ? (
@@ -816,6 +911,29 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                                       title="Editar cantidad y precio"
                                     >
                                       <Pencil className="h-3.5 w-3.5" />
+                                    </button>
+                                  )}
+                                  {canCerrarSinComp && !itemsCubiertos.has(item.id) && (
+                                    <button
+                                      type="button"
+                                      onClick={() => openSinCompDialog(item)}
+                                      className="text-muted-foreground/40 hover:text-orange-500 transition-colors"
+                                      title="Cerrar ítem sin documento (pago sin factura/boleta)"
+                                    >
+                                      <FileX className="h-3.5 w-3.5" />
+                                    </button>
+                                  )}
+                                  {canCerrarSinComp && item.sinComprobante && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRevertirSinComp(item.id)}
+                                      disabled={revirtiendoSinComp === item.id}
+                                      className="text-orange-500 hover:text-orange-700 disabled:opacity-50 transition-colors"
+                                      title="Revertir: volver a pendiente"
+                                    >
+                                      {revirtiendoSinComp === item.id
+                                        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                        : <RotateCcw className="h-3.5 w-3.5" />}
                                     </button>
                                   )}
                                   {(() => {
@@ -1726,6 +1844,97 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
           </DialogHeader>
           <DialogFooter>
             <Button size="sm" onClick={() => setBloqueadoRecepcion(null)}>Entendido</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Cerrar ítem sin comprobante */}
+      <Dialog open={!!sinCompDialog} onOpenChange={(v) => { if (!v) closeSinCompDialog() }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileX className="h-5 w-5 text-orange-600" />
+              Cerrar sin documento
+            </DialogTitle>
+            <DialogDescription>
+              Registre el precio real del ítem cuando la compra se hizo sin factura ni boleta.
+              El monto se cuenta en la rendición, pero el ítem queda marcado como &quot;sin sustento documental&quot;.
+            </DialogDescription>
+          </DialogHeader>
+          {sinCompDialog && (() => {
+            const { item } = sinCompDialog
+            const precio = parseFloat(sinCompPrecio)
+            const total = Number.isFinite(precio) && precio > 0 ? precio * item.cantidadSolicitada : null
+            return (
+              <div className="space-y-3 pt-1">
+                <div className="rounded-md border bg-muted/30 p-2.5 space-y-1">
+                  <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground">
+                    <span>{item.codigo}</span>
+                    <span className="text-muted-foreground/60">·</span>
+                    <span>{item.unidad}</span>
+                    <span className="text-muted-foreground/60">·</span>
+                    <span>Cant: {item.cantidadSolicitada}</span>
+                  </div>
+                  <p className="text-sm">{item.descripcion}</p>
+                  {item.precioEstimado != null && (
+                    <p className="text-xs text-muted-foreground">Precio estimado: {fmt(item.precioEstimado)}</p>
+                  )}
+                </div>
+                <div>
+                  <Label className="text-sm">Precio real unitario (S/) <span className="text-red-500">*</span></Label>
+                  <Input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={sinCompPrecio}
+                    onChange={e => setSinCompPrecio(e.target.value)}
+                    placeholder="0.00"
+                    className="mt-1"
+                    autoFocus
+                  />
+                  {total != null && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Total: <span className="font-mono font-semibold text-foreground">{fmt(total)}</span> ({item.cantidadSolicitada} × {fmt(precio)})
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <Label className="text-sm">
+                    Motivo <span className="text-red-500">*</span>
+                    <span className="text-xs text-muted-foreground ml-1 font-normal">(mínimo 10 caracteres)</span>
+                  </Label>
+                  <Textarea
+                    value={sinCompMotivo}
+                    onChange={e => setSinCompMotivo(e.target.value)}
+                    placeholder="Ej: Compra en mercado mayorista, proveedor no emite boleta / Pago en efectivo sin sustento formal"
+                    rows={3}
+                    maxLength={500}
+                    className="mt-1"
+                  />
+                  <p className="text-xs text-muted-foreground mt-0.5">{sinCompMotivo.trim().length}/500</p>
+                </div>
+                <div className="flex items-start gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md p-2.5">
+                  <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                  <span>
+                    Este ítem quedará marcado como <strong>&quot;Sin documento&quot;</strong>. Puedes revertirlo mientras el requerimiento esté en aprobado o depositado.
+                  </span>
+                </div>
+              </div>
+            )
+          })()}
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={closeSinCompDialog} disabled={sinCompSaving}>
+              Cancelar
+            </Button>
+            <Button
+              size="sm"
+              onClick={submitCerrarSinComp}
+              disabled={sinCompSaving || !sinCompPrecio || sinCompMotivo.trim().length < 10}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              {sinCompSaving && <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />}
+              Cerrar sin documento
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

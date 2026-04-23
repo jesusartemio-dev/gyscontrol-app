@@ -542,7 +542,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
   const canValidarLineas = hoja.estado === 'rendido' && ['admin', 'gerente', 'administracion'].includes(role || '')
   // Solo contar las líneas que tienen UI de conformidad (excluir las vinculadas a materiales en gastos)
   const lineasConformidad = hoja.tipoPropósito === 'compra_materiales'
-    ? lineas.filter(l => !l.gastoComprobanteId)
+    ? lineas.filter(l => !l.gastoComprobanteId && !l.requerimientoMaterialItemId)
     : lineas
   const itemsMaterialesConformidad = hoja.tipoPropósito === 'compra_materiales'
     ? (hoja.itemsMateriales || [])
@@ -997,7 +997,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
           <GastoLineaTable
             hojaDeGastosId={hoja.id}
             lineas={hoja.tipoPropósito === 'compra_materiales'
-              ? lineas.filter(l => !l.gastoComprobanteId)
+              ? lineas.filter(l => !l.gastoComprobanteId && !l.requerimientoMaterialItemId)
               : lineas}
             categorias={categorias}
             editable={isEditable}

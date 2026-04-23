@@ -2760,6 +2760,10 @@ export interface HojaDeGastos {
     recepciones?: Array<{ id: string; estado: string }>
     conformidad?: string | null
     comentarioConformidad?: string | null
+    sinComprobante?: boolean
+    motivoSinComprobante?: string | null
+    cerradoSinCompEn?: string | null
+    cerradoSinCompPorId?: string | null
   }>
   comprobantes?: Array<{
     id: string
@@ -2833,6 +2837,7 @@ export interface GastoLinea {
   centroCostoId?: string | null
   categoriaCosto?: 'equipos' | 'servicios' | 'gastos' | null
   gastoComprobanteId?: string | null
+  requerimientoMaterialItemId?: string | null
   createdAt: string
   updatedAt: string
   // Relations

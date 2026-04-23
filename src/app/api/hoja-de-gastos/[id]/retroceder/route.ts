@@ -65,12 +65,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // Si el destino es un estado pre-rendido, limpiar precioReal/totalReal de los ítems
     // SOLO si no hay comprobantes registrados: si existen comprobantes, el precioReal fue asignado
     // por ellos y debe conservarse (los comprobantes no se eliminan al retroceder).
+    // Los ítems cerrados "sin comprobante" también se preservan — deben revertirse explícitamente.
     const ESTADOS_PRE_RENDIDO = ['borrador', 'enviado', 'aprobado', 'depositado']
     if (ESTADOS_PRE_RENDIDO.includes(estadoPrevio)) {
       const comprobantesExistentes = await prisma.gastoComprobante.count({ where: { hojaDeGastosId: id } })
       if (comprobantesExistentes === 0) {
         await prisma.requerimientoMaterialItem.updateMany({
-          where: { hojaDeGastosId: id },
+          where: { hojaDeGastosId: id, sinComprobante: false },
           data: { precioReal: null, totalReal: null, updatedAt: new Date() },
         })
       }
