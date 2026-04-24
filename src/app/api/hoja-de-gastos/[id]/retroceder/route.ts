@@ -10,7 +10,8 @@ function estadoAnterior(estado: string, requiereAnticipo: boolean): string | nul
     case 'aprobado':   return 'enviado'
     case 'depositado': return 'aprobado'
     case 'rendido':    return requiereAnticipo ? 'depositado' : 'aprobado'
-    case 'validado':   return 'rendido'
+    case 'revisado':   return 'rendido'
+    case 'validado':   return 'revisado'
     case 'cerrado':    return 'validado'
     // Desde rechazado se regresa a borrador para que el dueño pueda corregir
     // anticipo, ítems o eliminar el requerimiento antes de re-enviar.
@@ -66,6 +67,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
     if (estadoActual === 'rendido') {
       extraData.fechaRendicion = null
+    }
+    if (estadoActual === 'revisado') {
+      extraData.fechaRevision = null
     }
 
     // Si el destino es un estado pre-rendido, limpiar precioReal/totalReal de los ítems

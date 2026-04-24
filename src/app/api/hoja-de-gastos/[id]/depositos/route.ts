@@ -33,8 +33,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
 /**
  * POST /api/hoja-de-gastos/[id]/depositos
- * - tipo "anticipo": solo admin/gerente/administracion, estados aprobado/depositado
- * - tipo "devolucion": solo el empleado dueño de la hoja, estado rendido
+ * Tipos de depósito:
+ *   - "anticipo"   → empresa → empleado, ANTES de gastar (aprobado/depositado/rendido)
+ *   - "reembolso"  → empresa → empleado, DESPUÉS de validar (rendido/validado), solo si saldo < 0
+ *   - "devolucion" → empleado → empresa, DESPUÉS de gastar (depositado/rendido/validado), solo si saldo > 0
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -60,9 +62,28 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       if (!['admin', 'gerente', 'administracion'].includes(session.user.role)) {
         return NextResponse.json({ error: 'Sin permisos para registrar anticipo' }, { status: 403 })
       }
-      if (!['aprobado', 'depositado', 'rendido', 'validado'].includes(hoja.estado)) {
+      if (!['aprobado', 'depositado', 'rendido'].includes(hoja.estado)) {
         return NextResponse.json({
-          error: 'Solo se pueden registrar anticipos/reembolsos cuando la hoja está en estado aprobado, depositado, rendido o validado',
+          error: 'Solo se pueden registrar anticipos cuando la hoja está en estado aprobado, depositado o rendido',
+        }, { status: 400 })
+      }
+    } else if (tipo === 'reembolso') {
+      if (!['admin', 'gerente', 'administracion'].includes(session.user.role)) {
+        return NextResponse.json({ error: 'Sin permisos para registrar reembolso' }, { status: 403 })
+      }
+      if (hoja.estado !== 'validado') {
+        return NextResponse.json({
+          error: 'Solo se pueden registrar reembolsos cuando la hoja está en estado validado',
+        }, { status: 400 })
+      }
+      if (hoja.saldo >= 0) {
+        return NextResponse.json({
+          error: 'No hay saldo pendiente por reembolsar al empleado',
+        }, { status: 400 })
+      }
+      if (monto > Math.abs(hoja.saldo) + 0.01) {
+        return NextResponse.json({
+          error: `El monto del reembolso (S/ ${monto.toFixed(2)}) excede el saldo pendiente (S/ ${Math.abs(hoja.saldo).toFixed(2)})`,
         }, { status: 400 })
       }
     } else if (tipo === 'devolucion') {
@@ -71,11 +92,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       if (!esEmpleado && !esAdmin) {
         return NextResponse.json({ error: 'Sin permisos para registrar esta devolución' }, { status: 403 })
       }
-      if (!['depositado', 'rendido', 'validado'].includes(hoja.estado)) {
-        return NextResponse.json({ error: 'Solo se pueden registrar devoluciones cuando la hoja está en estado depositado, rendido o validado' }, { status: 400 })
+      if (hoja.estado !== 'validado') {
+        return NextResponse.json({ error: 'Solo se pueden registrar devoluciones cuando la hoja está en estado validado' }, { status: 400 })
+      }
+      if (hoja.saldo <= 0) {
+        return NextResponse.json({ error: 'No hay saldo pendiente por devolver a la empresa' }, { status: 400 })
       }
     } else {
-      return NextResponse.json({ error: 'Tipo de depósito inválido' }, { status: 400 })
+      return NextResponse.json({ error: 'Tipo de depósito inválido. Debe ser anticipo, reembolso o devolucion' }, { status: 400 })
     }
 
     const deposito = await prisma.$transaction(async (tx) => {
@@ -99,29 +123,34 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         })
       }
 
-      // Recalcular saldo = anticipos - gastos - devoluciones
-      const [anticipos, devoluciones] = await Promise.all([
+      // Recalcular saldo = (anticipos + reembolsos) - gastos - devoluciones
+      const [anticipos, reembolsos, devoluciones] = await Promise.all([
         tx.depositoHoja.findMany({ where: { hojaDeGastosId: id, tipo: 'anticipo' } }),
+        tx.depositoHoja.findMany({ where: { hojaDeGastosId: id, tipo: 'reembolso' } }),
         tx.depositoHoja.findMany({ where: { hojaDeGastosId: id, tipo: 'devolucion' } }),
       ])
       const totalAnticipos = anticipos.reduce((s, d) => s + d.monto, 0)
+      const totalReembolsos = reembolsos.reduce((s, d) => s + d.monto, 0)
       const totalDevoluciones = devoluciones.reduce((s, d) => s + d.monto, 0)
       await tx.hojaDeGastos.update({
         where: { id },
         data: {
-          montoDepositado: totalAnticipos,
-          saldo: totalAnticipos - hoja.montoGastado - totalDevoluciones,
+          montoDepositado: totalAnticipos + totalReembolsos,
+          saldo: totalAnticipos + totalReembolsos - hoja.montoGastado - totalDevoluciones,
           updatedAt: new Date(),
         },
       })
+
+      const descripcionEvento =
+        tipo === 'devolucion' ? `Devolución registrada: S/ ${monto.toFixed(2)}` :
+        tipo === 'reembolso'  ? `Reembolso al empleado registrado: S/ ${monto.toFixed(2)}` :
+        `Anticipo registrado: S/ ${monto.toFixed(2)}`
 
       await tx.hojaDeGastosEvento.create({
         data: {
           hojaDeGastosId: id,
           tipo: tipo === 'devolucion' ? 'comentario' : 'depositado',
-          descripcion: tipo === 'devolucion'
-            ? `Devolución registrada: S/ ${monto.toFixed(2)}`
-            : `Anticipo registrado: S/ ${monto.toFixed(2)}`,
+          descripcion: descripcionEvento,
           usuarioId: session.user.id,
           metadata: { monto, depositoId: dep.id, tipoDeposito: tipo },
         },

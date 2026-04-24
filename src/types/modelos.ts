@@ -2698,6 +2698,7 @@ export type HojaDeGastosEstado =
   | 'aprobado'
   | 'depositado'
   | 'rendido'
+  | 'revisado'
   | 'validado'
   | 'cerrado'
   | 'rechazado'

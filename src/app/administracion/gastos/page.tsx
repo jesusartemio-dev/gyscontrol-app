@@ -22,6 +22,7 @@ import { toast } from 'sonner'
 import {
   getHojasDeGastos,
   aprobarHoja,
+  revisarHoja,
   validarHoja,
   cerrarHoja,
   rechazarHoja,
@@ -30,7 +31,7 @@ import { exportarRendicionesAExcel } from '@/lib/utils/rendicionExcel'
 import RendicionImportExcelModal from '@/components/administracion/RendicionImportExcelModal'
 import type { HojaDeGastos } from '@/types'
 
-type TabFilter = 'todas' | 'enviado' | 'aprobado' | 'depositado' | 'rendido' | 'validado' | 'cerrado' | 'rechazado'
+type TabFilter = 'todas' | 'enviado' | 'aprobado' | 'depositado' | 'rendido' | 'revisado' | 'validado' | 'cerrado' | 'rechazado'
 type TipoFilter = 'todas' | 'gastos_viaticos' | 'compra_materiales'
 
 const TABS: { key: TabFilter; label: string }[] = [
@@ -38,8 +39,9 @@ const TABS: { key: TabFilter; label: string }[] = [
   { key: 'depositado', label: 'Depositados' },
   { key: 'todas', label: 'Todas' },
   { key: 'enviado', label: 'Por Aprobar' },
-  { key: 'rendido', label: 'Rendidos' },
-  { key: 'validado', label: 'Validados' },
+  { key: 'rendido', label: 'Por Revisar' },
+  { key: 'revisado', label: 'Por Validar' },
+  { key: 'validado', label: 'Por Cerrar' },
   { key: 'cerrado', label: 'Cerrados' },
   { key: 'rechazado', label: 'Rechazados' },
 ]
@@ -56,6 +58,7 @@ const estadoColor: Record<string, string> = {
   aprobado: 'bg-emerald-100 text-emerald-700',
   depositado: 'bg-purple-100 text-purple-700',
   rendido: 'bg-orange-100 text-orange-700',
+  revisado: 'bg-cyan-100 text-cyan-700',
   validado: 'bg-teal-100 text-teal-700',
   cerrado: 'bg-green-100 text-green-800',
   rechazado: 'bg-red-100 text-red-700',
@@ -173,6 +176,9 @@ function GestionGastosContent() {
     executeAction(hoja.id, () => aprobarHoja(hoja.id), `${hoja.numero} aprobado`)
   }
 
+  const handleRevisar = (hoja: HojaDeGastos) => {
+    executeAction(hoja.id, () => revisarHoja(hoja.id), `${hoja.numero} revisado`)
+  }
   const handleValidar = (hoja: HojaDeGastos) => {
     executeAction(hoja.id, () => validarHoja(hoja.id), `${hoja.numero} validado`)
   }
@@ -318,6 +324,27 @@ function GestionGastosContent() {
           </div>
         ) : null
       case 'rendido':
+        return (
+          <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs border-cyan-300 text-cyan-700 hover:bg-cyan-50"
+              onClick={() => handleRevisar(hoja)}
+            >
+              <FileCheck className="h-3 w-3 mr-1" /> Revisar
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs border-red-300 text-red-700 hover:bg-red-50"
+              onClick={() => { setRechazoTarget(hoja); setComentarioRechazo('') }}
+            >
+              <XCircle className="h-3 w-3" />
+            </Button>
+          </div>
+        )
+      case 'revisado':
         return (
           <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
             <Button

@@ -34,7 +34,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: 'Solo se puede cerrar desde estado validado' }, { status: 400 })
     }
 
+    // Validar que el saldo esté cuadrado antes de cerrar.
+    // Para hojas que requirieron anticipo, exigimos saldo === 0 (todos los reembolsos
+    // y devoluciones deben haberse registrado). Para gastos sin anticipo se permite
+    // saldo negativo equivalente a -montoGastado (no se hizo reembolso) —
+    // este caso queda como reembolso pendiente fuera del sistema; no bloqueamos cierre.
     const esCompra = (hoja as any).tipoPropósito === 'compra_materiales'
+
+    if (!esCompra && hoja.requiereAnticipo && Math.abs(hoja.saldo) > 0.01) {
+      const accion = hoja.saldo > 0 ? 'devolución' : 'reembolso'
+      return NextResponse.json({
+        error: `No se puede cerrar: hay saldo pendiente de S/ ${Math.abs(hoja.saldo).toFixed(2)}. Registre la ${accion} antes de cerrar.`,
+      }, { status: 400 })
+    }
 
     const data = await prisma.$transaction(async (tx) => {
       const updated = await tx.hojaDeGastos.update({

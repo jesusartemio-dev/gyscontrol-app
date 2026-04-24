@@ -49,6 +49,7 @@ import {
   depositarHoja,
   rendirHoja,
   marcarSinAnticipoHoja,
+  revisarHoja,
   validarHoja,
   cerrarHoja,
   rechazarHoja,
@@ -110,6 +111,13 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
   const [adjuntosDevolucion, setAdjuntosDevolucion] = useState<HojaDeGastosAdjunto[]>([])
   const [uploadingDevolucion, setUploadingDevolucion] = useState(false)
 
+  // Reembolso dialog (admin, cuando saldo < 0)
+  const [showReembolso, setShowReembolso] = useState(false)
+  const [montoReembolso, setMontoReembolso] = useState('')
+  const [descripcionReembolso, setDescripcionReembolso] = useState('')
+  const [adjuntosReembolso, setAdjuntosReembolso] = useState<HojaDeGastosAdjunto[]>([])
+  const [uploadingReembolso, setUploadingReembolso] = useState(false)
+
   const [deletingDeposito, setDeletingDeposito] = useState<string | null>(null)
 
   const role = session?.user?.role
@@ -156,6 +164,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
   const handleEnviar = () => executeAction(() => enviarHoja(id), 'Requerimiento enviado')
   const handleAprobar = () => executeAction(() => aprobarHoja(id), 'Requerimiento aprobado')
   const handleRendir = () => executeAction(() => rendirHoja(id), 'Rendición enviada')
+  const handleRevisar = () => executeAction(() => revisarHoja(id), 'Rendición revisada')
   const handleValidar = () => executeAction(() => validarHoja(id), 'Rendición validada')
   const handleCerrar = () => executeAction(() => cerrarHoja(id), 'Requerimiento cerrado')
 
@@ -186,22 +195,39 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
     }
   }
 
-  const handleRegistrarDeposito = async (tipo: 'anticipo' | 'devolucion') => {
-    const monto = parseFloat(tipo === 'anticipo' ? montoAnticipo : montoDevolucion)
+  const handleRegistrarDeposito = async (tipo: 'anticipo' | 'reembolso' | 'devolucion') => {
+    const monto = parseFloat(
+      tipo === 'anticipo' ? montoAnticipo :
+      tipo === 'reembolso' ? montoReembolso :
+      montoDevolucion
+    )
     if (!monto || monto <= 0) { toast.error('Ingrese un monto válido'); return }
     try {
       setActionLoading(true)
-      const adjuntoIds = (tipo === 'anticipo' ? adjuntosAnticipo : adjuntosDevolucion).map(a => a.id)
-      const descripcion = tipo === 'anticipo' ? descripcionAnticipo : descripcionDevolucion
+      const adjuntoIds = (
+        tipo === 'anticipo' ? adjuntosAnticipo :
+        tipo === 'reembolso' ? adjuntosReembolso :
+        adjuntosDevolucion
+      ).map(a => a.id)
+      const descripcion =
+        tipo === 'anticipo' ? descripcionAnticipo :
+        tipo === 'reembolso' ? descripcionReembolso :
+        descripcionDevolucion
       const res = await fetch(`/api/hoja-de-gastos/${id}/depositos`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ monto, descripcion: descripcion || undefined, adjuntoIds, tipo }),
       })
       if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Error') }
-      toast.success(tipo === 'anticipo' ? 'Anticipo registrado' : 'Devolución registrada')
+      toast.success(
+        tipo === 'anticipo' ? 'Anticipo registrado' :
+        tipo === 'reembolso' ? 'Reembolso registrado' :
+        'Devolución registrada'
+      )
       if (tipo === 'anticipo') {
         setShowAnticipo(false); setMontoAnticipo(''); setDescripcionAnticipo(''); setAdjuntosAnticipo([])
+      } else if (tipo === 'reembolso') {
+        setShowReembolso(false); setMontoReembolso(''); setDescripcionReembolso(''); setAdjuntosReembolso([])
       } else {
         setShowDevolucion(false); setMontoDevolucion(''); setDescripcionDevolucion(''); setAdjuntosDevolucion([])
       }
@@ -538,7 +564,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
 
   if (!hoja) return null
 
-  const isEditable = !['rendido', 'validado', 'cerrado'].includes(hoja.estado)
+  const isEditable = !['rendido', 'revisado', 'validado', 'cerrado'].includes(hoja.estado)
   const canEnviar = ['borrador', 'rechazado'].includes(hoja.estado)
   const canAprobar = hoja.estado === 'enviado' && ['admin', 'gerente', 'gestor', 'coordinador', 'administracion'].includes(role || '')
   const canDepositar = hoja.estado === 'aprobado' && hoja.requiereAnticipo && ['admin', 'gerente', 'administracion'].includes(role || '')
@@ -551,7 +577,8 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
   const itemsPendientesRendicion = hoja.tipoPropósito === 'compra_materiales'
     ? (hoja.itemsMateriales || []).filter(i => i.precioReal == null).length
     : 0
-  const canValidarLineas = hoja.estado === 'rendido' && ['admin', 'gerente', 'administracion'].includes(role || '')
+  // Revisar (rendido → revisado): admin verifica conformidad documental
+  const canRevisarLineas = hoja.estado === 'rendido' && ['admin', 'gerente', 'administracion'].includes(role || '')
   // Solo contar las líneas que tienen UI de conformidad (excluir las vinculadas a materiales en gastos)
   const lineasConformidad = hoja.tipoPropósito === 'compra_materiales'
     ? lineas.filter(l => !l.gastoComprobanteId && !l.requerimientoMaterialItemId)
@@ -563,17 +590,22 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
     (lineasConformidad.length > 0 || itemsMaterialesConformidad.length > 0) &&
     lineasConformidad.every(l => l.conformidad === 'conforme') &&
     itemsMaterialesConformidad.every(i => i.conformidad === 'conforme')
-  const canValidar = canValidarLineas && allLineasConforme
-  const canCerrar = hoja.estado === 'validado' && ['admin', 'gerente', 'administracion'].includes(role || '')
-  const canRechazar = ['enviado', 'rendido', 'validado'].includes(hoja.estado) && ['admin', 'gerente', 'gestor', 'coordinador', 'administracion'].includes(role || '')
+  const canRevisar = canRevisarLineas && allLineasConforme
+  // Validar (revisado → validado): coordinador da conformidad final
+  const canValidar = hoja.estado === 'revisado' && ['admin', 'gerente', 'administracion', 'coordinador'].includes(role || '')
+  const esEmpleado = session?.user?.id === hoja.empleadoId
+  const saldoCuadrado = !hoja.requiereAnticipo || Math.abs(hoja.saldo) <= 0.01
+  const canCerrar = hoja.estado === 'validado' && saldoCuadrado && ['admin', 'gerente', 'administracion'].includes(role || '')
+  const canRechazar = ['enviado', 'rendido', 'revisado', 'validado'].includes(hoja.estado) && ['admin', 'gerente', 'gestor', 'coordinador', 'administracion'].includes(role || '')
   const canRetroceder = !['borrador', 'rechazado'].includes(hoja.estado) && ['admin', 'gerente', 'administracion'].includes(role || '')
   const canEliminar = hoja.estado === 'borrador' && role === 'admin'
-  const esEmpleado = session?.user?.id === hoja.empleadoId
   const canVolverABorrador = hoja.estado === 'rechazado' && (esEmpleado || ['admin', 'gerente', 'administracion'].includes(role || ''))
-  const anticipos = (hoja.depositos || []).filter((d: any) => d.tipo !== 'devolucion')
+  const anticipos = (hoja.depositos || []).filter((d: any) => d.tipo === 'anticipo' || (!d.tipo || d.tipo === null))
+  const reembolsos = (hoja.depositos || []).filter((d: any) => d.tipo === 'reembolso')
   const devoluciones = (hoja.depositos || []).filter((d: any) => d.tipo === 'devolucion')
-  const canRegistrarAnticipo = ['aprobado', 'depositado', 'rendido', 'validado'].includes(hoja.estado) && ['admin', 'gerente', 'administracion'].includes(role || '')
-  const canRegistrarDevolucion = ['depositado', 'rendido', 'validado'].includes(hoja.estado) && hoja.requiereAnticipo && (esEmpleado || ['admin', 'gerente', 'administracion'].includes(role || ''))
+  const canRegistrarAnticipo = ['aprobado', 'depositado', 'rendido'].includes(hoja.estado) && ['admin', 'gerente', 'administracion'].includes(role || '')
+  const canRegistrarReembolso = hoja.estado === 'validado' && hoja.saldo < 0 && ['admin', 'gerente', 'administracion'].includes(role || '')
+  const canRegistrarDevolucion = hoja.estado === 'validado' && hoja.saldo > 0 && hoja.requiereAnticipo && (esEmpleado || ['admin', 'gerente', 'administracion'].includes(role || ''))
 
   return (
     <div className="container mx-auto p-4 sm:p-6 space-y-4 max-w-4xl">
@@ -632,7 +664,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
             requiereAnticipo={hoja.requiereAnticipo}
             rechazadoEn={hoja.rechazadoEn}
           />
-          {(canEnviar || canAprobar || canActivarAnticipo || canAvanzarDepositado || canMarcarSinAnticipo || canRendir || canValidarLineas || canCerrar || canRechazar || canRetroceder || canVolverABorrador) && (
+          {(canEnviar || canAprobar || canActivarAnticipo || canAvanzarDepositado || canMarcarSinAnticipo || canRendir || canRevisarLineas || canValidar || canCerrar || canRechazar || canRetroceder || canVolverABorrador) && (
             <div className="flex flex-wrap gap-2 border-t pt-3">
               {canEnviar && (
                 <Button size="sm" onClick={handleEnviar} disabled={actionLoading} className="bg-blue-600 hover:bg-blue-700">
@@ -722,11 +754,11 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
                   </TooltipProvider>
                 </div>
               )}
-              {canValidarLineas && (
+              {canRevisarLineas && (
                 <div className="flex items-center gap-1.5">
-                  <Button size="sm" onClick={handleValidar} disabled={actionLoading || !allLineasConforme} className="bg-teal-600 hover:bg-teal-700" title={!allLineasConforme ? 'Todas las líneas deben estar conformes para validar' : undefined}>
+                  <Button size="sm" onClick={handleRevisar} disabled={actionLoading || !allLineasConforme} className="bg-cyan-600 hover:bg-cyan-700" title={!allLineasConforme ? 'Todas las líneas deben estar conformes para revisar' : undefined}>
                     <CheckCircle className="h-3.5 w-3.5 mr-1" />
-                    Validar rendición
+                    Marcar como revisado
                   </Button>
                   {!allLineasConforme && (
                     <span className="text-xs text-amber-600">
@@ -735,11 +767,28 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
                   )}
                 </div>
               )}
+              {canValidar && (
+                <Button size="sm" onClick={handleValidar} disabled={actionLoading} className="bg-teal-600 hover:bg-teal-700">
+                  <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                  Validar conformidad
+                </Button>
+              )}
               {canCerrar && (
-                <Button size="sm" onClick={handleCerrar} disabled={actionLoading} className="bg-green-700 hover:bg-green-800">
+                <Button
+                  size="sm"
+                  onClick={handleCerrar}
+                  disabled={actionLoading || !saldoCuadrado}
+                  className="bg-green-700 hover:bg-green-800"
+                  title={!saldoCuadrado ? `Saldo pendiente de S/ ${Math.abs(hoja.saldo).toFixed(2)}. Registre el ${hoja.saldo > 0 ? 'depósito' : 'reembolso'} antes de cerrar.` : undefined}
+                >
                   <Lock className="h-3.5 w-3.5 mr-1" />
                   Cerrar
                 </Button>
+              )}
+              {hoja.estado === 'validado' && !saldoCuadrado && ['admin','gerente','administracion'].includes(role || '') && (
+                <span className="text-xs text-amber-600">
+                  Saldo pendiente: S/ {Math.abs(hoja.saldo).toFixed(2)} ({hoja.saldo > 0 ? 'devolución' : 'reembolso'})
+                </span>
               )}
               {canRechazar && (
                 <Button size="sm" variant="destructive" onClick={() => setShowRechazo(true)} disabled={actionLoading}>
@@ -809,13 +858,13 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
         )
       })()}
 
-      {/* Depósitos y Devoluciones */}
+      {/* Anticipos, reembolsos y devoluciones */}
       {hoja.requiereAnticipo && ['aprobado', 'depositado', 'rendido', 'validado', 'cerrado'].includes(hoja.estado) && (
         <Card>
           <CardHeader className="py-3 px-4">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Banknote className="h-4 w-4 text-purple-600" />
-              Depósitos y devoluciones
+              Anticipos, reembolsos y devoluciones
             </CardTitle>
           </CardHeader>
           <CardContent className="px-4 pb-4 space-y-4">
@@ -872,6 +921,70 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
                 })}
               </div>
             </div>
+
+            {/* ── REEMBOLSOS (empresa → trabajador, después de validar) ── */}
+            {(canRegistrarReembolso || reembolsos.length > 0) && (
+              <div className="border-t pt-4">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-semibold text-orange-700 uppercase tracking-wide">
+                    Reembolsos al empleado ({reembolsos.length})
+                  </p>
+                  {canRegistrarReembolso && (
+                    <Button size="sm" variant="outline" className="h-7 text-xs border-orange-300 text-orange-700 hover:bg-orange-50"
+                      onClick={() => { setMontoReembolso(Math.abs(hoja.saldo).toFixed(2)); setDescripcionReembolso(''); setAdjuntosReembolso([]); setShowReembolso(true) }}>
+                      + Registrar reembolso
+                    </Button>
+                  )}
+                </div>
+                {canRegistrarReembolso && reembolsos.length === 0 && (
+                  <div className="flex items-start gap-2 text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded-lg p-2.5 mb-2">
+                    <Banknote className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                    <span>
+                      Saldo a reembolsar al empleado: <strong>S/ {Math.abs(hoja.saldo).toFixed(2)}</strong>.
+                      El empleado gastó más de lo que recibió como anticipo. Registre el pago realizado y adjunte el voucher.
+                    </span>
+                  </div>
+                )}
+                <div className="space-y-2">
+                  {reembolsos.length === 0 && !canRegistrarReembolso && (
+                    <p className="text-xs text-muted-foreground italic">Sin reembolsos registrados.</p>
+                  )}
+                  {reembolsos.map((dep: any, idx: number) => {
+                    const canEliminarReemb = ['rendido', 'validado'].includes(hoja.estado) && ['admin', 'gerente', 'administracion'].includes(role || '')
+                    return (
+                      <div key={dep.id} className="border border-orange-200 rounded-lg p-3 bg-orange-50/40">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-orange-400 font-medium">#{idx + 1}</span>
+                            <span className="text-sm font-bold text-orange-800">S/ {dep.monto.toFixed(2)}</span>
+                            {dep.descripcion && <span className="text-xs text-muted-foreground">· {dep.descripcion}</span>}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">{formatDate(dep.fecha)}</span>
+                            {canEliminarReemb && (
+                              <button onClick={() => handleEliminarDeposito(dep.id)} disabled={deletingDeposito === dep.id}
+                                className="text-red-400 hover:text-red-600 disabled:opacity-50" title="Eliminar">
+                                {deletingDeposito === dep.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        {dep.adjuntos?.length > 0 && (
+                          <div className="mt-2 space-y-1">
+                            {dep.adjuntos.map((adj: any) => (
+                              <div key={adj.id} className="flex items-center gap-1.5 text-xs">
+                                <FileText className="h-3 w-3 text-orange-400 shrink-0" />
+                                <a href={adj.urlArchivo} target="_blank" rel="noopener noreferrer" className="text-orange-700 hover:underline truncate">{adj.nombreArchivo}</a>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* ── DEVOLUCIONES (trabajador → empresa) ── */}
             {(canRegistrarDevolucion || devoluciones.length > 0) && (
@@ -1024,7 +1137,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
           onChanged={loadData}
           canAddItem={['borrador', 'aprobado', 'depositado'].includes(hoja.estado)}
           canAddComprobante={canRendir || hoja.estado === 'rendido'}
-          showConformidad={canValidarLineas}
+          showConformidad={canRevisarLineas}
         />
       )}
 
@@ -1051,7 +1164,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
             categorias={categorias}
             editable={isEditable}
             onChanged={loadData}
-            showConformidad={canValidarLineas}
+            showConformidad={canRevisarLineas}
             hojaInfo={{
               proyectoId: hoja.proyectoId,
               proyectoNombre: hoja.proyecto ? `${hoja.proyecto.codigo} - ${hoja.proyecto.nombre}` : null,
@@ -1156,6 +1269,61 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
             <Button onClick={() => handleRegistrarDeposito('anticipo')} disabled={actionLoading || !montoAnticipo} className="bg-purple-600 hover:bg-purple-700">
               {actionLoading && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
               Registrar anticipo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Registrar Reembolso (admin, cuando saldo < 0) */}
+      <Dialog open={showReembolso} onOpenChange={setShowReembolso}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Banknote className="h-5 w-5 text-orange-600" />
+              Registrar reembolso al empleado
+            </DialogTitle>
+            <DialogDescription>
+              Monto que la empresa paga al empleado porque gastó más que el anticipo. Adjunte el voucher del pago.
+              {hoja.saldo < 0 && <span className="block mt-1 font-medium text-orange-700">Saldo a reembolsar: S/ {Math.abs(hoja.saldo).toFixed(2)}</span>}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 pt-2">
+            <div>
+              <Label>Monto reembolsado (PEN) <span className="text-red-500">*</span></Label>
+              <Input type="number" step="0.01" min="0" value={montoReembolso} onChange={e => setMontoReembolso(e.target.value)} placeholder="0.00" />
+            </div>
+            <div>
+              <Label>Descripción (opcional)</Label>
+              <Input value={descripcionReembolso} onChange={e => setDescripcionReembolso(e.target.value)} placeholder="Ej: Reembolso por exceso de gastos" />
+            </div>
+            <div>
+              <Label>Constancia del pago</Label>
+              <div className="mt-1 border-2 border-dashed border-orange-200 rounded-lg p-3 text-center">
+                <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden" id="reembolso-upload"
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleUploadAdjuntoDeposito(f, setUploadingReembolso, setAdjuntosReembolso); e.target.value = '' }} />
+                <label htmlFor="reembolso-upload" className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
+                  {uploadingReembolso
+                    ? <span className="flex items-center justify-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Subiendo...</span>
+                    : <span className="flex items-center justify-center gap-2"><Upload className="h-4 w-4" /> Subir constancia (PDF, JPG, PNG)</span>}
+                </label>
+              </div>
+              {adjuntosReembolso.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  {adjuntosReembolso.map(adj => (
+                    <div key={adj.id} className="flex items-center justify-between text-xs bg-orange-50 border border-orange-200 rounded px-2 py-1">
+                      <a href={adj.urlArchivo} target="_blank" rel="noopener noreferrer" className="text-orange-700 hover:underline truncate">{adj.nombreArchivo}</a>
+                      <button onClick={async () => { await deleteHojaAdjunto(adj.id); setAdjuntosReembolso(prev => prev.filter(a => a.id !== adj.id)) }} className="text-red-500 hover:text-red-700 ml-2"><X className="h-3 w-3" /></button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowReembolso(false)}>Cancelar</Button>
+            <Button onClick={() => handleRegistrarDeposito('reembolso')} disabled={actionLoading || !montoReembolso} className="bg-orange-600 hover:bg-orange-700">
+              {actionLoading && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+              Registrar reembolso
             </Button>
           </DialogFooter>
         </DialogContent>

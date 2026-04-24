@@ -47,6 +47,7 @@ const ICON_MAP: Record<string, { icon: typeof FileText; color: string; bg: strin
   aprobado:      { icon: CheckCircle, color: 'text-emerald-600', bg: 'bg-emerald-100' },
   depositado:    { icon: Banknote,    color: 'text-purple-600',  bg: 'bg-purple-100' },
   rendido:       { icon: FileCheck,   color: 'text-orange-600',  bg: 'bg-orange-100' },
+  revisado:      { icon: FileCheck,   color: 'text-cyan-600',    bg: 'bg-cyan-100' },
   validado:      { icon: ShieldCheck, color: 'text-teal-600',    bg: 'bg-teal-100' },
   cerrado:       { icon: Lock,        color: 'text-green-700',   bg: 'bg-green-100' },
   rechazado:     { icon: XCircle,     color: 'text-red-600',     bg: 'bg-red-100' },

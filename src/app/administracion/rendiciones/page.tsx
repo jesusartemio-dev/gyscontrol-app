@@ -21,7 +21,7 @@ import {
   User, FolderOpen, Calendar, Receipt, CheckCircle2, AlertCircle, Circle,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { getHojasDeGastos, validarHoja, rechazarHoja } from '@/lib/services/hojaDeGastos'
+import { getHojasDeGastos, revisarHoja, validarHoja, rechazarHoja } from '@/lib/services/hojaDeGastos'
 import { marcarConformidad } from '@/lib/services/gastoLinea'
 import GastoLineaPreviewDrawer from '@/components/rendiciones/GastoLineaPreviewDrawer'
 import type { HojaDeGastos, GastoLinea } from '@/types'
@@ -53,12 +53,30 @@ export default function RendicionesPage() {
   const loadData = async () => {
     try {
       setLoading(true)
-      const data = await getHojasDeGastos({ estado: 'rendido' })
-      setHojas(data)
+      // Listar tanto las hojas pendientes de revisión (rendido) como las revisadas
+      // pendientes de validación (revisado) — ambas son trabajos pendientes de admin/coordinador.
+      const [rendidas, revisadas] = await Promise.all([
+        getHojasDeGastos({ estado: 'rendido' }),
+        getHojasDeGastos({ estado: 'revisado' }),
+      ])
+      setHojas([...rendidas, ...revisadas])
     } catch {
       toast.error('Error al cargar rendiciones')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleRevisar = async (hoja: HojaDeGastos) => {
+    try {
+      setActionLoading(hoja.id)
+      await revisarHoja(hoja.id)
+      toast.success(`${hoja.numero} revisado`)
+      await loadData()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Error al revisar')
+    } finally {
+      setActionLoading(null)
     }
   }
 
@@ -404,14 +422,14 @@ export default function RendicionesPage() {
                                   <span>
                                     <Button
                                       size="sm"
-                                      className="text-xs bg-teal-600 hover:bg-teal-700 disabled:opacity-50"
-                                      onClick={() => handleValidar(hoja)}
-                                      disabled={!allConforme}
+                                      className={`text-xs disabled:opacity-50 ${hoja.estado === 'revisado' ? 'bg-teal-600 hover:bg-teal-700' : 'bg-cyan-600 hover:bg-cyan-700'}`}
+                                      onClick={() => hoja.estado === 'revisado' ? handleValidar(hoja) : handleRevisar(hoja)}
+                                      disabled={hoja.estado === 'rendido' && !allConforme}
                                     >
                                       <FileCheck className="h-3.5 w-3.5 mr-1" />
-                                      Validar
-                                      {!allConforme && lineas.length > 0 && (
-                                        <Badge className="ml-1.5 bg-teal-800 text-[9px] px-1 py-0">
+                                      {hoja.estado === 'revisado' ? 'Validar' : 'Revisar'}
+                                      {hoja.estado === 'rendido' && !allConforme && lineas.length > 0 && (
+                                        <Badge className="ml-1.5 bg-cyan-800 text-[9px] px-1 py-0">
                                           {pendientesCount + observadosCount}
                                         </Badge>
                                       )}

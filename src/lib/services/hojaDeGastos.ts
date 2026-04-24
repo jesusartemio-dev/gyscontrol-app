@@ -141,6 +141,7 @@ export const depositarHoja = (id: string, montoDepositado?: number, adjuntoIds?:
   postAction(id, 'depositar', { montoDepositado, adjuntoIds, descripcion })
 export const rendirHoja = (id: string) => postAction(id, 'rendir')
 export const marcarSinAnticipoHoja = (id: string) => postAction(id, 'sin-anticipo')
+export const revisarHoja = (id: string) => postAction(id, 'revisar')
 export const validarHoja = (id: string) => postAction(id, 'validar')
 export const cerrarHoja = (id: string) => postAction(id, 'cerrar')
 export const rechazarHoja = (id: string, comentario: string) =>

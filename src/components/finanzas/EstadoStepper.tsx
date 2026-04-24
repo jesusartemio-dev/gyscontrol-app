@@ -8,6 +8,7 @@ const STEPS_CON_ANTICIPO = [
   { key: 'aprobado', label: 'Aprobado' },
   { key: 'depositado', label: 'Depositado' },
   { key: 'rendido', label: 'Rendido' },
+  { key: 'revisado', label: 'Revisado' },
   { key: 'validado', label: 'Validado' },
   { key: 'cerrado', label: 'Cerrado' },
 ]
@@ -17,6 +18,7 @@ const STEPS_SIN_ANTICIPO = [
   { key: 'enviado', label: 'Enviado' },
   { key: 'aprobado', label: 'Aprobado' },
   { key: 'rendido', label: 'Rendido' },
+  { key: 'revisado', label: 'Revisado' },
   { key: 'validado', label: 'Validado' },
   { key: 'cerrado', label: 'Cerrado' },
 ]
@@ -34,7 +36,8 @@ export default function EstadoStepper({ estado, requiereAnticipo, rechazadoEn }:
   const currentIndex = isRechazado
     ? stepsConfig.findIndex(s => {
         if (rechazadoEn === 'aprobacion') return s.key === 'enviado'
-        if (rechazadoEn === 'validacion') return s.key === 'rendido'
+        if (rechazadoEn === 'revision') return s.key === 'rendido'
+        if (rechazadoEn === 'validacion') return s.key === 'revisado'
         if (rechazadoEn === 'cierre') return s.key === 'validado'
         return s.key === 'enviado'
       })

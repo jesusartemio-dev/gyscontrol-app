@@ -23,7 +23,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // Determinar rechazadoEn basado en estado actual
     const estadosRechazables: Record<string, string> = {
       enviado: 'aprobacion',
-      rendido: 'validacion',
+      rendido: 'revision',
+      revisado: 'validacion',
       validado: 'cierre',
     }
 

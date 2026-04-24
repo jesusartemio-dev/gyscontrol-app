@@ -3354,11 +3354,11 @@ model CentroCosto {
   createdAt   DateTime @default(now())
   updatedAt   DateTime
 
-  hojas             HojaDeGastos[]
-  ordenesCompra     OrdenCompra[]
-  gastoLineas       GastoLinea[]
-  proyectosInternos Proyecto[]
-  pedidosEquipo     PedidoEquipo[]
+  hojas                     HojaDeGastos[]
+  ordenesCompra             OrdenCompra[]
+  gastoLineas               GastoLinea[]
+  proyectosInternos         Proyecto[]
+  pedidosEquipo             PedidoEquipo[]
   pedidoEquipoItemsOverride PedidoEquipoItem[] @relation("PedidoItemCentroCostoOverride")
 
   @@index([tipo, activo])
@@ -3390,6 +3390,7 @@ model HojaDeGastos {
   fechaAprobacion         DateTime?
   fechaDeposito           DateTime?
   fechaRendicion          DateTime?
+  fechaRevision           DateTime?
   fechaValidacion         DateTime?
   fechaCierre             DateTime?
   createdAt               DateTime       @default(now())
