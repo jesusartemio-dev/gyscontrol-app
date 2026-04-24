@@ -572,7 +572,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
   const canVolverABorrador = hoja.estado === 'rechazado' && (esEmpleado || ['admin', 'gerente', 'administracion'].includes(role || ''))
   const anticipos = (hoja.depositos || []).filter((d: any) => d.tipo !== 'devolucion')
   const devoluciones = (hoja.depositos || []).filter((d: any) => d.tipo === 'devolucion')
-  const canRegistrarAnticipo = ['aprobado', 'depositado', 'rendido'].includes(hoja.estado) && ['admin', 'gerente', 'administracion'].includes(role || '')
+  const canRegistrarAnticipo = ['aprobado', 'depositado', 'rendido', 'validado'].includes(hoja.estado) && ['admin', 'gerente', 'administracion'].includes(role || '')
   const canRegistrarDevolucion = ['depositado', 'rendido', 'validado'].includes(hoja.estado) && hoja.requiereAnticipo && (esEmpleado || ['admin', 'gerente', 'administracion'].includes(role || ''))
 
   return (

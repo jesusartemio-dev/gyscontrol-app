@@ -60,9 +60,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       if (!['admin', 'gerente', 'administracion'].includes(session.user.role)) {
         return NextResponse.json({ error: 'Sin permisos para registrar anticipo' }, { status: 403 })
       }
-      if (!['aprobado', 'depositado', 'rendido'].includes(hoja.estado)) {
+      if (!['aprobado', 'depositado', 'rendido', 'validado'].includes(hoja.estado)) {
         return NextResponse.json({
-          error: 'Solo se pueden registrar anticipos cuando la hoja está en estado aprobado, depositado o rendido',
+          error: 'Solo se pueden registrar anticipos/reembolsos cuando la hoja está en estado aprobado, depositado, rendido o validado',
         }, { status: 400 })
       }
     } else if (tipo === 'devolucion') {

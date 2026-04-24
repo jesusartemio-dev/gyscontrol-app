@@ -35,13 +35,13 @@ export async function DELETE(
       if (!['admin', 'gerente', 'administracion'].includes(session.user.role)) {
         return NextResponse.json({ error: 'Sin permisos para eliminar este anticipo' }, { status: 403 })
       }
-      if (!['aprobado', 'depositado', 'rendido'].includes(hoja.estado)) {
+      if (!['aprobado', 'depositado', 'rendido', 'validado'].includes(hoja.estado)) {
         return NextResponse.json({
-          error: 'Solo se pueden eliminar anticipos cuando la hoja está en estado aprobado, depositado o rendido',
+          error: 'Solo se pueden eliminar anticipos cuando la hoja está en estado aprobado, depositado, rendido o validado',
         }, { status: 400 })
       }
-      // En estados depositado/rendido no se puede eliminar el único anticipo
-      if (['depositado', 'rendido'].includes(hoja.estado)) {
+      // En estados depositado/rendido/validado no se puede eliminar el único anticipo
+      if (['depositado', 'rendido', 'validado'].includes(hoja.estado)) {
         const totalAnticipos = await prisma.depositoHoja.count({
           where: { hojaDeGastosId: id, tipo: 'anticipo' },
         })
