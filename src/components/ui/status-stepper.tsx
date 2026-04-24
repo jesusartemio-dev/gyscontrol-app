@@ -3,6 +3,12 @@
 import React from 'react'
 import { Check, X, Loader2, Pause } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 export type StepStatus = 'completed' | 'current' | 'future' | 'cancelled' | 'rejected' | 'paused'
 
@@ -10,6 +16,8 @@ export interface StatusStep {
   key: string
   label: string
   status: StepStatus
+  /** Texto descriptivo opcional — si se provee, aparece como tooltip al hover. */
+  description?: string
 }
 
 function getLineColor(nextStatus: StepStatus): string {
@@ -110,22 +118,45 @@ interface StatusStepperProps {
 
 export default function StatusStepper({ steps, onStepClick, loadingStep, disabled }: StatusStepperProps) {
   const isInteractive = !!onStepClick
+  const hasDescriptions = steps.some(s => s.description)
 
-  return (
+  const renderPill = (step: StatusStep) => {
+    const pill = (
+      <StepPill
+        label={step.label}
+        status={step.status}
+        interactive={isInteractive}
+        loading={loadingStep === step.key}
+        disabled={disabled}
+        onClick={() => onStepClick?.(step.key)}
+      />
+    )
+
+    if (!step.description) return pill
+
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-flex">{pill}</span>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs text-xs">
+          {step.description}
+        </TooltipContent>
+      </Tooltip>
+    )
+  }
+
+  const content = (
     <div className="flex items-center overflow-x-auto">
       {steps.map((step, index) => (
         <React.Fragment key={step.key}>
           {index > 0 && <StepLine nextStatus={step.status} />}
-          <StepPill
-            label={step.label}
-            status={step.status}
-            interactive={isInteractive}
-            loading={loadingStep === step.key}
-            disabled={disabled}
-            onClick={() => onStepClick?.(step.key)}
-          />
+          {renderPill(step)}
         </React.Fragment>
       ))}
     </div>
   )
+
+  if (!hasDescriptions) return content
+  return <TooltipProvider delayDuration={150}>{content}</TooltipProvider>
 }

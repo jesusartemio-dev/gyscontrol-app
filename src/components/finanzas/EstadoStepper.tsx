@@ -2,25 +2,31 @@
 
 import StatusStepper, { type StatusStep, type StepStatus } from '@/components/ui/status-stepper'
 
-const STEPS_CON_ANTICIPO = [
-  { key: 'borrador', label: 'Borrador' },
-  { key: 'enviado', label: 'Enviado' },
-  { key: 'aprobado', label: 'Aprobado' },
-  { key: 'depositado', label: 'Depositado' },
-  { key: 'rendido', label: 'Rendido' },
-  { key: 'revisado', label: 'Revisado' },
-  { key: 'validado', label: 'Validado' },
-  { key: 'cerrado', label: 'Cerrado' },
+interface StepDef {
+  key: string
+  label: string
+  description: string
+}
+
+const STEPS_CON_ANTICIPO: StepDef[] = [
+  { key: 'borrador',   label: 'Borrador',   description: 'Empleado: prepara la solicitud.' },
+  { key: 'enviado',    label: 'Enviado',    description: 'Empleado: envía para aprobación.' },
+  { key: 'aprobado',   label: 'Aprobado',   description: 'Administración: deposita el anticipo.' },
+  { key: 'depositado', label: 'Depositado', description: 'Empleado: rinde sus comprobantes.' },
+  { key: 'rendido',    label: 'Rendido',    description: 'Administración: revisa los comprobantes.' },
+  { key: 'revisado',   label: 'Revisado',   description: 'Coordinador: valida la conformidad.' },
+  { key: 'validado',   label: 'Validado',   description: 'Administración: registra reembolso/devolución y cierra.' },
+  { key: 'cerrado',    label: 'Cerrado',    description: 'Hoja cerrada.' },
 ]
 
-const STEPS_SIN_ANTICIPO = [
-  { key: 'borrador', label: 'Borrador' },
-  { key: 'enviado', label: 'Enviado' },
-  { key: 'aprobado', label: 'Aprobado' },
-  { key: 'rendido', label: 'Rendido' },
-  { key: 'revisado', label: 'Revisado' },
-  { key: 'validado', label: 'Validado' },
-  { key: 'cerrado', label: 'Cerrado' },
+const STEPS_SIN_ANTICIPO: StepDef[] = [
+  { key: 'borrador', label: 'Borrador', description: 'Empleado: prepara la solicitud.' },
+  { key: 'enviado',  label: 'Enviado',  description: 'Empleado: envía para aprobación.' },
+  { key: 'aprobado', label: 'Aprobado', description: 'Empleado: rinde sus comprobantes.' },
+  { key: 'rendido',  label: 'Rendido',  description: 'Administración: revisa los comprobantes.' },
+  { key: 'revisado', label: 'Revisado', description: 'Coordinador: valida la conformidad.' },
+  { key: 'validado', label: 'Validado', description: 'Administración: reembolsa al empleado y cierra.' },
+  { key: 'cerrado',  label: 'Cerrado',  description: 'Hoja cerrada.' },
 ]
 
 interface EstadoStepperProps {
@@ -57,6 +63,9 @@ export default function EstadoStepper({ estado, requiereAnticipo, rechazadoEn }:
     return {
       key: step.key,
       label: isRechazado && i === currentIndex ? 'Rechazado' : step.label,
+      description: isRechazado && i === currentIndex
+        ? `Rechazado. Empleado: corregir y reenviar.`
+        : step.description,
       status,
     }
   })
