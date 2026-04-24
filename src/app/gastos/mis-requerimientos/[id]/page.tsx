@@ -569,10 +569,11 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
   const canRetroceder = !['borrador', 'rechazado'].includes(hoja.estado) && ['admin', 'gerente', 'administracion'].includes(role || '')
   const canEliminar = hoja.estado === 'borrador' && role === 'admin'
   const esEmpleado = session?.user?.id === hoja.empleadoId
+  const canVolverABorrador = hoja.estado === 'rechazado' && (esEmpleado || ['admin', 'gerente', 'administracion'].includes(role || ''))
   const anticipos = (hoja.depositos || []).filter((d: any) => d.tipo !== 'devolucion')
   const devoluciones = (hoja.depositos || []).filter((d: any) => d.tipo === 'devolucion')
   const canRegistrarAnticipo = ['aprobado', 'depositado', 'rendido'].includes(hoja.estado) && ['admin', 'gerente', 'administracion'].includes(role || '')
-  const canRegistrarDevolucion = ['depositado', 'rendido'].includes(hoja.estado) && hoja.requiereAnticipo && (esEmpleado || ['admin', 'gerente', 'administracion'].includes(role || ''))
+  const canRegistrarDevolucion = ['depositado', 'rendido', 'validado'].includes(hoja.estado) && hoja.requiereAnticipo && (esEmpleado || ['admin', 'gerente', 'administracion'].includes(role || ''))
 
   return (
     <div className="container mx-auto p-4 sm:p-6 space-y-4 max-w-4xl">
@@ -631,13 +632,28 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
             requiereAnticipo={hoja.requiereAnticipo}
             rechazadoEn={hoja.rechazadoEn}
           />
-          {(canEnviar || canAprobar || canActivarAnticipo || canAvanzarDepositado || canMarcarSinAnticipo || canRendir || canValidarLineas || canCerrar || canRechazar || canRetroceder) && (
+          {(canEnviar || canAprobar || canActivarAnticipo || canAvanzarDepositado || canMarcarSinAnticipo || canRendir || canValidarLineas || canCerrar || canRechazar || canRetroceder || canVolverABorrador) && (
             <div className="flex flex-wrap gap-2 border-t pt-3">
               {canEnviar && (
                 <Button size="sm" onClick={handleEnviar} disabled={actionLoading} className="bg-blue-600 hover:bg-blue-700">
                   <Send className="h-3.5 w-3.5 mr-1" />
                   Enviar para aprobación
                 </Button>
+              )}
+              {canVolverABorrador && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button size="sm" variant="outline" onClick={handleRetroceder} disabled={actionLoading} className="border-amber-400 text-amber-700 hover:bg-amber-50">
+                        <Undo2 className="h-3.5 w-3.5 mr-1" />
+                        Volver a borrador
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-xs">
+                      Regresa el requerimiento a estado borrador para editar monto de anticipo, agregar ítems o eliminarlo antes de re-enviar.
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )}
               {canAprobar && (
                 <Button size="sm" onClick={handleAprobar} disabled={actionLoading} className="bg-emerald-600 hover:bg-emerald-700">
@@ -885,7 +901,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
                     <p className="text-xs text-muted-foreground italic">Sin devoluciones registradas.</p>
                   )}
                   {devoluciones.map((dep: any, idx: number) => {
-                    const canEliminarDev = ['depositado', 'rendido'].includes(hoja.estado) && (esEmpleado || ['admin', 'gerente', 'administracion'].includes(role || ''))
+                    const canEliminarDev = ['depositado', 'rendido', 'validado'].includes(hoja.estado) && (esEmpleado || ['admin', 'gerente', 'administracion'].includes(role || ''))
                     return (
                       <div key={dep.id} className="border border-teal-200 rounded-lg p-3 bg-teal-50/40">
                         <div className="flex items-center justify-between">

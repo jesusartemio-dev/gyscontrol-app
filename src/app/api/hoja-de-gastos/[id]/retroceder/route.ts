@@ -12,6 +12,9 @@ function estadoAnterior(estado: string, requiereAnticipo: boolean): string | nul
     case 'rendido':    return requiereAnticipo ? 'depositado' : 'aprobado'
     case 'validado':   return 'rendido'
     case 'cerrado':    return 'validado'
+    // Desde rechazado se regresa a borrador para que el dueño pueda corregir
+    // anticipo, ítems o eliminar el requerimiento antes de re-enviar.
+    case 'rechazado':  return 'borrador'
     default:           return null
   }
 }
@@ -23,14 +26,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    if (!['admin', 'gerente', 'administracion'].includes(session.user.role)) {
-      return NextResponse.json({ error: 'Sin permisos para retroceder estado' }, { status: 403 })
-    }
-
     const { id } = await params
     const hoja = await prisma.hojaDeGastos.findUnique({ where: { id } })
     if (!hoja) {
       return NextResponse.json({ error: 'Hoja de gastos no encontrada' }, { status: 404 })
+    }
+
+    const esAdmin = ['admin', 'gerente', 'administracion'].includes(session.user.role)
+    const esDuenoRechazado = hoja.estado === 'rechazado' && session.user.id === hoja.empleadoId
+
+    if (!esAdmin && !esDuenoRechazado) {
+      return NextResponse.json({ error: 'Sin permisos para retroceder estado' }, { status: 403 })
     }
 
     const estadoPrevio = estadoAnterior(hoja.estado, hoja.requiereAnticipo)
