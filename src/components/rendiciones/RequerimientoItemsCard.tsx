@@ -52,7 +52,7 @@ interface Props {
 
 interface ComprobanteLinea {
   itemId: string
-  proyectoId: string
+  proyectoId: string | null
   proyectoCodigo: string
   monto: number
 }
@@ -421,7 +421,7 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
         .map(item => ({
           itemId: item.id,
           proyectoId: item.proyectoId,
-          proyectoCodigo: item.proyecto?.codigo || item.proyectoId.slice(0, 8),
+          proyectoCodigo: item.proyecto?.codigo || item.proyectoId?.slice(0, 8) || '—',
           monto: 0,
         }))
     )
@@ -449,7 +449,7 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
         .map(item => ({
           itemId: item.id,
           proyectoId: item.proyectoId,
-          proyectoCodigo: item.proyecto?.codigo || item.proyectoId.slice(0, 8),
+          proyectoCodigo: item.proyecto?.codigo || item.proyectoId?.slice(0, 8) || '—',
           monto: itemsEnEsteComprobante.get(item.id) ?? 0,
         }))
     )
@@ -816,7 +816,7 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                         </td>
                         <td className="py-2 pr-3">
                           <Badge variant="outline" className="text-xs py-0 px-1.5 h-4 font-normal">
-                            {item.proyecto?.codigo || item.proyectoId.slice(0, 8)}
+                            {item.proyecto?.codigo || item.proyectoId?.slice(0, 8) || '—'}
                           </Badge>
                         </td>
                         <td className="py-2 pr-3">
