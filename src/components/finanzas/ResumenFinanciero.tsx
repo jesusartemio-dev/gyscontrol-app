@@ -62,7 +62,14 @@ export default function ResumenFinanciero({
       { label: 'Depositado', value: montoDepositado, icon: ArrowDownCircle, color: 'text-emerald-600', bg: 'bg-emerald-50', editable: false },
     ] : []),
     { label: 'Total gastado', value: montoGastado, icon: ArrowUpCircle, color: 'text-orange-600', bg: 'bg-orange-50', editable: false },
-    { label: 'Saldo', value: saldo, icon: Wallet, color: saldo >= 0 ? 'text-emerald-600' : 'text-red-600', bg: saldo >= 0 ? 'bg-emerald-50' : 'bg-red-50', editable: false },
+    {
+      label: saldo < 0 ? 'A reembolsar al empleado' : 'Saldo',
+      value: saldo < 0 ? Math.abs(saldo) : saldo,
+      icon: Wallet,
+      color: saldo >= 0 ? 'text-emerald-600' : 'text-amber-700',
+      bg: saldo >= 0 ? 'bg-emerald-50' : 'bg-amber-50',
+      editable: false,
+    },
   ]
 
   const hayMaterialesPendientes = materialesPendientesCount != null && materialesPendientesCount > 0

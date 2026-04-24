@@ -48,6 +48,7 @@ import {
   aprobarHoja,
   depositarHoja,
   rendirHoja,
+  marcarSinAnticipoHoja,
   validarHoja,
   cerrarHoja,
   rechazarHoja,
@@ -160,6 +161,14 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
 
   // Avanza el estado a "depositado" (requiere al menos un depósito registrado)
   const handleAvanzarDepositado = () => executeAction(() => depositarHoja(id), 'Avanzado a Depositado')
+
+  // Marca la hoja como sin anticipo (empleado gastó de su bolsillo).
+  // Si ya hay líneas válidas, avanza directo a "rendido" en la misma llamada.
+  const handleSinAnticipo = () => {
+    const msg = 'Marcar como "sin anticipo"? Esto indica que la empresa no entregó dinero al empleado; el saldo final quedará como reembolso pendiente a su favor.'
+    if (!window.confirm(msg)) return
+    executeAction(() => marcarSinAnticipoHoja(id), 'Marcada sin anticipo')
+  }
 
   const handleUploadAdjuntoDeposito = async (
     file: File,
@@ -535,6 +544,9 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
   const canDepositar = hoja.estado === 'aprobado' && hoja.requiereAnticipo && ['admin', 'gerente', 'administracion'].includes(role || '')
   const canActivarAnticipo = hoja.estado === 'aprobado' && !hoja.requiereAnticipo && ['admin', 'gerente', 'administracion'].includes(role || '')
   const canAvanzarDepositado = canDepositar && (hoja.depositos?.length ?? 0) > 0
+  // Marcar "sin anticipo": solo en estado aprobado, sin depósitos registrados.
+  // Cubre el caso donde el empleado gastó de su bolsillo (la empresa reembolsa al final).
+  const canMarcarSinAnticipo = hoja.estado === 'aprobado' && hoja.requiereAnticipo && (hoja.depositos?.length ?? 0) === 0 && ['admin', 'gerente', 'administracion'].includes(role || '')
   const canRendir = (hoja.estado === 'aprobado' && !hoja.requiereAnticipo) || hoja.estado === 'depositado'
   const itemsPendientesRendicion = hoja.tipoPropósito === 'compra_materiales'
     ? (hoja.itemsMateriales || []).filter(i => i.precioReal == null).length
@@ -619,7 +631,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
             requiereAnticipo={hoja.requiereAnticipo}
             rechazadoEn={hoja.rechazadoEn}
           />
-          {(canEnviar || canAprobar || canActivarAnticipo || canAvanzarDepositado || canRendir || canValidarLineas || canCerrar || canRechazar || canRetroceder) && (
+          {(canEnviar || canAprobar || canActivarAnticipo || canAvanzarDepositado || canMarcarSinAnticipo || canRendir || canValidarLineas || canCerrar || canRechazar || canRetroceder) && (
             <div className="flex flex-wrap gap-2 border-t pt-3">
               {canEnviar && (
                 <Button size="sm" onClick={handleEnviar} disabled={actionLoading} className="bg-blue-600 hover:bg-blue-700">
@@ -644,6 +656,27 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
                   <Banknote className="h-3.5 w-3.5 mr-1" />
                   Avanzar a Depositado
                 </Button>
+              )}
+              {canMarcarSinAnticipo && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleSinAnticipo}
+                        disabled={actionLoading}
+                        className="border-amber-400 text-amber-700 hover:bg-amber-50"
+                      >
+                        <FileCheck className="h-3.5 w-3.5 mr-1" />
+                        Sin anticipo
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-xs">
+                      El empleado gastó de su bolsillo. Salta el paso de depósito y deja el saldo como reembolso pendiente al empleado.
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )}
               {canRendir && (
                 <div className="flex items-center gap-1.5">
