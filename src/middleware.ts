@@ -60,5 +60,5 @@ const protectedRoutes = withAuth(
 export default protectedRoutes
 
 export const config = {
-  matcher: ['/((?!login|api|_next/static|_next/image|favicon.ico|ssoma/firma).*)'],
+  matcher: ['/((?!login|api|_next/static|_next/image|favicon.ico|manifest.json|sw.js|icons|ssoma/firma).*)'],
 }
