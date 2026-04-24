@@ -61,7 +61,6 @@ async function main() {
   const sistema = await prisma.user.findFirst({
     where: { OR: [{ email: 'sistema@gyscontrol.com' }, { role: 'admin' }] },
     select: { id: true, name: true },
-    orderBy: { createdAt: 'asc' },
   })
   if (!sistema) {
     console.error('❌ No se encontró usuario admin/sistema para registrar los eventos')
