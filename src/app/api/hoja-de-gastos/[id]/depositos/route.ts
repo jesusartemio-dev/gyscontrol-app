@@ -71,8 +71,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       if (!esEmpleado && !esAdmin) {
         return NextResponse.json({ error: 'Sin permisos para registrar esta devolución' }, { status: 403 })
       }
-      if (!['depositado', 'rendido'].includes(hoja.estado)) {
-        return NextResponse.json({ error: 'Solo se pueden registrar devoluciones cuando la hoja está en estado depositado o rendido' }, { status: 400 })
+      if (!['depositado', 'rendido', 'validado'].includes(hoja.estado)) {
+        return NextResponse.json({ error: 'Solo se pueden registrar devoluciones cuando la hoja está en estado depositado, rendido o validado' }, { status: 400 })
       }
     } else {
       return NextResponse.json({ error: 'Tipo de depósito inválido' }, { status: 400 })

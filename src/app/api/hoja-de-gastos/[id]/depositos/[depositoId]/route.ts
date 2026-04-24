@@ -55,9 +55,9 @@ export async function DELETE(
       if (hoja.empleadoId !== session.user.id && !['admin', 'gerente', 'administracion'].includes(session.user.role)) {
         return NextResponse.json({ error: 'Sin permisos para eliminar esta devolución' }, { status: 403 })
       }
-      if (!['depositado', 'rendido'].includes(hoja.estado)) {
+      if (!['depositado', 'rendido', 'validado'].includes(hoja.estado)) {
         return NextResponse.json({
-          error: 'Solo se pueden eliminar devoluciones cuando la hoja está en estado depositado o rendido',
+          error: 'Solo se pueden eliminar devoluciones cuando la hoja está en estado depositado, rendido o validado',
         }, { status: 400 })
       }
     }
