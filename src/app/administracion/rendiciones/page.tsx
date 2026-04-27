@@ -156,17 +156,38 @@ export default function RendicionesPage() {
   return (
     <div className="container mx-auto p-4 sm:p-6 space-y-4">
       {/* Header */}
-      <div>
-        <h1 className="text-xl font-bold flex items-center gap-2">
-          <FileCheck className="h-5 w-5 text-orange-600" />
-          Rendiciones por Validar
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {hojas.length === 0
-            ? 'No hay rendiciones pendientes'
-            : `${hojas.length} rendición${hojas.length === 1 ? '' : 'es'} pendiente${hojas.length === 1 ? '' : 's'} de validación`}
-        </p>
-      </div>
+      {(() => {
+        const porRevisar = hojas.filter(h => h.estado === 'rendido').length
+        const porValidar = hojas.filter(h => h.estado === 'revisado').length
+        return (
+          <div>
+            <h1 className="text-xl font-bold flex items-center gap-2">
+              <FileCheck className="h-5 w-5 text-orange-600" />
+              Revisión y Validación de Rendiciones
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              {hojas.length === 0
+                ? 'No hay rendiciones pendientes ✨'
+                : (
+                  <>
+                    {porRevisar > 0 && (
+                      <span className="text-cyan-700">
+                        {porRevisar} por revisar (admin)
+                      </span>
+                    )}
+                    {porRevisar > 0 && porValidar > 0 && <span> · </span>}
+                    {porValidar > 0 && (
+                      <span className="text-teal-700">
+                        {porValidar} por validar (coordinador)
+                      </span>
+                    )}
+                  </>
+                )
+              }
+            </p>
+          </div>
+        )
+      })()}
 
       {/* Cards */}
       {hojas.length === 0 ? (
@@ -197,9 +218,13 @@ export default function RendicionesPage() {
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className="font-mono text-sm font-bold">{hoja.numero}</span>
-                        <Badge className="bg-orange-100 text-orange-700 text-[10px]">Rendido</Badge>
+                        {hoja.estado === 'rendido' ? (
+                          <Badge className="bg-orange-100 text-orange-700 text-[10px]">Rendido · Por revisar</Badge>
+                        ) : (
+                          <Badge className="bg-cyan-100 text-cyan-700 text-[10px]">Revisado · Por validar</Badge>
+                        )}
                       </div>
                       <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
                         <span className="flex items-center gap-1">
