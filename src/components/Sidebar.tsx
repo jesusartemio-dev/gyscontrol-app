@@ -331,6 +331,7 @@ export default function Sidebar() {
       links: [
         { href: '/administracion', label: 'Dashboard', icon: LayoutDashboard },
         { href: '/administracion/gastos', label: 'Gestión de Gastos', icon: Receipt },
+        { href: '/administracion/gastos/pendientes', label: 'Pendientes de saldo', icon: AlertCircle },
         { href: '/administracion/rendiciones', label: 'Rendiciones', icon: FileCheck },
         { href: '/administracion/facturacion', label: 'Facturación', icon: FileSpreadsheet },
         { href: '/administracion/cuentas-cobrar', label: 'Cuentas por Cobrar', icon: ArrowDownCircle },
