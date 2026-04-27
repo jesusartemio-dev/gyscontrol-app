@@ -19,6 +19,7 @@ export interface OCImportRow {
   unidad: string
   cantidad: number
   precioUnitario: number
+  descuento: number   // % 0-100, opcional (default 0)
 }
 
 export interface OCValidatedRow extends OCImportRow {
@@ -94,6 +95,7 @@ interface OCExportRow {
     unidad: string
     cantidad: number
     precioUnitario: number
+    descuento?: number
     costoTotal: number
     cantidadRecibida: number
   }[]
@@ -186,6 +188,7 @@ export function validarOCImport(
     const unidad = String(row['Unidad'] || row['unidad'] || '').trim()
     const cantidadRaw = row['Cantidad'] || row['cantidad']
     const precioRaw = row['Precio Unitario'] || row['precioUnitario']
+    const descuentoRaw = row['Descuento %'] || row['Descuento'] || row['descuento']
 
     // Validar item
     if (!codigoItem) errores.push('Código Item es requerido')
@@ -200,6 +203,13 @@ export function validarOCImport(
     const precioUnitario = parseFloat(String(precioRaw || '0').replace(/,/g, ''))
     if (isNaN(precioUnitario) || precioUnitario <= 0) {
       errores.push('Precio Unitario debe ser mayor a 0')
+    }
+
+    let descuento = parseFloat(String(descuentoRaw || '0').replace(/,/g, ''))
+    if (isNaN(descuento)) descuento = 0
+    if (descuento < 0 || descuento > 100) {
+      errores.push('Descuento debe estar entre 0 y 100')
+      descuento = Math.max(0, Math.min(100, descuento))
     }
 
     // Validar RUC
@@ -266,7 +276,7 @@ export function validarOCImport(
       }
     }
 
-    const costoTotal = cantidad * precioUnitario
+    const costoTotal = cantidad * precioUnitario * (1 - descuento / 100)
 
     parsedRows.push({
       fila,
@@ -285,6 +295,7 @@ export function validarOCImport(
       unidad,
       cantidad,
       precioUnitario,
+      descuento,
       costoTotal,
       proveedorId,
       proyectoId,
@@ -394,6 +405,7 @@ export async function generarPlantillaOC() {
     { header: 'Unidad', key: 'unidad', width: 10 },
     { header: 'Cantidad', key: 'cantidad', width: 12 },
     { header: 'Precio Unitario', key: 'precioUnitario', width: 15 },
+    { header: 'Descuento %', key: 'descuento', width: 12 },
   ]
 
   // Estilo header
@@ -518,6 +530,7 @@ export async function generarPlantillaOC() {
     ['Unidad', 'Sí', 'Unidad de medida (und, kg, m, glb, etc.).'],
     ['Cantidad', 'Sí', 'Cantidad a comprar. Debe ser mayor a 0.'],
     ['Precio Unitario', 'Sí', 'Precio unitario sin IGV. Debe ser mayor a 0.'],
+    ['Descuento %', 'No', '% de descuento sobre el subtotal de la línea (0–100). Si lo omite, queda en 0.'],
   ]
   for (const [campo, req, desc] of instrucciones) {
     wsInfo.addRow({ campo, requerido: req, descripcion: desc })
@@ -558,6 +571,7 @@ export async function exportarOCAExcel(ordenes: OCExportRow[]) {
     { header: 'Unidad', key: 'unidad', width: 10 },
     { header: 'Cantidad', key: 'cantidad', width: 12 },
     { header: 'P. Unitario', key: 'precioUnitario', width: 14 },
+    { header: 'Desc. %', key: 'descuento', width: 10 },
     { header: 'Costo Total', key: 'costoTotal', width: 14 },
     { header: 'Cant. Recibida', key: 'cantRecibida', width: 14 },
     { header: 'Subtotal OC', key: 'subtotal', width: 14 },
@@ -615,6 +629,7 @@ export async function exportarOCAExcel(ordenes: OCExportRow[]) {
           unidad: item.unidad,
           cantidad: item.cantidad,
           precioUnitario: item.precioUnitario,
+          descuento: item.descuento ?? 0,
           costoTotal: item.costoTotal,
           cantRecibida: item.cantidadRecibida,
           subtotal: i === 0 ? oc.subtotal : '',

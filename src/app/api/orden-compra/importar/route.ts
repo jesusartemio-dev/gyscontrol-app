@@ -88,15 +88,19 @@ export async function POST(req: Request) {
 
         const numero = await generarNumeroOC()
 
-        const items = oc.items.map(item => ({
-          codigo: item.codigo,
-          descripcion: item.descripcion,
-          unidad: item.unidad,
-          cantidad: item.cantidad,
-          precioUnitario: item.precioUnitario,
-          costoTotal: item.cantidad * item.precioUnitario,
-          updatedAt: new Date(),
-        }))
+        const items = oc.items.map(item => {
+          const descuento = Math.max(0, Math.min(100, Number((item as any).descuento) || 0))
+          return {
+            codigo: item.codigo,
+            descripcion: item.descripcion,
+            unidad: item.unidad,
+            cantidad: item.cantidad,
+            precioUnitario: item.precioUnitario,
+            descuento,
+            costoTotal: item.cantidad * item.precioUnitario * (1 - descuento / 100),
+            updatedAt: new Date(),
+          }
+        })
 
         const subtotal = items.reduce((sum, it) => sum + it.costoTotal, 0)
         const igv = subtotal * 0.18

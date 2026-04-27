@@ -101,18 +101,22 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       // Delete existing items
       await prisma.ordenCompraItem.deleteMany({ where: { ordenCompraId: id } })
 
-      const newItems = payload.items.map((item: any) => ({
-        ordenCompraId: id,
-        codigo: item.codigo,
-        descripcion: item.descripcion,
-        unidad: item.unidad,
-        cantidad: item.cantidad,
-        precioUnitario: item.precioUnitario,
-        costoTotal: item.cantidad * item.precioUnitario,
-        pedidoEquipoItemId: item.pedidoEquipoItemId || null,
-        listaEquipoItemId: item.listaEquipoItemId || null,
-        updatedAt: new Date(),
-      }))
+      const newItems = payload.items.map((item: any) => {
+        const descuento = Math.max(0, Math.min(100, Number(item.descuento) || 0))
+        return {
+          ordenCompraId: id,
+          codigo: item.codigo,
+          descripcion: item.descripcion,
+          unidad: item.unidad,
+          cantidad: item.cantidad,
+          precioUnitario: item.precioUnitario,
+          descuento,
+          costoTotal: item.cantidad * item.precioUnitario * (1 - descuento / 100),
+          pedidoEquipoItemId: item.pedidoEquipoItemId || null,
+          listaEquipoItemId: item.listaEquipoItemId || null,
+          updatedAt: new Date(),
+        }
+      })
 
       await prisma.ordenCompraItem.createMany({ data: newItems })
 

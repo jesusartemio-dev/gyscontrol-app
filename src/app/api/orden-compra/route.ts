@@ -148,17 +148,21 @@ export async function POST(req: Request) {
     const numero = await generarNumeroOC()
 
     // Calculate totals
-    const items = payload.items.map((item: any) => ({
-      codigo: item.codigo || '',
-      descripcion: item.descripcion,
-      unidad: item.unidad,
-      cantidad: item.cantidad,
-      precioUnitario: item.precioUnitario,
-      costoTotal: item.cantidad * item.precioUnitario,
-      pedidoEquipoItemId: item.pedidoEquipoItemId || null,
-      listaEquipoItemId: item.listaEquipoItemId || null,
-      updatedAt: new Date(),
-    }))
+    const items = payload.items.map((item: any) => {
+      const descuento = Math.max(0, Math.min(100, Number(item.descuento) || 0))
+      return {
+        codigo: item.codigo || '',
+        descripcion: item.descripcion,
+        unidad: item.unidad,
+        cantidad: item.cantidad,
+        precioUnitario: item.precioUnitario,
+        descuento,
+        costoTotal: item.cantidad * item.precioUnitario * (1 - descuento / 100),
+        pedidoEquipoItemId: item.pedidoEquipoItemId || null,
+        listaEquipoItemId: item.listaEquipoItemId || null,
+        updatedAt: new Date(),
+      }
+    })
 
     const subtotal = items.reduce((sum: number, i: any) => sum + i.costoTotal, 0)
     const igv = subtotal * 0.18

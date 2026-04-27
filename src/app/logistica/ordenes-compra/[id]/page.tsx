@@ -129,7 +129,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
   const [catalogoCantidades, setCatalogoCantidades] = useState<Record<string, number>>({})
   const [addingItems, setAddingItems] = useState(false)
   const [showAddManual, setShowAddManual] = useState(false)
-  const [manualItem, setManualItem] = useState({ descripcion: '', unidad: 'UND', cantidad: 1, precioUnitario: 0 })
+  const [manualItem, setManualItem] = useState({ descripcion: '', unidad: 'UND', cantidad: 1, precioUnitario: 0, descuento: 0 })
 
   // Header edit modal state
   const [headerEditOpen, setHeaderEditOpen] = useState(false)
@@ -347,7 +347,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
       if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Error') }
       toast.success('Item agregado')
       setShowAddManual(false)
-      setManualItem({ descripcion: '', unidad: 'UND', cantidad: 1, precioUnitario: 0 })
+      setManualItem({ descripcion: '', unidad: 'UND', cantidad: 1, precioUnitario: 0, descuento: 0 })
       await loadData()
     } catch (err: any) {
       toast.error(err.message || 'Error al agregar item')
@@ -806,6 +806,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
                 <TableHead className="w-[70px]">Unidad</TableHead>
                 <TableHead className="w-[70px] text-right">Cant.</TableHead>
                 <TableHead className="w-[100px] text-right">P. Unit.</TableHead>
+                <TableHead className="w-[70px] text-right">Desc. %</TableHead>
                 <TableHead className="w-[100px] text-right">Total</TableHead>
                 {['confirmada', 'parcial', 'completada'].includes(oc.estado) && (
                   <TableHead className="w-[100px] text-right">Recibido</TableHead>
@@ -822,6 +823,13 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
                   <TableCell className="text-xs">{item.unidad}</TableCell>
                   <TableCell className="text-right font-mono text-sm">{item.cantidad}</TableCell>
                   <TableCell className="text-right font-mono text-sm">{formatCurrency(item.precioUnitario, oc.moneda)}</TableCell>
+                  <TableCell className="text-right font-mono text-sm">
+                    {(item.descuento ?? 0) > 0 ? (
+                      <span className="text-red-600">{Number(item.descuento).toFixed(2)}%</span>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-right font-mono text-sm">{formatCurrency(item.costoTotal, oc.moneda)}</TableCell>
                   {['confirmada', 'parcial', 'completada'].includes(oc.estado) && (
                     <TableCell className="text-right">
@@ -1274,7 +1282,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
               <Label className="text-xs">Descripción <span className="text-red-500">*</span></Label>
               <Input value={manualItem.descripcion} onChange={e => setManualItem(p => ({ ...p, descripcion: e.target.value }))} placeholder="Descripción del item" />
             </div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-4 gap-3">
               <div>
                 <Label className="text-xs">Unidad</Label>
                 <Input value={manualItem.unidad} onChange={e => setManualItem(p => ({ ...p, unidad: e.target.value }))} />
@@ -1286,6 +1294,10 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
               <div>
                 <Label className="text-xs">P. Unit. <span className="text-red-500">*</span></Label>
                 <Input type="number" min={0} step={0.01} value={manualItem.precioUnitario} onChange={e => setManualItem(p => ({ ...p, precioUnitario: parseFloat(e.target.value) || 0 }))} />
+              </div>
+              <div>
+                <Label className="text-xs">Desc. %</Label>
+                <Input type="number" min={0} max={100} step={0.01} value={manualItem.descuento} onChange={e => setManualItem(p => ({ ...p, descuento: parseFloat(e.target.value) || 0 }))} placeholder="0" />
               </div>
             </div>
           </div>
