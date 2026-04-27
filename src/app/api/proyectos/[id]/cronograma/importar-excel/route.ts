@@ -5,6 +5,7 @@
 
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import { ROLES_CRONOGRAMA, validarPermisoCronograma } from '@/lib/services/cronogramaPermisos'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { parseDuration, parseWork } from '@/lib/utils/msProjectExcelParser'
@@ -51,8 +52,14 @@ export async function POST(
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session) {
+    if (!session?.user) {
       return NextResponse.json({ message: 'No autorizado' }, { status: 401 })
+    }
+    if (!ROLES_CRONOGRAMA.includes(session.user.role as any)) {
+      return NextResponse.json(
+        { message: 'Sin permisos para modificar cronogramas. Solo admin, gerente, gestor y coordinador pueden hacerlo.' },
+        { status: 403 }
+      )
     }
 
     const { id: proyectoId } = await params
@@ -108,9 +115,10 @@ export async function POST(
       where: { proyectoId, tipo: 'planificacion' },
     })
 
-    // Check cronograma lock
-    if (cronograma?.id && await isCronogramaBloqueado(cronograma.id)) {
-      return cronogramaBloqueadoResponse()
+    // Si existe, validar permisos completos (rol + tipo + bloqueo)
+    if (cronograma?.id) {
+      const permiso = await validarPermisoCronograma(cronograma.id)
+      if (!permiso.ok) return permiso.response
     }
 
     if (cronograma) {

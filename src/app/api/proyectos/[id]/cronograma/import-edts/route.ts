@@ -9,6 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import { validarPermisoCronograma } from '@/lib/services/cronogramaPermisos'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
@@ -194,6 +195,10 @@ export async function POST(
         { status: 404 }
       )
     }
+
+    // ✅ Validar permisos: solo admin/gerente/gestor/coordinador y NO en cronograma comercial
+    const permiso = await validarPermisoCronograma(cronograma.id)
+    if (!permiso.ok) return permiso.response
 
     console.log('✅ Cronograma encontrado:', cronograma.id)
 

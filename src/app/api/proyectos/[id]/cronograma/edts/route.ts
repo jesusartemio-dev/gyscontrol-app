@@ -14,6 +14,7 @@ import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { recalcularPadresPostOperacion } from '@/lib/utils/cronogramaRollup'
 import { logger } from '@/lib/logger'
+import { validarPermisoCronograma } from '@/lib/services/cronogramaPermisos'
 
 // ✅ Schema de validación para crear EDT
 const createEdtSchema = z.object({
@@ -191,6 +192,10 @@ export async function POST(
         { status: 404 }
       )
     }
+
+    // ✅ Validar permisos: solo admin/gerente/gestor/coordinador y NO en cronograma comercial
+    const permiso = await validarPermisoCronograma(cronogramaId)
+    if (!permiso.ok) return permiso.response
 
     // ✅ Crear el EDT
     const edt = await prisma.proyectoEdt.create({

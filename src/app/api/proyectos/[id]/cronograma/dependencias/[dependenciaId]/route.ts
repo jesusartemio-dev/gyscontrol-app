@@ -10,6 +10,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
+import { validarPermisoCronogramaPorTarea } from '@/lib/services/cronogramaPermisos'
 
 // ✅ DELETE /api/proyectos/[id]/cronograma/dependencias/[dependenciaId]
 export async function DELETE(
@@ -44,6 +45,10 @@ export async function DELETE(
         error: 'Dependencia no encontrada o no pertenece a este proyecto'
       }, { status: 404 })
     }
+
+    // ✅ Validar permisos: solo admin/gerente/gestor/coordinador y NO en cronograma comercial
+    const permiso = await validarPermisoCronogramaPorTarea(dependencia.tareaOrigenId)
+    if (!permiso.ok) return permiso.response
 
     // ✅ Eliminar dependencia
     await prisma.proyectoDependenciasTarea.delete({

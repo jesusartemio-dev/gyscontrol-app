@@ -14,6 +14,7 @@ import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { recalcularPadresPostOperacion } from '@/lib/utils/cronogramaRollup'
 import { logger } from '@/lib/logger'
+import { validarPermisoCronograma } from '@/lib/services/cronogramaPermisos'
 
 // ✅ Schema de validación para crear actividad (5 niveles)
 const createActividadSchema = z.object({
@@ -246,6 +247,10 @@ export async function POST(
       cronogramaId = cronograma.id
       console.log('✅ [API ACTIVIDADES] Cronograma baseline ID determinado:', cronogramaId)
     }
+
+    // ✅ Validar permisos: solo admin/gerente/gestor/coordinador y NO en cronograma comercial
+    const permiso = await validarPermisoCronograma(cronogramaId)
+    if (!permiso.ok) return permiso.response
 
     // ✅ Determinar fechas automáticamente según posicionamiento
     let fechaInicioPlan: Date | null = null

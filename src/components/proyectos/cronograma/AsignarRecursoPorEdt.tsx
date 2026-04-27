@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Wrench, Loader2, CheckCircle } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
@@ -17,6 +18,7 @@ interface EdtResumen {
   recursoActualId: string | null
   recursoActualNombre: string | null
   mixto: boolean
+  recursosUnicos?: string[]
 }
 
 interface RecursoOption {
@@ -75,6 +77,21 @@ export function AsignarRecursoPorEdt({
   const handleAsignar = async (edtId: string, recursoId: string) => {
     const finalRecursoId = recursoId === '__none__' ? null : recursoId
     const edt = edts.find(e => e.id === edtId)
+
+    // Confirmar antes de sobreescribir un EDT mixto
+    if (edt?.mixto && finalRecursoId !== edt.recursoActualId) {
+      const recursosListados = (edt.recursosUnicos && edt.recursosUnicos.length > 0)
+        ? edt.recursosUnicos.join(', ')
+        : 'varios distintos'
+      const accionTexto = finalRecursoId
+        ? `asignar a TODAS las tareas un solo recurso`
+        : `eliminar el recurso de TODAS las tareas`
+      const confirmado = window.confirm(
+        `Este EDT tiene tareas con recursos distintos (${recursosListados}). ` +
+        `Vas a ${accionTexto}, sobreescribiendo lo existente. ¿Continuar?`
+      )
+      if (!confirmado) return
+    }
 
     try {
       setSaving(edtId)
@@ -221,9 +238,28 @@ export function AsignarRecursoPorEdt({
                             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />
                           )}
                           {edt.mixto && saving !== edt.id && (
-                            <Badge variant="outline" className="text-[9px] shrink-0 border-orange-300 text-orange-600">
-                              mixto
-                            </Badge>
+                            <TooltipProvider delayDuration={200}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge variant="outline" className="text-[9px] shrink-0 border-orange-300 text-orange-600 cursor-help">
+                                    mixto
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent side="left" className="max-w-xs text-xs">
+                                  <p className="font-medium mb-0.5">Tareas con recursos distintos:</p>
+                                  {edt.recursosUnicos && edt.recursosUnicos.length > 0 ? (
+                                    <ul className="list-disc list-inside space-y-0.5">
+                                      {edt.recursosUnicos.map(nombre => (
+                                        <li key={nombre}>{nombre}</li>
+                                      ))}
+                                    </ul>
+                                  ) : (
+                                    <p>Varios recursos distintos.</p>
+                                  )}
+                                  <p className="mt-1 italic text-orange-200">Al elegir un recurso aquí se sobreescribe en todas las tareas.</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                           )}
                         </div>
                       </td>

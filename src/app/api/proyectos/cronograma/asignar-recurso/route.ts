@@ -189,6 +189,7 @@ export async function GET(request: NextRequest) {
       let recursoActualId: string | null = null
       let recursoActualNombre: string | null = null
       let mixto = false
+      const recursosUnicos: string[] = []
 
       if (totalTareas > 0 && tareasConRecurso > 0) {
         const primerRecursoId = edt.proyectoTarea.find(t => t.recursoId)?.recursoId || null
@@ -200,6 +201,12 @@ export async function GET(request: NextRequest) {
           recursoActualNombre = edt.proyectoTarea.find(t => t.recursoId)?.recurso?.nombre || null
         } else if (tareasConRecurso > 0) {
           mixto = true
+          // Lista de recursos únicos asignados (para mostrar en tooltip)
+          const setNombres = new Set<string>()
+          for (const t of edt.proyectoTarea) {
+            if (t.recurso?.nombre) setNombres.add(t.recurso.nombre)
+          }
+          recursosUnicos.push(...Array.from(setNombres).sort())
         }
       }
 
@@ -212,6 +219,7 @@ export async function GET(request: NextRequest) {
         recursoActualId,
         recursoActualNombre,
         mixto,
+        recursosUnicos, // ['Supervisor', 'Programador', ...] cuando es mixto
       }
     })
 

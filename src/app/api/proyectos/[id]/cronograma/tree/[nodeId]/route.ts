@@ -13,6 +13,22 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { logger } from '@/lib/logger'
+import {
+  validarPermisoCronogramaPorEdt,
+  validarPermisoCronogramaPorTarea,
+  validarPermisoCronogramaPorFase,
+  validarPermisoCronogramaPorActividad,
+} from '@/lib/services/cronogramaPermisos'
+
+async function validarPorTipoNodo(nodeType: string, realId: string) {
+  switch (nodeType) {
+    case 'fase':       return validarPermisoCronogramaPorFase(realId)
+    case 'edt':        return validarPermisoCronogramaPorEdt(realId)
+    case 'actividad':  return validarPermisoCronogramaPorActividad(realId)
+    case 'tarea':      return validarPermisoCronogramaPorTarea(realId)
+    default:           return null
+  }
+}
 
 // Schema de validación para actualizar nodos
 const updateNodeSchema = z.object({
@@ -91,6 +107,10 @@ export async function PUT(
         { status: 400 }
       )
     }
+
+    // ✅ Validar permisos: solo admin/gerente/gestor/coordinador y NO en cronograma comercial
+    const permiso = await validarPorTipoNodo(nodeType, realId)
+    if (permiso && !permiso.ok) return permiso.response
 
     console.log('🔍 [API TREE UPDATE] Actualizando:', { nodeType, realId, validatedData })
     console.log('🔍 [API TREE UPDATE] Orden value:', validatedData.orden)
@@ -266,6 +286,10 @@ export async function DELETE(
         { status: 400 }
       )
     }
+
+    // ✅ Validar permisos: solo admin/gerente/gestor/coordinador y NO en cronograma comercial
+    const permiso = await validarPorTipoNodo(nodeType, realId)
+    if (permiso && !permiso.ok) return permiso.response
 
     console.log('🔍 [API TREE DELETE] Eliminando:', { nodeType, realId })
 

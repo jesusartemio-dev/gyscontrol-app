@@ -12,18 +12,19 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
+import { validarPermisoCronograma } from '@/lib/services/cronogramaPermisos'
 
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; cronogramaId: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    }
-
     const { id, cronogramaId } = await params
+
+    // ✅ Validar permisos: solo admin/gerente/gestor/coordinador y NO en cronograma comercial
+    // Permitimos ignoreBloqueo porque marcar baseline cambia el estado bloqueado
+    const permiso = await validarPermisoCronograma(cronogramaId, { ignoreBloqueo: true })
+    if (!permiso.ok) return permiso.response
 
     // ✅ Validar que el proyecto existe
     const proyecto = await prisma.proyecto.findUnique({

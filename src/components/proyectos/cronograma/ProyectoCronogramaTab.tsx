@@ -54,7 +54,6 @@ import { ProyectoCronogramaTreeView } from './ProyectoCronogramaTreeView'
 import { ProyectoGanttView } from './ProyectoGanttView'
 // CronogramaGanttViewPro deshabilitado - funcionalidad consolidada en Gantt
 import { ProyectoDependencyManager } from './ProyectoDependencyManager'
-import { convertToMSProjectXML, downloadMSProjectXML } from '@/lib/utils/msProjectXmlExport'
 import { exportCronogramaToExcel, type RecursoExport } from '@/lib/utils/msProjectExcelExport'
 import ImportExcelCronogramaModal from './ImportExcelCronogramaModal'
 import { CronogramaVarianza } from './CronogramaVarianza'
@@ -460,84 +459,6 @@ export function ProyectoCronogramaTab({
         description: error instanceof Error ? error.message : 'No se pudo eliminar.',
         variant: 'destructive'
       })
-    }
-  }
-
-  const handleExportXML = async () => {
-    try {
-      setIsLoading(true)
-      toast({ title: 'Generando XML...', description: 'Obteniendo datos del cronograma.' })
-
-      const cronogramaId = selectedCronograma?.id
-      const treeUrl = cronogramaId
-        ? `/api/proyectos/${proyectoId}/cronograma/tree?cronogramaId=${cronogramaId}`
-        : `/api/proyectos/${proyectoId}/cronograma/tree`
-
-      const treeResponse = await fetch(treeUrl)
-      if (!treeResponse.ok) throw new Error('Error al obtener estructura')
-      const treeData = await treeResponse.json()
-
-      interface GanttTask {
-        id: string
-        nombre: string
-        tipo: 'fase' | 'edt' | 'actividad' | 'tarea'
-        fechaInicio: Date | null
-        fechaFin: Date | null
-        progreso: number
-        estado: string
-        nivel: number
-        parentId?: string
-        children?: GanttTask[]
-      }
-
-      const transformToGanttTasks = (items: any[], parentId?: string): GanttTask[] => {
-        if (!items || !Array.isArray(items)) return []
-        return items.map((item: any) => {
-          const itemData = item.data || {}
-          const tipo = (item.type || 'tarea') as 'fase' | 'edt' | 'actividad' | 'tarea'
-          const fechaInicio = itemData.fechaInicio || itemData.fechaInicioComercial
-          const fechaFin = itemData.fechaFin || itemData.fechaFinComercial
-
-          const task: GanttTask = {
-            id: item.id?.replace(/^(fase|edt|actividad|tarea)-/, '') || item.id,
-            nombre: item.nombre || 'Sin nombre',
-            tipo,
-            fechaInicio: fechaInicio ? new Date(fechaInicio) : null,
-            fechaFin: fechaFin ? new Date(fechaFin) : null,
-            progreso: itemData.progreso || 0,
-            estado: itemData.estado || 'pendiente',
-            nivel: item.level || 0,
-            parentId
-          }
-
-          if (item.children?.length > 0) {
-            task.children = transformToGanttTasks(item.children, item.id)
-          }
-          return task
-        })
-      }
-
-      const treeArray = treeData?.data?.tree || treeData?.tree || []
-      const ganttTasks = transformToGanttTasks(Array.isArray(treeArray) ? treeArray : [])
-
-      if (ganttTasks.length === 0) {
-        toast({ title: 'Sin datos', description: 'No hay elementos para exportar.', variant: 'destructive' })
-        return
-      }
-
-      const xmlContent = convertToMSProjectXML(ganttTasks, `Cronograma - ${proyectoNombre}`, null)
-      const filename = `cronograma-${proyectoNombre.replace(/[^a-zA-Z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.xml`
-      downloadMSProjectXML(xmlContent, filename)
-
-      toast({ title: 'Exportación completada', description: `Archivo ${filename} descargado.` })
-    } catch (error) {
-      toast({
-        title: 'Error en exportación',
-        description: error instanceof Error ? error.message : 'No se pudo exportar.',
-        variant: 'destructive'
-      })
-    } finally {
-      setIsLoading(false)
     }
   }
 
@@ -988,14 +909,6 @@ export function ProyectoCronogramaTab({
                   cronogramaId={selectedCronograma?.id}
                   onDependenciaChange={handleRefresh}
                 />
-              </DropdownMenuItem>
-
-              <DropdownMenuItem onSelect={() => {
-                setDropdownOpen(false)
-                setTimeout(() => handleExportXML(), 100)
-              }} disabled={isLoading}>
-                <Download className="h-4 w-4 mr-2" />
-                Exportar XML
               </DropdownMenuItem>
 
               <DropdownMenuItem onSelect={() => {

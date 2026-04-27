@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { validarPermisoCronogramaPorTarea } from '@/lib/services/cronogramaPermisos'
 
 // ✅ GET /api/proyecto-edt/[id]/tareas/[tareaId] - Obtener tarea individual
 export async function GET(
@@ -103,27 +104,17 @@ export async function PUT(
   { params }: { params: Promise<{ id: string; tareaId: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    }
-
     const { id, tareaId } = await params
+    const permiso = await validarPermisoCronogramaPorTarea(tareaId)
+    if (!permiso.ok) return permiso.response
+
     const data = await request.json()
 
-    // Verificar permisos y existencia
+    // Verificar existencia (los permisos ya los validó validarPermisoCronogramaPorTarea)
     const tareaExistente = await prisma.proyectoTarea.findFirst({
       where: {
         id: tareaId,
         proyectoEdtId: id,
-        proyectoEdt: {
-          proyecto: {
-            OR: [
-              { comercialId: session.user.id },
-              { gestorId: session.user.id }
-            ]
-          }
-        }
       },
       include: {
         proyectoEdt: {
@@ -208,12 +199,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; tareaId: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    }
-
     const { id, tareaId } = await params
+    const permiso = await validarPermisoCronogramaPorTarea(tareaId)
+    if (!permiso.ok) return permiso.response
 
     // Verificar existencia
     const tarea = await prisma.proyectoTarea.findFirst({
@@ -228,8 +216,8 @@ export async function DELETE(
     }
 
     // Solo el creador o admin pueden eliminar
-    const esAdmin = session.user.role === 'admin'
-    const esCreador = tarea.creadoPorId === session.user.id
+    const esAdmin = permiso.role === 'admin'
+    const esCreador = tarea.creadoPorId === permiso.userId
     if (!esAdmin && !esCreador) {
       return NextResponse.json(
         { error: 'Solo el creador de la tarea o un administrador puede eliminarla' },

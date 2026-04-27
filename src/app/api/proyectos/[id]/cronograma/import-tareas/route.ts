@@ -9,6 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import { validarPermisoCronogramaPorActividad } from '@/lib/services/cronogramaPermisos'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
@@ -195,6 +196,10 @@ export async function POST(
 
     // ✅ Limpiar el ID de actividad (remover prefijo si existe)
     const cleanActividadId = actividadId.replace(/^actividad-/, '')
+
+    // ✅ Validar permisos: solo admin/gerente/gestor/coordinador y NO en cronograma comercial
+    const permiso = await validarPermisoCronogramaPorActividad(cleanActividadId)
+    if (!permiso.ok) return permiso.response
 
     // ✅ Validar que la actividad existe y pertenece al proyecto
     const actividad = await prisma.proyectoActividad.findFirst({

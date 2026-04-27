@@ -13,6 +13,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { logger } from '@/lib/logger'
+import { validarPermisoCronograma } from '@/lib/services/cronogramaPermisos'
 
 // ✅ Schema de validación para crear fase
 const createFaseSchema = z.object({
@@ -111,6 +112,10 @@ export async function POST(
 
     // ✅ Validar datos de entrada
     const validatedData = createFaseSchema.parse(body)
+
+    // ✅ Validar permisos: solo admin/gerente/gestor/coordinador y NO en cronograma comercial
+    const permiso = await validarPermisoCronograma(validatedData.proyectoCronogramaId)
+    if (!permiso.ok) return permiso.response
 
     // ✅ Validar que el proyecto existe
     const proyecto = await prisma.proyecto.findUnique({

@@ -14,6 +14,7 @@ import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { recalcularPadresPostOperacion } from '@/lib/utils/cronogramaRollup'
 import { logger } from '@/lib/logger'
+import { validarPermisoCronograma } from '@/lib/services/cronogramaPermisos'
 
 // ✅ Schema de validación para crear tarea
 const createTareaSchema = z.object({
@@ -239,6 +240,10 @@ export async function POST(
     // ✅ Obtener el cronograma de la actividad para asignarlo a la tarea
     // Nota: Las tareas heredan el cronograma de su actividad padre
     const cronogramaId = actividad.proyectoCronogramaId
+
+    // ✅ Validar permisos: solo admin/gerente/gestor/coordinador y NO en cronograma comercial
+    const permiso = await validarPermisoCronograma(cronogramaId)
+    if (!permiso.ok) return permiso.response
 
     // ✅ Validar que el cronograma sea baseline si es de planificación
     const cronograma = await prisma.proyectoCronograma.findUnique({

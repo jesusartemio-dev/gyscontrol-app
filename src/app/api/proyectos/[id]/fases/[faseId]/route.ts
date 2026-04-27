@@ -12,6 +12,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { validarPermisoCronogramaPorFase } from '@/lib/services/cronogramaPermisos'
 import { logger } from '@/lib/logger'
 
 // ✅ Schema de validación para actualizar fase
@@ -106,12 +107,10 @@ export async function PUT(
   { params }: { params: Promise<{ id: string; faseId: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    }
-
     const { id, faseId } = await params
+    const permiso = await validarPermisoCronogramaPorFase(faseId)
+    if (!permiso.ok) return permiso.response
+
     const body = await request.json()
 
     // ✅ Validar datos de entrada
@@ -197,12 +196,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; faseId: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    }
-
     const { id, faseId } = await params
+    const permiso = await validarPermisoCronogramaPorFase(faseId)
+    if (!permiso.ok) return permiso.response
 
     // ✅ Validar que la fase existe y pertenece al proyecto
     const fase = await prisma.proyectoFase.findFirst({
