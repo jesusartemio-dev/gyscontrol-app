@@ -155,7 +155,8 @@ export function AsignarRecursoPorEdt({
             Asignar Recursos por EDT
           </DialogTitle>
           <p className="text-sm text-muted-foreground">
-            Selecciona un recurso para cada EDT. Se asignará automáticamente a todas sus tareas.
+            Selecciona un recurso para cada EDT. Se asignará a todas sus tareas del plan.
+            <span className="block text-[11px] mt-0.5 italic">Las tareas extras (fuera del plan) no se modifican.</span>
           </p>
         </DialogHeader>
 

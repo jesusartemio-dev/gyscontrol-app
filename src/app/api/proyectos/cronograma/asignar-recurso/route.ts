@@ -111,6 +111,8 @@ export async function PUT(request: NextRequest) {
 
       const result = await prisma.proyectoTarea.updateMany({
         where: {
+          // No tocamos tareas extras (esExtra=true) — están fuera del plan
+          esExtra: false,
           OR: [
             { proyectoEdtId: id },
             ...(actividadIds.length > 0
@@ -155,7 +157,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'cronogramaId requerido' }, { status: 400 })
     }
 
-    // Cargar EDTs con tareas y recurso info
+    // Cargar EDTs con tareas y recurso info.
+    // ⚠️ Excluimos tareas extras (esExtra=true) porque están "fuera del plan"
+    // y no deben afectar la asignación masiva por EDT.
     const edts = await prisma.proyectoEdt.findMany({
       where: { proyectoCronogramaId: cronogramaId },
       select: {
@@ -163,6 +167,7 @@ export async function GET(request: NextRequest) {
         nombre: true,
         orden: true,
         proyectoTarea: {
+          where: { esExtra: false },
           select: {
             id: true,
             recursoId: true,
