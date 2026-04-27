@@ -37,6 +37,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const unidad = body.unidad !== undefined ? body.unidad : item.unidad
     const precioUnitario = body.precioUnitario !== undefined ? Number(body.precioUnitario) : item.precioUnitario
     const cantidad = body.cantidad !== undefined ? Number(body.cantidad) : item.cantidad
+    const descuento = body.descuento !== undefined ? Number(body.descuento) : item.descuento
 
     if (precioUnitario < 0) {
       return NextResponse.json({ error: 'El precio no puede ser negativo' }, { status: 400 })
@@ -44,8 +45,12 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (cantidad <= 0) {
       return NextResponse.json({ error: 'La cantidad debe ser mayor a 0' }, { status: 400 })
     }
+    if (descuento < 0 || descuento > 100) {
+      return NextResponse.json({ error: 'El descuento debe estar entre 0 y 100' }, { status: 400 })
+    }
 
-    const costoTotal = precioUnitario * cantidad
+    const subtotalLinea = precioUnitario * cantidad
+    const costoTotal = subtotalLinea * (1 - descuento / 100)
 
     const now = new Date()
 
@@ -60,6 +65,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
           unidad,
           precioUnitario,
           cantidad,
+          descuento,
           costoTotal,
           updatedAt: now,
         },

@@ -3685,7 +3685,8 @@ model OrdenCompraItem {
   unidad             String
   cantidad           Float
   precioUnitario     Float
-  costoTotal         Float
+  descuento          Float    @default(0) // % de descuento sobre el subtotal (0-100)
+  costoTotal         Float // Neto después de descuento: cantidad × precioUnitario × (1 - descuento/100)
   cantidadRecibida   Float    @default(0)
   createdAt          DateTime @default(now())
   updatedAt          DateTime

@@ -325,7 +325,7 @@ function OrdenCompraPDF({ oc }: Props) {
           <View style={styles.colUnd}><Text style={styles.tableCell}>{item.unidad}</Text></View>
           <View style={styles.colCant}><Text style={styles.tableCellRight}>{Number(item.cantidad).toFixed(2)}</Text></View>
           <View style={styles.colPrecio}><Text style={styles.tableCellRight}>{Number(item.precioUnitario).toFixed(2)}</Text></View>
-          <View style={styles.colDesc_}><Text style={styles.tableCellCenter}>0.00</Text></View>
+          <View style={styles.colDesc_}><Text style={styles.tableCellCenter}>{Number(item.descuento ?? 0).toFixed(2)}</Text></View>
           <View style={styles.colTotal}><Text style={styles.tableCellRight}>{formatCurrency(item.costoTotal, oc.moneda)}</Text></View>
         </View>
       ))}

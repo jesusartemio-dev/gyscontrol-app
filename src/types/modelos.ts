@@ -2921,7 +2921,8 @@ export interface OrdenCompraItem {
   unidad: string
   cantidad: number
   precioUnitario: number
-  costoTotal: number
+  descuento: number   // % de descuento sobre el subtotal (0–100)
+  costoTotal: number  // Neto después de descuento
   cantidadRecibida: number
   createdAt: string
   updatedAt: string

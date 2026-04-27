@@ -117,7 +117,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
   // Edit item modal state
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [editItemId, setEditItemId] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState({ codigo: '', descripcion: '', unidad: '', cantidad: 1, precioUnitario: 0 })
+  const [editForm, setEditForm] = useState({ codigo: '', descripcion: '', unidad: '', cantidad: 1, precioUnitario: 0, descuento: 0 })
   const [savingEdit, setSavingEdit] = useState(false)
 
   // Add/delete item state
@@ -217,10 +217,17 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
     }
   }
 
-  const openEditItem = (item: { id: string; codigo: string; descripcion: string; unidad: string; cantidad: number; precioUnitario: number }) => {
+  const openEditItem = (item: { id: string; codigo: string; descripcion: string; unidad: string; cantidad: number; precioUnitario: number; descuento?: number }) => {
     if (!esBorrador) return
     setEditItemId(item.id)
-    setEditForm({ codigo: item.codigo, descripcion: item.descripcion, unidad: item.unidad, cantidad: item.cantidad, precioUnitario: item.precioUnitario })
+    setEditForm({
+      codigo: item.codigo,
+      descripcion: item.descripcion,
+      unidad: item.unidad,
+      cantidad: item.cantidad,
+      precioUnitario: item.precioUnitario,
+      descuento: item.descuento ?? 0,
+    })
     setEditModalOpen(true)
   }
 
@@ -229,6 +236,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
     if (!editForm.descripcion.trim()) return toast.error('La descripción es obligatoria')
     if (editForm.cantidad <= 0) return toast.error('La cantidad debe ser mayor a 0')
     if (editForm.precioUnitario < 0) return toast.error('El precio no puede ser negativo')
+    if (editForm.descuento < 0 || editForm.descuento > 100) return toast.error('El descuento debe estar entre 0 y 100')
     setSavingEdit(true)
     try {
       const res = await fetch(`/api/orden-compra-item/${editItemId}`, {
@@ -1410,7 +1418,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
               <Label className="text-xs">Descripción <span className="text-red-500">*</span></Label>
               <Input value={editForm.descripcion} onChange={e => setEditForm(p => ({ ...p, descripcion: e.target.value }))} placeholder="Descripción del item" autoFocus />
             </div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-4 gap-3">
               <div>
                 <Label className="text-xs">Unidad</Label>
                 <Input value={editForm.unidad} onChange={e => setEditForm(p => ({ ...p, unidad: e.target.value }))} />
@@ -1423,7 +1431,23 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
                 <Label className="text-xs">P. Unit. <span className="text-red-500">*</span></Label>
                 <Input type="number" min={0} step={0.01} value={editForm.precioUnitario} onChange={e => setEditForm(p => ({ ...p, precioUnitario: parseFloat(e.target.value) || 0 }))} />
               </div>
+              <div>
+                <Label className="text-xs">Desc. %</Label>
+                <Input type="number" min={0} max={100} step={0.01} value={editForm.descuento} onChange={e => setEditForm(p => ({ ...p, descuento: parseFloat(e.target.value) || 0 }))} placeholder="0" />
+              </div>
             </div>
+            {(editForm.precioUnitario > 0 && editForm.cantidad > 0) && (
+              <div className="text-[11px] text-muted-foreground bg-muted/50 px-3 py-2 rounded">
+                Subtotal: <span className="font-mono">{(editForm.precioUnitario * editForm.cantidad).toFixed(2)}</span>
+                {editForm.descuento > 0 && (
+                  <>
+                    {' · '}Descuento ({editForm.descuento}%):{' '}
+                    <span className="font-mono text-red-600">-{(editForm.precioUnitario * editForm.cantidad * editForm.descuento / 100).toFixed(2)}</span>
+                  </>
+                )}
+                {' · '}<strong>Neto: <span className="font-mono">{(editForm.precioUnitario * editForm.cantidad * (1 - editForm.descuento / 100)).toFixed(2)}</span></strong>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditModalOpen(false)}>Cancelar</Button>

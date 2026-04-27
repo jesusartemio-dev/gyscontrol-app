@@ -39,18 +39,23 @@ export async function POST(req: Request) {
 
     const now = new Date()
 
-    const newItems = items.map((item: any) => ({
-      ordenCompraId,
-      codigo: item.codigo || '',
-      descripcion: item.descripcion,
-      unidad: item.unidad,
-      cantidad: item.cantidad,
-      precioUnitario: item.precioUnitario,
-      costoTotal: item.cantidad * item.precioUnitario,
-      pedidoEquipoItemId: item.pedidoEquipoItemId || null,
-      listaEquipoItemId: item.listaEquipoItemId || null,
-      updatedAt: now,
-    }))
+    const newItems = items.map((item: any) => {
+      const descuento = Math.max(0, Math.min(100, Number(item.descuento) || 0))
+      const subtotalLinea = item.cantidad * item.precioUnitario
+      return {
+        ordenCompraId,
+        codigo: item.codigo || '',
+        descripcion: item.descripcion,
+        unidad: item.unidad,
+        cantidad: item.cantidad,
+        precioUnitario: item.precioUnitario,
+        descuento,
+        costoTotal: subtotalLinea * (1 - descuento / 100),
+        pedidoEquipoItemId: item.pedidoEquipoItemId || null,
+        listaEquipoItemId: item.listaEquipoItemId || null,
+        updatedAt: now,
+      }
+    })
 
     await prisma.$transaction(async (tx) => {
       await tx.ordenCompraItem.createMany({ data: newItems })
