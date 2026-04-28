@@ -120,7 +120,6 @@ function NuevaOrdenCompraContent() {
   const [manualForm, setManualForm] = useState({ codigo: '', descripcion: '', unidad: 'UND', cantidad: 1, precioUnitario: 0 })
 
   const hasAsignacion = !!(asignacion.proyectoId || asignacion.centroCostoId)
-  const isProyecto = !!asignacion.proyectoId
 
   useEffect(() => {
     getProveedores()
@@ -129,19 +128,25 @@ function NuevaOrdenCompraContent() {
       .finally(() => setLoadingData(false))
   }, [])
 
-  // Leer query params: proyectoId + pedidoItems (IDs separados por coma)
+  // Leer query params: proyectoId | centroCostoId + pedidoItems (IDs separados por coma)
   useEffect(() => {
-    const proyectoIdParam = searchParams.get('proyectoId')
+    const proyectoIdParam = searchParams.get('proyectoId') || null
+    const centroCostoIdParam = searchParams.get('centroCostoId') || null
     const pedidoItemsParam = searchParams.get('pedidoItems')
+
     if (proyectoIdParam) {
       setAsignacion({ proyectoId: proyectoIdParam, centroCostoId: null })
+    } else if (centroCostoIdParam) {
+      setAsignacion({ proyectoId: null, centroCostoId: centroCostoIdParam })
     }
-    if (pedidoItemsParam && proyectoIdParam) {
+
+    const tieneAsignacion = !!(proyectoIdParam || centroCostoIdParam)
+    if (pedidoItemsParam && tieneAsignacion) {
       const ids = pedidoItemsParam.split(',').filter(Boolean)
       if (ids.length > 0) {
         // Cargar items del pedido y pre-seleccionarlos
         setLoadingItems(true)
-        fetchItemsDisponibles(proyectoIdParam)
+        fetchItemsDisponibles({ proyectoId: proyectoIdParam, centroCostoId: centroCostoIdParam })
           .then(data => {
             const preselected = data.items.filter(i => ids.includes(i.id))
             const newItems: ItemForm[] = preselected.map(i => ({
@@ -217,12 +222,12 @@ function NuevaOrdenCompraContent() {
 
   // ── Pedido selector ──────────────────────────────────────
   const openSelector = useCallback(async () => {
-    if (!asignacion.proyectoId) return
+    if (!asignacion.proyectoId && !asignacion.centroCostoId) return
     setSelectorOpen(true)
     setSelectedIds(new Set())
     setLoadingItems(true)
     try {
-      const data = await fetchItemsDisponibles(asignacion.proyectoId, proveedorId || undefined)
+      const data = await fetchItemsDisponibles(asignacion, proveedorId || undefined)
       const existingIds = new Set(items.filter(i => i.pedidoEquipoItemId).map(i => i.pedidoEquipoItemId))
       setPedidoItemsDisp(data.items.filter(i => !existingIds.has(i.id)))
     } catch (err) {
@@ -230,7 +235,7 @@ function NuevaOrdenCompraContent() {
     } finally {
       setLoadingItems(false)
     }
-  }, [asignacion.proyectoId, proveedorId, items])
+  }, [asignacion, proveedorId, items])
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
@@ -551,8 +556,8 @@ function NuevaOrdenCompraContent() {
               variant="outline"
               size="sm"
               onClick={openSelector}
-              disabled={!isProyecto}
-              title={!isProyecto ? 'Selecciona un proyecto primero' : undefined}
+              disabled={!hasAsignacion}
+              title={!hasAsignacion ? 'Selecciona un proyecto o centro de costo primero' : undefined}
             >
               <FileText className="h-3.5 w-3.5 mr-1" /> Desde Pedidos
             </Button>
@@ -570,11 +575,9 @@ function NuevaOrdenCompraContent() {
               <PackageSearch className="h-8 w-8 mb-2" />
               <p className="text-sm">No hay items agregados</p>
               <p className="text-xs mt-1">
-                {isProyecto
+                {hasAsignacion
                   ? 'Agrega items desde pedidos, catálogo o manualmente'
-                  : hasAsignacion
-                    ? 'Agrega items desde catálogo o manualmente'
-                    : 'Selecciona un proyecto o centro de costo primero'}
+                  : 'Selecciona un proyecto o centro de costo primero'}
               </p>
             </div>
           ) : (

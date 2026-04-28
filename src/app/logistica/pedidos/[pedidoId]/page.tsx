@@ -598,8 +598,17 @@ export default function PedidoLogisticaDetailPage() {
     const seleccionados = Object.entries(ocItemsState).filter(([, v]) => v.selected)
     if (seleccionados.length === 0) { toast.error('Selecciona al menos un item'); return }
     const itemIds = seleccionados.map(([id]) => id).join(',')
-    const proyectoId = (pedido as any)?.proyecto?.id || ''
-    router.push(`/logistica/ordenes-compra/nueva?proyectoId=${proyectoId}&pedidoItems=${itemIds}`)
+    const proyectoId = (pedido as any)?.proyecto?.id
+    const centroCostoId = (pedido as any)?.centroCosto?.id
+    const params = new URLSearchParams()
+    if (proyectoId) params.set('proyectoId', proyectoId)
+    else if (centroCostoId) params.set('centroCostoId', centroCostoId)
+    else {
+      toast.error('El pedido no tiene proyecto ni centro de costo asociado')
+      return
+    }
+    params.set('pedidoItems', itemIds)
+    router.push(`/logistica/ordenes-compra/nueva?${params.toString()}`)
   }
 
   const handleGenerarOCDesdeAPI = async () => {

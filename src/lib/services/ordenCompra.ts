@@ -134,10 +134,14 @@ export interface ItemDisponible {
   pedidoId: string
 }
 
-export async function fetchItemsDisponibles(proyectoId: string, proveedorId?: string): Promise<{
-  items: ItemDisponible[]
-}> {
-  const params = new URLSearchParams({ proyectoId })
+export async function fetchItemsDisponibles(
+  asignacion: { proyectoId?: string | null; centroCostoId?: string | null },
+  proveedorId?: string
+): Promise<{ items: ItemDisponible[] }> {
+  const params = new URLSearchParams()
+  if (asignacion.proyectoId) params.set('proyectoId', asignacion.proyectoId)
+  else if (asignacion.centroCostoId) params.set('centroCostoId', asignacion.centroCostoId)
+  else throw new Error('Se requiere proyectoId o centroCostoId')
   if (proveedorId) params.set('proveedorId', proveedorId)
   const res = await fetch(`${BASE_URL}/items-disponibles?${params}`)
   if (!res.ok) {

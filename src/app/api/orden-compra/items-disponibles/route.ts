@@ -4,8 +4,9 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
 /**
- * GET /api/orden-compra/items-disponibles?proyectoId=X&proveedorId=Y
+ * GET /api/orden-compra/items-disponibles?proyectoId=X|centroCostoId=X&proveedorId=Y
  * Returns pedido items available for OC creation (without existing OC).
+ * Acepta proyectoId O centroCostoId (uno de los dos es requerido).
  */
 export async function GET(req: Request) {
   try {
@@ -18,9 +19,13 @@ export async function GET(req: Request) {
     }
 
     const { searchParams } = new URL(req.url)
-    const proyectoId = searchParams.get('proyectoId')
-    if (!proyectoId) {
-      return NextResponse.json({ error: 'proyectoId es requerido' }, { status: 400 })
+    const proyectoId = searchParams.get('proyectoId') || undefined
+    const centroCostoId = searchParams.get('centroCostoId') || undefined
+    if (!proyectoId && !centroCostoId) {
+      return NextResponse.json(
+        { error: 'Se requiere proyectoId o centroCostoId' },
+        { status: 400 }
+      )
     }
     const proveedorId = searchParams.get('proveedorId') || undefined
 
@@ -28,7 +33,7 @@ export async function GET(req: Request) {
     const pedidoItems = await prisma.pedidoEquipoItem.findMany({
       where: {
         pedidoEquipo: {
-          proyectoId,
+          ...(proyectoId ? { proyectoId } : { centroCostoId }),
           estado: { in: ['aprobado', 'atendido', 'parcial'] },
         },
         estado: { notIn: ['cancelado', 'entregado'] },
