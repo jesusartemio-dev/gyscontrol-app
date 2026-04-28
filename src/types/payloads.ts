@@ -677,6 +677,7 @@ export interface CotizacionProveedorPayload {
   tipoCambio?: number | null
   // Condiciones comerciales (alineadas a OrdenCompra)
   condicionPago?: string | null
+  formaPago?: string | null
   diasCredito?: number | null
   lugarEntrega?: string | null
   tiempoEntrega?: string | null

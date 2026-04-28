@@ -15,6 +15,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import toast from 'react-hot-toast'
 import CxPImportExcelModal from '@/components/administracion/CxPImportExcelModal'
 import { exportarCxPAExcel } from '@/lib/utils/cuentasPagarExcel'
+import { CONDICIONES_PAGO, FORMAS_PAGO, formatPago } from '@/lib/utils/formaPago'
 
 interface CuentaBancaria {
   id: string
@@ -54,6 +55,7 @@ interface OrdenCompra {
   moneda: string
   total: number
   condicionPago: string
+  formaPago?: string | null
   diasCredito: number | null
   estado: string
   proveedor?: { id: string; nombre: string; ruc?: string | null }
@@ -74,6 +76,8 @@ interface CuentaPorPagar {
   fechaRecepcion: string
   fechaVencimiento: string
   condicionPago: string
+  formaPago?: string | null
+  diasCredito?: number | null
   estado: string
   observaciones: string | null
   pedidoEquipoId?: string | null
@@ -104,14 +108,6 @@ const ESTADOS_CXP = [
   { value: 'anulada', label: 'Anulada', color: 'bg-gray-100 text-gray-700' },
 ]
 
-const CONDICIONES_PAGO = [
-  { value: 'contado', label: 'Contado' },
-  { value: 'credito_15', label: 'Crédito 15 días' },
-  { value: 'credito_30', label: 'Crédito 30 días' },
-  { value: 'credito_45', label: 'Crédito 45 días' },
-  { value: 'credito_60', label: 'Crédito 60 días' },
-  { value: 'credito_90', label: 'Crédito 90 días' },
-]
 
 const getEstadoColor = (estado: string) =>
   ESTADOS_CXP.find(e => e.value === estado)?.color || 'bg-gray-100 text-gray-700'
@@ -160,6 +156,7 @@ export default function CuentasPagarPage() {
     fechaRecepcion: new Date().toISOString().split('T')[0],
     fechaVencimiento: '',
     condicionPago: 'contado',
+    formaPago: '',
     diasCredito: '',
     proyectoId: '',
     ordenCompraId: '',
@@ -323,6 +320,7 @@ export default function CuentasPagarPage() {
       fechaRecepcion: new Date().toISOString().split('T')[0],
       fechaVencimiento: '',
       condicionPago: 'contado',
+      formaPago: '',
       diasCredito: '',
       proyectoId: '',
       ordenCompraId: '',
@@ -333,11 +331,8 @@ export default function CuentasPagarPage() {
 
   const calcularFechaVencimiento = (fechaRecepcion: string, condicionPago: string, diasCredito: string): string => {
     if (!fechaRecepcion) return ''
-    if (condicionPago === 'contado') return fechaRecepcion
-    let dias = parseInt(diasCredito)
-    if (isNaN(dias) && condicionPago.startsWith('credito_')) {
-      dias = parseInt(condicionPago.split('_')[1])
-    }
+    if (condicionPago !== 'credito') return fechaRecepcion
+    const dias = parseInt(diasCredito)
     if (isNaN(dias) || dias <= 0) return ''
     const fecha = new Date(fechaRecepcion + 'T00:00:00')
     fecha.setDate(fecha.getDate() + dias)
@@ -375,7 +370,8 @@ export default function CuentasPagarPage() {
           fechaRecepcion: createForm.fechaRecepcion,
           fechaVencimiento: createForm.fechaVencimiento,
           condicionPago: createForm.condicionPago,
-          diasCredito: createForm.diasCredito ? parseInt(createForm.diasCredito) : null,
+          formaPago: createForm.formaPago || null,
+          diasCredito: createForm.condicionPago === 'credito' && createForm.diasCredito ? parseInt(createForm.diasCredito) : null,
           proyectoId: createForm.proyectoId || null,
           ordenCompraId: createForm.ordenCompraId || null,
           descripcion: createForm.descripcion || null,
@@ -655,6 +651,7 @@ export default function CuentasPagarPage() {
                           resetCreateForm()
                           const diasStr = oc.diasCredito ? String(oc.diasCredito) : ''
                           const fechaRec = new Date().toISOString().split('T')[0]
+                          const cond = ['contado', 'credito', 'adelanto'].includes(oc.condicionPago || '') ? (oc.condicionPago || 'contado') : 'contado'
                           setCreateForm(f => ({
                             ...f,
                             ordenCompraId: oc.id,
@@ -662,10 +659,11 @@ export default function CuentasPagarPage() {
                             monto: oc.total.toFixed(2),
                             moneda: oc.moneda,
                             proyectoId: oc.proyectoId || '',
-                            condicionPago: oc.condicionPago || 'contado',
+                            condicionPago: cond,
+                            formaPago: (oc as any).formaPago || '',
                             diasCredito: diasStr,
                             descripcion: `OC ${oc.numero}`,
-                            fechaVencimiento: calcularFechaVencimiento(fechaRec, oc.condicionPago || 'contado', diasStr),
+                            fechaVencimiento: calcularFechaVencimiento(fechaRec, cond, diasStr),
                           }))
                           setShowCreateDialog(true)
                         }}
@@ -908,6 +906,7 @@ export default function CuentasPagarPage() {
                       const oc = ordenesCompra.find(o => o.id === ocId)
                       if (oc) {
                         const diasStr = oc.diasCredito ? String(oc.diasCredito) : ''
+                        const cond = ['contado', 'credito', 'adelanto'].includes(oc.condicionPago || '') ? (oc.condicionPago || 'contado') : 'contado'
                         setCreateForm(f => ({
                           ...f,
                           ordenCompraId: ocId,
@@ -915,10 +914,11 @@ export default function CuentasPagarPage() {
                           monto: oc.total.toFixed(2),
                           moneda: oc.moneda,
                           proyectoId: oc.proyectoId || '',
-                          condicionPago: oc.condicionPago || 'contado',
+                          condicionPago: cond,
+                          formaPago: (oc as any).formaPago || '',
                           diasCredito: diasStr,
                           descripcion: f.descripcion || `OC ${oc.numero}`,
-                          fechaVencimiento: calcularFechaVencimiento(f.fechaRecepcion, oc.condicionPago || 'contado', diasStr),
+                          fechaVencimiento: calcularFechaVencimiento(f.fechaRecepcion, cond, diasStr),
                         }))
                       }
                     }
@@ -981,43 +981,56 @@ export default function CuentasPagarPage() {
                 </div>
               )}
             </div>
-            <div>
-              <Label>Condición de Pago</Label>
-              <Select value={createForm.condicionPago} onValueChange={v => {
-                const diasFromCondicion = v.startsWith('credito_') ? v.split('_')[1] : ''
-                setCreateForm(f => ({
-                  ...f,
-                  condicionPago: v,
-                  diasCredito: diasFromCondicion || f.diasCredito,
-                  fechaVencimiento: calcularFechaVencimiento(f.fechaRecepcion, v, diasFromCondicion || f.diasCredito),
-                }))
-              }}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {CONDICIONES_PAGO.map(c => (
-                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {createForm.condicionPago !== 'contado' && (
+            <div className="grid grid-cols-3 gap-3">
               <div>
-                <Label>Días de crédito</Label>
-                <Input
-                  type="number"
-                  placeholder="30"
-                  value={createForm.diasCredito}
-                  onChange={e => {
-                    const dias = e.target.value
-                    setCreateForm(f => ({
-                      ...f,
-                      diasCredito: dias,
-                      fechaVencimiento: calcularFechaVencimiento(f.fechaRecepcion, f.condicionPago, dias),
-                    }))
-                  }}
-                />
+                <Label>Condición</Label>
+                <Select value={createForm.condicionPago} onValueChange={v => {
+                  setCreateForm(f => ({
+                    ...f,
+                    condicionPago: v,
+                    diasCredito: v === 'credito' ? f.diasCredito : '',
+                    fechaVencimiento: calcularFechaVencimiento(f.fechaRecepcion, v, f.diasCredito),
+                  }))
+                }}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {CONDICIONES_PAGO.map(c => (
+                      <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            )}
+              <div>
+                <Label>Forma de Pago</Label>
+                <Select value={createForm.formaPago || '__none__'} onValueChange={v => setCreateForm(f => ({ ...f, formaPago: v === '__none__' ? '' : v }))}>
+                  <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__"><span className="text-muted-foreground">— Ninguna —</span></SelectItem>
+                    {FORMAS_PAGO.map(f => (
+                      <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {createForm.condicionPago === 'credito' && (
+                <div>
+                  <Label>Días</Label>
+                  <Input
+                    type="number"
+                    placeholder="30"
+                    value={createForm.diasCredito}
+                    onChange={e => {
+                      const dias = e.target.value
+                      setCreateForm(f => ({
+                        ...f,
+                        diasCredito: dias,
+                        fechaVencimiento: calcularFechaVencimiento(f.fechaRecepcion, f.condicionPago, dias),
+                      }))
+                    }}
+                  />
+                </div>
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Fecha Emisión *</Label>
@@ -1201,7 +1214,7 @@ export default function CuentasPagarPage() {
                 {isVencida(showDetail.fechaVencimiento, showDetail.estado) && (
                   <Badge className="bg-red-100 text-red-700">Vencida</Badge>
                 )}
-                <Badge variant="outline">{showDetail.condicionPago}</Badge>
+                <Badge variant="outline">{formatPago(showDetail.condicionPago, (showDetail as any).formaPago, showDetail.diasCredito)}</Badge>
               </div>
               <Card>
                 <CardContent className="p-3 space-y-1">

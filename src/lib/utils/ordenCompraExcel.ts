@@ -104,7 +104,9 @@ interface OCExportRow {
 const ESTADOS_OC = ['borrador', 'aprobada', 'enviada', 'confirmada', 'parcial', 'completada', 'cancelada']
 const CATEGORIAS_VALIDAS = ['equipos', 'servicios', 'gastos']
 const MONEDAS_VALIDAS = ['PEN', 'USD']
-const CONDICIONES_VALIDAS = ['contado', 'credito_15', 'credito_30', 'credito_45', 'credito_60', 'credito_90']
+// Soporta: nuevos valores ('contado'|'credito'|'adelanto') y legacy ('credito_NN').
+const CONDICIONES_VALIDAS = ['contado', 'credito', 'adelanto', 'credito_15', 'credito_30', 'credito_45', 'credito_60', 'credito_90']
+const FORMAS_VALIDAS = ['transferencia', 'factura', 'cheque', 'letra', 'factura_negociable', 'otro', '']
 
 // ============================================
 // LEER EXCEL

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { notFound, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { getCotizacionProveedorById } from '@/lib/services/cotizacionProveedor'
+import { CONDICIONES_PAGO, FORMAS_PAGO, formatPago } from '@/lib/utils/formaPago'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
@@ -75,6 +76,7 @@ export default function CotizacionProveedorDetailPage({ params }: PageProps) {
   const [editingCondiciones, setEditingCondiciones] = useState(false)
   const [condicionesForm, setCondicionesForm] = useState({
     condicionPago: '',
+    formaPago: '',
     diasCredito: '',
     lugarEntrega: '',
     tiempoEntrega: '',
@@ -170,8 +172,13 @@ Equipo de Compras`
 
   const handleEditCondiciones = () => {
     if (!cotizacion) return
+    // Normalizar legacy a los nuevos valores
+    const condicionLegit = ['contado', 'credito', 'adelanto'].includes(cotizacion.condicionPago || '')
+      ? cotizacion.condicionPago || ''
+      : ''
     setCondicionesForm({
-      condicionPago: cotizacion.condicionPago || '',
+      condicionPago: condicionLegit,
+      formaPago: (cotizacion as any).formaPago || '',
       diasCredito: cotizacion.diasCredito?.toString() || '',
       lugarEntrega: cotizacion.lugarEntrega || '',
       tiempoEntrega: cotizacion.tiempoEntrega || '',
@@ -185,7 +192,8 @@ Equipo de Compras`
     if (!cotizacion) return
     const patch = {
       condicionPago: condicionesForm.condicionPago || null,
-      diasCredito: condicionesForm.diasCredito ? parseInt(condicionesForm.diasCredito) : null,
+      formaPago: condicionesForm.formaPago || null,
+      diasCredito: condicionesForm.condicionPago === 'credito' && condicionesForm.diasCredito ? parseInt(condicionesForm.diasCredito) : null,
       lugarEntrega: condicionesForm.lugarEntrega || null,
       tiempoEntrega: condicionesForm.tiempoEntrega || null,
       contactoEntrega: condicionesForm.contactoEntrega || null,
@@ -463,7 +471,7 @@ Equipo de Compras`
                 <span className="text-gray-500">Pago:</span>
                 <span className="font-medium">
                   {cotizacion.condicionPago
-                    ? `${cotizacion.condicionPago}${cotizacion.diasCredito ? ` (${cotizacion.diasCredito} días)` : ''}`
+                    ? formatPago(cotizacion.condicionPago, (cotizacion as any).formaPago, cotizacion.diasCredito)
                     : <span className="text-gray-400 italic">No especificado</span>}
                 </span>
               </div>
@@ -508,15 +516,25 @@ Equipo de Compras`
                 <select
                   className="w-full h-8 text-xs border rounded px-2 bg-white"
                   value={condicionesForm.condicionPago}
-                  onChange={(e) => setCondicionesForm(p => ({ ...p, condicionPago: e.target.value }))}
+                  onChange={(e) => setCondicionesForm(p => ({ ...p, condicionPago: e.target.value, diasCredito: e.target.value === 'credito' ? p.diasCredito : '' }))}
                 >
                   <option value="">Sin especificar</option>
-                  <option value="contado">Contado</option>
-                  <option value="factura">Factura</option>
-                  <option value="cheque">Cheque</option>
-                  <option value="letra">Letra</option>
-                  <option value="adelanto">Adelanto</option>
-                  <option value="otro">Otro</option>
+                  {CONDICIONES_PAGO.map(c => (
+                    <option key={c.value} value={c.value}>{c.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">Forma de pago</label>
+                <select
+                  className="w-full h-8 text-xs border rounded px-2 bg-white"
+                  value={condicionesForm.formaPago}
+                  onChange={(e) => setCondicionesForm(p => ({ ...p, formaPago: e.target.value }))}
+                >
+                  <option value="">Sin especificar</option>
+                  {FORMAS_PAGO.map(f => (
+                    <option key={f.value} value={f.value}>{f.label}</option>
+                  ))}
                 </select>
               </div>
               <div className="space-y-1">
@@ -528,7 +546,7 @@ Equipo de Compras`
                   className="h-8 text-xs"
                   value={condicionesForm.diasCredito}
                   onChange={(e) => setCondicionesForm(p => ({ ...p, diasCredito: e.target.value }))}
-                  disabled={!condicionesForm.condicionPago || condicionesForm.condicionPago === 'contado'}
+                  disabled={condicionesForm.condicionPago !== 'credito'}
                 />
               </div>
               <div className="space-y-1">

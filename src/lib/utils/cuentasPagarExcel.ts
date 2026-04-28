@@ -60,7 +60,8 @@ interface CxPExportRow {
 
 const ESTADOS_VALIDOS = ['pendiente', 'parcial', 'pagada', 'vencida', 'anulada']
 const MONEDAS_VALIDAS = ['PEN', 'USD']
-const CONDICIONES_VALIDAS = ['contado', 'credito_15', 'credito_30', 'credito_45', 'credito_60', 'credito_90']
+// Soporta: nuevos valores ('contado'|'credito'|'adelanto') y legacy ('credito_NN').
+const CONDICIONES_VALIDAS = ['contado', 'credito', 'adelanto', 'credito_15', 'credito_30', 'credito_45', 'credito_60', 'credito_90']
 
 // ============================================
 // LEER EXCEL
