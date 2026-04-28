@@ -472,7 +472,8 @@ model CotizacionProveedor {
   moneda                  String                    @default("USD")
   tipoCambio              Float?
   // Condiciones comerciales (alineadas a OrdenCompra)
-  condicionPago           String?
+  condicionPago           String? // 'contado' | 'credito' | 'adelanto'
+  formaPago               String? // 'transferencia' | 'factura' | 'cheque' | 'letra' | 'factura_negociable' | 'otro'
   diasCredito             Int?
   lugarEntrega            String?
   tiempoEntrega           String?
@@ -3641,7 +3642,8 @@ model OrdenCompra {
   categoriaCosto       CategoriaCosto    @default(equipos)
   requiereRecepcion    Boolean           @default(true)
   estado               EstadoOrdenCompra @default(borrador)
-  condicionPago        String            @default("contado")
+  condicionPago        String            @default("contado") // 'contado' | 'credito' | 'adelanto'
+  formaPago            String? // 'transferencia' | 'factura' | 'cheque' | 'letra' | 'factura_negociable' | 'otro'
   diasCredito          Int?
   moneda               String            @default("PEN")
   subtotal             Float             @default(0)
@@ -3773,7 +3775,8 @@ model CuentaPorCobrar {
   saldoPendiente   Float              @default(0) // calculado: monto - montoPagado
   fechaEmision     DateTime
   fechaVencimiento DateTime
-  condicionPago    String?
+  condicionPago    String? // 'contado' | 'credito' | 'adelanto'
+  formaPago        String? // 'transferencia' | 'factura' | 'cheque' | 'letra' | 'factura_negociable' | 'otro'
   diasCredito      Int?
   metodoPago       String?
   bancoFinanciera  String?
@@ -3837,7 +3840,8 @@ model CuentaPorPagar {
   saldoPendiente     Float             @default(0) // calculado: monto - montoPagado
   fechaRecepcion     DateTime
   fechaVencimiento   DateTime
-  condicionPago      String            @default("contado") // contado, credito
+  condicionPago      String            @default("contado") // 'contado' | 'credito' | 'adelanto'
+  formaPago          String? // 'transferencia' | 'factura' | 'cheque' | 'letra' | 'factura_negociable' | 'otro'
   diasCredito        Int?
   estado             EstadoCuentaPagar @default(pendiente)
   observaciones      String?
