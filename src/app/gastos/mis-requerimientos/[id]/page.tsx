@@ -603,13 +603,14 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
   const anticipos = (hoja.depositos || []).filter((d: any) => d.tipo === 'anticipo' || (!d.tipo || d.tipo === null))
   const reembolsos = (hoja.depositos || []).filter((d: any) => d.tipo === 'reembolso')
   const devoluciones = (hoja.depositos || []).filter((d: any) => d.tipo === 'devolucion')
-  const canRegistrarAnticipo = ['aprobado', 'depositado', 'rendido'].includes(hoja.estado) && ['admin', 'gerente', 'administracion'].includes(role || '')
+  const canRegistrarAnticipo = ['aprobado', 'depositado', 'rendido', 'revisado', 'validado'].includes(hoja.estado) && ['admin', 'gerente', 'administracion'].includes(role || '')
   const canRegistrarReembolso = hoja.estado === 'validado' && hoja.saldo < 0 && ['admin', 'gerente', 'administracion'].includes(role || '')
-  const canRegistrarDevolucion = hoja.estado === 'validado' && hoja.saldo > 0 && hoja.requiereAnticipo && (esEmpleado || ['admin', 'gerente', 'administracion'].includes(role || ''))
+  const canRegistrarDevolucion = hoja.estado === 'validado' && hoja.saldo > 0 && (esEmpleado || ['admin', 'gerente', 'administracion'].includes(role || ''))
   const estadosConSeccionPagos = ['aprobado', 'depositado', 'rendido', 'revisado', 'validado', 'cerrado']
-  const showAnticipos = hoja.requiereAnticipo && estadosConSeccionPagos.includes(hoja.estado)
+  const estaEnSeccion = estadosConSeccionPagos.includes(hoja.estado)
+  const showAnticipos = estaEnSeccion && (hoja.requiereAnticipo || canRegistrarAnticipo || anticipos.length > 0)
   const showReembolsos = canRegistrarReembolso || reembolsos.length > 0
-  const showDevoluciones = hoja.requiereAnticipo && (canRegistrarDevolucion || devoluciones.length > 0)
+  const showDevoluciones = canRegistrarDevolucion || devoluciones.length > 0
   const showSeccionPagos = showAnticipos || showReembolsos || showDevoluciones
 
   return (
