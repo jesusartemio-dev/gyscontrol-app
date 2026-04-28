@@ -283,11 +283,28 @@ const formatDate = (date: string | null | undefined) => {
   return new Date(y, m - 1, d).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
-function displayCondicionPago(condicionPago: string, diasCredito?: number | null): string {
-  if (condicionPago === 'contado') return 'Contado'
-  if (condicionPago === 'credito' && diasCredito) return `Crédito ${diasCredito} días`
-  if (condicionPago.startsWith('credito_')) return `Crédito ${condicionPago.split('_')[1]} días`
-  return condicionPago
+function displayCondicionPago(condicionPago: string, formaPago: string | null | undefined, diasCredito?: number | null): string {
+  // Importación local para evitar problemas de bundling con react-pdf
+  const labelCond: Record<string, string> = { contado: 'Contado', credito: 'Crédito', adelanto: 'Adelanto' }
+  const labelForma: Record<string, string> = {
+    transferencia: 'Transferencia bancaria',
+    factura: 'Factura',
+    cheque: 'Cheque',
+    letra: 'Letra',
+    factura_negociable: 'Factura negociable',
+    otro: 'Otro',
+  }
+  const cond = labelCond[condicionPago] ?? condicionPago
+  const fma = formaPago ? (labelForma[formaPago] ?? formaPago) : ''
+  // Compatibilidad con datos legacy (string compuesto)
+  if (!labelCond[condicionPago]) {
+    if (condicionPago.startsWith('credito_')) return `Crédito ${condicionPago.split('_')[1]} días`
+    return condicionPago
+  }
+  if (condicionPago === 'credito' && diasCredito) {
+    return fma ? `Crédito ${diasCredito} días vía ${fma}` : `Crédito ${diasCredito} días`
+  }
+  return fma ? `${cond} vía ${fma}` : cond
 }
 
 function OrdenCompraPDF({ oc }: Props) {
@@ -389,7 +406,7 @@ function OrdenCompraPDF({ oc }: Props) {
           </View>
           <View style={styles.refCell}>
             <Text style={styles.refLabel}>Condición de pago</Text>
-            <Text style={styles.refValue}>{displayCondicionPago(oc.condicionPago, oc.diasCredito)}</Text>
+            <Text style={styles.refValue}>{displayCondicionPago(oc.condicionPago, (oc as any).formaPago, oc.diasCredito)}</Text>
           </View>
           <View style={styles.refCellLast}>
             <Text style={styles.refLabel}>Fecha orden</Text>
@@ -421,7 +438,7 @@ function OrdenCompraPDF({ oc }: Props) {
 
         {/* ── TÉRMINOS DE ENTREGA ── */}
         <View style={styles.termsSection}>
-          <Text style={styles.termRow}>Términos de pago: {displayCondicionPago(oc.condicionPago, oc.diasCredito)}</Text>
+          <Text style={styles.termRow}>Términos de pago: {displayCondicionPago(oc.condicionPago, (oc as any).formaPago, oc.diasCredito)}</Text>
           {(oc as any).tiempoEntrega && (
             <Text style={styles.termRow}>Tiempo de entrega: {(oc as any).tiempoEntrega}</Text>
           )}

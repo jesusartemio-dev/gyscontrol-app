@@ -18,6 +18,7 @@ import { Switch } from '@/components/ui/switch'
 import { toast } from 'sonner'
 import { createOrdenCompra, fetchItemsDisponibles, type ItemDisponible } from '@/lib/services/ordenCompra'
 import { getProveedores } from '@/lib/services/proveedor'
+import { CONDICIONES_PAGO, FORMAS_PAGO, DIAS_CREDITO_PRESETS } from '@/lib/utils/formaPago'
 import SelectorAsignacion, { type AsignacionValue } from '@/components/shared/SelectorAsignacion'
 import type { Proveedor, OrdenCompraItemPayload } from '@/types'
 
@@ -26,23 +27,7 @@ const MONEDAS = [
   { value: 'USD', label: 'Dólares (USD)' },
 ]
 
-const FORMAS_PAGO = [
-  { value: 'contado', label: 'Contado' },
-  { value: 'factura', label: 'Factura' },
-  { value: 'cheque', label: 'Cheque' },
-  { value: 'letra', label: 'Letra' },
-  { value: 'adelanto', label: 'Adelanto' },
-  { value: 'otro', label: 'Otro...' },
-]
-
-const DIAS_PAGO = [
-  { value: '7', label: '7 días' },
-  { value: '15', label: '15 días' },
-  { value: '30', label: '30 días' },
-  { value: '45', label: '45 días' },
-  { value: '60', label: '60 días' },
-  { value: 'otro', label: 'Otro...' },
-]
+// Constantes y helpers en src/lib/utils/formaPago.ts
 
 const CATEGORIAS = [
   { value: 'equipos', label: 'Equipos' },
@@ -88,10 +73,10 @@ function NuevaOrdenCompraContent() {
   const [proveedorId, setProveedorId] = useState('')
   const [asignacion, setAsignacion] = useState<AsignacionValue>({ proyectoId: null, centroCostoId: null })
   const [categoriaCosto, setCategoriaCosto] = useState('equipos')
-  const [formaPago, setFormaPago] = useState('contado')
-  const [diasPago, setDiasPago] = useState('')
-  const [diasPagoCustom, setDiasPagoCustom] = useState('')
-  const [formaPagoCustom, setFormaPagoCustom] = useState('')
+  const [condicionPago, setCondicionPago] = useState('contado')
+  const [formaPago, setFormaPago] = useState('')
+  const [diasCredito, setDiasCredito] = useState('')
+  const [diasCreditoCustom, setDiasCreditoCustom] = useState('')
   const [moneda, setMoneda] = useState('PEN')
   const [lugarEntrega, setLugarEntrega] = useState('')
   const [tiempoEntrega, setTiempoEntrega] = useState('')
@@ -203,14 +188,12 @@ function NuevaOrdenCompraContent() {
     setItems(prev => prev.filter((_, i) => i !== index))
   }
 
-  const needsDias = ['factura', 'cheque', 'letra'].includes(formaPago)
-  const buildCondicionPago = (): string => {
-    if (formaPago === 'otro') return formaPagoCustom
-    if (formaPago === 'contado') return 'Contado'
-    if (formaPago === 'adelanto') return 'Adelanto'
-    const forma = FORMAS_PAGO.find(f => f.value === formaPago)?.label || formaPago
-    const dias = diasPago === 'otro' ? diasPagoCustom : diasPago
-    return dias ? `${forma} ${dias} días` : forma
+  const needsDias = condicionPago === 'credito'
+  const getDiasCreditoNum = (): number | null => {
+    if (condicionPago !== 'credito') return null
+    const diasStr = diasCredito === 'otro' ? diasCreditoCustom : diasCredito
+    const n = parseInt(diasStr)
+    return isNaN(n) ? null : n
   }
 
   const subtotal = items.reduce((sum, item) => sum + (item.cantidad * item.precioUnitario), 0)
@@ -355,7 +338,9 @@ function NuevaOrdenCompraContent() {
         centroCostoId: asignacion.centroCostoId || undefined,
         categoriaCosto: categoriaCosto as 'equipos' | 'servicios' | 'gastos',
         requiereRecepcion,
-        condicionPago: buildCondicionPago() || undefined,
+        condicionPago,
+        formaPago: formaPago || undefined,
+        diasCredito: getDiasCreditoNum() ?? undefined,
         moneda,
         lugarEntrega: lugarEntrega || undefined,
         tiempoEntrega: tiempoEntrega || undefined,
@@ -457,43 +442,52 @@ function NuevaOrdenCompraContent() {
         <CardContent>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
             <div>
-              <Label className="text-xs">Forma de Pago</Label>
-              <Select value={formaPago} onValueChange={(v) => { setFormaPago(v); setDiasPago(''); setDiasPagoCustom(''); setFormaPagoCustom('') }}>
+              <Label className="text-xs">Condición de Pago</Label>
+              <Select value={condicionPago} onValueChange={(v) => { setCondicionPago(v); if (v !== 'credito') { setDiasCredito(''); setDiasCreditoCustom('') } }}>
                 <SelectTrigger className="h-9">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  {CONDICIONES_PAGO.map(c => (
+                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Forma de Pago</Label>
+              <Select value={formaPago || '__none__'} onValueChange={(v) => setFormaPago(v === '__none__' ? '' : v)}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Seleccionar" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__"><span className="text-muted-foreground">— Ninguna —</span></SelectItem>
                   {FORMAS_PAGO.map(f => (
                     <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            {formaPago === 'otro' && (
-              <div>
-                <Label className="text-xs">Especificar</Label>
-                <Input value={formaPagoCustom} onChange={e => setFormaPagoCustom(e.target.value)} placeholder="Ej: Transferencia 15 días" className="h-9" />
-              </div>
-            )}
             {needsDias && (
               <div>
-                <Label className="text-xs">Días</Label>
-                <Select value={diasPago} onValueChange={(v) => { setDiasPago(v); if (v !== 'otro') setDiasPagoCustom('') }}>
+                <Label className="text-xs">Días de Crédito</Label>
+                <Select value={diasCredito} onValueChange={(v) => { setDiasCredito(v); if (v !== 'otro') setDiasCreditoCustom('') }}>
                   <SelectTrigger className="h-9">
                     <SelectValue placeholder="Seleccionar" />
                   </SelectTrigger>
                   <SelectContent>
-                    {DIAS_PAGO.map(d => (
-                      <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                    {DIAS_CREDITO_PRESETS.map(d => (
+                      <SelectItem key={d} value={String(d)}>{d} días</SelectItem>
                     ))}
+                    <SelectItem value="otro">Otro...</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             )}
-            {needsDias && diasPago === 'otro' && (
+            {needsDias && diasCredito === 'otro' && (
               <div>
                 <Label className="text-xs">Días (personalizado)</Label>
-                <Input type="number" min={1} value={diasPagoCustom} onChange={e => setDiasPagoCustom(e.target.value)} placeholder="Ej: 90" className="h-9" />
+                <Input type="number" min={1} value={diasCreditoCustom} onChange={e => setDiasCreditoCustom(e.target.value)} placeholder="Ej: 90" className="h-9" />
               </div>
             )}
             <div>

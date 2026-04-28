@@ -94,6 +94,7 @@ export const retrocederOC = (id: string, targetEstado: string, motivo?: string) 
 
 export interface EditarAdministrativoPayload {
   condicionPago?: string
+  formaPago?: string | null
   diasCredito?: number | null
   observaciones?: string | null
   lugarEntrega?: string | null
@@ -156,6 +157,8 @@ export async function generarOCsDesdePedido(payload: {
   itemIds?: string[]
   moneda?: string
   condicionPago?: string
+  formaPago?: string
+  diasCredito?: number | null
   observaciones?: string
   fechaEntregaEstimada?: string
   fechasEntregaPorProveedor?: Record<string, string>

@@ -8,6 +8,7 @@ const ROLES_ALLOWED = ['admin', 'gerente']
 
 const CAMPOS_PERMITIDOS = [
   'condicionPago',
+  'formaPago',
   'diasCredito',
   'observaciones',
   'lugarEntrega',
@@ -40,6 +41,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         estado: true,
         proyectoId: true,
         condicionPago: true,
+        formaPago: true,
         diasCredito: true,
         observaciones: true,
         lugarEntrega: true,
@@ -78,6 +80,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       }
       setIfChanged('condicionPago', v)
     }
+    if (payload.formaPago !== undefined) {
+      const v = payload.formaPago === null || payload.formaPago === '' ? null : String(payload.formaPago).trim()
+      setIfChanged('formaPago', v)
+    }
     if (payload.diasCredito !== undefined) {
       const v = payload.diasCredito === null || payload.diasCredito === '' ? null : Number(payload.diasCredito)
       if (v !== null && (Number.isNaN(v) || v < 0)) {
@@ -109,7 +115,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       return NextResponse.json({ error: 'No hay cambios que guardar' }, { status: 400 })
     }
 
-    const tocaCondicionPago = 'condicionPago' in cambios || 'diasCredito' in cambios
+    const tocaCondicionPago = 'condicionPago' in cambios || 'formaPago' in cambios || 'diasCredito' in cambios
 
     if (tocaCondicionPago) {
       const cxpsConPagos = await prisma.cuentaPorPagar.findMany({
@@ -143,6 +149,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       if (tocaCondicionPago) {
         const dataCxP: Record<string, any> = { updatedAt: new Date() }
         if ('condicionPago' in cambios) dataCxP.condicionPago = updateData.condicionPago
+        if ('formaPago' in cambios) dataCxP.formaPago = updateData.formaPago
         if ('diasCredito' in cambios) dataCxP.diasCredito = updateData.diasCredito
 
         const sync = await tx.cuentaPorPagar.updateMany({

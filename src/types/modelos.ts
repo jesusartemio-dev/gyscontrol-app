@@ -2895,7 +2895,8 @@ export interface OrdenCompra {
   categoriaCosto: CategoriaCosto
   requiereRecepcion: boolean
   estado: EstadoOrdenCompra
-  condicionPago: string
+  condicionPago: string  // 'contado' | 'credito' | 'adelanto'
+  formaPago?: string | null  // 'transferencia' | 'factura' | 'cheque' | 'letra' | 'factura_negociable' | 'otro'
   diasCredito?: number | null
   moneda: string
   subtotal: number

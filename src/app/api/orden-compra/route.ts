@@ -179,6 +179,7 @@ export async function POST(req: Request) {
         requiereRecepcion: payload.requiereRecepcion ?? true,
         solicitanteId: session.user.id,
         condicionPago: payload.condicionPago || 'contado',
+        formaPago: payload.formaPago || null,
         diasCredito: payload.diasCredito ? Number(payload.diasCredito) : null,
         moneda: payload.moneda || 'PEN',
         subtotal,
