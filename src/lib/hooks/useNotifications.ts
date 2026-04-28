@@ -37,6 +37,14 @@ const DEFAULT_COUNTS: NotificationCounts = {
   'listas-por-cotizar': 0,
   'recepciones-pendientes': 0,
   'notificaciones-no-leidas': 0,
+  'tareas-asignadas': 0,
+  'tareas-vencidas': 0,
+  'tareas-proximas': 0,
+  'asistencia-abierta': 0,
+  'solicitudes-remoto-pendientes': 0,
+  'timesheet-no-enviado': 0,
+  'timesheet-rechazado': 0,
+  'timesheet-pendientes-aprobacion': 0,
 }
 
 const DEFAULT_PREFERENCES: UserPreferences = {
@@ -145,6 +153,14 @@ export function useNotifications(): UseNotificationsReturn {
         'listas-por-cotizar': data['listas-por-cotizar'] || 0,
         'recepciones-pendientes': data['recepciones-pendientes'] || 0,
         'notificaciones-no-leidas': conteoData.noLeidas || 0,
+        'tareas-asignadas': data['tareas-asignadas'] || 0,
+        'tareas-vencidas': data['tareas-vencidas'] || 0,
+        'tareas-proximas': data['tareas-proximas'] || 0,
+        'asistencia-abierta': data['asistencia-abierta'] || 0,
+        'solicitudes-remoto-pendientes': data['solicitudes-remoto-pendientes'] || 0,
+        'timesheet-no-enviado': data['timesheet-no-enviado'] || 0,
+        'timesheet-rechazado': data['timesheet-rechazado'] || 0,
+        'timesheet-pendientes-aprobacion': data['timesheet-pendientes-aprobacion'] || 0,
       }
 
       setCounts(newCounts)

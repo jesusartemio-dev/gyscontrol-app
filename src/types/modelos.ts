@@ -39,7 +39,18 @@ export type NotificationBadgeType =
   | 'listas-por-cotizar'
   | 'recepciones-pendientes'
   | 'notificaciones-no-leidas'
-  
+  // Tareas
+  | 'tareas-asignadas'
+  | 'tareas-vencidas'
+  | 'tareas-proximas'
+  // Asistencia
+  | 'asistencia-abierta'
+  | 'solicitudes-remoto-pendientes'
+  // Timesheet
+  | 'timesheet-no-enviado'
+  | 'timesheet-rechazado'
+  | 'timesheet-pendientes-aprobacion'
+
 
 // ✅ Tipo para enlaces del sidebar con notificaciones
 export interface SidebarLink {
