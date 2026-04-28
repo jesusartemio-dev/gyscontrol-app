@@ -18,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
-import { getOrdenCompraById, aprobarOC, enviarOC, confirmarOC, cancelarOC, deleteOrdenCompra, registrarRecepcionOC, completarOC } from '@/lib/services/ordenCompra'
+import { getOrdenCompraById, aprobarOC, enviarOC, confirmarOC, cancelarOC, deleteOrdenCompra, registrarRecepcionOC, completarOC, editarAdministrativoOC } from '@/lib/services/ordenCompra'
 import OCEstadoStepper from '@/components/logistica/OCEstadoStepper'
 import { RollbackButton } from '@/components/RollbackButton'
 import { useDeleteWithValidation } from '@/hooks/useDeleteWithValidation'
@@ -144,10 +144,17 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
     contactoEntrega: '',
     observaciones: '',
     requiereRecepcion: true,
+    fechaEntregaEstimada: '',
   })
   const [savingHeader, setSavingHeader] = useState(false)
 
   const esBorrador = oc?.estado === 'borrador'
+  const esCancelada = oc?.estado === 'cancelada'
+  const esAdminGerente = ['admin', 'gerente'].includes(userRole)
+  const puedeEditarAdministrativo = !!oc && !esBorrador && !esCancelada && esAdminGerente
+  const cxpConPagos = ((oc as any)?.cuentasPorPagar || []).some(
+    (c: any) => c.saldoPendiente != null && c.saldoPendiente < c.monto
+  )
 
   useEffect(() => { loadData() }, [id])
 
@@ -164,7 +171,8 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
   }
 
   const openHeaderEdit = () => {
-    if (!oc || !esBorrador) return
+    if (!oc) return
+    if (!esBorrador && !puedeEditarAdministrativo) return
     const parsed = parseCondicionPago(oc.condicionPago || 'contado')
     setHeaderForm({
       ...parsed,
@@ -174,44 +182,79 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
       contactoEntrega: oc.contactoEntrega || '',
       observaciones: oc.observaciones || '',
       requiereRecepcion: oc.requiereRecepcion,
+      fechaEntregaEstimada: oc.fechaEntregaEstimada
+        ? new Date(oc.fechaEntregaEstimada).toISOString().split('T')[0]
+        : '',
     })
     setHeaderEditOpen(true)
+  }
+
+  const buildCondicionPago = (): string => {
+    const { formaPago, diasPago, diasPagoCustom, formaPagoCustom } = headerForm
+    if (formaPago === 'otro') return formaPagoCustom || 'Otro'
+    if (formaPago === 'contado') return 'Contado'
+    if (formaPago === 'adelanto') return 'Adelanto'
+    const forma = FORMAS_PAGO.find(f => f.value === formaPago)?.label || formaPago
+    const dias = diasPago === 'otro' ? diasPagoCustom : diasPago
+    return dias ? `${forma} ${dias} días` : forma
+  }
+
+  const buildDiasCredito = (): number | null => {
+    const { formaPago, diasPago, diasPagoCustom } = headerForm
+    if (!['factura', 'cheque', 'letra'].includes(formaPago)) return null
+    const diasStr = diasPago === 'otro' ? diasPagoCustom : diasPago
+    const dias = parseInt(diasStr)
+    return isNaN(dias) ? null : dias
   }
 
   const saveHeaderEdit = async () => {
     if (!oc) return
     setSavingHeader(true)
     try {
-      const res = await fetch(`/api/orden-compra/${oc.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          condicionPago: (() => {
-            const { formaPago, diasPago, diasPagoCustom, formaPagoCustom } = headerForm
-            if (formaPago === 'otro') return formaPagoCustom || null
-            if (formaPago === 'contado') return 'Contado'
-            if (formaPago === 'adelanto') return 'Adelanto'
-            const forma = FORMAS_PAGO.find(f => f.value === formaPago)?.label || formaPago
-            const dias = diasPago === 'otro' ? diasPagoCustom : diasPago
-            return dias ? `${forma} ${dias} días` : forma
-          })(),
-          moneda: headerForm.moneda,
+      if (esBorrador) {
+        const res = await fetch(`/api/orden-compra/${oc.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            condicionPago: buildCondicionPago(),
+            diasCredito: buildDiasCredito(),
+            moneda: headerForm.moneda,
+            lugarEntrega: headerForm.lugarEntrega || null,
+            tiempoEntrega: headerForm.tiempoEntrega || null,
+            contactoEntrega: headerForm.contactoEntrega || null,
+            observaciones: headerForm.observaciones || null,
+            requiereRecepcion: headerForm.requiereRecepcion,
+            fechaEntregaEstimada: headerForm.fechaEntregaEstimada || null,
+          }),
+        })
+        if (!res.ok) {
+          const err = await res.json()
+          throw new Error(err.error || 'Error al guardar')
+        }
+        toast.success('Condiciones actualizadas')
+      } else {
+        const result = await editarAdministrativoOC(oc.id, {
+          condicionPago: buildCondicionPago(),
+          diasCredito: buildDiasCredito(),
+          observaciones: headerForm.observaciones || null,
           lugarEntrega: headerForm.lugarEntrega || null,
           tiempoEntrega: headerForm.tiempoEntrega || null,
           contactoEntrega: headerForm.contactoEntrega || null,
-          observaciones: headerForm.observaciones || null,
-          requiereRecepcion: headerForm.requiereRecepcion,
-        }),
-      })
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error || 'Error al guardar')
+          fechaEntregaEstimada: headerForm.fechaEntregaEstimada || null,
+        })
+        const sufijo = result.cxpsSincronizadas > 0
+          ? ` · ${result.cxpsSincronizadas} factura(s) sincronizada(s)`
+          : ''
+        toast.success(`Datos administrativos actualizados${sufijo}`)
       }
-      toast.success('Condiciones actualizadas')
       setHeaderEditOpen(false)
       loadData()
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Error al guardar')
+    } catch (error: any) {
+      if (error?.cuentasPorPagarBloqueantes) {
+        toast.error(error.message, { duration: 8000 })
+      } else {
+        toast.error(error instanceof Error ? error.message : 'Error al guardar')
+      }
     } finally {
       setSavingHeader(false)
     }
@@ -681,8 +724,12 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
             <span className="text-muted-foreground border-l pl-4">{displayCondicionPago(oc.condicionPago, oc.diasCredito)} · {oc.moneda}</span>
             {oc.centroCosto && <span className="text-muted-foreground">CC: {oc.centroCosto.nombre}</span>}
             {oc.proyecto && <span className="text-muted-foreground">{oc.proyecto.codigo}</span>}
-            {esBorrador && (
-              <button onClick={openHeaderEdit} className="p-1 rounded hover:bg-blue-50 ml-1" title="Editar condiciones">
+            {(esBorrador || puedeEditarAdministrativo) && (
+              <button
+                onClick={openHeaderEdit}
+                className="p-1 rounded hover:bg-blue-50 ml-1"
+                title={esBorrador ? 'Editar condiciones' : 'Editar datos administrativos'}
+              >
                 <Settings2 className="h-3.5 w-3.5 text-blue-500" />
               </button>
             )}
@@ -1315,9 +1362,24 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
       <Dialog open={headerEditOpen} onOpenChange={setHeaderEditOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Editar Condiciones</DialogTitle>
-            <DialogDescription>Modifica las condiciones de la OC mientras está en borrador</DialogDescription>
+            <DialogTitle>
+              {esBorrador ? 'Editar Condiciones' : 'Editar Datos Administrativos'}
+            </DialogTitle>
+            <DialogDescription>
+              {esBorrador
+                ? 'Modifica las condiciones de la OC mientras está en borrador'
+                : `OC ${oc.estado} · solo se editan campos administrativos (no afecta items, montos ni recepciones)`}
+            </DialogDescription>
           </DialogHeader>
+          {!esBorrador && cxpConPagos && (
+            <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span>
+                Esta OC tiene factura(s) con pagos registrados. <strong>No podrás cambiar la condición de pago</strong>;
+                corrige la factura desde el módulo de Cuentas por Pagar. Los demás campos sí son editables.
+              </span>
+            </div>
+          )}
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -1352,18 +1414,20 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
                   <Input type="number" min={1} value={headerForm.diasPagoCustom} onChange={e => setHeaderForm(f => ({ ...f, diasPagoCustom: e.target.value }))} placeholder="Ej: 90" className="h-9" />
                 </div>
               )}
-              <div>
-                <Label className="text-xs">Moneda</Label>
-                <Select value={headerForm.moneda} onValueChange={v => setHeaderForm(f => ({ ...f, moneda: v }))}>
-                  <SelectTrigger className="h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="PEN">Soles (PEN)</SelectItem>
-                    <SelectItem value="USD">Dólares (USD)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {esBorrador && (
+                <div>
+                  <Label className="text-xs">Moneda</Label>
+                  <Select value={headerForm.moneda} onValueChange={v => setHeaderForm(f => ({ ...f, moneda: v }))}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="PEN">Soles (PEN)</SelectItem>
+                      <SelectItem value="USD">Dólares (USD)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -1380,29 +1444,40 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
                 <Label className="text-xs">Contacto de Entrega</Label>
                 <Input value={headerForm.contactoEntrega} onChange={e => setHeaderForm(f => ({ ...f, contactoEntrega: e.target.value }))} placeholder="Nombre / teléfono" className="h-9" />
               </div>
+              <div>
+                <Label className="text-xs">Fecha Entrega Estimada</Label>
+                <Input
+                  type="date"
+                  value={headerForm.fechaEntregaEstimada}
+                  onChange={e => setHeaderForm(f => ({ ...f, fechaEntregaEstimada: e.target.value }))}
+                  className="h-9"
+                />
+              </div>
             </div>
             <div>
               <Label className="text-xs">Observaciones</Label>
               <Textarea value={headerForm.observaciones} onChange={e => setHeaderForm(f => ({ ...f, observaciones: e.target.value }))} placeholder="Notas adicionales..." rows={2} />
             </div>
-            <div className="flex items-start gap-3 p-3 rounded-md border bg-muted/30">
-              <Switch
-                id="headerRequiereRecepcion"
-                checked={headerForm.requiereRecepcion}
-                onCheckedChange={v => setHeaderForm(f => ({ ...f, requiereRecepcion: v }))}
-              />
-              <div className="space-y-0.5">
-                <Label htmlFor="headerRequiereRecepcion" className="text-sm font-medium cursor-pointer">
-                  Requiere recepción física
-                </Label>
-                <p className="text-xs text-muted-foreground flex items-start gap-1">
-                  <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                  {headerForm.requiereRecepcion
-                    ? 'Se registrará la recepción de materiales o entregables antes de completar la OC.'
-                    : 'Para servicios sin entregable físico (transporte, alquiler, etc.). La OC se completa directamente al confirmar.'}
-                </p>
+            {esBorrador && (
+              <div className="flex items-start gap-3 p-3 rounded-md border bg-muted/30">
+                <Switch
+                  id="headerRequiereRecepcion"
+                  checked={headerForm.requiereRecepcion}
+                  onCheckedChange={v => setHeaderForm(f => ({ ...f, requiereRecepcion: v }))}
+                />
+                <div className="space-y-0.5">
+                  <Label htmlFor="headerRequiereRecepcion" className="text-sm font-medium cursor-pointer">
+                    Requiere recepción física
+                  </Label>
+                  <p className="text-xs text-muted-foreground flex items-start gap-1">
+                    <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                    {headerForm.requiereRecepcion
+                      ? 'Se registrará la recepción de materiales o entregables antes de completar la OC.'
+                      : 'Para servicios sin entregable físico (transporte, alquiler, etc.). La OC se completa directamente al confirmar.'}
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setHeaderEditOpen(false)}>Cancelar</Button>

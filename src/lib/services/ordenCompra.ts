@@ -92,6 +92,34 @@ export const completarOC = (id: string) => postAction(id, 'completar')
 export const retrocederOC = (id: string, targetEstado: string, motivo?: string) =>
   postAction(id, 'retroceder', { targetEstado, motivo })
 
+export interface EditarAdministrativoPayload {
+  condicionPago?: string
+  diasCredito?: number | null
+  observaciones?: string | null
+  lugarEntrega?: string | null
+  tiempoEntrega?: string | null
+  contactoEntrega?: string | null
+  fechaEntregaEstimada?: string | null
+}
+
+export async function editarAdministrativoOC(
+  id: string,
+  payload: EditarAdministrativoPayload
+): Promise<{ ok: boolean; ordenCompra: OrdenCompra; cxpsSincronizadas: number }> {
+  const res = await fetch(`${BASE_URL}/${id}/editar-administrativo`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  const data = await res.json()
+  if (!res.ok) {
+    const err: any = new Error(data.error || 'Error al editar datos administrativos')
+    err.cuentasPorPagarBloqueantes = data.cuentasPorPagarBloqueantes
+    throw err
+  }
+  return data
+}
+
 export interface ItemDisponible {
   id: string
   codigo: string
