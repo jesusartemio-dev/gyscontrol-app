@@ -1431,6 +1431,18 @@ export interface ListaEquipoItem {
     }
   }
 
+  // 🧩 Padre cotizado del que este ítem es línea de un desglose
+  desgloseDeProyectoEquipoCotizadoItemId?: string | null
+  desgloseDeProyectoEquipoCotizadoItem?: {
+    id: string
+    codigo: string
+    descripcion: string
+    proyectoEquipoCotizado?: {
+      id: string
+      nombre: string
+    }
+  } | null
+
   proyectoEquipo?: {
     id: string
     nombre: string
@@ -1468,6 +1480,7 @@ export interface CotizacionProveedor {
   tipoCambio: number | null
   // Condiciones comerciales
   condicionPago?: string | null
+  formaPago?: string | null
   diasCredito?: number | null
   lugarEntrega?: string | null
   tiempoEntrega?: string | null

@@ -36,7 +36,9 @@ import {
   Undo2,
   Link2,
   Loader2,
-  Layers
+  Layers,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -63,12 +65,41 @@ type DesgloseInfo = {
   listaEquipo: ListaInfo
 }
 
+type DesgloseLinea = {
+  id: string
+  listaId: string
+  codigo: string
+  descripcion: string
+  cantidad: number
+  unidad: string
+  listaEquipo?: ListaInfo | null
+}
+
+type ItemDisponibleDesglose = {
+  id: string
+  codigo: string
+  descripcion: string
+  cantidad: number
+  unidad: string
+  origen: string
+  estado: string
+  asociadoAEsteDesglose: boolean
+  bloqueadoPorOtroDesglose: { cotizadoItemId: string; codigo: string | null; descripcion: string | null } | null
+}
+
+type ItemsDisponiblesPorLista = {
+  listaId: string
+  lista: ListaInfo | null
+  items: ItemDisponibleDesglose[]
+}
+
 type ItemWithLista = ProyectoEquipoCotizadoItem & {
   listaEquipo?: ListaInfo | null
   listaEquipoSeleccionado?: (Pick<ListaEquipoItem, 'id' | 'cantidad'> & {
     listaEquipo?: ListaInfo | null
   }) | null
   desgloses?: DesgloseInfo[]
+  listaEquipoItemsDesglose?: DesgloseLinea[]
 }
 
 type ProyectoEquipoCotizadoWithItems = Omit<ProyectoEquipoCotizado, 'proyecto' | 'responsable'> & {
@@ -522,6 +553,12 @@ export default function ProjectEquipmentDetailPage({ params }: PageProps) {
   const [desgloseItem, setDesgloseItem] = useState<ItemWithLista | null>(null)
   const [desgloseListasProyecto, setDesgloseListasProyecto] = useState<ListaInfo[]>([])
   const [desgloseSelected, setDesgloseSelected] = useState<string[]>([])
+  const [desgloseItemsByLista, setDesgloseItemsByLista] = useState<Record<string, ItemDisponibleDesglose[]>>({})
+  const [desgloseLineasSelected, setDesgloseLineasSelected] = useState<Record<string, string[]>>({})
+  const [desgloseExpanded, setDesgloseExpanded] = useState<string[]>([])
+  const [desgloseLoadingLista, setDesgloseLoadingLista] = useState<string | null>(null)
+  const [desgloseSearch, setDesgloseSearch] = useState<Record<string, string>>({})
+  const [desgloseNota, setDesgloseNota] = useState('')
   const [desgloseSaving, setDesgloseSaving] = useState(false)
   const { toast } = useToast()
 
@@ -637,9 +674,46 @@ export default function ProjectEquipmentDetailPage({ params }: PageProps) {
     }
   }
 
+  const fetchItemsDisponiblesDesglose = async (cotizadoItemId: string, listaIds: string[]) => {
+    if (listaIds.length === 0) return
+    setDesgloseLoadingLista(listaIds.join(','))
+    try {
+      const res = await fetch(
+        `/api/proyecto-equipo-item/${cotizadoItemId}/desglose/items-disponibles?listaIds=${listaIds.join(',')}`
+      )
+      if (!res.ok) throw new Error('Error')
+      const data = (await res.json()) as ItemsDisponiblesPorLista[]
+      setDesgloseItemsByLista(prev => {
+        const next = { ...prev }
+        for (const g of data) next[g.listaId] = g.items
+        return next
+      })
+      // Hidratar selección desde items asociados a este desglose
+      setDesgloseLineasSelected(prev => {
+        const next = { ...prev }
+        for (const g of data) {
+          if (next[g.listaId] === undefined) {
+            next[g.listaId] = g.items.filter(i => i.asociadoAEsteDesglose).map(i => i.id)
+          }
+        }
+        return next
+      })
+    } catch {
+      toast({ title: 'Error', description: 'No se pudieron cargar items de la lista', variant: 'destructive' })
+    } finally {
+      setDesgloseLoadingLista(null)
+    }
+  }
+
   const handleOpenDesglosar = async (item: ItemWithLista) => {
     setDesgloseItem(item)
-    setDesgloseSelected(item.desgloses?.map(d => d.listaEquipo.id) || [])
+    const listasIniciales = item.desgloses?.map(d => d.listaEquipo.id) || []
+    setDesgloseSelected(listasIniciales)
+    setDesgloseExpanded(listasIniciales)
+    setDesgloseItemsByLista({})
+    setDesgloseLineasSelected({})
+    setDesgloseSearch({})
+    setDesgloseNota('')
     try {
       const res = await fetch(`/api/lista-equipo?proyectoId=${proyectoId}`)
       if (res.ok) {
@@ -649,26 +723,75 @@ export default function ProjectEquipmentDetailPage({ params }: PageProps) {
     } catch {
       toast({ title: 'Error', description: 'No se pudo cargar listas del proyecto', variant: 'destructive' })
     }
+    if (listasIniciales.length > 0) {
+      await fetchItemsDisponiblesDesglose(item.id, listasIniciales)
+    }
+  }
+
+  const handleToggleListaSelection = async (listaId: string, checked: boolean) => {
+    if (!desgloseItem) return
+    if (checked) {
+      setDesgloseSelected(prev => [...prev, listaId])
+      setDesgloseExpanded(prev => prev.includes(listaId) ? prev : [...prev, listaId])
+      if (!desgloseItemsByLista[listaId]) {
+        await fetchItemsDisponiblesDesglose(desgloseItem.id, [listaId])
+      }
+    } else {
+      setDesgloseSelected(prev => prev.filter(id => id !== listaId))
+      setDesgloseLineasSelected(prev => {
+        const next = { ...prev }
+        delete next[listaId]
+        return next
+      })
+    }
+  }
+
+  const handleToggleLineaSelection = (listaId: string, lineaId: string, checked: boolean) => {
+    setDesgloseLineasSelected(prev => {
+      const current = prev[listaId] || []
+      return {
+        ...prev,
+        [listaId]: checked ? [...current, lineaId] : current.filter(id => id !== lineaId),
+      }
+    })
   }
 
   const handleDesglosar = async () => {
     if (!desgloseItem || desgloseSelected.length === 0) return
     setDesgloseSaving(true)
     try {
+      const payload = {
+        listas: desgloseSelected.map(listaId => ({
+          listaId,
+          listaItemIds: desgloseLineasSelected[listaId] || [],
+        })),
+        nota: desgloseNota.trim() || undefined,
+      }
       const res = await fetch(`/api/proyecto-equipo-item/${desgloseItem.id}/desglosar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ listaIds: desgloseSelected }),
+        body: JSON.stringify(payload),
       })
       if (!res.ok) throw new Error('Error al desglosar')
       const updated = await res.json()
       if (equipo) {
         setEquipo({
           ...equipo,
-          items: equipo.items.map(i => i.id === desgloseItem.id ? { ...i, estado: 'desglosado' as EstadoEquipoItem, desgloses: updated.desgloses } : i)
+          items: equipo.items.map(i => i.id === desgloseItem.id ? {
+            ...i,
+            estado: 'desglosado' as EstadoEquipoItem,
+            desgloses: updated.desgloses,
+            listaEquipoItemsDesglose: updated.listaEquipoItemsDesglose,
+          } : i)
         })
       }
-      toast({ title: 'Desglosado', description: `Ítem desglosado en ${desgloseSelected.length} lista(s)` })
+      const totalLineas = Object.values(desgloseLineasSelected).reduce((s, arr) => s + arr.length, 0)
+      toast({
+        title: 'Desglosado',
+        description: totalLineas > 0
+          ? `${totalLineas} ítem(s) asociado(s) en ${desgloseSelected.length} lista(s)`
+          : `Ítem desglosado en ${desgloseSelected.length} lista(s)`,
+      })
       setDesgloseItem(null)
     } catch {
       toast({ title: 'Error', description: 'No se pudo desglosar el ítem', variant: 'destructive' })
@@ -872,13 +995,13 @@ export default function ProjectEquipmentDetailPage({ params }: PageProps) {
 
       {/* Dialog Desglosar */}
       <Dialog open={!!desgloseItem} onOpenChange={() => setDesgloseItem(null)}>
-        <DialogContent className="max-w-md max-h-[85vh] flex flex-col overflow-hidden">
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
           <DialogTitle className="text-base font-semibold flex items-center gap-2">
             <Layers className="h-4 w-4 text-purple-600" />
             Desglosar ítem
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground -mt-2">
-            Selecciona las listas donde se desglosó <strong>{desgloseItem?.codigo}</strong> — <span className="text-gray-500">{desgloseItem?.descripcion}</span>
+            <strong>{desgloseItem?.codigo}</strong> — <span className="text-gray-500">{desgloseItem?.descripcion}</span>
           </DialogDescription>
 
           {desgloseListasProyecto.length === 0 ? (
@@ -886,51 +1009,177 @@ export default function ProjectEquipmentDetailPage({ params }: PageProps) {
               No hay listas en este proyecto.
             </div>
           ) : (
-            <ScrollArea className="h-[50vh]">
-              <div className="space-y-1">
-                {desgloseListasProyecto.map((lista) => (
-                  <label
-                    key={lista.id}
-                    className={cn(
-                      'flex items-center gap-3 p-2 rounded-lg border cursor-pointer transition-colors',
-                      desgloseSelected.includes(lista.id) ? 'bg-purple-50 border-purple-200' : 'hover:bg-gray-50'
-                    )}
-                  >
-                    <Checkbox
-                      checked={desgloseSelected.includes(lista.id)}
-                      onCheckedChange={(checked) => {
-                        setDesgloseSelected(prev =>
-                          checked ? [...prev, lista.id] : prev.filter(id => id !== lista.id)
-                        )
-                      }}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <span className="font-mono text-xs text-gray-600">{lista.codigo}</span>
-                      <p className="text-xs text-gray-700 truncate">{lista.nombre}</p>
-                    </div>
-                  </label>
-                ))}
+            <>
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-medium text-gray-600">Nota (opcional)</label>
+                <textarea
+                  value={desgloseNota}
+                  onChange={(e) => setDesgloseNota(e.target.value)}
+                  placeholder="Motivo o detalle del desglose..."
+                  rows={2}
+                  className="w-full text-xs px-2 py-1.5 border rounded-md resize-none focus:outline-none focus:ring-1 focus:ring-purple-400"
+                />
               </div>
-            </ScrollArea>
+
+              <div className="text-[11px] text-muted-foreground border-t pt-2">
+                Marca las listas donde se desglosó este ítem. Para cada lista, opcionalmente selecciona los ítems específicos que componen el desglose.
+              </div>
+
+              <ScrollArea className="flex-1 min-h-[40vh] max-h-[55vh] pr-2">
+                <div className="space-y-1.5">
+                  {desgloseListasProyecto.map((lista) => {
+                    const isSelected = desgloseSelected.includes(lista.id)
+                    const isExpanded = desgloseExpanded.includes(lista.id)
+                    const items = desgloseItemsByLista[lista.id]
+                    const seleccionados = desgloseLineasSelected[lista.id] || []
+                    const search = (desgloseSearch[lista.id] || '').toLowerCase()
+                    const itemsFiltrados = items?.filter(it =>
+                      !search || it.codigo.toLowerCase().includes(search) || it.descripcion.toLowerCase().includes(search)
+                    )
+                    return (
+                      <div
+                        key={lista.id}
+                        className={cn(
+                          'rounded-lg border transition-colors',
+                          isSelected ? 'border-purple-200 bg-purple-50/40' : 'border-gray-200'
+                        )}
+                      >
+                        <div className="flex items-center gap-2 p-2">
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={(checked) => handleToggleListaSelection(lista.id, !!checked)}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDesgloseExpanded(prev =>
+                                prev.includes(lista.id) ? prev.filter(id => id !== lista.id) : [...prev, lista.id]
+                              )
+                              if (isSelected && !desgloseItemsByLista[lista.id] && desgloseItem) {
+                                fetchItemsDisponiblesDesglose(desgloseItem.id, [lista.id])
+                              }
+                            }}
+                            className="flex-1 flex items-center gap-2 min-w-0 text-left hover:bg-purple-50/40 rounded px-1 py-0.5 transition-colors"
+                          >
+                            {isExpanded ? (
+                              <ChevronDown className="h-3.5 w-3.5 text-gray-500 shrink-0" />
+                            ) : (
+                              <ChevronRight className="h-3.5 w-3.5 text-gray-500 shrink-0" />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-mono text-xs text-gray-700">{lista.codigo}</span>
+                                {isSelected && seleccionados.length > 0 && (
+                                  <Badge variant="secondary" className="text-[9px] px-1 py-0 bg-purple-100 text-purple-700 border-purple-200">
+                                    {seleccionados.length} ítem{seleccionados.length !== 1 ? 's' : ''}
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-gray-500 truncate">{lista.nombre}</p>
+                            </div>
+                          </button>
+                        </div>
+                        {isExpanded && isSelected && (
+                          <div className="border-t border-purple-100 px-2 py-2 space-y-1.5">
+                            {!items ? (
+                              <div className="flex items-center justify-center py-4">
+                                <Loader2 className="h-4 w-4 animate-spin text-purple-500" />
+                              </div>
+                            ) : items.length === 0 ? (
+                              <p className="text-[11px] text-muted-foreground text-center py-2">
+                                Esta lista no tiene ítems candidatos. Crea ítems en la lista (origen "nuevo") y vuelve aquí.
+                              </p>
+                            ) : (
+                              <>
+                                <div className="relative">
+                                  <Search className="h-3 w-3 text-gray-400 absolute left-2 top-1/2 -translate-y-1/2" />
+                                  <Input
+                                    value={desgloseSearch[lista.id] || ''}
+                                    onChange={(e) => setDesgloseSearch(prev => ({ ...prev, [lista.id]: e.target.value }))}
+                                    placeholder="Buscar por código o descripción..."
+                                    className="h-7 text-xs pl-7"
+                                  />
+                                </div>
+                                <div className="space-y-0.5 max-h-[240px] overflow-y-auto">
+                                  {itemsFiltrados?.map((it) => {
+                                    const bloqueado = !!it.bloqueadoPorOtroDesglose
+                                    const checked = seleccionados.includes(it.id)
+                                    return (
+                                      <label
+                                        key={it.id}
+                                        className={cn(
+                                          'flex items-start gap-2 p-1.5 rounded text-xs transition-colors',
+                                          bloqueado
+                                            ? 'opacity-60 cursor-not-allowed bg-gray-50'
+                                            : checked
+                                            ? 'bg-purple-100/60 cursor-pointer'
+                                            : 'hover:bg-gray-50 cursor-pointer'
+                                        )}
+                                      >
+                                        <Checkbox
+                                          checked={checked}
+                                          disabled={bloqueado}
+                                          onCheckedChange={(c) => handleToggleLineaSelection(lista.id, it.id, !!c)}
+                                          className="mt-0.5"
+                                        />
+                                        <div className="flex-1 min-w-0">
+                                          <div className="flex items-center gap-1.5 flex-wrap">
+                                            <span className="font-mono text-gray-700">{it.codigo}</span>
+                                            <span className="text-[10px] text-gray-500">{it.cantidad} {it.unidad}</span>
+                                            {bloqueado && (
+                                              <Badge variant="outline" className="text-[9px] px-1 py-0 bg-amber-50 text-amber-700 border-amber-200">
+                                                en desglose de {it.bloqueadoPorOtroDesglose?.codigo || '?'}
+                                              </Badge>
+                                            )}
+                                          </div>
+                                          <p className="text-[11px] text-gray-600 truncate">{it.descripcion}</p>
+                                        </div>
+                                      </label>
+                                    )
+                                  })}
+                                  {itemsFiltrados?.length === 0 && (
+                                    <p className="text-[11px] text-muted-foreground text-center py-2">
+                                      Sin resultados.
+                                    </p>
+                                  )}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </ScrollArea>
+            </>
           )}
 
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" size="sm" onClick={() => setDesgloseItem(null)}>
-              Cancelar
-            </Button>
-            <Button
-              size="sm"
-              disabled={desgloseSelected.length === 0 || desgloseSaving}
-              onClick={handleDesglosar}
-              className="bg-purple-600 hover:bg-purple-700"
-            >
-              {desgloseSaving ? (
-                <Loader2 className="h-3 w-3 animate-spin mr-1" />
-              ) : (
-                <Layers className="h-3 w-3 mr-1" />
-              )}
-              Desglosar en {desgloseSelected.length} lista(s)
-            </Button>
+          <div className="flex justify-between items-center gap-2 pt-2 border-t">
+            <p className="text-[11px] text-muted-foreground">
+              {(() => {
+                const totalLineas = Object.values(desgloseLineasSelected).reduce((s, arr) => s + arr.length, 0)
+                return `${desgloseSelected.length} lista${desgloseSelected.length !== 1 ? 's' : ''}, ${totalLineas} ítem${totalLineas !== 1 ? 's' : ''} asociado${totalLineas !== 1 ? 's' : ''}`
+              })()}
+            </p>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setDesgloseItem(null)}>
+                Cancelar
+              </Button>
+              <Button
+                size="sm"
+                disabled={desgloseSelected.length === 0 || desgloseSaving}
+                onClick={handleDesglosar}
+                className="bg-purple-600 hover:bg-purple-700"
+              >
+                {desgloseSaving ? (
+                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                ) : (
+                  <Layers className="h-3 w-3 mr-1" />
+                )}
+                Guardar
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

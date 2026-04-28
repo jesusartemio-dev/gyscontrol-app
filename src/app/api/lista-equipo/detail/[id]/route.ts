@@ -153,6 +153,17 @@ export async function GET(
                 }
               }
             },
+            // 🧩 Cotizado padre del que este item es línea de desglose
+            desgloseDeProyectoEquipoCotizadoItem: {
+              select: {
+                id: true,
+                codigo: true,
+                descripcion: true,
+                proyectoEquipoCotizado: {
+                  select: { id: true, nombre: true }
+                }
+              }
+            },
             // 📦 Catálogo de equipo con categoría (para exportación Excel)
             catalogoEquipo: {
               select: {

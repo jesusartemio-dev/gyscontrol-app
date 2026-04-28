@@ -703,6 +703,7 @@ model ListaEquipoItem {
   tiempoEntregaDias                     Int?
   responsableId                         String
   reemplazaProyectoEquipoCotizadoItemId String?
+  desgloseDeProyectoEquipoCotizadoItemId String?
   cotizacionProveedorItems              CotizacionProveedorItem[]    @relation("cotizacionProveedorItemListaEquipoItem")
   entregaItem                           EntregaItem[]
   cotizacionSeleccionada                CotizacionProveedorItem?     @relation("listaEquipoItemCotizacionSeleccionada", fields: [cotizacionSeleccionadaId], references: [id])
@@ -711,6 +712,7 @@ model ListaEquipoItem {
   proyectoEquipoCotizado                ProyectoEquipoCotizado?      @relation(fields: [proyectoEquipoId], references: [id])
   proyectoEquipoItem                    ProyectoEquipoCotizadoItem?  @relation("listaEquipoItemProyectoEquipoItem", fields: [proyectoEquipoItemId], references: [id])
   reemplazaProyectoEquipoCotizadoItem   ProyectoEquipoCotizadoItem?  @relation("listaEquipoItemReemplazaProyectoEquipoItem", fields: [reemplazaProyectoEquipoCotizadoItemId], references: [id])
+  desgloseDeProyectoEquipoCotizadoItem  ProyectoEquipoCotizadoItem?  @relation("listaEquipoItemDesgloseDeProyectoEquipoItem", fields: [desgloseDeProyectoEquipoCotizadoItemId], references: [id], onDelete: SetNull)
   user                                  User                         @relation(fields: [responsableId], references: [id])
   verificadoPor                         User?                        @relation("ListaEquipoItemVerificador", fields: [verificadoPorId], references: [id])
   pedidoEquipoItem                      PedidoEquipoItem[]
@@ -1225,6 +1227,7 @@ model ProyectoEquipoCotizadoItem {
   listaEquipoSeleccionadoId String?
   listaEquipoItemsAsociados ListaEquipoItem[]      @relation("listaEquipoItemProyectoEquipoItem")
   listaEquipoItemsReemplazo ListaEquipoItem[]      @relation("listaEquipoItemReemplazaProyectoEquipoItem")
+  listaEquipoItemsDesglose  ListaEquipoItem[]      @relation("listaEquipoItemDesgloseDeProyectoEquipoItem")
   desgloses                 DesgloseEquipoItem[]
   catalogoEquipo            CatalogoEquipo?        @relation(fields: [catalogoEquipoId], references: [id])
   listaEquipoSeleccionado   ListaEquipoItem?       @relation("proyectoEquipoCotizadoItemListaEquipoSeleccionado", fields: [listaEquipoSeleccionadoId], references: [id])

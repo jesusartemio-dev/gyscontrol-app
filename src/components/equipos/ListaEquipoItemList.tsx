@@ -749,7 +749,27 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                       )}
                    </td>
                    <td className={`${cellPadding} ${columnWidths.origen} text-center`}>
-                      {(item.origen === 'cotizado' || item.origen === 'reemplazo') && item.proyectoEquipoItem ? (
+                      {item.desgloseDeProyectoEquipoCotizadoItem ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="text-[11px] text-purple-600 cursor-help border-b border-dotted border-purple-400 inline-flex items-center gap-0.5">
+                              <Layers className="h-2.5 w-2.5" />
+                              desglose
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-xs">
+                            <p className="text-[10px] font-semibold mb-0.5">Parte del desglose de:</p>
+                            <p className="text-[10px]">
+                              <span className="font-medium">{item.desgloseDeProyectoEquipoCotizadoItem.codigo}</span> — {item.desgloseDeProyectoEquipoCotizadoItem.descripcion}
+                            </p>
+                            {item.desgloseDeProyectoEquipoCotizadoItem.proyectoEquipoCotizado?.nombre && (
+                              <p className="text-[9px] text-muted-foreground mt-0.5">
+                                Grupo: {item.desgloseDeProyectoEquipoCotizadoItem.proyectoEquipoCotizado.nombre}
+                              </p>
+                            )}
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : (item.origen === 'cotizado' || item.origen === 'reemplazo') && item.proyectoEquipoItem ? (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <span className={`text-[11px] text-muted-foreground cursor-help border-b border-dotted border-gray-400`}>
@@ -1054,7 +1074,27 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                         <Badge variant={getStatusVariant(item.estado) as "default" | "secondary" | "outline"} className="text-[10px] px-1.5 py-0">
                           {item.estado || 'Sin estado'}
                         </Badge>
-                        {(item.origen === 'cotizado' || item.origen === 'reemplazo') && item.proyectoEquipoItem ? (
+                        {item.desgloseDeProyectoEquipoCotizadoItem ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 cursor-help bg-purple-50 text-purple-700 border-purple-200">
+                                <Layers className="h-2.5 w-2.5 mr-0.5" />
+                                desglose
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-xs">
+                              <p className="text-[10px] font-semibold mb-0.5">Parte del desglose de:</p>
+                              <p className="text-[10px]">
+                                <span className="font-medium">{item.desgloseDeProyectoEquipoCotizadoItem.codigo}</span> — {item.desgloseDeProyectoEquipoCotizadoItem.descripcion}
+                              </p>
+                              {item.desgloseDeProyectoEquipoCotizadoItem.proyectoEquipoCotizado?.nombre && (
+                                <p className="text-[9px] text-muted-foreground mt-0.5">
+                                  Grupo: {item.desgloseDeProyectoEquipoCotizadoItem.proyectoEquipoCotizado.nombre}
+                                </p>
+                              )}
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : (item.origen === 'cotizado' || item.origen === 'reemplazo') && item.proyectoEquipoItem ? (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Badge variant={getOrigenVariant(item.origen)} className="text-[10px] px-1.5 py-0 cursor-help">
