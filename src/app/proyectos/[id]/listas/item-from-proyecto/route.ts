@@ -22,6 +22,17 @@ export async function POST(req: Request) {
     // Obtener el ítem del proyecto
     const item = await prisma.proyectoEquipoCotizadoItem.findUnique({
       where: { id: proyectoEquipoItemId },
+      select: {
+        id: true,
+        codigo: true,
+        descripcion: true,
+        marca: true,
+        categoria: true,
+        unidad: true,
+        cantidad: true,
+        precioCliente: true,
+        listaEquipoSeleccionadoId: true,
+      },
     })
 
     if (!item) {
@@ -38,28 +49,61 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Lista no encontrada' }, { status: 404 })
     }
 
-    // Crear el nuevo ítem en la lista técnica
-    const nuevo = await prisma.listaEquipoItem.create({
-      data: {
-        id: `lista-equipo-item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        listaId,
-        proyectoEquipoItemId: item.id,
-        responsableId: lista.responsableId,
-        codigo: item.codigo,
-        descripcion: item.descripcion,
-        marca: item.marca || '', // ✅ Copiar marca
-        categoria: item.categoria || '', // ✅ Copiar categoria
-        unidad: item.unidad,
-        cantidad: item.cantidad,
-        presupuesto: item.precioCliente, // Se usa como presupuesto referencial
-        estado: 'borrador',
-        origen: 'cotizado',
-        verificado: false,
-        updatedAt: new Date(),
-      },
+    const oldListaItemId = item.listaEquipoSeleccionadoId
+
+    const nuevo = await prisma.$transaction(async (tx) => {
+      // 1. Limpiar el lista item previo del equipo si existía (evita huérfano)
+      if (oldListaItemId) {
+        try {
+          await tx.listaEquipoItem.update({
+            where: { id: oldListaItemId },
+            data: {
+              proyectoEquipoItemId: null,
+              reemplazaProyectoEquipoCotizadoItemId: null,
+              origen: 'nuevo',
+            },
+          })
+        } catch (e) {
+          // El lista item previo podría haber sido eliminado o estar en lista no editable.
+          // Lo dejamos pasar — el cascade SetNull manejará referencias colgantes.
+          console.warn(`⚠️ item-from-proyecto: no se pudo limpiar lista item previo ${oldListaItemId}:`, e)
+        }
+      }
+
+      // 2. Crear el nuevo ítem en la lista técnica
+      const nuevoLi = await tx.listaEquipoItem.create({
+        data: {
+          id: `lista-equipo-item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          listaId,
+          proyectoEquipoItemId: item.id,
+          responsableId: lista.responsableId,
+          codigo: item.codigo,
+          descripcion: item.descripcion,
+          marca: item.marca || '',
+          categoria: item.categoria || '',
+          unidad: item.unidad,
+          cantidad: item.cantidad,
+          presupuesto: item.precioCliente,
+          estado: 'borrador',
+          origen: 'cotizado',
+          verificado: false,
+          updatedAt: new Date(),
+        },
+      })
+
+      // 3. Actualizar el equipo cotizado para que apunte a este nuevo lista item
+      await tx.proyectoEquipoCotizadoItem.update({
+        where: { id: item.id },
+        data: {
+          listaEquipoSeleccionadoId: nuevoLi.id,
+          listaId,
+          estado: 'en_lista',
+        },
+      })
+
+      return nuevoLi
     })
 
-    // Retornar el nuevo ítem creado
     return NextResponse.json(nuevo)
   } catch (error) {
     console.error('❌ Error al copiar ProyectoEquipoItem a ListaEquipoItem:', error)

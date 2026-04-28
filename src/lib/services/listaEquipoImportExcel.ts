@@ -291,6 +291,8 @@ export async function importarDesdeCotizacion(
 
       const existente = itemsPorCodigo.get(codigo)
 
+      let listaItemId: string | undefined
+
       if (existente) {
         // ✅ Actualizar item existente
         await updateListaEquipoItem(existente.id, {
@@ -300,10 +302,11 @@ export async function importarDesdeCotizacion(
           categoria,
           proyectoEquipoItemId: itemId,
         })
+        listaItemId = existente.id
         console.log(`🔄 Item ${codigo} actualizado en lista (vinculado a ${proyectoItem.codigo})`)
       } else {
         // ✅ Crear nuevo item con datos del Excel + vínculo al cotizado
-        await createListaEquipoItem({
+        const nuevo = await createListaEquipoItem({
           listaId,
           proyectoEquipoItemId: itemId,
           proyectoEquipoId: proyectoItem.proyectoEquipoId,
@@ -318,7 +321,20 @@ export async function importarDesdeCotizacion(
           origen: 'cotizado',
           estado: 'borrador',
         })
+        listaItemId = nuevo?.id
         console.log(`✅ Item ${codigo} creado en lista (vinculado a ${proyectoItem.codigo})`)
+      }
+
+      // ✅ Sincronizar el equipo cotizado para que apunte al lista item vigente
+      // Evita huérfanos: si proyectoEquipoItem.listaEquipoSeleccionadoId queda
+      // distinto al lista item recién creado/actualizado, el item resulta huérfano
+      // (origen='cotizado' con back-link roto).
+      if (listaItemId && proyectoItem.listaEquipoSeleccionadoId !== listaItemId) {
+        await updateProyectoEquipoItem(itemId, {
+          listaEquipoSeleccionadoId: listaItemId,
+          listaId,
+          estado: 'en_lista',
+        })
       }
     }
   } catch (error) {
@@ -466,6 +482,11 @@ export async function importarComoReemplazo(
 ): Promise<void> {
   try {
     for (const { excelItem, proyectoEquipoItemId, motivo } of replacements) {
+      // 0. Obtener estado actual del equipo para limpiar referencias previas si las hay
+      const proyectoItemRes = await fetch(buildApiUrl(`/api/proyecto-equipo-item/${proyectoEquipoItemId}`))
+      const proyectoItem = proyectoItemRes.ok ? await proyectoItemRes.json() : null
+      const oldListaItemId: string | null = proyectoItem?.listaEquipoSeleccionadoId ?? null
+
       // 1. Crear nuevo ListaEquipoItem con origen 'reemplazo'
       const nuevoItem = await createListaEquipoItem({
         listaId,
@@ -485,7 +506,22 @@ export async function importarComoReemplazo(
         comentarioRevision: motivo,
       })
 
-      // 2. Actualizar ProyectoEquipoItem → reemplazado
+      // 2. Limpiar lista item previo si existía (evita huérfano Patrón B)
+      if (nuevoItem && oldListaItemId && oldListaItemId !== nuevoItem.id) {
+        try {
+          await updateListaEquipoItem(oldListaItemId, {
+            proyectoEquipoItemId: null as any,
+            reemplazaProyectoEquipoCotizadoItemId: null as any,
+            origen: 'nuevo',
+          })
+        } catch (e) {
+          // si la lista del item viejo no es editable, dejamos el huérfano
+          // y avisamos en consola — el usuario podrá limpiarlo manualmente.
+          console.warn(`⚠️ No se pudo limpiar lista item previo ${oldListaItemId}:`, e)
+        }
+      }
+
+      // 3. Actualizar ProyectoEquipoItem → reemplazado, apuntando al nuevo
       if (nuevoItem) {
         await updateProyectoEquipoItem(proyectoEquipoItemId, {
           listaEquipoSeleccionadoId: nuevoItem.id,
