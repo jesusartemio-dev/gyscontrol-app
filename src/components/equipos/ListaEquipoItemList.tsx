@@ -125,21 +125,32 @@ const getOrigenVariant = (origen: string): "default" | "secondary" | "outline" =
 }
 
 
-function SortableItemRow({ id, disabled, showHandle, rowClassName, children }: {
+function SortableItemRow({ id, disabled, showHandle, index, rowClassName, children }: {
   id: string
   disabled: boolean
   showHandle: boolean
+  index: number
   rowClassName?: string
   children: (dragHandle: React.ReactNode) => React.ReactNode
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id, disabled })
-  const dragHandle = showHandle ? (
-    <td className="w-5 px-1" onClick={(e) => e.stopPropagation()}>
-      <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity p-0.5">
-        <GripVertical className="h-3.5 w-3.5 text-gray-400" />
-      </div>
+  const dragHandle = (
+    <td className="w-10 px-1 text-center" onClick={(e) => e.stopPropagation()}>
+      {showHandle ? (
+        <div
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing inline-flex items-center justify-center gap-0.5 text-[11px] text-gray-500 select-none px-1 py-0.5 rounded hover:bg-gray-100 transition-colors"
+          title="Arrastra para reordenar"
+        >
+          <GripVertical className="h-3 w-3 text-gray-300 group-hover:text-gray-500 transition-colors" />
+          <span className="font-mono font-medium tabular-nums">{index + 1}</span>
+        </div>
+      ) : (
+        <span className="text-[11px] text-gray-400 font-mono tabular-nums">{index + 1}</span>
+      )}
     </td>
-  ) : null
+  )
   return (
     <tr
       ref={setNodeRef}
@@ -591,7 +602,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
           <table className={`w-full ${textSize}`}>
             <thead>
               <tr className="bg-gray-50 border-b">
-                {canDragItems && <th className="w-5 p-0" />}
+                <th className="w-10 px-1 text-center font-semibold text-gray-700">#</th>
                 <th className={`${cellPadding} ${columnWidths.codigoDescripcion} text-left font-semibold text-gray-700`}>
                   Código / Descripción
                 </th>
@@ -641,6 +652,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                    id={item.id}
                    disabled={!canDragItems}
                    showHandle={canDragItems}
+                   index={rowIndex}
                    rowClassName={`border-b hover:bg-gray-50 transition-colors group ${
                      rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'
                    }`}
