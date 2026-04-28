@@ -90,14 +90,14 @@ async function main() {
   // ── CuentaPorCobrar ──
   const cxcs = await prisma.cuentaPorCobrar.findMany({
     where: { formaPago: null, condicionPago: { not: null } },
-    select: { id: true, numeroFactura: true, condicionPago: true, diasCredito: true },
+    select: { id: true, numeroDocumento: true, condicionPago: true, diasCredito: true },
   })
   for (const cxc of cxcs) {
     const parsed = parsePagoLegacy(cxc.condicionPago, cxc.diasCredito)
     cambios.push({
       modelo: 'CuentaPorCobrar',
       id: cxc.id,
-      ref: cxc.numeroFactura ?? cxc.id.slice(-6),
+      ref: cxc.numeroDocumento ?? cxc.id.slice(-6),
       antes: { condicion: cxc.condicionPago, dias: cxc.diasCredito },
       despues: parsed,
     })
