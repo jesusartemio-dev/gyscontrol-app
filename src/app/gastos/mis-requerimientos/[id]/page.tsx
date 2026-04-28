@@ -606,6 +606,11 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
   const canRegistrarAnticipo = ['aprobado', 'depositado', 'rendido'].includes(hoja.estado) && ['admin', 'gerente', 'administracion'].includes(role || '')
   const canRegistrarReembolso = hoja.estado === 'validado' && hoja.saldo < 0 && ['admin', 'gerente', 'administracion'].includes(role || '')
   const canRegistrarDevolucion = hoja.estado === 'validado' && hoja.saldo > 0 && hoja.requiereAnticipo && (esEmpleado || ['admin', 'gerente', 'administracion'].includes(role || ''))
+  const estadosConSeccionPagos = ['aprobado', 'depositado', 'rendido', 'revisado', 'validado', 'cerrado']
+  const showAnticipos = hoja.requiereAnticipo && estadosConSeccionPagos.includes(hoja.estado)
+  const showReembolsos = canRegistrarReembolso || reembolsos.length > 0
+  const showDevoluciones = hoja.requiereAnticipo && (canRegistrarDevolucion || devoluciones.length > 0)
+  const showSeccionPagos = showAnticipos || showReembolsos || showDevoluciones
 
   return (
     <div className="container mx-auto p-4 sm:p-6 space-y-4 max-w-4xl">
@@ -859,7 +864,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
       })()}
 
       {/* Anticipos, reembolsos y devoluciones */}
-      {hoja.requiereAnticipo && ['aprobado', 'depositado', 'rendido', 'validado', 'cerrado'].includes(hoja.estado) && (
+      {showSeccionPagos && (
         <Card>
           <CardHeader className="py-3 px-4">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -870,6 +875,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
           <CardContent className="px-4 pb-4 space-y-4">
 
             {/* ── ANTICIPOS (empresa → trabajador) ── */}
+            {showAnticipos && (
             <div>
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs font-semibold text-purple-700 uppercase tracking-wide">
@@ -921,6 +927,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
                 })}
               </div>
             </div>
+            )}
 
             {/* ── REEMBOLSOS (empresa → trabajador, después de validar) ── */}
             {(canRegistrarReembolso || reembolsos.length > 0) && (
