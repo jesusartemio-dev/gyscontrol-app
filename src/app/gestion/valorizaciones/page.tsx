@@ -106,6 +106,7 @@ export default function ValorizacionesPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterProyecto, setFilterProyecto] = useState<string>('all')
   const [filterEstado, setFilterEstado] = useState<string>('all')
+  const [filterCondicionPago, setFilterCondicionPago] = useState<string>('all')
 
   // Form fields (create only)
   const [formProyectoId, setFormProyectoId] = useState('')
@@ -182,6 +183,11 @@ export default function ValorizacionesPage() {
     let result = items
     if (filterProyecto !== 'all') result = result.filter(i => i.proyectoId === filterProyecto)
     if (filterEstado !== 'all') result = result.filter(i => i.estado === filterEstado)
+    if (filterCondicionPago !== 'all') {
+      result = filterCondicionPago === '__none__'
+        ? result.filter(i => !(i as any).condicionPago)
+        : result.filter(i => (i as any).condicionPago === filterCondicionPago)
+    }
     if (searchTerm) {
       const term = searchTerm.toLowerCase()
       result = result.filter(i =>
@@ -191,7 +197,7 @@ export default function ValorizacionesPage() {
       )
     }
     return result
-  }, [items, filterProyecto, filterEstado, searchTerm])
+  }, [items, filterProyecto, filterEstado, filterCondicionPago, searchTerm])
 
   // Preview info: qué número de valorización se creará y si hay partidas anteriores
   const formPreview = useMemo(() => {
@@ -429,6 +435,18 @@ export default function ValorizacionesPage() {
             {ESTADOS.map(e => (
               <SelectItem key={e.value} value={e.value}>{e.label}</SelectItem>
             ))}
+          </SelectContent>
+        </Select>
+        <Select value={filterCondicionPago} onValueChange={setFilterCondicionPago}>
+          <SelectTrigger className="w-44">
+            <SelectValue placeholder="Condición de pago" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas las condiciones</SelectItem>
+            <SelectItem value="contado">Contado</SelectItem>
+            <SelectItem value="credito">Crédito</SelectItem>
+            <SelectItem value="adelanto">Adelanto</SelectItem>
+            <SelectItem value="__none__">Sin definir</SelectItem>
           </SelectContent>
         </Select>
       </div>

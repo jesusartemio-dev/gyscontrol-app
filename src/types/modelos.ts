@@ -1638,6 +1638,11 @@ export interface Valorizacion {
   fondoGarantiaPorcentaje: number
   fondoGarantiaMonto: number
   netoARecibir: number
+  // Condiciones de pago de esta valorización (heredadas por sus CxC)
+  condicionPago?: string | null  // 'contado' | 'credito' | 'adelanto'
+  formaPago?: string | null      // 'transferencia' | 'factura' | 'cheque' | 'letra' | 'factura_negociable' | 'otro'
+  diasCredito?: number | null
+  notasPago?: string | null      // Texto libre para hitos complejos o aclaraciones
   // Estado y fechas
   estado: EstadoValorizacion
   fechaEnvio?: string | null

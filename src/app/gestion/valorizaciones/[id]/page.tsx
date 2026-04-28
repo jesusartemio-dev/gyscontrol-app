@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ArrowLeft, Loader2, Save, Eye, Check } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { CONDICIONES_PAGO, FORMAS_PAGO, DIAS_CREDITO_PRESETS, formatPago } from '@/lib/utils/formaPago'
 import TablaPartidas from '@/components/valorizacion/TablaPartidas'
 import DetalleHH from '@/components/valorizacion/DetalleHH'
 import { calcularAdelantoValorizacion } from '@/lib/utils/adelantoUtils'
@@ -119,6 +120,11 @@ export default function ValorizacionEditPage() {
   const [formTipoCambio, setFormTipoCambio] = useState('')
   const [showTipoCambio, setShowTipoCambio] = useState(false)
   const [formObservaciones, setFormObservaciones] = useState('')
+  // Condiciones de pago de la valorización
+  const [formCondicionPago, setFormCondicionPago] = useState('')
+  const [formFormaPago, setFormFormaPago] = useState('')
+  const [formDiasCredito, setFormDiasCredito] = useState('')
+  const [formNotasPago, setFormNotasPago] = useState('')
 
   const loadVal = useCallback(async () => {
     try {
@@ -143,6 +149,10 @@ export default function ValorizacionEditPage() {
       setFormTipoCambio(data.tipoCambio?.toString() || '')
       setShowTipoCambio(!!data.tipoCambio)
       setFormObservaciones(data.observaciones || '')
+      setFormCondicionPago((data as any).condicionPago || '')
+      setFormFormaPago((data as any).formaPago || '')
+      setFormDiasCredito((data as any).diasCredito?.toString() || '')
+      setFormNotasPago((data as any).notasPago || '')
     } catch {
       toast.error('Error al cargar valorización')
       router.push('/gestion/valorizaciones')
@@ -182,6 +192,10 @@ export default function ValorizacionEditPage() {
         moneda: formMoneda,
         tipoCambio: formTipoCambio ? parseFloat(formTipoCambio) : null,
         observaciones: formObservaciones || null,
+        condicionPago: formCondicionPago || null,
+        formaPago: formFormaPago || null,
+        diasCredito: formDiasCredito ? parseInt(formDiasCredito) : null,
+        notasPago: formNotasPago || null,
       }
       const res = await fetch(`/api/proyectos/${val.proyectoId}/valorizaciones/${val.id}`, {
         method: 'PUT',
@@ -405,7 +419,87 @@ export default function ValorizacionEditPage() {
               <div className="mt-3">
                 <Input placeholder="Observaciones..." className="h-8 text-xs" value={formObservaciones} onChange={e => setFormObservaciones(e.target.value)} />
               </div>
+
+              {/* Condiciones de pago de esta valorización */}
+              <div className="mt-3 pt-3 border-t">
+                <Label className="text-xs text-muted-foreground font-semibold">Condiciones de pago</Label>
+                <div className="grid grid-cols-3 gap-2 mt-1.5">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Condición</Label>
+                    <Select
+                      value={formCondicionPago || '__none__'}
+                      onValueChange={v => {
+                        const next = v === '__none__' ? '' : v
+                        setFormCondicionPago(next)
+                        if (next !== 'credito') setFormDiasCredito('')
+                      }}
+                    >
+                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__"><span className="text-muted-foreground">—</span></SelectItem>
+                        {CONDICIONES_PAGO.map(c => (
+                          <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Forma</Label>
+                    <Select
+                      value={formFormaPago || '__none__'}
+                      onValueChange={v => setFormFormaPago(v === '__none__' ? '' : v)}
+                    >
+                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__"><span className="text-muted-foreground">—</span></SelectItem>
+                        {FORMAS_PAGO.map(f => (
+                          <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {formCondicionPago === 'credito' && (
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Días</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        list="dias-credito-presets"
+                        className="h-8 text-xs"
+                        value={formDiasCredito}
+                        onChange={e => setFormDiasCredito(e.target.value)}
+                        placeholder="30"
+                      />
+                      <datalist id="dias-credito-presets">
+                        {DIAS_CREDITO_PRESETS.map(d => <option key={d} value={d} />)}
+                      </datalist>
+                    </div>
+                  )}
+                </div>
+                <div className="mt-2">
+                  <Label className="text-xs text-muted-foreground">Notas (hitos, aclaraciones)</Label>
+                  <Input
+                    placeholder='Ej: "30% adelanto al firmar, 70% contra entrega"'
+                    className="h-8 text-xs"
+                    value={formNotasPago}
+                    onChange={e => setFormNotasPago(e.target.value)}
+                  />
+                </div>
+              </div>
             </>
+          )}
+
+          {/* Vista solo lectura: mostrar condiciones de pago si están definidas */}
+          {readOnly && val && ((val as any).condicionPago || (val as any).notasPago) && (
+            <div className="mt-3 pt-3 border-t">
+              <span className="text-xs text-muted-foreground block">Condiciones de pago</span>
+              <span className="text-sm font-medium">
+                {formatPago((val as any).condicionPago, (val as any).formaPago, (val as any).diasCredito)}
+              </span>
+              {(val as any).notasPago && (
+                <p className="text-xs text-muted-foreground mt-1 italic">{(val as any).notasPago}</p>
+              )}
+            </div>
           )}
         </CardContent>
       </Card>

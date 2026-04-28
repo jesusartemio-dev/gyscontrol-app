@@ -275,6 +275,25 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       calculados.adelantoMonto = adelantoMontoOverride
     }
 
+    // Bloqueo: condiciones de pago no editables si la valorización está en estado final
+    // (ya facturada, pagada, aprobada_cliente o anulada). Solo editables en borrador/enviada/observada/corregida.
+    const ESTADOS_PAGO_BLOQUEADOS = ['aprobada_cliente', 'facturada', 'pagada', 'anulada']
+    const tocaPago = body.condicionPago !== undefined || body.formaPago !== undefined
+                  || body.diasCredito !== undefined || body.notasPago !== undefined
+    if (tocaPago && ESTADOS_PAGO_BLOQUEADOS.includes(existing.estado)) {
+      const cambiaCampoPago =
+        (body.condicionPago !== undefined && body.condicionPago !== existing.condicionPago) ||
+        (body.formaPago !== undefined && body.formaPago !== existing.formaPago) ||
+        (body.diasCredito !== undefined && body.diasCredito !== existing.diasCredito) ||
+        (body.notasPago !== undefined && body.notasPago !== existing.notasPago)
+      if (cambiaCampoPago) {
+        return NextResponse.json(
+          { error: `No se pueden modificar las condiciones de pago en estado "${existing.estado}". Anule la valorización si necesita cambios.` },
+          { status: 400 }
+        )
+      }
+    }
+
     const valorizacion = await prisma.valorizacion.update({
       where: { id: valId },
       data: {
@@ -285,6 +304,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         ...(body.estado !== undefined && { estado: body.estado }),
         ...extraCampos,
         ...(body.observaciones !== undefined && { observaciones: body.observaciones }),
+        ...(body.condicionPago !== undefined && { condicionPago: body.condicionPago || null }),
+        ...(body.formaPago !== undefined && { formaPago: body.formaPago || null }),
+        ...(body.diasCredito !== undefined && { diasCredito: body.diasCredito ?? null }),
+        ...(body.notasPago !== undefined && { notasPago: body.notasPago || null }),
         presupuestoContractual,
         montoValorizacion,
         acumuladoAnterior,
@@ -297,6 +320,36 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       },
       include: includeRelations,
     })
+
+    // Auditoría: registrar cambios en condiciones de pago
+    if (tocaPago && existing) {
+      const cambios: Record<string, { antes: any; despues: any }> = {}
+      if (body.condicionPago !== undefined && body.condicionPago !== existing.condicionPago)
+        cambios.condicionPago = { antes: existing.condicionPago, despues: body.condicionPago || null }
+      if (body.formaPago !== undefined && body.formaPago !== existing.formaPago)
+        cambios.formaPago = { antes: existing.formaPago, despues: body.formaPago || null }
+      if (body.diasCredito !== undefined && body.diasCredito !== existing.diasCredito)
+        cambios.diasCredito = { antes: existing.diasCredito, despues: body.diasCredito ?? null }
+      if (body.notasPago !== undefined && body.notasPago !== existing.notasPago)
+        cambios.notasPago = { antes: existing.notasPago, despues: body.notasPago || null }
+
+      if (Object.keys(cambios).length > 0) {
+        try {
+          await prisma.eventoTrazabilidad.create({
+            data: {
+              id: `evt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              tipo: 'valorizacion_pago_actualizado',
+              descripcion: `Condiciones de pago actualizadas en valorización ${valorizacion.codigo}`,
+              usuarioId: session.user.id,
+              metadata: { valorizacionId: valId, proyectoId, cambios },
+              updatedAt: new Date(),
+            },
+          })
+        } catch (e) {
+          console.warn('No se pudo crear evento de auditoría:', e)
+        }
+      }
+    }
 
     return NextResponse.json(valorizacion)
   } catch (error) {

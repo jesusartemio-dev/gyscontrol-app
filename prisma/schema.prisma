@@ -669,59 +669,59 @@ model ListaEquipo {
 }
 
 model ListaEquipoItem {
-  id                                    String                       @id @default(cuid())
-  listaId                               String
-  proyectoEquipoId                      String?
-  proyectoEquipoItemId                  String?
-  proveedorId                           String?
-  cotizacionSeleccionadaId              String?                      @unique
-  catalogoEquipoId                      String?
-  codigo                                String
-  descripcion                           String
-  categoria                             String                       @default("SIN-CATEGORIA")
-  tipoItem                              String                       @default("equipo")
-  unidad                                String
-  marca                                 String                       @default("SIN-MARCA")
-  cantidad                              Float
-  orden                                 Int                          @default(0)
-  verificado                            Boolean                      @default(false)
-  verificadoPorId                       String?
-  verificadoAt                          DateTime?
-  comentarioRevision                    String?
-  presupuesto                           Float?
-  precioElegido                         Float?
-  costoElegido                          Float?
-  costoPedido                           Float?                       @default(0)
-  costoReal                             Float?                       @default(0)
-  cantidadPedida                        Float?                       @default(0)
-  cantidadEntregada                     Float?                       @default(0)
-  estado                                EstadoListaItem              @default(borrador)
-  createdAt                             DateTime                     @default(now())
-  updatedAt                             DateTime                     @updatedAt
-  origen                                OrigenListaItem              @default(nuevo)
-  tiempoEntrega                         String?
-  tiempoEntregaDias                     Int?
-  responsableId                         String
-  reemplazaProyectoEquipoCotizadoItemId String?
+  id                                     String                       @id @default(cuid())
+  listaId                                String
+  proyectoEquipoId                       String?
+  proyectoEquipoItemId                   String?
+  proveedorId                            String?
+  cotizacionSeleccionadaId               String?                      @unique
+  catalogoEquipoId                       String?
+  codigo                                 String
+  descripcion                            String
+  categoria                              String                       @default("SIN-CATEGORIA")
+  tipoItem                               String                       @default("equipo")
+  unidad                                 String
+  marca                                  String                       @default("SIN-MARCA")
+  cantidad                               Float
+  orden                                  Int                          @default(0)
+  verificado                             Boolean                      @default(false)
+  verificadoPorId                        String?
+  verificadoAt                           DateTime?
+  comentarioRevision                     String?
+  presupuesto                            Float?
+  precioElegido                          Float?
+  costoElegido                           Float?
+  costoPedido                            Float?                       @default(0)
+  costoReal                              Float?                       @default(0)
+  cantidadPedida                         Float?                       @default(0)
+  cantidadEntregada                      Float?                       @default(0)
+  estado                                 EstadoListaItem              @default(borrador)
+  createdAt                              DateTime                     @default(now())
+  updatedAt                              DateTime                     @updatedAt
+  origen                                 OrigenListaItem              @default(nuevo)
+  tiempoEntrega                          String?
+  tiempoEntregaDias                      Int?
+  responsableId                          String
+  reemplazaProyectoEquipoCotizadoItemId  String?
   desgloseDeProyectoEquipoCotizadoItemId String?
-  cotizacionProveedorItems              CotizacionProveedorItem[]    @relation("cotizacionProveedorItemListaEquipoItem")
-  entregaItem                           EntregaItem[]
-  cotizacionSeleccionada                CotizacionProveedorItem?     @relation("listaEquipoItemCotizacionSeleccionada", fields: [cotizacionSeleccionadaId], references: [id])
-  listaEquipo                           ListaEquipo                  @relation(fields: [listaId], references: [id], onDelete: Cascade)
-  proveedor                             Proveedor?                   @relation(fields: [proveedorId], references: [id])
-  proyectoEquipoCotizado                ProyectoEquipoCotizado?      @relation(fields: [proyectoEquipoId], references: [id])
-  proyectoEquipoItem                    ProyectoEquipoCotizadoItem?  @relation("listaEquipoItemProyectoEquipoItem", fields: [proyectoEquipoItemId], references: [id])
-  reemplazaProyectoEquipoCotizadoItem   ProyectoEquipoCotizadoItem?  @relation("listaEquipoItemReemplazaProyectoEquipoItem", fields: [reemplazaProyectoEquipoCotizadoItemId], references: [id])
-  desgloseDeProyectoEquipoCotizadoItem  ProyectoEquipoCotizadoItem?  @relation("listaEquipoItemDesgloseDeProyectoEquipoItem", fields: [desgloseDeProyectoEquipoCotizadoItemId], references: [id], onDelete: SetNull)
-  user                                  User                         @relation(fields: [responsableId], references: [id])
-  verificadoPor                         User?                        @relation("ListaEquipoItemVerificador", fields: [verificadoPorId], references: [id])
-  pedidoEquipoItem                      PedidoEquipoItem[]
-  ordenCompraItems                      OrdenCompraItem[]
-  listaEquipoItemSeleccionados          ProyectoEquipoCotizadoItem[] @relation("proyectoEquipoCotizadoItemListaEquipoSeleccionado")
-  catalogoEquipo                        CatalogoEquipo?              @relation(fields: [catalogoEquipoId], references: [id])
-  seleccionadoPorId                     String?
-  fechaSeleccion                        DateTime?
-  seleccionadoPor                       User?                        @relation("ListaEquipoItemSeleccionador", fields: [seleccionadoPorId], references: [id])
+  cotizacionProveedorItems               CotizacionProveedorItem[]    @relation("cotizacionProveedorItemListaEquipoItem")
+  entregaItem                            EntregaItem[]
+  cotizacionSeleccionada                 CotizacionProveedorItem?     @relation("listaEquipoItemCotizacionSeleccionada", fields: [cotizacionSeleccionadaId], references: [id])
+  listaEquipo                            ListaEquipo                  @relation(fields: [listaId], references: [id], onDelete: Cascade)
+  proveedor                              Proveedor?                   @relation(fields: [proveedorId], references: [id])
+  proyectoEquipoCotizado                 ProyectoEquipoCotizado?      @relation(fields: [proyectoEquipoId], references: [id])
+  proyectoEquipoItem                     ProyectoEquipoCotizadoItem?  @relation("listaEquipoItemProyectoEquipoItem", fields: [proyectoEquipoItemId], references: [id])
+  reemplazaProyectoEquipoCotizadoItem    ProyectoEquipoCotizadoItem?  @relation("listaEquipoItemReemplazaProyectoEquipoItem", fields: [reemplazaProyectoEquipoCotizadoItemId], references: [id])
+  desgloseDeProyectoEquipoCotizadoItem   ProyectoEquipoCotizadoItem?  @relation("listaEquipoItemDesgloseDeProyectoEquipoItem", fields: [desgloseDeProyectoEquipoCotizadoItemId], references: [id], onDelete: SetNull)
+  user                                   User                         @relation(fields: [responsableId], references: [id])
+  verificadoPor                          User?                        @relation("ListaEquipoItemVerificador", fields: [verificadoPorId], references: [id])
+  pedidoEquipoItem                       PedidoEquipoItem[]
+  ordenCompraItems                       OrdenCompraItem[]
+  listaEquipoItemSeleccionados           ProyectoEquipoCotizadoItem[] @relation("proyectoEquipoCotizadoItemListaEquipoSeleccionado")
+  catalogoEquipo                         CatalogoEquipo?              @relation(fields: [catalogoEquipoId], references: [id])
+  seleccionadoPorId                      String?
+  fechaSeleccion                         DateTime?
+  seleccionadoPor                        User?                        @relation("ListaEquipoItemSeleccionador", fields: [seleccionadoPorId], references: [id])
 
   @@index([listaId, estado, createdAt(sort: Desc)], map: "idx_lista_item_lista_estado_fecha")
   @@index([proveedorId, estado, precioElegido], map: "idx_lista_item_proveedor_estado_precio")
@@ -1050,7 +1050,9 @@ model Proyecto {
   fondoGarantiaPct           Float                       @default(0)
   descuentoComercialPct      Float                       @default(0)
   igvPct                     Float                       @default(18)
+  /// @deprecated — usar Valorizacion.condicionPago. Estos campos son legacy huérfanos sin uso operacional. Mantener solo por retrocompatibilidad.
   condicionPago              String?
+  /// @deprecated — usar Valorizacion.diasCredito.
   diasCredito                Int?
   createdAt                  DateTime                    @default(now())
   updatedAt                  DateTime
@@ -1738,6 +1740,11 @@ model Valorizacion {
   fondoGarantiaPorcentaje      Float              @default(0)
   fondoGarantiaMonto           Float              @default(0) // calculado
   netoARecibir                 Float              @default(0) // calculado: subtotal + IGV - fondoGarantia
+  // Condiciones de pago de esta valorización (operacional — heredado por sus CxC)
+  condicionPago                String? // 'contado' | 'credito' | 'adelanto'
+  formaPago                    String? // 'transferencia' | 'factura' | 'cheque' | 'letra' | 'factura_negociable' | 'otro'
+  diasCredito                  Int?
+  notasPago                    String? // Texto libre para hitos complejos o aclaraciones
   // Estado y fechas
   estado                       EstadoValorizacion @default(borrador)
   fechaEnvio                   DateTime?

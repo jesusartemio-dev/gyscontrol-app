@@ -182,6 +182,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           igvPorcentaje,
           fondoGarantiaPorcentaje,
           observaciones: body.observaciones || null,
+          // Condiciones de pago de esta valorización
+          condicionPago: body.condicionPago || null,
+          formaPago: body.formaPago || null,
+          diasCredito: body.diasCredito ?? null,
+          notasPago: body.notasPago || null,
           ...calculados,
           updatedAt: new Date(),
         },
