@@ -603,15 +603,41 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
   const anticipos = (hoja.depositos || []).filter((d: any) => d.tipo === 'anticipo' || (!d.tipo || d.tipo === null))
   const reembolsos = (hoja.depositos || []).filter((d: any) => d.tipo === 'reembolso')
   const devoluciones = (hoja.depositos || []).filter((d: any) => d.tipo === 'devolucion')
-  const canRegistrarAnticipo = ['aprobado', 'depositado', 'rendido', 'revisado', 'validado'].includes(hoja.estado) && ['admin', 'gerente', 'administracion'].includes(role || '')
-  const canRegistrarReembolso = hoja.estado === 'validado' && hoja.saldo < 0 && ['admin', 'gerente', 'administracion'].includes(role || '')
-  const canRegistrarDevolucion = hoja.estado === 'validado' && hoja.saldo > 0 && (esEmpleado || ['admin', 'gerente', 'administracion'].includes(role || ''))
+  const esAdminGerente = ['admin', 'gerente', 'administracion'].includes(role || '')
   const estadosConSeccionPagos = ['aprobado', 'depositado', 'rendido', 'revisado', 'validado', 'cerrado']
   const estaEnSeccion = estadosConSeccionPagos.includes(hoja.estado)
-  const showAnticipos = estaEnSeccion && (hoja.requiereAnticipo || canRegistrarAnticipo || anticipos.length > 0)
-  const showReembolsos = canRegistrarReembolso || reembolsos.length > 0
-  const showDevoluciones = canRegistrarDevolucion || devoluciones.length > 0
-  const showSeccionPagos = showAnticipos || showReembolsos || showDevoluciones
+
+  // 🚫 Motivos por los que cada acción no se puede ejecutar (null = sí se puede)
+  const motivoNoAnticipo: string | null = (() => {
+    if (!estaEnSeccion) return 'Disponible solo a partir del estado "Aprobado"'
+    if (hoja.estado === 'cerrado') return 'No se puede modificar una hoja cerrada'
+    if (!esAdminGerente) return 'Solo administración o gerencia puede registrar anticipos'
+    return null
+  })()
+  const motivoNoReembolso: string | null = (() => {
+    if (hoja.estado === 'cerrado') return 'No se puede modificar una hoja cerrada'
+    if (hoja.estado !== 'validado') return 'Disponible solo cuando la hoja esté en estado "Validado"'
+    if (hoja.saldo >= 0) return hoja.saldo === 0
+      ? 'No hay saldo pendiente a reembolsar'
+      : 'No corresponde reembolso: el saldo es positivo, en su caso debería registrarse una devolución'
+    if (!esAdminGerente) return 'Solo administración o gerencia puede registrar reembolsos'
+    return null
+  })()
+  const motivoNoDevolucion: string | null = (() => {
+    if (hoja.estado === 'cerrado') return 'No se puede modificar una hoja cerrada'
+    if (hoja.estado !== 'validado') return 'Disponible solo cuando la hoja esté en estado "Validado"'
+    if (hoja.saldo <= 0) return hoja.saldo === 0
+      ? 'No hay saldo pendiente a devolver'
+      : 'No corresponde devolución: el saldo es negativo, en su caso debería registrarse un reembolso'
+    if (!esEmpleado && !esAdminGerente) return 'Solo el empleado o administración puede registrar la devolución'
+    return null
+  })()
+
+  const canRegistrarAnticipo = motivoNoAnticipo === null
+  const canRegistrarReembolso = motivoNoReembolso === null
+  const canRegistrarDevolucion = motivoNoDevolucion === null
+
+  const showSeccionPagos = estaEnSeccion
 
   return (
     <div className="container mx-auto p-4 sm:p-6 space-y-4 max-w-4xl">
@@ -876,18 +902,23 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
           <CardContent className="px-4 pb-4 space-y-4">
 
             {/* ── ANTICIPOS (empresa → trabajador) ── */}
-            {showAnticipos && (
             <div>
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs font-semibold text-purple-700 uppercase tracking-wide">
                   Anticipos de la empresa ({anticipos.length})
                 </p>
-                {canRegistrarAnticipo && (
-                  <Button size="sm" variant="outline" className="h-7 text-xs border-purple-300 text-purple-700 hover:bg-purple-50"
-                    onClick={() => { setMontoAnticipo(''); setDescripcionAnticipo(''); setAdjuntosAnticipo([]); setShowAnticipo(true) }}>
-                    + Registrar anticipo
-                  </Button>
-                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className={`h-7 text-xs border-purple-300 text-purple-700 hover:bg-purple-50 ${motivoNoAnticipo ? 'opacity-60' : ''}`}
+                  title={motivoNoAnticipo || undefined}
+                  onClick={() => {
+                    if (motivoNoAnticipo) { toast.info(motivoNoAnticipo); return }
+                    setMontoAnticipo(''); setDescripcionAnticipo(''); setAdjuntosAnticipo([]); setShowAnticipo(true)
+                  }}
+                >
+                  + Registrar anticipo
+                </Button>
               </div>
               <div className="space-y-2">
                 {anticipos.length === 0 && (
@@ -928,21 +959,25 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
                 })}
               </div>
             </div>
-            )}
 
             {/* ── REEMBOLSOS (empresa → trabajador, después de validar) ── */}
-            {(canRegistrarReembolso || reembolsos.length > 0) && (
-              <div className="border-t pt-4">
+            <div className="border-t pt-4">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-xs font-semibold text-orange-700 uppercase tracking-wide">
                     Reembolsos al empleado ({reembolsos.length})
                   </p>
-                  {canRegistrarReembolso && (
-                    <Button size="sm" variant="outline" className="h-7 text-xs border-orange-300 text-orange-700 hover:bg-orange-50"
-                      onClick={() => { setMontoReembolso(Math.abs(hoja.saldo).toFixed(2)); setDescripcionReembolso(''); setAdjuntosReembolso([]); setShowReembolso(true) }}>
-                      + Registrar reembolso
-                    </Button>
-                  )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className={`h-7 text-xs border-orange-300 text-orange-700 hover:bg-orange-50 ${motivoNoReembolso ? 'opacity-60' : ''}`}
+                    title={motivoNoReembolso || undefined}
+                    onClick={() => {
+                      if (motivoNoReembolso) { toast.info(motivoNoReembolso); return }
+                      setMontoReembolso(Math.abs(hoja.saldo).toFixed(2)); setDescripcionReembolso(''); setAdjuntosReembolso([]); setShowReembolso(true)
+                    }}
+                  >
+                    + Registrar reembolso
+                  </Button>
                 </div>
                 {canRegistrarReembolso && reembolsos.length === 0 && (
                   <div className="flex items-start gap-2 text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded-lg p-2.5 mb-2">
@@ -992,21 +1027,25 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
                   })}
                 </div>
               </div>
-            )}
 
             {/* ── DEVOLUCIONES (trabajador → empresa) ── */}
-            {(canRegistrarDevolucion || devoluciones.length > 0) && (
-              <div className="border-t pt-4">
+            <div className="border-t pt-4">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-xs font-semibold text-teal-700 uppercase tracking-wide">
-                    Devoluciones al empresa ({devoluciones.length})
+                    Devoluciones a la empresa ({devoluciones.length})
                   </p>
-                  {canRegistrarDevolucion && (
-                    <Button size="sm" variant="outline" className="h-7 text-xs border-teal-300 text-teal-700 hover:bg-teal-50"
-                      onClick={() => { setMontoDevolucion(''); setDescripcionDevolucion(''); setAdjuntosDevolucion([]); setShowDevolucion(true) }}>
-                      + Registrar devolución
-                    </Button>
-                  )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className={`h-7 text-xs border-teal-300 text-teal-700 hover:bg-teal-50 ${motivoNoDevolucion ? 'opacity-60' : ''}`}
+                    title={motivoNoDevolucion || undefined}
+                    onClick={() => {
+                      if (motivoNoDevolucion) { toast.info(motivoNoDevolucion); return }
+                      setMontoDevolucion(''); setDescripcionDevolucion(''); setAdjuntosDevolucion([]); setShowDevolucion(true)
+                    }}
+                  >
+                    + Registrar devolución
+                  </Button>
                 </div>
                 {canRegistrarDevolucion && devoluciones.length === 0 && (
                   <div className="flex items-start gap-2 text-xs text-teal-700 bg-teal-50 border border-teal-200 rounded-lg p-2.5 mb-2">
@@ -1056,7 +1095,6 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
                   })}
                 </div>
               </div>
-            )}
           </CardContent>
         </Card>
       )}
