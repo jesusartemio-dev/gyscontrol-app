@@ -214,12 +214,23 @@ export async function DELETE(
       )
     }
 
+    // 📌 Obtener IDs de los lista items para detectar cotizados huérfanos
+    // (estado='en_lista' con listaId=NULL pero listaEquipoSeleccionadoId apuntando aquí)
+    const listaItemsDeLista = await prisma.listaEquipoItem.findMany({
+      where: { listaId: id },
+      select: { id: true },
+    })
+    const listaItemIds = listaItemsDeLista.map(li => li.id)
+
     // 🗑️ Resetear estado de items cotizados vinculados y eliminar lista
     await prisma.$transaction([
       prisma.proyectoEquipoCotizadoItem.updateMany({
         where: {
-          listaId: id,
           estado: { in: ['en_lista', 'reemplazado'] },
+          OR: [
+            { listaId: id },
+            ...(listaItemIds.length > 0 ? [{ listaEquipoSeleccionadoId: { in: listaItemIds } }] : []),
+          ],
         },
         data: {
           estado: 'pendiente',

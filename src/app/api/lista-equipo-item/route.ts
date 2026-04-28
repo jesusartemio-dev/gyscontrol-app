@@ -228,11 +228,15 @@ export async function POST(request: Request) {
     console.log('✅ Ítem creado correctamente:', nuevo)
 
     // 🔄 Paso 2: Actualizar listaEquipoSeleccionadoId en ProyectoEquipoItem si aplica
+    // ✅ Mantener `listaId` sincronizado con el lista item vinculado: si no se setea,
+    // el cotizado queda con estado='en_lista' pero listaId=NULL → si la lista se borra
+    // después, el DELETE no lo detecta y queda fantasma.
     if (body.proyectoEquipoItemId) {
       await prisma.proyectoEquipoCotizadoItem.update({
         where: { id: body.proyectoEquipoItemId },
         data: {
           listaEquipoSeleccionadoId: nuevo.id,
+          listaId: body.listaId,
           estado: 'en_lista',
         },
       })

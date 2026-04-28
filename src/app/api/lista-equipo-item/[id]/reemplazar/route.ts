@@ -90,10 +90,12 @@ export async function PATCH(
     })
 
     // 5. Actualizar ProyectoEquipoItem con el nuevo ítem
+    // ✅ listaId se incluye para que al borrar la lista, el DELETE detecte el cotizado y lo resetee.
     await prisma.proyectoEquipoCotizadoItem.update({
       where: { id: nuevo.proyectoEquipoItemId },
       data: {
         listaEquipoSeleccionadoId: nuevoItem.id,
+        listaId: original.listaId,
         estado: 'en_lista',
         cantidadReal: nuevo.cantidad,
         precioReal: nuevo.precioElegido ?? undefined,

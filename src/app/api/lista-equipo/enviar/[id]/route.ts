@@ -38,13 +38,14 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
       select: { id: true, proyectoEquipoItemId: true },
     })
 
-    // 3. Generar actualizaciones en los ProyectoEquipoItem (estado: en_lista + listaEquipoSeleccionadoId)
+    // 3. Generar actualizaciones en los ProyectoEquipoItem (estado: en_lista + listaEquipoSeleccionadoId + listaId)
+    // ✅ listaId se incluye para que al borrar la lista, el DELETE detecte el cotizado y lo resetee.
     const actualizaciones = items
       .filter((item) => item.proyectoEquipoItemId)
       .map((item) =>
         prisma.proyectoEquipoCotizadoItem.update({
           where: { id: item.proyectoEquipoItemId! },
-          data: { estado: 'en_lista', listaEquipoSeleccionadoId: item.id },
+          data: { estado: 'en_lista', listaEquipoSeleccionadoId: item.id, listaId },
         })
       )
 

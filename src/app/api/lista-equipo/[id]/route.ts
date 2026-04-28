@@ -252,6 +252,15 @@ export async function DELETE(req: Request, context: { params: Promise<{ id: stri
       )
     }
 
+    // 📌 Obtener IDs de los lista items ANTES de borrar para detectar cotizados
+    // que apunten a ellos vía listaEquipoSeleccionadoId aunque su listaId esté NULL
+    // (caso de items creados antes del fix donde listaId no se sincronizaba).
+    const listaItemsDeLista = await prisma.listaEquipoItem.findMany({
+      where: { listaId: id },
+      select: { id: true },
+    })
+    const listaItemIds = listaItemsDeLista.map(li => li.id)
+
     await prisma.$transaction([
       // 0. Desmarcar todas las cotizaciones seleccionadas relacionadas
       prisma.cotizacionProveedorItem.updateMany({
@@ -299,10 +308,16 @@ export async function DELETE(req: Request, context: { params: Promise<{ id: stri
       }),
 
       // 3. Resetear estado de items cotizados vinculados a esta lista
+      // Captura tanto los que tienen listaId apuntando aquí como los que solo
+      // tienen listaEquipoSeleccionadoId apuntando a un item de esta lista
+      // (con listaId=NULL — pre-fix dejó esos casos).
       prisma.proyectoEquipoCotizadoItem.updateMany({
         where: {
-          listaId: id,
           estado: { in: ['en_lista', 'reemplazado'] },
+          OR: [
+            { listaId: id },
+            ...(listaItemIds.length > 0 ? [{ listaEquipoSeleccionadoId: { in: listaItemIds } }] : []),
+          ],
         },
         data: {
           estado: 'pendiente',
