@@ -382,20 +382,35 @@ function ItemsTable({ items, proyectoId, onEstadoChange, onVincular, onDesglosar
                     </td>
                     <td className="px-2 py-1.5">
                       {(() => {
-                        // Desglosado: show multiple listas
+                        // Desglosado: show multiple listas with count of associated items
                         if (item.estado === 'desglosado' && item.desgloses && item.desgloses.length > 0) {
+                          const lineasPorLista: Record<string, number> = {}
+                          for (const linea of item.listaEquipoItemsDesglose || []) {
+                            lineasPorLista[linea.listaId] = (lineasPorLista[linea.listaId] || 0) + 1
+                          }
                           return (
-                            <div className="flex flex-wrap gap-0.5">
-                              {item.desgloses.map((d) => (
-                                <Link
-                                  key={d.id}
-                                  href={`/proyectos/${proyectoId}/listas/${d.listaEquipo.id}`}
-                                  className="text-[10px] font-mono text-purple-600 hover:underline"
-                                  title={d.listaEquipo.nombre}
-                                >
-                                  {d.listaEquipo.codigo}
-                                </Link>
-                              ))}
+                            <div className="flex flex-wrap gap-x-1.5 gap-y-0.5">
+                              {item.desgloses.map((d) => {
+                                const count = lineasPorLista[d.listaEquipo.id] || 0
+                                return (
+                                  <Link
+                                    key={d.id}
+                                    href={`/proyectos/${proyectoId}/listas/${d.listaEquipo.id}`}
+                                    className="text-[10px] font-mono text-purple-600 hover:underline inline-flex items-center gap-0.5"
+                                    title={`${d.listaEquipo.nombre}${count > 0 ? ` — ${count} ítem${count !== 1 ? 's' : ''} asociado${count !== 1 ? 's' : ''}` : ' — sin ítems asociados'}`}
+                                  >
+                                    <span>{d.listaEquipo.codigo}</span>
+                                    <span className={cn(
+                                      'text-[9px] px-1 py-0 rounded font-medium',
+                                      count === 0
+                                        ? 'bg-amber-100 text-amber-700'
+                                        : 'bg-purple-100 text-purple-700'
+                                    )}>
+                                      {count}
+                                    </span>
+                                  </Link>
+                                )
+                              })}
                             </div>
                           )
                         }
