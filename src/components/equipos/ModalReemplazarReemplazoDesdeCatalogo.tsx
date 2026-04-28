@@ -60,6 +60,8 @@ import type {
   ListaEquipoItem,
 } from '@/types'
 
+import PedidosBloqueantesWarning, { type PedidoBloqueante } from './PedidosBloqueantesWarning'
+
 interface Props {
   open: boolean
   onClose: () => void
@@ -88,12 +90,33 @@ export default function ModalReemplazarReemplazoDesdeCatalogo({
   const [loading, setLoading] = useState(false)
   const [initialLoading, setInitialLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [pedidosBloqueantes, setPedidosBloqueantes] = useState<PedidoBloqueante[]>([])
+  const [pedidosLoading, setPedidosLoading] = useState(false)
 
   useEffect(() => {
     if (open) {
       cargarDatos()
+      fetchPedidosBloqueantes()
     }
   }, [open])
+
+  const fetchPedidosBloqueantes = async () => {
+    if (!item?.id) return
+    setPedidosLoading(true)
+    try {
+      const res = await fetch(`/api/lista-equipo-item/${item.id}/pedidos-bloqueantes`)
+      if (res.ok) {
+        const data = await res.json()
+        setPedidosBloqueantes(data.bloqueantes || [])
+      } else {
+        setPedidosBloqueantes([])
+      }
+    } catch {
+      setPedidosBloqueantes([])
+    } finally {
+      setPedidosLoading(false)
+    }
+  }
 
   const cargarDatos = async () => {
     setInitialLoading(true)
@@ -129,7 +152,12 @@ export default function ModalReemplazarReemplazoDesdeCatalogo({
       toast.warning('Completa todos los campos')
       return
     }
-    
+
+    if (pedidosBloqueantes.length > 0) {
+      toast.error('❌ El ítem tiene pedidos en curso — pásalos a borrador antes de reemplazar')
+      return
+    }
+
     try {
       setLoading(true)
 
@@ -225,6 +253,9 @@ export default function ModalReemplazarReemplazoDesdeCatalogo({
               </div>
 
               <ScrollArea className="flex-1 px-6 py-4 overflow-y-auto">
+
+              {/* ⚠️ Aviso de pedidos bloqueantes */}
+              <PedidosBloqueantesWarning pedidos={pedidosBloqueantes} loading={pedidosLoading} />
 
               {/* 🔍 Filtros de búsqueda */}
               <motion.div
@@ -495,7 +526,7 @@ export default function ModalReemplazarReemplazoDesdeCatalogo({
                  </Button>
                  <Button
                    onClick={handleReemplazar}
-                   disabled={!selected || loading || !motivoCambio.trim()}
+                   disabled={!selected || loading || !motivoCambio.trim() || pedidosBloqueantes.length > 0}
                    className="bg-blue-600 hover:bg-blue-700"
                  >
                    {loading ? (

@@ -58,6 +58,8 @@ import type {
   ListaEquipoItem,
 } from '@/types'
 
+import PedidosBloqueantesWarning, { type PedidoBloqueante } from './PedidosBloqueantesWarning'
+
 interface Props {
   open: boolean
   onClose: () => void
@@ -86,6 +88,8 @@ export default function ModalReemplazarItemDesdeCatalogo({
   const [loading, setLoading] = useState(false)
   const [initialLoading, setInitialLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [pedidosBloqueantes, setPedidosBloqueantes] = useState<PedidoBloqueante[]>([])
+  const [pedidosLoading, setPedidosLoading] = useState(false)
 
   // 🎨 Animation variants
   const modalVariants = {
@@ -101,27 +105,27 @@ export default function ModalReemplazarItemDesdeCatalogo({
 
   useEffect(() => {
     if (!open) return
-    
+
     const fetchData = async () => {
       try {
         setInitialLoading(true)
         setError(null)
-        
+
         const [e, c] = await Promise.all([
           getCatalogoEquipos(),
           getCategoriasEquipo(),
         ])
-        
+
         setEquipos(e)
         setCategorias(c)
-        
+
         // 🔄 Reset form when modal opens
         setSelected(null)
         setCantidad(1)
         setMotivoCambio('')
         setCategoriaFiltro('todas')
         setSearch('')
-        
+
       } catch (error) {
         console.error('Error loading data:', error)
         setError('Error al cargar los datos del catálogo')
@@ -130,9 +134,28 @@ export default function ModalReemplazarItemDesdeCatalogo({
         setInitialLoading(false)
       }
     }
-    
+
     fetchData()
+    fetchPedidosBloqueantes()
   }, [open])
+
+  const fetchPedidosBloqueantes = async () => {
+    if (!item?.id) return
+    setPedidosLoading(true)
+    try {
+      const res = await fetch(`/api/lista-equipo-item/${item.id}/pedidos-bloqueantes`)
+      if (res.ok) {
+        const data = await res.json()
+        setPedidosBloqueantes(data.bloqueantes || [])
+      } else {
+        setPedidosBloqueantes([])
+      }
+    } catch {
+      setPedidosBloqueantes([])
+    } finally {
+      setPedidosLoading(false)
+    }
+  }
 
   const handleSeleccionar = (equipo: CatalogoEquipo) => {
     setSelected(equipo)
@@ -165,6 +188,11 @@ export default function ModalReemplazarItemDesdeCatalogo({
 
     if (item.origen !== 'cotizado') {
       toast.error('❌ Este modal solo aplica a ítems con origen "cotizado"')
+      return
+    }
+
+    if (pedidosBloqueantes.length > 0) {
+      toast.error('❌ El ítem tiene pedidos en curso — pásalos a borrador antes de reemplazar')
       return
     }
 
@@ -254,6 +282,9 @@ export default function ModalReemplazarItemDesdeCatalogo({
               </div>
 
               <ScrollArea className="flex-1 px-6 py-4 overflow-y-auto">
+                {/* ⚠️ Aviso de pedidos bloqueantes */}
+                <PedidosBloqueantesWarning pedidos={pedidosBloqueantes} loading={pedidosLoading} />
+
                 {/* 🔍 Filtros y Búsqueda */}
                 <Card className="mb-4">
                   <CardHeader className="pb-2 pt-3">
@@ -563,7 +594,7 @@ export default function ModalReemplazarItemDesdeCatalogo({
                     </Button>
                     <Button
                       onClick={handleReemplazar}
-                      disabled={!selected || loading || !motivoCambio.trim() || cantidad <= 0}
+                      disabled={!selected || loading || !motivoCambio.trim() || cantidad <= 0 || pedidosBloqueantes.length > 0}
                       className="bg-blue-600 hover:bg-blue-700 transition-all duration-200 shadow-sm hover:shadow-md min-w-[120px]"
                     >
                       {loading ? (
