@@ -181,6 +181,7 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
         fechaEntregaEstimada: true,
         estado: true,
         codigo: true,
+        responsableId: true,
         proyecto: {
           select: { nombre: true }
         },
@@ -197,7 +198,8 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
     // Validate state transition using state machine
     if (body.estado && body.estado !== pedidoActual.estado) {
       const userRole = session.user.role || ''
-      const resultado = validarTransicionPedido(pedidoActual.estado, body.estado, userRole)
+      const esCreador = pedidoActual.responsableId === session.user.id
+      const resultado = validarTransicionPedido(pedidoActual.estado, body.estado, userRole, esCreador)
       if (!resultado.valido) {
         return NextResponse.json(
           { error: resultado.error },

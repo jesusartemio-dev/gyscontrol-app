@@ -314,7 +314,7 @@ export default function Sidebar() {
       title: 'Gastos',
       icon: Receipt,
       color: 'text-amber-400',
-      roles: ['admin', 'gerente', 'gestor', 'coordinador', 'coordinador_logistico', 'proyectos', 'colaborador', 'logistico', 'administracion'],
+      roles: ['admin', 'gerente', 'gestor', 'coordinador', 'coordinador_logistico', 'proyectos', 'colaborador', 'logistico', 'administracion', 'seguridad', 'comercial', 'presupuestos'],
       links: [
         { href: '/gastos/mis-requerimientos', label: 'Mis Requerimientos', icon: CreditCard },
         { href: '/gastos/mis-pedidos', label: 'Mis Pedidos Internos', icon: ShoppingCart },

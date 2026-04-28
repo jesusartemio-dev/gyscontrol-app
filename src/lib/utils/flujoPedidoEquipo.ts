@@ -19,7 +19,7 @@ export interface FlujoPedidoEstado {
 }
 
 export const flujoEstadosPedido: Record<EstadoPedidoEquipo, FlujoPedidoEstado> = {
-  borrador:   { siguiente: 'enviado',    cancelar: 'cancelado', roles: ['proyectos', 'admin', 'gerente', 'gestor', 'coordinador', 'logistico', 'coordinador_logistico'] },
+  borrador:   { siguiente: 'enviado',    cancelar: 'cancelado', roles: ['proyectos', 'admin', 'gerente', 'gestor', 'coordinador', 'logistico', 'coordinador_logistico', 'administracion', 'seguridad', 'comercial', 'presupuestos', 'colaborador'] },
   enviado:    { siguiente: 'aprobado',   cancelar: 'cancelado', roles: ['admin', 'gerente', 'gestor', 'coordinador', 'coordinador_logistico'] },
   aprobado:   { siguiente: 'atendido',   cancelar: 'cancelado', roles: ['logistico', 'coordinador_logistico', 'admin'] },
   atendido:   { siguiente: 'parcial',    cancelar: 'cancelado', roles: ['logistico', 'coordinador_logistico', 'admin'] },
@@ -46,11 +46,17 @@ export const estadoPedidoLabels: Record<string, string> = Object.fromEntries(
  * Validates whether a state transition is allowed for the given role.
  * Returns `{ valido: true }` if the transition is permitted,
  * or `{ valido: false, error: '...' }` otherwise.
+ *
+ * @param esCreador - Si el usuario es el creador (responsable) del pedido.
+ *   Cuando es true, se permite que envíe (borrador → enviado) o cancele
+ *   (borrador → cancelado) su propio pedido aunque su rol no esté en la lista.
+ *   Esto cubre el caso de empleados que crean pedidos personales.
  */
 export function validarTransicionPedido(
   estadoActual: string,
   nuevoEstado: string,
-  rol: string
+  rol: string,
+  esCreador = false
 ): { valido: boolean; error?: string } {
   const flujo = flujoEstadosPedido[estadoActual as EstadoPedidoEquipo]
 
@@ -67,6 +73,11 @@ export function validarTransicionPedido(
       valido: false,
       error: `No se puede pasar de "${estadoPedidoLabels[estadoActual]}" a "${estadoPedidoLabels[nuevoEstado]}"`,
     }
+  }
+
+  // Excepción: el creador del pedido siempre puede enviar o cancelar su propio borrador
+  if (esCreador && estadoActual === 'borrador' && (nuevoEstado === 'enviado' || nuevoEstado === 'cancelado')) {
+    return { valido: true }
   }
 
   // Check role permission

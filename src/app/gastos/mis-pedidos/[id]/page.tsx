@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { ArrowLeft, Loader2, Building2, Calendar, User, AlertTriangle, Package, Plus, Pencil, Trash2, ArrowRightLeft } from 'lucide-react'
+import { ArrowLeft, Loader2, Building2, Calendar, User, AlertTriangle, Package, Plus, Pencil, Trash2, ArrowRightLeft, Send } from 'lucide-react'
 import { toast } from 'sonner'
 import { getPedidoInternoById, deletePedidoInterno, type PedidoInterno, type PedidoInternoItem } from '@/lib/services/pedidoInterno'
 import { getCentrosCosto } from '@/lib/services/centroCosto'
@@ -324,14 +324,45 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
           )}
         </div>
         {esBorrador && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="border-red-300 text-red-600 hover:bg-red-50 h-8"
-            onClick={() => setOpenDelete(true)}
-          >
-            Eliminar
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              className="h-8 bg-blue-600 hover:bg-blue-700"
+              onClick={async () => {
+                if ((pedido.pedidoEquipoItem?.length ?? 0) === 0) {
+                  toast.error('Agrega al menos un ítem antes de enviar')
+                  return
+                }
+                if (!confirm(`¿Enviar el pedido ${pedido.codigo}? No podrás editar los ítems después.`)) return
+                try {
+                  const res = await fetch(`/api/pedido-equipo/${pedido.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ estado: 'enviado' }),
+                  })
+                  if (!res.ok) {
+                    const err = await res.json().catch(() => ({}))
+                    throw new Error(err.error || 'Error al enviar')
+                  }
+                  toast.success('Pedido enviado')
+                  handleEstadoUpdated('enviado')
+                } catch (e: any) {
+                  toast.error(e.message || 'Error al enviar')
+                }
+              }}
+            >
+              <Send className="h-3.5 w-3.5 mr-1" />
+              Enviar Pedido
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-red-300 text-red-600 hover:bg-red-50 h-8"
+              onClick={() => setOpenDelete(true)}
+            >
+              Eliminar
+            </Button>
+          </div>
         )}
       </div>
 
