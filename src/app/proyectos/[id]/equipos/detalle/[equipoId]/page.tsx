@@ -575,31 +575,26 @@ export default function ProjectEquipmentDetailPage({ params }: PageProps) {
     if (!vincularItem) return
     setLinkingId(listaItemId)
     try {
-      // 1. Update ListaEquipoItem to link to the cotizado item
-      const res1 = await fetch(`/api/lista-equipo-item/${listaItemId}`, {
-        method: 'PUT',
+      const res = await fetch(`/api/proyecto-equipo-item/${vincularItem.id}/vincular`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          proyectoEquipoItemId: vincularItem.id,
-          reemplazaProyectoEquipoCotizadoItemId: vincularItem.id,
-          origen: 'reemplazo',
-        }),
+        body: JSON.stringify({ listaItemId }),
       })
-      if (!res1.ok) throw new Error('Error al vincular ítem de lista')
 
-      // 2. Update ProyectoEquipoCotizadoItem to mark as reemplazado
-      const res2 = await fetch(`/api/proyecto-equipo-item/${vincularItem.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          estado: 'reemplazado',
-          listaEquipoSeleccionadoId: listaItemId,
-          motivoCambio: 'Vinculado manualmente como reemplazo',
-        }),
-      })
-      if (!res2.ok) throw new Error('Error al actualizar ítem cotizado')
+      if (res.status === 409) {
+        const data = await res.json().catch(() => ({}))
+        const pedidos = (data.bloqueantes || []) as Array<{ pedidoCodigo: string; pedidoEstado: string }>
+        const detalle = pedidos.map(p => `${p.pedidoCodigo} (${p.pedidoEstado})`).join(', ') || 'pedidos en curso'
+        toast({
+          title: 'No se puede vincular',
+          description: `El ítem actualmente vinculado tiene ${detalle}. Pásalos a borrador antes de revincular.`,
+          variant: 'destructive',
+        })
+        return
+      }
 
-      // Update local state
+      if (!res.ok) throw new Error('Error al vincular')
+
       if (equipo) {
         setEquipo({
           ...equipo,
@@ -622,15 +617,8 @@ export default function ProjectEquipmentDetailPage({ params }: PageProps) {
 
   const handleDesvincular = async (itemId: string) => {
     try {
-      const res = await fetch(`/api/proyecto-equipo-item/${itemId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          estado: 'pendiente',
-          listaEquipoSeleccionadoId: null,
-          listaId: null,
-          motivoCambio: null,
-        }),
+      const res = await fetch(`/api/proyecto-equipo-item/${itemId}/desvincular`, {
+        method: 'POST',
       })
       if (!res.ok) throw new Error('Error al desvincular')
       if (equipo) {
