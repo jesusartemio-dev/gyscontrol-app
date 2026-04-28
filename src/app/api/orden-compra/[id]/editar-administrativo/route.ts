@@ -4,7 +4,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { crearEvento } from '@/lib/utils/trazabilidad'
 
-const ROLES_ALLOWED = ['admin', 'gerente']
+const ROLES_ALLOWED = ['admin', 'gerente', 'administracion']
+const ROLES_FECHA_EMISION = ['admin']
 
 const CAMPOS_PERMITIDOS = [
   'condicionPago',
@@ -15,6 +16,7 @@ const CAMPOS_PERMITIDOS = [
   'tiempoEntrega',
   'contactoEntrega',
   'fechaEntregaEstimada',
+  'fechaEmision',
 ] as const
 
 type CampoEditable = (typeof CAMPOS_PERMITIDOS)[number]
@@ -27,7 +29,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     }
     if (!ROLES_ALLOWED.includes(session.user.role)) {
       return NextResponse.json(
-        { error: 'Solo admin o gerente pueden editar datos administrativos' },
+        { error: 'Solo admin, gerente o administración pueden editar datos administrativos' },
         { status: 403 }
       )
     }
@@ -48,6 +50,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         tiempoEntrega: true,
         contactoEntrega: true,
         fechaEntregaEstimada: true,
+        fechaEmision: true,
       },
     })
     if (!existing) {
@@ -109,6 +112,22 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         return NextResponse.json({ error: 'fechaEntregaEstimada inválida' }, { status: 400 })
       }
       setIfChanged('fechaEntregaEstimada', v)
+    }
+    if (payload.fechaEmision !== undefined) {
+      if (!ROLES_FECHA_EMISION.includes(session.user.role)) {
+        return NextResponse.json(
+          { error: 'Solo el rol admin puede modificar la fecha de orden' },
+          { status: 403 }
+        )
+      }
+      const v = payload.fechaEmision ? new Date(payload.fechaEmision) : null
+      if (!v) {
+        return NextResponse.json({ error: 'fechaEmision no puede ser vacía' }, { status: 400 })
+      }
+      if (Number.isNaN(v.getTime())) {
+        return NextResponse.json({ error: 'fechaEmision inválida' }, { status: 400 })
+      }
+      setIfChanged('fechaEmision', v)
     }
 
     if (Object.keys(cambios).length === 0) {

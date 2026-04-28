@@ -98,13 +98,15 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
     observaciones: '',
     requiereRecepcion: true,
     fechaEntregaEstimada: '',
+    fechaEmision: '',
   })
   const [savingHeader, setSavingHeader] = useState(false)
 
   const esBorrador = oc?.estado === 'borrador'
   const esCancelada = oc?.estado === 'cancelada'
-  const esAdminGerente = ['admin', 'gerente'].includes(userRole)
-  const puedeEditarAdministrativo = !!oc && !esBorrador && !esCancelada && esAdminGerente
+  const puedeEditarAdmin = ['admin', 'gerente', 'administracion'].includes(userRole)
+  const puedeEditarFechaEmision = userRole === 'admin'
+  const puedeEditarAdministrativo = !!oc && !esBorrador && !esCancelada && puedeEditarAdmin
   const cxpConPagos = ((oc as any)?.cuentasPorPagar || []).some(
     (c: any) => c.saldoPendiente != null && c.saldoPendiente < c.monto
   )
@@ -143,6 +145,9 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
       requiereRecepcion: oc.requiereRecepcion,
       fechaEntregaEstimada: oc.fechaEntregaEstimada
         ? new Date(oc.fechaEntregaEstimada).toISOString().split('T')[0]
+        : '',
+      fechaEmision: oc.fechaEmision
+        ? new Date(oc.fechaEmision).toISOString().split('T')[0]
         : '',
     })
     setHeaderEditOpen(true)
@@ -187,7 +192,10 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
         }
         toast.success('Condiciones actualizadas')
       } else {
-        const result = await editarAdministrativoOC(oc.id, payloadBase)
+        const adminPayload = puedeEditarFechaEmision && headerForm.fechaEmision
+          ? { ...payloadBase, fechaEmision: headerForm.fechaEmision }
+          : payloadBase
+        const result = await editarAdministrativoOC(oc.id, adminPayload)
         const sufijo = result.cxpsSincronizadas > 0
           ? ` · ${result.cxpsSincronizadas} factura(s) sincronizada(s)`
           : ''
@@ -1415,6 +1423,25 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
                 />
               </div>
             </div>
+            {!esBorrador && puedeEditarFechaEmision && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs flex items-center gap-1">
+                    Fecha Orden
+                    <span className="text-[10px] font-normal text-muted-foreground">(solo admin)</span>
+                  </Label>
+                  <Input
+                    type="date"
+                    value={headerForm.fechaEmision}
+                    onChange={e => setHeaderForm(f => ({ ...f, fechaEmision: e.target.value }))}
+                    className="h-9"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Fecha de emisión de la OC. Modifícala solo para corregir errores de registro.
+                  </p>
+                </div>
+              </div>
+            )}
             <div>
               <Label className="text-xs">Observaciones</Label>
               <Textarea value={headerForm.observaciones} onChange={e => setHeaderForm(f => ({ ...f, observaciones: e.target.value }))} placeholder="Notas adicionales..." rows={2} />

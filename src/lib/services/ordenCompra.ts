@@ -101,6 +101,7 @@ export interface EditarAdministrativoPayload {
   tiempoEntrega?: string | null
   contactoEntrega?: string | null
   fechaEntregaEstimada?: string | null
+  fechaEmision?: string | null
 }
 
 export async function editarAdministrativoOC(
