@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
-import { Loader2, Pencil, Layers } from 'lucide-react'
+import { Loader2, Pencil, AlertCircle } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -13,76 +13,39 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { updateListaEquipoItem } from '@/lib/services/listaEquipoItem'
-import { getProyectoEquipos } from '@/lib/services/proyectoEquipo'
-import type { ListaEquipoItem, ProyectoEquipoCotizado } from '@/types'
+import type { ListaEquipoItem } from '@/types'
 
 interface Props {
   isOpen: boolean
   item: ListaEquipoItem
-  proyectoId: string
   onClose: () => void
   onUpdated?: () => Promise<void>
 }
 
-export default function ModalEditarListaItem({ isOpen, item, proyectoId, onClose, onUpdated }: Props) {
+export default function ModalEditarListaItem({ isOpen, item, onClose, onUpdated }: Props) {
   const [loading, setLoading] = useState(false)
-  const [equipos, setEquipos] = useState<ProyectoEquipoCotizado[]>([])
-  const [form, setForm] = useState({
-    codigo: '',
-    descripcion: '',
-    categoria: '',
-    unidad: '',
-    marca: '',
-    cantidad: 0,
-    comentarioRevision: '',
-    proyectoEquipoId: '',
-  })
+  const [cantidad, setCantidad] = useState(0)
+  const [comentarioRevision, setComentarioRevision] = useState('')
 
   useEffect(() => {
     if (isOpen && item) {
-      getProyectoEquipos(proyectoId).then(setEquipos).catch(() => {})
-      const grupoId = (item as any).proyectoEquipoId
-        || item.proyectoEquipo?.id
-        || item.proyectoEquipoItem?.proyectoEquipoCotizado?.id
-        || ''
-      setForm({
-        codigo: item.codigo || '',
-        descripcion: item.descripcion || '',
-        categoria: item.categoria || '',
-        unidad: item.unidad || '',
-        marca: item.marca || '',
-        cantidad: item.cantidad || 0,
-        comentarioRevision: item.comentarioRevision || '',
-        proyectoEquipoId: grupoId,
-      })
+      setCantidad(item.cantidad || 0)
+      setComentarioRevision(item.comentarioRevision || '')
     }
-  }, [isOpen, item, proyectoId])
+  }, [isOpen, item])
 
   const handleSubmit = async () => {
-    if (!form.codigo.trim() || !form.descripcion.trim() || !form.cantidad) {
-      toast.error('Completa los campos obligatorios')
+    if (!cantidad) {
+      toast.error('La cantidad es obligatoria')
       return
     }
 
     setLoading(true)
     try {
       await updateListaEquipoItem(item.id, {
-        codigo: form.codigo.trim(),
-        descripcion: form.descripcion.trim(),
-        categoria: form.categoria.trim() || undefined,
-        unidad: form.unidad.trim(),
-        marca: form.marca.trim() || undefined,
-        cantidad: form.cantidad,
-        comentarioRevision: form.comentarioRevision.trim() || undefined,
-        proyectoEquipoId: form.proyectoEquipoId || undefined,
+        cantidad,
+        comentarioRevision: comentarioRevision.trim() || undefined,
       })
 
       toast.success('Item actualizado')
@@ -104,91 +67,62 @@ export default function ModalEditarListaItem({ isOpen, item, proyectoId, onClose
             <DialogTitle className="text-sm font-semibold">Editar item</DialogTitle>
           </div>
           <DialogDescription className="sr-only">
-            Formulario para editar un item de la lista
+            Editar cantidad y comentario de revisión del item
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3 mt-2">
-          {/* Grupo (Equipo Cotizado) */}
-          <div>
-            <label className="text-xs font-medium mb-1 flex items-center gap-1">
-              <Layers className="h-3 w-3" />
-              Equipo Cotizado
-            </label>
-            <Select value={form.proyectoEquipoId} onValueChange={(v) => setForm(prev => ({ ...prev, proyectoEquipoId: v }))}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue placeholder="Sin grupo asignado" />
-              </SelectTrigger>
-              <SelectContent>
-                {equipos.map(eq => (
-                  <SelectItem key={eq.id} value={eq.id} className="text-xs">{eq.nombre}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        {/* Resumen de identidad del item (read-only) */}
+        <div className="mt-2 rounded border bg-muted/40 p-3 space-y-1.5 text-xs">
+          <div className="flex gap-2">
+            <span className="text-muted-foreground min-w-[80px]">Código:</span>
+            <span className="font-medium">{item.codigo}</span>
           </div>
+          <div className="flex gap-2">
+            <span className="text-muted-foreground min-w-[80px]">Descripción:</span>
+            <span className="font-medium">{item.descripcion}</span>
+          </div>
+          <div className="grid grid-cols-3 gap-2 pt-1">
+            <div className="flex flex-col">
+              <span className="text-muted-foreground">Categoría</span>
+              <span>{item.categoria || '—'}</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-muted-foreground">Marca</span>
+              <span>{item.marca || '—'}</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-muted-foreground">Unidad</span>
+              <span>{item.unidad || '—'}</span>
+            </div>
+          </div>
+        </div>
 
+        {/* Aviso */}
+        <div className="mt-2 flex items-start gap-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
+          <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+          <span>
+            Para cambiar código, descripción, categoría, marca o unidad, usa <strong>Reemplazar</strong>.
+          </span>
+        </div>
+
+        {/* Campos editables */}
+        <div className="space-y-3 mt-3">
           <div>
-            <label className="text-xs font-medium mb-1 block">Descripcion *</label>
-            <Textarea
-              value={form.descripcion}
-              onChange={(e) => setForm(prev => ({ ...prev, descripcion: e.target.value }))}
-              className="text-xs min-h-[60px]"
+            <label className="text-xs font-medium mb-1 block">Cantidad *</label>
+            <Input
+              type="number"
+              min={0}
+              value={cantidad || ''}
+              onChange={(e) => setCantidad(parseFloat(e.target.value) || 0)}
+              className="h-8 text-xs"
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-medium mb-1 block">Codigo *</label>
-              <Input
-                value={form.codigo}
-                onChange={(e) => setForm(prev => ({ ...prev, codigo: e.target.value }))}
-                className="h-8 text-xs"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium mb-1 block">Categoria</label>
-              <Input
-                value={form.categoria}
-                onChange={(e) => setForm(prev => ({ ...prev, categoria: e.target.value }))}
-                className="h-8 text-xs"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="text-xs font-medium mb-1 block">Cantidad *</label>
-              <Input
-                type="number"
-                min={0}
-                value={form.cantidad || ''}
-                onChange={(e) => setForm(prev => ({ ...prev, cantidad: parseFloat(e.target.value) || 0 }))}
-                className="h-8 text-xs"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium mb-1 block">Unidad</label>
-              <Input
-                value={form.unidad}
-                onChange={(e) => setForm(prev => ({ ...prev, unidad: e.target.value }))}
-                className="h-8 text-xs"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium mb-1 block">Marca</label>
-              <Input
-                value={form.marca}
-                onChange={(e) => setForm(prev => ({ ...prev, marca: e.target.value }))}
-                className="h-8 text-xs"
-              />
-            </div>
-          </div>
-
           <div>
-            <label className="text-xs font-medium mb-1 block">Comentario de revision</label>
+            <label className="text-xs font-medium mb-1 block">Comentario de revisión</label>
             <Textarea
-              value={form.comentarioRevision}
-              onChange={(e) => setForm(prev => ({ ...prev, comentarioRevision: e.target.value }))}
+              value={comentarioRevision}
+              onChange={(e) => setComentarioRevision(e.target.value)}
               placeholder="Comentario opcional..."
               className="text-xs min-h-[50px]"
               rows={2}
@@ -203,7 +137,7 @@ export default function ModalEditarListaItem({ isOpen, item, proyectoId, onClose
           <Button
             size="sm"
             onClick={handleSubmit}
-            disabled={loading || !form.codigo.trim() || !form.descripcion.trim() || !form.cantidad}
+            disabled={loading || !cantidad}
             className="h-7 text-xs"
           >
             {loading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Pencil className="h-3 w-3 mr-1" />}

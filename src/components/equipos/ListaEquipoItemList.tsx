@@ -1311,7 +1311,6 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
         <ModalEditarListaItem
           isOpen={!!editingItem}
           item={editingItem}
-          proyectoId={proyectoId}
           onClose={() => setEditingItem(null)}
           onUpdated={async () => {
             await onItemsUpdated?.()
