@@ -106,12 +106,25 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (payload.contactoEntrega !== undefined) {
       setIfChanged('contactoEntrega', payload.contactoEntrega || null)
     }
+    // Parser de "YYYY-MM-DD" como mediodía UTC para evitar shift de zona horaria
+    const parseFechaSoloDia = (raw: unknown): Date | null => {
+      if (!raw) return null
+      const s = String(raw)
+      const isoDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(s)
+      const d = isoDateOnly ? new Date(`${s}T12:00:00Z`) : new Date(s)
+      return Number.isNaN(d.getTime()) ? null : d
+    }
+
     if (payload.fechaEntregaEstimada !== undefined) {
-      const v = payload.fechaEntregaEstimada ? new Date(payload.fechaEntregaEstimada) : null
-      if (v && Number.isNaN(v.getTime())) {
-        return NextResponse.json({ error: 'fechaEntregaEstimada inválida' }, { status: 400 })
+      if (payload.fechaEntregaEstimada === null || payload.fechaEntregaEstimada === '') {
+        setIfChanged('fechaEntregaEstimada', null)
+      } else {
+        const v = parseFechaSoloDia(payload.fechaEntregaEstimada)
+        if (!v) {
+          return NextResponse.json({ error: 'fechaEntregaEstimada inválida' }, { status: 400 })
+        }
+        setIfChanged('fechaEntregaEstimada', v)
       }
-      setIfChanged('fechaEntregaEstimada', v)
     }
     if (payload.fechaEmision !== undefined) {
       if (!ROLES_FECHA_EMISION.includes(session.user.role)) {
@@ -120,11 +133,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           { status: 403 }
         )
       }
-      const v = payload.fechaEmision ? new Date(payload.fechaEmision) : null
-      if (!v) {
+      if (!payload.fechaEmision) {
         return NextResponse.json({ error: 'fechaEmision no puede ser vacía' }, { status: 400 })
       }
-      if (Number.isNaN(v.getTime())) {
+      const v = parseFechaSoloDia(payload.fechaEmision)
+      if (!v) {
         return NextResponse.json({ error: 'fechaEmision inválida' }, { status: 400 })
       }
       setIfChanged('fechaEmision', v)
