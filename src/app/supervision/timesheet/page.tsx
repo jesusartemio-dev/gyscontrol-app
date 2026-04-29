@@ -31,6 +31,10 @@ import {
   ChevronDown,
   ChevronUp,
   ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  List,
+  LayoutGrid,
   User,
   Users,
   Calendar,
@@ -103,6 +107,29 @@ function getSemanaRange(semana: string): { start: Date; end: Date } | null {
   return { start, end }
 }
 
+// Calcula la semana ISO de una Date como "YYYY-Www"
+function getISOWeekString(date: Date): string {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+  const dayNum = d.getUTCDay() || 7
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum)
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
+  const weekNum = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
+  return `${d.getUTCFullYear()}-W${String(weekNum).padStart(2, '0')}`
+}
+
+function getSemanaActual(): string {
+  return getISOWeekString(new Date())
+}
+
+// Suma o resta semanas a una semana ISO
+function shiftSemana(semana: string, delta: number): string {
+  const r = getSemanaRange(semana)
+  if (!r) return semana
+  const newStart = new Date(r.start)
+  newStart.setDate(newStart.getDate() + delta * 7)
+  return getISOWeekString(newStart)
+}
+
 function formatSemanaRango(semana: string): string {
   const r = getSemanaRange(semana)
   if (!r) return ''
@@ -123,6 +150,11 @@ export default function SupervisionTimesheetPage() {
   const [aprobaciones, setAprobaciones] = useState<Aprobacion[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+
+  // Vista: lista (acordeón) o matriz (tabla días × personas)
+  const [vista, setVista] = useState<'lista' | 'matriz'>('lista')
+  const [semanaMatriz, setSemanaMatriz] = useState<string>(getSemanaActual())
+  const [usuariosElegibles, setUsuariosElegibles] = useState<{ id: string; name: string | null; email: string }[]>([])
 
   // Filters
   const [busqueda, setBusqueda] = useState('')
@@ -164,14 +196,32 @@ export default function SupervisionTimesheetPage() {
     } catch { /* silent */ }
   }, [])
 
+  const cargarUsuariosElegibles = useCallback(async () => {
+    try {
+      const res = await fetch('/api/horas-hombre/timesheet-aprobacion/usuarios-elegibles')
+      if (res.ok) {
+        const data = await res.json()
+        setUsuariosElegibles(data.usuarios || [])
+      }
+    } catch { /* silent */ }
+  }, [])
+
   const cargarDatos = useCallback(async () => {
     try {
       setLoading(true)
       const params = new URLSearchParams()
-      params.set('estado', tab)
-      if (filtroUsuarioId) params.set('usuarioId', filtroUsuarioId)
-      if (filtroSemanaDesde) params.set('semanaDesde', filtroSemanaDesde)
-      if (filtroSemanaHasta) params.set('semanaHasta', filtroSemanaHasta)
+      if (vista === 'matriz') {
+        // En matriz fijamos: estado=todos y rango = solo la semana visible
+        params.set('estado', 'todos')
+        params.set('semanaDesde', semanaMatriz)
+        params.set('semanaHasta', semanaMatriz)
+        if (filtroUsuarioId) params.set('usuarioId', filtroUsuarioId)
+      } else {
+        params.set('estado', tab)
+        if (filtroUsuarioId) params.set('usuarioId', filtroUsuarioId)
+        if (filtroSemanaDesde) params.set('semanaDesde', filtroSemanaDesde)
+        if (filtroSemanaHasta) params.set('semanaHasta', filtroSemanaHasta)
+      }
 
       const res = await fetch(`/api/horas-hombre/timesheet-aprobacion/pendientes?${params}`)
       if (!res.ok) {
@@ -185,12 +235,13 @@ export default function SupervisionTimesheetPage() {
     } finally {
       setLoading(false)
     }
-  }, [tab, filtroUsuarioId, filtroSemanaDesde, filtroSemanaHasta, toast])
+  }, [vista, semanaMatriz, tab, filtroUsuarioId, filtroSemanaDesde, filtroSemanaHasta, toast])
 
   useEffect(() => {
     cargarUsuarios()
     cargarResumen()
-  }, [cargarUsuarios, cargarResumen])
+    cargarUsuariosElegibles()
+  }, [cargarUsuarios, cargarResumen, cargarUsuariosElegibles])
 
   useEffect(() => {
     cargarDatos()
@@ -326,10 +377,32 @@ export default function SupervisionTimesheetPage() {
             Vista general de horas registradas (oficina y campo) con aprobación semanal
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={cargarDatos} disabled={loading}>
-          <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
-          Refrescar
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center rounded-md border bg-background p-0.5">
+            <Button
+              variant={vista === 'lista' ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-7 px-2.5"
+              onClick={() => setVista('lista')}
+            >
+              <List className="h-4 w-4 mr-1" />
+              Lista
+            </Button>
+            <Button
+              variant={vista === 'matriz' ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-7 px-2.5"
+              onClick={() => setVista('matriz')}
+            >
+              <LayoutGrid className="h-4 w-4 mr-1" />
+              Matriz
+            </Button>
+          </div>
+          <Button variant="outline" size="sm" onClick={cargarDatos} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
+            Refrescar
+          </Button>
+        </div>
       </div>
 
       {/* Resumen semana actual */}
@@ -462,25 +535,62 @@ export default function SupervisionTimesheetPage() {
             <option key={u.id} value={u.id}>{u.name}</option>
           ))}
         </select>
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-muted-foreground whitespace-nowrap">Semana:</span>
-          <Input
-            type="week"
-            value={filtroSemanaDesde}
-            onChange={e => setFiltroSemanaDesde(e.target.value)}
-            className="h-9 w-[155px] text-sm"
-            title="Desde"
-          />
-          <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-          <Input
-            type="week"
-            value={filtroSemanaHasta}
-            onChange={e => setFiltroSemanaHasta(e.target.value)}
-            className="h-9 w-[155px] text-sm"
-            title="Hasta"
-          />
-        </div>
-        {tieneFiltros && (
+        {vista === 'lista' && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground whitespace-nowrap">Semana:</span>
+            <Input
+              type="week"
+              value={filtroSemanaDesde}
+              onChange={e => setFiltroSemanaDesde(e.target.value)}
+              className="h-9 w-[155px] text-sm"
+              title="Desde"
+            />
+            <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <Input
+              type="week"
+              value={filtroSemanaHasta}
+              onChange={e => setFiltroSemanaHasta(e.target.value)}
+              className="h-9 w-[155px] text-sm"
+              title="Hasta"
+            />
+          </div>
+        )}
+        {vista === 'matriz' && (
+          <div className="flex items-center gap-1 border rounded-md bg-background h-9 px-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={() => setSemanaMatriz(s => shiftSemana(s, -1))}
+              title="Semana anterior"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-xs text-muted-foreground px-2 whitespace-nowrap">
+              {parseSemanaLabel(semanaMatriz)} · {formatSemanaRango(semanaMatriz)}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={() => setSemanaMatriz(s => shiftSemana(s, 1))}
+              title="Semana siguiente"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            {semanaMatriz !== getSemanaActual() && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={() => setSemanaMatriz(getSemanaActual())}
+              >
+                Hoy
+              </Button>
+            )}
+          </div>
+        )}
+        {vista === 'lista' && tieneFiltros && (
           <Button variant="ghost" size="sm" onClick={limpiarFiltros} className="h-9">
             <X className="h-4 w-4 mr-1" />
             Limpiar
@@ -488,7 +598,8 @@ export default function SupervisionTimesheetPage() {
         )}
       </div>
 
-      {/* Tabs */}
+      {/* Tabs (solo en modo lista) */}
+      {vista === 'lista' && (
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="todos">
@@ -706,6 +817,22 @@ export default function SupervisionTimesheetPage() {
           )}
         </TabsContent>
       </Tabs>
+      )}
+
+      {/* Vista Matriz */}
+      {vista === 'matriz' && (
+        <TimesheetMatriz
+          aprobaciones={aprobacionesFiltradas}
+          usuariosElegibles={usuariosElegibles}
+          semana={semanaMatriz}
+          loading={loading}
+          processing={processing}
+          filtroUsuarioId={filtroUsuarioId}
+          onAprobar={handleAprobar}
+          onRechazar={(id) => { setRejectId(id); setMotivoRechazo('') }}
+          onVolverBorrador={handleVolverBorrador}
+        />
+      )}
 
       {/* Reject Dialog */}
       <Dialog open={!!rejectId} onOpenChange={(open) => { if (!open) { setRejectId(null); setMotivoRechazo('') } }}>
@@ -741,6 +868,219 @@ export default function SupervisionTimesheetPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Componente: Vista matricial (días × personas)
+// ─────────────────────────────────────────────────────────────────
+
+interface TimesheetMatrizProps {
+  aprobaciones: Aprobacion[]
+  usuariosElegibles: { id: string; name: string | null; email: string }[]
+  semana: string
+  loading: boolean
+  processing: boolean
+  filtroUsuarioId: string
+  onAprobar: (id: string) => void
+  onRechazar: (id: string) => void
+  onVolverBorrador: (id: string) => void
+}
+
+interface CeldaDia {
+  totalHoras: number
+  proyectos: { codigo: string; horas: number }[]
+}
+
+function TimesheetMatriz({
+  aprobaciones,
+  usuariosElegibles,
+  semana,
+  loading,
+  processing,
+  filtroUsuarioId,
+  onAprobar,
+  onRechazar,
+  onVolverBorrador,
+}: TimesheetMatrizProps) {
+  const r = getSemanaRange(semana)
+  if (!r) return null
+
+  // Construir 7 días de la semana
+  const dias: { fecha: Date; key: string; label: string }[] = []
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(r.start)
+    d.setDate(r.start.getDate() + i)
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    dias.push({ fecha: d, key, label: format(d, 'EEE d', { locale: es }) })
+  }
+
+  // Filas: usuarios elegibles (filtrados por filtroUsuarioId si aplica)
+  const usuariosVisibles = filtroUsuarioId
+    ? usuariosElegibles.filter(u => u.id === filtroUsuarioId)
+    : usuariosElegibles
+
+  // Mapear aprobaciones por usuarioId
+  const porUsuario = new Map<string, Aprobacion>()
+  for (const a of aprobaciones) {
+    porUsuario.set(a.usuario.id, a)
+  }
+
+  // Para cada usuario, agrupar registros por día
+  const matrizPorUsuario = new Map<string, Record<string, CeldaDia>>()
+  for (const a of aprobaciones) {
+    const celdas: Record<string, CeldaDia> = {}
+    for (const reg of a.registros) {
+      const d = new Date(reg.fechaTrabajo)
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      if (!celdas[key]) celdas[key] = { totalHoras: 0, proyectos: [] }
+      celdas[key].totalHoras += reg.horasTrabajadas
+      const idx = celdas[key].proyectos.findIndex(p => p.codigo === reg.proyecto.codigo)
+      if (idx >= 0) {
+        celdas[key].proyectos[idx].horas += reg.horasTrabajadas
+      } else {
+        celdas[key].proyectos.push({ codigo: reg.proyecto.codigo, horas: reg.horasTrabajadas })
+      }
+    }
+    matrizPorUsuario.set(a.usuario.id, celdas)
+  }
+
+  const estadoBadgeMatriz = (estado: string | undefined) => {
+    if (!estado) return <Badge variant="outline" className="bg-gray-50 text-gray-500 border-gray-200">Sin registros</Badge>
+    switch (estado) {
+      case 'sin_enviar':
+        return <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-300">Sin enviar</Badge>
+      case 'enviado':
+        return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-300">Pendiente</Badge>
+      case 'aprobado':
+        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">Aprobado</Badge>
+      case 'rechazado':
+        return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-300">Rechazado</Badge>
+      default:
+        return <Badge variant="outline">{estado}</Badge>
+    }
+  }
+
+  const colorFila = (estado: string | undefined): string => {
+    if (!estado) return ''
+    switch (estado) {
+      case 'sin_enviar': return 'bg-amber-50/40'
+      case 'enviado': return 'bg-yellow-50/40'
+      case 'aprobado': return 'bg-green-50/30'
+      case 'rechazado': return 'bg-red-50/30'
+      default: return ''
+    }
+  }
+
+  if (loading) {
+    return <div className="text-center py-8 text-muted-foreground">Cargando...</div>
+  }
+
+  if (usuariosVisibles.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <ClipboardCheck className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
+        <p className="text-sm text-muted-foreground">No hay usuarios elegibles que mostrar.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="border rounded-lg overflow-x-auto bg-background">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="sticky left-0 bg-background z-10 min-w-[180px]">Empleado</TableHead>
+            {dias.map(d => (
+              <TableHead key={d.key} className="text-center min-w-[110px]">
+                <span className="capitalize">{d.label}</span>
+              </TableHead>
+            ))}
+            <TableHead className="text-right min-w-[70px]">Total</TableHead>
+            <TableHead className="min-w-[110px]">Estado</TableHead>
+            <TableHead className="min-w-[200px]">Acciones</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {usuariosVisibles.map(u => {
+            const aprobacion = porUsuario.get(u.id)
+            const celdas = matrizPorUsuario.get(u.id) || {}
+            const estado = aprobacion?.estado
+            const totalSemana = aprobacion?.totalHoras ?? 0
+            return (
+              <TableRow key={u.id} className={colorFila(estado)}>
+                <TableCell className="sticky left-0 bg-inherit z-10 font-medium text-sm">
+                  {u.name || u.email}
+                </TableCell>
+                {dias.map(d => {
+                  const c = celdas[d.key]
+                  if (!c) {
+                    return (
+                      <TableCell key={d.key} className="text-center text-muted-foreground/50 text-xs">
+                        —
+                      </TableCell>
+                    )
+                  }
+                  const principal = c.proyectos[0]
+                  const extras = c.proyectos.length - 1
+                  const tooltip = c.proyectos.map(p => `${p.codigo}: ${p.horas}h`).join('\n')
+                  return (
+                    <TableCell key={d.key} className="text-center" title={tooltip}>
+                      <div className="text-sm font-semibold">{c.totalHoras}h</div>
+                      <div className="text-[10px] text-muted-foreground font-mono leading-tight">
+                        {principal?.codigo}
+                        {extras > 0 && <span className="text-muted-foreground/70"> +{extras}</span>}
+                      </div>
+                    </TableCell>
+                  )
+                })}
+                <TableCell className="text-right font-semibold text-sm">
+                  {totalSemana > 0 ? `${totalSemana}h` : '—'}
+                </TableCell>
+                <TableCell>{estadoBadgeMatriz(estado)}</TableCell>
+                <TableCell>
+                  {aprobacion?.estado === 'enviado' && (
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs text-green-700 border-green-300 hover:bg-green-50"
+                        onClick={() => onAprobar(aprobacion.id)}
+                        disabled={processing}
+                      >
+                        <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                        Aprobar
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs text-red-700 border-red-300 hover:bg-red-50"
+                        onClick={() => onRechazar(aprobacion.id)}
+                        disabled={processing}
+                      >
+                        <XCircle className="h-3.5 w-3.5 mr-1" />
+                        Rechazar
+                      </Button>
+                    </div>
+                  )}
+                  {aprobacion?.estado === 'aprobado' && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs"
+                      onClick={() => onVolverBorrador(aprobacion.id)}
+                      disabled={processing}
+                    >
+                      Devolver a borrador
+                    </Button>
+                  )}
+                </TableCell>
+              </TableRow>
+            )
+          })}
+        </TableBody>
+      </Table>
     </div>
   )
 }
