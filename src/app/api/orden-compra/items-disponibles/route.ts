@@ -4,17 +4,16 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
 /**
- * GET /api/orden-compra/items-disponibles?proyectoId=X|centroCostoId=X&proveedorId=Y&incluirSinProveedor=true
+ * GET /api/orden-compra/items-disponibles?proyectoId=X|centroCostoId=X&proveedorId=Y&mostrarTodos=true|false
  * Returns pedido items available for OC creation (without existing OC).
  * Acepta proyectoId O centroCostoId (uno de los dos es requerido).
  *
  * Reglas de filtrado por proveedor:
- *   - Sin proveedorId: devuelve TODOS los items (cualquier proveedor o sin asignar).
- *   - Con proveedorId + incluirSinProveedor=true (default): devuelve items del proveedor + items sin proveedor asignado (PEI.proveedorId NULL Y LEI.proveedorId NULL).
- *   - Con proveedorId + incluirSinProveedor=false: filtro estricto solo del proveedor.
- *
- * También considera el caso legacy donde PedidoEquipoItem.proveedorId está NULL pero
- * ListaEquipoItem.proveedorId sí tiene valor (cotización aprobada no propagada al pedido).
+ *   - Sin proveedorId: devuelve TODOS los items en pedidos activos.
+ *   - Con proveedorId + mostrarTodos=false (default): solo items asignados al proveedor seleccionado
+ *     (incluye caso legacy donde PEI.proveedorId NULL pero LEI.proveedorId apunta al proveedor).
+ *   - Con proveedorId + mostrarTodos=true: devuelve TODOS los items disponibles del proyecto, incluyendo
+ *     items asignados a otros proveedores (que se reasignarán) y items sin proveedor (se asignarán a esta OC).
  */
 export async function GET(req: Request) {
   try {
@@ -36,21 +35,20 @@ export async function GET(req: Request) {
       )
     }
     const proveedorId = searchParams.get('proveedorId') || undefined
-    const incluirSinProveedor = searchParams.get('incluirSinProveedor') !== 'false' // default true
+    const mostrarTodos = searchParams.get('mostrarTodos') === 'true'
 
-    // Filtro por proveedor — considera ambos: PEI.proveedorId Y LEI.proveedorId
+    // Filtro por proveedor:
+    //  - mostrarTodos=true: ignorar el filtro de proveedor (devuelve todo lo del proyecto)
+    //  - mostrarTodos=false + proveedorId: estricto (asignados a ese proveedor + sin asignar via LEI legacy)
+    //  - sin proveedorId: sin filtro
     let proveedorFilter: any = {}
-    if (proveedorId) {
-      const conditions: any[] = [
-        { proveedorId },                                                    // (a) ítem ya asignado al proveedor
-        { proveedorId: null, listaEquipoItem: { proveedorId } },             // (b) PEI sin proveedor pero LEI sí (caso legacy)
-      ]
-      if (incluirSinProveedor) {
-        // (c) Items completamente sin asignar — se compran al proveedor de esta OC
-        conditions.push({ proveedorId: null, listaEquipoItem: { proveedorId: null } })
-        conditions.push({ proveedorId: null, listaEquipoItemId: null })
+    if (proveedorId && !mostrarTodos) {
+      proveedorFilter = {
+        OR: [
+          { proveedorId },                                                    // (a) ítem ya asignado al proveedor
+          { proveedorId: null, listaEquipoItem: { proveedorId } },             // (b) PEI sin proveedor pero LEI sí (caso legacy)
+        ],
       }
-      proveedorFilter = { OR: conditions }
     }
 
     // Items de pedidos elegibles (aprobado/atendido/parcial) con cantidad restante > 0

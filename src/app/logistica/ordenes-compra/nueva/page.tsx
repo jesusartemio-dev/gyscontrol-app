@@ -89,7 +89,7 @@ function NuevaOrdenCompraContent() {
   const [selectorOpen, setSelectorOpen] = useState(false)
   const [loadingItems, setLoadingItems] = useState(false)
   const [pedidoItemsDisp, setPedidoItemsDisp] = useState<ItemDisponible[]>([])
-  const [incluirSinProveedor, setIncluirSinProveedor] = useState(true)
+  const [mostrarTodosLosItems, setMostrarTodosLosItems] = useState(false)
   // Cantidad editable por ítem (cantidad a comprar puede ser menor que la disponible)
   const [cantidadesAcomprar, setCantidadesAcomprar] = useState<Record<string, number>>({})
   // Pedidos colapsados (codigoPedido → boolean)
@@ -209,11 +209,11 @@ function NuevaOrdenCompraContent() {
     new Intl.NumberFormat('es-PE', { style: 'currency', currency: moneda }).format(amount)
 
   // ── Pedido selector ──────────────────────────────────────
-  const cargarItemsDisponibles = useCallback(async (incluirSinProv: boolean) => {
+  const cargarItemsDisponibles = useCallback(async (mostrarTodos: boolean) => {
     if (!asignacion.proyectoId && !asignacion.centroCostoId) return
     setLoadingItems(true)
     try {
-      const data = await fetchItemsDisponibles(asignacion, proveedorId || undefined, { incluirSinProveedor: incluirSinProv })
+      const data = await fetchItemsDisponibles(asignacion, proveedorId || undefined, { mostrarTodos })
       const existingIds = new Set(items.filter(i => i.pedidoEquipoItemId).map(i => i.pedidoEquipoItemId))
       setPedidoItemsDisp(data.items.filter(i => !existingIds.has(i.id)))
     } catch (err) {
@@ -227,8 +227,8 @@ function NuevaOrdenCompraContent() {
     if (!asignacion.proyectoId && !asignacion.centroCostoId) return
     setSelectorOpen(true)
     setSelectedIds(new Set())
-    await cargarItemsDisponibles(incluirSinProveedor)
-  }, [asignacion, cargarItemsDisponibles, incluirSinProveedor])
+    await cargarItemsDisponibles(mostrarTodosLosItems)
+  }, [asignacion, cargarItemsDisponibles, mostrarTodosLosItems])
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
@@ -702,20 +702,25 @@ function NuevaOrdenCompraContent() {
             <DialogTitle>Agregar items desde pedidos</DialogTitle>
           </DialogHeader>
 
-          {/* Toggle: incluir items sin proveedor */}
+          {/* Toggle: mostrar items de otros proveedores */}
           {proveedorId && (
-            <div className="flex items-center gap-2 px-6 py-2.5 border-b bg-amber-50/40">
+            <div className="flex items-start gap-2 px-6 py-2.5 border-b bg-amber-50/40">
               <Checkbox
-                id="incluir-sin-proveedor"
-                checked={incluirSinProveedor}
+                id="mostrar-todos-items"
+                checked={mostrarTodosLosItems}
                 onCheckedChange={(checked) => {
                   const next = checked === true
-                  setIncluirSinProveedor(next)
+                  setMostrarTodosLosItems(next)
                   cargarItemsDisponibles(next)
                 }}
+                className="mt-0.5"
               />
-              <label htmlFor="incluir-sin-proveedor" className="text-xs cursor-pointer">
-                Incluir items <strong>sin proveedor asignado</strong> (se asignarán al proveedor de esta OC)
+              <label htmlFor="mostrar-todos-items" className="text-xs cursor-pointer leading-tight">
+                <strong>Mostrar items de otros proveedores y sin asignar</strong>
+                <br />
+                <span className="text-muted-foreground">
+                  Si lo activas, podrás incluir items que estaban asignados a otros proveedores. Al guardar la OC, esos items se reasignarán al proveedor seleccionado.
+                </span>
               </label>
             </div>
           )}
@@ -726,16 +731,35 @@ function NuevaOrdenCompraContent() {
                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
               </div>
             ) : pedidoItemsDisp.length === 0 ? (
-              <div className="text-center py-10 text-muted-foreground text-sm">
-                No hay items disponibles para generar OC.
-                <div className="text-xs mt-3 max-w-md mx-auto space-y-1">
-                  <p>Posibles razones:</p>
-                  <ul className="list-disc list-inside text-left">
-                    <li>Todos los items ya tienen OC generada.</li>
-                    <li>Los items están asignados a otros proveedores (si no marcaste "Incluir sin proveedor").</li>
-                    <li>El proyecto no tiene pedidos en estado aprobado/atendido/parcial.</li>
-                  </ul>
-                </div>
+              <div className="text-center py-10 px-4">
+                <Package className="h-12 w-12 text-muted-foreground/40 mx-auto mb-3" />
+                <p className="text-sm font-medium text-foreground mb-2">
+                  No hay items disponibles para este proveedor
+                </p>
+                <p className="text-xs text-muted-foreground max-w-lg mx-auto mb-4">
+                  No encontramos items asignados al proveedor seleccionado en los pedidos activos del proyecto.
+                </p>
+                {proveedorId && !mostrarTodosLosItems && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 max-w-md mx-auto text-left">
+                    <p className="text-xs font-medium text-blue-900 mb-1.5 flex items-center gap-1.5">
+                      <Info className="h-3.5 w-3.5" />
+                      ¿Querés comprarle a este proveedor items asignados a otro?
+                    </p>
+                    <p className="text-xs text-blue-800 mb-2">
+                      Activá la opción <strong>"Mostrar items de otros proveedores y sin asignar"</strong> de arriba para verlos. Al guardar la OC se reasignarán automáticamente.
+                    </p>
+                  </div>
+                )}
+                {mostrarTodosLosItems && (
+                  <div className="text-xs text-muted-foreground max-w-md mx-auto space-y-1">
+                    <p>Otras razones posibles:</p>
+                    <ul className="list-disc list-inside text-left">
+                      <li>Todos los items del proyecto ya tienen OC generada.</li>
+                      <li>El proyecto no tiene pedidos en estado aprobado / atendido / parcial.</li>
+                      <li>Los pedidos siguen en borrador o enviado (necesitan estar aprobados).</li>
+                    </ul>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="space-y-3">
@@ -774,6 +798,8 @@ function NuevaOrdenCompraContent() {
                           {itemsPedido.map(item => {
                             const seleccionado = selectedIds.has(item.id)
                             const cantidadActual = cantidadesAcomprar[item.id] ?? item.cantidad
+                            // Determinar si el item se reasignará (proveedor actual != proveedor de la OC)
+                            const seReasignara = !!proveedorId && !!item.proveedorId && item.proveedorId !== proveedorId
                             return (
                               <div
                                 key={item.id}
@@ -790,13 +816,20 @@ function NuevaOrdenCompraContent() {
                                       {item.codigo}
                                     </p>
                                     {item.proveedorNombre ? (
-                                      <p className="text-[10px] text-muted-foreground truncate" title={item.proveedorNombre}>
-                                        {item.proveedorNombre}
-                                      </p>
+                                      seReasignara ? (
+                                        <p className="inline-flex items-center gap-1 text-[10px] text-orange-700 truncate" title={`Se reasignará de "${item.proveedorNombre}" al proveedor de esta OC`}>
+                                          <span className="h-1.5 w-1.5 rounded-full bg-orange-500 shrink-0" />
+                                          <span className="truncate">⚠ Reasignar de: {item.proveedorNombre}</span>
+                                        </p>
+                                      ) : (
+                                        <p className="text-[10px] text-muted-foreground truncate" title={item.proveedorNombre}>
+                                          {item.proveedorNombre}
+                                        </p>
+                                      )
                                     ) : (
                                       <p className="inline-flex items-center gap-1 text-[10px] text-amber-700 italic">
                                         <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                                        Sin proveedor
+                                        Sin proveedor — se asignará a esta OC
                                       </p>
                                     )}
                                   </div>

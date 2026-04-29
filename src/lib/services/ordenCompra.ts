@@ -140,14 +140,14 @@ export interface ItemDisponible {
 export async function fetchItemsDisponibles(
   asignacion: { proyectoId?: string | null; centroCostoId?: string | null },
   proveedorId?: string,
-  options: { incluirSinProveedor?: boolean } = {}
+  options: { mostrarTodos?: boolean } = {}
 ): Promise<{ items: ItemDisponible[] }> {
   const params = new URLSearchParams()
   if (asignacion.proyectoId) params.set('proyectoId', asignacion.proyectoId)
   else if (asignacion.centroCostoId) params.set('centroCostoId', asignacion.centroCostoId)
   else throw new Error('Se requiere proyectoId o centroCostoId')
   if (proveedorId) params.set('proveedorId', proveedorId)
-  if (options.incluirSinProveedor === false) params.set('incluirSinProveedor', 'false')
+  if (options.mostrarTodos) params.set('mostrarTodos', 'true')
   const res = await fetch(`${BASE_URL}/items-disponibles?${params}`)
   if (!res.ok) {
     const err = await res.json()
