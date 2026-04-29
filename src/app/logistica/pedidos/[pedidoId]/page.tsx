@@ -93,10 +93,10 @@ import {
 import TipoItemBadge from '@/components/shared/TipoItemBadge'
 
 // 🔧 Utility functions
-const formatCurrency = (amount: number): string => {
+const formatCurrency = (amount: number, currency: string = 'USD'): string => {
   return new Intl.NumberFormat('es-PE', {
     style: 'currency',
-    currency: 'USD',
+    currency,
     minimumFractionDigits: 2
   }).format(amount)
 }
@@ -1897,7 +1897,7 @@ export default function PedidoLogisticaDetailPage() {
                     <td className="px-3 py-2 text-gray-600">{oc.proveedor?.nombre || '—'}</td>
                     <td className="px-3 py-2 text-center">{oc.items?.length || 0}</td>
                     <td className="px-3 py-2 text-right font-medium text-emerald-600">
-                      {formatCurrency(oc.subtotal || 0)}
+                      {formatCurrency(oc.subtotal || 0, oc.moneda || 'PEN')}
                     </td>
                     <td className="px-3 py-2 text-center">
                       <Badge variant="outline" className={cn('text-[10px] px-1.5 py-0', getEstadoBadgeClass(oc.estado))}>
