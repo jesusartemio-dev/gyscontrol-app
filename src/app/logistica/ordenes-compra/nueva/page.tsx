@@ -715,7 +715,7 @@ function NuevaOrdenCompraContent() {
                 }}
               />
               <label htmlFor="incluir-sin-proveedor" className="text-xs cursor-pointer">
-                Incluir items <strong>sin proveedor asignado</strong> (admin decide a quién comprarlos)
+                Incluir items <strong>sin proveedor asignado</strong> (se asignarán al proveedor de esta OC)
               </label>
             </div>
           )}
