@@ -131,6 +131,7 @@ export interface ItemDisponible {
   precioUnitario: number
   proveedorId: string | null
   proveedorNombre: string | null
+  sinProveedorAsignado?: boolean
   listaEquipoItemId?: string
   pedidoCodigo: string
   pedidoId: string
@@ -138,13 +139,15 @@ export interface ItemDisponible {
 
 export async function fetchItemsDisponibles(
   asignacion: { proyectoId?: string | null; centroCostoId?: string | null },
-  proveedorId?: string
+  proveedorId?: string,
+  options: { incluirSinProveedor?: boolean } = {}
 ): Promise<{ items: ItemDisponible[] }> {
   const params = new URLSearchParams()
   if (asignacion.proyectoId) params.set('proyectoId', asignacion.proyectoId)
   else if (asignacion.centroCostoId) params.set('centroCostoId', asignacion.centroCostoId)
   else throw new Error('Se requiere proyectoId o centroCostoId')
   if (proveedorId) params.set('proveedorId', proveedorId)
+  if (options.incluirSinProveedor === false) params.set('incluirSinProveedor', 'false')
   const res = await fetch(`${BASE_URL}/items-disponibles?${params}`)
   if (!res.ok) {
     const err = await res.json()

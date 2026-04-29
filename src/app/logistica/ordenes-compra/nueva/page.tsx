@@ -89,6 +89,7 @@ function NuevaOrdenCompraContent() {
   const [selectorOpen, setSelectorOpen] = useState(false)
   const [loadingItems, setLoadingItems] = useState(false)
   const [pedidoItemsDisp, setPedidoItemsDisp] = useState<ItemDisponible[]>([])
+  const [incluirSinProveedor, setIncluirSinProveedor] = useState(true)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   // Catalogo dialog state
@@ -204,13 +205,11 @@ function NuevaOrdenCompraContent() {
     new Intl.NumberFormat('es-PE', { style: 'currency', currency: moneda }).format(amount)
 
   // ── Pedido selector ──────────────────────────────────────
-  const openSelector = useCallback(async () => {
+  const cargarItemsDisponibles = useCallback(async (incluirSinProv: boolean) => {
     if (!asignacion.proyectoId && !asignacion.centroCostoId) return
-    setSelectorOpen(true)
-    setSelectedIds(new Set())
     setLoadingItems(true)
     try {
-      const data = await fetchItemsDisponibles(asignacion, proveedorId || undefined)
+      const data = await fetchItemsDisponibles(asignacion, proveedorId || undefined, { incluirSinProveedor: incluirSinProv })
       const existingIds = new Set(items.filter(i => i.pedidoEquipoItemId).map(i => i.pedidoEquipoItemId))
       setPedidoItemsDisp(data.items.filter(i => !existingIds.has(i.id)))
     } catch (err) {
@@ -219,6 +218,13 @@ function NuevaOrdenCompraContent() {
       setLoadingItems(false)
     }
   }, [asignacion, proveedorId, items])
+
+  const openSelector = useCallback(async () => {
+    if (!asignacion.proyectoId && !asignacion.centroCostoId) return
+    setSelectorOpen(true)
+    setSelectedIds(new Set())
+    await cargarItemsDisponibles(incluirSinProveedor)
+  }, [asignacion, cargarItemsDisponibles, incluirSinProveedor])
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
@@ -657,6 +663,24 @@ function NuevaOrdenCompraContent() {
             <DialogTitle>Agregar items desde pedidos</DialogTitle>
           </DialogHeader>
 
+          {/* Toggle: incluir items sin proveedor */}
+          {proveedorId && (
+            <div className="flex items-center gap-2 px-1 py-2 border-y bg-amber-50/50">
+              <Checkbox
+                id="incluir-sin-proveedor"
+                checked={incluirSinProveedor}
+                onCheckedChange={(checked) => {
+                  const next = checked === true
+                  setIncluirSinProveedor(next)
+                  cargarItemsDisponibles(next)
+                }}
+              />
+              <label htmlFor="incluir-sin-proveedor" className="text-xs cursor-pointer">
+                Incluir items <strong>sin proveedor asignado</strong> (admin decide a quién comprarlos)
+              </label>
+            </div>
+          )}
+
           <div className="flex-1 overflow-auto">
             {loadingItems ? (
               <div className="flex items-center justify-center py-10">
@@ -665,9 +689,14 @@ function NuevaOrdenCompraContent() {
             ) : pedidoItemsDisp.length === 0 ? (
               <div className="text-center py-10 text-muted-foreground text-sm">
                 No hay items disponibles para generar OC.
-                <span className="block text-xs mt-2 max-w-md mx-auto">
-                  Posibles razones: (1) todos los items del pedido ya tienen OC generada, o (2) están asignados a otro proveedor distinto del seleccionado.
-                </span>
+                <div className="text-xs mt-3 max-w-md mx-auto space-y-1">
+                  <p>Posibles razones:</p>
+                  <ul className="list-disc list-inside text-left">
+                    <li>Todos los items ya tienen OC generada.</li>
+                    <li>Los items están asignados a otros proveedores (si no marcaste "Incluir sin proveedor").</li>
+                    <li>El proyecto no tiene pedidos en estado aprobado/atendido/parcial.</li>
+                  </ul>
+                </div>
               </div>
             ) : (
               <Table>
@@ -703,8 +732,15 @@ function NuevaOrdenCompraContent() {
                       <TableCell className="text-xs text-right font-mono">
                         {item.precioUnitario > 0 ? item.precioUnitario.toFixed(2) : '-'}
                       </TableCell>
-                      <TableCell className="text-xs truncate max-w-[120px]" title={item.proveedorNombre || ''}>
-                        {item.proveedorNombre || <span className="text-muted-foreground italic">Sin proveedor</span>}
+                      <TableCell className="text-xs truncate max-w-[120px]" title={item.proveedorNombre || 'Sin proveedor — se asignará a este OC'}>
+                        {item.proveedorNombre ? (
+                          item.proveedorNombre
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-amber-700 italic">
+                            <span className="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
+                            Sin proveedor
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         {item.pedidoCodigo}
