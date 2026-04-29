@@ -160,6 +160,7 @@ export async function POST(req: Request) {
         costoTotal: item.cantidad * item.precioUnitario * (1 - descuento / 100),
         pedidoEquipoItemId: item.pedidoEquipoItemId || null,
         listaEquipoItemId: item.listaEquipoItemId || null,
+        catalogoEppId: item.catalogoEppId || null,
         updatedAt: new Date(),
       }
     })

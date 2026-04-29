@@ -134,6 +134,7 @@ export interface ItemDisponible {
   proveedorNombre: string | null
   sinProveedorAsignado?: boolean
   listaEquipoItemId?: string
+  catalogoEppId?: string | null
   pedidoCodigo: string
   pedidoId: string
 }

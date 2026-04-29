@@ -34,6 +34,8 @@ export interface PedidoInternoItem {
   precioUnitarioMoneda?: string | null
   costoTotal?: number
   estado: string
+  catalogoEquipoId?: string | null
+  catalogoEppId?: string | null
   // Override de imputación (ambos null = hereda del pedido)
   proyectoId?: string | null
   centroCostoId?: string | null

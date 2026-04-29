@@ -45,7 +45,7 @@ export async function POST(
         ordenCompraItem: {
           include: {
             ordenCompra: { select: { numero: true, proyectoId: true, proyecto: { select: { nombre: true, gestorId: true } } } },
-            pedidoEquipoItem: { select: { catalogoEquipoId: true } },
+            pedidoEquipoItem: { select: { catalogoEquipoId: true, catalogoEppId: true } },
           }
         },
         requerimientoMaterialItem: {
@@ -83,6 +83,11 @@ export async function POST(
     const reqItem = recepcion.requerimientoMaterialItem || null
     const catalogoEquipoId = pedidoItem?.catalogoEquipoId
       || ocItem?.pedidoEquipoItem?.catalogoEquipoId
+      || null
+    // EPPs: catalogoEppId puede venir del pedido item, del oc item directo, o del oc item via su pedido item
+    const catalogoEppId = (pedidoItem as any)?.catalogoEppId
+      || (ocItem as any)?.catalogoEppId
+      || (ocItem as any)?.pedidoEquipoItem?.catalogoEppId
       || null
     const ocNumero = ocItem?.ordenCompra.numero || reqItem?.hojaDeGastos.numero || 'REQ'
     const proyectoId = pedido?.proyectoId || ocItem?.ordenCompra.proyectoId || reqItem?.proyectoId || null
@@ -137,7 +142,20 @@ export async function POST(
         })
 
         // Hook de stock: registrar entrada al almacén
-        if (almacen && catalogoEquipoId) {
+        // Si el item es un EPP (catalogoEppId), ingresa al stock EPP con tipo entrada_epp.
+        // Si es un equipo (catalogoEquipoId), mantiene el flujo normal entrada_recepcion.
+        if (almacen && catalogoEppId) {
+          await registrarMovimiento({
+            almacenId: almacen.id,
+            tipo: 'entrada_epp',
+            catalogoEppId,
+            cantidad: cantidadConfirmada,
+            costoUnitario: ocItem?.precioUnitario ?? undefined,
+            usuarioId: session.user.id,
+            recepcionPendienteId: id,
+            observaciones: `Recepción EPP desde OC ${ocNumero}`,
+          }, tx)
+        } else if (almacen && catalogoEquipoId) {
           await registrarMovimiento({
             almacenId: almacen.id,
             tipo: 'entrada_recepcion',

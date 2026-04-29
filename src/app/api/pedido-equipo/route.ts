@@ -453,6 +453,7 @@ export async function POST(request: Request) {
               costoTotal,
               marca: itemLibre.marca ?? null,
               catalogoEquipoId: itemLibre.catalogoEquipoId ?? null,
+              catalogoEppId: itemLibre.catalogoEppId ?? null,
               responsableId: body.responsableId,
               estado: 'pendiente',
               estadoEntrega: 'pendiente',

@@ -733,6 +733,7 @@ export interface PedidoEquipoPayload {
     precioUnitarioMoneda?: string | null
     marca?: string | null
     catalogoEquipoId?: string | null
+    catalogoEppId?: string | null
     // Override de imputación (mutuamente excluyentes)
     proyectoId?: string | null
     centroCostoId?: string | null
@@ -782,6 +783,7 @@ export interface PedidoEquipoItemPayload {
   categoria?: string
   marca?: string
   catalogoEquipoId?: string
+  catalogoEppId?: string
   tipoItem?: string // "equipo" | "consumible" | "servicio"
   tiempoEntrega?: string
   tiempoEntregaDias?: number
@@ -1475,6 +1477,7 @@ export interface GastoLineaUpdatePayload {
 export interface OrdenCompraItemPayload {
   pedidoEquipoItemId?: string
   listaEquipoItemId?: string
+  catalogoEppId?: string | null
   codigo?: string
   descripcion: string
   unidad: string

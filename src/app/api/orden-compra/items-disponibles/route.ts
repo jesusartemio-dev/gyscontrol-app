@@ -72,6 +72,7 @@ export async function GET(req: Request) {
         proveedorId: true,
         proveedorNombre: true,
         listaEquipoItemId: true,
+        catalogoEppId: true,
         listaEquipoItem: {
           select: { proveedorId: true, proveedor: { select: { nombre: true } } },
         },
@@ -113,6 +114,7 @@ export async function GET(req: Request) {
           // Indica si el item viene sin proveedor asignado (se confirmará al guardar)
           sinProveedorAsignado: !proveedorEfectivoId,
           listaEquipoItemId: item.listaEquipoItemId,
+          catalogoEppId: item.catalogoEppId,
           pedidoCodigo: item.pedidoEquipo.codigo,
           pedidoId: item.pedidoEquipo.id,
         }

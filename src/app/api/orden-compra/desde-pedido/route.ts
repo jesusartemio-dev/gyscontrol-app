@@ -181,6 +181,7 @@ export async function POST(req: Request) {
             costoTotal: cantidadRestante * precioFinal,
             pedidoEquipoItemId: item.id,
             listaEquipoItemId: item.listaEquipoItemId || null,
+            catalogoEppId: (item as any).catalogoEppId || null,
             updatedAt: new Date(),
           }
         })

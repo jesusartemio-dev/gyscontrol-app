@@ -185,6 +185,7 @@ export async function POST(request: Request) {
         tipoItem: body.tipoItem || 'equipo',
         marca: body.marca ?? null,
         catalogoEquipoId: body.catalogoEquipoId ?? null,
+        catalogoEppId: body.catalogoEppId ?? null,
         proyectoId: body.proyectoId ?? null,
         centroCostoId: body.centroCostoId ?? null,
         categoriaCosto: body.categoriaCosto ?? null,

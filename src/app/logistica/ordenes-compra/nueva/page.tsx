@@ -41,9 +41,10 @@ interface ItemForm {
   unidad: string
   cantidad: number
   precioUnitario: number
-  source: 'manual' | 'pedido' | 'catalogo'
+  source: 'manual' | 'pedido' | 'catalogo' | 'epp'
   pedidoEquipoItemId?: string
   listaEquipoItemId?: string
+  catalogoEppId?: string | null
   sourceLabel?: string
 }
 
@@ -104,6 +105,20 @@ function NuevaOrdenCompraContent() {
   const [catalogoSelectedIds, setCatalogoSelectedIds] = useState<Set<string>>(new Set())
   const [catalogoCantidades, setCatalogoCantidades] = useState<Record<string, number>>({})
 
+  // Catalogo EPP dialog state
+  interface CatalogoEppRes {
+    id: string; codigo: string; descripcion: string
+    marca: string | null; modelo: string | null; talla: string | null
+    subcategoria: string; precioReferencial: number | null; monedaReferencial: string
+    unidad: { nombre: string }
+  }
+  const [catalogoEppOpen, setCatalogoEppOpen] = useState(false)
+  const [catalogoEppQuery, setCatalogoEppQuery] = useState('')
+  const [catalogoEppResults, setCatalogoEppResults] = useState<CatalogoEppRes[]>([])
+  const [catalogoEppLoading, setCatalogoEppLoading] = useState(false)
+  const [catalogoEppSelectedIds, setCatalogoEppSelectedIds] = useState<Set<string>>(new Set())
+  const [catalogoEppCantidades, setCatalogoEppCantidades] = useState<Record<string, number>>({})
+
   // Manual item modal state
   const [manualModalOpen, setManualModalOpen] = useState(false)
   const [manualEditIndex, setManualEditIndex] = useState<number | null>(null)
@@ -148,6 +163,7 @@ function NuevaOrdenCompraContent() {
               source: 'pedido' as const,
               pedidoEquipoItemId: i.id,
               listaEquipoItemId: i.listaEquipoItemId,
+              catalogoEppId: i.catalogoEppId ?? null,
               sourceLabel: i.pedidoCodigo,
             }))
             if (newItems.length > 0) {
@@ -281,6 +297,7 @@ function NuevaOrdenCompraContent() {
         source: 'pedido' as const,
         pedidoEquipoItemId: i.id,
         listaEquipoItemId: i.listaEquipoItemId,
+        catalogoEppId: i.catalogoEppId ?? null,
         sourceLabel: i.pedidoCodigo,
       }
     })
@@ -385,6 +402,72 @@ function NuevaOrdenCompraContent() {
     toast.success(`${newItems.length} item(s) agregados desde catálogo`)
   }
 
+  // ── Catálogo EPP selector ───────────────────────────────
+  const openCatalogoEpp = () => {
+    setCatalogoEppOpen(true)
+    setCatalogoEppQuery('')
+    setCatalogoEppResults([])
+    setCatalogoEppSelectedIds(new Set())
+    setCatalogoEppCantidades({})
+  }
+
+  const searchCatalogoEpp = useCallback(async (q: string) => {
+    if (q.length < 2) { setCatalogoEppResults([]); return }
+    setCatalogoEppLoading(true)
+    try {
+      const res = await fetch(`/api/catalogo-epp/search?q=${encodeURIComponent(q)}&limit=30`)
+      const data: CatalogoEppRes[] = await res.json()
+      setCatalogoEppResults(data)
+    } catch {
+      setCatalogoEppResults([])
+    } finally {
+      setCatalogoEppLoading(false)
+    }
+  }, [])
+
+  const catalogoEppTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+  const handleCatalogoEppSearch = (val: string) => {
+    setCatalogoEppQuery(val)
+    if (catalogoEppTimerRef.current) clearTimeout(catalogoEppTimerRef.current)
+    catalogoEppTimerRef.current = setTimeout(() => searchCatalogoEpp(val), 300)
+  }
+
+  const toggleCatalogoEppSelect = (id: string) => {
+    setCatalogoEppSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else {
+        next.add(id)
+        if (!catalogoEppCantidades[id]) {
+          setCatalogoEppCantidades(p => ({ ...p, [id]: 1 }))
+        }
+      }
+      return next
+    })
+  }
+
+  const updateCatalogoEppCantidad = (id: string, cant: number) => {
+    setCatalogoEppCantidades(prev => ({ ...prev, [id]: cant }))
+  }
+
+  const addCatalogoEppItems = () => {
+    const toAdd = catalogoEppResults.filter(i => catalogoEppSelectedIds.has(i.id))
+    const newItems: ItemForm[] = toAdd.map(item => ({
+      codigo: item.codigo,
+      descripcion: item.descripcion + (item.talla ? ` (talla ${item.talla})` : ''),
+      unidad: item.unidad?.nombre || 'UND',
+      cantidad: catalogoEppCantidades[item.id] || 1,
+      precioUnitario: item.precioReferencial || 0,
+      source: 'epp' as const,
+      catalogoEppId: item.id,
+      sourceLabel: 'Catálogo EPP',
+    }))
+
+    setItems(prev => [...prev, ...newItems])
+    setCatalogoEppOpen(false)
+    toast.success(`${newItems.length} EPP(s) agregados desde catálogo`)
+  }
+
   // ── Submit ───────────────────────────────────────────────
   const handleSubmit = async () => {
     if (!proveedorId) return toast.error('Selecciona un proveedor')
@@ -425,6 +508,7 @@ function NuevaOrdenCompraContent() {
           precioUnitario: item.precioUnitario,
           pedidoEquipoItemId: item.pedidoEquipoItemId,
           listaEquipoItemId: item.listaEquipoItemId,
+          catalogoEppId: item.catalogoEppId ?? undefined,
         })),
       }
       const created = await createOrdenCompra(payload)
@@ -628,6 +712,9 @@ function NuevaOrdenCompraContent() {
             </Button>
             <Button variant="outline" size="sm" onClick={openCatalogo}>
               <Search className="h-3.5 w-3.5 mr-1" /> Desde Catálogo
+            </Button>
+            <Button variant="outline" size="sm" onClick={openCatalogoEpp} className="border-orange-200 text-orange-700 hover:bg-orange-50">
+              <Search className="h-3.5 w-3.5 mr-1" /> Desde Catálogo EPP
             </Button>
             <Button variant="outline" size="sm" onClick={openManualAdd}>
               <Plus className="h-3.5 w-3.5 mr-1" /> Item Manual
@@ -1026,6 +1113,115 @@ function NuevaOrdenCompraContent() {
               className="bg-orange-600 hover:bg-orange-700"
             >
               Agregar {catalogoSelectedIds.size} item(s)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Catálogo EPP Selector Dialog ────────────────────── */}
+      <Dialog open={catalogoEppOpen} onOpenChange={setCatalogoEppOpen}>
+        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Buscar en catálogo de EPPs</DialogTitle>
+          </DialogHeader>
+
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={catalogoEppQuery}
+              onChange={e => handleCatalogoEppSearch(e.target.value)}
+              placeholder="Buscar por código, descripción o marca... (mín. 2 caracteres)"
+              className="pl-9"
+              autoFocus
+            />
+          </div>
+
+          <div className="flex-1 overflow-auto min-h-0">
+            {catalogoEppLoading ? (
+              <div className="flex items-center justify-center py-10">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : catalogoEppQuery.length < 2 ? (
+              <div className="text-center py-10 text-muted-foreground text-sm">
+                Escribe al menos 2 caracteres para buscar
+              </div>
+            ) : catalogoEppResults.length === 0 ? (
+              <div className="text-center py-10 text-muted-foreground text-sm">
+                No se encontraron EPPs para &quot;{catalogoEppQuery}&quot;
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[40px]"></TableHead>
+                    <TableHead className="w-[140px]">Código</TableHead>
+                    <TableHead>Descripción</TableHead>
+                    <TableHead className="w-[60px]">Talla</TableHead>
+                    <TableHead className="w-[80px]">Marca</TableHead>
+                    <TableHead className="w-[80px]">Subcat.</TableHead>
+                    <TableHead className="w-[60px]">Unid.</TableHead>
+                    <TableHead className="w-[100px] text-right">Precio ref.</TableHead>
+                    <TableHead className="w-[80px] text-right">Cant.</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {catalogoEppResults.map(item => {
+                    const isSelected = catalogoEppSelectedIds.has(item.id)
+                    const sym = item.monedaReferencial === 'USD' ? 'US$' : 'S/'
+                    return (
+                      <TableRow
+                        key={item.id}
+                        className={isSelected ? 'bg-orange-50' : 'cursor-pointer hover:bg-muted/50'}
+                        onClick={() => toggleCatalogoEppSelect(item.id)}
+                      >
+                        <TableCell>
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleCatalogoEppSelect(item.id)}
+                          />
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">{item.codigo}</TableCell>
+                        <TableCell className="text-xs">{item.descripcion}</TableCell>
+                        <TableCell className="text-xs font-mono font-semibold">{item.talla || '—'}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{item.marca || '-'}</TableCell>
+                        <TableCell className="text-xs">{item.subcategoria}</TableCell>
+                        <TableCell className="text-xs">{item.unidad?.nombre}</TableCell>
+                        <TableCell className="text-xs text-right font-mono">
+                          {item.precioReferencial ? `${sym} ${item.precioReferencial.toFixed(2)}` : '-'}
+                        </TableCell>
+                        <TableCell className="text-right" onClick={e => e.stopPropagation()}>
+                          {isSelected && (
+                            <Input
+                              type="number"
+                              min={1}
+                              value={catalogoEppCantidades[item.id] || 1}
+                              onChange={e => updateCatalogoEppCantidad(item.id, parseInt(e.target.value) || 1)}
+                              className="h-7 w-16 text-xs text-right"
+                            />
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+
+          {catalogoEppSelectedIds.size > 0 && (
+            <div className="text-xs text-muted-foreground">
+              {catalogoEppSelectedIds.size} EPP(s) seleccionado(s)
+            </div>
+          )}
+
+          <DialogFooter className="mt-2">
+            <Button variant="outline" onClick={() => setCatalogoEppOpen(false)}>Cancelar</Button>
+            <Button
+              onClick={addCatalogoEppItems}
+              disabled={catalogoEppSelectedIds.size === 0}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              Agregar {catalogoEppSelectedIds.size} EPP(s)
             </Button>
           </DialogFooter>
         </DialogContent>

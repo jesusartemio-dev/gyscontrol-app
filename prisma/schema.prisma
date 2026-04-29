@@ -792,6 +792,9 @@ model PedidoEquipoItem {
   tipoItem                    String                      @default("equipo")
   marca                       String?
   catalogoEquipoId            String?
+  // Link al catálogo EPP cuando el item del pedido es un EPP (mutuamente
+  // excluyente con catalogoEquipoId). Permite trazabilidad pedido→OC→stock EPP.
+  catalogoEppId               String?
   tiempoEntrega               String?
   tiempoEntregaDias           Int?
   unidad                      String
@@ -821,6 +824,7 @@ model PedidoEquipoItem {
   pedidoEquipo                PedidoEquipo                @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
   proveedor                   Proveedor?                  @relation(fields: [proveedorId], references: [id], onDelete: SetNull)
   catalogoEquipo              CatalogoEquipo?             @relation(fields: [catalogoEquipoId], references: [id], onDelete: SetNull)
+  catalogoEpp                 CatalogoEPP?                @relation(fields: [catalogoEppId], references: [id], onDelete: SetNull)
   user                        User                        @relation(fields: [responsableId], references: [id])
   comentarioLogisticaPor      User?                       @relation("PedidoEquipoItemComentarioLogistica", fields: [comentarioLogisticaPorId], references: [id])
   proyecto                    Proyecto?                   @relation("PedidoItemProyectoOverride", fields: [proyectoId], references: [id], onDelete: SetNull)
@@ -4811,6 +4815,7 @@ model CatalogoEPP {
   stockAlmacen        StockAlmacen[]
   movimientos         MovimientoAlmacen[]
   ordenCompraItems    OrdenCompraItem[]
+  pedidoEquipoItems   PedidoEquipoItem[]
   entregaItems        EntregaEPPItem[]
 
   @@index([subcategoria, activo])

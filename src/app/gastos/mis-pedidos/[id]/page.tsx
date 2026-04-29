@@ -36,6 +36,19 @@ interface CatalogoResult {
   unidad: { nombre: string }
 }
 
+interface CatalogoEppResult {
+  id: string
+  codigo: string
+  descripcion: string
+  marca: string | null
+  modelo: string | null
+  talla: string | null
+  subcategoria: string
+  precioReferencial: number | null
+  monedaReferencial: string
+  unidad: { nombre: string }
+}
+
 // Mapea la unidad del catálogo a una de las opciones locales (case-insensitive).
 // Si no coincide, devuelve 'und' como fallback.
 const normalizarUnidad = (raw: string | undefined): string => {
@@ -61,6 +74,7 @@ interface ItemDraft {
   precioUnitarioMoneda: string
   marca: string | null
   catalogoEquipoId: string | null
+  catalogoEppId: string | null
   proyectoIdOverride: string | null
   centroCostoIdOverride: string | null
   categoriaCostoOverride: CategoriaCostoStr | null
@@ -75,6 +89,7 @@ const ITEM_VACIO: ItemDraft = {
   precioUnitarioMoneda: 'PEN',
   marca: null,
   catalogoEquipoId: null,
+  catalogoEppId: null,
   proyectoIdOverride: null,
   centroCostoIdOverride: null,
   categoriaCostoOverride: null,
@@ -123,28 +138,43 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
   const [centros, setCentros] = useState<CentroCosto[]>([])
   const [proyectos, setProyectos] = useState<ProyectoOpcion[]>([])
 
-  // Búsqueda en catálogo de equipos (typeahead dentro del modal)
+  // Búsqueda en catálogo (typeahead dentro del modal)
+  // Toggle entre catálogo de equipos y catálogo EPP
+  const [catalogoTipo, setCatalogoTipo] = useState<'equipo' | 'epp'>('equipo')
   const [catalogoQuery, setCatalogoQuery] = useState('')
   const [catalogoResults, setCatalogoResults] = useState<CatalogoResult[]>([])
+  const [catalogoEppResults, setCatalogoEppResults] = useState<CatalogoEppResult[]>([])
   const [catalogoLoading, setCatalogoLoading] = useState(false)
   const catalogoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const buscarCatalogo = async (q: string) => {
+  const buscarCatalogo = async (q: string, tipo: 'equipo' | 'epp') => {
     if (q.trim().length < 2) {
       setCatalogoResults([])
+      setCatalogoEppResults([])
       return
     }
     setCatalogoLoading(true)
     try {
-      const res = await fetch(`/api/catalogo-equipo/search?q=${encodeURIComponent(q.trim())}&limit=15`)
+      const url = tipo === 'epp'
+        ? `/api/catalogo-epp/search?q=${encodeURIComponent(q.trim())}&limit=15`
+        : `/api/catalogo-equipo/search?q=${encodeURIComponent(q.trim())}&limit=15`
+      const res = await fetch(url)
       if (res.ok) {
-        const data: CatalogoResult[] = await res.json()
-        setCatalogoResults(data)
+        const data = await res.json()
+        if (tipo === 'epp') {
+          setCatalogoEppResults(data)
+          setCatalogoResults([])
+        } else {
+          setCatalogoResults(data)
+          setCatalogoEppResults([])
+        }
       } else {
         setCatalogoResults([])
+        setCatalogoEppResults([])
       }
     } catch {
       setCatalogoResults([])
+      setCatalogoEppResults([])
     } finally {
       setCatalogoLoading(false)
     }
@@ -153,7 +183,16 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
   const handleCatalogoQuery = (val: string) => {
     setCatalogoQuery(val)
     if (catalogoTimerRef.current) clearTimeout(catalogoTimerRef.current)
-    catalogoTimerRef.current = setTimeout(() => buscarCatalogo(val), 300)
+    catalogoTimerRef.current = setTimeout(() => buscarCatalogo(val, catalogoTipo), 300)
+  }
+
+  const handleCambioTipo = (tipo: 'equipo' | 'epp') => {
+    setCatalogoTipo(tipo)
+    setCatalogoResults([])
+    setCatalogoEppResults([])
+    if (catalogoQuery.trim().length >= 2) {
+      buscarCatalogo(catalogoQuery, tipo)
+    }
   }
 
   const elegirDelCatalogo = (item: CatalogoResult) => {
@@ -165,11 +204,30 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
       unidad: normalizarUnidad(item.unidad?.nombre),
       marca: item.marca || null,
       catalogoEquipoId: item.id,
-      // Solo precargar precio si el draft no tiene uno ya escrito por el usuario
+      catalogoEppId: null, // mutuamente excluyente
       precioUnitario: d.precioUnitario > 0 ? d.precioUnitario : precioRef,
     }))
     setCatalogoQuery('')
     setCatalogoResults([])
+    setCatalogoEppResults([])
+  }
+
+  const elegirDelCatalogoEpp = (item: CatalogoEppResult) => {
+    const precioRef = item.precioReferencial ?? 0
+    setDraft(d => ({
+      ...d,
+      codigo: item.codigo,
+      descripcion: item.descripcion + (item.talla ? ` (talla ${item.talla})` : ''),
+      unidad: normalizarUnidad(item.unidad?.nombre),
+      marca: item.marca || null,
+      catalogoEppId: item.id,
+      catalogoEquipoId: null, // mutuamente excluyente
+      precioUnitario: d.precioUnitario > 0 ? d.precioUnitario : precioRef,
+      precioUnitarioMoneda: item.monedaReferencial || d.precioUnitarioMoneda,
+    }))
+    setCatalogoQuery('')
+    setCatalogoResults([])
+    setCatalogoEppResults([])
   }
 
   useEffect(() => {
@@ -197,6 +255,8 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
     setEditingItem(null)
     setCatalogoQuery('')
     setCatalogoResults([])
+    setCatalogoEppResults([])
+    setCatalogoTipo('equipo')
     setModalOpen(true)
     setTimeout(() => descripcionRef.current?.focus(), 100)
   }
@@ -210,7 +270,8 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
       precioUnitario: item.precioUnitario ?? 0,
       precioUnitarioMoneda: item.precioUnitarioMoneda || 'PEN',
       marca: null,
-      catalogoEquipoId: null,
+      catalogoEquipoId: item.catalogoEquipoId ?? null,
+      catalogoEppId: item.catalogoEppId ?? null,
       proyectoIdOverride: item.proyectoId ?? null,
       centroCostoIdOverride: item.centroCostoId ?? null,
       categoriaCostoOverride: (item.categoriaCosto as CategoriaCostoStr | null | undefined) ?? null,
@@ -218,6 +279,8 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
     setEditingItem(item)
     setCatalogoQuery('')
     setCatalogoResults([])
+    setCatalogoEppResults([])
+    setCatalogoTipo(item.catalogoEppId ? 'epp' : 'equipo')
     setModalOpen(true)
     setTimeout(() => descripcionRef.current?.focus(), 100)
   }
@@ -291,6 +354,7 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
             costoTotal: draft.precioUnitario ? draft.cantidadPedida * draft.precioUnitario : null,
             marca: draft.marca,
             catalogoEquipoId: draft.catalogoEquipoId,
+            catalogoEppId: draft.catalogoEppId,
             proyectoId: draft.proyectoIdOverride,
             centroCostoId: draft.centroCostoIdOverride,
             categoriaCosto: draft.categoriaCostoOverride,
@@ -313,6 +377,8 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
             precioUnitarioMoneda: created.precioUnitarioMoneda,
             costoTotal: created.costoTotal,
             estado: created.estado,
+            catalogoEquipoId: created.catalogoEquipoId ?? null,
+            catalogoEppId: created.catalogoEppId ?? null,
             proyectoId: created.proyectoId ?? null,
             centroCostoId: created.centroCostoId ?? null,
             categoriaCosto: created.categoriaCosto ?? null,
@@ -652,15 +718,33 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
             {/* 🔍 Buscar en catálogo (solo al crear, edición ya tiene los datos) */}
             {!editingItem && (
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">
-                  Buscar en catálogo <span className="text-[10px]">(opcional)</span>
-                </Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs text-muted-foreground">
+                    Buscar en catálogo <span className="text-[10px]">(opcional)</span>
+                  </Label>
+                  <div className="inline-flex border rounded overflow-hidden text-[10px]">
+                    <button
+                      type="button"
+                      onClick={() => handleCambioTipo('equipo')}
+                      className={`px-2 py-0.5 ${catalogoTipo === 'equipo' ? 'bg-blue-600 text-white' : 'bg-background hover:bg-muted/40'}`}
+                    >
+                      Equipos
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleCambioTipo('epp')}
+                      className={`px-2 py-0.5 border-l ${catalogoTipo === 'epp' ? 'bg-orange-600 text-white' : 'bg-background hover:bg-muted/40'}`}
+                    >
+                      EPPs
+                    </button>
+                  </div>
+                </div>
                 <div className="relative">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                   <Input
                     value={catalogoQuery}
                     onChange={e => handleCatalogoQuery(e.target.value)}
-                    placeholder="Código o descripción (mín. 2 caracteres)"
+                    placeholder={catalogoTipo === 'epp' ? 'Código, descripción o marca de EPP (mín. 2)' : 'Código o descripción (mín. 2 caracteres)'}
                     className="h-8 text-sm pl-8"
                   />
                   {catalogoLoading && (
@@ -669,32 +753,60 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
                 </div>
                 {catalogoQuery.trim().length >= 2 && !catalogoLoading && (
                   <div className="border rounded-md max-h-44 overflow-auto bg-background shadow-sm">
-                    {catalogoResults.length === 0 ? (
-                      <div className="px-3 py-2 text-xs text-muted-foreground">
-                        Sin resultados — puedes escribirlo manualmente abajo
-                      </div>
+                    {catalogoTipo === 'equipo' ? (
+                      catalogoResults.length === 0 ? (
+                        <div className="px-3 py-2 text-xs text-muted-foreground">
+                          Sin resultados — puedes escribirlo manualmente abajo
+                        </div>
+                      ) : (
+                        catalogoResults.map(c => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => elegirDelCatalogo(c)}
+                            className="w-full text-left px-3 py-1.5 hover:bg-muted/60 border-b last:border-b-0 text-xs"
+                          >
+                            <div className="font-medium truncate">{c.descripcion}</div>
+                            <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-mono">
+                              <span>{c.codigo}</span>
+                              {c.marca && <span>· {c.marca}</span>}
+                              <span>· {c.unidad?.nombre}</span>
+                            </div>
+                          </button>
+                        ))
+                      )
                     ) : (
-                      catalogoResults.map(c => (
-                        <button
-                          key={c.id}
-                          type="button"
-                          onClick={() => elegirDelCatalogo(c)}
-                          className="w-full text-left px-3 py-1.5 hover:bg-muted/60 border-b last:border-b-0 text-xs"
-                        >
-                          <div className="font-medium truncate">{c.descripcion}</div>
-                          <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-mono">
-                            <span>{c.codigo}</span>
-                            {c.marca && <span>· {c.marca}</span>}
-                            <span>· {c.unidad?.nombre}</span>
-                          </div>
-                        </button>
-                      ))
+                      catalogoEppResults.length === 0 ? (
+                        <div className="px-3 py-2 text-xs text-muted-foreground">
+                          Sin EPPs encontrados
+                        </div>
+                      ) : (
+                        catalogoEppResults.map(c => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => elegirDelCatalogoEpp(c)}
+                            className="w-full text-left px-3 py-1.5 hover:bg-muted/60 border-b last:border-b-0 text-xs"
+                          >
+                            <div className="font-medium truncate flex items-center gap-2">
+                              <span>{c.descripcion}</span>
+                              {c.talla && <span className="text-[10px] font-mono bg-muted px-1 rounded">talla {c.talla}</span>}
+                            </div>
+                            <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-mono">
+                              <span>{c.codigo}</span>
+                              {c.marca && <span>· {c.marca}</span>}
+                              <span>· {c.subcategoria}</span>
+                              <span>· {c.unidad?.nombre}</span>
+                            </div>
+                          </button>
+                        ))
+                      )
                     )}
                   </div>
                 )}
-                {draft.catalogoEquipoId && (
+                {(draft.catalogoEquipoId || draft.catalogoEppId) && (
                   <p className="text-[10px] text-emerald-700">
-                    ✓ Item del catálogo cargado{draft.marca ? ` · ${draft.marca}` : ''}
+                    ✓ {draft.catalogoEppId ? 'EPP' : 'Item'} del catálogo cargado{draft.marca ? ` · ${draft.marca}` : ''}
                   </p>
                 )}
               </div>
@@ -705,7 +817,7 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
               <Input
                 ref={descripcionRef}
                 value={draft.descripcion}
-                onChange={e => setDraft(d => ({ ...d, descripcion: e.target.value, catalogoEquipoId: null }))}
+                onChange={e => setDraft(d => ({ ...d, descripcion: e.target.value, catalogoEquipoId: null, catalogoEppId: null }))}
                 placeholder="Ej: Casco de seguridad tipo I"
                 className="h-8 text-sm"
               />
