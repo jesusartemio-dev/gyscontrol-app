@@ -241,6 +241,32 @@ function NuevaOrdenCompraContent() {
 
   const addSelectedItems = () => {
     const toAdd = pedidoItemsDisp.filter(i => selectedIds.has(i.id))
+
+    // Validación de moneda: detectar las monedas únicas de los items con precio
+    const monedasItems = new Set(
+      toAdd
+        .filter(i => i.precioUnitario > 0 && i.precioMoneda)
+        .map(i => i.precioMoneda as string)
+    )
+
+    if (monedasItems.size > 1) {
+      toast.error(`No se pueden mezclar items en distintas monedas (${Array.from(monedasItems).join(', ')}). Crea una OC por cada moneda.`)
+      return
+    }
+
+    // Si los items tienen una moneda única y es distinta a la actual de la OC, alertar y auto-cambiar
+    const monedaItems = monedasItems.size === 1 ? Array.from(monedasItems)[0] : null
+    if (monedaItems && monedaItems !== moneda) {
+      const yaHayItemsEnOC = items.length > 0
+      if (yaHayItemsEnOC) {
+        toast.error(`Estos items están en ${monedaItems} pero la OC actual está en ${moneda}. Vacía la OC o crea otra para mezclar monedas.`)
+        return
+      }
+      // OC vacía → cambiar la moneda automáticamente
+      setMoneda(monedaItems)
+      toast.info(`Moneda de la OC cambiada a ${monedaItems} para coincidir con los items.`)
+    }
+
     const newItems: ItemForm[] = toAdd.map(i => {
       const cantidadEditada = cantidadesAcomprar[i.id]
       const cantidadFinal = cantidadEditada && cantidadEditada > 0 && cantidadEditada <= i.cantidad
@@ -863,8 +889,15 @@ function NuevaOrdenCompraContent() {
                                   </div>
                                   <div className="col-span-4 sm:col-span-1 text-right">
                                     <Label className="text-[10px] text-muted-foreground">P.Unit.</Label>
-                                    <p className="text-xs font-mono">
-                                      {item.precioUnitario > 0 ? item.precioUnitario.toFixed(2) : '—'}
+                                    <p className={`text-xs font-mono ${item.precioMoneda && item.precioMoneda !== moneda ? 'text-amber-700 font-semibold' : ''}`}>
+                                      {item.precioUnitario > 0 ? (
+                                        <>
+                                          {item.precioMoneda && (
+                                            <span className="text-[9px] mr-0.5">{item.precioMoneda === 'USD' ? '$' : 'S/'}</span>
+                                          )}
+                                          {item.precioUnitario.toFixed(2)}
+                                        </>
+                                      ) : '—'}
                                     </p>
                                   </div>
                                 </div>

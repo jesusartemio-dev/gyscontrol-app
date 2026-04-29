@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { ArrowLeft, Plus, Trash2, Pencil, ShoppingCart, Loader2, AlertTriangle, Package, ArrowRightLeft } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Pencil, ShoppingCart, Loader2, AlertTriangle, Package, ArrowRightLeft, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { createPedidoInterno } from '@/lib/services/pedidoInterno'
 import { getCentrosCosto } from '@/lib/services/centroCosto'
@@ -31,6 +31,9 @@ interface ItemLibre {
   unidad: string
   cantidadPedida: number
   precioUnitario: number
+  precioUnitarioMoneda: string
+  marca: string | null
+  catalogoEquipoId: string | null
   // Override de imputación (mutuamente excluyentes)
   proyectoIdOverride: string | null
   centroCostoIdOverride: string | null
@@ -44,14 +47,39 @@ const ITEM_VACIO: ItemLibre = {
   unidad: 'und',
   cantidadPedida: 1,
   precioUnitario: 0,
+  precioUnitarioMoneda: 'PEN',
+  marca: null,
+  catalogoEquipoId: null,
   proyectoIdOverride: null,
   centroCostoIdOverride: null,
   categoriaCostoOverride: null,
 }
 const UNIDADES = ['und', 'par', 'm', 'm²', 'm³', 'kg', 'lt', 'caja', 'bolsa', 'rollo', 'juego', 'set']
 
-const formatCurrency = (amount: number) =>
-  new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' }).format(amount)
+const MONEDAS = [
+  { value: 'PEN', label: 'S/' },
+  { value: 'USD', label: 'US$' },
+]
+
+interface CatalogoResult {
+  id: string
+  codigo: string
+  descripcion: string
+  marca: string
+  precioLogistica: number | null
+  precioReal: number | null
+  precioInterno: number
+  unidad: { nombre: string }
+}
+
+const normalizarUnidad = (raw: string | undefined): string => {
+  if (!raw) return 'und'
+  const lower = raw.toLowerCase().trim()
+  return UNIDADES.find(u => u.toLowerCase() === lower) ?? 'und'
+}
+
+const formatCurrency = (amount: number, moneda: string = 'PEN') =>
+  new Intl.NumberFormat('es-PE', { style: 'currency', currency: moneda }).format(amount)
 
 export default function NuevoPedidoInternoPage() {
   const router = useRouter()
@@ -77,6 +105,54 @@ export default function NuevoPedidoInternoPage() {
   const [draft, setDraft] = useState<ItemLibre>({ ...ITEM_VACIO })
   const descripcionRef = useRef<HTMLInputElement>(null)
 
+  // Búsqueda en catálogo de equipos (typeahead dentro del modal)
+  const [catalogoQuery, setCatalogoQuery] = useState('')
+  const [catalogoResults, setCatalogoResults] = useState<CatalogoResult[]>([])
+  const [catalogoLoading, setCatalogoLoading] = useState(false)
+  const catalogoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const buscarCatalogo = async (q: string) => {
+    if (q.trim().length < 2) {
+      setCatalogoResults([])
+      return
+    }
+    setCatalogoLoading(true)
+    try {
+      const res = await fetch(`/api/catalogo-equipo/search?q=${encodeURIComponent(q.trim())}&limit=15`)
+      if (res.ok) {
+        const data: CatalogoResult[] = await res.json()
+        setCatalogoResults(data)
+      } else {
+        setCatalogoResults([])
+      }
+    } catch {
+      setCatalogoResults([])
+    } finally {
+      setCatalogoLoading(false)
+    }
+  }
+
+  const handleCatalogoQuery = (val: string) => {
+    setCatalogoQuery(val)
+    if (catalogoTimerRef.current) clearTimeout(catalogoTimerRef.current)
+    catalogoTimerRef.current = setTimeout(() => buscarCatalogo(val), 300)
+  }
+
+  const elegirDelCatalogo = (item: CatalogoResult) => {
+    const precioRef = item.precioLogistica ?? item.precioReal ?? item.precioInterno ?? 0
+    setDraft(d => ({
+      ...d,
+      codigo: item.codigo,
+      descripcion: item.descripcion,
+      unidad: normalizarUnidad(item.unidad?.nombre),
+      marca: item.marca || null,
+      catalogoEquipoId: item.id,
+      precioUnitario: d.precioUnitario > 0 ? d.precioUnitario : precioRef,
+    }))
+    setCatalogoQuery('')
+    setCatalogoResults([])
+  }
+
   useEffect(() => {
     getCentrosCosto({ activo: true })
       .then(setCentros)
@@ -93,6 +169,8 @@ export default function NuevoPedidoInternoPage() {
   const openAddModal = () => {
     setDraft({ ...ITEM_VACIO })
     setEditIndex(null)
+    setCatalogoQuery('')
+    setCatalogoResults([])
     setModalOpen(true)
     setTimeout(() => descripcionRef.current?.focus(), 100)
   }
@@ -100,6 +178,8 @@ export default function NuevoPedidoInternoPage() {
   const openEditModal = (index: number) => {
     setDraft({ ...items[index] })
     setEditIndex(index)
+    setCatalogoQuery('')
+    setCatalogoResults([])
     setModalOpen(true)
     setTimeout(() => descripcionRef.current?.focus(), 100)
   }
@@ -127,6 +207,15 @@ export default function NuevoPedidoInternoPage() {
 
   const totalPresupuesto = items.reduce((sum, item) => sum + item.cantidadPedida * item.precioUnitario, 0)
 
+  // Totales agrupados por moneda — un pedido puede mezclar PEN y USD por ítem.
+  const totalesPorMoneda = items.reduce<Record<string, number>>((acc, item) => {
+    const monto = item.cantidadPedida * item.precioUnitario
+    if (!monto) return acc
+    const m = item.precioUnitarioMoneda || 'PEN'
+    acc[m] = (acc[m] ?? 0) + monto
+    return acc
+  }, {})
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!centroCostoId) return toast.error('Selecciona un centro de costo')
@@ -149,6 +238,9 @@ export default function NuevoPedidoInternoPage() {
           unidad: item.unidad,
           cantidadPedida: item.cantidadPedida,
           precioUnitario: item.precioUnitario || undefined,
+          precioUnitarioMoneda: item.precioUnitario ? item.precioUnitarioMoneda : null,
+          marca: item.marca,
+          catalogoEquipoId: item.catalogoEquipoId,
           proyectoId: item.proyectoIdOverride,
           centroCostoId: item.centroCostoIdOverride,
           categoriaCosto: item.categoriaCostoOverride,
@@ -337,11 +429,11 @@ export default function NuevoPedidoInternoPage() {
                         <TableCell className="text-center text-sm">{item.cantidadPedida}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{item.unidad}</TableCell>
                         <TableCell className="text-right font-mono text-sm">
-                          {item.precioUnitario > 0 ? formatCurrency(item.precioUnitario) : '—'}
+                          {item.precioUnitario > 0 ? formatCurrency(item.precioUnitario, item.precioUnitarioMoneda) : '—'}
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm font-medium">
                           {item.precioUnitario > 0
-                            ? formatCurrency(item.cantidadPedida * item.precioUnitario)
+                            ? formatCurrency(item.cantidadPedida * item.precioUnitario, item.precioUnitarioMoneda)
                             : '—'}
                         </TableCell>
                         <TableCell>
@@ -367,10 +459,15 @@ export default function NuevoPedidoInternoPage() {
                   </TableBody>
                 </Table>
 
-                {totalPresupuesto > 0 && (
+                {Object.keys(totalesPorMoneda).length > 0 && (
                   <div className="flex justify-end px-4 py-3 border-t">
-                    <span className="text-sm font-semibold">
-                      Total estimado: <span className="text-blue-700">{formatCurrency(totalPresupuesto)}</span>
+                    <span className="text-sm font-semibold flex items-center gap-3">
+                      <span>Total estimado:</span>
+                      {Object.entries(totalesPorMoneda).map(([moneda, monto]) => (
+                        <span key={moneda} className="text-blue-700">
+                          {formatCurrency(monto, moneda)}
+                        </span>
+                      ))}
                     </span>
                   </div>
                 )}
@@ -399,6 +496,57 @@ export default function NuevoPedidoInternoPage() {
           </DialogHeader>
 
           <div className="space-y-4 py-2">
+            {/* 🔍 Buscar en catálogo (solo al crear) */}
+            {editIndex === null && (
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">
+                  Buscar en catálogo <span className="text-[10px]">(opcional)</span>
+                </Label>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    value={catalogoQuery}
+                    onChange={e => handleCatalogoQuery(e.target.value)}
+                    placeholder="Código o descripción (mín. 2 caracteres)"
+                    className="pl-8"
+                  />
+                  {catalogoLoading && (
+                    <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                  )}
+                </div>
+                {catalogoQuery.trim().length >= 2 && !catalogoLoading && (
+                  <div className="border rounded-md max-h-44 overflow-auto bg-background shadow-sm">
+                    {catalogoResults.length === 0 ? (
+                      <div className="px-3 py-2 text-xs text-muted-foreground">
+                        Sin resultados — puedes escribirlo manualmente abajo
+                      </div>
+                    ) : (
+                      catalogoResults.map(c => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => elegirDelCatalogo(c)}
+                          className="w-full text-left px-3 py-1.5 hover:bg-muted/60 border-b last:border-b-0 text-xs"
+                        >
+                          <div className="font-medium truncate">{c.descripcion}</div>
+                          <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-mono">
+                            <span>{c.codigo}</span>
+                            {c.marca && <span>· {c.marca}</span>}
+                            <span>· {c.unidad?.nombre}</span>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+                {draft.catalogoEquipoId && (
+                  <p className="text-[10px] text-emerald-700">
+                    ✓ Item del catálogo cargado{draft.marca ? ` · ${draft.marca}` : ''}
+                  </p>
+                )}
+              </div>
+            )}
+
             <div className="space-y-1.5">
               <Label htmlFor="draft-descripcion">Descripción *</Label>
               <Input
@@ -406,7 +554,7 @@ export default function NuevoPedidoInternoPage() {
                 ref={descripcionRef}
                 placeholder="Ej: Casco de seguridad, Papel bond A4..."
                 value={draft.descripcion}
-                onChange={e => setDraft(d => ({ ...d, descripcion: e.target.value }))}
+                onChange={e => setDraft(d => ({ ...d, descripcion: e.target.value, catalogoEquipoId: null }))}
                 onKeyDown={e => e.key === 'Enter' && e.preventDefault()}
               />
             </div>
@@ -451,23 +599,47 @@ export default function NuevoPedidoInternoPage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="draft-precio">Precio estimado (S/)</Label>
-                <Input
-                  id="draft-precio"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={draft.precioUnitario || ''}
-                  placeholder="0.00"
-                  onChange={e => setDraft(d => ({ ...d, precioUnitario: parseFloat(e.target.value) || 0 }))}
-                  onKeyDown={e => e.key === 'Enter' && e.preventDefault()}
-                />
+                <Label htmlFor="draft-precio">
+                  Precio estimado <span className="text-[10px] text-muted-foreground">(opcional)</span>
+                </Label>
+                <div className="grid grid-cols-[80px_1fr] gap-2">
+                  <Select
+                    value={draft.precioUnitarioMoneda}
+                    onValueChange={v => setDraft(d => ({ ...d, precioUnitarioMoneda: v }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MONEDAS.map(m => (
+                        <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    id="draft-precio"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={draft.precioUnitario || ''}
+                    placeholder="0.00"
+                    onChange={e => setDraft(d => ({ ...d, precioUnitario: parseFloat(e.target.value) || 0 }))}
+                    onKeyDown={e => e.key === 'Enter' && e.preventDefault()}
+                  />
+                </div>
               </div>
             </div>
 
+            <p className="text-[10px] text-muted-foreground -mt-2">
+              Si no conoces el precio, déjalo en 0; logística lo completa al cotizar.
+            </p>
+
             {draft.cantidadPedida > 0 && draft.precioUnitario > 0 && (
               <p className="text-sm text-right text-muted-foreground">
-                Subtotal: <span className="font-semibold text-gray-800">{formatCurrency(draft.cantidadPedida * draft.precioUnitario)}</span>
+                Subtotal:{' '}
+                <span className="font-semibold text-gray-800">
+                  {formatCurrency(draft.cantidadPedida * draft.precioUnitario, draft.precioUnitarioMoneda)}
+                </span>
               </p>
             )}
 

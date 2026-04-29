@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { ArrowLeft, Loader2, Building2, Calendar, User, AlertTriangle, Package, Plus, Pencil, Trash2, ArrowRightLeft, Send } from 'lucide-react'
+import { ArrowLeft, Loader2, Building2, Calendar, User, AlertTriangle, Package, Plus, Pencil, Trash2, ArrowRightLeft, Send, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { getPedidoInternoById, deletePedidoInterno, type PedidoInterno, type PedidoInternoItem } from '@/lib/services/pedidoInterno'
 import { getCentrosCosto } from '@/lib/services/centroCosto'
@@ -19,6 +19,30 @@ import type { CentroCosto } from '@/types'
 import PedidoEstadoFlujoBanner from '@/components/equipos/PedidoEstadoFlujoBanner'
 
 const UNIDADES = ['und', 'par', 'm', 'm²', 'm³', 'kg', 'lt', 'caja', 'bolsa', 'rollo', 'juego', 'set']
+
+const MONEDAS = [
+  { value: 'PEN', label: 'S/' },
+  { value: 'USD', label: 'US$' },
+]
+
+interface CatalogoResult {
+  id: string
+  codigo: string
+  descripcion: string
+  marca: string
+  precioLogistica: number | null
+  precioReal: number | null
+  precioInterno: number
+  unidad: { nombre: string }
+}
+
+// Mapea la unidad del catálogo a una de las opciones locales (case-insensitive).
+// Si no coincide, devuelve 'und' como fallback.
+const normalizarUnidad = (raw: string | undefined): string => {
+  if (!raw) return 'und'
+  const lower = raw.toLowerCase().trim()
+  return UNIDADES.find(u => u.toLowerCase() === lower) ?? 'und'
+}
 
 interface ProyectoOpcion {
   id: string
@@ -34,6 +58,9 @@ interface ItemDraft {
   unidad: string
   cantidadPedida: number
   precioUnitario: number
+  precioUnitarioMoneda: string
+  marca: string | null
+  catalogoEquipoId: string | null
   proyectoIdOverride: string | null
   centroCostoIdOverride: string | null
   categoriaCostoOverride: CategoriaCostoStr | null
@@ -45,13 +72,16 @@ const ITEM_VACIO: ItemDraft = {
   unidad: 'und',
   cantidadPedida: 1,
   precioUnitario: 0,
+  precioUnitarioMoneda: 'PEN',
+  marca: null,
+  catalogoEquipoId: null,
   proyectoIdOverride: null,
   centroCostoIdOverride: null,
   categoriaCostoOverride: null,
 }
 
-const formatCurrency = (amount: number) =>
-  new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' }).format(amount)
+const formatCurrency = (amount: number, moneda: string = 'PEN') =>
+  new Intl.NumberFormat('es-PE', { style: 'currency', currency: moneda }).format(amount)
 
 const formatDate = (date: string) =>
   new Date(date).toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' })
@@ -93,6 +123,55 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
   const [centros, setCentros] = useState<CentroCosto[]>([])
   const [proyectos, setProyectos] = useState<ProyectoOpcion[]>([])
 
+  // Búsqueda en catálogo de equipos (typeahead dentro del modal)
+  const [catalogoQuery, setCatalogoQuery] = useState('')
+  const [catalogoResults, setCatalogoResults] = useState<CatalogoResult[]>([])
+  const [catalogoLoading, setCatalogoLoading] = useState(false)
+  const catalogoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const buscarCatalogo = async (q: string) => {
+    if (q.trim().length < 2) {
+      setCatalogoResults([])
+      return
+    }
+    setCatalogoLoading(true)
+    try {
+      const res = await fetch(`/api/catalogo-equipo/search?q=${encodeURIComponent(q.trim())}&limit=15`)
+      if (res.ok) {
+        const data: CatalogoResult[] = await res.json()
+        setCatalogoResults(data)
+      } else {
+        setCatalogoResults([])
+      }
+    } catch {
+      setCatalogoResults([])
+    } finally {
+      setCatalogoLoading(false)
+    }
+  }
+
+  const handleCatalogoQuery = (val: string) => {
+    setCatalogoQuery(val)
+    if (catalogoTimerRef.current) clearTimeout(catalogoTimerRef.current)
+    catalogoTimerRef.current = setTimeout(() => buscarCatalogo(val), 300)
+  }
+
+  const elegirDelCatalogo = (item: CatalogoResult) => {
+    const precioRef = item.precioLogistica ?? item.precioReal ?? item.precioInterno ?? 0
+    setDraft(d => ({
+      ...d,
+      codigo: item.codigo,
+      descripcion: item.descripcion,
+      unidad: normalizarUnidad(item.unidad?.nombre),
+      marca: item.marca || null,
+      catalogoEquipoId: item.id,
+      // Solo precargar precio si el draft no tiene uno ya escrito por el usuario
+      precioUnitario: d.precioUnitario > 0 ? d.precioUnitario : precioRef,
+    }))
+    setCatalogoQuery('')
+    setCatalogoResults([])
+  }
+
   useEffect(() => {
     getPedidoInternoById(id)
       .then(setPedido)
@@ -116,6 +195,8 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
   const openAddModal = () => {
     setDraft({ ...ITEM_VACIO })
     setEditingItem(null)
+    setCatalogoQuery('')
+    setCatalogoResults([])
     setModalOpen(true)
     setTimeout(() => descripcionRef.current?.focus(), 100)
   }
@@ -127,11 +208,16 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
       unidad: item.unidad,
       cantidadPedida: item.cantidadPedida,
       precioUnitario: item.precioUnitario ?? 0,
+      precioUnitarioMoneda: item.precioUnitarioMoneda || 'PEN',
+      marca: null,
+      catalogoEquipoId: null,
       proyectoIdOverride: item.proyectoId ?? null,
       centroCostoIdOverride: item.centroCostoId ?? null,
       categoriaCostoOverride: (item.categoriaCosto as CategoriaCostoStr | null | undefined) ?? null,
     })
     setEditingItem(item)
+    setCatalogoQuery('')
+    setCatalogoResults([])
     setModalOpen(true)
     setTimeout(() => descripcionRef.current?.focus(), 100)
   }
@@ -158,6 +244,7 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
             unidad: draft.unidad,
             cantidadPedida: draft.cantidadPedida,
             precioUnitario: draft.precioUnitario || null,
+            precioUnitarioMoneda: draft.precioUnitario ? draft.precioUnitarioMoneda : null,
             costoTotal: draft.precioUnitario ? draft.cantidadPedida * draft.precioUnitario : null,
             proyectoId: draft.proyectoIdOverride,
             centroCostoId: draft.centroCostoIdOverride,
@@ -179,6 +266,7 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
               unidad: updated.unidad,
               cantidadPedida: updated.cantidadPedida,
               precioUnitario: updated.precioUnitario,
+              precioUnitarioMoneda: updated.precioUnitarioMoneda,
               costoTotal: updated.costoTotal,
               proyectoId: updated.proyectoId ?? null,
               centroCostoId: updated.centroCostoId ?? null,
@@ -199,7 +287,10 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
             unidad: draft.unidad,
             cantidadPedida: draft.cantidadPedida,
             precioUnitario: draft.precioUnitario || null,
+            precioUnitarioMoneda: draft.precioUnitario ? draft.precioUnitarioMoneda : null,
             costoTotal: draft.precioUnitario ? draft.cantidadPedida * draft.precioUnitario : null,
+            marca: draft.marca,
+            catalogoEquipoId: draft.catalogoEquipoId,
             proyectoId: draft.proyectoIdOverride,
             centroCostoId: draft.centroCostoIdOverride,
             categoriaCosto: draft.categoriaCostoOverride,
@@ -219,6 +310,7 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
             unidad: created.unidad,
             cantidadPedida: created.cantidadPedida,
             precioUnitario: created.precioUnitario,
+            precioUnitarioMoneda: created.precioUnitarioMoneda,
             costoTotal: created.costoTotal,
             estado: created.estado,
             proyectoId: created.proyectoId ?? null,
@@ -293,6 +385,18 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
   const totalPresupuesto = pedido.pedidoEquipoItem?.reduce(
     (sum, item) => sum + (item.costoTotal ?? 0), 0
   ) ?? 0
+
+  // Totales agrupados por moneda — un pedido interno puede tener items en PEN y USD.
+  const totalesPorMoneda = (pedido.pedidoEquipoItem ?? []).reduce<Record<string, number>>(
+    (acc, item) => {
+      const monto = item.costoTotal ?? 0
+      if (!monto) return acc
+      const m = item.precioUnitarioMoneda || 'PEN'
+      acc[m] = (acc[m] ?? 0) + monto
+      return acc
+    },
+    {}
+  )
 
   return (
     <div className="container mx-auto p-4 sm:p-6 space-y-4 max-w-3xl">
@@ -479,10 +583,10 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
                     <TableCell className="text-center text-sm">{item.cantidadPedida}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{item.unidad}</TableCell>
                     <TableCell className="text-right font-mono text-sm">
-                      {item.precioUnitario ? formatCurrency(item.precioUnitario) : '—'}
+                      {item.precioUnitario ? formatCurrency(item.precioUnitario, item.precioUnitarioMoneda || 'PEN') : '—'}
                     </TableCell>
                     <TableCell className="text-right font-mono text-sm font-medium">
-                      {item.costoTotal ? formatCurrency(item.costoTotal) : '—'}
+                      {item.costoTotal ? formatCurrency(item.costoTotal, item.precioUnitarioMoneda || 'PEN') : '—'}
                     </TableCell>
                     {esBorrador && (
                       <TableCell>
@@ -516,10 +620,15 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
             </Table>
           )}
 
-          {totalPresupuesto > 0 && (
-            <div className="flex justify-end px-4 py-3 border-t">
-              <span className="text-sm font-semibold">
-                Total: <span className="text-blue-700">{formatCurrency(totalPresupuesto)}</span>
+          {Object.keys(totalesPorMoneda).length > 0 && (
+            <div className="flex justify-end px-4 py-3 border-t gap-4">
+              <span className="text-sm font-semibold flex items-center gap-3">
+                <span>Total:</span>
+                {Object.entries(totalesPorMoneda).map(([moneda, monto]) => (
+                  <span key={moneda} className="text-blue-700">
+                    {formatCurrency(monto, moneda)}
+                  </span>
+                ))}
               </span>
             </div>
           )}
@@ -540,12 +649,63 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
+            {/* 🔍 Buscar en catálogo (solo al crear, edición ya tiene los datos) */}
+            {!editingItem && (
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">
+                  Buscar en catálogo <span className="text-[10px]">(opcional)</span>
+                </Label>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    value={catalogoQuery}
+                    onChange={e => handleCatalogoQuery(e.target.value)}
+                    placeholder="Código o descripción (mín. 2 caracteres)"
+                    className="h-8 text-sm pl-8"
+                  />
+                  {catalogoLoading && (
+                    <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                  )}
+                </div>
+                {catalogoQuery.trim().length >= 2 && !catalogoLoading && (
+                  <div className="border rounded-md max-h-44 overflow-auto bg-background shadow-sm">
+                    {catalogoResults.length === 0 ? (
+                      <div className="px-3 py-2 text-xs text-muted-foreground">
+                        Sin resultados — puedes escribirlo manualmente abajo
+                      </div>
+                    ) : (
+                      catalogoResults.map(c => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => elegirDelCatalogo(c)}
+                          className="w-full text-left px-3 py-1.5 hover:bg-muted/60 border-b last:border-b-0 text-xs"
+                        >
+                          <div className="font-medium truncate">{c.descripcion}</div>
+                          <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-mono">
+                            <span>{c.codigo}</span>
+                            {c.marca && <span>· {c.marca}</span>}
+                            <span>· {c.unidad?.nombre}</span>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+                {draft.catalogoEquipoId && (
+                  <p className="text-[10px] text-emerald-700">
+                    ✓ Item del catálogo cargado{draft.marca ? ` · ${draft.marca}` : ''}
+                  </p>
+                )}
+              </div>
+            )}
+
             <div className="space-y-1">
               <Label className="text-xs">Descripción <span className="text-red-500">*</span></Label>
               <Input
                 ref={descripcionRef}
                 value={draft.descripcion}
-                onChange={e => setDraft(d => ({ ...d, descripcion: e.target.value }))}
+                onChange={e => setDraft(d => ({ ...d, descripcion: e.target.value, catalogoEquipoId: null }))}
                 placeholder="Ej: Casco de seguridad tipo I"
                 className="h-8 text-sm"
               />
@@ -585,20 +745,43 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
               </div>
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Precio estimado (S/)</Label>
-              <Input
-                type="number"
-                min={0}
-                step={0.01}
-                value={draft.precioUnitario || ''}
-                onChange={e => setDraft(d => ({ ...d, precioUnitario: Number(e.target.value) }))}
-                placeholder="0.00"
-                className="h-8 text-sm"
-              />
+              <Label className="text-xs">
+                Precio estimado <span className="text-[10px] text-muted-foreground">(opcional)</span>
+              </Label>
+              <div className="grid grid-cols-[80px_1fr] gap-2">
+                <Select
+                  value={draft.precioUnitarioMoneda}
+                  onValueChange={v => setDraft(d => ({ ...d, precioUnitarioMoneda: v }))}
+                >
+                  <SelectTrigger className="h-8 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MONEDAS.map(m => (
+                      <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  value={draft.precioUnitario || ''}
+                  onChange={e => setDraft(d => ({ ...d, precioUnitario: Number(e.target.value) }))}
+                  placeholder="0.00"
+                  className="h-8 text-sm"
+                />
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Si no conoces el precio, déjalo en 0; logística lo completa al cotizar.
+              </p>
             </div>
             {draft.precioUnitario > 0 && draft.cantidadPedida > 0 && (
               <p className="text-xs text-right text-muted-foreground">
-                Total estimado: <span className="font-semibold text-foreground">{formatCurrency(draft.cantidadPedida * draft.precioUnitario)}</span>
+                Total estimado:{' '}
+                <span className="font-semibold text-foreground">
+                  {formatCurrency(draft.cantidadPedida * draft.precioUnitario, draft.precioUnitarioMoneda)}
+                </span>
               </p>
             )}
 

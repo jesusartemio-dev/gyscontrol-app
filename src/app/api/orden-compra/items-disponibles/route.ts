@@ -68,6 +68,7 @@ export async function GET(req: Request) {
         unidad: true,
         cantidadPedida: true,
         precioUnitario: true,
+        precioUnitarioMoneda: true,
         proveedorId: true,
         proveedorNombre: true,
         listaEquipoItemId: true,
@@ -106,6 +107,7 @@ export async function GET(req: Request) {
           unidad: item.unidad,
           cantidad: item.cantidadRestante,
           precioUnitario: item.precioUnitario || 0,
+          precioMoneda: item.precioUnitarioMoneda || null,
           proveedorId: proveedorEfectivoId,
           proveedorNombre: proveedorEfectivoNombre,
           // Indica si el item viene sin proveedor asignado (se confirmará al guardar)

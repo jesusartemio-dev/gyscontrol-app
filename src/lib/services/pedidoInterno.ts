@@ -31,6 +31,7 @@ export interface PedidoInternoItem {
   unidad: string
   cantidadPedida: number
   precioUnitario?: number
+  precioUnitarioMoneda?: string | null
   costoTotal?: number
   estado: string
   // Override de imputación (ambos null = hereda del pedido)

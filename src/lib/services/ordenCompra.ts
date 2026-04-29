@@ -129,6 +129,7 @@ export interface ItemDisponible {
   unidad: string
   cantidad: number
   precioUnitario: number
+  precioMoneda?: string | null  // 'PEN' | 'USD' — moneda original del precio del item del pedido
   proveedorId: string | null
   proveedorNombre: string | null
   sinProveedorAsignado?: boolean

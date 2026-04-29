@@ -143,9 +143,10 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
        where: { id }, 
        data: { 
          cantidadPedida: body.cantidadPedida, 
-         cantidadAtendida: body.cantidadAtendida, 
-         precioUnitario: body.precioUnitario, 
-         costoTotal: body.costoTotal, 
+         cantidadAtendida: body.cantidadAtendida,
+         precioUnitario: body.precioUnitario,
+         ...(body.precioUnitarioMoneda !== undefined ? { precioUnitarioMoneda: body.precioUnitarioMoneda || null } : {}),
+         costoTotal: body.costoTotal,
          tiempoEntrega: body.tiempoEntrega, 
          tiempoEntregaDias: body.tiempoEntregaDias, 
          fechaOrdenCompraRecomendada: fechaOC, 

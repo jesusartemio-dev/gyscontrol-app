@@ -171,6 +171,7 @@ export async function POST(request: Request) {
         cantidadPedida: body.cantidadPedida,
         cantidadAtendida: body.cantidadAtendida ?? null,
         precioUnitario: body.precioUnitario ?? null,
+        precioUnitarioMoneda: body.precioUnitarioMoneda ?? null,
         costoTotal: body.costoTotal ?? null,
         tiempoEntrega,
         tiempoEntregaDias,

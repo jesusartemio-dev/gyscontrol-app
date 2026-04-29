@@ -730,6 +730,9 @@ export interface PedidoEquipoPayload {
     unidad: string
     cantidadPedida: number
     precioUnitario?: number
+    precioUnitarioMoneda?: string | null
+    marca?: string | null
+    catalogoEquipoId?: string | null
     // Override de imputación (mutuamente excluyentes)
     proyectoId?: string | null
     centroCostoId?: string | null
@@ -767,6 +770,7 @@ export interface PedidoEquipoItemPayload {
   // 💰 Datos económicos (opcionalmente copiados desde cotización seleccionada)
   precioUnitario?: number
   costoTotal?: number
+  precioUnitarioMoneda?: string | null
   // 🚦 Estado de atención
   estado?: EstadoPedidoItem
   cantidadAtendida?: number
