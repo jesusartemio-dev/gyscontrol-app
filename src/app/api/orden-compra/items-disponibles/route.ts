@@ -46,7 +46,7 @@ export async function GET(req: Request) {
         { proveedorId: null, listaEquipoItem: { proveedorId } },             // (b) PEI sin proveedor pero LEI sí (caso legacy)
       ]
       if (incluirSinProveedor) {
-        // (c) Items completamente sin asignar — admin decide a quién comprarles
+        // (c) Items completamente sin asignar — se compran al proveedor de esta OC
         conditions.push({ proveedorId: null, listaEquipoItem: { proveedorId: null } })
         conditions.push({ proveedorId: null, listaEquipoItemId: null })
       }
@@ -110,7 +110,7 @@ export async function GET(req: Request) {
           precioUnitario: item.precioUnitario || 0,
           proveedorId: proveedorEfectivoId,
           proveedorNombre: proveedorEfectivoNombre,
-          // Indica si el item viene sin proveedor asignado (admin tendrá que confirmar)
+          // Indica si el item viene sin proveedor asignado (se confirmará al guardar)
           sinProveedorAsignado: !proveedorEfectivoId,
           listaEquipoItemId: item.listaEquipoItemId,
           pedidoCodigo: item.pedidoEquipo.codigo,
