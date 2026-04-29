@@ -726,6 +726,7 @@ model ListaEquipoItem {
   @@index([listaId, estado, createdAt(sort: Desc)], map: "idx_lista_item_lista_estado_fecha")
   @@index([proveedorId, estado, precioElegido], map: "idx_lista_item_proveedor_estado_precio")
   @@index([responsableId, estado, verificado], map: "idx_lista_item_responsable_estado_verificado")
+  @@index([desgloseDeProyectoEquipoCotizadoItemId], map: "idx_lista_item_desglose_de")
   @@map("lista_equipo_item")
 }
 
