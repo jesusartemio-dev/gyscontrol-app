@@ -1099,6 +1099,7 @@ model Proyecto {
   prestamosHerramienta       PrestamoHerramienta[]
   solicitudesHerramienta     SolicitudHerramienta[]
   devolucionesMaterial       DevolucionMaterial[]
+  entregasEpp                EntregaEPP[]
 
   @@index([clienteId, estado, createdAt(sort: Desc)], map: "idx_proyecto_cliente_estado_fecha")
   @@index([comercialId, estado, fechaInicio], map: "idx_proyecto_comercial_estado_inicio")
@@ -1493,6 +1494,7 @@ model Unidad {
   createdAt      DateTime         @default(now())
   updatedAt      DateTime
   catalogoEquipo CatalogoEquipo[]
+  catalogoEpp    CatalogoEPP[]
 
   @@map("unidad")
 }
@@ -1627,6 +1629,7 @@ model User {
   solicitudesHerramientaAtendidas          SolicitudHerramienta[]      @relation("SolicitudHerramientaAtendidaPor")
   devolucionesRegistradas                  DevolucionMaterial[]        @relation("DevolucionRegistradoPor")
   devolucionesDevueltas                    DevolucionMaterial[]        @relation("DevolucionDevueltoPor")
+  entregasEppEntregadas                    EntregaEPP[]                @relation("EntregaEppEntregador")
 
   @@map("user")
 }
@@ -1685,6 +1688,11 @@ model Empleado {
   // Modalidad de trabajo (control administrativo de asistencia)
   modalidadTrabajo     ModalidadTrabajo     @default(presencial)
   diasRemoto           DiaSemana[]          @default([]) // usado solo si modalidad=hibrido
+  // Tallas (para asignación de EPPs)
+  tallaCamisa          String? // S/M/L/XL/XXL
+  tallaPantalon        String? // 28-44
+  tallaCalzado         String? // 36-46
+  tallaCasco           String? // S/M/L
   createdAt            DateTime             @default(now())
   updatedAt            DateTime             @updatedAt
   cargo                Cargo?               @relation(fields: [cargoId], references: [id])
@@ -1692,6 +1700,7 @@ model Empleado {
   user                 User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   recursoComposiciones RecursoComposicion[]
   asistencias          Asistencia[]
+  entregasEpp          EntregaEPP[]
 
   @@map("empleado")
 }
@@ -3371,6 +3380,7 @@ model CentroCosto {
   proyectosInternos         Proyecto[]
   pedidosEquipo             PedidoEquipo[]
   pedidoEquipoItemsOverride PedidoEquipoItem[] @relation("PedidoItemCentroCostoOverride")
+  entregasEpp               EntregaEPP[]
 
   @@index([tipo, activo])
   @@map("centro_costo")
@@ -3691,6 +3701,7 @@ model OrdenCompraItem {
   ordenCompraId      String
   pedidoEquipoItemId String?
   listaEquipoItemId  String?
+  catalogoEppId      String?
   codigo             String
   descripcion        String
   tipoItem           String   @default("equipo")
@@ -3706,6 +3717,7 @@ model OrdenCompraItem {
   ordenCompra      OrdenCompra       @relation(fields: [ordenCompraId], references: [id], onDelete: Cascade)
   pedidoEquipoItem PedidoEquipoItem? @relation(fields: [pedidoEquipoItemId], references: [id])
   listaEquipoItem  ListaEquipoItem?  @relation(fields: [listaEquipoItemId], references: [id])
+  catalogoEpp      CatalogoEPP?      @relation(fields: [catalogoEppId], references: [id])
 
   recepcionesPendientes RecepcionPendiente[]
 
@@ -4489,6 +4501,7 @@ model Almacen {
   stock               StockAlmacen[]
   movimientos         MovimientoAlmacen[]
   unidadesHerramienta HerramientaUnidad[]
+  entregasEpp         EntregaEPP[]
   createdAt           DateTime            @default(now())
 
   @@map("almacen")
@@ -4499,6 +4512,7 @@ model StockAlmacen {
   almacenId             String
   catalogoEquipoId      String?
   catalogoHerramientaId String?
+  catalogoEppId         String?
   cantidadDisponible    Float                @default(0)
   cantidadReservada     Float                @default(0)
   costoUnitarioPromedio Float? // Promedio ponderado del costo por unidad (se recalcula en cada entrada)
@@ -4507,9 +4521,11 @@ model StockAlmacen {
   almacen               Almacen              @relation(fields: [almacenId], references: [id])
   catalogoEquipo        CatalogoEquipo?      @relation(fields: [catalogoEquipoId], references: [id])
   catalogoHerramienta   CatalogoHerramienta? @relation(fields: [catalogoHerramientaId], references: [id])
+  catalogoEpp           CatalogoEPP?         @relation(fields: [catalogoEppId], references: [id])
 
   @@unique([almacenId, catalogoEquipoId])
   @@unique([almacenId, catalogoHerramientaId])
+  @@unique([almacenId, catalogoEppId])
   @@map("stock_almacen")
 }
 
@@ -4519,6 +4535,7 @@ model MovimientoAlmacen {
   tipo                  TipoMovimiento
   catalogoEquipoId      String?
   catalogoHerramientaId String?
+  catalogoEppId         String?
   herramientaUnidadId   String?
   cantidad              Float
   costoUnitario         Float? // Costo unitario de esta entrada (para entradas) / costo aplicado al salir (para salidas)
@@ -4529,19 +4546,23 @@ model MovimientoAlmacen {
   entregaItemId         String?
   prestamoHerramientaId String?
   devolucionMaterialId  String?
+  entregaEppItemId      String?
   observaciones         String?
   almacen               Almacen              @relation(fields: [almacenId], references: [id])
   usuario               User                 @relation(fields: [usuarioId], references: [id])
   catalogoEquipo        CatalogoEquipo?      @relation(fields: [catalogoEquipoId], references: [id])
   catalogoHerramienta   CatalogoHerramienta? @relation(fields: [catalogoHerramientaId], references: [id])
+  catalogoEpp           CatalogoEPP?         @relation(fields: [catalogoEppId], references: [id])
   herramientaUnidad     HerramientaUnidad?   @relation(fields: [herramientaUnidadId], references: [id])
   recepcionPendiente    RecepcionPendiente?  @relation(fields: [recepcionPendienteId], references: [id])
   prestamoHerramienta   PrestamoHerramienta? @relation(fields: [prestamoHerramientaId], references: [id])
   devolucionMaterial    DevolucionMaterial?  @relation(fields: [devolucionMaterialId], references: [id])
+  entregaEppItem        EntregaEPPItem?      @relation(fields: [entregaEppItemId], references: [id])
 
   @@index([almacenId, fechaMovimiento])
   @@index([catalogoEquipoId])
   @@index([catalogoHerramientaId])
+  @@index([catalogoEppId])
   @@index([tipo, fechaMovimiento])
   @@map("movimiento_almacen")
 }
@@ -4555,6 +4576,10 @@ enum TipoMovimiento {
   devolucion_herramienta
   baja_herramienta
   ajuste_inventario
+  entrada_epp
+  salida_epp
+  devolucion_epp
+  baja_epp
 }
 
 model CatalogoHerramienta {
@@ -4746,4 +4771,133 @@ model DevolucionMaterialItem {
   catalogoEquipo     CatalogoEquipo     @relation(fields: [catalogoEquipoId], references: [id])
 
   @@map("devolucion_material_item")
+}
+
+// ======================
+// 🦺 EPPs (Equipos de Protección Personal)
+// ======================
+// Catálogo dedicado para EPPs. Separado de CatalogoEquipo para evitar
+// contaminar selectores de equipos de proyecto y mantener campos
+// específicos (vida útil, talla, sub-categoría) sin bloat.
+model CatalogoEPP {
+  id                  String              @id @default(cuid())
+  codigo              String              @unique
+  descripcion         String
+  marca               String?
+  modelo              String?
+  unidadId            String
+  subcategoria        SubcategoriaEPP
+  requiereTalla       Boolean             @default(false)
+  // Si requiereTalla=true, qué campo del Empleado consultar para sugerir
+  // la talla al hacer la entrega (ej. para casco -> Empleado.tallaCasco).
+  tallaCampo          TallaCampo?
+  // Vida útil estimada en días. null = consumible o sin vencimiento individual.
+  vidaUtilDias        Int?
+  esConsumible        Boolean             @default(false)
+  imagenUrl           String?
+  precioReferencial   Float?
+  monedaReferencial   String              @default("PEN")
+  activo              Boolean             @default(true)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  unidad              Unidad              @relation(fields: [unidadId], references: [id])
+  stockAlmacen        StockAlmacen[]
+  movimientos         MovimientoAlmacen[]
+  ordenCompraItems    OrdenCompraItem[]
+  entregaItems        EntregaEPPItem[]
+
+  @@index([subcategoria, activo])
+  @@map("catalogo_epp")
+}
+
+enum SubcategoriaEPP {
+  cabeza
+  manos
+  ojos
+  auditiva
+  respiratoria
+  pies
+  caida
+  ropa
+  visibilidad
+  otro
+}
+
+enum TallaCampo {
+  calzado
+  camisa
+  pantalon
+  casco
+}
+
+model EntregaEPP {
+  id              String              @id @default(cuid())
+  numero          String              @unique
+  empleadoId      String
+  almacenId       String
+  proyectoId      String?
+  centroCostoId   String?
+  fechaEntrega    DateTime            @default(now())
+  entregadoPorId  String
+  observaciones   String?
+  firmaUrl        String?
+  estado          EstadoEntregaEPP    @default(vigente)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  empleado        Empleado            @relation(fields: [empleadoId], references: [id])
+  almacen         Almacen             @relation(fields: [almacenId], references: [id])
+  proyecto        Proyecto?           @relation(fields: [proyectoId], references: [id])
+  centroCosto    CentroCosto?         @relation(fields: [centroCostoId], references: [id])
+  entregadoPor    User                @relation("EntregaEppEntregador", fields: [entregadoPorId], references: [id])
+  items           EntregaEPPItem[]
+
+  @@index([empleadoId, fechaEntrega(sort: Desc)])
+  @@index([fechaEntrega(sort: Desc)])
+  @@map("entrega_epp")
+}
+
+model EntregaEPPItem {
+  id                      String                @id @default(cuid())
+  entregaId               String
+  catalogoEppId           String
+  cantidad                Float
+  talla                   String?
+  costoUnitario           Float? // Snapshot del costo ponderado al momento de la entrega
+  costoMoneda             String                @default("PEN")
+  fechaEntrega            DateTime
+  fechaReposicionEstimada DateTime?
+  estado                  EstadoEntregaEPPItem  @default(vigente)
+  motivoBaja              String? // perdido | dañado | renovado | empleado_baja | otro
+  reemplazadoPorItemId    String?
+  observaciones           String?
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
+
+  entrega                 EntregaEPP            @relation(fields: [entregaId], references: [id], onDelete: Cascade)
+  catalogoEpp             CatalogoEPP           @relation(fields: [catalogoEppId], references: [id])
+  reemplazadoPor          EntregaEPPItem?       @relation("EppReemplazo", fields: [reemplazadoPorItemId], references: [id])
+  reemplazos              EntregaEPPItem[]      @relation("EppReemplazo")
+  movimientos             MovimientoAlmacen[]
+
+  @@index([catalogoEppId, estado])
+  @@index([fechaReposicionEstimada])
+  @@map("entrega_epp_item")
+}
+
+enum EstadoEntregaEPP {
+  vigente
+  parcialmente_renovada
+  renovada
+  dada_baja
+}
+
+enum EstadoEntregaEPPItem {
+  vigente
+  reemplazado
+  devuelto
+  perdido
+  dañado
+  baja
 }

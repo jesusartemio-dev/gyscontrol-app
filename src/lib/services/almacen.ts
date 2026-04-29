@@ -8,6 +8,7 @@ interface RegistrarMovimientoInput {
   tipo: TipoMovimiento
   catalogoEquipoId?: string
   catalogoHerramientaId?: string
+  catalogoEppId?: string
   herramientaUnidadId?: string
   cantidad: number
   costoUnitario?: number  // Costo unitario (para entradas se guarda y se usa en el promedio; para salidas se guarda como evidencia)
@@ -17,6 +18,7 @@ interface RegistrarMovimientoInput {
   entregaItemId?: string
   prestamoHerramientaId?: string
   devolucionMaterialId?: string
+  entregaEppItemId?: string
   observaciones?: string
 }
 
@@ -25,6 +27,8 @@ const TIPOS_ENTRADA: TipoMovimiento[] = [
   'devolucion_proyecto',
   'alta_herramienta',
   'devolucion_herramienta',
+  'entrada_epp',
+  'devolucion_epp',
 ]
 
 export async function registrarMovimiento(
@@ -45,6 +49,7 @@ export async function registrarMovimiento(
       tipo: input.tipo,
       catalogoEquipoId: input.catalogoEquipoId,
       catalogoHerramientaId: input.catalogoHerramientaId,
+      catalogoEppId: input.catalogoEppId,
       herramientaUnidadId: input.herramientaUnidadId,
       cantidad: input.cantidad,
       costoUnitario: input.costoUnitario ?? null,
@@ -54,18 +59,23 @@ export async function registrarMovimiento(
       entregaItemId: input.entregaItemId,
       prestamoHerramientaId: input.prestamoHerramientaId,
       devolucionMaterialId: input.devolucionMaterialId,
+      entregaEppItemId: input.entregaEppItemId,
       observaciones: input.observaciones,
     },
   })
 
-  if (input.catalogoEquipoId || input.catalogoHerramientaId) {
+  if (input.catalogoEquipoId || input.catalogoHerramientaId || input.catalogoEppId) {
     // Traer stock actual para calcular promedio ponderado en entradas
     const stockActual = input.catalogoEquipoId
       ? await db.stockAlmacen.findUnique({
           where: { almacenId_catalogoEquipoId: { almacenId: input.almacenId, catalogoEquipoId: input.catalogoEquipoId } },
         })
+      : input.catalogoHerramientaId
+      ? await db.stockAlmacen.findUnique({
+          where: { almacenId_catalogoHerramientaId: { almacenId: input.almacenId, catalogoHerramientaId: input.catalogoHerramientaId } },
+        })
       : await db.stockAlmacen.findUnique({
-          where: { almacenId_catalogoHerramientaId: { almacenId: input.almacenId, catalogoHerramientaId: input.catalogoHerramientaId! } },
+          where: { almacenId_catalogoEppId: { almacenId: input.almacenId, catalogoEppId: input.catalogoEppId! } },
         })
 
     // Cálculo de nuevo costo promedio ponderado
@@ -108,12 +118,28 @@ export async function registrarMovimiento(
           costoMoneda: nuevaMoneda,
         },
       })
-    } else {
+    } else if (input.catalogoHerramientaId) {
       await db.stockAlmacen.upsert({
-        where: { almacenId_catalogoHerramientaId: { almacenId: input.almacenId, catalogoHerramientaId: input.catalogoHerramientaId! } },
+        where: { almacenId_catalogoHerramientaId: { almacenId: input.almacenId, catalogoHerramientaId: input.catalogoHerramientaId } },
         create: {
           almacenId: input.almacenId,
-          catalogoHerramientaId: input.catalogoHerramientaId!,
+          catalogoHerramientaId: input.catalogoHerramientaId,
+          cantidadDisponible: delta,
+          costoUnitarioPromedio: nuevoPromedio,
+          costoMoneda: nuevaMoneda,
+        },
+        update: {
+          cantidadDisponible: { increment: delta },
+          costoUnitarioPromedio: nuevoPromedio,
+          costoMoneda: nuevaMoneda,
+        },
+      })
+    } else if (input.catalogoEppId) {
+      await db.stockAlmacen.upsert({
+        where: { almacenId_catalogoEppId: { almacenId: input.almacenId, catalogoEppId: input.catalogoEppId } },
+        create: {
+          almacenId: input.almacenId,
+          catalogoEppId: input.catalogoEppId,
           cantidadDisponible: delta,
           costoUnitarioPromedio: nuevoPromedio,
           costoMoneda: nuevaMoneda,

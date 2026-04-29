@@ -321,7 +321,22 @@ export default function Sidebar() {
         { href: '/gastos/requerimientos', label: 'Aprobar Requerimientos', icon: CheckCircle2, roles: ['admin', 'gerente', 'gestor', 'coordinador', 'coordinador_logistico', 'administracion'] as any },
       ],
     },
-    // 4.2. Administración - Gestión financiera y administrativa
+    // 4.5. Seguridad - Gestión de EPPs y SSOMA
+    {
+      key: 'seguridad',
+      title: 'Seguridad',
+      icon: HardHat,
+      color: 'text-orange-400',
+      roles: ['admin', 'gerente', 'seguridad'],
+      links: [
+        { href: '/seguridad', label: 'Dashboard', icon: LayoutDashboard },
+        { href: '/seguridad/catalogo', label: 'Catálogo EPP', icon: Package },
+        { href: '/seguridad/stock', label: 'Stock EPP', icon: Warehouse },
+        { href: '/seguridad/entregas', label: 'Entregas', icon: ClipboardList },
+        { href: '/seguridad/empleados', label: 'Empleados', icon: Users },
+      ],
+    },
+    // 4.6. Administración - Gestión financiera y administrativa
     {
       key: 'administracion',
       title: 'Administración',

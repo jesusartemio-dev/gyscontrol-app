@@ -64,6 +64,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (body.contactoEmergencia !== undefined) updateData.contactoEmergencia = body.contactoEmergencia
     if (body.telefonoEmergencia !== undefined) updateData.telefonoEmergencia = body.telefonoEmergencia
     if (body.observaciones !== undefined) updateData.observaciones = body.observaciones
+    if (body.tallaCamisa !== undefined) updateData.tallaCamisa = body.tallaCamisa || null
+    if (body.tallaPantalon !== undefined) updateData.tallaPantalon = body.tallaPantalon || null
+    if (body.tallaCalzado !== undefined) updateData.tallaCalzado = body.tallaCalzado || null
+    if (body.tallaCasco !== undefined) updateData.tallaCasco = body.tallaCasco || null
 
     const data = await prisma.empleado.update({
       where: { id },
