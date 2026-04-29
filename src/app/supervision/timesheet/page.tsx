@@ -83,6 +83,39 @@ function parseSemanaLabel(semana: string): string {
   return `Semana ${parseInt(weekStr)}, ${year}`
 }
 
+// Devuelve lunes y domingo de una semana ISO "YYYY-Www" como Dates locales
+// (mediodía local) para que format() no las shift por timezone.
+function getSemanaRange(semana: string): { start: Date; end: Date } | null {
+  const m = semana.match(/^(\d{4})-W(\d{1,2})$/)
+  if (!m) return null
+  const year = parseInt(m[1])
+  const week = parseInt(m[2])
+  // 4 de enero siempre está en la semana ISO 1
+  const jan4 = new Date(year, 0, 4, 12, 0, 0)
+  const jan4Day = jan4.getDay() || 7 // lunes=1, domingo=7
+  const week1Monday = new Date(jan4)
+  week1Monday.setDate(jan4.getDate() - jan4Day + 1)
+  const start = new Date(week1Monday)
+  start.setDate(week1Monday.getDate() + (week - 1) * 7)
+  const end = new Date(start)
+  end.setDate(start.getDate() + 6)
+  return { start, end }
+}
+
+function formatSemanaRango(semana: string): string {
+  const r = getSemanaRange(semana)
+  if (!r) return ''
+  const sameMonth = r.start.getMonth() === r.end.getMonth()
+  const sameYear = r.start.getFullYear() === r.end.getFullYear()
+  if (sameMonth) {
+    return `${format(r.start, 'd', { locale: es })} – ${format(r.end, "d 'de' MMM yyyy", { locale: es })}`
+  }
+  if (sameYear) {
+    return `${format(r.start, 'd MMM', { locale: es })} – ${format(r.end, "d 'de' MMM yyyy", { locale: es })}`
+  }
+  return `${format(r.start, 'd MMM yyyy', { locale: es })} – ${format(r.end, 'd MMM yyyy', { locale: es })}`
+}
+
 export default function SupervisionTimesheetPage() {
   const { toast } = useToast()
   const [tab, setTab] = useState('todos')
@@ -510,7 +543,10 @@ export default function SupervisionTimesheetPage() {
                           </div>
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Calendar className="h-4 w-4 shrink-0" />
-                            <span>{parseSemanaLabel(a.semana)}</span>
+                            <span className="whitespace-nowrap">
+                              {parseSemanaLabel(a.semana)}
+                              <span className="text-muted-foreground/70"> · {formatSemanaRango(a.semana)}</span>
+                            </span>
                           </div>
                           <Badge variant="secondary" className="shrink-0">
                             {a.totalHoras}h
