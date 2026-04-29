@@ -6,7 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { ArrowLeft, Loader2, Building2, User, Calendar, ClipboardList } from 'lucide-react'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { ArrowLeft, Loader2, Building2, User, Calendar, ClipboardList, MoreVertical, RotateCcw, ArrowDownToLine, AlertTriangle, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface EntregaDetalle {
@@ -59,18 +63,78 @@ const formatCosto = (monto: number | null, moneda: string) => {
   return `${sym} ${monto.toFixed(2)}`
 }
 
+type AccionTipo = 'renovar' | 'devolver' | 'perdido' | 'dañado' | 'baja'
+
+const ACCION_LABEL: Record<AccionTipo, string> = {
+  renovar: 'Renovar',
+  devolver: 'Devolver al stock',
+  perdido: 'Marcar como perdido',
+  dañado: 'Marcar como dañado',
+  baja: 'Dar de baja',
+}
+
+const ACCION_DESC: Record<AccionTipo, string> = {
+  renovar: 'Crea un item nuevo en esta entrega y descuenta 1 unidad del stock. El item original queda como reemplazado.',
+  devolver: 'El empleado devuelve el EPP. Se re-ingresa al stock del almacén.',
+  perdido: 'El item se reporta como perdido. No modifica el stock.',
+  dañado: 'El item se reporta como dañado. No modifica el stock.',
+  baja: 'El item se da de baja por otros motivos. No modifica el stock.',
+}
+
 export default function EntregaEppDetallePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const [data, setData] = useState<EntregaDetalle | null>(null)
   const [loading, setLoading] = useState(true)
+  const [accionModal, setAccionModal] = useState<{ itemId: string; itemDesc: string; accion: AccionTipo } | null>(null)
+  const [accionObs, setAccionObs] = useState('')
+  const [accionLoading, setAccionLoading] = useState(false)
 
-  useEffect(() => {
-    fetch(`/api/entrega-epp/${id}`)
-      .then(r => r.ok ? r.json() : Promise.reject())
-      .then(setData)
-      .catch(() => toast.error('Error al cargar entrega'))
-      .finally(() => setLoading(false))
-  }, [id])
+  const cargar = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/entrega-epp/${id}`)
+      if (!res.ok) throw new Error()
+      setData(await res.json())
+    } catch {
+      toast.error('Error al cargar entrega')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { cargar() }, [id])
+
+  const ejecutarAccion = async () => {
+    if (!accionModal) return
+    setAccionLoading(true)
+    try {
+      const res = await fetch(`/api/entrega-epp/items/${accionModal.itemId}/accion`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accion: accionModal.accion,
+          observaciones: accionObs.trim() || undefined,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Error al ejecutar acción')
+      }
+      toast.success(`Acción ejecutada: ${ACCION_LABEL[accionModal.accion]}`)
+      setAccionModal(null)
+      setAccionObs('')
+      cargar()
+    } catch (e: any) {
+      toast.error(e?.message || 'Error al ejecutar acción')
+    } finally {
+      setAccionLoading(false)
+    }
+  }
+
+  const abrirAccion = (itemId: string, itemDesc: string, accion: AccionTipo) => {
+    setAccionModal({ itemId, itemDesc, accion })
+    setAccionObs('')
+  }
 
   if (loading) {
     return <div className="flex items-center justify-center py-20"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
@@ -150,6 +214,7 @@ export default function EntregaEppDetallePage({ params }: { params: Promise<{ id
                 <TableHead className="text-right">Subtotal</TableHead>
                 <TableHead>Reposición</TableHead>
                 <TableHead>Estado</TableHead>
+                <TableHead className="w-12"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -169,6 +234,34 @@ export default function EntregaEppDetallePage({ params }: { params: Promise<{ id
                   </TableCell>
                   <TableCell className="text-xs">{formatFecha(it.fechaReposicionEstimada)}</TableCell>
                   <TableCell><Badge variant="outline" className="text-[10px]">{it.estado}</Badge></TableCell>
+                  <TableCell>
+                    {it.estado === 'vigente' && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-7 w-7">
+                            <MoreVertical className="h-3.5 w-3.5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => abrirAccion(it.id, it.catalogoEpp.descripcion, 'renovar')}>
+                            <RotateCcw className="h-3.5 w-3.5 mr-2 text-emerald-600" /> Renovar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => abrirAccion(it.id, it.catalogoEpp.descripcion, 'devolver')}>
+                            <ArrowDownToLine className="h-3.5 w-3.5 mr-2 text-blue-600" /> Devolver al stock
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => abrirAccion(it.id, it.catalogoEpp.descripcion, 'perdido')}>
+                            <AlertTriangle className="h-3.5 w-3.5 mr-2 text-amber-600" /> Marcar perdido
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => abrirAccion(it.id, it.catalogoEpp.descripcion, 'dañado')}>
+                            <AlertTriangle className="h-3.5 w-3.5 mr-2 text-orange-600" /> Marcar dañado
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => abrirAccion(it.id, it.catalogoEpp.descripcion, 'baja')}>
+                            <XCircle className="h-3.5 w-3.5 mr-2 text-red-600" /> Dar de baja
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -179,6 +272,51 @@ export default function EntregaEppDetallePage({ params }: { params: Promise<{ id
           </div>
         </CardContent>
       </Card>
+
+      {/* Modal de confirmación de acción */}
+      <Dialog open={!!accionModal} onOpenChange={v => { if (!v) setAccionModal(null) }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {accionModal && ACCION_LABEL[accionModal.accion]}
+            </DialogTitle>
+          </DialogHeader>
+          {accionModal && (
+            <div className="space-y-3">
+              <div className="bg-muted/40 rounded p-3 text-sm">
+                <p className="font-medium">{accionModal.itemDesc}</p>
+              </div>
+              <p className="text-xs text-muted-foreground">{ACCION_DESC[accionModal.accion]}</p>
+              <div className="space-y-1">
+                <Label className="text-xs">Observaciones (opcional)</Label>
+                <Textarea
+                  value={accionObs}
+                  onChange={e => setAccionObs(e.target.value)}
+                  rows={3}
+                  placeholder="Detalles del motivo, ubicación, etc..."
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAccionModal(null)} disabled={accionLoading}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={ejecutarAccion}
+              disabled={accionLoading}
+              className={
+                accionModal?.accion === 'renovar' ? 'bg-emerald-600 hover:bg-emerald-700' :
+                accionModal?.accion === 'devolver' ? 'bg-blue-600 hover:bg-blue-700' :
+                'bg-orange-600 hover:bg-orange-700'
+              }
+            >
+              {accionLoading && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+              Confirmar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -333,7 +333,9 @@ export default function Sidebar() {
         { href: '/seguridad/catalogo', label: 'Catálogo EPP', icon: Package },
         { href: '/seguridad/stock', label: 'Stock EPP', icon: Warehouse },
         { href: '/seguridad/entregas', label: 'Entregas', icon: ClipboardList },
+        { href: '/seguridad/reposiciones', label: 'Reposiciones', icon: Clock },
         { href: '/seguridad/empleados', label: 'Empleados', icon: Users },
+        { href: '/seguridad/reportes', label: 'Reportes', icon: BarChart3 },
       ],
     },
     // 4.6. Administración - Gestión financiera y administrativa

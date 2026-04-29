@@ -1,14 +1,16 @@
 'use client'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Package, Warehouse, ClipboardList, Users, HardHat } from 'lucide-react'
+import { Package, Warehouse, ClipboardList, Users, HardHat, Clock, BarChart3 } from 'lucide-react'
 import Link from 'next/link'
 
 const TILES = [
   { href: '/seguridad/catalogo', label: 'Catálogo EPP', icon: Package, color: 'text-blue-600 bg-blue-50', desc: 'Crea y administra los EPPs disponibles' },
   { href: '/seguridad/stock', label: 'Stock EPP', icon: Warehouse, color: 'text-emerald-600 bg-emerald-50', desc: 'Cuántos EPPs hay disponibles por almacén' },
   { href: '/seguridad/entregas', label: 'Entregas', icon: ClipboardList, color: 'text-orange-600 bg-orange-50', desc: 'Registrar y consultar entregas a empleados' },
+  { href: '/seguridad/reposiciones', label: 'Reposiciones', icon: Clock, color: 'text-red-600 bg-red-50', desc: 'Items por vencer o vencidos para renovar' },
   { href: '/seguridad/empleados', label: 'Empleados', icon: Users, color: 'text-violet-600 bg-violet-50', desc: 'Tallas y EPPs asignados por empleado' },
+  { href: '/seguridad/reportes', label: 'Reportes', icon: BarChart3, color: 'text-cyan-600 bg-cyan-50', desc: 'Consumos, costos y auditoría por empleado' },
 ]
 
 export default function SeguridadDashboardPage() {
