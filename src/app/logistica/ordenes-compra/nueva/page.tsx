@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback, Suspense } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Plus, Trash2, Loader2, Save, PackageSearch, FileText, Search, Pencil, Info } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Loader2, Save, PackageSearch, FileText, Search, Pencil, Info, ChevronDown, ChevronRight, Package } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { toast } from 'sonner'
 import { createOrdenCompra, fetchItemsDisponibles, type ItemDisponible } from '@/lib/services/ordenCompra'
@@ -90,6 +90,10 @@ function NuevaOrdenCompraContent() {
   const [loadingItems, setLoadingItems] = useState(false)
   const [pedidoItemsDisp, setPedidoItemsDisp] = useState<ItemDisponible[]>([])
   const [incluirSinProveedor, setIncluirSinProveedor] = useState(true)
+  // Cantidad editable por ítem (cantidad a comprar puede ser menor que la disponible)
+  const [cantidadesAcomprar, setCantidadesAcomprar] = useState<Record<string, number>>({})
+  // Pedidos colapsados (codigoPedido → boolean)
+  const [pedidosColapsados, setPedidosColapsados] = useState<Record<string, boolean>>({})
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   // Catalogo dialog state
@@ -237,21 +241,56 @@ function NuevaOrdenCompraContent() {
 
   const addSelectedItems = () => {
     const toAdd = pedidoItemsDisp.filter(i => selectedIds.has(i.id))
-    const newItems: ItemForm[] = toAdd.map(i => ({
-      codigo: i.codigo,
-      descripcion: i.descripcion,
-      unidad: i.unidad,
-      cantidad: i.cantidad,
-      precioUnitario: i.precioUnitario,
-      source: 'pedido' as const,
-      pedidoEquipoItemId: i.id,
-      listaEquipoItemId: i.listaEquipoItemId,
-      sourceLabel: i.pedidoCodigo,
-    }))
+    const newItems: ItemForm[] = toAdd.map(i => {
+      const cantidadEditada = cantidadesAcomprar[i.id]
+      const cantidadFinal = cantidadEditada && cantidadEditada > 0 && cantidadEditada <= i.cantidad
+        ? cantidadEditada
+        : i.cantidad
+      return {
+        codigo: i.codigo,
+        descripcion: i.descripcion,
+        unidad: i.unidad,
+        cantidad: cantidadFinal,
+        precioUnitario: i.precioUnitario,
+        source: 'pedido' as const,
+        pedidoEquipoItemId: i.id,
+        listaEquipoItemId: i.listaEquipoItemId,
+        sourceLabel: i.pedidoCodigo,
+      }
+    })
 
     setItems(prev => [...prev, ...newItems])
     setSelectorOpen(false)
+    setCantidadesAcomprar({})
     toast.success(`${newItems.length} item(s) agregados desde pedidos`)
+  }
+
+  // Agrupar items por pedido para visualización
+  const itemsPorPedido = useMemo(() => {
+    const grupos = new Map<string, ItemDisponible[]>()
+    for (const item of pedidoItemsDisp) {
+      const lista = grupos.get(item.pedidoCodigo) || []
+      lista.push(item)
+      grupos.set(item.pedidoCodigo, lista)
+    }
+    return Array.from(grupos.entries()).sort(([a], [b]) => a.localeCompare(b))
+  }, [pedidoItemsDisp])
+
+  const togglePedidoColapsado = (pedidoCodigo: string) => {
+    setPedidosColapsados(prev => ({ ...prev, [pedidoCodigo]: !prev[pedidoCodigo] }))
+  }
+
+  const seleccionarTodosDePedido = (pedidoCodigo: string, items: ItemDisponible[]) => {
+    const todosSeleccionados = items.every(i => selectedIds.has(i.id))
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (todosSeleccionados) {
+        items.forEach(i => next.delete(i.id))
+      } else {
+        items.forEach(i => next.add(i.id))
+      }
+      return next
+    })
   }
 
   // ── Catálogo selector ────────────────────────────────────
@@ -658,14 +697,14 @@ function NuevaOrdenCompraContent() {
 
       {/* ── Pedido Item Selector Dialog ─────────────────────── */}
       <Dialog open={selectorOpen} onOpenChange={setSelectorOpen}>
-        <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
-          <DialogHeader>
+        <DialogContent className="!max-w-5xl max-h-[90vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="px-6 pt-6 pb-4 border-b">
             <DialogTitle>Agregar items desde pedidos</DialogTitle>
           </DialogHeader>
 
           {/* Toggle: incluir items sin proveedor */}
           {proveedorId && (
-            <div className="flex items-center gap-2 px-1 py-2 border-y bg-amber-50/50">
+            <div className="flex items-center gap-2 px-6 py-2.5 border-b bg-amber-50/40">
               <Checkbox
                 id="incluir-sin-proveedor"
                 checked={incluirSinProveedor}
@@ -681,7 +720,7 @@ function NuevaOrdenCompraContent() {
             </div>
           )}
 
-          <div className="flex-1 overflow-auto">
+          <div className="flex-1 overflow-auto px-6 py-3">
             {loadingItems ? (
               <div className="flex items-center justify-center py-10">
                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -699,60 +738,116 @@ function NuevaOrdenCompraContent() {
                 </div>
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[40px]"></TableHead>
-                    <TableHead className="w-[100px]">Código</TableHead>
-                    <TableHead>Descripción</TableHead>
-                    <TableHead className="w-[60px]">Unid.</TableHead>
-                    <TableHead className="w-[60px] text-right">Cant.</TableHead>
-                    <TableHead className="w-[90px] text-right">P.Unit.</TableHead>
-                    <TableHead className="w-[120px]">Proveedor</TableHead>
-                    <TableHead className="w-[100px]">Pedido</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pedidoItemsDisp.map(item => (
-                    <TableRow
-                      key={item.id}
-                      className={selectedIds.has(item.id) ? 'bg-orange-50' : 'cursor-pointer hover:bg-muted/50'}
-                      onClick={() => toggleSelect(item.id)}
-                    >
-                      <TableCell>
+              <div className="space-y-3">
+                {itemsPorPedido.map(([pedidoCodigo, itemsPedido]) => {
+                  const colapsado = !!pedidosColapsados[pedidoCodigo]
+                  const todosSeleccionados = itemsPedido.every(i => selectedIds.has(i.id))
+                  const algunosSeleccionados = itemsPedido.some(i => selectedIds.has(i.id))
+                  return (
+                    <div key={pedidoCodigo} className="border rounded-lg overflow-hidden">
+                      {/* Header del pedido (colapsable) */}
+                      <div className="flex items-center gap-2 px-3 py-2 bg-muted/40 border-b">
+                        <button
+                          type="button"
+                          onClick={() => togglePedidoColapsado(pedidoCodigo)}
+                          className="text-muted-foreground hover:text-foreground"
+                        >
+                          {colapsado ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        </button>
                         <Checkbox
-                          checked={selectedIds.has(item.id)}
-                          onCheckedChange={() => toggleSelect(item.id)}
+                          checked={todosSeleccionados ? true : algunosSeleccionados ? 'indeterminate' : false}
+                          onCheckedChange={() => seleccionarTodosDePedido(pedidoCodigo, itemsPedido)}
                         />
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">{item.codigo}</TableCell>
-                      <TableCell className="text-xs">{item.descripcion}</TableCell>
-                      <TableCell className="text-xs">{item.unidad}</TableCell>
-                      <TableCell className="text-xs text-right">{item.cantidad}</TableCell>
-                      <TableCell className="text-xs text-right font-mono">
-                        {item.precioUnitario > 0 ? item.precioUnitario.toFixed(2) : '-'}
-                      </TableCell>
-                      <TableCell className="text-xs truncate max-w-[120px]" title={item.proveedorNombre || 'Sin proveedor — se asignará a este OC'}>
-                        {item.proveedorNombre ? (
-                          item.proveedorNombre
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-amber-700 italic">
-                            <span className="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
-                            Sin proveedor
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {item.pedidoCodigo}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                        <Package className="h-4 w-4 text-blue-600" />
+                        <span className="font-mono font-semibold text-sm">{pedidoCodigo}</span>
+                        <Badge variant="outline" className="text-[10px]">
+                          {itemsPedido.length} item{itemsPedido.length === 1 ? '' : 's'}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground ml-auto">
+                          {itemsPedido.filter(i => selectedIds.has(i.id)).length} seleccionado(s)
+                        </span>
+                      </div>
+
+                      {/* Items */}
+                      {!colapsado && (
+                        <div className="divide-y">
+                          {itemsPedido.map(item => {
+                            const seleccionado = selectedIds.has(item.id)
+                            const cantidadActual = cantidadesAcomprar[item.id] ?? item.cantidad
+                            return (
+                              <div
+                                key={item.id}
+                                className={`flex items-start gap-3 px-3 py-2.5 ${seleccionado ? 'bg-orange-50' : 'hover:bg-muted/30'}`}
+                              >
+                                <Checkbox
+                                  checked={seleccionado}
+                                  onCheckedChange={() => toggleSelect(item.id)}
+                                  className="mt-0.5"
+                                />
+                                <div className="flex-1 min-w-0 grid grid-cols-12 gap-2 items-start">
+                                  <div className="col-span-12 sm:col-span-3">
+                                    <p className="font-mono text-xs font-medium truncate" title={item.codigo}>
+                                      {item.codigo}
+                                    </p>
+                                    {item.proveedorNombre ? (
+                                      <p className="text-[10px] text-muted-foreground truncate" title={item.proveedorNombre}>
+                                        {item.proveedorNombre}
+                                      </p>
+                                    ) : (
+                                      <p className="inline-flex items-center gap-1 text-[10px] text-amber-700 italic">
+                                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                                        Sin proveedor
+                                      </p>
+                                    )}
+                                  </div>
+                                  <div className="col-span-12 sm:col-span-5">
+                                    <p className="text-xs leading-snug" title={item.descripcion}>{item.descripcion}</p>
+                                  </div>
+                                  <div className="col-span-3 sm:col-span-1 text-xs text-muted-foreground">
+                                    {item.unidad}
+                                  </div>
+                                  <div className="col-span-5 sm:col-span-2">
+                                    <Label className="text-[10px] text-muted-foreground">Cantidad</Label>
+                                    <div className="flex items-center gap-1">
+                                      <Input
+                                        type="number"
+                                        min={0.01}
+                                        max={item.cantidad}
+                                        step="any"
+                                        value={cantidadActual}
+                                        onChange={(e) => {
+                                          const val = parseFloat(e.target.value)
+                                          setCantidadesAcomprar(prev => ({ ...prev, [item.id]: isNaN(val) ? 0 : val }))
+                                          if (!seleccionado && val > 0) toggleSelect(item.id)
+                                        }}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="h-7 text-xs w-20"
+                                      />
+                                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                                        / {item.cantidad}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="col-span-4 sm:col-span-1 text-right">
+                                    <Label className="text-[10px] text-muted-foreground">P.Unit.</Label>
+                                    <p className="text-xs font-mono">
+                                      {item.precioUnitario > 0 ? item.precioUnitario.toFixed(2) : '—'}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
             )}
           </div>
 
-          <DialogFooter className="mt-2">
+          <DialogFooter className="px-6 py-4 border-t">
             <Button variant="outline" onClick={() => setSelectorOpen(false)}>Cancelar</Button>
             <Button
               onClick={addSelectedItems}
