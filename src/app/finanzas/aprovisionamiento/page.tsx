@@ -18,7 +18,12 @@ import {
   Loader2,
   Eye,
   CheckCircle,
-  Filter
+  Filter,
+  ClipboardList,
+  Receipt,
+  Wallet,
+  Truck,
+  Banknote,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -53,6 +58,19 @@ interface ConsolidatedResponse {
   kpis: KPIsConsolidados
 }
 
+interface PipelineKPI {
+  count: number
+  monto: number
+}
+
+interface PipelineResponse {
+  listasSinPedido: PipelineKPI
+  pedidosSinOC: PipelineKPI
+  ocsSinRecepcion: PipelineKPI
+  ocsSinFactura: PipelineKPI
+  facturasSinPagar: PipelineKPI
+}
+
 export default function AprovisionamientoPage() {
   return (
     <Suspense fallback={<div className="flex items-center justify-center h-64"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}>
@@ -66,6 +84,7 @@ function AprovisionamientoContent() {
   const searchParams = useSearchParams()
 
   const [data, setData] = useState<ConsolidatedResponse | null>(null)
+  const [pipeline, setPipeline] = useState<PipelineResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
@@ -83,10 +102,17 @@ function AprovisionamientoContent() {
       if (searchParams.get('search')) params.set('search', searchParams.get('search')!)
       if (estado !== 'all') params.set('estado', estado)
 
-      const res = await fetch(buildApiUrl(`/api/finanzas/aprovisionamiento/proyectos?${params.toString()}`))
-      if (!res.ok) throw new Error('Error al cargar datos')
-      const json: ConsolidatedResponse = await res.json()
+      const [resProyectos, resPipeline] = await Promise.all([
+        fetch(buildApiUrl(`/api/finanzas/aprovisionamiento/proyectos?${params.toString()}`)),
+        fetch(buildApiUrl('/api/finanzas/aprovisionamiento/pipeline')),
+      ])
+      if (!resProyectos.ok) throw new Error('Error al cargar datos')
+      const json: ConsolidatedResponse = await resProyectos.json()
       setData(json)
+      if (resPipeline.ok) {
+        const pipelineJson: PipelineResponse = await resPipeline.json()
+        setPipeline(pipelineJson)
+      }
     } catch (error) {
       console.error('Error fetching aprovisionamiento:', error)
     } finally {
@@ -191,9 +217,9 @@ function AprovisionamientoContent() {
       </div>
 
       <div className="p-4 space-y-4">
-        {/* KPIs + navegacion consolidados */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {/* Listas Tecnicas */}
+        {/* Flujo financiero: Listas → Pedidos → OCs → Facturado → Pagado / Pendiente */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          {/* 1. Listas */}
           <Link href="/finanzas/aprovisionamiento/listas">
             <Card className="border-l-4 border-l-emerald-400 hover:shadow-md transition-shadow cursor-pointer h-full">
               <CardContent className="p-3">
@@ -204,13 +230,13 @@ function AprovisionamientoContent() {
                   </div>
                   <ArrowRight className="h-3 w-3 text-muted-foreground" />
                 </div>
-                <div className="text-lg font-bold text-emerald-600">{formatMonto(kpis?.montoTotalListas || 0)}</div>
-                <div className="text-[10px] text-muted-foreground">{kpis?.totalListas || 0} listas en {kpis?.totalProyectos || 0} proyectos</div>
+                <div className="text-base font-bold text-emerald-600">{formatMonto(kpis?.montoTotalListas || 0)}</div>
+                <div className="text-[10px] text-muted-foreground">{kpis?.totalListas || 0} listas</div>
               </CardContent>
             </Card>
           </Link>
 
-          {/* Pedidos */}
+          {/* 2. Pedidos */}
           <Link href="/finanzas/aprovisionamiento/pedidos">
             <Card className="border-l-4 border-l-purple-400 hover:shadow-md transition-shadow cursor-pointer h-full">
               <CardContent className="p-3">
@@ -221,29 +247,163 @@ function AprovisionamientoContent() {
                   </div>
                   <ArrowRight className="h-3 w-3 text-muted-foreground" />
                 </div>
-                <div className="text-lg font-bold text-purple-600">{formatMonto(kpis?.montoTotalPedidos || 0)}</div>
+                <div className="text-base font-bold text-purple-600">{formatMonto(kpis?.montoTotalPedidos || 0)}</div>
                 <div className="text-[10px] text-muted-foreground">{kpis?.totalPedidos || 0} pedidos</div>
               </CardContent>
             </Card>
           </Link>
 
-          {/* Desviacion (Listas vs Pedidos) */}
+          {/* 3. Comprometido (OCs activas) */}
+          <Link href="/logistica/ordenes-compra">
+            <Card className="border-l-4 border-l-blue-400 hover:shadow-md transition-shadow cursor-pointer h-full">
+              <CardContent className="p-3">
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <ClipboardList className="h-3.5 w-3.5 text-blue-500" />
+                    <span className="text-[11px] font-medium text-muted-foreground">Comprometido</span>
+                  </div>
+                  <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                </div>
+                <div className="text-base font-bold text-blue-600">{formatMonto(kpis?.montoComprometido || 0)}</div>
+                <div className="text-[10px] text-muted-foreground">{kpis?.totalOrdenes || 0} OCs activas</div>
+              </CardContent>
+            </Card>
+          </Link>
+
+          {/* 4. Facturado */}
+          <Link href="/administracion/cuentas-pagar">
+            <Card className="border-l-4 border-l-indigo-400 hover:shadow-md transition-shadow cursor-pointer h-full">
+              <CardContent className="p-3">
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <Receipt className="h-3.5 w-3.5 text-indigo-500" />
+                    <span className="text-[11px] font-medium text-muted-foreground">Facturado</span>
+                  </div>
+                  <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                </div>
+                <div className="text-base font-bold text-indigo-600">{formatMonto(kpis?.montoFacturado || 0)}</div>
+                <div className="text-[10px] text-muted-foreground">{kpis?.totalFacturas || 0} facturas</div>
+              </CardContent>
+            </Card>
+          </Link>
+
+          {/* 5. Pagado */}
+          <Card className="border-l-4 border-l-green-400">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <Wallet className="h-3.5 w-3.5 text-green-500" />
+                <span className="text-[11px] font-medium text-muted-foreground">Pagado</span>
+              </div>
+              <div className="text-base font-bold text-green-600">{formatMonto(kpis?.montoPagado || 0)}</div>
+              <div className="text-[10px] text-muted-foreground">
+                {kpis?.montoFacturado
+                  ? `${Math.round(((kpis.montoPagado || 0) / kpis.montoFacturado) * 100)}% del facturado`
+                  : 'sin facturas'}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 6. Pendiente de pago */}
+          <Card className={`border-l-4 ${(kpis?.saldoPendientePago || 0) > 0 ? 'border-l-amber-400' : 'border-l-gray-300'}`}>
+            <CardContent className="p-3">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <Banknote className="h-3.5 w-3.5 text-amber-500" />
+                <span className="text-[11px] font-medium text-muted-foreground">Pendiente</span>
+              </div>
+              <div className="text-base font-bold text-amber-600">{formatMonto(kpis?.saldoPendientePago || 0)}</div>
+              <div className="text-[10px] text-muted-foreground">por pagar</div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Pipeline: qué quedó stuck en cada etapa */}
+        <Card>
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-1.5">
+                <TrendingUp className="h-3.5 w-3.5 text-gray-500" />
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Pipeline · pendientes en cada etapa
+                </span>
+              </div>
+              <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                <AlertTriangle className="h-3 w-3" /> Indica posibles cuellos de botella
+              </div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+              <PipelineItem
+                icon={<FileText className="h-3 w-3" />}
+                label="Listas sin pedido"
+                count={pipeline?.listasSinPedido.count}
+                monto={pipeline?.listasSinPedido.monto}
+                formatMonto={formatMonto}
+                href="/finanzas/aprovisionamiento/listas?sinPedido=1"
+              />
+              <PipelineItem
+                icon={<ShoppingCart className="h-3 w-3" />}
+                label="Pedidos sin OC"
+                count={pipeline?.pedidosSinOC.count}
+                monto={pipeline?.pedidosSinOC.monto}
+                formatMonto={formatMonto}
+                href="/finanzas/aprovisionamiento/pedidos?sinOC=1"
+              />
+              <PipelineItem
+                icon={<Truck className="h-3 w-3" />}
+                label="OCs sin recepción"
+                count={pipeline?.ocsSinRecepcion.count}
+                monto={pipeline?.ocsSinRecepcion.monto}
+                formatMonto={formatMonto}
+                href="/logistica/ordenes-compra?estado=confirmada"
+              />
+              <PipelineItem
+                icon={<Receipt className="h-3 w-3" />}
+                label="OCs sin factura"
+                count={pipeline?.ocsSinFactura.count}
+                monto={pipeline?.ocsSinFactura.monto}
+                formatMonto={formatMonto}
+                href="/logistica/ordenes-compra?estado=completada"
+              />
+              <PipelineItem
+                icon={<Banknote className="h-3 w-3" />}
+                label="Facturas sin pagar"
+                count={pipeline?.facturasSinPagar.count}
+                monto={pipeline?.facturasSinPagar.monto}
+                formatMonto={formatMonto}
+                href="/administracion/cuentas-pagar"
+                tone="warn"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Desviación + alertas */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <Card className={`border-l-4 ${desviacion > 5 ? 'border-l-red-400' : desviacion < -5 ? 'border-l-amber-400' : 'border-l-green-400'}`}>
             <CardContent className="p-3">
               <div className="flex items-center gap-1.5 mb-1.5">
                 <TrendingUp className={`h-3.5 w-3.5 ${desviacion > 5 ? 'text-red-500' : desviacion < -5 ? 'text-amber-500' : 'text-green-500'}`} />
-                <span className="text-[11px] font-medium text-muted-foreground">Desviacion</span>
+                <span className="text-[11px] font-medium text-muted-foreground">Desviación pedidos vs listas</span>
               </div>
               <div className={`text-lg font-bold ${desviacion > 5 ? 'text-red-600' : desviacion < -5 ? 'text-amber-600' : 'text-green-600'}`}>
                 {desviacion !== 0 ? `${desviacion > 0 ? '+' : ''}${desviacion}%` : '0%'}
               </div>
               <div className="text-[10px] text-muted-foreground">
-                {formatMonto(Math.abs((kpis?.montoTotalPedidos || 0) - (kpis?.montoTotalListas || 0)))} diferencia
+                {formatMonto(Math.abs((kpis?.montoTotalPedidos || 0) - (kpis?.montoTotalListas || 0)))} de diferencia
               </div>
             </CardContent>
           </Card>
 
-          {/* Alertas + Progreso */}
+          <Card className="border-l-4 border-l-orange-400">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <Truck className="h-3.5 w-3.5 text-orange-500" />
+                <span className="text-[11px] font-medium text-muted-foreground">Recepciones pendientes</span>
+              </div>
+              <div className="text-lg font-bold text-orange-600">{kpis?.recepcionesPendientes || 0}</div>
+              <div className="text-[10px] text-muted-foreground">items por recibir/almacenar</div>
+            </CardContent>
+          </Card>
+
           <Link href="/finanzas/aprovisionamiento/timeline">
             <Card className={`border-l-4 ${(kpis?.totalAlertas || 0) > 0 ? 'border-l-red-400' : 'border-l-green-400'} hover:shadow-md transition-shadow cursor-pointer h-full`}>
               <CardContent className="p-3">
@@ -253,13 +413,13 @@ function AprovisionamientoContent() {
                       ? <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
                       : <CheckCircle className="h-3.5 w-3.5 text-green-500" />
                     }
-                    <span className="text-[11px] font-medium text-muted-foreground">Estado</span>
+                    <span className="text-[11px] font-medium text-muted-foreground">Alertas / progreso</span>
                   </div>
                   <ArrowRight className="h-3 w-3 text-muted-foreground" />
                 </div>
-                <div className="flex items-baseline gap-2">
-                  <span className={`text-lg font-bold ${(kpis?.totalAlertas || 0) > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                    {kpis?.totalAlertas || 0} alerta{(kpis?.totalAlertas || 0) !== 1 ? 's' : ''}
+                <div className="text-lg font-bold">
+                  <span className={(kpis?.totalAlertas || 0) > 0 ? 'text-red-600' : 'text-green-600'}>
+                    {kpis?.totalAlertas || 0} alertas
                   </span>
                 </div>
                 <div className="text-[10px] text-muted-foreground">
@@ -460,5 +620,39 @@ function AprovisionamientoContent() {
         </div>
       </div>
     </div>
+  )
+}
+
+interface PipelineItemProps {
+  icon: React.ReactNode
+  label: string
+  count: number | undefined
+  monto: number | undefined
+  formatMonto: (n: number, m?: string) => string
+  href: string
+  tone?: 'default' | 'warn'
+}
+
+function PipelineItem({ icon, label, count, monto, formatMonto, href, tone = 'default' }: PipelineItemProps) {
+  const c = count ?? 0
+  const m = monto ?? 0
+  const isEmpty = c === 0
+  return (
+    <Link href={href}>
+      <div
+        className={`rounded-md border p-2 transition-colors hover:bg-muted/40 cursor-pointer ${
+          isEmpty ? 'opacity-60' : tone === 'warn' && c > 0 ? 'border-amber-300 bg-amber-50/30' : ''
+        }`}
+      >
+        <div className="flex items-center gap-1 text-[10px] text-muted-foreground mb-0.5">
+          {icon}
+          <span className="truncate">{label}</span>
+        </div>
+        <div className="text-base font-bold leading-tight">{c}</div>
+        <div className="text-[10px] text-muted-foreground font-mono">
+          {m > 0 ? formatMonto(m) : '—'}
+        </div>
+      </div>
+    </Link>
   )
 }

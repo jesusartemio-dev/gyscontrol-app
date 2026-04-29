@@ -54,6 +54,17 @@ interface ProyectoConsolidado {
     pendientes: number
     montoTotal: number
   }
+  ordenes: {
+    total: number
+    montoComprometido: number
+  }
+  facturas: {
+    total: number
+    montoFacturado: number
+    montoPagado: number
+    saldoPendiente: number
+  }
+  recepcionesPendientes: number
   alertas: number
   progreso: number
   moneda: 'PEN' | 'USD'
@@ -240,32 +251,89 @@ export async function GET(request: NextRequest) {
         updatedAt: 'desc'
       }
     })
+
+    const proyectoIds = proyectos.map(p => p.id)
+
+    // 💰 Agregar datos financieros del lado derecho del flujo (OC, CxP, Recepciones)
+    // Hacemos una query agregada por proyecto para evitar N+1.
+
+    // Comprometido: OCs en estado vivo (no borrador, no cancelada)
+    const ocsActivas = proyectoIds.length === 0 ? [] : await prisma.ordenCompra.groupBy({
+      by: ['proyectoId'],
+      where: {
+        proyectoId: { in: proyectoIds },
+        estado: { in: ['aprobada', 'enviada', 'confirmada', 'parcial', 'completada'] },
+      },
+      _sum: { total: true },
+      _count: { _all: true },
+    })
+    const compromisoMap = new Map<string, { monto: number; count: number }>()
+    for (const r of ocsActivas) {
+      if (r.proyectoId) compromisoMap.set(r.proyectoId, { monto: r._sum.total || 0, count: r._count._all })
+    }
+
+    // Cuentas por pagar (facturas) por proyecto
+    const cxpAgg = proyectoIds.length === 0 ? [] : await prisma.cuentaPorPagar.groupBy({
+      by: ['proyectoId'],
+      where: {
+        proyectoId: { in: proyectoIds },
+        estado: { not: 'anulada' },
+      },
+      _sum: { monto: true, montoPagado: true, saldoPendiente: true },
+      _count: { _all: true },
+    })
+    const cxpMap = new Map<string, { facturado: number; pagado: number; pendiente: number; count: number }>()
+    for (const r of cxpAgg) {
+      if (r.proyectoId) cxpMap.set(r.proyectoId, {
+        facturado: r._sum.monto || 0,
+        pagado: r._sum.montoPagado || 0,
+        pendiente: r._sum.saldoPendiente || 0,
+        count: r._count._all,
+      })
+    }
+
+    // Recepciones pendientes por proyecto (vía OC.proyectoId → OrdenCompraItem → RecepcionPendiente)
+    const recepcionesPend = proyectoIds.length === 0 ? [] : await prisma.recepcionPendiente.findMany({
+      where: {
+        estado: { in: ['pendiente', 'en_almacen'] },
+        ordenCompraItem: {
+          ordenCompra: { proyectoId: { in: proyectoIds } },
+        },
+      },
+      select: {
+        ordenCompraItem: {
+          select: { ordenCompra: { select: { proyectoId: true } } },
+        },
+      },
+    })
+    const recepcionesMap = new Map<string, number>()
+    for (const r of recepcionesPend) {
+      const pid = r.ordenCompraItem?.ordenCompra?.proyectoId
+      if (pid) recepcionesMap.set(pid, (recepcionesMap.get(pid) || 0) + 1)
+    }
     
     // 🔄 Transformar datos a formato consolidado
     let proyectosConsolidados: ProyectoConsolidado[] = proyectos.map(proyecto => {
       const listas = proyecto.listaEquipo || []
       const pedidos = proyecto.pedidoEquipo || []
 
-      // 💰 Calcular presupuesto total (suma de costoElegido de todos los items)
-      const presupuestoTotal = listas.reduce((total, lista) => {
+      // 💰 Monto total de listas (precioElegido = lo cotizado/aprobado).
+      // Es el valor "presupuestado" desde la vista de aprovisionamiento.
+      // Antes se usaba costoElegido que casi nunca está cargado → mostraba 0.
+      const montoTotalListas = listas.reduce((total, lista) => {
         const montoLista = lista.listaEquipoItem?.reduce((subtotal, item) => {
-          return subtotal + (item.costoElegido || 0) * item.cantidad
+          return subtotal + (item.precioElegido || 0) * item.cantidad
         }, 0) || 0
         return total + montoLista
       }, 0)
+
+      // 💰 Presupuesto total = monto total de listas (alias por retrocompatibilidad)
+      const presupuestoTotal = montoTotalListas
 
       // 💰 Calcular presupuesto ejecutado (suma de costoReal de todos los items)
       const presupuestoEjecutado = listas.reduce((total, lista) => {
         const montoLista = lista.listaEquipoItem?.reduce((subtotal, item) => {
           return subtotal + (item.costoReal || 0) * item.cantidad
-        }, 0) || 0
-        return total + montoLista
-      }, 0)
-      
-      // 💰 Calcular montos de listas (para mostrar en la sección de listas)
-      const montoTotalListas = listas.reduce((total, lista) => {
-        const montoLista = lista.listaEquipoItem?.reduce((subtotal, item) => {
-          return subtotal + (item.precioElegido || 0) * item.cantidad
         }, 0) || 0
         return total + montoLista
       }, 0)
@@ -287,7 +355,10 @@ export async function GET(request: NextRequest) {
       
       const alertas = contarAlertas(proyecto, listas, pedidos)
       const progreso = calcularProgreso(listas, pedidos)
-      
+      const compromiso = compromisoMap.get(proyecto.id) || { monto: 0, count: 0 }
+      const cxp = cxpMap.get(proyecto.id) || { facturado: 0, pagado: 0, pendiente: 0, count: 0 }
+      const recepcionesPendientes = recepcionesMap.get(proyecto.id) || 0
+
       return {
         id: proyecto.id,
         nombre: proyecto.nombre,
@@ -313,6 +384,17 @@ export async function GET(request: NextRequest) {
           pendientes: pedidosPendientes,
           montoTotal: montoTotalPedidos
         },
+        ordenes: {
+          total: compromiso.count,
+          montoComprometido: compromiso.monto,
+        },
+        facturas: {
+          total: cxp.count,
+          montoFacturado: cxp.facturado,
+          montoPagado: cxp.pagado,
+          saldoPendiente: cxp.pendiente,
+        },
+        recepcionesPendientes,
         alertas,
         progreso,
         moneda: 'USD' as const
@@ -332,10 +414,17 @@ export async function GET(request: NextRequest) {
       proyectosCompletados: proyectosConsolidados.filter(p => p.estado === 'completado').length,
       totalListas: proyectosConsolidados.reduce((sum, p) => sum + p.listas.total, 0),
       totalPedidos: proyectosConsolidados.reduce((sum, p) => sum + p.pedidos.total, 0),
+      totalOrdenes: proyectosConsolidados.reduce((sum, p) => sum + p.ordenes.total, 0),
+      totalFacturas: proyectosConsolidados.reduce((sum, p) => sum + p.facturas.total, 0),
       montoTotalListas: proyectosConsolidados.reduce((sum, p) => sum + p.listas.montoTotal, 0),
       montoTotalPedidos: proyectosConsolidados.reduce((sum, p) => sum + p.pedidos.montoTotal, 0),
+      montoComprometido: proyectosConsolidados.reduce((sum, p) => sum + p.ordenes.montoComprometido, 0),
+      montoFacturado: proyectosConsolidados.reduce((sum, p) => sum + p.facturas.montoFacturado, 0),
+      montoPagado: proyectosConsolidados.reduce((sum, p) => sum + p.facturas.montoPagado, 0),
+      saldoPendientePago: proyectosConsolidados.reduce((sum, p) => sum + p.facturas.saldoPendiente, 0),
+      recepcionesPendientes: proyectosConsolidados.reduce((sum, p) => sum + p.recepcionesPendientes, 0),
       totalAlertas: proyectosConsolidados.reduce((sum, p) => sum + p.alertas, 0),
-      progresoPromedio: proyectosConsolidados.length > 0 
+      progresoPromedio: proyectosConsolidados.length > 0
         ? Math.round(proyectosConsolidados.reduce((sum, p) => sum + p.progreso, 0) / proyectosConsolidados.length)
         : 0
     }

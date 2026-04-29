@@ -40,6 +40,17 @@ export interface ProyectoConsolidado {
     pendientes: number
     montoTotal: number
   }
+  ordenes: {
+    total: number
+    montoComprometido: number
+  }
+  facturas: {
+    total: number
+    montoFacturado: number
+    montoPagado: number
+    saldoPendiente: number
+  }
+  recepcionesPendientes: number
   alertas: number
   progreso: number
   moneda: 'PEN' | 'USD'
@@ -52,8 +63,15 @@ export interface KPIsConsolidados {
   proyectosCompletados: number
   totalListas: number
   totalPedidos: number
+  totalOrdenes: number
+  totalFacturas: number
   montoTotalListas: number
   montoTotalPedidos: number
+  montoComprometido: number
+  montoFacturado: number
+  montoPagado: number
+  saldoPendientePago: number
+  recepcionesPendientes: number
   totalAlertas: number
   progresoPromedio: number
 }
@@ -185,8 +203,15 @@ export async function obtenerProyectosConsolidados(
         proyectosCompletados: 0,
         totalListas: 0,
         totalPedidos: 0,
+        totalOrdenes: 0,
+        totalFacturas: 0,
         montoTotalListas: 0,
         montoTotalPedidos: 0,
+        montoComprometido: 0,
+        montoFacturado: 0,
+        montoPagado: 0,
+        saldoPendientePago: 0,
+        recepcionesPendientes: 0,
         totalAlertas: 0,
         progresoPromedio: 0
       },
@@ -221,8 +246,15 @@ export async function obtenerKPIsConsolidados(
       proyectosCompletados: 0,
       totalListas: 0,
       totalPedidos: 0,
+      totalOrdenes: 0,
+      totalFacturas: 0,
       montoTotalListas: 0,
       montoTotalPedidos: 0,
+      montoComprometido: 0,
+      montoFacturado: 0,
+      montoPagado: 0,
+      saldoPendientePago: 0,
+      recepcionesPendientes: 0,
       totalAlertas: 0,
       progresoPromedio: 0
     }
