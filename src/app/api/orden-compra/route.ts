@@ -168,12 +168,32 @@ export async function POST(req: Request) {
     const igv = subtotal * 0.18
     const total = subtotal + igv
 
+    // Derivar pedidoEquipoId de los items: si todos los items con pedidoEquipoItemId
+    // apuntan al mismo PedidoEquipo, vincular la OC a ese pedido. Si vienen de varios
+    // pedidos (o ninguno tiene pedidoEquipoItemId), dejar null.
+    let pedidoEquipoIdFinal: string | null = payload.pedidoEquipoId || null
+    if (!pedidoEquipoIdFinal) {
+      const pedidoItemIds = items
+        .map((i: any) => i.pedidoEquipoItemId)
+        .filter((id: string | null): id is string => !!id)
+      if (pedidoItemIds.length > 0) {
+        const pedidoItems = await prisma.pedidoEquipoItem.findMany({
+          where: { id: { in: pedidoItemIds } },
+          select: { pedidoId: true },
+        })
+        const pedidosUnicos = new Set(pedidoItems.map(pi => pi.pedidoId))
+        if (pedidosUnicos.size === 1) {
+          pedidoEquipoIdFinal = pedidoItems[0].pedidoId
+        }
+      }
+    }
+
     const data = await prisma.ordenCompra.create({
       data: {
         numero,
         proveedorId: payload.proveedorId,
         centroCostoId: payload.centroCostoId || null,
-        pedidoEquipoId: payload.pedidoEquipoId || null,
+        pedidoEquipoId: pedidoEquipoIdFinal,
         proyectoId: payload.proyectoId || null,
         categoriaCosto: payload.categoriaCosto || 'equipos',
         requiereRecepcion: payload.requiereRecepcion ?? true,

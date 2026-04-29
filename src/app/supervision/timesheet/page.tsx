@@ -30,6 +30,7 @@ import {
   AlertCircle,
   ChevronDown,
   ChevronUp,
+  ArrowRight,
   User,
   Users,
   Calendar,
@@ -461,20 +462,24 @@ export default function SupervisionTimesheetPage() {
             <option key={u.id} value={u.id}>{u.name}</option>
           ))}
         </select>
-        <Input
-          type="week"
-          value={filtroSemanaDesde}
-          onChange={e => setFiltroSemanaDesde(e.target.value)}
-          className="h-9 w-[170px] text-sm"
-          title="Semana desde"
-        />
-        <Input
-          type="week"
-          value={filtroSemanaHasta}
-          onChange={e => setFiltroSemanaHasta(e.target.value)}
-          className="h-9 w-[170px] text-sm"
-          title="Semana hasta"
-        />
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-muted-foreground whitespace-nowrap">Semana:</span>
+          <Input
+            type="week"
+            value={filtroSemanaDesde}
+            onChange={e => setFiltroSemanaDesde(e.target.value)}
+            className="h-9 w-[155px] text-sm"
+            title="Desde"
+          />
+          <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          <Input
+            type="week"
+            value={filtroSemanaHasta}
+            onChange={e => setFiltroSemanaHasta(e.target.value)}
+            className="h-9 w-[155px] text-sm"
+            title="Hasta"
+          />
+        </div>
         {tieneFiltros && (
           <Button variant="ghost" size="sm" onClick={limpiarFiltros} className="h-9">
             <X className="h-4 w-4 mr-1" />
