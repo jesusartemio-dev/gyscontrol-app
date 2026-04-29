@@ -10,9 +10,11 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
-import { ArrowLeft, Loader2, Pencil, Plus, Search } from 'lucide-react'
+import { ArrowLeft, Download, FileSpreadsheet, Loader2, Pencil, Plus, Search, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
+import ModalImportarCatalogoEPP from '@/components/seguridad/ModalImportarCatalogoEPP'
+import { exportarCatalogoEppAExcel } from '@/lib/utils/catalogoEppExcel'
 
 const SUBCATEGORIAS = [
   { value: 'cabeza', label: 'Cabeza (cascos)' },
@@ -45,6 +47,7 @@ interface CatalogoEppItem {
   descripcion: string
   marca: string | null
   modelo: string | null
+  talla: string | null
   unidadId: string
   unidad: { id: string; nombre: string }
   subcategoria: string
@@ -63,6 +66,7 @@ interface DraftItem {
   descripcion: string
   marca: string
   modelo: string
+  talla: string
   unidadId: string
   subcategoria: string
   requiereTalla: boolean
@@ -79,6 +83,7 @@ const DRAFT_VACIO: DraftItem = {
   descripcion: '',
   marca: '',
   modelo: '',
+  talla: '',
   unidadId: '',
   subcategoria: 'otro',
   requiereTalla: false,
@@ -101,6 +106,7 @@ export default function CatalogoEppPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [draft, setDraft] = useState<DraftItem>({ ...DRAFT_VACIO })
   const [saving, setSaving] = useState(false)
+  const [importarOpen, setImportarOpen] = useState(false)
 
   const cargar = async () => {
     setLoading(true)
@@ -147,6 +153,7 @@ export default function CatalogoEppPage() {
       descripcion: item.descripcion,
       marca: item.marca ?? '',
       modelo: item.modelo ?? '',
+      talla: item.talla ?? '',
       unidadId: item.unidadId,
       subcategoria: item.subcategoria,
       requiereTalla: item.requiereTalla,
@@ -165,7 +172,10 @@ export default function CatalogoEppPage() {
     if (!draft.descripcion.trim()) return toast.error('Descripción es obligatoria')
     if (!draft.unidadId) return toast.error('Unidad es obligatoria')
     if (draft.requiereTalla && !draft.tallaCampo) {
-      return toast.error('Selecciona qué talla del empleado consultar')
+      return toast.error('Selecciona el tipo de talla a consultar (Calzado/Camisa/Pantalón/Casco)')
+    }
+    if (draft.requiereTalla && !draft.talla.trim()) {
+      return toast.error('Indica la talla específica de este SKU (ej. M, 40)')
     }
 
     setSaving(true)
@@ -175,6 +185,7 @@ export default function CatalogoEppPage() {
         descripcion: draft.descripcion.trim(),
         marca: draft.marca.trim() || null,
         modelo: draft.modelo.trim() || null,
+        talla: draft.requiereTalla ? draft.talla.trim() : null,
         unidadId: draft.unidadId,
         subcategoria: draft.subcategoria,
         requiereTalla: draft.requiereTalla,
@@ -208,7 +219,7 @@ export default function CatalogoEppPage() {
 
   return (
     <div className="container mx-auto p-4 sm:p-6 space-y-4 max-w-6xl">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <Link href="/seguridad">
           <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
         </Link>
@@ -216,6 +227,17 @@ export default function CatalogoEppPage() {
           <h1 className="text-xl font-bold">Catálogo EPP</h1>
           <p className="text-sm text-muted-foreground">Crea y administra los EPPs disponibles para entregar</p>
         </div>
+        <Button
+          variant="outline"
+          onClick={() => exportarCatalogoEppAExcel(items)}
+          disabled={items.length === 0}
+          title="Descargar el catálogo en formato Excel"
+        >
+          <Download className="h-4 w-4 mr-1" /> Exportar
+        </Button>
+        <Button variant="outline" onClick={() => setImportarOpen(true)}>
+          <Upload className="h-4 w-4 mr-1" /> Importar
+        </Button>
         <Button onClick={abrirCrear} className="bg-orange-600 hover:bg-orange-700">
           <Plus className="h-4 w-4 mr-1" /> Nuevo EPP
         </Button>
@@ -257,9 +279,10 @@ export default function CatalogoEppPage() {
                   <TableHead>Código</TableHead>
                   <TableHead>Descripción</TableHead>
                   <TableHead>Marca</TableHead>
+                  <TableHead>Talla</TableHead>
                   <TableHead>Subcategoría</TableHead>
                   <TableHead>Unidad</TableHead>
-                  <TableHead>Talla</TableHead>
+                  <TableHead>Tipo talla</TableHead>
                   <TableHead className="text-right">Vida útil</TableHead>
                   <TableHead className="text-right">Precio ref.</TableHead>
                   <TableHead className="w-16"></TableHead>
@@ -274,9 +297,10 @@ export default function CatalogoEppPage() {
                       {item.modelo && <div className="text-[10px] text-muted-foreground">{item.modelo}</div>}
                     </TableCell>
                     <TableCell className="text-xs">{item.marca || '—'}</TableCell>
+                    <TableCell className="text-xs font-mono font-semibold">{item.talla || '—'}</TableCell>
                     <TableCell><Badge variant="secondary" className="text-[10px]">{item.subcategoria}</Badge></TableCell>
                     <TableCell className="text-xs">{item.unidad.nombre}</TableCell>
-                    <TableCell className="text-xs">{item.requiereTalla ? `Sí (${item.tallaCampo})` : '—'}</TableCell>
+                    <TableCell className="text-xs">{item.requiereTalla ? item.tallaCampo : '—'}</TableCell>
                     <TableCell className="text-right text-xs">
                       {item.esConsumible ? <span className="text-amber-600">consumible</span> : item.vidaUtilDias ? `${item.vidaUtilDias}d` : '—'}
                     </TableCell>
@@ -338,25 +362,43 @@ export default function CatalogoEppPage() {
               <Input type="number" min={0} value={draft.vidaUtilDias} onChange={e => setDraft(d => ({ ...d, vidaUtilDias: e.target.value }))} placeholder="365 = anual" disabled={draft.esConsumible} />
               <p className="text-[10px] text-muted-foreground">Vacío o consumible = sin vencimiento</p>
             </div>
-            <div className="col-span-2 grid grid-cols-3 gap-3 border-t pt-3">
+            <div className="col-span-2 border-t pt-3 space-y-3">
               <label className="flex items-center gap-2 text-sm">
-                <Switch checked={draft.requiereTalla} onCheckedChange={v => setDraft(d => ({ ...d, requiereTalla: v, tallaCampo: v ? d.tallaCampo : '' }))} />
+                <Switch checked={draft.requiereTalla} onCheckedChange={v => setDraft(d => ({ ...d, requiereTalla: v, tallaCampo: v ? d.tallaCampo : '', talla: v ? d.talla : '' }))} />
                 Requiere talla
               </label>
               {draft.requiereTalla && (
-                <Select value={draft.tallaCampo} onValueChange={v => setDraft(d => ({ ...d, tallaCampo: v }))}>
-                  <SelectTrigger className="col-span-2"><SelectValue placeholder="Talla del empleado a usar..." /></SelectTrigger>
-                  <SelectContent>{TALLA_CAMPOS.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
-                </Select>
+                <div className="grid grid-cols-2 gap-3 pl-7">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Talla específica de este SKU *</Label>
+                    <Input
+                      value={draft.talla}
+                      onChange={e => setDraft(d => ({ ...d, talla: e.target.value }))}
+                      placeholder="Ej: M, L, 40"
+                      className="h-8 text-sm"
+                    />
+                    <p className="text-[10px] text-muted-foreground">El valor concreto (S/M/L o número) que define este SKU.</p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Tipo de talla *</Label>
+                    <Select value={draft.tallaCampo} onValueChange={v => setDraft(d => ({ ...d, tallaCampo: v }))}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Calzado / Camisa / ..." /></SelectTrigger>
+                      <SelectContent>{TALLA_CAMPOS.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
+                    </Select>
+                    <p className="text-[10px] text-muted-foreground">Qué medida del empleado se consulta al entregar.</p>
+                  </div>
+                </div>
               )}
-              <label className="flex items-center gap-2 text-sm">
-                <Switch checked={draft.esConsumible} onCheckedChange={v => setDraft(d => ({ ...d, esConsumible: v, vidaUtilDias: v ? '' : d.vidaUtilDias }))} />
-                Consumible
-              </label>
-              <label className="flex items-center gap-2 text-sm col-span-2">
-                <Switch checked={draft.activo} onCheckedChange={v => setDraft(d => ({ ...d, activo: v }))} />
-                Activo
-              </label>
+              <div className="flex items-center gap-6 pt-1">
+                <label className="flex items-center gap-2 text-sm">
+                  <Switch checked={draft.esConsumible} onCheckedChange={v => setDraft(d => ({ ...d, esConsumible: v, vidaUtilDias: v ? '' : d.vidaUtilDias }))} />
+                  Consumible
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <Switch checked={draft.activo} onCheckedChange={v => setDraft(d => ({ ...d, activo: v }))} />
+                  Activo
+                </label>
+              </div>
             </div>
             <div className="col-span-2 grid grid-cols-[80px_1fr] gap-2 items-end">
               <div className="space-y-1">
@@ -384,6 +426,14 @@ export default function CatalogoEppPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Modal de importación masiva desde Excel */}
+      <ModalImportarCatalogoEPP
+        open={importarOpen}
+        onOpenChange={setImportarOpen}
+        unidades={unidades}
+        onImportado={cargar}
+      />
     </div>
   )
 }

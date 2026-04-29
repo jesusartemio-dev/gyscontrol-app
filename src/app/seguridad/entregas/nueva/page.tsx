@@ -49,6 +49,7 @@ interface CatalogoEppResult {
   descripcion: string
   marca: string | null
   modelo: string | null
+  talla: string | null
   subcategoria: string
   requiereTalla: boolean
   tallaCampo: 'calzado' | 'camisa' | 'pantalon' | 'casco' | null
@@ -144,8 +145,13 @@ export default function NuevaEntregaEppPage() {
     catalogoTimerRef.current = setTimeout(() => buscarCatalogo(val), 300)
   }
 
+  // Determina la talla a usar para la entrega:
+  // 1. Si el SKU del catálogo ya tiene `talla` definida, esa es la verdad (cada SKU es una talla específica).
+  // 2. Si no, sugiere la talla del empleado según el tallaCampo (legacy).
   const tallaSugerida = (cat: CatalogoEppResult): string => {
-    if (!cat.requiereTalla || !empleado || !cat.tallaCampo) return ''
+    if (!cat.requiereTalla) return ''
+    if (cat.talla) return cat.talla
+    if (!empleado || !cat.tallaCampo) return ''
     return (
       (cat.tallaCampo === 'camisa' && empleado.tallaCamisa) ||
       (cat.tallaCampo === 'pantalon' && empleado.tallaPantalon) ||
@@ -153,6 +159,23 @@ export default function NuevaEntregaEppPage() {
       (cat.tallaCampo === 'casco' && empleado.tallaCasco) ||
       ''
     )
+  }
+
+  // Detecta si la talla del catálogo (cuando existe) coincide con la del empleado.
+  // Devuelve un mensaje de aviso si NO coincide (talla del SKU != talla del empleado).
+  const avisoMismatchTalla = (cat: CatalogoEppResult): string | null => {
+    if (!cat.requiereTalla || !cat.talla || !empleado || !cat.tallaCampo) return null
+    const tallaEmpleado =
+      (cat.tallaCampo === 'camisa' && empleado.tallaCamisa) ||
+      (cat.tallaCampo === 'pantalon' && empleado.tallaPantalon) ||
+      (cat.tallaCampo === 'calzado' && empleado.tallaCalzado) ||
+      (cat.tallaCampo === 'casco' && empleado.tallaCasco) ||
+      ''
+    if (!tallaEmpleado) return null
+    if (tallaEmpleado.trim().toLowerCase() !== cat.talla.trim().toLowerCase()) {
+      return `Empleado usa talla ${tallaEmpleado}, este SKU es talla ${cat.talla}`
+    }
+    return null
   }
 
   const consultarStock = async (catalogoEppId: string): Promise<number> => {
@@ -174,6 +197,8 @@ export default function NuevaEntregaEppPage() {
       return
     }
     const stockDisponible = await consultarStock(cat.id)
+    const aviso = avisoMismatchTalla(cat)
+    if (aviso) toast.warning(aviso)
     setItems(prev => [
       ...prev,
       {
@@ -366,22 +391,28 @@ export default function NuevaEntregaEppPage() {
                 {catalogoResults.length === 0 ? (
                   <div className="px-3 py-2 text-xs text-muted-foreground">Sin resultados</div>
                 ) : (
-                  catalogoResults.map(c => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => agregarDelCatalogo(c)}
-                      className="w-full text-left px-3 py-1.5 hover:bg-muted/60 border-b last:border-b-0 text-xs"
-                    >
-                      <div className="font-medium">{c.descripcion}</div>
-                      <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-mono">
-                        <span>{c.codigo}</span>
-                        {c.marca && <span>· {c.marca}</span>}
-                        <span>· {c.unidad?.nombre}</span>
-                        {c.requiereTalla && <Badge variant="secondary" className="text-[9px] py-0 h-3.5">requiere talla</Badge>}
-                      </div>
-                    </button>
-                  ))
+                  catalogoResults.map(c => {
+                    const aviso = avisoMismatchTalla(c)
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => agregarDelCatalogo(c)}
+                        className="w-full text-left px-3 py-1.5 hover:bg-muted/60 border-b last:border-b-0 text-xs"
+                      >
+                        <div className="font-medium flex items-center gap-2">
+                          <span>{c.descripcion}</span>
+                          {c.talla && <Badge variant="outline" className="text-[9px] py-0 h-4 font-mono">talla {c.talla}</Badge>}
+                        </div>
+                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-mono">
+                          <span>{c.codigo}</span>
+                          {c.marca && <span>· {c.marca}</span>}
+                          <span>· {c.unidad?.nombre}</span>
+                          {aviso && <span className="text-amber-600">⚠ {aviso}</span>}
+                        </div>
+                      </button>
+                    )
+                  })
                 )}
               </div>
             )}

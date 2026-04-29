@@ -4786,6 +4786,11 @@ model CatalogoEPP {
   descripcion         String
   marca               String?
   modelo              String?
+  // Talla específica de este SKU (S/M/L o 38/39/40). Convención: cada
+  // talla es un SKU distinto; este campo guarda el valor explícito para
+  // poder filtrar/agrupar y hacer auto-match con la talla del empleado.
+  // Vacío para items que no requieren talla (mascarillas, tapones, etc.).
+  talla               String?
   unidadId            String
   subcategoria        SubcategoriaEPP
   requiereTalla       Boolean             @default(false)

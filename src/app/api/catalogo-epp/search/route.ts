@@ -37,6 +37,7 @@ export async function GET(req: NextRequest) {
         descripcion: true,
         marca: true,
         modelo: true,
+        talla: true,
         subcategoria: true,
         requiereTalla: true,
         tallaCampo: true,

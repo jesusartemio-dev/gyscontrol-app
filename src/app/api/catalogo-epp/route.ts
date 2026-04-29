@@ -65,10 +65,16 @@ export async function POST(req: Request) {
       )
     }
 
-    // Validar que requiereTalla y tallaCampo sean coherentes
+    // Validar que requiereTalla, tallaCampo y talla sean coherentes
     if (body.requiereTalla && !body.tallaCampo) {
       return NextResponse.json(
         { error: 'Si requiereTalla=true, tallaCampo es obligatorio' },
+        { status: 400 }
+      )
+    }
+    if (body.requiereTalla && !body.talla?.toString().trim()) {
+      return NextResponse.json(
+        { error: 'Si requiereTalla=true, debes indicar la talla específica de este SKU (ej. M, 40)' },
         { status: 400 }
       )
     }
@@ -79,6 +85,7 @@ export async function POST(req: Request) {
         descripcion: body.descripcion.trim(),
         marca: body.marca?.trim() || null,
         modelo: body.modelo?.trim() || null,
+        talla: body.requiereTalla ? body.talla.toString().trim() : null,
         unidadId: body.unidadId,
         subcategoria: body.subcategoria,
         requiereTalla: !!body.requiereTalla,

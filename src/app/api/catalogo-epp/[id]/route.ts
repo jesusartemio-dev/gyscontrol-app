@@ -44,6 +44,12 @@ export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }
         { status: 400 }
       )
     }
+    if (body.requiereTalla && !body.talla?.toString().trim()) {
+      return NextResponse.json(
+        { error: 'Si requiereTalla=true, debes indicar la talla específica del SKU' },
+        { status: 400 }
+      )
+    }
 
     const updated = await prisma.catalogoEPP.update({
       where: { id },
@@ -52,12 +58,14 @@ export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }
         ...(body.descripcion !== undefined ? { descripcion: body.descripcion.trim() } : {}),
         ...(body.marca !== undefined ? { marca: body.marca?.trim() || null } : {}),
         ...(body.modelo !== undefined ? { modelo: body.modelo?.trim() || null } : {}),
+        ...(body.talla !== undefined ? { talla: body.talla?.toString().trim() || null } : {}),
         ...(body.unidadId !== undefined ? { unidadId: body.unidadId } : {}),
         ...(body.subcategoria !== undefined ? { subcategoria: body.subcategoria } : {}),
         ...(body.requiereTalla !== undefined
           ? {
               requiereTalla: !!body.requiereTalla,
               tallaCampo: body.requiereTalla ? body.tallaCampo : null,
+              talla: body.requiereTalla ? (body.talla?.toString().trim() || null) : null,
             }
           : {}),
         ...(body.vidaUtilDias !== undefined
