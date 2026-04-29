@@ -88,11 +88,10 @@ export default function ListasEquipoPageContent() {
       pendientes: items.filter((item: any) => item.estado === 'pendiente').length,
       aprobadas: items.filter((item: any) => item.estado === 'aprobada').length,
       anuladas: items.filter((item: any) => item.estado === 'anulada').length,
+      // El backend ya devuelve el monto agregado por lista en estadisticas.montoTotal.
+      // Antes recorríamos lista.listaEquipoItem (que no viene en la respuesta) → 0.
       montoTotal: items.reduce((sum: number, item: any) => {
-        const itemTotal = (item.listaEquipoItem || []).reduce((s: number, i: any) => {
-          return s + ((i.precioElegido || i.presupuesto || 0) * (i.cantidad || 0))
-        }, 0)
-        return sum + itemTotal
+        return sum + (item.estadisticas?.montoTotal ?? item.gantt?.montoProyectado ?? 0)
       }, 0)
     }
   }, [listasData])
@@ -288,9 +287,7 @@ export default function ListasEquipoPageContent() {
             </TableHeader>
             <TableBody>
               {listasData.items.map((lista: any) => {
-                const montoLista = (lista.listaEquipoItem || []).reduce((s: number, i: any) => {
-                  return s + ((i.precioElegido || i.presupuesto || 0) * (i.cantidad || 0))
-                }, 0)
+                const montoLista = lista.estadisticas?.montoTotal ?? lista.gantt?.montoProyectado ?? 0
 
                 return (
                   <TableRow key={lista.id} className="hover:bg-gray-50/50">
@@ -310,7 +307,7 @@ export default function ListasEquipoPageContent() {
                     <TableCell className="py-2">{getEstadoBadge(lista.estado)}</TableCell>
                     <TableCell className="py-2 text-center">
                       <Badge variant="outline" className="text-[10px] h-5 px-1.5">
-                        {lista._count?.listaEquipoItem || lista.listaEquipoItem?.length || 0}
+                        {lista.estadisticas?.totalItems ?? lista._count?.listaEquipoItem ?? lista.listaEquipoItem?.length ?? 0}
                       </Badge>
                     </TableCell>
                     <TableCell className="py-2 text-right">
