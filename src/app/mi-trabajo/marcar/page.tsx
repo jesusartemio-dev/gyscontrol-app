@@ -124,13 +124,14 @@ export default function MarcarPage() {
       .finally(() => setCargandoCercanas(false))
   }, [geo.coords])
 
-  // Pre-solicitar GPS al cargar para que aparezca el panel "¿Dónde estoy?" sin que el
-  // usuario tenga que tocar "Marcar" primero. Solo si el permiso ya fue concedido.
+  // Pre-solicitar GPS al cargar para que aparezca el mapa de sedes sin que el usuario
+  // tenga que tocar "Marcar" primero. Aplica a todos (incluido confianza, donde el
+  // mapa es informativo). Si el permiso esta denegado no insistimos.
   useEffect(() => {
-    if (permisoGps === 'granted' && !geo.coords) {
-      geo.solicitar()
-    }
-  }, [permisoGps, geo])
+    if (permisoGps === 'denied') return
+    if (geo.coords) return
+    geo.solicitar()
+  }, [permisoGps, geo.coords, geo.solicitar])
 
   async function enviarMarcaje(
     tipo: TipoBotón,
