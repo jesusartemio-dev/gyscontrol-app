@@ -13,7 +13,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { toast } from 'sonner'
-import { CheckCircle2, Loader2, Smartphone, X } from 'lucide-react'
+import { CheckCircle2, Loader2, Smartphone, X, ShieldOff } from 'lucide-react'
 
 interface Dispositivo {
   id: string
@@ -31,15 +31,33 @@ interface Dispositivo {
 export default function DispositivosPage() {
   const [data, setData] = useState<Dispositivo[]>([])
   const [loading, setLoading] = useState(true)
+  const [sinPermiso, setSinPermiso] = useState(false)
   const [filtro, setFiltro] = useState<'pendientes' | 'todos'>('pendientes')
 
   async function cargar() {
     setLoading(true)
+    setSinPermiso(false)
     const url = `/api/asistencia/dispositivos?scope=all${filtro === 'pendientes' ? '&pendientes=1' : ''}`
-    const r = await fetch(url)
-    const j = await r.json()
-    setData(j)
-    setLoading(false)
+    try {
+      const r = await fetch(url)
+      if (r.status === 401 || r.status === 403) {
+        setSinPermiso(true)
+        setData([])
+        return
+      }
+      if (!r.ok) {
+        toast.error('Error al cargar dispositivos')
+        setData([])
+        return
+      }
+      const j = await r.json()
+      setData(Array.isArray(j) ? j : [])
+    } catch {
+      toast.error('Error de red')
+      setData([])
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
@@ -93,6 +111,17 @@ export default function DispositivosPage() {
           {loading ? (
             <div className="flex h-40 items-center justify-center">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : sinPermiso ? (
+            <div className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+              <ShieldOff className="h-10 w-10 text-muted-foreground" />
+              <div>
+                <p className="text-base font-semibold">No tienes acceso a esta sección</p>
+                <p className="text-sm text-muted-foreground">
+                  La aprobación de dispositivos es solo para roles de supervisión
+                  (admin, gerente, coordinador, gestor).
+                </p>
+              </div>
             </div>
           ) : (
             <Table>

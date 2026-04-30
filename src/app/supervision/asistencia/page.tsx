@@ -117,9 +117,14 @@ function estadoColor(e: string) {
   }
 }
 
+const ROLES_SUPERVISION_DISPOSITIVOS = ['admin', 'gerente', 'coordinador', 'gestor']
+
 export default function SupervisionAsistencia() {
   const { data: session } = useSession()
   const esAdmin = session?.user?.role === 'admin' || session?.user?.role === 'gerente'
+  const puedeSupervisarDispositivos = ROLES_SUPERVISION_DISPOSITIVOS.includes(
+    session?.user?.role || '',
+  )
 
   const [data, setData] = useState<Fila[]>([])
   const [loading, setLoading] = useState(false)
@@ -293,11 +298,13 @@ export default function SupervisionAsistencia() {
             Marcajes del equipo y gestión de dispositivos
           </p>
         </div>
-        <Link href="/supervision/asistencia/dispositivos">
-          <Button variant="outline">
-            <ShieldCheck className="mr-2 h-4 w-4" /> Aprobar dispositivos
-          </Button>
-        </Link>
+        {puedeSupervisarDispositivos && (
+          <Link href="/supervision/asistencia/dispositivos">
+            <Button variant="outline">
+              <ShieldCheck className="mr-2 h-4 w-4" /> Aprobar dispositivos
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* Presets rápidos */}
