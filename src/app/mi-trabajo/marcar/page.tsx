@@ -112,25 +112,25 @@ export default function MarcarPage() {
     }
   }, [])
 
-  // Cargar sedes cercanas cuando obtenemos GPS (solo si el usuario no es confianza/remoto puro).
+  // Cargar sedes cercanas cuando obtenemos GPS. Para confianza también — el mapa es
+  // informativo (puede marcar igual estando fuera) pero sirve para ubicarse en zona.
   useEffect(() => {
     if (!geo.coords) return
-    if (modoHoy?.esConfianza) return
     setCargandoCercanas(true)
     fetch(`/api/asistencia/ubicaciones/cercanas?lat=${geo.coords.latitud}&lon=${geo.coords.longitud}`)
       .then(r => (r.ok ? r.json() : null))
       .then(d => setCercanas(d))
       .catch(() => setCercanas(null))
       .finally(() => setCargandoCercanas(false))
-  }, [geo.coords, modoHoy?.esConfianza])
+  }, [geo.coords])
 
   // Pre-solicitar GPS al cargar para que aparezca el panel "¿Dónde estoy?" sin que el
   // usuario tenga que tocar "Marcar" primero. Solo si el permiso ya fue concedido.
   useEffect(() => {
-    if (permisoGps === 'granted' && !geo.coords && !modoHoy?.esConfianza) {
+    if (permisoGps === 'granted' && !geo.coords) {
       geo.solicitar()
     }
-  }, [permisoGps, geo, modoHoy?.esConfianza])
+  }, [permisoGps, geo])
 
   async function enviarMarcaje(
     tipo: TipoBotón,
@@ -350,13 +350,15 @@ export default function MarcarPage() {
         </Card>
       )}
 
-      {!scannerOpen && !modoHoy?.esConfianza && geo.coords && cercanas && (
+      {!scannerOpen && geo.coords && cercanas && (
         <Card className={`mb-4 border-2 ${
           cercanas.sedeEnZona
             ? 'border-emerald-400'
             : cercanas.sedeRemota?.dentro
               ? 'border-purple-400'
-              : 'border-amber-400'
+              : modoHoy?.esConfianza
+                ? 'border-slate-300'
+                : 'border-amber-400'
         }`}>
           <CardContent className="space-y-3 py-3">
             {cercanas.sedeEnZona ? (
@@ -380,6 +382,16 @@ export default function MarcarPage() {
                   </p>
                   <p className="text-xs text-purple-800">
                     A {cercanas.sedeRemota.distanciaMetros}m del centro
+                  </p>
+                </div>
+              </div>
+            ) : modoHoy?.esConfianza ? (
+              <div className="flex items-start gap-2 text-sm">
+                <MapPin className="h-5 w-5 shrink-0 text-slate-600" />
+                <div>
+                  <p className="font-bold text-slate-900">Vista informativa</p>
+                  <p className="text-xs text-slate-700">
+                    Puedes marcar desde donde estés. El mapa te ubica respecto a las sedes.
                   </p>
                 </div>
               </div>
@@ -411,7 +423,7 @@ export default function MarcarPage() {
         </Card>
       )}
 
-      {!scannerOpen && cargandoCercanas && !cercanas && !modoHoy?.esConfianza && (
+      {!scannerOpen && cargandoCercanas && !cercanas && (
         <Card className="mb-4">
           <CardContent className="flex items-center gap-2 py-3 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
