@@ -99,19 +99,33 @@ export default function MapaSedesCercanas({
     ensureLeafletCss()
   }, [])
 
-  // Solo entran al zoom inicial las sedes "cercanas" (<= 25km del usuario).
-  // Las sedes lejanas (otra ciudad/provincia) se siguen renderizando como
-  // marcadores en el mapa, pero no estiran el zoom — el usuario hace zoom
-  // out manualmente si las quiere ver. Sin esto, una sede en otra provincia
-  // alejaba el mapa cientos de km y se perdia la utilidad.
-  const RADIO_FIT_METROS = 25_000
+  // Decidir qué sedes mostrar según el contexto del usuario:
+  // - Si esta DENTRO de una sede oficial → solo esa sede (vista de marcaje)
+  // - Si esta DENTRO de su sede remota → solo la sede remota
+  // - Si NO esta dentro de nada → sedes a 5km (caminables/cercanas) para
+  //   orientarse, o la mas cercana como referencia si no hay ninguna en 5km.
+  // Idea: mostrar SU contexto, no un mapa de "todas las sedes de la empresa".
+  const sedeEnZona = sedes.find(s => s.dentro)
+  const RADIO_REFERENCIA_METROS = 5_000
+  let sedesAMostrar: Sede[]
+  let mostrarSedeRemota = false
+  if (sedeEnZona) {
+    sedesAMostrar = [sedeEnZona]
+    mostrarSedeRemota = !!sedeRemota && sedeRemota.distanciaMetros <= RADIO_REFERENCIA_METROS
+  } else if (sedeRemota?.dentro) {
+    sedesAMostrar = []
+    mostrarSedeRemota = true
+  } else {
+    const cercanas = sedes.filter(s => s.distanciaMetros <= RADIO_REFERENCIA_METROS)
+    sedesAMostrar = cercanas.length > 0 ? cercanas : sedes.slice(0, 1)
+    mostrarSedeRemota = !!sedeRemota
+  }
+
   const puntosParaFit: Array<[number, number]> = [
     [usuarioLat, usuarioLon],
-    ...sedes
-      .filter(s => s.distanciaMetros <= RADIO_FIT_METROS)
-      .map(s => [s.latitud, s.longitud] as [number, number]),
+    ...sedesAMostrar.map(s => [s.latitud, s.longitud] as [number, number]),
   ]
-  if (sedeRemota && sedeRemota.distanciaMetros <= RADIO_FIT_METROS) {
+  if (mostrarSedeRemota && sedeRemota) {
     puntosParaFit.push([sedeRemota.latitud, sedeRemota.longitud])
   }
 
@@ -154,7 +168,7 @@ export default function MapaSedesCercanas({
         )}
 
         {/* Sedes oficiales */}
-        {sedes.map(s => (
+        {sedesAMostrar.map(s => (
           <Fragment key={s.id}>
             <Marker position={[s.latitud, s.longitud]} icon={sedeIcon}>
               <Popup>
@@ -192,7 +206,7 @@ export default function MapaSedesCercanas({
         ))}
 
         {/* Sede remota personal */}
-        {sedeRemota && (
+        {mostrarSedeRemota && sedeRemota && (
           <>
             <Marker position={[sedeRemota.latitud, sedeRemota.longitud]} icon={sedeIcon}>
               <Popup>
