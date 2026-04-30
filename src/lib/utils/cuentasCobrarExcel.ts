@@ -57,6 +57,36 @@ interface CxCExportRow {
   valorizacion?: { codigo: string } | null
 }
 
+interface CxCAdminPagoRow {
+  monto: number
+  fechaPago: string
+  medioPago: string
+  numeroOperacion: string | null
+  observaciones: string | null
+  esDetraccion?: boolean
+  detraccionPorcentaje?: number | null
+  detraccionMonto?: number | null
+  detraccionFechaPago?: string | null
+  numeroConstanciaBN?: string | null
+  esRetencion?: boolean
+  retencionPorcentaje?: number | null
+  retencionMonto?: number | null
+  retencionNumeroConstancia?: string | null
+  cuentaBancaria?: { nombreBanco: string; numeroCuenta: string } | null
+}
+
+export interface CxCAdminExportRow extends CxCExportRow {
+  tipoCambio?: number | null
+  diasCredito?: number | null
+  condicionPago?: string | null
+  formaPago?: string | null
+  bancoFinanciera?: string | null
+  fechaRecepcion?: string | null
+  ordenCompraCliente?: string | null
+  numeroNegociacion?: string | null
+  pagos?: CxCAdminPagoRow[]
+}
+
 const ESTADOS_VALIDOS = ['pendiente', 'parcial', 'pagada', 'vencida', 'anulada']
 const MONEDAS_VALIDAS = ['PEN', 'USD']
 
@@ -393,6 +423,321 @@ export async function exportarCxCAExcel(items: CxCExportRow[]) {
   const link = document.createElement('a')
   link.href = url
   link.download = `CuentasPorCobrar_${new Date().toISOString().split('T')[0]}.xlsx`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
+// ============================================
+// EXPORTAR FORMATO ADMINISTRACIÓN (33 columnas)
+// ============================================
+export async function exportarCxCFormatoAdmin(items: CxCAdminExportRow[]) {
+  const ExcelJS = (await import('exceljs')).default
+  const wb = new ExcelJS.Workbook()
+  const ws = wb.addWorksheet('CxC Administración')
+
+  // Fila 1-3: cabecera con grupos (Detracción, Retención, Estado Pago)
+  // Fila 4: nombres de columna individual
+  // Datos comienzan en fila 5
+
+  const HEADER_FILL_PRIMARY = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FF1E3A8A' } }
+  const HEADER_FILL_GROUP = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FF2563EB' } }
+  const HEADER_FONT_WHITE = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 }
+  const HEADER_FONT_RED = { bold: true, color: { argb: 'FFFCA5A5' }, size: 11 }
+
+  // Anchos de columna
+  const colWidths = [
+    6,   // A Nro.
+    13,  // B Fecha Emisión
+    13,  // C Fecha Recepción
+    10,  // D Crédito (Días)
+    13,  // E Fecha Vencimiento
+    14,  // F Fecha Estimada Pago
+    14,  // G Nro. Comprobante
+    13,  // H RUC
+    35,  // I Razón Social
+    16,  // J Orden de Compra
+    40,  // K Servicio
+    14,  // L Base Imponible
+    12,  // M IGV
+    16,  // N Importe Total
+    10,  // O Tipo de Cambio
+    12,  // P Detracción Fecha
+    14,  // Q Detracción Nro. Constancia
+    14,  // R Detracción Monto
+    8,   // S Detracción %
+    12,  // T Retención Fecha
+    14,  // U Retención Nro. Comprobante
+    14,  // V Retención Monto Pagado
+    8,   // W Retención %
+    14,  // X Total Soles
+    14,  // Y Total Dólares
+    18,  // Z Por Vencer/Días Vencidos
+    10,  // AA Negociado
+    18,  // AB Banco/Financiera
+    14,  // AC Nro. Negociación
+    16,  // AD Banco (Desembolso)
+    14,  // AE Nro. Operación
+    13,  // AF Fecha Depósito
+    30,  // AG Comentarios
+  ]
+  ws.columns = colWidths.map(w => ({ width: w }))
+
+  // ===== Fila 1-3: cabecera con grupos =====
+  // Las columnas simples ocupan filas 1-4 (merge vertical), los grupos tienen header en filas 1-2 y subhead en 3-4
+  ws.getCell('A1').value = 'Nro.'
+  ws.getCell('B1').value = 'Fecha\nEmisión'
+  ws.getCell('C1').value = 'Fecha\nRecepción'
+  ws.getCell('D1').value = 'Crédito\n(Días)'
+  ws.getCell('E1').value = 'Fecha\nVencimiento'
+  ws.getCell('F1').value = 'Fecha Estimada\nde Pago'
+  ws.getCell('G1').value = 'Nro.\nComprobante'
+  ws.getCell('H1').value = 'RUC'
+  ws.getCell('I1').value = 'Razón Social'
+  ws.getCell('J1').value = 'Orden de Compra'
+  ws.getCell('K1').value = 'Servicio'
+  ws.getCell('L1').value = 'Base Imponible'
+  ws.getCell('M1').value = 'IGV'
+  ws.getCell('N1').value = 'Importe Total\ndel Comprobante'
+  ws.getCell('O1').value = 'Tipo de\nCambio'
+
+  // Merge celdas simples A1:A4, B1:B4...O1:O4
+  for (const col of ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O']) {
+    ws.mergeCells(`${col}1:${col}4`)
+  }
+
+  // Grupo Detracción: P1:S2 + subheaders P3:S3
+  ws.mergeCells('P1:S2')
+  ws.getCell('P1').value = 'Detracción'
+  ws.getCell('P3').value = 'Fecha'
+  ws.getCell('Q3').value = 'Nro. de\nConstancia'
+  ws.getCell('R3').value = 'Monto Depositado'
+  ws.getCell('S3').value = '%'
+  // Merge subheaders P3:P4, etc.
+  for (const col of ['P', 'Q', 'R', 'S']) {
+    ws.mergeCells(`${col}3:${col}4`)
+  }
+
+  // Grupo Retención: T1:W2 + subheaders T3:W3
+  ws.mergeCells('T1:W2')
+  ws.getCell('T1').value = 'Retención'
+  ws.getCell('T3').value = 'Fecha'
+  ws.getCell('U3').value = 'Nro.\nComprobante'
+  ws.getCell('V3').value = 'Monto Pagado'
+  ws.getCell('W3').value = '%'
+  for (const col of ['T', 'U', 'V', 'W']) {
+    ws.mergeCells(`${col}3:${col}4`)
+  }
+
+  // Total Soles / Dólares: X1:X4, Y1:Y4
+  ws.getCell('X1').value = 'Total\nSoles'
+  ws.getCell('Y1').value = 'Total\nDólares'
+  ws.mergeCells('X1:X4')
+  ws.mergeCells('Y1:Y4')
+
+  // Grupo Estado Pago del Comprobante: Z1:AG2 + subheaders Z3:AG3
+  ws.mergeCells('Z1:AG2')
+  ws.getCell('Z1').value = 'Estado Pago del Comprobante'
+  ws.getCell('Z3').value = 'Por Vencer/\nDías Vencidos'
+  ws.getCell('AA3').value = 'Negociado'
+  ws.getCell('AB3').value = 'Banco /\nFinanciera'
+  ws.getCell('AC3').value = 'Nro.\nNegociación'
+  ws.getCell('AD3').value = 'Banco\n(Desembolso)'
+  ws.getCell('AE3').value = 'Nro. Operación'
+  ws.getCell('AF3').value = 'Fecha\nDepósito'
+  ws.getCell('AG3').value = 'Comentarios'
+  for (const col of ['Z', 'AA', 'AB', 'AC', 'AD', 'AE', 'AF', 'AG']) {
+    ws.mergeCells(`${col}3:${col}4`)
+  }
+
+  // Estilo cabecera (filas 1-4)
+  for (let row = 1; row <= 4; row++) {
+    const r = ws.getRow(row)
+    r.eachCell({ includeEmpty: false }, (cell) => {
+      cell.fill = HEADER_FILL_PRIMARY
+      cell.font = HEADER_FONT_WHITE
+      cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true }
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+        bottom: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+        left: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+        right: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+      }
+    })
+  }
+
+  // Cabeceras en rojo (campos calculados/fiscales): F, L, M
+  for (const cell of ['F1', 'L1', 'M1']) {
+    ws.getCell(cell).font = HEADER_FONT_RED
+  }
+  // Cabeceras grupo (Detracción, Retención, Estado Pago) en color distinto
+  for (const cell of ['P1', 'T1', 'Z1']) {
+    ws.getCell(cell).fill = HEADER_FILL_GROUP
+  }
+
+  ws.getRow(1).height = 22
+  ws.getRow(2).height = 22
+  ws.getRow(3).height = 28
+  ws.getRow(4).height = 4 // fila pequeña separadora (parte del merge)
+
+  // ===== Datos =====
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  let dataRow = 5
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]
+    const fechaEmision = item.fechaEmision ? new Date(item.fechaEmision) : null
+    const fechaRecepcion = item.fechaRecepcion ? new Date(item.fechaRecepcion) : null
+    const fechaVencimiento = item.fechaVencimiento ? new Date(item.fechaVencimiento) : null
+
+    // Fecha estimada de pago: prioriza fechaRecepcion + diasCredito (real); si no hay recepción, usa emisión
+    let fechaEstimada: Date | null = null
+    const baseEstimada = fechaRecepcion || fechaEmision
+    if (baseEstimada && item.diasCredito) {
+      fechaEstimada = new Date(baseEstimada)
+      fechaEstimada.setDate(fechaEstimada.getDate() + item.diasCredito)
+    }
+
+    // Base Imponible / IGV (asume IGV 18% — Perú estándar)
+    const IGV_RATE = 0.18
+    const baseImponible = item.monto / (1 + IGV_RATE)
+    const igv = item.monto - baseImponible
+
+    // Total Soles / Total Dólares
+    let totalSoles: number | null = null
+    let totalDolares: number | null = null
+    if (item.moneda === 'PEN') {
+      totalSoles = item.monto
+      if (item.tipoCambio && item.tipoCambio > 0) totalDolares = item.monto / item.tipoCambio
+    } else if (item.moneda === 'USD') {
+      totalDolares = item.monto
+      if (item.tipoCambio && item.tipoCambio > 0) totalSoles = item.monto * item.tipoCambio
+    }
+
+    // Por Vencer / Días Vencidos
+    let porVencer = ''
+    if (item.estado === 'pagada') {
+      porVencer = 'Pagada'
+    } else if (item.estado === 'anulada') {
+      porVencer = 'Anulada'
+    } else if (fechaVencimiento) {
+      const diff = Math.floor((fechaVencimiento.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+      if (diff > 0) porVencer = `${diff} días por vencer`
+      else if (diff < 0) porVencer = `${Math.abs(diff)} días vencidos`
+      else porVencer = 'Vence hoy'
+    }
+
+    // Negociado: SI si bancoFinanciera o formaPago=factura_negociable
+    const negociado = (item.bancoFinanciera || item.formaPago === 'factura_negociable') ? 'SI' : 'NO'
+
+    // Detracción: tomar la primera detracción registrada (esDetraccion=true)
+    const detraccion = item.pagos?.find(p => p.esDetraccion)
+
+    // Retención: tomar la primera retención (esRetencion=true)
+    const retencion = item.pagos?.find(p => p.esRetencion)
+
+    // Pagos comerciales (cobros netos, sin detracción ni retención)
+    const pagoCobro = item.pagos?.find(p => !p.esDetraccion && !p.esRetencion)
+
+    const row = ws.getRow(dataRow)
+    row.getCell(1).value = i + 1                                                      // A
+    row.getCell(2).value = fechaEmision                                               // B
+    row.getCell(3).value = fechaRecepcion                                             // C
+    row.getCell(4).value = item.diasCredito ?? null                                   // D
+    row.getCell(5).value = fechaVencimiento                                           // E
+    row.getCell(6).value = fechaEstimada                                              // F
+    row.getCell(7).value = item.numeroDocumento ?? ''                                 // G
+    row.getCell(8).value = item.cliente?.ruc ?? ''                                    // H
+    row.getCell(9).value = item.cliente?.nombre ?? ''                                 // I
+    row.getCell(10).value = item.ordenCompraCliente ?? ''                             // J
+    row.getCell(11).value = item.descripcion ?? item.valorizacion?.codigo ?? ''       // K
+    row.getCell(12).value = baseImponible                                             // L
+    row.getCell(13).value = igv                                                       // M
+    row.getCell(14).value = item.monto                                                // N
+    row.getCell(15).value = item.tipoCambio ?? null                                   // O
+
+    // Detracción
+    row.getCell(16).value = detraccion?.detraccionFechaPago ? new Date(detraccion.detraccionFechaPago) : null  // P
+    row.getCell(17).value = detraccion?.numeroConstanciaBN ?? ''                      // Q
+    row.getCell(18).value = detraccion?.detraccionMonto ?? detraccion?.monto ?? null  // R
+    row.getCell(19).value = detraccion?.detraccionPorcentaje != null ? detraccion.detraccionPorcentaje / 100 : null // S (formato %)
+
+    // Retención
+    row.getCell(20).value = retencion?.fechaPago ? new Date(retencion.fechaPago) : null  // T
+    row.getCell(21).value = retencion?.retencionNumeroConstancia ?? ''                   // U
+    row.getCell(22).value = retencion?.retencionMonto ?? retencion?.monto ?? null        // V
+    row.getCell(23).value = retencion?.retencionPorcentaje != null ? retencion.retencionPorcentaje / 100 : null // W
+
+    // Totales
+    row.getCell(24).value = totalSoles                                                // X
+    row.getCell(25).value = totalDolares                                              // Y
+
+    // Estado Pago
+    row.getCell(26).value = porVencer                                                 // Z
+    row.getCell(27).value = negociado                                                 // AA
+    row.getCell(28).value = item.bancoFinanciera ?? ''                                // AB
+    row.getCell(29).value = item.numeroNegociacion ?? ''                              // AC
+    row.getCell(30).value = pagoCobro?.cuentaBancaria?.nombreBanco ?? ''              // AD
+    row.getCell(31).value = pagoCobro?.numeroOperacion ?? ''                          // AE
+    row.getCell(32).value = pagoCobro?.fechaPago ? new Date(pagoCobro.fechaPago) : null // AF
+    row.getCell(33).value = item.observaciones ?? ''                                  // AG
+
+    // Bordes
+    for (let c = 1; c <= 33; c++) {
+      row.getCell(c).border = {
+        top: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+        bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+        left: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+        right: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+      }
+    }
+
+    dataRow++
+  }
+
+  // ===== Formatos numéricos =====
+  const lastRow = dataRow - 1
+  if (lastRow >= 5) {
+    // Fechas (B, C, E, F, P, T, AF) — DD-MM-YY
+    for (const col of ['B', 'C', 'E', 'F', 'P', 'T', 'AF']) {
+      for (let r = 5; r <= lastRow; r++) {
+        ws.getCell(`${col}${r}`).numFmt = 'dd-mm-yy'
+      }
+    }
+    // Montos con 2 decimales (L, M, N, R, V, X, Y)
+    for (const col of ['L', 'M', 'N', 'R', 'V', 'X', 'Y']) {
+      for (let r = 5; r <= lastRow; r++) {
+        ws.getCell(`${col}${r}`).numFmt = '#,##0.00'
+      }
+    }
+    // Tipo de cambio (O) — 3 decimales
+    for (let r = 5; r <= lastRow; r++) {
+      ws.getCell(`O${r}`).numFmt = '0.000'
+    }
+    // Porcentajes (S, W)
+    for (const col of ['S', 'W']) {
+      for (let r = 5; r <= lastRow; r++) {
+        ws.getCell(`${col}${r}`).numFmt = '0%'
+      }
+    }
+    // Días crédito (D) — entero
+    for (let r = 5; r <= lastRow; r++) {
+      ws.getCell(`D${r}`).numFmt = '0'
+    }
+  }
+
+  // Freeze header (panes congelados después de fila 4)
+  ws.views = [{ state: 'frozen', ySplit: 4 }]
+
+  // Descargar
+  const buffer = await wb.xlsx.writeBuffer()
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `CuentasPorCobrar_Admin_${new Date().toISOString().split('T')[0]}.xlsx`
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)

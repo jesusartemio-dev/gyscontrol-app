@@ -10,10 +10,11 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Loader2, Search, ArrowDownCircle, AlertTriangle, DollarSign, Clock, CheckCircle, Plus, Ban, Download, Upload, Trash2 } from 'lucide-react'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Loader2, Search, ArrowDownCircle, AlertTriangle, DollarSign, Clock, CheckCircle, Plus, Ban, Download, Upload, Trash2, ChevronDown, Pencil } from 'lucide-react'
 import toast from 'react-hot-toast'
 import CxCImportExcelModal from '@/components/administracion/CxCImportExcelModal'
-import { exportarCxCAExcel } from '@/lib/utils/cuentasCobrarExcel'
+import { exportarCxCAExcel, exportarCxCFormatoAdmin } from '@/lib/utils/cuentasCobrarExcel'
 
 interface CuentaBancaria {
   id: string
@@ -29,7 +30,14 @@ interface PagoCobro {
   numeroOperacion: string | null
   observaciones: string | null
   esDetraccion?: boolean
+  detraccionPorcentaje?: number | null
+  detraccionMonto?: number | null
+  detraccionFechaPago?: string | null
   numeroConstanciaBN?: string | null
+  esRetencion?: boolean
+  retencionPorcentaje?: number | null
+  retencionMonto?: number | null
+  retencionNumeroConstancia?: string | null
   cuentaBancaria: CuentaBancaria | null
 }
 
@@ -61,10 +69,18 @@ interface CuentaPorCobrar {
   descripcion: string | null
   monto: number
   moneda: string
+  tipoCambio?: number | null
   montoPagado: number
   saldoPendiente: number
   fechaEmision: string
+  fechaRecepcion?: string | null
   fechaVencimiento: string
+  condicionPago?: string | null
+  formaPago?: string | null
+  diasCredito?: number | null
+  bancoFinanciera?: string | null
+  ordenCompraCliente?: string | null
+  numeroNegociacion?: string | null
   estado: string
   observaciones: string | null
   proyecto?: Proyecto
@@ -126,15 +142,22 @@ export default function CuentasCobrarPage() {
 
   // Create dialog
   const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [createErrors, setCreateErrors] = useState<Set<string>>(new Set())
   const [createForm, setCreateForm] = useState({
     clienteId: '',
     proyectoId: '',
     numeroDocumento: '',
     monto: '',
     moneda: 'PEN',
+    tipoCambio: '',
     fechaEmision: new Date().toISOString().split('T')[0],
+    fechaRecepcion: '',
     fechaVencimiento: '',
+    diasCredito: '',
     valorizacionId: '',
+    ordenCompraCliente: '',
+    numeroNegociacion: '',
+    bancoFinanciera: '',
     descripcion: '',
     observaciones: '',
   })
@@ -154,9 +177,27 @@ export default function CuentasCobrarPage() {
   const [detraccionFechaPago, setDetraccionFechaPago] = useState('')
   const [cuentaBNId, setCuentaBNId] = useState('none')
   const [numeroConstanciaBN, setNumeroConstanciaBN] = useState('')
+  const [conRetencion, setConRetencion] = useState(false)
+  const [retencionPorcentaje, setRetencionPorcentaje] = useState('3')
+  const [retencionFecha, setRetencionFecha] = useState('')
+  const [retencionNumeroConstancia, setRetencionNumeroConstancia] = useState('')
 
   // Detail dialog
   const [showDetail, setShowDetail] = useState<CuentaPorCobrar | null>(null)
+
+  // Edit dialog
+  const [editCuenta, setEditCuenta] = useState<CuentaPorCobrar | null>(null)
+  const [editForm, setEditForm] = useState({
+    numeroDocumento: '',
+    descripcion: '',
+    fechaRecepcion: '',
+    diasCredito: '',
+    tipoCambio: '',
+    ordenCompraCliente: '',
+    bancoFinanciera: '',
+    numeroNegociacion: '',
+    observaciones: '',
+  })
 
   // Import dialog
   const [showImportDialog, setShowImportDialog] = useState(false)
@@ -244,30 +285,68 @@ export default function CuentasCobrarPage() {
       numeroDocumento: '',
       monto: '',
       moneda: 'PEN',
+      tipoCambio: '',
       fechaEmision: new Date().toISOString().split('T')[0],
+      fechaRecepcion: '',
       fechaVencimiento: '',
+      diasCredito: '',
       valorizacionId: '',
+      ordenCompraCliente: '',
+      numeroNegociacion: '',
+      bancoFinanciera: '',
       descripcion: '',
       observaciones: '',
     })
+    setCreateErrors(new Set())
+  }
+
+  const updateCreateField = <K extends keyof typeof createForm>(field: K, value: (typeof createForm)[K]) => {
+    setCreateForm(f => ({ ...f, [field]: value }))
+    if (createErrors.has(field as string)) {
+      setCreateErrors(prev => {
+        const next = new Set(prev)
+        next.delete(field as string)
+        return next
+      })
+    }
   }
 
   const handleCreate = async () => {
-    if (!createForm.clienteId || !createForm.proyectoId || !createForm.monto || !createForm.fechaEmision || !createForm.fechaVencimiento) {
-      toast.error('Cliente, proyecto, monto, fecha emisión y fecha vencimiento son requeridos')
+    const missing = new Set<string>()
+    const labels: Record<string, string> = {
+      clienteId: 'Cliente',
+      proyectoId: 'Proyecto',
+      monto: 'Monto',
+      fechaEmision: 'Fecha Emisión',
+      fechaVencimiento: 'Fecha Vencimiento',
+    }
+    if (!createForm.clienteId) missing.add('clienteId')
+    if (!createForm.proyectoId) missing.add('proyectoId')
+    if (!createForm.monto) missing.add('monto')
+    if (!createForm.fechaEmision) missing.add('fechaEmision')
+    if (!createForm.fechaVencimiento) missing.add('fechaVencimiento')
+    if (missing.size > 0) {
+      setCreateErrors(missing)
+      const faltantes = Array.from(missing).map(k => labels[k]).join(', ')
+      toast.error(`Falta: ${faltantes}`)
       return
     }
     const monto = parseFloat(createForm.monto)
     if (isNaN(monto) || monto <= 0) {
+      setCreateErrors(new Set(['monto']))
       toast.error('El monto debe ser mayor a 0')
       return
     }
     if (new Date(createForm.fechaVencimiento) < new Date(createForm.fechaEmision)) {
+      setCreateErrors(new Set(['fechaVencimiento']))
       toast.error('La fecha de vencimiento debe ser posterior a la de emisión')
       return
     }
+    setCreateErrors(new Set())
     setSaving(true)
     try {
+      const tipoCambio = createForm.tipoCambio ? parseFloat(createForm.tipoCambio) : null
+      const diasCredito = createForm.diasCredito ? parseInt(createForm.diasCredito, 10) : null
       const res = await fetch('/api/administracion/cuentas-cobrar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -277,9 +356,15 @@ export default function CuentasCobrarPage() {
           numeroDocumento: createForm.numeroDocumento || null,
           monto,
           moneda: createForm.moneda,
+          tipoCambio,
           fechaEmision: createForm.fechaEmision,
+          fechaRecepcion: createForm.fechaRecepcion || null,
           fechaVencimiento: createForm.fechaVencimiento,
+          diasCredito,
           valorizacionId: createForm.valorizacionId || null,
+          ordenCompraCliente: createForm.ordenCompraCliente || null,
+          numeroNegociacion: createForm.numeroNegociacion || null,
+          bancoFinanciera: createForm.bancoFinanciera || null,
           descripcion: createForm.descripcion || null,
           observaciones: createForm.observaciones || null,
         }),
@@ -294,6 +379,65 @@ export default function CuentasCobrarPage() {
       loadData()
     } catch (e: any) {
       toast.error(e.message || 'Error al crear cuenta')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // --- Editar ---
+  const openEdit = (cuenta: CuentaPorCobrar) => {
+    setEditCuenta(cuenta)
+    setEditForm({
+      numeroDocumento: cuenta.numeroDocumento ?? '',
+      descripcion: cuenta.descripcion ?? '',
+      fechaRecepcion: cuenta.fechaRecepcion ? cuenta.fechaRecepcion.split('T')[0] : '',
+      diasCredito: cuenta.diasCredito != null ? String(cuenta.diasCredito) : '',
+      tipoCambio: cuenta.tipoCambio != null ? String(cuenta.tipoCambio) : '',
+      ordenCompraCliente: cuenta.ordenCompraCliente ?? '',
+      bancoFinanciera: cuenta.bancoFinanciera ?? '',
+      numeroNegociacion: cuenta.numeroNegociacion ?? '',
+      observaciones: cuenta.observaciones ?? '',
+    })
+  }
+
+  const handleEdit = async () => {
+    if (!editCuenta) return
+    const tipoCambio = editForm.tipoCambio ? parseFloat(editForm.tipoCambio) : null
+    if (editForm.tipoCambio && (isNaN(tipoCambio!) || tipoCambio! <= 0)) {
+      toast.error('Tipo de cambio inválido')
+      return
+    }
+    const diasCredito = editForm.diasCredito ? parseInt(editForm.diasCredito, 10) : null
+    if (editForm.diasCredito && (isNaN(diasCredito!) || diasCredito! < 0)) {
+      toast.error('Días de crédito inválidos')
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/administracion/cuentas-cobrar/${editCuenta.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          numeroDocumento: editForm.numeroDocumento || null,
+          descripcion: editForm.descripcion || null,
+          fechaRecepcion: editForm.fechaRecepcion || null,
+          diasCredito,
+          tipoCambio,
+          ordenCompraCliente: editForm.ordenCompraCliente || null,
+          bancoFinanciera: editForm.bancoFinanciera || null,
+          numeroNegociacion: editForm.numeroNegociacion || null,
+          observaciones: editForm.observaciones || null,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Error al actualizar')
+      }
+      toast.success('Cuenta actualizada')
+      setEditCuenta(null)
+      loadData()
+    } catch (e: any) {
+      toast.error(e.message || 'Error al actualizar')
     } finally {
       setSaving(false)
     }
@@ -368,6 +512,16 @@ export default function CuentasCobrarPage() {
     setPagoOperacion('')
     setPagoBancoId('none')
     setPagoObs('')
+    setConDetraccion(false)
+    setDetraccionPorcentaje('12')
+    setDetraccionCodigo('')
+    setDetraccionFechaPago('')
+    setCuentaBNId('none')
+    setNumeroConstanciaBN('')
+    setConRetencion(false)
+    setRetencionPorcentaje('3')
+    setRetencionFecha('')
+    setRetencionNumeroConstancia('')
     setShowPagoDialog(true)
   }
 
@@ -403,6 +557,10 @@ export default function CuentasCobrarPage() {
           detraccionFechaPago: conDetraccion ? detraccionFechaPago || undefined : undefined,
           cuentaBNId: conDetraccion && cuentaBNId !== 'none' ? cuentaBNId : undefined,
           numeroConstanciaBN: conDetraccion && numeroConstanciaBN ? numeroConstanciaBN : undefined,
+          conRetencion,
+          retencionPorcentaje: conRetencion ? parseFloat(retencionPorcentaje) : undefined,
+          retencionFecha: conRetencion ? retencionFecha || undefined : undefined,
+          retencionNumeroConstancia: conRetencion ? retencionNumeroConstancia || undefined : undefined,
         }),
       })
       if (!res.ok) {
@@ -443,10 +601,23 @@ export default function CuentasCobrarPage() {
           <p className="text-muted-foreground">Gestión de facturas y cobros pendientes</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => exportarCxCAExcel(filtered)}>
-            <Download className="h-4 w-4 mr-1" />
-            Exportar
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Download className="h-4 w-4 mr-1" />
+                Exportar
+                <ChevronDown className="h-3 w-3 ml-1" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => exportarCxCAExcel(filtered)}>
+                Formato estándar
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => exportarCxCFormatoAdmin(filtered)}>
+                Formato administración
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button variant="outline" size="sm" onClick={() => setShowImportDialog(true)}>
             <Upload className="h-4 w-4 mr-1" />
             Importar
@@ -636,6 +807,11 @@ export default function CuentasCobrarPage() {
                           <Button variant="ghost" size="sm" onClick={() => setShowDetail(item)}>
                             Ver
                           </Button>
+                          {item.estado !== 'anulada' && (
+                            <Button variant="ghost" size="sm" onClick={() => openEdit(item)} title="Editar">
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                          )}
                           {(item.estado === 'pendiente' || item.estado === 'parcial') && (
                             <Button variant="outline" size="sm" onClick={() => openPago(item)}>
                               <ArrowDownCircle className="h-3 w-3 mr-1" />
@@ -671,10 +847,11 @@ export default function CuentasCobrarPage() {
             <DialogDescription>Registrar una factura o documento de cobro a cliente</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            <p className="text-xs text-muted-foreground">Los campos marcados con <span className="text-red-500 font-bold">*</span> son obligatorios.</p>
             <div>
-              <Label>Cliente *</Label>
-              <Select value={createForm.clienteId} onValueChange={v => setCreateForm(f => ({ ...f, clienteId: v }))}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar cliente" /></SelectTrigger>
+              <Label>Cliente <span className="text-red-500">*</span></Label>
+              <Select value={createForm.clienteId} onValueChange={v => updateCreateField('clienteId', v)}>
+                <SelectTrigger className={createErrors.has('clienteId') ? 'border-red-500 ring-1 ring-red-500' : ''}><SelectValue placeholder="Seleccionar cliente" /></SelectTrigger>
                 <SelectContent>
                   {clientes.map(c => (
                     <SelectItem key={c.id} value={c.id}>{c.nombre}{c.ruc ? ` (${c.ruc})` : ''}</SelectItem>
@@ -683,9 +860,9 @@ export default function CuentasCobrarPage() {
               </Select>
             </div>
             <div>
-              <Label>Proyecto *</Label>
-              <Select value={createForm.proyectoId} onValueChange={v => setCreateForm(f => ({ ...f, proyectoId: v }))}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar proyecto" /></SelectTrigger>
+              <Label>Proyecto <span className="text-red-500">*</span></Label>
+              <Select value={createForm.proyectoId} onValueChange={v => updateCreateField('proyectoId', v)}>
+                <SelectTrigger className={createErrors.has('proyectoId') ? 'border-red-500 ring-1 ring-red-500' : ''}><SelectValue placeholder="Seleccionar proyecto" /></SelectTrigger>
                 <SelectContent>
                   {proyectos.map(p => (
                     <SelectItem key={p.id} value={p.id}>{p.codigo} - {p.nombre}</SelectItem>
@@ -695,16 +872,23 @@ export default function CuentasCobrarPage() {
             </div>
             <div>
               <Label>N° Documento</Label>
-              <Input placeholder="F001-00123" value={createForm.numeroDocumento} onChange={e => setCreateForm(f => ({ ...f, numeroDocumento: e.target.value }))} />
+              <Input placeholder="F001-00123" value={createForm.numeroDocumento} onChange={e => updateCreateField('numeroDocumento', e.target.value)} />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div>
-                <Label>Monto *</Label>
-                <Input type="number" step="0.01" placeholder="0.00" value={createForm.monto} onChange={e => setCreateForm(f => ({ ...f, monto: e.target.value }))} />
+                <Label>Monto <span className="text-red-500">*</span></Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={createForm.monto}
+                  onChange={e => updateCreateField('monto', e.target.value)}
+                  className={createErrors.has('monto') ? 'border-red-500 ring-1 ring-red-500' : ''}
+                />
               </div>
               <div>
                 <Label>Moneda</Label>
-                <Select value={createForm.moneda} onValueChange={v => setCreateForm(f => ({ ...f, moneda: v }))}>
+                <Select value={createForm.moneda} onValueChange={v => updateCreateField('moneda', v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="PEN">PEN (S/)</SelectItem>
@@ -712,28 +896,66 @@ export default function CuentasCobrarPage() {
                   </SelectContent>
                 </Select>
               </div>
+              <div>
+                <Label>Tipo Cambio</Label>
+                <Input type="number" step="0.001" placeholder="3.800" value={createForm.tipoCambio} onChange={e => updateCreateField('tipoCambio', e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <Label>Fecha Emisión <span className="text-red-500">*</span></Label>
+                <Input
+                  type="date"
+                  value={createForm.fechaEmision}
+                  onChange={e => updateCreateField('fechaEmision', e.target.value)}
+                  className={createErrors.has('fechaEmision') ? 'border-red-500 ring-1 ring-red-500' : ''}
+                />
+              </div>
+              <div>
+                <Label>Fecha Recepción</Label>
+                <Input type="date" value={createForm.fechaRecepcion} onChange={e => updateCreateField('fechaRecepcion', e.target.value)} />
+              </div>
+              <div>
+                <Label>Fecha Vencimiento <span className="text-red-500">*</span></Label>
+                <Input
+                  type="date"
+                  value={createForm.fechaVencimiento}
+                  onChange={e => updateCreateField('fechaVencimiento', e.target.value)}
+                  className={createErrors.has('fechaVencimiento') ? 'border-red-500 ring-1 ring-red-500' : ''}
+                />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Fecha Emisión *</Label>
-                <Input type="date" value={createForm.fechaEmision} onChange={e => setCreateForm(f => ({ ...f, fechaEmision: e.target.value }))} />
+                <Label>Días Crédito</Label>
+                <Input type="number" placeholder="30" value={createForm.diasCredito} onChange={e => updateCreateField('diasCredito', e.target.value)} />
               </div>
               <div>
-                <Label>Fecha Vencimiento *</Label>
-                <Input type="date" value={createForm.fechaVencimiento} onChange={e => setCreateForm(f => ({ ...f, fechaVencimiento: e.target.value }))} />
+                <Label>Orden de Compra (cliente)</Label>
+                <Input placeholder="8070008797" value={createForm.ordenCompraCliente} onChange={e => updateCreateField('ordenCompraCliente', e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Banco / Financiera (negociación)</Label>
+                <Input placeholder="BANPRO, CRECE CAPITAL..." value={createForm.bancoFinanciera} onChange={e => updateCreateField('bancoFinanciera', e.target.value)} />
+              </div>
+              <div>
+                <Label>Nro. Negociación</Label>
+                <Input placeholder="12237" value={createForm.numeroNegociacion} onChange={e => updateCreateField('numeroNegociacion', e.target.value)} />
               </div>
             </div>
             <div>
               <Label>Valorización (opcional)</Label>
-              <Input placeholder="ID de valorización" value={createForm.valorizacionId} onChange={e => setCreateForm(f => ({ ...f, valorizacionId: e.target.value }))} />
+              <Input placeholder="ID de valorización" value={createForm.valorizacionId} onChange={e => updateCreateField('valorizacionId', e.target.value)} />
             </div>
             <div>
-              <Label>Descripción</Label>
-              <Input placeholder="Descripción del cobro" value={createForm.descripcion} onChange={e => setCreateForm(f => ({ ...f, descripcion: e.target.value }))} />
+              <Label>Descripción / Servicio</Label>
+              <Input placeholder="Servicio eléctrico (3era valorización)" value={createForm.descripcion} onChange={e => updateCreateField('descripcion', e.target.value)} />
             </div>
             <div>
               <Label>Observaciones</Label>
-              <Input placeholder="Notas adicionales" value={createForm.observaciones} onChange={e => setCreateForm(f => ({ ...f, observaciones: e.target.value }))} />
+              <Input placeholder="Notas adicionales" value={createForm.observaciones} onChange={e => updateCreateField('observaciones', e.target.value)} />
             </div>
           </div>
           <DialogFooter>
@@ -836,30 +1058,75 @@ export default function CuentasCobrarPage() {
                   <Label className="text-xs">N° Constancia depósito BN</Label>
                   <Input placeholder="Ej: 00123456789" value={numeroConstanciaBN} onChange={e => setNumeroConstanciaBN(e.target.value)} />
                 </div>
-                {pagoMonto && detraccionPorcentaje && (
-                  <div className="text-xs space-y-1 pt-2 border-t border-amber-300">
-                    <div className="flex justify-between">
-                      <span>Monto total:</span>
-                      <span className="font-mono">{pagoCuenta ? formatCurrency(parseFloat(pagoMonto), pagoCuenta.moneda) : pagoMonto}</span>
-                    </div>
-                    <div className="flex justify-between text-amber-700">
-                      <span>Detracción ({detraccionPorcentaje}%):</span>
-                      <span className="font-mono">{pagoCuenta ? formatCurrency(Math.round(parseFloat(pagoMonto) * parseFloat(detraccionPorcentaje) / 100 * 100) / 100, pagoCuenta.moneda) : ''}</span>
-                    </div>
-                    <div className="flex justify-between font-bold">
-                      <span>Neto a cuenta comercial:</span>
-                      <span className="font-mono">{pagoCuenta ? formatCurrency(Math.round((parseFloat(pagoMonto) - parseFloat(pagoMonto) * parseFloat(detraccionPorcentaje) / 100) * 100) / 100, pagoCuenta.moneda) : ''}</span>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
+
+            {/* Retención */}
+            <div className="flex items-center space-x-2 pt-2 border-t">
+              <Checkbox id="conRetencion" checked={conRetencion} onCheckedChange={(v) => setConRetencion(!!v)} />
+              <Label htmlFor="conRetencion" className="text-sm font-medium cursor-pointer">¿Incluye retención?</Label>
+            </div>
+            {conRetencion && (
+              <div className="space-y-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs">Porcentaje retención (%)</Label>
+                    <Input type="number" step="0.01" min={0} max={100} value={retencionPorcentaje} onChange={e => setRetencionPorcentaje(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Fecha retención</Label>
+                    <Input type="date" value={retencionFecha} onChange={e => setRetencionFecha(e.target.value)} />
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-xs">N° Constancia de retención</Label>
+                  <Input placeholder="Ej: R001-00012345" value={retencionNumeroConstancia} onChange={e => setRetencionNumeroConstancia(e.target.value)} />
+                </div>
+              </div>
+            )}
+
+            {/* Resumen del split */}
+            {pagoMonto && (conDetraccion || conRetencion) && pagoCuenta && (() => {
+              const total = parseFloat(pagoMonto) || 0
+              const detPct = conDetraccion ? parseFloat(detraccionPorcentaje) || 0 : 0
+              const retPct = conRetencion ? parseFloat(retencionPorcentaje) || 0 : 0
+              const detMonto = Math.round(total * detPct / 100 * 100) / 100
+              const retMonto = Math.round(total * retPct / 100 * 100) / 100
+              const neto = Math.round((total - detMonto - retMonto) * 100) / 100
+              return (
+                <div className="text-xs space-y-1 pt-2 border-t">
+                  <div className="flex justify-between">
+                    <span>Monto total:</span>
+                    <span className="font-mono">{formatCurrency(total, pagoCuenta.moneda)}</span>
+                  </div>
+                  {conDetraccion && (
+                    <div className="flex justify-between text-amber-700">
+                      <span>Detracción ({detPct}%):</span>
+                      <span className="font-mono">{formatCurrency(detMonto, pagoCuenta.moneda)}</span>
+                    </div>
+                  )}
+                  {conRetencion && (
+                    <div className="flex justify-between text-purple-700">
+                      <span>Retención ({retPct}%):</span>
+                      <span className="font-mono">{formatCurrency(retMonto, pagoCuenta.moneda)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-bold">
+                    <span>Neto a cuenta comercial:</span>
+                    <span className="font-mono">{formatCurrency(neto, pagoCuenta.moneda)}</span>
+                  </div>
+                </div>
+              )
+            })()}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowPagoDialog(false)}>Cancelar</Button>
             <Button onClick={handlePago} disabled={saving}>
               {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {conDetraccion ? 'Registrar con Detracción' : 'Registrar Cobro'}
+              {conDetraccion && conRetencion ? 'Registrar con Detracción y Retención'
+                : conDetraccion ? 'Registrar con Detracción'
+                : conRetencion ? 'Registrar con Retención'
+                : 'Registrar Cobro'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -898,9 +1165,15 @@ export default function CuentasCobrarPage() {
                   <div className="flex justify-between"><span>Cliente</span><span className="font-medium">{showDetail.cliente?.nombre}</span></div>
                   <div className="flex justify-between"><span>Proyecto</span><span className="font-mono">{showDetail.proyecto?.codigo}</span></div>
                   {showDetail.valorizacion && <div className="flex justify-between"><span>Valorización</span><span className="font-mono">{showDetail.valorizacion.codigo}</span></div>}
+                  {showDetail.ordenCompraCliente && <div className="flex justify-between"><span>OC Cliente</span><span className="font-mono">{showDetail.ordenCompraCliente}</span></div>}
                   {showDetail.descripcion && <div className="flex justify-between"><span>Descripción</span><span className="text-right max-w-[200px] truncate">{showDetail.descripcion}</span></div>}
                   <div className="flex justify-between"><span>Emisión</span><span>{formatDate(showDetail.fechaEmision)}</span></div>
+                  {showDetail.fechaRecepcion && <div className="flex justify-between"><span>Recepción</span><span>{formatDate(showDetail.fechaRecepcion)}</span></div>}
                   <div className="flex justify-between"><span>Vencimiento</span><span className={isVencida(showDetail.fechaVencimiento, showDetail.estado) ? 'text-red-600 font-bold' : ''}>{formatDate(showDetail.fechaVencimiento)}</span></div>
+                  {showDetail.diasCredito != null && <div className="flex justify-between"><span>Días Crédito</span><span>{showDetail.diasCredito}</span></div>}
+                  {showDetail.tipoCambio && <div className="flex justify-between"><span>Tipo Cambio</span><span className="font-mono">{showDetail.tipoCambio.toFixed(3)}</span></div>}
+                  {showDetail.bancoFinanciera && <div className="flex justify-between"><span>Banco / Financiera</span><span>{showDetail.bancoFinanciera}</span></div>}
+                  {showDetail.numeroNegociacion && <div className="flex justify-between"><span>N° Negociación</span><span className="font-mono">{showDetail.numeroNegociacion}</span></div>}
                   <div className="flex justify-between border-t pt-1"><span>Monto Total</span><span className="font-mono font-bold">{formatCurrency(showDetail.monto, showDetail.moneda)}</span></div>
                   <div className="flex justify-between text-green-600"><span>Pagado</span><span className="font-mono">{formatCurrency(showDetail.montoPagado, showDetail.moneda)}</span></div>
                   <div className="flex justify-between font-bold border-t pt-1"><span>Saldo Pendiente</span><span className="font-mono">{formatCurrency(showDetail.saldoPendiente, showDetail.moneda)}</span></div>
@@ -921,6 +1194,12 @@ export default function CuentasCobrarPage() {
                               {p.numeroOperacion && <div className="text-xs text-muted-foreground">Op: {p.numeroOperacion}</div>}
                               {p.cuentaBancaria && <div className="text-xs text-muted-foreground">{p.cuentaBancaria.nombreBanco}</div>}
                               {p.esDetraccion && p.numeroConstanciaBN && <div className="text-xs text-amber-700 font-medium">N° Constancia BN: {p.numeroConstanciaBN}</div>}
+                              {p.esRetencion && (
+                                <div className="text-xs text-purple-700 font-medium">
+                                  Retención {p.retencionPorcentaje ?? ''}%
+                                  {p.retencionNumeroConstancia ? ` · Constancia ${p.retencionNumeroConstancia}` : ''}
+                                </div>
+                              )}
                             </div>
                           </div>
                         </CardContent>
@@ -999,6 +1278,12 @@ export default function CuentasCobrarPage() {
           )}
           <DialogFooter>
             {showDetail && showDetail.estado !== 'anulada' && (
+              <Button variant="outline" size="sm" onClick={() => { const c = showDetail; setShowDetail(null); openEdit(c) }} disabled={saving}>
+                <Pencil className="h-4 w-4 mr-1" />
+                Editar
+              </Button>
+            )}
+            {showDetail && showDetail.estado !== 'anulada' && (
               <Button variant="destructive" size="sm" onClick={() => handleAnular(showDetail)} disabled={saving}>
                 <Ban className="h-4 w-4 mr-1" />
                 Anular
@@ -1018,6 +1303,77 @@ export default function CuentasCobrarPage() {
                 Registrar Cobro
               </Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog editar CxC */}
+      <Dialog open={!!editCuenta} onOpenChange={open => { if (!open) setEditCuenta(null) }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar Cuenta por Cobrar</DialogTitle>
+            <DialogDescription>
+              {editCuenta?.numeroDocumento || 'Sin documento'} — {editCuenta?.cliente?.nombre}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="p-3 bg-muted/50 border rounded text-xs space-y-0.5">
+              <div className="flex justify-between"><span className="text-muted-foreground">Cliente</span><span>{editCuenta?.cliente?.nombre}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Proyecto</span><span className="font-mono">{editCuenta?.proyecto?.codigo}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Monto</span><span className="font-mono">{editCuenta && formatCurrency(editCuenta.monto, editCuenta.moneda)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Emisión / Vencimiento</span><span>{editCuenta && `${formatDate(editCuenta.fechaEmision)} → ${formatDate(editCuenta.fechaVencimiento)}`}</span></div>
+              <div className="text-muted-foreground italic pt-1">Cliente, proyecto, monto y fechas base no son editables. Para cambiarlos, anula y crea una nueva.</div>
+            </div>
+
+            <div>
+              <Label>N° Documento</Label>
+              <Input placeholder="F001-00123" value={editForm.numeroDocumento} onChange={e => setEditForm(f => ({ ...f, numeroDocumento: e.target.value }))} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Fecha Recepción</Label>
+                <Input type="date" value={editForm.fechaRecepcion} onChange={e => setEditForm(f => ({ ...f, fechaRecepcion: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Días Crédito</Label>
+                <Input type="number" placeholder="30" value={editForm.diasCredito} onChange={e => setEditForm(f => ({ ...f, diasCredito: e.target.value }))} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Tipo Cambio</Label>
+                <Input type="number" step="0.001" placeholder="3.800" value={editForm.tipoCambio} onChange={e => setEditForm(f => ({ ...f, tipoCambio: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Orden de Compra (cliente)</Label>
+                <Input placeholder="8070008797" value={editForm.ordenCompraCliente} onChange={e => setEditForm(f => ({ ...f, ordenCompraCliente: e.target.value }))} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Banco / Financiera</Label>
+                <Input placeholder="BANPRO, CRECE CAPITAL..." value={editForm.bancoFinanciera} onChange={e => setEditForm(f => ({ ...f, bancoFinanciera: e.target.value }))} />
+              </div>
+              <div>
+                <Label>N° Negociación</Label>
+                <Input placeholder="12237" value={editForm.numeroNegociacion} onChange={e => setEditForm(f => ({ ...f, numeroNegociacion: e.target.value }))} />
+              </div>
+            </div>
+            <div>
+              <Label>Descripción / Servicio</Label>
+              <Input placeholder="Servicio eléctrico (3era valorización)" value={editForm.descripcion} onChange={e => setEditForm(f => ({ ...f, descripcion: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Observaciones</Label>
+              <Input placeholder="Notas adicionales" value={editForm.observaciones} onChange={e => setEditForm(f => ({ ...f, observaciones: e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditCuenta(null)}>Cancelar</Button>
+            <Button onClick={handleEdit} disabled={saving}>
+              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Guardar Cambios
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

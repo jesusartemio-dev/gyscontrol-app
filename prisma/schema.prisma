@@ -3789,28 +3789,31 @@ model CuentaBancaria {
 }
 
 model CuentaPorCobrar {
-  id               String             @id @default(cuid())
-  proyectoId       String
-  clienteId        String
-  valorizacionId   String?
-  numeroDocumento  String? // número de factura emitida
-  descripcion      String?
-  monto            Float
-  moneda           String             @default("PEN")
-  tipoCambio       Float?
-  montoPagado      Float              @default(0) // calculado: SUM(pagosCobro.monto)
-  saldoPendiente   Float              @default(0) // calculado: monto - montoPagado
-  fechaEmision     DateTime
-  fechaVencimiento DateTime
-  condicionPago    String? // 'contado' | 'credito' | 'adelanto'
-  formaPago        String? // 'transferencia' | 'factura' | 'cheque' | 'letra' | 'factura_negociable' | 'otro'
-  diasCredito      Int?
-  metodoPago       String?
-  bancoFinanciera  String?
-  estado           EstadoCuentaCobrar @default(pendiente)
-  observaciones    String?
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime
+  id                 String             @id @default(cuid())
+  proyectoId         String
+  clienteId          String
+  valorizacionId     String?
+  numeroDocumento    String? // número de factura emitida
+  descripcion        String?
+  monto              Float
+  moneda             String             @default("PEN")
+  tipoCambio         Float?
+  montoPagado        Float              @default(0) // calculado: SUM(pagosCobro.monto)
+  saldoPendiente     Float              @default(0) // calculado: monto - montoPagado
+  fechaEmision       DateTime
+  fechaRecepcion     DateTime? // fecha en que el cliente recibió la factura (los días de crédito suelen contarse desde aquí)
+  fechaVencimiento   DateTime
+  condicionPago      String? // 'contado' | 'credito' | 'adelanto'
+  formaPago          String? // 'transferencia' | 'factura' | 'cheque' | 'letra' | 'factura_negociable' | 'otro'
+  diasCredito        Int?
+  metodoPago         String?
+  bancoFinanciera    String?
+  ordenCompraCliente String? // N° de Orden de Compra emitida por el cliente
+  numeroNegociacion  String? // N° de operación con la financiera (cuando se negocia/factoriza la factura)
+  estado             EstadoCuentaCobrar @default(pendiente)
+  observaciones      String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime
 
   proyecto     Proyecto      @relation(fields: [proyectoId], references: [id])
   cliente      Cliente       @relation(fields: [clienteId], references: [id])
@@ -3825,22 +3828,26 @@ model CuentaPorCobrar {
 }
 
 model PagoCobro {
-  id                   String    @id @default(cuid())
-  cuentaPorCobrarId    String
-  cuentaBancariaId     String?
-  monto                Float
-  fechaPago            DateTime
-  medioPago            String    @default("transferencia") // transferencia, cheque, efectivo, detraccion
-  numeroOperacion      String?
-  observaciones        String?
-  esDetraccion         Boolean   @default(false)
-  detraccionPorcentaje Float?
-  detraccionCodigo     String?
-  detraccionMonto      Float?
-  detraccionFechaPago  DateTime?
-  numeroConstanciaBN   String?
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime
+  id                        String    @id @default(cuid())
+  cuentaPorCobrarId         String
+  cuentaBancariaId          String?
+  monto                     Float
+  fechaPago                 DateTime
+  medioPago                 String    @default("transferencia") // transferencia, cheque, efectivo, detraccion, retencion
+  numeroOperacion           String?
+  observaciones             String?
+  esDetraccion              Boolean   @default(false)
+  detraccionPorcentaje      Float?
+  detraccionCodigo          String?
+  detraccionMonto           Float?
+  detraccionFechaPago       DateTime?
+  numeroConstanciaBN        String?
+  esRetencion               Boolean   @default(false)
+  retencionPorcentaje       Float?
+  retencionMonto            Float?
+  retencionNumeroConstancia String? // N° de comprobante de retención emitido por el cliente
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime
 
   cuentaPorCobrar CuentaPorCobrar @relation(fields: [cuentaPorCobrarId], references: [id], onDelete: Cascade)
   cuentaBancaria  CuentaBancaria? @relation(fields: [cuentaBancariaId], references: [id])

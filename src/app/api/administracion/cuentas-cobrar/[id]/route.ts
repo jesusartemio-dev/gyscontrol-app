@@ -36,7 +36,32 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       return NextResponse.json(updated)
     }
 
-    return NextResponse.json({ error: 'Operación no soportada' }, { status: 400 })
+    // Editar campos administrativos (no toca monto/saldo/estado financiero — solo metadata)
+    const editableFields = [
+      'fechaRecepcion', 'ordenCompraCliente', 'numeroNegociacion',
+      'bancoFinanciera', 'tipoCambio', 'diasCredito', 'observaciones',
+      'descripcion', 'numeroDocumento',
+    ] as const
+
+    const data: Record<string, any> = {}
+    for (const field of editableFields) {
+      if (field in body) {
+        const value = body[field]
+        if (field === 'fechaRecepcion') {
+          data[field] = value ? new Date(value) : null
+        } else {
+          data[field] = value === '' ? null : value
+        }
+      }
+    }
+
+    if (Object.keys(data).length === 0) {
+      return NextResponse.json({ error: 'No hay campos para actualizar' }, { status: 400 })
+    }
+
+    data.updatedAt = new Date()
+    const updated = await prisma.cuentaPorCobrar.update({ where: { id }, data })
+    return NextResponse.json(updated)
   } catch (error) {
     console.error('Error al actualizar CxC:', error)
     return NextResponse.json({ error: 'Error del servidor' }, { status: 500 })
