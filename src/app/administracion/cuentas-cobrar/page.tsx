@@ -80,6 +80,8 @@ interface CuentaPorCobrar {
   diasCredito?: number | null
   bancoFinanciera?: string | null
   ordenCompraCliente?: string | null
+  numeroHES?: string | null
+  numeroGuiaRemision?: string | null
   numeroNegociacion?: string | null
   estado: string
   observaciones: string | null
@@ -156,6 +158,8 @@ export default function CuentasCobrarPage() {
     diasCredito: '',
     valorizacionId: '',
     ordenCompraCliente: '',
+    numeroHES: '',
+    numeroGuiaRemision: '',
     numeroNegociacion: '',
     bancoFinanciera: '',
     descripcion: '',
@@ -194,6 +198,8 @@ export default function CuentasCobrarPage() {
     diasCredito: '',
     tipoCambio: '',
     ordenCompraCliente: '',
+    numeroHES: '',
+    numeroGuiaRemision: '',
     bancoFinanciera: '',
     numeroNegociacion: '',
     observaciones: '',
@@ -292,6 +298,8 @@ export default function CuentasCobrarPage() {
       diasCredito: '',
       valorizacionId: '',
       ordenCompraCliente: '',
+      numeroHES: '',
+      numeroGuiaRemision: '',
       numeroNegociacion: '',
       bancoFinanciera: '',
       descripcion: '',
@@ -363,6 +371,8 @@ export default function CuentasCobrarPage() {
           diasCredito,
           valorizacionId: createForm.valorizacionId || null,
           ordenCompraCliente: createForm.ordenCompraCliente || null,
+          numeroHES: createForm.numeroHES || null,
+          numeroGuiaRemision: createForm.numeroGuiaRemision || null,
           numeroNegociacion: createForm.numeroNegociacion || null,
           bancoFinanciera: createForm.bancoFinanciera || null,
           descripcion: createForm.descripcion || null,
@@ -394,6 +404,8 @@ export default function CuentasCobrarPage() {
       diasCredito: cuenta.diasCredito != null ? String(cuenta.diasCredito) : '',
       tipoCambio: cuenta.tipoCambio != null ? String(cuenta.tipoCambio) : '',
       ordenCompraCliente: cuenta.ordenCompraCliente ?? '',
+      numeroHES: cuenta.numeroHES ?? '',
+      numeroGuiaRemision: cuenta.numeroGuiaRemision ?? '',
       bancoFinanciera: cuenta.bancoFinanciera ?? '',
       numeroNegociacion: cuenta.numeroNegociacion ?? '',
       observaciones: cuenta.observaciones ?? '',
@@ -424,6 +436,8 @@ export default function CuentasCobrarPage() {
           diasCredito,
           tipoCambio,
           ordenCompraCliente: editForm.ordenCompraCliente || null,
+          numeroHES: editForm.numeroHES || null,
+          numeroGuiaRemision: editForm.numeroGuiaRemision || null,
           bancoFinanciera: editForm.bancoFinanciera || null,
           numeroNegociacion: editForm.numeroNegociacion || null,
           observaciones: editForm.observaciones || null,
@@ -937,6 +951,16 @@ export default function CuentasCobrarPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
+                <Label>N° HES (servicios)</Label>
+                <Input placeholder="HES-1000123" value={createForm.numeroHES} onChange={e => updateCreateField('numeroHES', e.target.value)} />
+              </div>
+              <div>
+                <Label>N° Guía de Remisión (bienes)</Label>
+                <Input placeholder="T001-12345" value={createForm.numeroGuiaRemision} onChange={e => updateCreateField('numeroGuiaRemision', e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
                 <Label>Banco / Financiera (negociación)</Label>
                 <Input placeholder="BANPRO, CRECE CAPITAL..." value={createForm.bancoFinanciera} onChange={e => updateCreateField('bancoFinanciera', e.target.value)} />
               </div>
@@ -1166,6 +1190,8 @@ export default function CuentasCobrarPage() {
                   <div className="flex justify-between"><span>Proyecto</span><span className="font-mono">{showDetail.proyecto?.codigo}</span></div>
                   {showDetail.valorizacion && <div className="flex justify-between"><span>Valorización</span><span className="font-mono">{showDetail.valorizacion.codigo}</span></div>}
                   {showDetail.ordenCompraCliente && <div className="flex justify-between"><span>OC Cliente</span><span className="font-mono">{showDetail.ordenCompraCliente}</span></div>}
+                  {showDetail.numeroHES && <div className="flex justify-between"><span>N° HES</span><span className="font-mono">{showDetail.numeroHES}</span></div>}
+                  {showDetail.numeroGuiaRemision && <div className="flex justify-between"><span>N° Guía Remisión</span><span className="font-mono">{showDetail.numeroGuiaRemision}</span></div>}
                   {showDetail.descripcion && <div className="flex justify-between"><span>Descripción</span><span className="text-right max-w-[200px] truncate">{showDetail.descripcion}</span></div>}
                   <div className="flex justify-between"><span>Emisión</span><span>{formatDate(showDetail.fechaEmision)}</span></div>
                   {showDetail.fechaRecepcion && <div className="flex justify-between"><span>Recepción</span><span>{formatDate(showDetail.fechaRecepcion)}</span></div>}
@@ -1347,6 +1373,16 @@ export default function CuentasCobrarPage() {
               <div>
                 <Label>Orden de Compra (cliente)</Label>
                 <Input placeholder="8070008797" value={editForm.ordenCompraCliente} onChange={e => setEditForm(f => ({ ...f, ordenCompraCliente: e.target.value }))} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>N° HES (servicios)</Label>
+                <Input placeholder="HES-1000123" value={editForm.numeroHES} onChange={e => setEditForm(f => ({ ...f, numeroHES: e.target.value }))} />
+              </div>
+              <div>
+                <Label>N° Guía de Remisión (bienes)</Label>
+                <Input placeholder="T001-12345" value={editForm.numeroGuiaRemision} onChange={e => setEditForm(f => ({ ...f, numeroGuiaRemision: e.target.value }))} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">

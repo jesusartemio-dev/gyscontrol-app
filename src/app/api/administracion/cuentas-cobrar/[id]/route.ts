@@ -38,9 +38,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
     // Editar campos administrativos (no toca monto/saldo/estado financiero — solo metadata)
     const editableFields = [
-      'fechaRecepcion', 'ordenCompraCliente', 'numeroNegociacion',
-      'bancoFinanciera', 'tipoCambio', 'diasCredito', 'observaciones',
-      'descripcion', 'numeroDocumento',
+      'fechaRecepcion', 'ordenCompraCliente', 'numeroHES', 'numeroGuiaRemision',
+      'numeroNegociacion', 'bancoFinanciera', 'tipoCambio', 'diasCredito',
+      'observaciones', 'descripcion', 'numeroDocumento',
     ] as const
 
     const data: Record<string, any> = {}

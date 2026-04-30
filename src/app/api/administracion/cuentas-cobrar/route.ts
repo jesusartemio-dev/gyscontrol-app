@@ -66,7 +66,8 @@ export async function POST(req: Request) {
     const {
       proyectoId, clienteId, valorizacionId, numeroDocumento, descripcion,
       monto, moneda, tipoCambio, fechaEmision, fechaRecepcion, fechaVencimiento,
-      ordenCompraCliente, numeroNegociacion, bancoFinanciera, observaciones,
+      ordenCompraCliente, numeroHES, numeroGuiaRemision, numeroNegociacion,
+      bancoFinanciera, observaciones,
     } = body
 
     if (!proyectoId || !clienteId || !monto || !fechaEmision || !fechaVencimiento) {
@@ -109,6 +110,8 @@ export async function POST(req: Request) {
         diasCredito,
         bancoFinanciera: bancoFinanciera || null,
         ordenCompraCliente: ordenCompraCliente || null,
+        numeroHES: numeroHES || null,
+        numeroGuiaRemision: numeroGuiaRemision || null,
         numeroNegociacion: numeroNegociacion || null,
         observaciones: observaciones || null,
         updatedAt: new Date(),

@@ -3812,6 +3812,8 @@ model CuentaPorCobrar {
   metodoPago         String?
   bancoFinanciera    String?
   ordenCompraCliente String? // N° de Orden de Compra emitida por el cliente
+  numeroHES          String? // N° de Hoja de Entrada de Servicios (HES) — cuando se factura un servicio
+  numeroGuiaRemision String? // N° de Guía de Remisión — cuando se factura entrega de bienes
   numeroNegociacion  String? // N° de operación con la financiera (cuando se negocia/factoriza la factura)
   estado             EstadoCuentaCobrar @default(pendiente)
   observaciones      String?
