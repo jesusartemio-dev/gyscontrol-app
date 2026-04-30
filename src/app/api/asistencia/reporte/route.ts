@@ -23,12 +23,19 @@ export async function GET(req: Request) {
   const where: any = {}
   if (desde || hasta) {
     where.fechaHora = {}
-    if (desde) where.fechaHora.gte = new Date(desde)
+    // Interpretar las fechas YYYY-MM-DD como dia completo en zona Lima (Peru no usa DST,
+    // por eso podemos hardcodear -05:00). Antes usabamos new Date(string) + setHours()
+    // que dependia de la zona del servidor — fallaba en local Lima (excluia el dia entero)
+    // y en Vercel UTC (cortaba horas). Esta version es estable en cualquier servidor.
+    if (desde) {
+      where.fechaHora.gte = /^\d{4}-\d{2}-\d{2}$/.test(desde)
+        ? new Date(`${desde}T00:00:00.000-05:00`)
+        : new Date(desde)
+    }
     if (hasta) {
-      // Si hasta es fecha sola (YYYY-MM-DD), llevar al final del día local
-      const h = new Date(hasta)
-      if (/^\d{4}-\d{2}-\d{2}$/.test(hasta)) h.setHours(23, 59, 59, 999)
-      where.fechaHora.lte = h
+      where.fechaHora.lte = /^\d{4}-\d{2}-\d{2}$/.test(hasta)
+        ? new Date(`${hasta}T23:59:59.999-05:00`)
+        : new Date(hasta)
     }
   }
   if (ubicacionId) where.ubicacionId = ubicacionId
