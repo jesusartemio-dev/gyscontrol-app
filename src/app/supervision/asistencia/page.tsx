@@ -16,7 +16,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
-import { Loader2, ShieldCheck, FileSpreadsheet, Trash2, Search, ArrowUp, ArrowDown, MapPin, Smartphone, MapPinOff, Moon, Home } from 'lucide-react'
+import { Loader2, ShieldCheck, FileSpreadsheet, Trash2, Search, ArrowUp, ArrowDown, MapPin, Smartphone, MapPinOff, Moon, Home, Briefcase } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { toast } from 'sonner'
 import { formatearTardanza } from '@/lib/utils/formatTardanza'
@@ -29,7 +29,8 @@ interface Fila {
   estado: string
   dentroGeofence: boolean
   distanciaMetros: number | null
-  metodoMarcaje: 'qr_estatico' | 'qr_supervisor' | 'gps_directo' | 'manual_supervisor' | 'remoto'
+  metodoMarcaje: 'qr_estatico' | 'qr_supervisor' | 'gps_directo' | 'visita_externa' | 'manual_supervisor' | 'remoto'
+  observacion: string | null
   banderas: string[]
   user: { name: string | null; email: string }
   empleado: { departamento: { nombre: string } | null; cargo: { nombre: string } | null } | null
@@ -130,6 +131,21 @@ export default function SupervisionAsistencia() {
   const [filaAEliminar, setFilaAEliminar] = useState<Fila | null>(null)
   const [eliminando, setEliminando] = useState(false)
 
+  const [visitasMes, setVisitasMes] = useState<{
+    umbral: number
+    resumen: Array<{
+      userId: string
+      nombre: string
+      email: string
+      totalDiasMarcados: number
+      diasVisitaExterna: number
+      ratio: number
+      excedeUmbral: boolean
+      ultimosLugares: string[]
+    }>
+  } | null>(null)
+  const [dialogVisitas, setDialogVisitas] = useState(false)
+
   async function cargar(overrideDesde?: string, overrideHasta?: string) {
     setLoading(true)
     const d = overrideDesde ?? desde
@@ -145,8 +161,17 @@ export default function SupervisionAsistencia() {
 
   useEffect(() => {
     cargar()
+    fetch('/api/asistencia/visitas-externas-mes')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => setVisitasMes(d))
+      .catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const usuariosExcedenUmbral = useMemo(
+    () => new Set((visitasMes?.resumen || []).filter(r => r.excedeUmbral).map(r => r.email)),
+    [visitasMes],
+  )
 
   function aplicarPreset(p: typeof PRESETS[number]) {
     const d = p.desde()
@@ -193,7 +218,7 @@ export default function SupervisionAsistencia() {
   }, [data, busqueda, sortKey, sortDir])
 
   const contadores = useMemo(() => {
-    const c = { total: 0, a_tiempo: 0, tarde: 0, muy_tarde: 0, fuera_zona: 0, dispositivo_nuevo: 0, sin_qr: 0 }
+    const c = { total: 0, a_tiempo: 0, tarde: 0, muy_tarde: 0, fuera_zona: 0, dispositivo_nuevo: 0, sin_qr: 0, sin_gps: 0 }
     for (const f of dataFiltrada) {
       c.total++
       // Puntualidad
@@ -204,6 +229,8 @@ export default function SupervisionAsistencia() {
       if (f.banderas?.includes('fuera_zona') || (!f.dentroGeofence && f.metodoMarcaje !== 'remoto')) c.fuera_zona++
       if (f.banderas?.includes('dispositivo_nuevo')) c.dispositivo_nuevo++
       if (f.metodoMarcaje === 'gps_directo') c.sin_qr++
+      // Marcaje presencial sin coordenadas registradas — bypass histórico antes del fix
+      if (f.metodoMarcaje === 'gps_directo' && f.distanciaMetros == null) c.sin_gps++
     }
     return c
   }, [dataFiltrada])
@@ -321,6 +348,7 @@ export default function SupervisionAsistencia() {
                 <SelectItem value="qr_estatico">QR estático</SelectItem>
                 <SelectItem value="qr_supervisor">QR supervisor</SelectItem>
                 <SelectItem value="gps_directo">GPS sin QR</SelectItem>
+                <SelectItem value="visita_externa">Visita externa</SelectItem>
                 <SelectItem value="manual_supervisor">Manual</SelectItem>
               </SelectContent>
             </Select>
@@ -347,8 +375,31 @@ export default function SupervisionAsistencia() {
         </CardContent>
       </Card>
 
+      {/* Alerta de visitas externas del mes (>50%) */}
+      {visitasMes && visitasMes.resumen.some(r => r.excedeUmbral) && (
+        <Card className="mb-4 border-2 border-amber-400 bg-amber-50">
+          <CardContent className="flex items-start justify-between gap-3 py-3">
+            <div className="flex items-start gap-3">
+              <Briefcase className="h-5 w-5 shrink-0 text-amber-700" />
+              <div className="text-sm">
+                <p className="font-bold text-amber-900">
+                  {visitasMes.resumen.filter(r => r.excedeUmbral).length} trabajador(es) con más del{' '}
+                  {Math.round(visitasMes.umbral * 100)}% del mes en visita externa
+                </p>
+                <p className="text-xs text-amber-800">
+                  Revisa si las visitas son legítimas o si están saltando el control de sede oficial.
+                </p>
+              </div>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => setDialogVisitas(true)}>
+              Ver detalle
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Contadores */}
-      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-7">
+      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-8">
         <Card><CardContent className="py-3">
           <p className="text-xs text-muted-foreground">Total</p>
           <p className="text-2xl font-bold">{contadores.total}</p>
@@ -376,6 +427,15 @@ export default function SupervisionAsistencia() {
         <Card><CardContent className="py-3">
           <p className="text-xs text-muted-foreground" title="Marcajes sin escanear QR">Sin QR</p>
           <p className="text-2xl font-bold text-amber-700">{contadores.sin_qr}</p>
+        </CardContent></Card>
+        <Card><CardContent className="py-3">
+          <p
+            className="text-xs text-muted-foreground"
+            title="Presencial sin coordenadas registradas — bypass del sistema (legacy)"
+          >
+            Sin GPS
+          </p>
+          <p className="text-2xl font-bold text-red-700">{contadores.sin_gps}</p>
         </CardContent></Card>
       </div>
 
@@ -425,12 +485,30 @@ export default function SupervisionAsistencia() {
                   <TableCell className="font-mono text-xs whitespace-nowrap">
                     {new Date(f.fechaHora).toLocaleString('es-PE')}
                   </TableCell>
-                  <TableCell>{f.user.name || f.user.email}</TableCell>
+                  <TableCell>
+                    <span className="inline-flex items-center gap-1">
+                      {f.user.name || f.user.email}
+                      {usuariosExcedenUmbral.has(f.user.email) && (
+                        <span
+                          title={`Más del ${Math.round((visitasMes?.umbral ?? 0.5) * 100)}% del mes en visita externa`}
+                          className="inline-flex items-center gap-0.5 rounded bg-amber-200 px-1.5 py-0.5 text-[10px] font-medium text-amber-900"
+                        >
+                          <Briefcase className="h-3 w-3" /> {Math.round(
+                            (visitasMes?.resumen.find(r => r.email === f.user.email)?.ratio ?? 0) * 100,
+                          )}%
+                        </span>
+                      )}
+                    </span>
+                  </TableCell>
                   <TableCell className="text-xs">{f.empleado?.departamento?.nombre || '—'}</TableCell>
                   <TableCell>{f.tipo.replace('_', ' ')}</TableCell>
                   <TableCell>
                     {f.metodoMarcaje === 'remoto' ? (
                       <Badge variant="outline" className="bg-purple-100 text-purple-800">remoto</Badge>
+                    ) : f.metodoMarcaje === 'visita_externa' ? (
+                      <Badge variant="outline" className="bg-orange-100 text-orange-800" title={f.observacion || 'Visita externa'}>
+                        <Briefcase className="mr-1 h-3 w-3" /> visita
+                      </Badge>
                     ) : f.metodoMarcaje === 'gps_directo' ? (
                       <Badge variant="outline" className="bg-amber-100 text-amber-800" title="Marcó sin escanear el QR">
                         sin QR
@@ -441,7 +519,15 @@ export default function SupervisionAsistencia() {
                       <span className="text-xs text-muted-foreground">presencial</span>
                     )}
                   </TableCell>
-                  <TableCell>{f.ubicacion?.nombre || (f.metodoMarcaje === 'remoto' ? 'Casa' : '—')}</TableCell>
+                  <TableCell>
+                    {f.metodoMarcaje === 'visita_externa' ? (
+                      <span className="text-xs italic text-orange-700" title={f.observacion || ''}>
+                        {f.observacion || 'visita'}
+                      </span>
+                    ) : (
+                      f.ubicacion?.nombre || (f.metodoMarcaje === 'remoto' ? 'Casa' : '—')
+                    )}
+                  </TableCell>
                   <TableCell>{f.minutosTarde > 0 ? formatearTardanza(f.minutosTarde) : '—'}</TableCell>
                   <TableCell>
                     {f.distanciaMetros != null ? (
@@ -471,6 +557,14 @@ export default function SupervisionAsistencia() {
                           className="inline-flex items-center gap-0.5 rounded bg-orange-100 px-1.5 py-0.5 text-[10px] text-orange-700"
                         >
                           <MapPinOff className="h-3 w-3" /> fuera
+                        </span>
+                      )}
+                      {f.metodoMarcaje === 'gps_directo' && f.distanciaMetros == null && (
+                        <span
+                          title="Marcaje presencial sin coordenadas — bypass del sistema (legacy)"
+                          className="inline-flex items-center gap-0.5 rounded bg-red-100 px-1.5 py-0.5 text-[10px] text-red-700"
+                        >
+                          <MapPinOff className="h-3 w-3" /> sin GPS
                         </span>
                       )}
                       {f.banderas?.includes('auto_cierre') && (
@@ -526,6 +620,52 @@ export default function SupervisionAsistencia() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Dialog detalle de visitas externas del mes */}
+      <Dialog open={dialogVisitas} onOpenChange={setDialogVisitas}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Briefcase className="h-5 w-5" /> Visitas externas del mes
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            {visitasMes && visitasMes.resumen.length > 0 ? (
+              visitasMes.resumen.map(r => (
+                <div
+                  key={r.userId}
+                  className={`rounded-md border p-3 text-sm ${
+                    r.excedeUmbral ? 'border-amber-400 bg-amber-50' : 'border-muted'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="font-semibold">{r.nombre}</p>
+                    <span
+                      className={`rounded px-2 py-0.5 text-xs font-medium ${
+                        r.excedeUmbral ? 'bg-amber-200 text-amber-900' : 'bg-muted text-muted-foreground'
+                      }`}
+                    >
+                      {Math.round(r.ratio * 100)}% ({r.diasVisitaExterna}/{r.totalDiasMarcados} días)
+                    </span>
+                  </div>
+                  {r.ultimosLugares.length > 0 && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Últimos lugares: {r.ultimosLugares.join(' · ')}
+                    </p>
+                  )}
+                </div>
+              ))
+            ) : (
+              <p className="py-4 text-center text-sm text-muted-foreground">
+                Nadie ha registrado visitas externas este mes.
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setDialogVisitas(false)}>Cerrar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog confirmar eliminación */}
       <Dialog open={!!filaAEliminar} onOpenChange={v => !v && setFilaAEliminar(null)}>

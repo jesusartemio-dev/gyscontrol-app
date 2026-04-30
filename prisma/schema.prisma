@@ -4412,6 +4412,7 @@ enum MetodoMarcaje {
   qr_estatico
   qr_supervisor
   gps_directo
+  visita_externa
   manual_supervisor
   remoto
 }

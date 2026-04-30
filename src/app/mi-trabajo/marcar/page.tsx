@@ -17,10 +17,21 @@ import {
   Camera,
   X,
   Home,
+  Briefcase,
 } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { getDeviceInfo } from '@/lib/utils/deviceFingerprint'
 import { useGeolocation } from '@/lib/hooks/useGeolocation'
 import { useQrScanner } from '@/lib/hooks/useQrScanner'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import type { TipoMarcaje } from '@prisma/client'
 
 type TipoBotón = TipoMarcaje
@@ -44,6 +55,17 @@ export default function MarcarPage() {
   const [scannerOpen, setScannerOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [modoHoy, setModoHoy] = useState<ModoHoy | null>(null)
+  const [permisoGps, setPermisoGps] = useState<'prompt' | 'granted' | 'denied' | 'unknown'>('unknown')
+  const [dialogGpsBloqueado, setDialogGpsBloqueado] = useState(false)
+  const [cercanas, setCercanas] = useState<null | {
+    sedeEnZona: { id: string; nombre: string; tipo: string; distanciaMetros: number; radioMetros: number } | null
+    sedesCercanas: Array<{ id: string; nombre: string; tipo: string; distanciaMetros: number; radioMetros: number; dentro: boolean }>
+    sedeRemota: { id: string; nombre: string; distanciaMetros: number; radioMetros: number; dentro: boolean } | null
+  }>(null)
+  const [cargandoCercanas, setCargandoCercanas] = useState(false)
+  const [dialogVisitaExterna, setDialogVisitaExterna] = useState(false)
+  const [visitaTipo, setVisitaTipo] = useState<TipoBotón>('ingreso')
+  const [visitaLugar, setVisitaLugar] = useState('')
   const [ultimoResultado, setUltimoResultado] = useState<null | {
     ok: boolean
     titulo?: string
@@ -68,9 +90,45 @@ export default function MarcarPage() {
       .then(r => r.json())
       .then(setModoHoy)
       .catch(() => setModoHoy({ esRemoto: false }))
+
+    // Consultar el estado del permiso de geolocalización para detectar de antemano
+    // si el navegador lo tiene bloqueado y poder mostrar instrucciones de recuperación.
+    if (typeof navigator !== 'undefined' && navigator.permissions?.query) {
+      navigator.permissions
+        .query({ name: 'geolocation' as PermissionName })
+        .then(p => {
+          setPermisoGps(p.state)
+          p.onchange = () => setPermisoGps(p.state)
+        })
+        .catch(() => setPermisoGps('unknown'))
+    }
   }, [])
 
-  async function enviarMarcaje(tipo: TipoBotón, qrPayload?: string) {
+  // Cargar sedes cercanas cuando obtenemos GPS (solo si el usuario no es confianza/remoto puro).
+  useEffect(() => {
+    if (!geo.coords) return
+    if (modoHoy?.esConfianza) return
+    setCargandoCercanas(true)
+    fetch(`/api/asistencia/ubicaciones/cercanas?lat=${geo.coords.latitud}&lon=${geo.coords.longitud}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => setCercanas(d))
+      .catch(() => setCercanas(null))
+      .finally(() => setCargandoCercanas(false))
+  }, [geo.coords, modoHoy?.esConfianza])
+
+  // Pre-solicitar GPS al cargar para que aparezca el panel "¿Dónde estoy?" sin que el
+  // usuario tenga que tocar "Marcar" primero. Solo si el permiso ya fue concedido.
+  useEffect(() => {
+    if (permisoGps === 'granted' && !geo.coords && !modoHoy?.esConfianza) {
+      geo.solicitar()
+    }
+  }, [permisoGps, geo, modoHoy?.esConfianza])
+
+  async function enviarMarcaje(
+    tipo: TipoBotón,
+    qrPayload?: string,
+    visitaExterna?: { lugar: string },
+  ) {
     if (!deviceRef.current) deviceRef.current = await getDeviceInfo()
     setLoading(true)
     setUltimoResultado(null)
@@ -85,10 +143,18 @@ export default function MarcarPage() {
           longitud: geo.coords?.longitud,
           precisionGps: geo.coords?.precision,
           device: deviceRef.current,
+          visitaExterna,
         }),
       })
       const json = await res.json()
       if (!res.ok) {
+        // Si el server detecta que está fuera de toda sede, abrimos el flujo de visita externa.
+        if (res.status === 409 && json.codigo === 'fuera_de_toda_sede') {
+          setVisitaTipo(tipo)
+          setVisitaLugar('')
+          setDialogVisitaExterna(true)
+          return
+        }
         setUltimoResultado({ ok: false, mensaje: json.message || 'Error al marcar' })
         toast.error(json.message || 'Error al marcar')
       } else {
@@ -108,16 +174,53 @@ export default function MarcarPage() {
     }
   }
 
-  async function onClickTipo(tipo: TipoBotón) {
+  async function abrirDialogVisitaExterna(tipo: TipoBotón) {
     setTipoSel(tipo)
-    // En modo remoto no pedimos GPS ni QR
-    if (modoHoy?.esRemoto) {
-      await enviarMarcaje(tipo)
+    if (permisoGps === 'denied') {
+      setDialogGpsBloqueado(true)
       return
     }
     const c = geo.coords || (await geo.solicitar())
     if (!c) {
-      toast.error('Se requiere permiso de ubicación')
+      setDialogGpsBloqueado(true)
+      return
+    }
+    setVisitaTipo(tipo)
+    setVisitaLugar('')
+    setDialogVisitaExterna(true)
+  }
+
+  async function confirmarVisitaExterna() {
+    const lugar = visitaLugar.trim()
+    if (lugar.length < 5) {
+      toast.error('Describe el lugar (mínimo 5 caracteres)')
+      return
+    }
+    setDialogVisitaExterna(false)
+    await enviarMarcaje(visitaTipo, undefined, { lugar })
+  }
+
+  async function onClickTipo(tipo: TipoBotón) {
+    setTipoSel(tipo)
+    // Personal de confianza: marcaje voluntario sin GPS ni QR
+    if (modoHoy?.esConfianza) {
+      await enviarMarcaje(tipo)
+      return
+    }
+    // Modo remoto declarado: marca sin GPS ni QR (validación remota se hace server-side)
+    if (modoHoy?.esRemoto) {
+      await enviarMarcaje(tipo)
+      return
+    }
+    // Presencial: si el navegador tiene GPS bloqueado, no tiene sentido intentar.
+    if (permisoGps === 'denied') {
+      setDialogGpsBloqueado(true)
+      return
+    }
+    const c = geo.coords || (await geo.solicitar())
+    if (!c) {
+      // Si después de pedirlo no hay coords, casi siempre es porque lo bloqueó el navegador.
+      setDialogGpsBloqueado(true)
       return
     }
     setScannerOpen(true)
@@ -132,9 +235,13 @@ export default function MarcarPage() {
   // Para remotos que van a oficina: abrir el scanner aunque su modalidad sea remota.
   async function abrirScannerDesdeRemoto(tipo: TipoBotón) {
     setTipoSel(tipo)
+    if (permisoGps === 'denied') {
+      setDialogGpsBloqueado(true)
+      return
+    }
     const c = geo.coords || (await geo.solicitar())
     if (!c) {
-      toast.error('Se requiere permiso de ubicación para marcar desde oficina')
+      setDialogGpsBloqueado(true)
       return
     }
     setScannerOpen(true)
@@ -226,6 +333,109 @@ export default function MarcarPage() {
         </Card>
       )}
 
+      {!scannerOpen && !modoHoy?.esConfianza && geo.coords && cercanas && (
+        <Card className={`mb-4 border-2 ${
+          cercanas.sedeEnZona
+            ? 'border-emerald-400 bg-emerald-50'
+            : cercanas.sedeRemota?.dentro
+              ? 'border-purple-400 bg-purple-50'
+              : 'border-amber-400 bg-amber-50'
+        }`}>
+          <CardContent className="py-4">
+            {cercanas.sedeEnZona ? (
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" />
+                <div className="text-sm">
+                  <p className="font-bold text-emerald-900">
+                    Estás en {cercanas.sedeEnZona.nombre}
+                  </p>
+                  <p className="text-emerald-800">
+                    A {cercanas.sedeEnZona.distanciaMetros}m del centro · radio permitido {cercanas.sedeEnZona.radioMetros}m
+                  </p>
+                </div>
+              </div>
+            ) : cercanas.sedeRemota?.dentro ? (
+              <div className="flex items-start gap-3">
+                <Home className="h-5 w-5 shrink-0 text-purple-600" />
+                <div className="text-sm">
+                  <p className="font-bold text-purple-900">
+                    Estás en tu sede remota: {cercanas.sedeRemota.nombre}
+                  </p>
+                  <p className="text-purple-800">
+                    A {cercanas.sedeRemota.distanciaMetros}m del centro
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600" />
+                <div className="flex-1 text-sm">
+                  <p className="font-bold text-amber-900">No estás en ninguna sede registrada</p>
+                  {cercanas.sedesCercanas.length > 0 && (
+                    <div className="mt-2">
+                      <p className="text-xs text-amber-800">Sedes más cercanas:</p>
+                      <ul className="mt-1 space-y-0.5 text-xs text-amber-900">
+                        {cercanas.sedesCercanas.slice(0, 3).map(s => (
+                          <li key={s.id} className="flex items-center justify-between gap-2">
+                            <span>{s.nombre} ({s.tipo})</span>
+                            <span className="font-mono">
+                              {s.distanciaMetros < 1000
+                                ? `${s.distanciaMetros}m`
+                                : `${(s.distanciaMetros / 1000).toFixed(2)}km`}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {cercanas.sedeRemota && !cercanas.sedeRemota.dentro && (
+                    <p className="mt-2 text-xs text-amber-800">
+                      Tu sede remota está a{' '}
+                      {cercanas.sedeRemota.distanciaMetros < 1000
+                        ? `${cercanas.sedeRemota.distanciaMetros}m`
+                        : `${(cercanas.sedeRemota.distanciaMetros / 1000).toFixed(2)}km`}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {!scannerOpen && cargandoCercanas && !cercanas && !modoHoy?.esConfianza && (
+        <Card className="mb-4">
+          <CardContent className="flex items-center gap-2 py-3 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Buscando sedes cercanas...
+          </CardContent>
+        </Card>
+      )}
+
+      {!scannerOpen && permisoGps === 'denied' && !modoHoy?.esConfianza && !modoHoy?.esRemoto && (
+        <Card className="mb-4 border-2 border-red-500 bg-red-50">
+          <CardContent className="flex items-start gap-3 py-4">
+            <AlertTriangle className="h-6 w-6 shrink-0 text-red-600" />
+            <div className="flex-1 text-sm">
+              <p className="text-base font-bold text-red-900">
+                Tu navegador tiene bloqueado el GPS
+              </p>
+              <p className="mt-1 text-red-800">
+                No puedes marcar asistencia presencial sin permiso de ubicación.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                onClick={() => setDialogGpsBloqueado(true)}
+              >
+                Ver cómo activarlo
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {!scannerOpen && (
         <Card>
           <CardHeader>
@@ -248,11 +458,13 @@ export default function MarcarPage() {
           <CardContent className="space-y-3">
             {TIPOS.map(t => {
               const Icon = t.icon
+              const gpsBloqueadoYRequerido =
+                permisoGps === 'denied' && !modoHoy?.esConfianza && !modoHoy?.esRemoto
               return (
                 <Button
                   key={t.value}
                   className={`h-16 w-full text-base ${t.color}`}
-                  disabled={loading}
+                  disabled={loading || gpsBloqueadoYRequerido}
                   onClick={() => onClickTipo(t.value)}
                 >
                   <Icon className="mr-2 h-5 w-5" />
@@ -271,6 +483,22 @@ export default function MarcarPage() {
                 >
                   <QrCode className="mr-2 h-4 w-4" />
                   Escanear QR de oficina
+                </Button>
+              </div>
+            )}
+            {!modoHoy?.esConfianza && (
+              <div className="rounded border border-dashed border-amber-300 bg-amber-50/50 p-3 text-center text-xs">
+                <p className="mb-2 text-amber-900">
+                  ¿Estás de visita en planta de cliente, obra externa o viaje?
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={loading || (permisoGps === 'denied' && !geo.coords)}
+                  onClick={() => abrirDialogVisitaExterna('ingreso')}
+                >
+                  <Briefcase className="mr-2 h-4 w-4" />
+                  Marcar visita externa
                 </Button>
               </div>
             )}
@@ -337,6 +565,133 @@ export default function MarcarPage() {
           <Loader2 className="h-8 w-8 animate-spin text-white" />
         </div>
       )}
+
+      <Dialog open={dialogVisitaExterna} onOpenChange={setDialogVisitaExterna}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Briefcase className="h-5 w-5" />
+              Marcar visita externa
+            </DialogTitle>
+            <DialogDescription>
+              Describe brevemente dónde estás (planta de cliente, obra, sede de proveedor, etc.).
+              Se registrará tu GPS como evidencia para que tu supervisor pueda auditar la visita.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs">Tipo de marcaje</Label>
+              <div className="mt-1 flex gap-2">
+                <Button
+                  size="sm"
+                  variant={visitaTipo === 'ingreso' ? 'default' : 'outline'}
+                  className="flex-1"
+                  onClick={() => setVisitaTipo('ingreso')}
+                >
+                  <LogIn className="mr-1 h-3 w-3" /> Ingreso
+                </Button>
+                <Button
+                  size="sm"
+                  variant={visitaTipo === 'salida' ? 'default' : 'outline'}
+                  className="flex-1"
+                  onClick={() => setVisitaTipo('salida')}
+                >
+                  <LogOut className="mr-1 h-3 w-3" /> Salida
+                </Button>
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">Lugar de la visita</Label>
+              <Input
+                autoFocus
+                placeholder="Ej. Planta Antamina - Cajamarca"
+                value={visitaLugar}
+                onChange={e => setVisitaLugar(e.target.value)}
+                maxLength={120}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                {visitaLugar.trim().length} / mín. 5 caracteres
+              </p>
+            </div>
+            {geo.coords && (
+              <div className="rounded bg-muted/40 p-2 text-xs text-muted-foreground">
+                <MapPin className="mr-1 inline h-3 w-3" />
+                GPS capturado (±{Math.round(geo.coords.precision)}m)
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogVisitaExterna(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={confirmarVisitaExterna}
+              disabled={loading || visitaLugar.trim().length < 5}
+            >
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Registrar visita
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={dialogGpsBloqueado} onOpenChange={setDialogGpsBloqueado}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-red-600" />
+              Activa el GPS para poder marcar
+            </DialogTitle>
+            <DialogDescription>
+              Sin permiso de ubicación no se puede validar tu asistencia presencial.
+              Sigue los pasos según tu navegador:
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <div className="rounded-md border bg-muted/40 p-3">
+              <p className="font-semibold">📱 Chrome / Edge (Android y PC)</p>
+              <ol className="ml-4 mt-1 list-decimal space-y-0.5 text-muted-foreground">
+                <li>Toca el candado 🔒 a la izquierda de la URL</li>
+                <li>Entra a "Permisos del sitio" o "Configuración del sitio"</li>
+                <li>Cambia "Ubicación" a <strong>Permitir</strong></li>
+                <li>Recarga la página</li>
+              </ol>
+            </div>
+            <div className="rounded-md border bg-muted/40 p-3">
+              <p className="font-semibold">🍎 Safari (iPhone)</p>
+              <ol className="ml-4 mt-1 list-decimal space-y-0.5 text-muted-foreground">
+                <li>Ajustes → Safari → Ubicación → <strong>Permitir</strong></li>
+                <li>Ajustes → Privacidad → Localización → activado</li>
+                <li>Vuelve a Safari y recarga</li>
+              </ol>
+            </div>
+            <div className="rounded-md border bg-muted/40 p-3">
+              <p className="font-semibold">🦊 Firefox</p>
+              <ol className="ml-4 mt-1 list-decimal space-y-0.5 text-muted-foreground">
+                <li>Toca el candado 🔒 → "Conexión segura" → "Más información"</li>
+                <li>Permisos → "Acceder a tu ubicación" → quita el bloqueo</li>
+                <li>Recarga la página</li>
+              </ol>
+            </div>
+            <p className="rounded bg-amber-50 p-2 text-xs text-amber-900">
+              💡 Si trabajas remoto autorizado o eres personal de confianza, no necesitas GPS para marcar.
+              Si crees que tu modalidad no es la correcta, contacta a Recursos Humanos.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setDialogGpsBloqueado(false)}>Entendido</Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDialogGpsBloqueado(false)
+                window.location.reload()
+              }}
+            >
+              Recargar página
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

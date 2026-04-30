@@ -28,6 +28,11 @@ interface MarcarBody {
     resolucion: string
   }
   observacion?: string
+  // Marcaje de visita externa (planta de cliente, obra no registrada, viaje).
+  // Requiere GPS y un texto descriptivo del lugar.
+  visitaExterna?: {
+    lugar: string
+  }
 }
 
 export async function POST(req: Request) {
@@ -131,18 +136,16 @@ export async function POST(req: Request) {
 
   // Si escaneó QR y originalmente era remoto, anular el modo remoto para
   // que la validación y los cálculos siguientes lo traten como presencial.
-  const esRemotoEfectivo = modoRemoto.esRemoto && !qrOverrideRemoto
+  let esRemotoEfectivo = modoRemoto.esRemoto && !qrOverrideRemoto
 
-  // Si no escaneó QR pero es presencial y tiene GPS, auto-asignar la
-  // ubicación activa más cercana dentro de un radio razonable (500m).
-  // Así evitamos que queden sin ubicación cuando marcan "sin QR".
+  // Auto-asignación de sede oficial por GPS.
+  // Regla de negocio: el lugar físico (oficina/planta/obra) tiene prioridad sobre la
+  // modalidad declarada. Si un trabajador "remoto" está físicamente en una sede oficial,
+  // el marcaje cuenta como presencial en esa sede, no como remoto.
+  // Por eso buscamos sede cercana INCLUSO si la modalidad declarada es remota.
   const RADIO_AUTO_ASIGNACION = 500
-  if (
-    !ubicacionId &&
-    !esRemotoEfectivo &&
-    body.latitud != null &&
-    body.longitud != null
-  ) {
+  let llegadaASedePorGps = false
+  if (!ubicacionId && body.latitud != null && body.longitud != null) {
     const ubicacionesActivas = await prisma.ubicacion.findMany({
       where: { activo: true },
       select: { id: true, latitud: true, longitud: true, radioMetros: true },
@@ -150,8 +153,6 @@ export async function POST(req: Request) {
     let mejor: { id: string; distancia: number } | null = null
     for (const u of ubicacionesActivas) {
       const d = haversineMetros(body.latitud, body.longitud, u.latitud, u.longitud)
-      // Aceptar si está dentro del radio de la ubicación O dentro de 500m
-      // (lo que sea mayor — obras con radio amplio también aplican).
       const umbral = Math.max(u.radioMetros, RADIO_AUTO_ASIGNACION)
       if (d <= umbral && (!mejor || d < mejor.distancia)) {
         mejor = { id: u.id, distancia: d }
@@ -159,8 +160,80 @@ export async function POST(req: Request) {
     }
     if (mejor) {
       ubicacionId = mejor.id
-      // El método sigue siendo gps_directo (para distinguir de los que sí escanearon QR).
+      llegadaASedePorGps = true
+      // Override del modo remoto: si era remoto y el GPS lo pone físicamente en sede,
+      // el marcaje es presencial. Queda bandera para trazabilidad (línea más abajo).
+      if (esRemotoEfectivo) {
+        esRemotoEfectivo = false
+        qrOverrideRemoto = true
+      }
+      metodoMarcaje = 'gps_directo'
     }
+  }
+
+  // Visita externa: GPS obligatorio + lugar de texto. No requiere estar cerca de sede oficial.
+  // Útil para visitas a planta de cliente, obras nuevas, viajes — quedan registradas con
+  // evidencia GPS y descripción del lugar para que el supervisor las pueda auditar después.
+  const esVisitaExterna = Boolean(body.visitaExterna && body.visitaExterna.lugar)
+  if (esVisitaExterna && !modoRemoto.esConfianza) {
+    if (body.latitud == null || body.longitud == null) {
+      return NextResponse.json(
+        { message: 'Para registrar visita externa necesitas activar el GPS' },
+        { status: 400 },
+      )
+    }
+    const lugar = (body.visitaExterna!.lugar || '').trim()
+    if (lugar.length < 5) {
+      return NextResponse.json(
+        { message: 'Describe el lugar de la visita (mínimo 5 caracteres)' },
+        { status: 400 },
+      )
+    }
+    // La visita externa anula tanto la auto-asignación a sede oficial (si hubo)
+    // como el modo remoto: lo que importa es que estuvo en otro lado declarado.
+    ubicacionId = null
+    metodoMarcaje = 'visita_externa'
+    esRemotoEfectivo = false
+  }
+
+  // 🔒 Bloqueo anti-bypass: presencial sin QR, sin GPS y sin modalidad remota declarada
+  // = saltarse el sistema. Confianza queda exenta (marcaje voluntario).
+  if (
+    !modoRemoto.esConfianza &&
+    !esRemotoEfectivo &&
+    !ubicacionId &&
+    !esVisitaExterna &&
+    (body.latitud == null || body.longitud == null)
+  ) {
+    return NextResponse.json(
+      {
+        message:
+          'Necesitas activar el GPS o escanear un QR de tu sede para marcar. Si tu navegador bloqueó el permiso, actívalo en configuración.',
+      },
+      { status: 400 },
+    )
+  }
+
+  // 🚧 Presencial con GPS pero sin sede cercana, sin visita externa y sin modalidad remota:
+  // sugerirle al usuario que registre como visita externa o se acerque a una sede.
+  // Devolvemos 409 con datos para que el cliente abra el flujo de visita externa.
+  if (
+    !modoRemoto.esConfianza &&
+    !esRemotoEfectivo &&
+    !ubicacionId &&
+    !esVisitaExterna &&
+    body.latitud != null &&
+    body.longitud != null
+  ) {
+    return NextResponse.json(
+      {
+        message: 'No estás cerca de ninguna sede registrada.',
+        codigo: 'fuera_de_toda_sede',
+        sugerencia:
+          'Si estás de visita en otra planta o cliente, márcalo como visita externa. Si no, acércate a tu sede.',
+      },
+      { status: 409 },
+    )
   }
 
   // Evaluar geofence + distancia
@@ -169,7 +242,11 @@ export async function POST(req: Request) {
   let ubicacionRemotaId: string | null = null
   let sedeRemotaNombre: string | null = null
 
-  if (esRemotoEfectivo && !modoRemoto.esConfianza && body.latitud != null && body.longitud != null) {
+  if (esVisitaExterna) {
+    // Visita externa: el lugar lo declara el trabajador. No hay geofence contra qué validar,
+    // pero queda lat/long de evidencia. Se considera "dentro" para no contar como infracción.
+    dentroGeofence = true
+  } else if (esRemotoEfectivo && !modoRemoto.esConfianza && body.latitud != null && body.longitud != null) {
     // Validar contra la sede remota personal aprobada (si tiene)
     const sedeRemota = await obtenerSedeRemotaActiva(userId)
     if (sedeRemota) {
@@ -221,9 +298,17 @@ export async function POST(req: Request) {
   if (esRemotoEfectivo && modoRemoto.origen && !modoRemoto.esConfianza) {
     banderas.push(`remoto:${modoRemoto.origen}`)
   }
-  // Trazabilidad: remoto que vino a oficina y escaneó QR
+  // Trazabilidad: estaba en modo remoto declarado pero asistió físicamente (QR o GPS en sede)
   if (qrOverrideRemoto) {
     banderas.push('asistio_oficina_siendo_remoto')
+  }
+  // Trazabilidad: visita externa. Si además era remoto, dejamos la bandera de visita
+  // (la visita prevalece) más una nota del origen remoto para auditoría.
+  if (esVisitaExterna) {
+    banderas.push('visita_externa')
+    if (modoRemoto.esRemoto && modoRemoto.origen && !modoRemoto.esConfianza) {
+      banderas.push(`era_remoto:${modoRemoto.origen}`)
+    }
   }
 
   const asistencia = await prisma.asistencia.create({
@@ -246,7 +331,9 @@ export async function POST(req: Request) {
       dispositivoId,
       dispositivoEraNuevo: eraNuevo,
       estado,
-      observacion: body.observacion || null,
+      observacion: esVisitaExterna
+        ? (body.visitaExterna!.lugar || '').trim()
+        : body.observacion || null,
       banderas,
     },
   })
@@ -267,9 +354,14 @@ export async function POST(req: Request) {
 
   const lineas: string[] = []
   lineas.push(`${tipoHumano} registrado a las ${horaLima}`)
-  if (qrOverrideRemoto && ubicacionDatos) {
+  if (esVisitaExterna) {
+    lineas.push(`📍 Visita externa: ${(body.visitaExterna!.lugar || '').trim()}`)
+    if (modoRemoto.esRemoto && !modoRemoto.esConfianza) {
+      lineas.push('ℹ️ Eras remoto hoy — quedó registrado como visita externa (prioridad)')
+    }
+  } else if (qrOverrideRemoto && ubicacionDatos) {
     lineas.push(`Ubicación: ${ubicacionDatos.nombre}`)
-    lineas.push('ℹ️ Eras remoto hoy, pero escaneaste QR — quedaste como presencial')
+    lineas.push('ℹ️ Eras remoto hoy, pero llegaste a sede — quedaste como presencial')
   } else if (esRemotoEfectivo) {
     lineas.push(`Modo: trabajo remoto (${modoRemoto.razon})`)
     if (sedeRemotaNombre) {
@@ -279,6 +371,8 @@ export async function POST(req: Request) {
     }
   } else if (ubicacionDatos) {
     lineas.push(`Ubicación: ${ubicacionDatos.nombre}`)
+  } else if (!esRemotoEfectivo && !modoRemoto.esConfianza) {
+    lineas.push('⚠️ No estás cerca de ninguna sede registrada')
   }
   if (distanciaMetros != null) {
     lineas.push(`Distancia a sede: ${Math.round(distanciaMetros)} m`)
