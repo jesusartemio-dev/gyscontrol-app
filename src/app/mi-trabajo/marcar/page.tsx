@@ -74,11 +74,6 @@ export default function MarcarPage() {
   const [dialogVisitaExterna, setDialogVisitaExterna] = useState(false)
   const [visitaTipo, setVisitaTipo] = useState<TipoBotón>('ingreso')
   const [visitaLugar, setVisitaLugar] = useState('')
-  const [dialogContinuidad, setDialogContinuidad] = useState<null | {
-    tipo: TipoBotón
-    sedeAnterior: { id: string; nombre: string; tipo: string; radioMetros: number; distanciaAhora: number }
-    ultimoMarcajeMinutos: number
-  }>(null)
   const [ultimoResultado, setUltimoResultado] = useState<null | {
     ok: boolean
     titulo?: string
@@ -142,7 +137,6 @@ export default function MarcarPage() {
     tipo: TipoBotón,
     qrPayload?: string,
     visitaExterna?: { lugar: string },
-    extras?: { confirmarContinuidad?: { ubicacionId: string }; ignorarContinuidad?: boolean },
   ) {
     if (!deviceRef.current) deviceRef.current = await getDeviceInfo()
     setLoading(true)
@@ -159,22 +153,13 @@ export default function MarcarPage() {
           precisionGps: geo.coords?.precision,
           device: deviceRef.current,
           visitaExterna,
-          confirmarContinuidad: extras?.confirmarContinuidad,
-          ignorarContinuidad: extras?.ignorarContinuidad,
         }),
       })
       const json = await res.json()
       if (!res.ok) {
-        // GPS alejado de la sede del último marcaje del día — pedir confirmación al usuario.
-        if (res.status === 409 && json.codigo === 'continuidad_sugerida') {
-          setDialogContinuidad({
-            tipo,
-            sedeAnterior: json.sedeAnterior,
-            ultimoMarcajeMinutos: json.ultimoMarcajeMinutos,
-          })
-          return
-        }
-        // Si el server detecta que está fuera de toda sede, abrimos el flujo de visita externa.
+        // Si el server detecta que está fuera de toda sede (oficial o remota),
+        // abrimos el flujo de visita externa para que el trabajador describa
+        // dónde está realmente — funciona para presenciales y remotos.
         if (res.status === 409 && json.codigo === 'fuera_de_toda_sede') {
           setVisitaTipo(tipo)
           setVisitaLugar('')
@@ -198,25 +183,6 @@ export default function MarcarPage() {
     } finally {
       setLoading(false)
     }
-  }
-
-  async function confirmarContinuidad() {
-    if (!dialogContinuidad) return
-    const { tipo, sedeAnterior } = dialogContinuidad
-    setDialogContinuidad(null)
-    await enviarMarcaje(tipo, undefined, undefined, {
-      confirmarContinuidad: { ubicacionId: sedeAnterior.id },
-    })
-  }
-
-  async function continuarComoSalida() {
-    if (!dialogContinuidad) return
-    const { tipo } = dialogContinuidad
-    setDialogContinuidad(null)
-    // Re-enviar ignorando la continuidad: el server seguirá su flujo normal —
-    // si tiene modalidad remota validará contra sede remota personal,
-    // si no, devolverá 409 fuera_de_toda_sede y abrirá el modal de visita externa.
-    await enviarMarcaje(tipo, undefined, undefined, { ignorarContinuidad: true })
   }
 
   async function abrirDialogVisitaExterna(tipo: TipoBotón) {
@@ -610,53 +576,6 @@ export default function MarcarPage() {
           <Loader2 className="h-8 w-8 animate-spin text-white" />
         </div>
       )}
-
-      <Dialog open={!!dialogContinuidad} onOpenChange={v => !v && setDialogContinuidad(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <MapPin className="h-5 w-5 text-amber-600" />
-              ¿Sigues en {dialogContinuidad?.sedeAnterior.nombre}?
-            </DialogTitle>
-            <DialogDescription>
-              Tu último marcaje fue presencial en{' '}
-              <strong>{dialogContinuidad?.sedeAnterior.nombre}</strong> hace{' '}
-              {dialogContinuidad?.ultimoMarcajeMinutos} min. Tu GPS ahora te ubica a{' '}
-              {dialogContinuidad
-                ? dialogContinuidad.sedeAnterior.distanciaAhora < 1000
-                  ? `${dialogContinuidad.sedeAnterior.distanciaAhora}m`
-                  : `${(dialogContinuidad.sedeAnterior.distanciaAhora / 1000).toFixed(2)}km`
-                : ''}{' '}
-              de la sede.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2 text-sm">
-            <p className="rounded bg-amber-50 p-3 text-amber-900">
-              💡 En plantas grandes el GPS puede fluctuar (techo metálico, sombras de
-              edificios). Si sigues en la planta, confirma. Si ya saliste de la planta,
-              elige la otra opción.
-            </p>
-          </div>
-          <DialogFooter className="flex-col gap-2 sm:flex-col">
-            <Button
-              className="w-full bg-emerald-600 hover:bg-emerald-700"
-              disabled={loading}
-              onClick={confirmarContinuidad}
-            >
-              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-              Sigo en {dialogContinuidad?.sedeAnterior.nombre}
-            </Button>
-            <Button
-              variant="outline"
-              className="w-full"
-              disabled={loading}
-              onClick={continuarComoSalida}
-            >
-              Ya salí — registrar como remoto / visita externa
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={dialogVisitaExterna} onOpenChange={setDialogVisitaExterna}>
         <DialogContent>

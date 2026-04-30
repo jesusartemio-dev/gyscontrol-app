@@ -16,7 +16,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
-import { Loader2, ShieldCheck, FileSpreadsheet, Trash2, Search, ArrowUp, ArrowDown, MapPin, Smartphone, MapPinOff, Moon, Home, Briefcase, CheckCircle2 } from 'lucide-react'
+import { Loader2, ShieldCheck, FileSpreadsheet, Trash2, Search, ArrowUp, ArrowDown, MapPin, Smartphone, MapPinOff, Moon, Home, Briefcase } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { toast } from 'sonner'
 import { formatearTardanza } from '@/lib/utils/formatTardanza'
@@ -608,14 +608,6 @@ export default function SupervisionAsistencia() {
                           className="inline-flex items-center gap-0.5 rounded bg-purple-100 px-1.5 py-0.5 text-[10px] text-purple-700"
                         >
                           <Home className="h-3 w-3" /> remoto
-                        </span>
-                      )}
-                      {f.banderas?.includes('continuidad_confirmada') && (
-                        <span
-                          title="GPS estaba alejado pero el trabajador confirmó que seguía en sede"
-                          className="inline-flex items-center gap-0.5 rounded bg-cyan-100 px-1.5 py-0.5 text-[10px] text-cyan-700"
-                        >
-                          <CheckCircle2 className="h-3 w-3" /> continuidad
                         </span>
                       )}
                     </div>

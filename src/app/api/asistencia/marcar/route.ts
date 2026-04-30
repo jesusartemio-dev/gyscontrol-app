@@ -28,19 +28,13 @@ interface MarcarBody {
     resolucion: string
   }
   observacion?: string
-  // Marcaje de visita externa (planta de cliente, obra no registrada, viaje).
-  // Requiere GPS y un texto descriptivo del lugar.
+  // Marcaje de visita externa (planta de cliente, obra no registrada, viaje,
+  // tramite fuera de sede). Requiere GPS y un texto descriptivo del lugar.
+  // Tambien se usa cuando el trabajador esta fuera de su sede oficial o sede
+  // remota — describe donde esta realmente.
   visitaExterna?: {
     lugar: string
   }
-  // El usuario confirma desde el modal "Sigo en X" que quiere registrar
-  // continuidad con su sede previa pese a que el GPS se alejo del radio.
-  confirmarContinuidad?: {
-    ubicacionId: string
-  }
-  // El usuario confirma "Ya sali" — saltar el chequeo de continuidad y
-  // procesar como flujo normal (remoto / visita externa segun corresponda).
-  ignorarContinuidad?: boolean
 }
 
 export async function POST(req: Request) {
@@ -146,25 +140,6 @@ export async function POST(req: Request) {
   // que la validación y los cálculos siguientes lo traten como presencial.
   let esRemotoEfectivo = modoRemoto.esRemoto && !qrOverrideRemoto
 
-  // Continuidad confirmada por el usuario desde el modal "Sigo en X".
-  // Se acepta sin re-validar GPS porque el usuario explicitamente confirmó que
-  // sigue en esa sede (queda bandera continuidad_confirmada para auditoria).
-  let continuidadConfirmadaPorUsuario = false
-  if (body.confirmarContinuidad?.ubicacionId) {
-    const sedeConfirmada = await prisma.ubicacion.findUnique({
-      where: { id: body.confirmarContinuidad.ubicacionId },
-    })
-    if (sedeConfirmada && sedeConfirmada.activo) {
-      ubicacionId = sedeConfirmada.id
-      metodoMarcaje = 'gps_directo'
-      continuidadConfirmadaPorUsuario = true
-      if (esRemotoEfectivo) {
-        esRemotoEfectivo = false
-        qrOverrideRemoto = true
-      }
-    }
-  }
-
   // Auto-asignación de sede oficial por GPS.
   // Regla de negocio: el lugar físico (oficina/planta/obra) tiene prioridad sobre la
   // modalidad declarada. Si un trabajador "remoto" está físicamente en una sede oficial,
@@ -198,69 +173,37 @@ export async function POST(req: Request) {
     }
   }
 
-  // Continuidad temporal: si NO cayó en ninguna sede pero hoy ya marcó presencial en
-  // una sede X, podría ser fluctuación del GPS dentro de la planta (común en plantas
-  // industriales con techo metálico). Antes de caer al fallback remoto, sugerir al
-  // usuario que confirme si sigue en X o si realmente salió.
-  // Solo aplica si: no es confianza, no es visita externa, GPS válido, no se asignó
-  // sede oficial, no se está ignorando explícitamente, no se confirmó continuidad ya.
-  const esVisitaExternaTemp = Boolean(body.visitaExterna && body.visitaExterna.lugar)
+  // Si NO cayó en sede oficial Y es remoto declarado, validar contra su sede remota
+  // personal aprobada. Si cae dentro → continuará como remoto OK (validación final
+  // en el bloque de geofence más abajo). Si cae fuera o no tiene sede remota
+  // aprobada, lo tratamos igual que un presencial fuera de toda sede: ofrecer
+  // registrar como visita externa con nota del lugar.
+  const esVisitaExternaPreCheck = Boolean(body.visitaExterna && body.visitaExterna.lugar)
   if (
     !modoRemoto.esConfianza &&
-    !esVisitaExternaTemp &&
-    !continuidadConfirmadaPorUsuario &&
-    !body.ignorarContinuidad &&
+    !esVisitaExternaPreCheck &&
     !ubicacionId &&
+    esRemotoEfectivo &&
     body.latitud != null &&
     body.longitud != null
   ) {
-    const inicioDiaLima = new Date(
-      `${new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'America/Lima',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      }).format(new Date())}T00:00:00.000-05:00`,
-    )
-    const ultimoMarcajePresencialHoy = await prisma.asistencia.findFirst({
-      where: {
-        userId,
-        ubicacionId: { not: null },
-        fechaHora: { gte: inicioDiaLima },
-      },
-      orderBy: { fechaHora: 'desc' },
-      include: { ubicacion: true },
-    })
-
-    if (ultimoMarcajePresencialHoy?.ubicacion) {
-      const sedeAnterior = ultimoMarcajePresencialHoy.ubicacion
-      const distAhora = haversineMetros(
-        body.latitud,
-        body.longitud,
-        sedeAnterior.latitud,
-        sedeAnterior.longitud,
+    const sedeRemota = await obtenerSedeRemotaActiva(userId)
+    const dentroSedeRemota =
+      sedeRemota &&
+      haversineMetros(body.latitud, body.longitud, sedeRemota.latitud, sedeRemota.longitud) <=
+        sedeRemota.radioMetros
+    if (!dentroSedeRemota) {
+      return NextResponse.json(
+        {
+          message: sedeRemota
+            ? 'Tu GPS está fuera de tu sede remota aprobada.'
+            : 'No tienes sede remota aprobada y no estás en ninguna sede oficial.',
+          codigo: 'fuera_de_toda_sede',
+          sugerencia:
+            'Si estás de visita en otra planta o lugar, márcalo como visita externa describiendo dónde estás.',
+        },
+        { status: 409 },
       )
-      const UMBRAL_CONTINUIDAD_METROS = 5000 // GPS dentro de 5km de la sede previa = posible fluctuación
-      if (distAhora <= UMBRAL_CONTINUIDAD_METROS) {
-        const minutosDesdeUltimo = Math.round(
-          (Date.now() - ultimoMarcajePresencialHoy.fechaHora.getTime()) / 60000,
-        )
-        return NextResponse.json(
-          {
-            message: 'Tu GPS se alejó de tu última sede',
-            codigo: 'continuidad_sugerida',
-            sedeAnterior: {
-              id: sedeAnterior.id,
-              nombre: sedeAnterior.nombre,
-              tipo: sedeAnterior.tipo,
-              radioMetros: sedeAnterior.radioMetros,
-              distanciaAhora: Math.round(distAhora),
-            },
-            ultimoMarcajeMinutos: minutosDesdeUltimo,
-          },
-          { status: 409 },
-        )
-      }
     }
   }
 
@@ -402,11 +345,6 @@ export async function POST(req: Request) {
     if (modoRemoto.esRemoto && modoRemoto.origen && !modoRemoto.esConfianza) {
       banderas.push(`era_remoto:${modoRemoto.origen}`)
     }
-  }
-  // Trazabilidad: usuario confirmó manualmente que sigue en sede pese a que el GPS
-  // se alejó del radio. Útil para que supervisión pueda auditar uso/abuso.
-  if (continuidadConfirmadaPorUsuario) {
-    banderas.push('continuidad_confirmada')
   }
 
   const asistencia = await prisma.asistencia.create({
