@@ -29,6 +29,9 @@ interface Fila {
   estado: string
   dentroGeofence: boolean
   distanciaMetros: number | null
+  latitud: number | null
+  longitud: number | null
+  precisionGps: number | null
   metodoMarcaje: 'qr_estatico' | 'qr_supervisor' | 'gps_directo' | 'visita_externa' | 'manual_supervisor' | 'remoto'
   observacion: string | null
   banderas: string[]
@@ -520,13 +523,30 @@ export default function SupervisionAsistencia() {
                     )}
                   </TableCell>
                   <TableCell>
-                    {f.metodoMarcaje === 'visita_externa' ? (
-                      <span className="text-xs italic text-orange-700" title={f.observacion || ''}>
-                        {f.observacion || 'visita'}
-                      </span>
-                    ) : (
-                      f.ubicacion?.nombre || (f.metodoMarcaje === 'remoto' ? 'Casa' : '—')
-                    )}
+                    <div className="flex items-center gap-1.5">
+                      {f.metodoMarcaje === 'visita_externa' ? (
+                        <span className="text-xs italic text-orange-700" title={f.observacion || ''}>
+                          {f.observacion || 'visita'}
+                        </span>
+                      ) : (
+                        <span>
+                          {f.ubicacion?.nombre || (f.metodoMarcaje === 'remoto' ? 'Casa' : '—')}
+                        </span>
+                      )}
+                      {f.latitud != null && f.longitud != null && (
+                        <a
+                          href={`https://www.google.com/maps?q=${f.latitud},${f.longitud}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-800"
+                          title={`Ver en mapa · ${f.latitud.toFixed(6)}, ${f.longitud.toFixed(6)}${
+                            f.precisionGps ? ` · ±${Math.round(f.precisionGps)}m` : ''
+                          }`}
+                        >
+                          <MapPin className="h-3.5 w-3.5" />
+                        </a>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>{f.minutosTarde > 0 ? formatearTardanza(f.minutosTarde) : '—'}</TableCell>
                   <TableCell>

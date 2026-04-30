@@ -223,6 +223,15 @@ export default function MarcarPage() {
       setDialogGpsBloqueado(true)
       return
     }
+    // Si ya sabemos por las sedes cercanas que NO está en ninguna sede ni en su sede remota
+    // aprobada, el scanner QR no aplica — saltamos directo al flujo de visita externa para
+    // no obligar al usuario a abrir una cámara que no usará.
+    if (cercanas && !cercanas.sedeEnZona && !cercanas.sedeRemota?.dentro) {
+      setVisitaTipo(tipo)
+      setVisitaLugar('')
+      setDialogVisitaExterna(true)
+      return
+    }
     setScannerOpen(true)
     setTimeout(() => iniciar(scannerElemId), 100)
   }
