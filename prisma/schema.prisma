@@ -1770,6 +1770,13 @@ model Valorizacion {
   fechaCorreccion              DateTime?
   motivoObservacion            String?
   ciclosAprobacion             Int                @default(0)
+  // Conformidad del cliente — documento que emite el cliente al aprobar el avance,
+  // es el habilitador para emitir la factura. Se hereda a la CxC al facturar.
+  // tipoConformidad: 'hes' (Hoja de Entrada de Servicios) | 'guia_remision' | 'acta' | 'otro'
+  tipoConformidad              String?
+  numeroHES                    String?            // N° de HES (cuando es servicio)
+  numeroGuiaRemision           String?            // N° de Guía de Remisión (cuando es bien)
+  fechaConformidad             DateTime?          // Cuándo el cliente firmó/emitió la conformidad
   observaciones                String?
   createdAt                    DateTime           @default(now())
   updatedAt                    DateTime

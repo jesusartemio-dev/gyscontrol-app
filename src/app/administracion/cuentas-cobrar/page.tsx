@@ -1188,10 +1188,22 @@ export default function CuentasCobrarPage() {
                 <CardContent className="p-3 space-y-1">
                   <div className="flex justify-between"><span>Cliente</span><span className="font-medium">{showDetail.cliente?.nombre}</span></div>
                   <div className="flex justify-between"><span>Proyecto</span><span className="font-mono">{showDetail.proyecto?.codigo}</span></div>
-                  {showDetail.valorizacion && <div className="flex justify-between"><span>Valorización</span><span className="font-mono">{showDetail.valorizacion.codigo}</span></div>}
-                  {showDetail.ordenCompraCliente && <div className="flex justify-between"><span>OC Cliente</span><span className="font-mono">{showDetail.ordenCompraCliente}</span></div>}
-                  {showDetail.numeroHES && <div className="flex justify-between"><span>N° HES</span><span className="font-mono">{showDetail.numeroHES}</span></div>}
-                  {showDetail.numeroGuiaRemision && <div className="flex justify-between"><span>N° Guía Remisión</span><span className="font-mono">{showDetail.numeroGuiaRemision}</span></div>}
+                  {showDetail.valorizacion && (
+                    <div className="flex justify-between">
+                      <span>Valorización</span>
+                      <a
+                        href={`/gestion/valorizaciones/${showDetail.valorizacion.id}?mode=view`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-mono text-blue-600 hover:underline"
+                      >
+                        {showDetail.valorizacion.codigo} ↗
+                      </a>
+                    </div>
+                  )}
+                  <div className="flex justify-between"><span>OC Cliente</span><span className="font-mono">{showDetail.ordenCompraCliente || <span className="text-muted-foreground">—</span>}</span></div>
+                  <div className="flex justify-between"><span>N° HES</span><span className="font-mono">{showDetail.numeroHES || <span className="text-muted-foreground">—</span>}</span></div>
+                  <div className="flex justify-between"><span>N° Guía Remisión</span><span className="font-mono">{showDetail.numeroGuiaRemision || <span className="text-muted-foreground">—</span>}</span></div>
                   {showDetail.descripcion && <div className="flex justify-between"><span>Descripción</span><span className="text-right max-w-[200px] truncate">{showDetail.descripcion}</span></div>}
                   <div className="flex justify-between"><span>Emisión</span><span>{formatDate(showDetail.fechaEmision)}</span></div>
                   {showDetail.fechaRecepcion && <div className="flex justify-between"><span>Recepción</span><span>{formatDate(showDetail.fechaRecepcion)}</span></div>}

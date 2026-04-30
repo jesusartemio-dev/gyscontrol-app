@@ -61,6 +61,10 @@ interface Valorizacion {
   motivoObservacion: string | null
   ciclosAprobacion: number
   observaciones: string | null
+  tipoConformidad?: string | null
+  numeroHES?: string | null
+  numeroGuiaRemision?: string | null
+  fechaConformidad?: string | null
   createdAt: string
   updatedAt: string
   proyecto?: Proyecto
@@ -125,6 +129,12 @@ export default function ValorizacionEditPage() {
   const [formFormaPago, setFormFormaPago] = useState('')
   const [formDiasCredito, setFormDiasCredito] = useState('')
   const [formNotasPago, setFormNotasPago] = useState('')
+  // Conformidad del cliente (HES, Guía de Remisión, acta) — editable en aprobada_cliente
+  const [formTipoConformidad, setFormTipoConformidad] = useState('')
+  const [formNumeroHES, setFormNumeroHES] = useState('')
+  const [formNumeroGuiaRemision, setFormNumeroGuiaRemision] = useState('')
+  const [formFechaConformidad, setFormFechaConformidad] = useState('')
+  const [savingConformidad, setSavingConformidad] = useState(false)
 
   const loadVal = useCallback(async () => {
     try {
@@ -153,6 +163,10 @@ export default function ValorizacionEditPage() {
       setFormFormaPago((data as any).formaPago || '')
       setFormDiasCredito((data as any).diasCredito?.toString() || '')
       setFormNotasPago((data as any).notasPago || '')
+      setFormTipoConformidad(data.tipoConformidad || '')
+      setFormNumeroHES(data.numeroHES || '')
+      setFormNumeroGuiaRemision(data.numeroGuiaRemision || '')
+      setFormFechaConformidad(data.fechaConformidad ? data.fechaConformidad.split('T')[0] : '')
     } catch {
       toast.error('Error al cargar valorización')
       router.push('/gestion/valorizaciones')
@@ -212,6 +226,35 @@ export default function ValorizacionEditPage() {
       toast.error(e.message || 'Error al guardar')
     } finally {
       setSaving(false)
+    }
+  }
+
+  // Guardar Conformidad del cliente (independiente de los campos generales).
+  // Editable cuando estado >= aprobada_cliente y antes de facturar.
+  const handleSaveConformidad = async () => {
+    if (!val) return
+    setSavingConformidad(true)
+    try {
+      const res = await fetch(`/api/proyectos/${val.proyectoId}/valorizaciones/${val.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tipoConformidad: formTipoConformidad || null,
+          numeroHES: formNumeroHES || null,
+          numeroGuiaRemision: formNumeroGuiaRemision || null,
+          fechaConformidad: formFechaConformidad || null,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Error')
+      }
+      toast.success('Conformidad registrada')
+      loadVal()
+    } catch (e: any) {
+      toast.error(e.message || 'Error al guardar conformidad')
+    } finally {
+      setSavingConformidad(false)
     }
   }
 
@@ -503,6 +546,102 @@ export default function ValorizacionEditPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Conformidad del cliente — visible desde aprobada_cliente en adelante.
+          Editable solo cuando la valorización está en aprobada_cliente (antes de facturar).
+          Al facturar, los campos se heredan automáticamente a la CxC creada. */}
+      {!viewMode && val && ['aprobada_cliente', 'facturada', 'pagada', 'anulada'].includes(val.estado) && (() => {
+        const editable = val.estado === 'aprobada_cliente'
+        const tieneConformidad = !!(val.numeroHES || val.numeroGuiaRemision || val.fechaConformidad)
+        return (
+          <Card className={editable && !tieneConformidad ? 'border-amber-300 bg-amber-50/30' : ''}>
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-sm">Conformidad del cliente</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Documento que el cliente emite al aprobar la valorización (HES, Guía de Remisión o acta).
+                    Habilita la facturación y se hereda a la CxC.
+                  </p>
+                </div>
+                {!editable && tieneConformidad && (
+                  <span className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-0.5">
+                    Registrada
+                  </span>
+                )}
+              </div>
+
+              {editable && !tieneConformidad && (
+                <div className="text-xs text-amber-700 bg-amber-100 border border-amber-200 rounded px-2 py-1">
+                  ⚠ Conformidad pendiente — captúrala antes de facturar.
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">Tipo de conformidad</Label>
+                  {editable ? (
+                    <Select value={formTipoConformidad || '__none__'} onValueChange={v => setFormTipoConformidad(v === '__none__' ? '' : v)}>
+                      <SelectTrigger><SelectValue placeholder="Seleccionar tipo" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">— Sin especificar —</SelectItem>
+                        <SelectItem value="hes">HES (Hoja de Entrada de Servicios)</SelectItem>
+                        <SelectItem value="guia_remision">Guía de Remisión</SelectItem>
+                        <SelectItem value="acta">Acta de conformidad</SelectItem>
+                        <SelectItem value="otro">Otro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <p className="text-sm font-medium">
+                      {val.tipoConformidad === 'hes' ? 'HES' :
+                       val.tipoConformidad === 'guia_remision' ? 'Guía de Remisión' :
+                       val.tipoConformidad === 'acta' ? 'Acta de conformidad' :
+                       val.tipoConformidad === 'otro' ? 'Otro' : '—'}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <Label className="text-xs">Fecha de conformidad</Label>
+                  {editable ? (
+                    <Input type="date" value={formFechaConformidad} onChange={e => setFormFechaConformidad(e.target.value)} />
+                  ) : (
+                    <p className="text-sm font-medium">
+                      {val.fechaConformidad
+                        ? new Date(val.fechaConformidad).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })
+                        : '—'}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <Label className="text-xs">N° HES <span className="text-muted-foreground">(servicios)</span></Label>
+                  {editable ? (
+                    <Input placeholder="HES-1000123" value={formNumeroHES} onChange={e => setFormNumeroHES(e.target.value)} />
+                  ) : (
+                    <p className="text-sm font-mono font-medium">{val.numeroHES || '—'}</p>
+                  )}
+                </div>
+                <div>
+                  <Label className="text-xs">N° Guía de Remisión <span className="text-muted-foreground">(bienes)</span></Label>
+                  {editable ? (
+                    <Input placeholder="T001-12345" value={formNumeroGuiaRemision} onChange={e => setFormNumeroGuiaRemision(e.target.value)} />
+                  ) : (
+                    <p className="text-sm font-mono font-medium">{val.numeroGuiaRemision || '—'}</p>
+                  )}
+                </div>
+              </div>
+
+              {editable && (
+                <div className="flex justify-end">
+                  <Button onClick={handleSaveConformidad} disabled={savingConformidad} size="sm">
+                    {savingConformidad && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Guardar Conformidad
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )
+      })()}
 
       {/* HH detail OR partidas table */}
       {val.valorizacionHH ? (

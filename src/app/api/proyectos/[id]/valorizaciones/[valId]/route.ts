@@ -222,6 +222,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
               diasCredito: body.diasCredito ? Number(body.diasCredito) : null,
               metodoPago: body.metodoPago || null,
               bancoFinanciera: body.bancoFinanciera || null,
+              // Heredar conformidad del cliente (HES/Guía de Remisión) capturada en la valorización
+              numeroHES: existing.numeroHES,
+              numeroGuiaRemision: existing.numeroGuiaRemision,
               updatedAt: new Date(),
             },
           })
@@ -308,6 +311,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         ...(body.formaPago !== undefined && { formaPago: body.formaPago || null }),
         ...(body.diasCredito !== undefined && { diasCredito: body.diasCredito ?? null }),
         ...(body.notasPago !== undefined && { notasPago: body.notasPago || null }),
+        ...(body.tipoConformidad !== undefined && { tipoConformidad: body.tipoConformidad || null }),
+        ...(body.numeroHES !== undefined && { numeroHES: body.numeroHES || null }),
+        ...(body.numeroGuiaRemision !== undefined && { numeroGuiaRemision: body.numeroGuiaRemision || null }),
+        ...(body.fechaConformidad !== undefined && { fechaConformidad: body.fechaConformidad ? new Date(body.fechaConformidad) : null }),
         presupuestoContractual,
         montoValorizacion,
         acumuladoAnterior,
