@@ -75,6 +75,12 @@ function FitBounds({ puntos }: { puntos: Array<[number, number]> }) {
   const map = useMap()
   useEffect(() => {
     if (puntos.length === 0) return
+    // Si solo hay un punto (usuario sin sedes cercanas en el rango), centrar con
+    // zoom razonable de ciudad en lugar de fitBounds (que daría zoom maximo).
+    if (puntos.length === 1) {
+      map.setView(puntos[0], 14)
+      return
+    }
     const bounds = L.latLngBounds(puntos)
     map.fitBounds(bounds, { padding: [30, 30], maxZoom: 16 })
   }, [puntos, map])
@@ -93,11 +99,21 @@ export default function MapaSedesCercanas({
     ensureLeafletCss()
   }, [])
 
+  // Solo entran al zoom inicial las sedes "cercanas" (<= 25km del usuario).
+  // Las sedes lejanas (otra ciudad/provincia) se siguen renderizando como
+  // marcadores en el mapa, pero no estiran el zoom — el usuario hace zoom
+  // out manualmente si las quiere ver. Sin esto, una sede en otra provincia
+  // alejaba el mapa cientos de km y se perdia la utilidad.
+  const RADIO_FIT_METROS = 25_000
   const puntosParaFit: Array<[number, number]> = [
     [usuarioLat, usuarioLon],
-    ...sedes.map(s => [s.latitud, s.longitud] as [number, number]),
+    ...sedes
+      .filter(s => s.distanciaMetros <= RADIO_FIT_METROS)
+      .map(s => [s.latitud, s.longitud] as [number, number]),
   ]
-  if (sedeRemota) puntosParaFit.push([sedeRemota.latitud, sedeRemota.longitud])
+  if (sedeRemota && sedeRemota.distanciaMetros <= RADIO_FIT_METROS) {
+    puntosParaFit.push([sedeRemota.latitud, sedeRemota.longitud])
+  }
 
   return (
     <div className="relative w-full overflow-hidden rounded-md border" style={{ height: alturaPx }}>
