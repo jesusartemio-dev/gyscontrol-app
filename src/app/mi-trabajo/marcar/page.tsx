@@ -284,71 +284,59 @@ export default function MarcarPage() {
       </div>
 
       {modoHoy?.esConfianza && (
-        <Card className="mb-6 border-2 border-slate-400 bg-slate-50">
-          <CardContent className="flex items-start gap-3 py-4">
-            <Home className="h-6 w-6 shrink-0 text-slate-600" />
-            <div className="text-sm">
-              <p className="text-base font-bold text-slate-900">
-                Personal de confianza
-              </p>
-              <p className="mt-1 text-slate-700">
-                Tu marcaje es voluntario — sin QR, sin GPS, sin cálculo de tardanza.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="mb-3 flex items-center gap-2 rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+          <Home className="h-4 w-4 shrink-0 text-slate-600" />
+          <span>
+            <strong className="text-slate-900">Personal de confianza:</strong>{' '}
+            marcaje voluntario, sin QR ni GPS.
+          </span>
+        </div>
       )}
 
       {modoHoy?.esRemoto && !modoHoy?.esConfianza && (
-        <Card className="mb-6 border-2 border-purple-400 bg-purple-50">
-          <CardContent className="flex items-start gap-3 py-4">
-            <Home className="h-6 w-6 shrink-0 text-purple-600" />
-            <div className="text-sm">
-              <p className="text-base font-bold text-purple-900">
-                Hoy estás en modalidad remota
-              </p>
-              <p className="mt-1 text-purple-800">
-                {modoHoy.razon || 'Trabajo desde casa autorizado'} — marca sin QR ni ubicación.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="mb-3 flex items-center gap-2 rounded-md border border-purple-300 bg-purple-50 px-3 py-2 text-xs text-purple-800">
+          <Home className="h-4 w-4 shrink-0 text-purple-600" />
+          <span>
+            <strong className="text-purple-900">Modalidad remota hoy:</strong>{' '}
+            {modoHoy.razon || 'autorizado'}.
+          </span>
+        </div>
       )}
 
       {ultimoResultado && (
-        <Card
-          className={`mb-6 border-2 ${
-            ultimoResultado.ok ? 'border-emerald-500 bg-emerald-50' : 'border-red-500 bg-red-50'
+        <div
+          className={`mb-3 rounded-md border px-3 py-2 text-xs ${
+            ultimoResultado.ok
+              ? 'border-emerald-400 bg-emerald-50 text-emerald-900'
+              : 'border-red-400 bg-red-50 text-red-900'
           }`}
         >
-          <CardContent className="flex items-start gap-3 py-4">
+          <div className="flex items-center gap-2">
             {ultimoResultado.ok ? (
-              <CheckCircle2 className="h-6 w-6 shrink-0 text-emerald-600" />
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
             ) : (
-              <AlertTriangle className="h-6 w-6 shrink-0 text-red-600" />
+              <AlertTriangle className="h-4 w-4 shrink-0 text-red-600" />
             )}
-            <div className="flex-1 text-sm">
-              <p className="text-base font-bold">
-                {ultimoResultado.titulo ||
-                  (ultimoResultado.ok ? '✅ Marcaje guardado' : '❌ No se pudo marcar')}
-              </p>
-              {ultimoResultado.ok && ultimoResultado.lineas?.length ? (
-                <ul className="mt-2 space-y-1">
-                  {ultimoResultado.lineas.map((l, i) => (
-                    <li key={i}>{l}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="mt-1 whitespace-pre-line">{ultimoResultado.mensaje}</p>
-              )}
-              {ultimoResultado.estado && (
-                <Badge className="mt-3" variant="outline">
-                  Estado: {ultimoResultado.estado.replace('_', ' ')}
-                </Badge>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+            <strong className="text-sm">
+              {ultimoResultado.titulo ||
+                (ultimoResultado.ok ? 'Marcaje guardado' : 'No se pudo marcar')}
+            </strong>
+            {ultimoResultado.estado && (
+              <Badge className="ml-auto h-5" variant="outline">
+                {ultimoResultado.estado.replace('_', ' ')}
+              </Badge>
+            )}
+          </div>
+          {ultimoResultado.ok && ultimoResultado.lineas?.length ? (
+            <ul className="mt-1 ml-6 list-disc space-y-0.5">
+              {ultimoResultado.lineas.map((l, i) => (
+                <li key={i}>{l}</li>
+              ))}
+            </ul>
+          ) : !ultimoResultado.ok ? (
+            <p className="ml-6 mt-1 whitespace-pre-line">{ultimoResultado.mensaje}</p>
+          ) : null}
+        </div>
       )}
 
       {!scannerOpen && geo.coords && cercanas && (
