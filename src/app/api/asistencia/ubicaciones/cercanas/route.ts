@@ -36,6 +36,8 @@ export async function GET(req: Request) {
         id: u.id,
         nombre: u.nombre,
         tipo: u.tipo,
+        latitud: u.latitud,
+        longitud: u.longitud,
         distanciaMetros: Math.round(distancia),
         radioMetros: u.radioMetros,
         dentro: distancia <= u.radioMetros,
@@ -48,6 +50,8 @@ export async function GET(req: Request) {
   let sedeRemotaInfo: {
     id: string
     nombre: string
+    latitud: number
+    longitud: number
     distanciaMetros: number
     radioMetros: number
     dentro: boolean
@@ -57,6 +61,8 @@ export async function GET(req: Request) {
     sedeRemotaInfo = {
       id: sedeRemota.id,
       nombre: sedeRemota.nombre,
+      latitud: sedeRemota.latitud,
+      longitud: sedeRemota.longitud,
       distanciaMetros: Math.round(distRemota),
       radioMetros: sedeRemota.radioMetros,
       dentro: distRemota <= sedeRemota.radioMetros,

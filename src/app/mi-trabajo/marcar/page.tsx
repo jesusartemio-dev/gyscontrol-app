@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { useSession } from 'next-auth/react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -21,6 +22,13 @@ import {
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+
+// Leaflet usa window/document en su inicialización. Lo cargamos client-side
+// para evitar SSR errors y para que su bundle no pese en el primer render.
+const MapaSedesCercanas = dynamic(
+  () => import('@/components/asistencia/MapaSedesCercanas'),
+  { ssr: false, loading: () => <div className="h-[280px] w-full animate-pulse rounded-md bg-muted" /> },
+)
 import { getDeviceInfo } from '@/lib/utils/deviceFingerprint'
 import { useGeolocation } from '@/lib/hooks/useGeolocation'
 import { useQrScanner } from '@/lib/hooks/useQrScanner'
@@ -58,9 +66,9 @@ export default function MarcarPage() {
   const [permisoGps, setPermisoGps] = useState<'prompt' | 'granted' | 'denied' | 'unknown'>('unknown')
   const [dialogGpsBloqueado, setDialogGpsBloqueado] = useState(false)
   const [cercanas, setCercanas] = useState<null | {
-    sedeEnZona: { id: string; nombre: string; tipo: string; distanciaMetros: number; radioMetros: number } | null
-    sedesCercanas: Array<{ id: string; nombre: string; tipo: string; distanciaMetros: number; radioMetros: number; dentro: boolean }>
-    sedeRemota: { id: string; nombre: string; distanciaMetros: number; radioMetros: number; dentro: boolean } | null
+    sedeEnZona: { id: string; nombre: string; tipo: string; latitud: number; longitud: number; distanciaMetros: number; radioMetros: number } | null
+    sedesCercanas: Array<{ id: string; nombre: string; tipo: string; latitud: number; longitud: number; distanciaMetros: number; radioMetros: number; dentro: boolean }>
+    sedeRemota: { id: string; nombre: string; latitud: number; longitud: number; distanciaMetros: number; radioMetros: number; dentro: boolean } | null
   }>(null)
   const [cargandoCercanas, setCargandoCercanas] = useState(false)
   const [dialogVisitaExterna, setDialogVisitaExterna] = useState(false)
@@ -345,69 +353,60 @@ export default function MarcarPage() {
       {!scannerOpen && !modoHoy?.esConfianza && geo.coords && cercanas && (
         <Card className={`mb-4 border-2 ${
           cercanas.sedeEnZona
-            ? 'border-emerald-400 bg-emerald-50'
+            ? 'border-emerald-400'
             : cercanas.sedeRemota?.dentro
-              ? 'border-purple-400 bg-purple-50'
-              : 'border-amber-400 bg-amber-50'
+              ? 'border-purple-400'
+              : 'border-amber-400'
         }`}>
-          <CardContent className="py-4">
+          <CardContent className="space-y-3 py-3">
             {cercanas.sedeEnZona ? (
-              <div className="flex items-start gap-3">
+              <div className="flex items-start gap-2 text-sm">
                 <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" />
-                <div className="text-sm">
+                <div>
                   <p className="font-bold text-emerald-900">
                     Estás en {cercanas.sedeEnZona.nombre}
                   </p>
-                  <p className="text-emerald-800">
-                    A {cercanas.sedeEnZona.distanciaMetros}m del centro · radio permitido {cercanas.sedeEnZona.radioMetros}m
+                  <p className="text-xs text-emerald-800">
+                    A {cercanas.sedeEnZona.distanciaMetros}m del centro · radio {cercanas.sedeEnZona.radioMetros}m
                   </p>
                 </div>
               </div>
             ) : cercanas.sedeRemota?.dentro ? (
-              <div className="flex items-start gap-3">
+              <div className="flex items-start gap-2 text-sm">
                 <Home className="h-5 w-5 shrink-0 text-purple-600" />
-                <div className="text-sm">
+                <div>
                   <p className="font-bold text-purple-900">
-                    Estás en tu sede remota: {cercanas.sedeRemota.nombre}
+                    En tu sede remota: {cercanas.sedeRemota.nombre}
                   </p>
-                  <p className="text-purple-800">
+                  <p className="text-xs text-purple-800">
                     A {cercanas.sedeRemota.distanciaMetros}m del centro
                   </p>
                 </div>
               </div>
             ) : (
-              <div className="flex items-start gap-3">
+              <div className="flex items-start gap-2 text-sm">
                 <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600" />
-                <div className="flex-1 text-sm">
+                <div>
                   <p className="font-bold text-amber-900">No estás en ninguna sede registrada</p>
-                  {cercanas.sedesCercanas.length > 0 && (
-                    <div className="mt-2">
-                      <p className="text-xs text-amber-800">Sedes más cercanas:</p>
-                      <ul className="mt-1 space-y-0.5 text-xs text-amber-900">
-                        {cercanas.sedesCercanas.slice(0, 3).map(s => (
-                          <li key={s.id} className="flex items-center justify-between gap-2">
-                            <span>{s.nombre} ({s.tipo})</span>
-                            <span className="font-mono">
-                              {s.distanciaMetros < 1000
-                                ? `${s.distanciaMetros}m`
-                                : `${(s.distanciaMetros / 1000).toFixed(2)}km`}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {cercanas.sedeRemota && !cercanas.sedeRemota.dentro && (
-                    <p className="mt-2 text-xs text-amber-800">
-                      Tu sede remota está a{' '}
-                      {cercanas.sedeRemota.distanciaMetros < 1000
-                        ? `${cercanas.sedeRemota.distanciaMetros}m`
-                        : `${(cercanas.sedeRemota.distanciaMetros / 1000).toFixed(2)}km`}
-                    </p>
-                  )}
+                  <p className="text-xs text-amber-800">
+                    Acércate al círculo verde para marcar presencial, o usa visita externa
+                  </p>
                 </div>
               </div>
             )}
+
+            <MapaSedesCercanas
+              usuarioLat={geo.coords.latitud}
+              usuarioLon={geo.coords.longitud}
+              precisionGps={geo.coords.precision}
+              sedes={cercanas.sedesCercanas}
+              sedeRemota={cercanas.sedeRemota}
+              alturaPx={260}
+            />
+
+            <p className="text-center text-[10px] text-muted-foreground">
+              🔵 Tu posición · 🟢 sede en zona · 🟠 sede fuera de tu radio · 🟣 sede remota personal
+            </p>
           </CardContent>
         </Card>
       )}
