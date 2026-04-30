@@ -55,7 +55,28 @@ interface CxPExportRow {
   condicionPago: string
   estado: string
   observaciones: string | null
-  ordenCompra?: { numero: string } | null
+  ordenCompra?: { numero: string; centroCosto?: { nombre: string } | null } | null
+}
+
+interface CxPAdminPagoRow {
+  monto: number
+  fechaPago: string
+  medioPago: string
+  numeroOperacion: string | null
+  observaciones: string | null
+  esDetraccion?: boolean
+  detraccionPorcentaje?: number | null
+  detraccionMonto?: number | null
+  detraccionFechaPago?: string | null
+  numeroConstanciaBN?: string | null
+  cuentaBancaria?: { nombreBanco: string; numeroCuenta: string } | null
+}
+
+export interface CxPAdminExportRow extends CxPExportRow {
+  formaPago?: string | null
+  diasCredito?: number | null
+  detraccionPorcentaje?: number | null
+  pagos?: CxPAdminPagoRow[]
 }
 
 const ESTADOS_VALIDOS = ['pendiente', 'parcial', 'pagada', 'vencida', 'anulada']
@@ -416,6 +437,209 @@ export async function exportarCxPAExcel(items: CxPExportRow[]) {
   const link = document.createElement('a')
   link.href = url
   link.download = `CuentasPorPagar_${new Date().toISOString().split('T')[0]}.xlsx`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
+// ============================================
+// EXPORTAR FORMATO ADMINISTRACIÓN (21 columnas)
+// Reproduce el Excel manual de admin: doc/factura (verde), pago (azul), constancia (rojo).
+// ============================================
+const ESTADO_LABEL_CXP: Record<string, string> = {
+  pendiente: 'Pend. de Pago',
+  parcial: 'Parcial',
+  pagada: 'Pagada',
+  vencida: 'Vencida',
+  anulada: 'Anulada',
+}
+
+function formaPagoLabel(formaPago?: string | null, diasCredito?: number | null): string {
+  if (!formaPago && !diasCredito) return ''
+  const labels: Record<string, string> = {
+    transferencia: 'Transferencia',
+    cheque: 'Cheque',
+    letra: 'Letra',
+    factura: 'Factura',
+    factura_negociable: 'Factura Negociable',
+    otro: 'Otro',
+  }
+  const fp = formaPago ? (labels[formaPago] || formaPago) : ''
+  if (fp && diasCredito) return `${fp} ${diasCredito} días`
+  if (fp) return fp
+  if (diasCredito) return `${diasCredito} días`
+  return ''
+}
+
+function centroCostoCxP(item: CxPAdminExportRow): string {
+  if (item.proyecto?.codigo) return item.proyecto.codigo
+  if (item.ordenCompra?.centroCosto?.nombre) return item.ordenCompra.centroCosto.nombre
+  return ''
+}
+
+export async function exportarCxPFormatoAdmin(items: CxPAdminExportRow[]) {
+  const ExcelJS = (await import('exceljs')).default
+  const wb = new ExcelJS.Workbook()
+  const ws = wb.addWorksheet('CxP Administración')
+
+  const FILL_VERDE = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FF86EFAC' } }
+  const FILL_AZUL = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FF93C5FD' } }
+  const FONT_HEADER = { bold: true, color: { argb: 'FF000000' }, size: 11 }
+  const FONT_HEADER_RED = { bold: true, color: { argb: 'FFDC2626' }, size: 11 }
+
+  // Anchos
+  const colWidths = [
+    6,   // A Nro.
+    32,  // B Proveedor
+    13,  // C Fecha factura
+    16,  // D Referencia de proveedor
+    14,  // E Centro de costo
+    13,  // F Fecha vencimiento
+    14,  // G Orden de Compra
+    12,  // H Total
+    12,  // I A pagar
+    9,   // J Moneda
+    14,  // K Estado
+    16,  // L Forma de pago
+    12,  // M Nro. Cheque
+    12,  // N Nro. Letra
+    14,  // O Nro. Único
+    14,  // P Banco
+    13,  // Q Detracción pendiente
+    13,  // R Fecha de pago detracción
+    14,  // S Monto pagado detracción
+    16,  // T Nro. Constancia Detracción
+    32,  // U Observación
+  ]
+  ws.columns = colWidths.map(w => ({ width: w }))
+
+  // ===== Cabecera (fila 1) =====
+  const headers = [
+    'Nro.',                          // A
+    'Proveedor',                     // B
+    'Fecha factura',                 // C
+    'Referencia de proveedor',       // D
+    'Centro de costo',               // E
+    'Fecha vencimiento',             // F
+    'Orden de Compra',               // G
+    'Total',                         // H
+    'A pagar',                       // I
+    'Moneda',                        // J
+    'Estado',                        // K
+    'Forma de pago',                 // L
+    'Nro. Cheque',                   // M
+    'Nro. Letra',                    // N
+    'Nro. Único',                    // O
+    'Banco',                         // P
+    'Detracción\npendiente',         // Q
+    'Fecha de pago\ndetracción',     // R
+    'Monto pagado\ndetracción',      // S
+    'Nro. Constancia\nDetracción',   // T
+    'Observación',                   // U
+  ]
+  for (let i = 0; i < headers.length; i++) {
+    ws.getCell(1, i + 1).value = headers[i]
+  }
+
+  // Estilos cabecera
+  // A-L verde (datos del documento), M-U azul (datos del pago)
+  const r1 = ws.getRow(1)
+  r1.height = 32
+  for (let i = 1; i <= 21; i++) {
+    const cell = r1.getCell(i)
+    cell.font = (i === 20) ? FONT_HEADER_RED : FONT_HEADER  // T en rojo
+    cell.fill = (i <= 12) ? FILL_VERDE : FILL_AZUL
+    cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true }
+    cell.border = {
+      top: { style: 'thin', color: { argb: 'FF000000' } },
+      bottom: { style: 'thin', color: { argb: 'FF000000' } },
+      left: { style: 'thin', color: { argb: 'FF000000' } },
+      right: { style: 'thin', color: { argb: 'FF000000' } },
+    }
+  }
+
+  // ===== Datos =====
+  let dataRow = 2
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]
+    const fechaFactura = item.fechaRecepcion ? new Date(item.fechaRecepcion) : null
+    const fechaVencimiento = item.fechaVencimiento ? new Date(item.fechaVencimiento) : null
+
+    // Pagos por tipo
+    const pagoCheque = item.pagos?.find(p => !p.esDetraccion && p.medioPago === 'cheque')
+    const pagoLetra = item.pagos?.find(p => !p.esDetraccion && p.medioPago === 'letra')
+    const pagoTransferencia = item.pagos?.find(p => !p.esDetraccion && p.medioPago === 'transferencia')
+    const pagoNoDetraccion = item.pagos?.find(p => !p.esDetraccion) // para Banco
+    const detraccion = item.pagos?.find(p => p.esDetraccion)
+
+    const row = ws.getRow(dataRow)
+    row.getCell(1).value = i + 1                                          // A
+    row.getCell(2).value = item.proveedor?.nombre ?? ''                   // B
+    row.getCell(3).value = fechaFactura                                   // C
+    row.getCell(4).value = item.numeroFactura ?? ''                       // D
+    row.getCell(5).value = centroCostoCxP(item)                           // E
+    row.getCell(6).value = fechaVencimiento                               // F
+    row.getCell(7).value = item.ordenCompra?.numero ?? ''                 // G
+    row.getCell(8).value = item.monto                                     // H
+    row.getCell(9).value = item.saldoPendiente                            // I
+    row.getCell(10).value = item.moneda                                   // J
+    row.getCell(11).value = ESTADO_LABEL_CXP[item.estado] ?? item.estado  // K
+    row.getCell(12).value = formaPagoLabel(item.formaPago, item.diasCredito) // L
+    row.getCell(13).value = pagoCheque?.numeroOperacion ?? ''             // M
+    row.getCell(14).value = pagoLetra?.numeroOperacion ?? ''              // N
+    row.getCell(15).value = pagoTransferencia?.numeroOperacion ?? ''      // O
+    row.getCell(16).value = pagoNoDetraccion?.cuentaBancaria?.nombreBanco ?? ''  // P
+
+    // Q: Detracción pendiente = monto * % - sum(pagos detracción)
+    let detraccionPendiente: number | null = null
+    if (item.detraccionPorcentaje && item.detraccionPorcentaje > 0) {
+      const esperada = Math.round(item.monto * item.detraccionPorcentaje / 100 * 100) / 100
+      const pagada = (item.pagos ?? [])
+        .filter(p => p.esDetraccion)
+        .reduce((sum, p) => sum + (p.detraccionMonto ?? p.monto ?? 0), 0)
+      detraccionPendiente = Math.max(0, Math.round((esperada - pagada) * 100) / 100)
+    }
+    row.getCell(17).value = detraccionPendiente                           // Q
+    row.getCell(18).value = detraccion?.detraccionFechaPago ? new Date(detraccion.detraccionFechaPago) : null  // R
+    row.getCell(19).value = detraccion?.detraccionMonto ?? detraccion?.monto ?? null  // S
+    row.getCell(20).value = detraccion?.numeroConstanciaBN ?? ''          // T
+    row.getCell(21).value = item.observaciones ?? ''                      // U
+
+    // Bordes de datos
+    for (let c = 1; c <= 21; c++) {
+      row.getCell(c).border = {
+        top: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+        bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+        left: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+        right: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+      }
+    }
+
+    dataRow++
+  }
+
+  // ===== Formatos numéricos =====
+  const lastRow = dataRow - 1
+  if (lastRow >= 2) {
+    // Fechas: C, F, R
+    for (const col of ['C', 'F', 'R']) {
+      for (let r = 2; r <= lastRow; r++) ws.getCell(`${col}${r}`).numFmt = 'dd/mm/yyyy'
+    }
+    // Montos: H, I, Q, S
+    for (const col of ['H', 'I', 'Q', 'S']) {
+      for (let r = 2; r <= lastRow; r++) ws.getCell(`${col}${r}`).numFmt = '#,##0.00'
+    }
+  }
+
+  ws.views = [{ state: 'frozen', ySplit: 1 }]
+
+  const buffer = await wb.xlsx.writeBuffer()
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `CuentasPorPagar_Admin_${new Date().toISOString().split('T')[0]}.xlsx`
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)

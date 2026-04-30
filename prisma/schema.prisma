@@ -1003,6 +1003,9 @@ model Proveedor {
   numeroCuenta        String?
   cci                 String?
   tipoCuenta          String?
+  // % de detracción que SUNAT define para los servicios de este proveedor (4, 10, 12...).
+  // Sirve de sugerencia automática al crear una CxP — el usuario puede sobrescribirlo.
+  detraccionPorcentajeDefault Float?
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
   cotizacionProveedor CotizacionProveedor[]
@@ -3877,6 +3880,9 @@ model CuentaPorPagar {
   condicionPago      String            @default("contado") // 'contado' | 'credito' | 'adelanto'
   formaPago          String? // 'transferencia' | 'factura' | 'cheque' | 'letra' | 'factura_negociable' | 'otro'
   diasCredito        Int?
+  // % de detracción que SUNAT exige sobre esta factura (4, 10, 12...). Null si no aplica.
+  // El monto efectivamente depositado al BN se registra en PagoPagar.detraccionMonto.
+  detraccionPorcentaje Float?
   estado             EstadoCuentaPagar @default(pendiente)
   observaciones      String?
   createdAt          DateTime          @default(now())

@@ -8,7 +8,14 @@ const ROLES_ALLOWED = ['admin', 'gerente', 'administracion']
 const includeRelations = {
   proveedor: { select: { id: true, nombre: true, ruc: true } },
   proyecto: { select: { id: true, codigo: true, nombre: true } },
-  ordenCompra: { select: { id: true, numero: true, total: true } },
+  ordenCompra: {
+    select: {
+      id: true,
+      numero: true,
+      total: true,
+      centroCosto: { select: { id: true, nombre: true } },
+    },
+  },
   pedidoEquipo: { select: { id: true, codigo: true } },
   pedidoEquipoItem: { select: { id: true, codigo: true, descripcion: true } },
   pagos: {
@@ -65,11 +72,20 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json()
-    const { proveedorId, proyectoId, ordenCompraId, pedidoEquipoId, pedidoEquipoItemId, tipoOrigen, numeroFactura, descripcion, monto, moneda, tipoCambio, fechaRecepcion, fechaVencimiento, condicionPago, diasCredito, observaciones } = body
+    const {
+      proveedorId, proyectoId, ordenCompraId, pedidoEquipoId, pedidoEquipoItemId,
+      tipoOrigen, numeroFactura, descripcion, monto, moneda, tipoCambio,
+      fechaRecepcion, fechaVencimiento, condicionPago, diasCredito,
+      detraccionPorcentaje, guardarDetraccionDefault, observaciones,
+    } = body
 
     if (!proveedorId || !monto || !fechaRecepcion || !fechaVencimiento) {
       return NextResponse.json({ error: 'proveedorId, monto, fechaRecepcion y fechaVencimiento son requeridos' }, { status: 400 })
     }
+
+    const detraccion = detraccionPorcentaje != null && detraccionPorcentaje !== ''
+      ? Number(detraccionPorcentaje)
+      : null
 
     const cuenta = await prisma.cuentaPorPagar.create({
       data: {
@@ -89,11 +105,21 @@ export async function POST(req: Request) {
         fechaVencimiento: new Date(fechaVencimiento),
         condicionPago: condicionPago || 'contado',
         diasCredito: diasCredito ? Number(diasCredito) : null,
+        detraccionPorcentaje: detraccion,
         observaciones: observaciones || null,
         updatedAt: new Date(),
       },
       include: includeRelations,
     })
+
+    // Auto-aprender el % por proveedor: si pidieron guardar como default
+    // y hay un valor numérico, lo persistimos en proveedor.detraccionPorcentajeDefault.
+    if (guardarDetraccionDefault && detraccion != null && !isNaN(detraccion)) {
+      await prisma.proveedor.update({
+        where: { id: proveedorId },
+        data: { detraccionPorcentajeDefault: detraccion },
+      })
+    }
 
     return NextResponse.json(cuenta, { status: 201 })
   } catch (error) {

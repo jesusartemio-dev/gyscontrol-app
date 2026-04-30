@@ -14,7 +14,7 @@ import { Loader2, Search, ArrowUpCircle, AlertTriangle, DollarSign, Clock, Check
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import toast from 'react-hot-toast'
 import CxPImportExcelModal from '@/components/administracion/CxPImportExcelModal'
-import { exportarCxPAExcel } from '@/lib/utils/cuentasPagarExcel'
+import { exportarCxPAExcel, exportarCxPFormatoAdmin } from '@/lib/utils/cuentasPagarExcel'
 import { CONDICIONES_PAGO, FORMAS_PAGO, formatPago } from '@/lib/utils/formaPago'
 
 interface CuentaBancaria {
@@ -31,6 +31,9 @@ interface PagoPagar {
   numeroOperacion: string | null
   observaciones: string | null
   esDetraccion?: boolean
+  detraccionPorcentaje?: number | null
+  detraccionMonto?: number | null
+  detraccionFechaPago?: string | null
   numeroConstanciaBN?: string | null
   cuentaBancaria: CuentaBancaria | null
 }
@@ -39,6 +42,7 @@ interface Proveedor {
   id: string
   nombre: string
   ruc: string | null
+  detraccionPorcentajeDefault?: number | null
 }
 
 interface Proyecto {
@@ -60,6 +64,7 @@ interface OrdenCompra {
   estado: string
   proveedor?: { id: string; nombre: string; ruc?: string | null }
   proyecto?: { id: string; codigo: string; nombre: string } | null
+  centroCosto?: { id: string; nombre: string } | null
 }
 
 interface CuentaPorPagar {
@@ -78,6 +83,7 @@ interface CuentaPorPagar {
   condicionPago: string
   formaPago?: string | null
   diasCredito?: number | null
+  detraccionPorcentaje?: number | null
   estado: string
   observaciones: string | null
   pedidoEquipoId?: string | null
@@ -148,6 +154,7 @@ export default function CuentasPagarPage() {
 
   // Create dialog
   const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [createErrors, setCreateErrors] = useState<Set<string>>(new Set())
   const [createForm, setCreateForm] = useState({
     proveedorId: '',
     numeroFactura: '',
@@ -161,6 +168,8 @@ export default function CuentasPagarPage() {
     proyectoId: '',
     ordenCompraId: '',
     descripcion: '',
+    detraccionPorcentaje: '',
+    guardarDetraccionDefault: false,
     observaciones: '',
   })
 
@@ -183,6 +192,20 @@ export default function CuentasPagarPage() {
   // Detail dialog
   const [showDetail, setShowDetail] = useState<CuentaPorPagar | null>(null)
   const [editingObs, setEditingObs] = useState<string | null>(null)
+
+  // Edit dialog
+  const [editCuenta, setEditCuenta] = useState<CuentaPorPagar | null>(null)
+  const [editForm, setEditForm] = useState({
+    numeroFactura: '',
+    descripcion: '',
+    tipoCambio: '',
+    diasCredito: '',
+    condicionPago: 'contado',
+    formaPago: '',
+    detraccionPorcentaje: '',
+    guardarDetraccionDefault: false,
+    observaciones: '',
+  })
 
   // OCs sin factura panel
   const [ocsSinFacturaExpanded, setOcsSinFacturaExpanded] = useState(false)
@@ -325,8 +348,44 @@ export default function CuentasPagarPage() {
       proyectoId: '',
       ordenCompraId: '',
       descripcion: '',
+      detraccionPorcentaje: '',
+      guardarDetraccionDefault: false,
       observaciones: '',
     })
+    setCreateErrors(new Set())
+  }
+
+  const updateCreateField = <K extends keyof typeof createForm>(field: K, value: (typeof createForm)[K]) => {
+    setCreateForm(f => ({ ...f, [field]: value }))
+    if (createErrors.has(field as string)) {
+      setCreateErrors(prev => {
+        const next = new Set(prev)
+        next.delete(field as string)
+        return next
+      })
+    }
+  }
+
+  // Auto-fill: cuando el usuario elige proveedor y el campo % está vacío,
+  // sugerir el % por defecto de ese proveedor (si tiene uno configurado).
+  const handleProveedorChange = (proveedorId: string) => {
+    setCreateForm(f => {
+      const next = { ...f, proveedorId }
+      if (!f.detraccionPorcentaje) {
+        const prov = proveedores.find(p => p.id === proveedorId)
+        if (prov?.detraccionPorcentajeDefault != null) {
+          next.detraccionPorcentaje = String(prov.detraccionPorcentajeDefault)
+        }
+      }
+      return next
+    })
+    if (createErrors.has('proveedorId')) {
+      setCreateErrors(prev => {
+        const next = new Set(prev)
+        next.delete('proveedorId')
+        return next
+      })
+    }
   }
 
   const calcularFechaVencimiento = (fechaRecepcion: string, condicionPago: string, diasCredito: string): string => {
@@ -340,23 +399,37 @@ export default function CuentasPagarPage() {
   }
 
   const handleCreate = async () => {
-    if (!createForm.proveedorId || !createForm.monto || !createForm.fechaRecepcion || !createForm.fechaVencimiento) {
-      toast.error('Proveedor, monto, fecha recepción y fecha vencimiento son requeridos')
-      return
+    const missing = new Set<string>()
+    const labels: Record<string, string> = {
+      proveedorId: 'Proveedor',
+      monto: 'Monto',
+      fechaRecepcion: 'Fecha Emisión',
+      fechaVencimiento: 'Fecha Vencimiento',
+      numeroFactura: 'N° Factura',
     }
-    if (createForm.ordenCompraId && !createForm.numeroFactura.trim()) {
-      toast.error('El número de factura es obligatorio al registrar desde OC')
+    if (!createForm.proveedorId) missing.add('proveedorId')
+    if (!createForm.monto) missing.add('monto')
+    if (!createForm.fechaRecepcion) missing.add('fechaRecepcion')
+    if (!createForm.fechaVencimiento) missing.add('fechaVencimiento')
+    if (createForm.ordenCompraId && !createForm.numeroFactura.trim()) missing.add('numeroFactura')
+    if (missing.size > 0) {
+      setCreateErrors(missing)
+      const faltantes = Array.from(missing).map(k => labels[k]).join(', ')
+      toast.error(`Falta: ${faltantes}`)
       return
     }
     const monto = parseFloat(createForm.monto)
     if (isNaN(monto) || monto <= 0) {
+      setCreateErrors(new Set(['monto']))
       toast.error('El monto debe ser mayor a 0')
       return
     }
     if (new Date(createForm.fechaVencimiento) < new Date(createForm.fechaRecepcion)) {
-      toast.error('La fecha de vencimiento debe ser posterior a la de recepción')
+      setCreateErrors(new Set(['fechaVencimiento']))
+      toast.error('La fecha de vencimiento debe ser posterior a la de emisión')
       return
     }
+    setCreateErrors(new Set())
     setSaving(true)
     try {
       const res = await fetch('/api/administracion/cuentas-pagar', {
@@ -375,6 +448,8 @@ export default function CuentasPagarPage() {
           proyectoId: createForm.proyectoId || null,
           ordenCompraId: createForm.ordenCompraId || null,
           descripcion: createForm.descripcion || null,
+          detraccionPorcentaje: createForm.detraccionPorcentaje ? parseFloat(createForm.detraccionPorcentaje) : null,
+          guardarDetraccionDefault: createForm.guardarDetraccionDefault,
           observaciones: createForm.observaciones || null,
         }),
       })
@@ -391,6 +466,80 @@ export default function CuentasPagarPage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  // --- Editar CxP ---
+  const openEdit = (cuenta: CuentaPorPagar) => {
+    setEditCuenta(cuenta)
+    setEditForm({
+      numeroFactura: cuenta.numeroFactura ?? '',
+      descripcion: cuenta.descripcion ?? '',
+      tipoCambio: (cuenta as any).tipoCambio != null ? String((cuenta as any).tipoCambio) : '',
+      diasCredito: cuenta.diasCredito != null ? String(cuenta.diasCredito) : '',
+      condicionPago: cuenta.condicionPago || 'contado',
+      formaPago: cuenta.formaPago ?? '',
+      detraccionPorcentaje: cuenta.detraccionPorcentaje != null ? String(cuenta.detraccionPorcentaje) : '',
+      guardarDetraccionDefault: false,
+      observaciones: cuenta.observaciones ?? '',
+    })
+  }
+
+  const handleEdit = async () => {
+    if (!editCuenta) return
+    const detraccion = editForm.detraccionPorcentaje ? parseFloat(editForm.detraccionPorcentaje) : null
+    if (editForm.detraccionPorcentaje && (isNaN(detraccion!) || detraccion! < 0 || detraccion! > 100)) {
+      toast.error('% Detracción inválido (0-100)')
+      return
+    }
+    const tipoCambio = editForm.tipoCambio ? parseFloat(editForm.tipoCambio) : null
+    if (editForm.tipoCambio && (isNaN(tipoCambio!) || tipoCambio! <= 0)) {
+      toast.error('Tipo de cambio inválido')
+      return
+    }
+    const diasCredito = editForm.diasCredito ? parseInt(editForm.diasCredito, 10) : null
+    if (editForm.diasCredito && (isNaN(diasCredito!) || diasCredito! < 0)) {
+      toast.error('Días de crédito inválidos')
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/administracion/cuentas-pagar/${editCuenta.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          numeroFactura: editForm.numeroFactura || null,
+          descripcion: editForm.descripcion || null,
+          tipoCambio,
+          diasCredito,
+          condicionPago: editForm.condicionPago,
+          formaPago: editForm.formaPago || null,
+          detraccionPorcentaje: detraccion,
+          guardarDetraccionDefault: editForm.guardarDetraccionDefault,
+          observaciones: editForm.observaciones || null,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Error al actualizar')
+      }
+      toast.success('Cuenta actualizada')
+      setEditCuenta(null)
+      loadData()
+    } catch (e: any) {
+      toast.error(e.message || 'Error al actualizar')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Helper: detracción pendiente para una CxP
+  const detraccionPendiente = (cuenta: CuentaPorPagar): number => {
+    if (!cuenta.detraccionPorcentaje || cuenta.detraccionPorcentaje <= 0) return 0
+    const esperada = Math.round(cuenta.monto * cuenta.detraccionPorcentaje / 100 * 100) / 100
+    const pagada = (cuenta.pagos ?? [])
+      .filter(p => p.esDetraccion)
+      .reduce((sum, p) => sum + ((p as any).detraccionMonto ?? p.monto ?? 0), 0)
+    return Math.max(0, Math.round((esperada - pagada) * 100) / 100)
   }
 
   // --- Guardar observaciones ---
@@ -556,10 +705,23 @@ export default function CuentasPagarPage() {
           <p className="text-muted-foreground">Gestión de facturas y pagos a proveedores</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => exportarCxPAExcel(filtered)}>
-            <Download className="h-4 w-4 mr-1" />
-            Exportar
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Download className="h-4 w-4 mr-1" />
+                Exportar
+                <ChevronDown className="h-3 w-3 ml-1" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => exportarCxPAExcel(filtered)}>
+                Formato estándar
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => exportarCxPFormatoAdmin(filtered)}>
+                Formato administración
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button variant="outline" size="sm" onClick={() => setShowImportDialog(true)}>
             <Upload className="h-4 w-4 mr-1" />
             Importar
@@ -790,6 +952,18 @@ export default function CuentasPagarPage() {
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm font-semibold">
                         {formatCurrency(item.saldoPendiente, item.moneda)}
+                        {(() => {
+                          const detPend = detraccionPendiente(item)
+                          if (detPend <= 0) return null
+                          return (
+                            <div
+                              className="text-[10px] font-normal text-amber-700 mt-0.5"
+                              title={`Detracción ${item.detraccionPorcentaje}% pendiente de depositar al BN`}
+                            >
+                              Detr. {formatCurrency(detPend, item.moneda)}
+                            </div>
+                          )
+                        })()}
                       </TableCell>
                       <TableCell className="text-xs">
                         <div className="text-muted-foreground">{formatDate(item.fechaRecepcion)}</div>
@@ -823,6 +997,11 @@ export default function CuentasPagarPage() {
                             <DropdownMenuItem onClick={() => setTimeout(() => setShowDetail(item), 0)}>
                               <Eye className="h-4 w-4 mr-2" /> Ver detalle
                             </DropdownMenuItem>
+                            {item.estado !== 'anulada' && (
+                              <DropdownMenuItem onClick={() => setTimeout(() => openEdit(item), 0)}>
+                                <Pencil className="h-4 w-4 mr-2" /> Editar
+                              </DropdownMenuItem>
+                            )}
                             {(item.estado === 'pendiente' || item.estado === 'parcial') && (
                               <>
                                 <DropdownMenuItem onClick={() => setTimeout(() => openPago(item), 0)}>
@@ -870,6 +1049,7 @@ export default function CuentasPagarPage() {
             <DialogDescription>Registrar una factura o cuenta pendiente de pago a proveedor</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            <p className="text-xs text-muted-foreground">Los campos marcados con <span className="text-red-500 font-bold">*</span> son obligatorios.</p>
             {/* Card informativa OC (solo cuando viene de una OC) */}
             {createForm.ordenCompraId ? (() => {
               const oc = ordenesCompra.find(o => o.id === createForm.ordenCompraId)
@@ -935,9 +1115,11 @@ export default function CuentasPagarPage() {
                   </Select>
                 </div>
                 <div>
-                  <Label>Proveedor *</Label>
-                  <Select value={createForm.proveedorId} onValueChange={v => setCreateForm(f => ({ ...f, proveedorId: v }))}>
-                    <SelectTrigger><SelectValue placeholder="Seleccionar proveedor" /></SelectTrigger>
+                  <Label>Proveedor <span className="text-red-500">*</span></Label>
+                  <Select value={createForm.proveedorId} onValueChange={handleProveedorChange}>
+                    <SelectTrigger className={createErrors.has('proveedorId') ? 'border-red-500 ring-1 ring-red-500' : ''}>
+                      <SelectValue placeholder="Seleccionar proveedor" />
+                    </SelectTrigger>
                     <SelectContent>
                       {proveedores.map(p => (
                         <SelectItem key={p.id} value={p.id}>{p.nombre}{p.ruc ? ` (${p.ruc})` : ''}</SelectItem>
@@ -960,13 +1142,64 @@ export default function CuentasPagarPage() {
               </>
             )}
             <div>
-              <Label>N° Factura {createForm.ordenCompraId ? '*' : ''}</Label>
-              <Input placeholder="F001-00123" value={createForm.numeroFactura} onChange={e => setCreateForm(f => ({ ...f, numeroFactura: e.target.value }))} />
+              <Label>N° Factura {createForm.ordenCompraId && <span className="text-red-500">*</span>}</Label>
+              <Input
+                placeholder="F001-00123"
+                value={createForm.numeroFactura}
+                onChange={e => updateCreateField('numeroFactura', e.target.value)}
+                className={createErrors.has('numeroFactura') ? 'border-red-500 ring-1 ring-red-500' : ''}
+              />
+            </div>
+            {/* % Detracción (auto-rellenado desde proveedor.detraccionPorcentajeDefault) */}
+            <div className="space-y-2 p-3 bg-amber-50/50 border border-amber-200 rounded-lg">
+              <div className="grid grid-cols-2 gap-4 items-end">
+                <div>
+                  <Label className="text-sm">% Detracción</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    max={100}
+                    placeholder="Ej: 12 (vacío si no aplica)"
+                    value={createForm.detraccionPorcentaje}
+                    onChange={e => setCreateForm(f => ({ ...f, detraccionPorcentaje: e.target.value }))}
+                  />
+                </div>
+                <div className="text-xs">
+                  {createForm.detraccionPorcentaje && createForm.monto && (
+                    <div className="text-amber-700">
+                      Monto detracción: {formatCurrency(
+                        Math.round(parseFloat(createForm.monto || '0') * parseFloat(createForm.detraccionPorcentaje || '0') / 100 * 100) / 100,
+                        createForm.moneda,
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+              {createForm.detraccionPorcentaje && createForm.proveedorId && (
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="guardarDetDefault"
+                    checked={createForm.guardarDetraccionDefault}
+                    onCheckedChange={(v) => setCreateForm(f => ({ ...f, guardarDetraccionDefault: !!v }))}
+                  />
+                  <Label htmlFor="guardarDetDefault" className="text-xs font-normal cursor-pointer text-muted-foreground">
+                    Guardar {createForm.detraccionPorcentaje}% como default para este proveedor (próximas facturas se llenarán solas)
+                  </Label>
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Monto *</Label>
-                <Input type="number" step="0.01" placeholder="0.00" value={createForm.monto} onChange={e => setCreateForm(f => ({ ...f, monto: e.target.value }))} />
+                <Label>Monto <span className="text-red-500">*</span></Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={createForm.monto}
+                  onChange={e => updateCreateField('monto', e.target.value)}
+                  className={createErrors.has('monto') ? 'border-red-500 ring-1 ring-red-500' : ''}
+                />
               </div>
               {!createForm.ordenCompraId && (
                 <div>
@@ -1033,19 +1266,32 @@ export default function CuentasPagarPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Fecha Emisión *</Label>
-                <Input type="date" value={createForm.fechaRecepcion} onChange={e => {
-                  const fecha = e.target.value
-                  setCreateForm(f => ({
-                    ...f,
-                    fechaRecepcion: fecha,
-                    fechaVencimiento: calcularFechaVencimiento(fecha, f.condicionPago, f.diasCredito),
-                  }))
-                }} />
+                <Label>Fecha Emisión <span className="text-red-500">*</span></Label>
+                <Input
+                  type="date"
+                  value={createForm.fechaRecepcion}
+                  className={createErrors.has('fechaRecepcion') ? 'border-red-500 ring-1 ring-red-500' : ''}
+                  onChange={e => {
+                    const fecha = e.target.value
+                    setCreateForm(f => ({
+                      ...f,
+                      fechaRecepcion: fecha,
+                      fechaVencimiento: calcularFechaVencimiento(fecha, f.condicionPago, f.diasCredito),
+                    }))
+                    if (createErrors.has('fechaRecepcion')) {
+                      setCreateErrors(prev => { const n = new Set(prev); n.delete('fechaRecepcion'); return n })
+                    }
+                  }}
+                />
               </div>
               <div>
-                <Label>Fecha Vencimiento *</Label>
-                <Input type="date" value={createForm.fechaVencimiento} onChange={e => setCreateForm(f => ({ ...f, fechaVencimiento: e.target.value }))} />
+                <Label>Fecha Vencimiento <span className="text-red-500">*</span></Label>
+                <Input
+                  type="date"
+                  value={createForm.fechaVencimiento}
+                  onChange={e => updateCreateField('fechaVencimiento', e.target.value)}
+                  className={createErrors.has('fechaVencimiento') ? 'border-red-500 ring-1 ring-red-500' : ''}
+                />
               </div>
             </div>
             {!createForm.ordenCompraId && (
@@ -1250,6 +1496,30 @@ export default function CuentasPagarPage() {
                 </CardContent>
               </Card>
 
+              {/* Bloque detracción */}
+              {showDetail.detraccionPorcentaje && showDetail.detraccionPorcentaje > 0 && (() => {
+                const esperada = Math.round(showDetail.monto * showDetail.detraccionPorcentaje / 100 * 100) / 100
+                const pagada = (showDetail.pagos ?? [])
+                  .filter(p => p.esDetraccion)
+                  .reduce((sum, p) => sum + ((p as any).detraccionMonto ?? p.monto ?? 0), 0)
+                const pendiente = Math.max(0, Math.round((esperada - pagada) * 100) / 100)
+                return (
+                  <Card className="border-amber-200 bg-amber-50/30">
+                    <CardContent className="p-3 space-y-1">
+                      <div className="flex justify-between font-medium text-amber-800">
+                        <span>Detracción ({showDetail.detraccionPorcentaje}%)</span>
+                      </div>
+                      <div className="flex justify-between text-xs"><span className="text-muted-foreground">Esperada</span><span className="font-mono">{formatCurrency(esperada, showDetail.moneda)}</span></div>
+                      <div className="flex justify-between text-xs text-green-700"><span>Depositada al BN</span><span className="font-mono">{formatCurrency(pagada, showDetail.moneda)}</span></div>
+                      <div className={`flex justify-between font-bold border-t pt-1 ${pendiente > 0 ? 'text-amber-700' : 'text-green-700'}`}>
+                        <span>Pendiente de depositar</span>
+                        <span className="font-mono">{formatCurrency(pendiente, showDetail.moneda)}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })()}
+
               {showDetail.pagos && showDetail.pagos.length > 0 && (
                 <div>
                   <div className="font-medium mb-2">Historial de Pagos</div>
@@ -1349,6 +1619,12 @@ export default function CuentasPagarPage() {
           )}
           <DialogFooter>
             {showDetail && showDetail.estado !== 'anulada' && (
+              <Button variant="outline" size="sm" onClick={() => { const c = showDetail; setShowDetail(null); openEdit(c) }} disabled={saving}>
+                <Pencil className="h-4 w-4 mr-1" />
+                Editar
+              </Button>
+            )}
+            {showDetail && showDetail.estado !== 'anulada' && (
               <Button variant="destructive" size="sm" onClick={() => handleAnular(showDetail)} disabled={saving}>
                 <Ban className="h-4 w-4 mr-1" />
                 Anular
@@ -1368,6 +1644,120 @@ export default function CuentasPagarPage() {
                 Registrar Pago
               </Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog editar CxP */}
+      <Dialog open={!!editCuenta} onOpenChange={open => { if (!open) setEditCuenta(null) }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" onCloseAutoFocus={e => e.preventDefault()}>
+          <DialogHeader>
+            <DialogTitle>Editar Cuenta por Pagar</DialogTitle>
+            <DialogDescription>
+              {editCuenta?.numeroFactura || 'Sin factura'} — {editCuenta?.proveedor?.nombre}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="p-3 bg-muted/50 border rounded text-xs space-y-0.5">
+              <div className="flex justify-between"><span className="text-muted-foreground">Proveedor</span><span>{editCuenta?.proveedor?.nombre}</span></div>
+              {editCuenta?.proyecto && <div className="flex justify-between"><span className="text-muted-foreground">Proyecto</span><span className="font-mono">{editCuenta.proyecto.codigo}</span></div>}
+              {editCuenta?.ordenCompra && <div className="flex justify-between"><span className="text-muted-foreground">OC</span><span className="font-mono">{editCuenta.ordenCompra.numero}</span></div>}
+              <div className="flex justify-between"><span className="text-muted-foreground">Monto</span><span className="font-mono">{editCuenta && formatCurrency(editCuenta.monto, editCuenta.moneda)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Recepción / Vencimiento</span><span>{editCuenta && `${formatDate(editCuenta.fechaRecepcion)} → ${formatDate(editCuenta.fechaVencimiento)}`}</span></div>
+              <div className="text-muted-foreground italic pt-1">Proveedor, proyecto, OC, monto y fechas base no son editables. Para cambiarlos, anula y crea una nueva.</div>
+            </div>
+
+            <div>
+              <Label>N° Factura</Label>
+              <Input placeholder="F001-00123" value={editForm.numeroFactura} onChange={e => setEditForm(f => ({ ...f, numeroFactura: e.target.value }))} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Tipo Cambio</Label>
+                <Input type="number" step="0.001" placeholder="3.800" value={editForm.tipoCambio} onChange={e => setEditForm(f => ({ ...f, tipoCambio: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Días Crédito</Label>
+                <Input type="number" placeholder="30" value={editForm.diasCredito} onChange={e => setEditForm(f => ({ ...f, diasCredito: e.target.value }))} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Condición Pago</Label>
+                <Select value={editForm.condicionPago} onValueChange={v => setEditForm(f => ({ ...f, condicionPago: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {CONDICIONES_PAGO.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Forma de Pago</Label>
+                <Select value={editForm.formaPago || '__none__'} onValueChange={v => setEditForm(f => ({ ...f, formaPago: v === '__none__' ? '' : v }))}>
+                  <SelectTrigger><SelectValue placeholder="Sin especificar" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Sin especificar</SelectItem>
+                    {FORMAS_PAGO.map(fp => <SelectItem key={fp.value} value={fp.value}>{fp.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* % Detracción */}
+            <div className="space-y-2 p-3 bg-amber-50/50 border border-amber-200 rounded-lg">
+              <div className="grid grid-cols-2 gap-4 items-end">
+                <div>
+                  <Label className="text-sm">% Detracción</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    max={100}
+                    placeholder="Ej: 12 (vacío si no aplica)"
+                    value={editForm.detraccionPorcentaje}
+                    onChange={e => setEditForm(f => ({ ...f, detraccionPorcentaje: e.target.value }))}
+                  />
+                </div>
+                <div className="text-xs">
+                  {editForm.detraccionPorcentaje && editCuenta && (
+                    <div className="text-amber-700">
+                      Monto detracción: {formatCurrency(
+                        Math.round(editCuenta.monto * parseFloat(editForm.detraccionPorcentaje || '0') / 100 * 100) / 100,
+                        editCuenta.moneda,
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+              {editForm.detraccionPorcentaje && (
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="editGuardarDetDefault"
+                    checked={editForm.guardarDetraccionDefault}
+                    onCheckedChange={(v) => setEditForm(f => ({ ...f, guardarDetraccionDefault: !!v }))}
+                  />
+                  <Label htmlFor="editGuardarDetDefault" className="text-xs font-normal cursor-pointer text-muted-foreground">
+                    Guardar {editForm.detraccionPorcentaje}% como default para este proveedor
+                  </Label>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <Label>Descripción / Servicio</Label>
+              <Input placeholder="Servicio eléctrico..." value={editForm.descripcion} onChange={e => setEditForm(f => ({ ...f, descripcion: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Observaciones</Label>
+              <Input placeholder="Notas adicionales" value={editForm.observaciones} onChange={e => setEditForm(f => ({ ...f, observaciones: e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditCuenta(null)}>Cancelar</Button>
+            <Button onClick={handleEdit} disabled={saving}>
+              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Guardar Cambios
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

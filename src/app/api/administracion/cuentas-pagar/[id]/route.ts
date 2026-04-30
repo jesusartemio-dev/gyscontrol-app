@@ -45,16 +45,37 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       return NextResponse.json(updated)
     }
 
-    // Editar observaciones
-    if ('observaciones' in body) {
-      const updated = await prisma.cuentaPorPagar.update({
-        where: { id },
-        data: { observaciones: body.observaciones || null, updatedAt: new Date() },
-      })
-      return NextResponse.json(updated)
+    // Editar campos administrativos (no toca monto/saldo/estado financiero)
+    const editableFields = [
+      'numeroFactura', 'descripcion', 'observaciones',
+      'tipoCambio', 'diasCredito', 'condicionPago', 'formaPago',
+      'detraccionPorcentaje',
+    ] as const
+
+    const data: Record<string, any> = {}
+    for (const field of editableFields) {
+      if (field in body) {
+        const value = body[field]
+        data[field] = value === '' ? null : value
+      }
     }
 
-    return NextResponse.json({ error: 'Operación no soportada' }, { status: 400 })
+    if (Object.keys(data).length === 0) {
+      return NextResponse.json({ error: 'No hay campos para actualizar' }, { status: 400 })
+    }
+
+    data.updatedAt = new Date()
+    const updated = await prisma.cuentaPorPagar.update({ where: { id }, data })
+
+    // Auto-aprender el % por proveedor si pidieron guardar como default
+    if (body.guardarDetraccionDefault && data.detraccionPorcentaje != null && !isNaN(Number(data.detraccionPorcentaje))) {
+      await prisma.proveedor.update({
+        where: { id: existing.proveedorId },
+        data: { detraccionPorcentajeDefault: Number(data.detraccionPorcentaje) },
+      })
+    }
+
+    return NextResponse.json(updated)
   } catch (error) {
     console.error('Error al actualizar CxP:', error)
     return NextResponse.json({ error: 'Error del servidor' }, { status: 500 })
