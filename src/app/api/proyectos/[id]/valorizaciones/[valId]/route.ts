@@ -4,55 +4,13 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { calcularAdelantoValorizacion } from '@/lib/utils/adelantoUtils'
 import { canDelete } from '@/lib/utils/deleteValidation'
+import {
+  calcularMontos,
+  calcularAcumuladoAnterior,
+  recalcularValorizacionesPosteriores,
+} from '@/lib/utils/valorizacionAcumulado'
 
 const ROLES_ALLOWED = ['admin', 'gerente', 'gestor', 'coordinador', 'administracion']
-
-function calcularMontos(data: {
-  montoValorizacion: number
-  acumuladoAnterior: number
-  presupuestoContractual: number
-  descuentoComercialPorcentaje: number
-  adelantoPorcentaje: number
-  igvPorcentaje: number
-  fondoGarantiaPorcentaje: number
-}) {
-  const acumuladoActual = data.acumuladoAnterior + data.montoValorizacion
-  const saldoPorValorizar = data.presupuestoContractual - acumuladoActual
-  const porcentajeAvance = data.presupuestoContractual > 0
-    ? (acumuladoActual / data.presupuestoContractual) * 100
-    : 0
-
-  const descuentoComercialMonto = data.montoValorizacion * data.descuentoComercialPorcentaje / 100
-  const adelantoMonto = data.montoValorizacion * data.adelantoPorcentaje / 100
-  const subtotal = data.montoValorizacion - descuentoComercialMonto - adelantoMonto
-  const igvMonto = subtotal * data.igvPorcentaje / 100
-  const fondoGarantiaMonto = subtotal * data.fondoGarantiaPorcentaje / 100
-  const netoARecibir = subtotal + igvMonto - fondoGarantiaMonto
-
-  return {
-    acumuladoActual: Math.round(acumuladoActual * 100) / 100,
-    saldoPorValorizar: Math.round(saldoPorValorizar * 100) / 100,
-    porcentajeAvance: Math.round(porcentajeAvance * 100) / 100,
-    descuentoComercialMonto: Math.round(descuentoComercialMonto * 100) / 100,
-    adelantoMonto: Math.round(adelantoMonto * 100) / 100,
-    subtotal: Math.round(subtotal * 100) / 100,
-    igvMonto: Math.round(igvMonto * 100) / 100,
-    fondoGarantiaMonto: Math.round(fondoGarantiaMonto * 100) / 100,
-    netoARecibir: Math.round(netoARecibir * 100) / 100,
-  }
-}
-
-async function calcularAcumuladoAnterior(proyectoId: string, excludeId: string): Promise<number> {
-  const agg = await prisma.valorizacion.aggregate({
-    where: {
-      proyectoId,
-      estado: { not: 'anulada' },
-      id: { not: excludeId },
-    },
-    _sum: { montoValorizacion: true },
-  })
-  return agg._sum.montoValorizacion || 0
-}
 
 const includeRelations = {
   proyecto: { select: { id: true, codigo: true, nombre: true, totalCliente: true, clienteId: true, adelantoPorcentaje: true, adelantoMonto: true, adelantoAmortizado: true } },
@@ -262,7 +220,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       }
     }
 
-    const acumuladoAnterior = await calcularAcumuladoAnterior(proyectoId, valId)
+    const acumuladoAnterior = await calcularAcumuladoAnterior(prisma, proyectoId, existing.numero)
     const calculados = calcularMontos({
       montoValorizacion,
       acumuladoAnterior,
@@ -356,6 +314,12 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
           console.warn('No se pudo crear evento de auditoría:', e)
         }
       }
+    }
+
+    // Cascada: si cambió el monto valorizado, los acumulados de las
+    // valorizaciones POSTERIORES quedan desactualizados — recalcularlas.
+    if (valorizacion.montoValorizacion !== existing.montoValorizacion) {
+      await recalcularValorizacionesPosteriores(prisma, proyectoId, existing.numero)
     }
 
     return NextResponse.json(valorizacion)

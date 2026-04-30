@@ -2,115 +2,12 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { calcularAdelantoValorizacion } from '@/lib/utils/adelantoUtils'
+import {
+  recalcularValorizacionPorId,
+  recalcularValorizacionesPosteriores,
+} from '@/lib/utils/valorizacionAcumulado'
 
 const ROLES_ALLOWED = ['admin', 'gerente', 'gestor', 'coordinador', 'administracion']
-
-// Calcula todos los campos derivados de una valorización
-function calcularMontos(data: {
-  montoValorizacion: number
-  acumuladoAnterior: number
-  presupuestoContractual: number
-  descuentoComercialPorcentaje: number
-  adelantoPorcentaje: number
-  igvPorcentaje: number
-  fondoGarantiaPorcentaje: number
-}) {
-  const acumuladoActual = data.acumuladoAnterior + data.montoValorizacion
-  const saldoPorValorizar = data.presupuestoContractual - acumuladoActual
-  const porcentajeAvance = data.presupuestoContractual > 0
-    ? (acumuladoActual / data.presupuestoContractual) * 100
-    : 0
-
-  const descuentoComercialMonto = data.montoValorizacion * data.descuentoComercialPorcentaje / 100
-  const adelantoMonto = data.montoValorizacion * data.adelantoPorcentaje / 100
-  const subtotal = data.montoValorizacion - descuentoComercialMonto - adelantoMonto
-  const igvMonto = subtotal * data.igvPorcentaje / 100
-  const fondoGarantiaMonto = subtotal * data.fondoGarantiaPorcentaje / 100
-  const netoARecibir = subtotal + igvMonto - fondoGarantiaMonto
-
-  return {
-    acumuladoActual: Math.round(acumuladoActual * 100) / 100,
-    saldoPorValorizar: Math.round(saldoPorValorizar * 100) / 100,
-    porcentajeAvance: Math.round(porcentajeAvance * 100) / 100,
-    descuentoComercialMonto: Math.round(descuentoComercialMonto * 100) / 100,
-    adelantoMonto: Math.round(adelantoMonto * 100) / 100,
-    subtotal: Math.round(subtotal * 100) / 100,
-    igvMonto: Math.round(igvMonto * 100) / 100,
-    fondoGarantiaMonto: Math.round(fondoGarantiaMonto * 100) / 100,
-    netoARecibir: Math.round(netoARecibir * 100) / 100,
-  }
-}
-
-// Recalcula montoValorizacion = SUM(partidas.montoAvance) y todos los campos derivados
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function recalcularMontoValorizacion(valorizacionId: string, tx: any) {
-  const partidas = await tx.partidaValorizacion.findMany({
-    where: { valorizacionId },
-  })
-
-  const montoValorizacion = Math.round(
-    partidas.reduce((sum: number, p: any) => sum + p.montoAvance, 0) * 100
-  ) / 100
-
-  const val = await tx.valorizacion.findUnique({
-    where: { id: valorizacionId },
-  })
-  if (!val) return null
-
-  // Calcular acumulado anterior (SUM de otras valorizaciones no anuladas del mismo proyecto)
-  const agg = await tx.valorizacion.aggregate({
-    where: {
-      proyectoId: val.proyectoId,
-      estado: { not: 'anulada' },
-      id: { not: valorizacionId },
-    },
-    _sum: { montoValorizacion: true },
-  })
-  const acumuladoAnterior = agg._sum.montoValorizacion || 0
-
-  // Recalcular adelanto desde proyecto si tiene adelanto configurado
-  const proyecto = await tx.proyecto.findUnique({
-    where: { id: val.proyectoId },
-    select: { adelantoPorcentaje: true, adelantoMonto: true, adelantoAmortizado: true },
-  })
-
-  let adelantoPorcentaje = val.adelantoPorcentaje
-  let adelantoMontoOverride: number | undefined
-
-  if (proyecto && proyecto.adelantoMonto > 0) {
-    const adelantoCalc = calcularAdelantoValorizacion(proyecto, montoValorizacion)
-    if (adelantoCalc.tieneAdelanto) {
-      adelantoPorcentaje = adelantoCalc.adelantoPorcentaje
-      adelantoMontoOverride = adelantoCalc.adelantoMonto
-    }
-  }
-
-  const calculados = calcularMontos({
-    montoValorizacion,
-    acumuladoAnterior,
-    presupuestoContractual: val.presupuestoContractual,
-    descuentoComercialPorcentaje: val.descuentoComercialPorcentaje,
-    adelantoPorcentaje,
-    igvPorcentaje: val.igvPorcentaje,
-    fondoGarantiaPorcentaje: val.fondoGarantiaPorcentaje,
-  })
-
-  if (adelantoMontoOverride !== undefined) {
-    calculados.adelantoMonto = adelantoMontoOverride
-  }
-
-  return tx.valorizacion.update({
-    where: { id: valorizacionId },
-    data: {
-      montoValorizacion,
-      acumuladoAnterior,
-      adelantoPorcentaje,
-      ...calculados,
-      updatedAt: new Date(),
-    },
-  })
-}
 
 // GET /api/proyectos/[id]/valorizaciones/[valId]/partidas
 export async function GET(req: Request, { params }: { params: Promise<{ id: string; valId: string }> }) {
@@ -293,10 +190,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         },
       })
 
-      const valActualizada = await recalcularMontoValorizacion(valId, tx)
+      const valActualizada = await recalcularValorizacionPorId(tx, valId)
 
-      return { partida, montoValorizacion: valActualizada?.montoValorizacion ?? 0 }
+      return { partida, montoValorizacion: valActualizada?.montoValorizacion ?? 0, valNumero: valActualizada?.numero ?? 0 }
     })
+
+    // Cascada: recalcular acumulados de las valorizaciones posteriores del mismo proyecto.
+    if (result.valNumero > 0) {
+      await recalcularValorizacionesPosteriores(prisma, proyectoId, result.valNumero)
+    }
 
     return NextResponse.json(result, { status: 201 })
   } catch (error) {
@@ -377,10 +279,14 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         orderBy: { orden: 'asc' },
       })
 
-      const valActualizada = await recalcularMontoValorizacion(valId, tx)
+      const valActualizada = await recalcularValorizacionPorId(tx, valId)
 
-      return { partidas, montoValorizacion: valActualizada?.montoValorizacion ?? 0 }
+      return { partidas, montoValorizacion: valActualizada?.montoValorizacion ?? 0, valNumero: valActualizada?.numero ?? 0 }
     })
+
+    if (result.valNumero > 0) {
+      await recalcularValorizacionesPosteriores(prisma, proyectoId, result.valNumero)
+    }
 
     return NextResponse.json(result)
   } catch (error) {
