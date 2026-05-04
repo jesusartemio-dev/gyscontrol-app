@@ -1633,6 +1633,7 @@ model User {
   prestamosComoUsuario                     PrestamoHerramienta[]       @relation("PrestamoUsuario")
   prestamosEntregados                      PrestamoHerramienta[]       @relation("PrestamoEntregadoPor")
   prestamosRecibidos                       PrestamoHerramienta[]       @relation("PrestamoRecibidoPor")
+  prestamoItemsDadosDeBaja                 PrestamoHerramientaItem[]   @relation("PrestamoItemDadoDeBajaPor")
   solicitudesHerramienta                   SolicitudHerramienta[]      @relation("SolicitudHerramientaSolicitante")
   solicitudesHerramientaAtendidas          SolicitudHerramienta[]      @relation("SolicitudHerramientaAtendidaPor")
   devolucionesRegistradas                  DevolucionMaterial[]        @relation("DevolucionRegistradoPor")
@@ -4702,9 +4703,13 @@ model PrestamoHerramientaItem {
   fechaDevolucionItem   DateTime?
   estado                EstadoPrestamoItem   @default(prestado)
   observacionDevolucion String?
+  motivoBaja            String?
+  fechaBaja             DateTime?
+  dadoDeBajaPorId       String?
   prestamo              PrestamoHerramienta  @relation(fields: [prestamoId], references: [id], onDelete: Cascade)
   herramientaUnidad     HerramientaUnidad?   @relation(fields: [herramientaUnidadId], references: [id])
   catalogoHerramienta   CatalogoHerramienta? @relation(fields: [catalogoHerramientaId], references: [id])
+  dadoDeBajaPor         User?                @relation("PrestamoItemDadoDeBajaPor", fields: [dadoDeBajaPorId], references: [id])
 
   @@map("prestamo_herramienta_item")
 }
