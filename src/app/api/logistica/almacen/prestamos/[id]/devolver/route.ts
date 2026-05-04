@@ -19,7 +19,7 @@ export async function POST(
   try {
     const { id } = await params
     const body = await req.json()
-    // items: [{ prestamoItemId, cantidadDevuelta, estadoItem }]
+    // items: [{ prestamoItemId, cantidadDevuelta, observacionDevolucion? }]
     const { items } = body
 
     if (!items?.length) return NextResponse.json({ error: 'items requeridos' }, { status: 400 })
@@ -34,18 +34,42 @@ export async function POST(
     if (!prestamo) return NextResponse.json({ error: 'Préstamo no encontrado' }, { status: 404 })
     if (prestamo.estado === 'devuelto') return NextResponse.json({ error: 'El préstamo ya está devuelto' }, { status: 409 })
 
+    // Validar cantidades antes de tocar nada
+    for (const devItem of items) {
+      const prestamoItem = prestamo.items.find(i => i.id === devItem.prestamoItemId)
+      if (!prestamoItem) {
+        return NextResponse.json({ error: `Ítem ${devItem.prestamoItemId} no pertenece al préstamo` }, { status: 400 })
+      }
+      const pendiente = prestamoItem.cantidadPrestada - prestamoItem.cantidadDevuelta
+      const cantDev = Number(devItem.cantidadDevuelta) || 0
+      if (cantDev <= 0) {
+        return NextResponse.json({ error: `Cantidad inválida para "${prestamoItem.id}"` }, { status: 400 })
+      }
+      if (cantDev > pendiente) {
+        return NextResponse.json({ error: `No se puede devolver ${cantDev}, solo quedan ${pendiente} pendientes` }, { status: 400 })
+      }
+    }
+
     await prisma.$transaction(async (tx) => {
       for (const devItem of items) {
         const prestamoItem = prestamo.items.find(i => i.id === devItem.prestamoItemId)
         if (!prestamoItem) continue
 
-        const cantDev = devItem.cantidadDevuelta || prestamoItem.cantidadPrestada
+        const cantDev = Number(devItem.cantidadDevuelta) || prestamoItem.cantidadPrestada
+        const obsNueva = (devItem.observacionDevolucion || '').trim()
+        const obsPrev = (prestamoItem.observacionDevolucion || '').trim()
+        const fechaStr = new Date().toLocaleDateString('es-PE')
+        const obsCombinada = obsNueva
+          ? (obsPrev ? `${obsPrev}\n[${fechaStr}] ${obsNueva}` : `[${fechaStr}] ${obsNueva}`)
+          : (obsPrev || null)
+
         await tx.prestamoHerramientaItem.update({
           where: { id: devItem.prestamoItemId },
           data: {
             cantidadDevuelta: prestamoItem.cantidadDevuelta + cantDev,
             fechaDevolucionItem: new Date(),
             estado: (prestamoItem.cantidadDevuelta + cantDev) >= prestamoItem.cantidadPrestada ? 'devuelto' : 'prestado',
+            observacionDevolucion: obsCombinada,
           },
         })
 
@@ -61,6 +85,7 @@ export async function POST(
             cantidad: 1,
             usuarioId: session.user.id,
             prestamoHerramientaId: id,
+            observaciones: obsNueva || undefined,
           }, tx as any)
         } else if (prestamoItem.catalogoHerramientaId) {
           await registrarMovimiento({
@@ -70,6 +95,7 @@ export async function POST(
             cantidad: cantDev,
             usuarioId: session.user.id,
             prestamoHerramientaId: id,
+            observaciones: obsNueva || undefined,
           }, tx as any)
         }
       }

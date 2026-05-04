@@ -8,9 +8,21 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
+import { Input } from '@/components/ui/input'
+import { Checkbox } from '@/components/ui/checkbox'
 import { cn } from '@/lib/utils'
-import { Loader2, Plus, ArrowLeftRight, AlertTriangle, Inbox, CheckCircle2, XCircle, RotateCcw, User as UserIcon } from 'lucide-react'
+import { Loader2, Plus, ArrowLeftRight, AlertTriangle, Inbox, CheckCircle2, XCircle, RotateCcw, User as UserIcon, MessageSquare, PackageCheck } from 'lucide-react'
 import { toast } from 'sonner'
+
+interface PrestamoItem {
+  id: string
+  cantidadPrestada: number
+  cantidadDevuelta: number
+  estado: string
+  observacionDevolucion: string | null
+  herramientaUnidad: { serie: string; catalogoHerramienta: { nombre: string; codigo: string } } | null
+  catalogoHerramienta: { nombre: string; codigo: string } | null
+}
 
 interface Prestamo {
   id: string
@@ -20,14 +32,18 @@ interface Prestamo {
   usuario: { name: string | null; email: string }
   proyecto: { nombre: string; codigo: string } | null
   entregadoPor: { name: string | null }
-  items: {
-    id: string
-    cantidadPrestada: number
-    cantidadDevuelta: number
-    estado: string
-    herramientaUnidad: { serie: string; catalogoHerramienta: { nombre: string; codigo: string } } | null
-    catalogoHerramienta: { nombre: string; codigo: string } | null
-  }[]
+  items: PrestamoItem[]
+}
+
+// Estado del formulario por ítem en el dialog de devolución parcial.
+interface DevolucionFormItem {
+  prestamoItemId: string
+  pendiente: number
+  serializada: boolean
+  nombre: string
+  devuelve: boolean
+  cantidad: string
+  observacion: string
 }
 
 interface SolicitudPendiente {
@@ -67,7 +83,9 @@ export default function PrestamosPage() {
   const [data, setData] = useState<Prestamo[]>([])
   const [loading, setLoading] = useState(false)
   const [filtroEstado, setFiltroEstado] = useState('todos')
-  const [devolviendo, setDevolviendo] = useState<string | null>(null)
+  const [devolviendoPrestamo, setDevolviendoPrestamo] = useState<Prestamo | null>(null)
+  const [devForm, setDevForm] = useState<DevolucionFormItem[]>([])
+  const [devEnviando, setDevEnviando] = useState(false)
   const [pendientes, setPendientes] = useState<SolicitudPendiente[]>([])
   const [devolviendoSol, setDevolviendoSol] = useState<SolicitudPendiente | null>(null)
   const [devolverNota, setDevolverNota] = useState('')
@@ -167,28 +185,81 @@ export default function PrestamosPage() {
   useEffect(() => { cargar() }, [filtroEstado])
   useEffect(() => { cargarPendientes() }, [])
 
-  async function devolverTodo(prestamoId: string, items: Prestamo['items']) {
-    if (!confirm('¿Confirmar devolución total de este préstamo?')) return
-    setDevolviendo(prestamoId)
+  function abrirDevolucionPrestamo(p: Prestamo) {
+    const pendientes: DevolucionFormItem[] = p.items
+      .filter(i => i.estado === 'prestado')
+      .map(i => {
+        const pendiente = i.cantidadPrestada - i.cantidadDevuelta
+        const nombre = i.herramientaUnidad
+          ? `${i.herramientaUnidad.catalogoHerramienta.nombre} — Serie: ${i.herramientaUnidad.serie}`
+          : i.catalogoHerramienta?.nombre || ''
+        return {
+          prestamoItemId: i.id,
+          pendiente,
+          serializada: !!i.herramientaUnidad,
+          nombre,
+          devuelve: true,
+          cantidad: String(pendiente),
+          observacion: '',
+        }
+      })
+    setDevolviendoPrestamo(p)
+    setDevForm(pendientes)
+  }
+
+  function actualizarDevItem(prestamoItemId: string, patch: Partial<DevolucionFormItem>) {
+    setDevForm(prev => prev.map(it => it.prestamoItemId === prestamoItemId ? { ...it, ...patch } : it))
+  }
+
+  async function confirmarDevolucionPrestamo() {
+    if (!devolviendoPrestamo) return
+    const aDevolver = devForm.filter(i => i.devuelve)
+    if (aDevolver.length === 0) {
+      toast.error('Marca al menos un ítem para devolver')
+      return
+    }
+    for (const it of aDevolver) {
+      const cant = Number(it.cantidad)
+      if (!cant || cant <= 0) {
+        toast.error(`Cantidad inválida en "${it.nombre}"`)
+        return
+      }
+      if (cant > it.pendiente) {
+        toast.error(`"${it.nombre}": solo quedan ${it.pendiente} pendientes`)
+        return
+      }
+      if (it.serializada && cant !== 1) {
+        toast.error(`"${it.nombre}" es serializada, debe devolverse 1 unidad`)
+        return
+      }
+    }
+    setDevEnviando(true)
     try {
-      const r = await fetch(`/api/logistica/almacen/prestamos/${prestamoId}/devolver`, {
+      const r = await fetch(`/api/logistica/almacen/prestamos/${devolviendoPrestamo.id}/devolver`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          items: items
-            .filter(i => i.estado === 'prestado')
-            .map(i => ({
-              prestamoItemId: i.id,
-              cantidadDevuelta: i.cantidadPrestada - i.cantidadDevuelta,
-            })),
+          items: aDevolver.map(i => ({
+            prestamoItemId: i.prestamoItemId,
+            cantidadDevuelta: Number(i.cantidad),
+            observacionDevolucion: i.observacion.trim() || undefined,
+          })),
         }),
       })
       const json = await r.json()
-      if (!r.ok) { toast.error(json.error || 'Error'); return }
-      toast.success('Devolución registrada')
+      if (!r.ok) { toast.error(json.error || 'Error al registrar devolución'); return }
+      const totalPend = devForm.length
+      const totalDev = aDevolver.length
+      toast.success(
+        totalDev === totalPend
+          ? 'Devolución total registrada'
+          : `Devolución parcial registrada (${totalDev}/${totalPend} ítems)`
+      )
+      setDevolviendoPrestamo(null)
+      setDevForm([])
       cargar()
     } finally {
-      setDevolviendo(null)
+      setDevEnviando(false)
     }
   }
 
@@ -382,12 +453,26 @@ export default function PrestamosPage() {
                       const nombre = item.herramientaUnidad
                         ? `${item.herramientaUnidad.catalogoHerramienta.nombre} — Serie: ${item.herramientaUnidad.serie}`
                         : item.catalogoHerramienta?.nombre
+                      const totalmenteDevuelto = item.estado === 'devuelto'
+                      const parcial = item.cantidadDevuelta > 0 && !totalmenteDevuelto
                       return (
-                        <li key={item.id} className="flex items-center justify-between rounded border px-2 py-1">
-                          <span>{nombre}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {item.cantidadDevuelta}/{item.cantidadPrestada} devueltos
-                          </span>
+                        <li key={item.id} className={cn(
+                          'rounded border px-2 py-1',
+                          totalmenteDevuelto && 'bg-emerald-50/50 border-emerald-200',
+                          parcial && 'bg-amber-50/50 border-amber-200'
+                        )}>
+                          <div className="flex items-center justify-between">
+                            <span className={cn(totalmenteDevuelto && 'text-muted-foreground')}>{nombre}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {item.cantidadDevuelta}/{item.cantidadPrestada} devueltos
+                            </span>
+                          </div>
+                          {item.observacionDevolucion && (
+                            <div className="mt-1 flex items-start gap-1 text-[11px] text-muted-foreground">
+                              <MessageSquare className="mt-0.5 h-3 w-3 shrink-0" />
+                              <span className="whitespace-pre-line">{item.observacionDevolucion}</span>
+                            </div>
+                          )}
                         </li>
                       )
                     })}
@@ -397,11 +482,10 @@ export default function PrestamosPage() {
                       size="sm"
                       variant="outline"
                       className="mt-3"
-                      disabled={devolviendo === p.id}
-                      onClick={() => devolverTodo(p.id, p.items)}
+                      onClick={() => abrirDevolucionPrestamo(p)}
                     >
-                      {devolviendo === p.id ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : null}
-                      Registrar devolución total
+                      <PackageCheck className="mr-2 h-3 w-3" />
+                      Registrar devolución
                     </Button>
                   )}
                 </CardContent>
@@ -445,6 +529,100 @@ export default function PrestamosPage() {
             >
               {devolverEnviando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RotateCcw className="mr-2 h-4 w-4" />}
               Devolver
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!devolviendoPrestamo}
+        onOpenChange={(open) => { if (!open && !devEnviando) { setDevolviendoPrestamo(null); setDevForm([]) } }}
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <PackageCheck className="h-5 w-5 text-emerald-600" />
+              Registrar devolución
+            </DialogTitle>
+            <DialogDescription>
+              Préstamo de <strong>{devolviendoPrestamo?.usuario.name || devolviendoPrestamo?.usuario.email}</strong>.
+              Marca solo los ítems que regresan ahora. Lo no marcado queda pendiente.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[55vh] space-y-3 overflow-y-auto pr-1">
+            {devForm.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                No hay ítems pendientes en este préstamo.
+              </p>
+            ) : devForm.map(it => (
+              <div
+                key={it.prestamoItemId}
+                className={cn(
+                  'rounded-lg border p-3 transition-colors',
+                  it.devuelve ? 'border-emerald-300 bg-emerald-50/40' : 'border-gray-200 bg-gray-50/40'
+                )}
+              >
+                <div className="flex items-start gap-2">
+                  <Checkbox
+                    checked={it.devuelve}
+                    onCheckedChange={(v) => actualizarDevItem(it.prestamoItemId, { devuelve: !!v })}
+                    className="mt-1"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className={cn('text-sm font-medium', !it.devuelve && 'text-muted-foreground')}>
+                        {it.nombre}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground">
+                        {it.pendiente} pendiente{it.pendiente !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    {it.devuelve && (
+                      <div className="mt-2 grid gap-2 sm:grid-cols-[110px_1fr]">
+                        <div>
+                          <label className="text-[11px] font-medium text-muted-foreground">Cantidad</label>
+                          <Input
+                            type="number"
+                            step={it.serializada ? 1 : 0.01}
+                            min={0}
+                            max={it.pendiente}
+                            disabled={it.serializada}
+                            value={it.cantidad}
+                            onChange={(e) => actualizarDevItem(it.prestamoItemId, { cantidad: e.target.value })}
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] font-medium text-muted-foreground">Observación (opcional)</label>
+                          <Input
+                            value={it.observacion}
+                            onChange={(e) => actualizarDevItem(it.prestamoItemId, { observacion: e.target.value })}
+                            placeholder="Ej: regresa con golpe, falta cargador, OK"
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row">
+            <Button
+              variant="outline"
+              onClick={() => { setDevolviendoPrestamo(null); setDevForm([]) }}
+              disabled={devEnviando}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={confirmarDevolucionPrestamo}
+              disabled={devEnviando || devForm.length === 0 || devForm.every(i => !i.devuelve)}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              {devEnviando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PackageCheck className="mr-2 h-4 w-4" />}
+              Registrar devolución
             </Button>
           </DialogFooter>
         </DialogContent>

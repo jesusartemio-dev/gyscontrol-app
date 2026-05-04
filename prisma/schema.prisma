@@ -4701,6 +4701,7 @@ model PrestamoHerramientaItem {
   cantidadDevuelta      Float                @default(0)
   fechaDevolucionItem   DateTime?
   estado                EstadoPrestamoItem   @default(prestado)
+  observacionDevolucion String?
   prestamo              PrestamoHerramienta  @relation(fields: [prestamoId], references: [id], onDelete: Cascade)
   herramientaUnidad     HerramientaUnidad?   @relation(fields: [herramientaUnidadId], references: [id])
   catalogoHerramienta   CatalogoHerramienta? @relation(fields: [catalogoHerramientaId], references: [id])
