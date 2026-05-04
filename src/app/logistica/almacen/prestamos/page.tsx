@@ -583,12 +583,17 @@ export default function PrestamosPage() {
                           <label className="text-[11px] font-medium text-muted-foreground">Cantidad</label>
                           <Input
                             type="number"
-                            step={it.serializada ? 1 : 0.01}
+                            step={1}
                             min={0}
                             max={it.pendiente}
                             disabled={it.serializada}
                             value={it.cantidad}
-                            onChange={(e) => actualizarDevItem(it.prestamoItemId, { cantidad: e.target.value })}
+                            onChange={(e) => {
+                              const v = e.target.value
+                              actualizarDevItem(it.prestamoItemId, {
+                                cantidad: v === '' ? '' : String(Math.floor(Number(v) || 0)),
+                              })
+                            }}
                             className="h-8 text-sm"
                           />
                         </div>
