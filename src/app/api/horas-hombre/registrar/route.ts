@@ -343,7 +343,7 @@ export async function PUT(request: NextRequest) {
     const registroActualizado = await prisma.registroHoras.update({
       where: { id },
       data: {
-        fechaTrabajo: new Date(fecha), // Para PUT no necesitamos corrección especial
+        fechaTrabajo: new Date(`${String(fecha).slice(0, 10)}T12:00:00.000Z`),
         horasTrabajadas: horas,
         descripcion
       }

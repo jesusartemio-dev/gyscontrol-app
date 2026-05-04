@@ -94,15 +94,13 @@ export async function POST(request: NextRequest) {
     const usuarioId = session.user.id;
     const usuarioNombre = session.user.name || session.user.email || 'Usuario';
 
-    // Crear registro de horas con corrección de zona horaria
-    // Convertir fecha YYYY-MM-DD a Date en zona horaria local (GMT-5)
-    const [year, month, day] = fecha.split('-').map(Number);
-    const fechaLocal = new Date(year, month - 1, day, 0, 0, 0, 0); // Mes es 0-indexado
-    
+    // Fecha calendario almacenada como mediodía UTC para evitar shifts de TZ
+    // en cualquier cliente entre UTC-11 y UTC+11.
+    const fechaLocal = new Date(`${String(fecha).slice(0, 10)}T12:00:00.000Z`);
+
     console.log('🌍 REGISTRO SIMPLE: Conversión de fecha', {
       fechaOriginal: fecha,
       fechaLocal: fechaLocal.toISOString(),
-      zonaHoraria: 'GMT-5 (Colombia)'
     });
 
     // Determinar la categoría en orden de prioridad:
@@ -250,9 +248,8 @@ export async function PUT(request: NextRequest) {
     const horasNuevas = parseFloat(horas);
     const diferenciaHoras = horasNuevas - horasAnterior;
 
-    // Convertir fecha
-    const [year, month, day] = fecha.split('-').map(Number);
-    const fechaLocal = new Date(year, month - 1, day, 0, 0, 0, 0);
+    // Fecha calendario almacenada como mediodía UTC (mismo criterio que POST)
+    const fechaLocal = new Date(`${String(fecha).slice(0, 10)}T12:00:00.000Z`);
 
     // Verificar que la nueva fecha también esté en semana editable
     const nuevaSemanaEditable = await verificarSemanaEditable(registro.usuarioId, fechaLocal);

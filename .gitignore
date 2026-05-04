@@ -45,5 +45,6 @@ backups/
 nul
 scripts/fix-codes.ts
 scripts/test-ssoma.ts
+scripts/migration-snapshot-*.json
 docs/
 .claude/settings.local.json
