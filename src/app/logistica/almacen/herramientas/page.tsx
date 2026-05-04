@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useSession } from 'next-auth/react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -9,12 +10,13 @@ import { Label } from '@/components/ui/label'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Loader2, Plus, Wrench, Search, LayoutGrid, List, Pencil, PackagePlus } from 'lucide-react'
+import { Loader2, Plus, Wrench, Search, LayoutGrid, List, Pencil, PackagePlus, Ban, AlertTriangle } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -41,7 +43,20 @@ const FORM_VACIO = {
   gestionPorUnidad: false, unidadMedida: 'unidad', cantidadInicial: '',
 }
 
+interface PrestamoPendiente {
+  prestamoItemId: string
+  prestamoId: string
+  cantidadPendiente: number
+  usuario: string
+  proyecto: string | null
+  fechaPrestamo: string
+}
+
 export default function HerramientasPage() {
+  const { data: session } = useSession()
+  const role = session?.user?.role as string | undefined
+  const puedeBaja = role === 'admin' || role === 'gerente'
+
   const [data, setData] = useState<Herramienta[]>([])
   const [loading, setLoading] = useState(false)
   const [busqueda, setBusqueda] = useState('')
@@ -56,6 +71,13 @@ export default function HerramientasPage() {
     accion: 'sumar', cantidad: '', motivo: '',
   })
   const [ajustando_guardando, setAjustandoGuardando] = useState(false)
+  const [dandoDeBaja, setDandoDeBaja] = useState<Herramienta | null>(null)
+  const [bajaForm, setBajaForm] = useState<{ cantidad: string; motivo: string; prestamoItemId: string }>({
+    cantidad: '', motivo: '', prestamoItemId: '',
+  })
+  const [bajaPrestamos, setBajaPrestamos] = useState<PrestamoPendiente[]>([])
+  const [bajaCargandoPrestamos, setBajaCargandoPrestamos] = useState(false)
+  const [bajaGuardando, setBajaGuardando] = useState(false)
 
   async function cargar(q = '') {
     setLoading(true)
@@ -97,6 +119,77 @@ export default function HerramientasPage() {
       cargar(busqueda)
     } finally {
       setAjustandoGuardando(false)
+    }
+  }
+
+  async function abrirBaja(h: Herramienta) {
+    setDandoDeBaja(h)
+    setBajaForm({ cantidad: '1', motivo: '', prestamoItemId: '' })
+    setBajaPrestamos([])
+    setBajaCargandoPrestamos(true)
+    try {
+      // Préstamos activos o parciales que tienen items pendientes con esta herramienta.
+      const [rA, rP] = await Promise.all([
+        fetch(`/api/logistica/almacen/prestamos?estado=activo`),
+        fetch(`/api/logistica/almacen/prestamos?estado=devuelto_parcial`),
+      ])
+      const [jA, jP] = await Promise.all([rA.json(), rP.json()])
+      const prestamos = [...(jA.prestamos || []), ...(jP.prestamos || [])]
+      const pendientes: PrestamoPendiente[] = []
+      for (const p of prestamos) {
+        for (const it of (p.items || [])) {
+          if (it.catalogoHerramientaId !== h.id) continue
+          if (it.estado !== 'prestado') continue
+          const pendiente = it.cantidadPrestada - it.cantidadDevuelta
+          if (pendiente <= 0) continue
+          pendientes.push({
+            prestamoItemId: it.id,
+            prestamoId: p.id,
+            cantidadPendiente: pendiente,
+            usuario: p.usuario.name || p.usuario.email,
+            proyecto: p.proyecto?.codigo || null,
+            fechaPrestamo: p.fechaPrestamo,
+          })
+        }
+      }
+      setBajaPrestamos(pendientes)
+    } finally {
+      setBajaCargandoPrestamos(false)
+    }
+  }
+
+  async function confirmarBaja() {
+    if (!dandoDeBaja) return
+    const cant = Math.floor(Number(bajaForm.cantidad) || 0)
+    if (cant <= 0) { toast.error('Cantidad debe ser un entero mayor a 0'); return }
+    if (!bajaForm.motivo.trim()) { toast.error('Indica el motivo de la baja'); return }
+    if (bajaForm.prestamoItemId) {
+      const sel = bajaPrestamos.find(p => p.prestamoItemId === bajaForm.prestamoItemId)
+      if (sel && cant > sel.cantidadPendiente) {
+        toast.error(`Solo quedan ${sel.cantidadPendiente} pendientes en ese préstamo`)
+        return
+      }
+    }
+    setBajaGuardando(true)
+    try {
+      const r = await fetch(`/api/logistica/almacen/herramientas/${dandoDeBaja.id}/dar-de-baja`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cantidad: cant,
+          motivo: bajaForm.motivo.trim(),
+          prestamoItemId: bajaForm.prestamoItemId || undefined,
+        }),
+      })
+      const json = await r.json()
+      if (!r.ok) { toast.error(json.error || 'Error al dar de baja'); return }
+      toast.success(bajaForm.prestamoItemId
+        ? 'Baja registrada y préstamo cerrado'
+        : 'Baja registrada')
+      setDandoDeBaja(null)
+      cargar(busqueda)
+    } finally {
+      setBajaGuardando(false)
     }
   }
 
@@ -298,6 +391,17 @@ export default function HerramientasPage() {
                               <PackagePlus className="h-3.5 w-3.5" />
                             </Button>
                           )}
+                          {!h.gestionPorUnidad && puedeBaja && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 text-red-600 hover:bg-red-50 hover:text-red-700"
+                              title="Dar de baja"
+                              onClick={() => abrirBaja(h)}
+                            >
+                              <Ban className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                           <Button size="icon" variant="ghost" className="h-7 w-7" title="Editar" onClick={() => abrirEditar(h)}>
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
@@ -327,6 +431,17 @@ export default function HerramientasPage() {
                       {!h.gestionPorUnidad && (
                         <Button size="icon" variant="ghost" className="h-6 w-6" title="Ajustar stock" onClick={() => abrirAjustar(h)}>
                           <PackagePlus className="h-3 w-3" />
+                        </Button>
+                      )}
+                      {!h.gestionPorUnidad && puedeBaja && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-6 w-6 text-red-600 hover:bg-red-50 hover:text-red-700"
+                          title="Dar de baja"
+                          onClick={() => abrirBaja(h)}
+                        >
+                          <Ban className="h-3 w-3" />
                         </Button>
                       )}
                       <Button size="icon" variant="ghost" className="h-6 w-6" title="Editar" onClick={() => abrirEditar(h)}>
@@ -426,6 +541,131 @@ export default function HerramientasPage() {
                 <Button className="w-full" onClick={guardarAjuste} disabled={ajustando_guardando || invalido}>
                   {ajustando_guardando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                   Registrar ajuste
+                </Button>
+              </div>
+            )
+          })()}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!dandoDeBaja}
+        onOpenChange={(open) => { if (!open && !bajaGuardando) setDandoDeBaja(null) }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-700">
+              <Ban className="h-5 w-5" />
+              Dar de baja — {dandoDeBaja?.nombre}
+            </DialogTitle>
+            <DialogDescription>
+              Acción irreversible. Descuenta del stock y deja registro auditable.
+              Si la baja corresponde a una pérdida en un préstamo activo, vincúlala
+              para cerrar el ítem y liberar al responsable.
+            </DialogDescription>
+          </DialogHeader>
+          {dandoDeBaja && (() => {
+            const stockDisp = dandoDeBaja.stock[0]?.cantidadDisponible ?? 0
+            const cant = Math.floor(Number(bajaForm.cantidad) || 0)
+            const selPrestamo = bajaPrestamos.find(p => p.prestamoItemId === bajaForm.prestamoItemId)
+            const limite = selPrestamo ? selPrestamo.cantidadPendiente : stockDisp
+            const excede = cant > limite
+            return (
+              <div className="space-y-3">
+                <div className="rounded-md border bg-gray-50 px-3 py-2 text-sm">
+                  <div>Stock disponible: <span className="font-semibold">{stockDisp}</span> {dandoDeBaja.unidadMedida}</div>
+                  {(dandoDeBaja.prestadosActivos ?? 0) > 0 && (
+                    <div className="text-xs text-amber-700">
+                      Prestados activos: {dandoDeBaja.prestadosActivos}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <Label className="text-xs">Vincular a préstamo (opcional)</Label>
+                  {bajaCargandoPrestamos ? (
+                    <div className="flex h-9 items-center gap-2 text-xs text-muted-foreground">
+                      <Loader2 className="h-3 w-3 animate-spin" /> Cargando préstamos pendientes…
+                    </div>
+                  ) : bajaPrestamos.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      No hay préstamos pendientes con esta herramienta. Será una baja natural (rotura, vida útil, etc.).
+                    </p>
+                  ) : (
+                    <Select
+                      value={bajaForm.prestamoItemId || 'ninguno'}
+                      onValueChange={(v) => setBajaForm(f => ({ ...f, prestamoItemId: v === 'ninguno' ? '' : v }))}
+                    >
+                      <SelectTrigger className="text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ninguno">Baja natural (sin préstamo)</SelectItem>
+                        {bajaPrestamos.map(p => (
+                          <SelectItem key={p.prestamoItemId} value={p.prestamoItemId}>
+                            {p.usuario}
+                            {p.proyecto ? ` · ${p.proyecto}` : ''}
+                            {' '}— {p.cantidadPendiente} pendiente{p.cantidadPendiente !== 1 ? 's' : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+
+                <div>
+                  <Label className="text-xs">
+                    Cantidad {selPrestamo
+                      ? <span className="text-muted-foreground">(máx. {selPrestamo.cantidadPendiente} pendiente{selPrestamo.cantidadPendiente !== 1 ? 's' : ''})</span>
+                      : <span className="text-muted-foreground">(máx. {stockDisp} en stock)</span>}
+                  </Label>
+                  <Input
+                    type="number"
+                    step={1}
+                    min={1}
+                    max={limite}
+                    value={bajaForm.cantidad}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      setBajaForm(f => ({ ...f, cantidad: v === '' ? '' : String(Math.floor(Number(v) || 0)) }))
+                    }}
+                    className={cn('h-9', excede && 'border-red-500')}
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-xs">Motivo *</Label>
+                  <Textarea
+                    rows={2}
+                    value={bajaForm.motivo}
+                    onChange={(e) => setBajaForm(f => ({ ...f, motivo: e.target.value }))}
+                    placeholder={selPrestamo
+                      ? 'Ej: pérdida confirmada por supervisor, robada en obra, destruida en uso'
+                      : 'Ej: rotura por uso normal, vida útil terminada, daño irreparable'}
+                  />
+                </div>
+
+                {excede && (
+                  <p className="flex items-center gap-1 text-xs text-red-600">
+                    <AlertTriangle className="h-3 w-3" />
+                    No puedes dar de baja más de {limite}.
+                  </p>
+                )}
+
+                {selPrestamo && (
+                  <div className="rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+                    Esto cerrará el ítem del préstamo de <strong>{selPrestamo.usuario}</strong> como
+                    perdido. El responsable quedará liberado.
+                  </div>
+                )}
+
+                <Button
+                  className="w-full bg-red-600 hover:bg-red-700"
+                  onClick={confirmarBaja}
+                  disabled={bajaGuardando || excede || cant <= 0 || !bajaForm.motivo.trim()}
+                >
+                  {bajaGuardando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Ban className="mr-2 h-4 w-4" />}
+                  Confirmar baja
                 </Button>
               </div>
             )
