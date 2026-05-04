@@ -45,6 +45,7 @@ export default function HerramientasPage() {
   const [data, setData] = useState<Herramienta[]>([])
   const [loading, setLoading] = useState(false)
   const [busqueda, setBusqueda] = useState('')
+  const [filtroCategoria, setFiltroCategoria] = useState<string>('todas')
   const [vista, setVista] = useState<'tabla' | 'card'>('tabla')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editando, setEditando] = useState<Herramienta | null>(null)
@@ -158,6 +159,18 @@ export default function HerramientasPage() {
     return { disponible, prestados, total: disponible + prestados }
   }
 
+  // Conteo por categoría sobre el set ya cargado, para mostrarlo en el filtro.
+  const categoriasCount = data.reduce<Record<string, number>>((acc, h) => {
+    acc[h.categoria] = (acc[h.categoria] || 0) + 1
+    return acc
+  }, {})
+  const categoriasDisponibles = Array.from(
+    new Set([...CATEGORIAS, ...Object.keys(categoriasCount)])
+  ).sort()
+  const dataFiltrada = filtroCategoria === 'todas'
+    ? data
+    : data.filter(h => h.categoria === filtroCategoria)
+
   return (
     <div className="container mx-auto max-w-6xl px-4 py-6">
       <div className="mb-6 flex items-center justify-between">
@@ -179,6 +192,19 @@ export default function HerramientasPage() {
         <Button variant="outline" onClick={() => cargar(busqueda)} disabled={loading}>
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
         </Button>
+        <Select value={filtroCategoria} onValueChange={setFiltroCategoria}>
+          <SelectTrigger className="w-48">
+            <SelectValue placeholder="Categoría" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todas">Todas las categorías ({data.length})</SelectItem>
+            {categoriasDisponibles.map(c => (
+              <SelectItem key={c} value={c} className="capitalize">
+                {c} ({categoriasCount[c] || 0})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <div className="ml-auto flex items-center gap-1 rounded-md border p-0.5">
           <button
             type="button"
@@ -203,9 +229,11 @@ export default function HerramientasPage() {
         </div>
       </div>
 
-      {data.length === 0 && !loading ? (
+      {dataFiltrada.length === 0 && !loading ? (
         <div className="py-12 text-center text-muted-foreground">
-          Sin herramientas registradas. Crea la primera.
+          {data.length === 0
+            ? 'Sin herramientas registradas. Crea la primera.'
+            : `Sin herramientas en la categoría "${filtroCategoria}".`}
         </div>
       ) : vista === 'tabla' ? (
         <Card>
@@ -224,7 +252,7 @@ export default function HerramientasPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data.map(h => {
+                {dataFiltrada.map(h => {
                   const { disponible, prestados, total } = counts(h)
                   return (
                     <TableRow key={h.id}>
@@ -284,7 +312,7 @@ export default function HerramientasPage() {
         </Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {data.map(h => {
+          {dataFiltrada.map(h => {
             const { disponible, prestados, total } = counts(h)
             return (
               <Card key={h.id}>
