@@ -15,6 +15,24 @@ export async function GET(
   const unidades = await prisma.herramientaUnidad.findMany({
     where: { catalogoHerramientaId: id },
     orderBy: { serie: 'asc' },
+    include: {
+      // Item de préstamo activo (si la unidad está prestada). Sirve para mostrar
+      // al responsable en la vista de unidades y advertir al dar de baja.
+      prestamoItems: {
+        where: { estado: 'prestado' },
+        take: 1,
+        include: {
+          prestamo: {
+            select: {
+              id: true,
+              fechaPrestamo: true,
+              usuario: { select: { name: true, email: true } },
+              proyecto: { select: { codigo: true } },
+            },
+          },
+        },
+      },
+    },
   })
   return NextResponse.json(unidades)
 }

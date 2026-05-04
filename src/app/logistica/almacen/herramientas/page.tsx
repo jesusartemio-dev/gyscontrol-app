@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Loader2, Plus, Wrench, Search, LayoutGrid, List, Pencil, PackagePlus, Ban, AlertTriangle } from 'lucide-react'
+import { Loader2, Plus, Wrench, Search, LayoutGrid, List, Pencil, PackagePlus, Ban, AlertTriangle, Layers, ArrowLeft, User as UserIcon } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -52,6 +52,30 @@ interface PrestamoPendiente {
   fechaPrestamo: string
 }
 
+interface UnidadDetalle {
+  id: string
+  serie: string
+  codigoQR: string | null
+  estado: 'disponible' | 'prestada' | 'en_reparacion' | 'dada_de_baja'
+  observaciones: string | null
+  prestamoItems: {
+    id: string
+    prestamo: {
+      id: string
+      fechaPrestamo: string
+      usuario: { name: string | null; email: string }
+      proyecto: { codigo: string } | null
+    }
+  }[]
+}
+
+const ESTADO_UNIDAD_COLORS: Record<string, string> = {
+  disponible: 'bg-emerald-100 text-emerald-700',
+  prestada: 'bg-amber-100 text-amber-700',
+  en_reparacion: 'bg-blue-100 text-blue-700',
+  dada_de_baja: 'bg-gray-200 text-gray-600',
+}
+
 export default function HerramientasPage() {
   const { data: session } = useSession()
   const role = session?.user?.role as string | undefined
@@ -78,6 +102,14 @@ export default function HerramientasPage() {
   const [bajaPrestamos, setBajaPrestamos] = useState<PrestamoPendiente[]>([])
   const [bajaCargandoPrestamos, setBajaCargandoPrestamos] = useState(false)
   const [bajaGuardando, setBajaGuardando] = useState(false)
+  // Vista de unidades serializadas (lista + step de baja por unidad).
+  const [verUnidadesDe, setVerUnidadesDe] = useState<Herramienta | null>(null)
+  const [unidadesData, setUnidadesData] = useState<UnidadDetalle[]>([])
+  const [cargandoUnidades, setCargandoUnidades] = useState(false)
+  const [pasoUnidades, setPasoUnidades] = useState<'lista' | 'baja'>('lista')
+  const [bajaUnidad, setBajaUnidad] = useState<UnidadDetalle | null>(null)
+  const [bajaUnidadMotivo, setBajaUnidadMotivo] = useState('')
+  const [bajaUnidadGuardando, setBajaUnidadGuardando] = useState(false)
 
   async function cargar(q = '') {
     setLoading(true)
@@ -190,6 +222,66 @@ export default function HerramientasPage() {
       cargar(busqueda)
     } finally {
       setBajaGuardando(false)
+    }
+  }
+
+  async function abrirVerUnidades(h: Herramienta) {
+    setVerUnidadesDe(h)
+    setPasoUnidades('lista')
+    setBajaUnidad(null)
+    setUnidadesData([])
+    setCargandoUnidades(true)
+    try {
+      const r = await fetch(`/api/logistica/almacen/herramientas/${h.id}/unidades`)
+      const json = await r.json()
+      setUnidadesData(Array.isArray(json) ? json : [])
+    } finally {
+      setCargandoUnidades(false)
+    }
+  }
+
+  async function recargarUnidades(h: Herramienta) {
+    const r = await fetch(`/api/logistica/almacen/herramientas/${h.id}/unidades`)
+    const json = await r.json()
+    setUnidadesData(Array.isArray(json) ? json : [])
+  }
+
+  function iniciarBajaUnidad(u: UnidadDetalle) {
+    setBajaUnidad(u)
+    setBajaUnidadMotivo('')
+    setPasoUnidades('baja')
+  }
+
+  function volverAListaUnidades() {
+    setBajaUnidad(null)
+    setBajaUnidadMotivo('')
+    setPasoUnidades('lista')
+  }
+
+  async function confirmarBajaUnidad() {
+    if (!verUnidadesDe || !bajaUnidad) return
+    if (!bajaUnidadMotivo.trim()) { toast.error('Indica el motivo de la baja'); return }
+    setBajaUnidadGuardando(true)
+    try {
+      const r = await fetch(`/api/logistica/almacen/herramientas/${verUnidadesDe.id}/dar-de-baja`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          herramientaUnidadId: bajaUnidad.id,
+          motivo: bajaUnidadMotivo.trim(),
+        }),
+      })
+      const json = await r.json()
+      if (!r.ok) { toast.error(json.error || 'Error al dar de baja'); return }
+      const seCerroPrestamo = !!json.prestamoIdAfectado
+      toast.success(seCerroPrestamo
+        ? `Unidad ${bajaUnidad.serie} dada de baja y préstamo cerrado`
+        : `Unidad ${bajaUnidad.serie} dada de baja`)
+      await recargarUnidades(verUnidadesDe)
+      cargar(busqueda) // refresca counts en la tabla principal
+      volverAListaUnidades()
+    } finally {
+      setBajaUnidadGuardando(false)
     }
   }
 
@@ -380,6 +472,17 @@ export default function HerramientasPage() {
                       <TableCell className="text-right text-sm">{total}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-0.5">
+                          {h.gestionPorUnidad && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7"
+                              title="Ver unidades"
+                              onClick={() => abrirVerUnidades(h)}
+                            >
+                              <Layers className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                           {!h.gestionPorUnidad && (
                             <Button
                               size="icon"
@@ -428,6 +531,11 @@ export default function HerramientasPage() {
                     </span>
                     <div className="flex items-center gap-1">
                       <Badge variant="outline" className="text-xs">{h.codigo}</Badge>
+                      {h.gestionPorUnidad && (
+                        <Button size="icon" variant="ghost" className="h-6 w-6" title="Ver unidades" onClick={() => abrirVerUnidades(h)}>
+                          <Layers className="h-3 w-3" />
+                        </Button>
+                      )}
                       {!h.gestionPorUnidad && (
                         <Button size="icon" variant="ghost" className="h-6 w-6" title="Ajustar stock" onClick={() => abrirAjustar(h)}>
                           <PackagePlus className="h-3 w-3" />
@@ -670,6 +778,170 @@ export default function HerramientasPage() {
               </div>
             )
           })()}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!verUnidadesDe}
+        onOpenChange={(open) => {
+          if (!open && !bajaUnidadGuardando) {
+            setVerUnidadesDe(null)
+            setUnidadesData([])
+            setBajaUnidad(null)
+            setPasoUnidades('lista')
+          }
+        }}
+      >
+        <DialogContent className="max-w-3xl">
+          {pasoUnidades === 'lista' ? (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Layers className="h-5 w-5" />
+                  Unidades — {verUnidadesDe?.nombre}
+                </DialogTitle>
+                <DialogDescription>
+                  {verUnidadesDe?.codigo} · Total: {unidadesData.length} unidad{unidadesData.length !== 1 ? 'es' : ''}
+                </DialogDescription>
+              </DialogHeader>
+              {cargandoUnidades ? (
+                <div className="flex h-32 items-center justify-center">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                </div>
+              ) : unidadesData.length === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                  Esta herramienta aún no tiene unidades registradas.
+                </p>
+              ) : (
+                <div className="max-h-[60vh] overflow-y-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-32">Serie</TableHead>
+                        <TableHead className="w-32">Estado</TableHead>
+                        <TableHead>Detalle</TableHead>
+                        {puedeBaja && <TableHead className="w-28 text-right">Acciones</TableHead>}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {unidadesData.map(u => {
+                        const itemActivo = u.prestamoItems[0]
+                        const dadaDeBaja = u.estado === 'dada_de_baja'
+                        return (
+                          <TableRow key={u.id} className={dadaDeBaja ? 'opacity-60' : ''}>
+                            <TableCell className="font-mono text-xs">{u.serie}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className={cn('text-[10px]', ESTADO_UNIDAD_COLORS[u.estado] || 'bg-gray-100')}>
+                                {u.estado.replace('_', ' ')}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-xs">
+                              {itemActivo && (
+                                <div className="flex items-center gap-1.5 text-amber-700">
+                                  <UserIcon className="h-3 w-3" />
+                                  <span>{itemActivo.prestamo.usuario.name || itemActivo.prestamo.usuario.email}</span>
+                                  {itemActivo.prestamo.proyecto && (
+                                    <Badge variant="outline" className="text-[10px]">{itemActivo.prestamo.proyecto.codigo}</Badge>
+                                  )}
+                                </div>
+                              )}
+                              {u.observaciones && (
+                                <div className="mt-0.5 whitespace-pre-line text-[11px] text-muted-foreground">
+                                  {u.observaciones}
+                                </div>
+                              )}
+                              {!itemActivo && !u.observaciones && (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                            {puedeBaja && (
+                              <TableCell className="text-right">
+                                {!dadaDeBaja && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 border-red-300 text-red-700 hover:bg-red-50"
+                                    onClick={() => iniciarBajaUnidad(u)}
+                                  >
+                                    <Ban className="mr-1 h-3 w-3" />
+                                    Dar de baja
+                                  </Button>
+                                )}
+                              </TableCell>
+                            )}
+                          </TableRow>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </>
+          ) : (
+            // Paso de confirmación de baja por unidad.
+            bajaUnidad && verUnidadesDe && (() => {
+              const itemActivo = bajaUnidad.prestamoItems[0]
+              return (
+                <>
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2 text-red-700">
+                      <Ban className="h-5 w-5" />
+                      Dar de baja — Serie {bajaUnidad.serie}
+                    </DialogTitle>
+                    <DialogDescription>
+                      {verUnidadesDe.nombre} ({verUnidadesDe.codigo})
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-3">
+                    {itemActivo && (
+                      <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                        <div>
+                          Esta unidad está actualmente prestada a{' '}
+                          <strong>{itemActivo.prestamo.usuario.name || itemActivo.prestamo.usuario.email}</strong>
+                          {itemActivo.prestamo.proyecto && <> en el proyecto <strong>{itemActivo.prestamo.proyecto.codigo}</strong></>}.
+                          Al dar de baja se cerrará automáticamente ese ítem del préstamo como
+                          <strong> perdido</strong> y el responsable quedará liberado.
+                        </div>
+                      </div>
+                    )}
+                    <div>
+                      <Label className="text-xs">Motivo *</Label>
+                      <Textarea
+                        rows={3}
+                        value={bajaUnidadMotivo}
+                        onChange={(e) => setBajaUnidadMotivo(e.target.value)}
+                        placeholder={itemActivo
+                          ? 'Ej: pérdida confirmada por supervisor, robada en obra, destruida en uso'
+                          : 'Ej: rotura por uso normal, vida útil terminada, daño irreparable'}
+                        autoFocus
+                      />
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={volverAListaUnidades}
+                        disabled={bajaUnidadGuardando}
+                      >
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        Volver
+                      </Button>
+                      <Button
+                        className="bg-red-600 hover:bg-red-700"
+                        onClick={confirmarBajaUnidad}
+                        disabled={bajaUnidadGuardando || !bajaUnidadMotivo.trim()}
+                      >
+                        {bajaUnidadGuardando
+                          ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          : <Ban className="mr-2 h-4 w-4" />}
+                        Confirmar baja
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              )
+            })()
+          )}
         </DialogContent>
       </Dialog>
 
