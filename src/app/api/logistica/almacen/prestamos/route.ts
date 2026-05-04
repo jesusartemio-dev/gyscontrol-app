@@ -29,6 +29,7 @@ export async function GET(req: Request) {
         include: {
           herramientaUnidad: { include: { catalogoHerramienta: { select: { nombre: true, codigo: true } } } },
           catalogoHerramienta: { select: { nombre: true, codigo: true } },
+          dadoDeBajaPor: { select: { name: true, email: true } },
         },
       },
     },

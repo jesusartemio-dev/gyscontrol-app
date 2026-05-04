@@ -139,13 +139,25 @@ export async function POST(
       // Cierre del ítem de préstamo (si aplica).
       if (prestamoItem) {
         const cantBaja = herramienta.gestionPorUnidad ? 1 : cantidad!
+        const nuevaCantDevuelta = prestamoItem.cantidadDevuelta + cantBaja
+        const cierraItem = nuevaCantDevuelta >= prestamoItem.cantidadPrestada
+        // Baja parcial (no cierra el ítem): mantenemos 'prestado' para que el
+        // resto se pueda devolver/dar de baja en operaciones posteriores. Solo
+        // marcamos motivoBaja/fechaBaja/dadoDeBajaPorId cuando la baja cierra
+        // el ítem — en bajas parciales sucesivas, el último motivo gana, pero
+        // el rastro detallado de cada baja queda en el historial de movimientos.
+        const motivoPrev = prestamoItem.motivoBaja || ''
+        const motivoNuevo = cierraItem
+          ? (motivoPrev ? `${motivoPrev}\n[${new Date().toLocaleDateString('es-PE')}] ${motivoLimpio}` : motivoLimpio)
+          : (motivoPrev ? `${motivoPrev}\n[${new Date().toLocaleDateString('es-PE')}] (parcial ${cantBaja}) ${motivoLimpio}` : `(parcial ${cantBaja}) ${motivoLimpio}`)
+
         await tx.prestamoHerramientaItem.update({
           where: { id: prestamoItem.id },
           data: {
-            cantidadDevuelta: prestamoItem.cantidadDevuelta + cantBaja,
-            estado: 'perdido',
-            fechaDevolucionItem: new Date(),
-            motivoBaja: motivoLimpio,
+            cantidadDevuelta: nuevaCantDevuelta,
+            estado: cierraItem ? 'perdido' : 'prestado',
+            fechaDevolucionItem: cierraItem ? new Date() : prestamoItem.fechaDevolucionItem,
+            motivoBaja: motivoNuevo,
             fechaBaja: new Date(),
             dadoDeBajaPorId: session.user.id,
           },

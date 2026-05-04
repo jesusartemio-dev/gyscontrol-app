@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
-import { Loader2, Plus, ArrowLeftRight, AlertTriangle, Inbox, CheckCircle2, XCircle, RotateCcw, User as UserIcon, MessageSquare, PackageCheck, ChevronRight, ChevronDown, LayoutGrid, List } from 'lucide-react'
+import { Loader2, Plus, ArrowLeftRight, AlertTriangle, Inbox, CheckCircle2, XCircle, RotateCcw, User as UserIcon, MessageSquare, PackageCheck, ChevronRight, ChevronDown, LayoutGrid, List, Ban } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface PrestamoItem {
@@ -21,6 +21,9 @@ interface PrestamoItem {
   cantidadDevuelta: number
   estado: string
   observacionDevolucion: string | null
+  motivoBaja: string | null
+  fechaBaja: string | null
+  dadoDeBajaPor: { name: string | null; email: string } | null
   herramientaUnidad: { serie: string; catalogoHerramienta: { nombre: string; codigo: string } } | null
   catalogoHerramienta: { nombre: string; codigo: string } | null
 }
@@ -462,19 +465,62 @@ export default function PrestamosPage() {
                 ? `${item.herramientaUnidad.catalogoHerramienta.nombre} — Serie: ${item.herramientaUnidad.serie}`
                 : item.catalogoHerramienta?.nombre
               const totalmenteDevuelto = item.estado === 'devuelto'
-              const parcial = item.cantidadDevuelta > 0 && !totalmenteDevuelto
+              const perdido = item.estado === 'perdido'
+              const parcial = !totalmenteDevuelto && !perdido && item.cantidadDevuelta > 0
+              const tuvoBaja = !!item.motivoBaja  // perdido total o baja parcial sobre item aún prestado
+              const autorBaja = item.dadoDeBajaPor?.name || item.dadoDeBajaPor?.email || null
+              const fechaBaja = item.fechaBaja
+                ? new Date(item.fechaBaja).toLocaleDateString('es-PE')
+                : null
               return (
                 <li key={item.id} className={cn(
                   'rounded border px-2 py-1',
                   totalmenteDevuelto && 'bg-emerald-50/50 border-emerald-200',
-                  parcial && 'bg-amber-50/50 border-amber-200'
+                  perdido && 'bg-red-50/40 border-red-200',
+                  parcial && !perdido && 'bg-amber-50/50 border-amber-200'
                 )}>
-                  <div className="flex items-center justify-between">
-                    <span className={cn(totalmenteDevuelto && 'text-muted-foreground')}>{nombre}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {item.cantidadDevuelta}/{item.cantidadPrestada} devueltos
+                  <div className="flex items-center justify-between gap-2">
+                    <span className={cn(
+                      'flex items-center gap-1.5',
+                      totalmenteDevuelto && 'text-muted-foreground',
+                      perdido && 'text-red-700'
+                    )}>
+                      {perdido && <Ban className="h-3 w-3 shrink-0" />}
+                      {nombre}
+                      {perdido && (
+                        <Badge variant="outline" className="bg-red-100 text-red-700 border-red-300 text-[10px]">
+                          dado de baja
+                        </Badge>
+                      )}
+                      {!perdido && tuvoBaja && (
+                        <Badge variant="outline" className="bg-orange-100 text-orange-700 border-orange-300 text-[10px]">
+                          con baja parcial
+                        </Badge>
+                      )}
+                    </span>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {item.cantidadDevuelta}/{item.cantidadPrestada} {perdido ? 'cerrados' : 'devueltos'}
                     </span>
                   </div>
+                  {tuvoBaja && (item.motivoBaja || autorBaja || fechaBaja) && (
+                    <div className={cn(
+                      'mt-1 text-[11px]',
+                      perdido ? 'text-red-700/80' : 'text-orange-700/90'
+                    )}>
+                      {item.motivoBaja && (
+                        <div className="whitespace-pre-line">
+                          <span className="font-medium">{perdido ? 'Motivo de baja:' : 'Bajas registradas:'}</span> {item.motivoBaja}
+                        </div>
+                      )}
+                      {(autorBaja || fechaBaja) && (
+                        <div className={perdido ? 'text-red-600/70' : 'text-orange-600/70'}>
+                          {autorBaja && <>última por <strong>{autorBaja}</strong></>}
+                          {autorBaja && fechaBaja && ' · '}
+                          {fechaBaja && <>el {fechaBaja}</>}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   {item.observacionDevolucion && (
                     <div className="mt-1 flex items-start gap-1 text-[11px] text-muted-foreground">
                       <MessageSquare className="mt-0.5 h-3 w-3 shrink-0" />
