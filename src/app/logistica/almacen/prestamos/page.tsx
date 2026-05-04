@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -10,8 +10,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
-import { Loader2, Plus, ArrowLeftRight, AlertTriangle, Inbox, CheckCircle2, XCircle, RotateCcw, User as UserIcon, MessageSquare, PackageCheck } from 'lucide-react'
+import { Loader2, Plus, ArrowLeftRight, AlertTriangle, Inbox, CheckCircle2, XCircle, RotateCcw, User as UserIcon, MessageSquare, PackageCheck, ChevronRight, ChevronDown, LayoutGrid, List } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface PrestamoItem {
@@ -83,10 +84,33 @@ export default function PrestamosPage() {
   const [data, setData] = useState<Prestamo[]>([])
   const [loading, setLoading] = useState(false)
   const [filtroEstado, setFiltroEstado] = useState('todos')
+  const [vista, setVista] = useState<'tabla' | 'card'>('tabla')
+  const [expandidos, setExpandidos] = useState<Set<string>>(new Set())
   const [devolviendoPrestamo, setDevolviendoPrestamo] = useState<Prestamo | null>(null)
   const [devForm, setDevForm] = useState<DevolucionFormItem[]>([])
   const [devEnviando, setDevEnviando] = useState(false)
   const [pendientes, setPendientes] = useState<SolicitudPendiente[]>([])
+
+  function toggleExpandido(id: string) {
+    setExpandidos(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function totalesPrestamo(p: Prestamo) {
+    const totalPrestada = p.items.reduce((s, i) => s + i.cantidadPrestada, 0)
+    const totalDevuelta = p.items.reduce((s, i) => s + i.cantidadDevuelta, 0)
+    return { totalPrestada, totalDevuelta }
+  }
+
+  function esVencido(p: Prestamo) {
+    return !!(p.fechaDevolucionEstimada
+      && new Date(p.fechaDevolucionEstimada) < new Date()
+      && p.estado === 'activo')
+  }
   const [devolviendoSol, setDevolviendoSol] = useState<SolicitudPendiente | null>(null)
   const [devolverNota, setDevolverNota] = useState('')
   const [devolverEnviando, setDevolverEnviando] = useState(false)
@@ -393,7 +417,7 @@ export default function PrestamosPage() {
         </Card>
       )}
 
-      <div className="mb-4 flex gap-3">
+      <div className="mb-4 flex flex-wrap items-center gap-3">
         <Select value={filtroEstado} onValueChange={setFiltroEstado}>
           <SelectTrigger className="w-44">
             <SelectValue />
@@ -406,94 +430,240 @@ export default function PrestamosPage() {
             <SelectItem value="devuelto">Devueltos</SelectItem>
           </SelectContent>
         </Select>
+        <div className="ml-auto flex items-center gap-1 rounded-md border p-0.5">
+          <button
+            type="button"
+            onClick={() => setVista('tabla')}
+            className={cn(
+              'flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors',
+              vista === 'tabla' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'
+            )}
+          >
+            <List className="h-3.5 w-3.5" /> Tabla
+          </button>
+          <button
+            type="button"
+            onClick={() => setVista('card')}
+            className={cn(
+              'flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors',
+              vista === 'card' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'
+            )}
+          >
+            <LayoutGrid className="h-3.5 w-3.5" /> Cards
+          </button>
+        </div>
       </div>
 
-      {loading ? (
-        <div className="flex h-32 items-center justify-center">
-          <Loader2 className="h-6 w-6 animate-spin" />
-        </div>
-      ) : data.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            Sin préstamos en el período seleccionado.
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-4">
-          {data.map(p => {
-            const vencido = p.fechaDevolucionEstimada && new Date(p.fechaDevolucionEstimada) < new Date() && p.estado === 'activo'
-            return (
-              <Card key={p.id} className={vencido ? 'border-red-300' : ''}>
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center justify-between text-base">
-                    <span className="flex items-center gap-2">
-                      <ArrowLeftRight className="h-4 w-4" />
-                      {p.usuario.name || p.usuario.email}
+      {(() => {
+        const renderItems = (p: Prestamo) => (
+          <ul className="space-y-1 text-sm">
+            {p.items.map(item => {
+              const nombre = item.herramientaUnidad
+                ? `${item.herramientaUnidad.catalogoHerramienta.nombre} — Serie: ${item.herramientaUnidad.serie}`
+                : item.catalogoHerramienta?.nombre
+              const totalmenteDevuelto = item.estado === 'devuelto'
+              const parcial = item.cantidadDevuelta > 0 && !totalmenteDevuelto
+              return (
+                <li key={item.id} className={cn(
+                  'rounded border px-2 py-1',
+                  totalmenteDevuelto && 'bg-emerald-50/50 border-emerald-200',
+                  parcial && 'bg-amber-50/50 border-amber-200'
+                )}>
+                  <div className="flex items-center justify-between">
+                    <span className={cn(totalmenteDevuelto && 'text-muted-foreground')}>{nombre}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {item.cantidadDevuelta}/{item.cantidadPrestada} devueltos
                     </span>
-                    <div className="flex items-center gap-2">
-                      {vencido && <AlertTriangle className="h-4 w-4 text-red-500" />}
-                      <Badge variant="outline" className={ESTADO_COLORS[p.estado] || 'bg-gray-100'}>
-                        {p.estado.replace('_', ' ')}
-                      </Badge>
-                    </div>
-                  </CardTitle>
-                  <div className="flex gap-4 text-xs text-muted-foreground">
-                    <span>Prestado: {new Date(p.fechaPrestamo).toLocaleDateString('es-PE')}</span>
-                    {p.fechaDevolucionEstimada && (
-                      <span className={vencido ? 'text-red-600 font-semibold' : ''}>
-                        Dev. estimada: {new Date(p.fechaDevolucionEstimada).toLocaleDateString('es-PE')}
-                      </span>
-                    )}
-                    {p.proyecto && <span>Proyecto: {p.proyecto.codigo}</span>}
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-1 text-sm">
-                    {p.items.map(item => {
-                      const nombre = item.herramientaUnidad
-                        ? `${item.herramientaUnidad.catalogoHerramienta.nombre} — Serie: ${item.herramientaUnidad.serie}`
-                        : item.catalogoHerramienta?.nombre
-                      const totalmenteDevuelto = item.estado === 'devuelto'
-                      const parcial = item.cantidadDevuelta > 0 && !totalmenteDevuelto
+                  {item.observacionDevolucion && (
+                    <div className="mt-1 flex items-start gap-1 text-[11px] text-muted-foreground">
+                      <MessageSquare className="mt-0.5 h-3 w-3 shrink-0" />
+                      <span className="whitespace-pre-line">{item.observacionDevolucion}</span>
+                    </div>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        )
+
+        if (loading) {
+          return (
+            <div className="flex h-32 items-center justify-center">
+              <Loader2 className="h-6 w-6 animate-spin" />
+            </div>
+          )
+        }
+        if (data.length === 0) {
+          return (
+            <Card>
+              <CardContent className="py-12 text-center text-muted-foreground">
+                Sin préstamos en el período seleccionado.
+              </CardContent>
+            </Card>
+          )
+        }
+
+        if (vista === 'tabla') {
+          return (
+            <Card>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-8"></TableHead>
+                      <TableHead>Usuario</TableHead>
+                      <TableHead className="w-24">Proyecto</TableHead>
+                      <TableHead className="w-28">Prestado</TableHead>
+                      <TableHead className="w-32">Dev. estimada</TableHead>
+                      <TableHead className="w-32">Estado</TableHead>
+                      <TableHead className="w-28 text-right">Devueltos</TableHead>
+                      <TableHead className="w-32 text-right">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {data.map(p => {
+                      const vencido = esVencido(p)
+                      const { totalPrestada, totalDevuelta } = totalesPrestamo(p)
+                      const expandido = expandidos.has(p.id)
+                      const puedeDevolver = p.estado === 'activo' || p.estado === 'devuelto_parcial'
+                      const progreso = totalPrestada > 0 ? Math.round((totalDevuelta / totalPrestada) * 100) : 0
                       return (
-                        <li key={item.id} className={cn(
-                          'rounded border px-2 py-1',
-                          totalmenteDevuelto && 'bg-emerald-50/50 border-emerald-200',
-                          parcial && 'bg-amber-50/50 border-amber-200'
-                        )}>
-                          <div className="flex items-center justify-between">
-                            <span className={cn(totalmenteDevuelto && 'text-muted-foreground')}>{nombre}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {item.cantidadDevuelta}/{item.cantidadPrestada} devueltos
-                            </span>
-                          </div>
-                          {item.observacionDevolucion && (
-                            <div className="mt-1 flex items-start gap-1 text-[11px] text-muted-foreground">
-                              <MessageSquare className="mt-0.5 h-3 w-3 shrink-0" />
-                              <span className="whitespace-pre-line">{item.observacionDevolucion}</span>
-                            </div>
+                        <Fragment key={p.id}>
+                          <TableRow
+                            className={cn(
+                              'cursor-pointer hover:bg-gray-50',
+                              vencido && 'bg-red-50/30',
+                              expandido && 'bg-gray-50'
+                            )}
+                            onClick={() => toggleExpandido(p.id)}
+                          >
+                            <TableCell className="pr-0">
+                              {expandido
+                                ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                            </TableCell>
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-2">
+                                <ArrowLeftRight className="h-3.5 w-3.5 text-muted-foreground" />
+                                {p.usuario.name || p.usuario.email}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {p.proyecto?.codigo || '—'}
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {new Date(p.fechaPrestamo).toLocaleDateString('es-PE')}
+                            </TableCell>
+                            <TableCell className={cn('text-xs', vencido ? 'text-red-600 font-semibold' : 'text-muted-foreground')}>
+                              <div className="flex items-center gap-1">
+                                {vencido && <AlertTriangle className="h-3 w-3" />}
+                                {p.fechaDevolucionEstimada
+                                  ? new Date(p.fechaDevolucionEstimada).toLocaleDateString('es-PE')
+                                  : '—'}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className={cn('text-[10px]', ESTADO_COLORS[p.estado] || 'bg-gray-100')}>
+                                {p.estado.replace('_', ' ')}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex flex-col items-end gap-0.5">
+                                <span className="text-xs font-medium">{totalDevuelta}/{totalPrestada}</span>
+                                <div className="h-1 w-16 overflow-hidden rounded-full bg-gray-200">
+                                  <div
+                                    className={cn(
+                                      'h-full transition-all',
+                                      progreso === 100 ? 'bg-emerald-500'
+                                        : progreso > 0 ? 'bg-amber-500'
+                                        : 'bg-gray-300'
+                                    )}
+                                    style={{ width: `${progreso}%` }}
+                                  />
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                              {puedeDevolver && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7"
+                                  onClick={() => abrirDevolucionPrestamo(p)}
+                                >
+                                  <PackageCheck className="mr-1 h-3 w-3" />
+                                  Devolver
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                          {expandido && (
+                            <TableRow className="bg-gray-50/50 hover:bg-gray-50/50">
+                              <TableCell colSpan={8} className="px-6 py-3">
+                                {renderItems(p)}
+                              </TableCell>
+                            </TableRow>
                           )}
-                        </li>
+                        </Fragment>
                       )
                     })}
-                  </ul>
-                  {(p.estado === 'activo' || p.estado === 'devuelto_parcial') && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="mt-3"
-                      onClick={() => abrirDevolucionPrestamo(p)}
-                    >
-                      <PackageCheck className="mr-2 h-3 w-3" />
-                      Registrar devolución
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            )
-          })}
-        </div>
-      )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )
+        }
+
+        return (
+          <div className="space-y-4">
+            {data.map(p => {
+              const vencido = esVencido(p)
+              return (
+                <Card key={p.id} className={vencido ? 'border-red-300' : ''}>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="flex items-center justify-between text-base">
+                      <span className="flex items-center gap-2">
+                        <ArrowLeftRight className="h-4 w-4" />
+                        {p.usuario.name || p.usuario.email}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        {vencido && <AlertTriangle className="h-4 w-4 text-red-500" />}
+                        <Badge variant="outline" className={ESTADO_COLORS[p.estado] || 'bg-gray-100'}>
+                          {p.estado.replace('_', ' ')}
+                        </Badge>
+                      </div>
+                    </CardTitle>
+                    <div className="flex gap-4 text-xs text-muted-foreground">
+                      <span>Prestado: {new Date(p.fechaPrestamo).toLocaleDateString('es-PE')}</span>
+                      {p.fechaDevolucionEstimada && (
+                        <span className={vencido ? 'text-red-600 font-semibold' : ''}>
+                          Dev. estimada: {new Date(p.fechaDevolucionEstimada).toLocaleDateString('es-PE')}
+                        </span>
+                      )}
+                      {p.proyecto && <span>Proyecto: {p.proyecto.codigo}</span>}
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {renderItems(p)}
+                    {(p.estado === 'activo' || p.estado === 'devuelto_parcial') && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="mt-3"
+                        onClick={() => abrirDevolucionPrestamo(p)}
+                      >
+                        <PackageCheck className="mr-2 h-3 w-3" />
+                        Registrar devolución
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        )
+      })()}
 
       <Dialog open={!!devolviendoSol} onOpenChange={(open) => { if (!open) setDevolviendoSol(null) }}>
         <DialogContent className="max-w-md">
