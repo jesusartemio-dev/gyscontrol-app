@@ -31,6 +31,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
+  LabelList,
 } from 'recharts'
 import { getTipoInfo } from '@/lib/agente/aiTipos'
 
@@ -496,9 +497,10 @@ export default function UsoIAPage() {
           .sort((a, b) => b[1] - a[1])
           .map(([tipo]) => tipo)
 
-        // Reshape: cada datapoint tiene { fecha, [label]: costo, ... } para recharts
+        // Reshape: cada datapoint tiene { fecha, [label]: costo, ... } para recharts.
+        // _total se usa para el LabelList encima de cada barra (suma del día).
         const chartData = stats.porDia.map((d) => {
-          const row: Record<string, string | number> = { fecha: d.fecha }
+          const row: Record<string, string | number> = { fecha: d.fecha, _total: d.costo }
           for (const tipo of tiposOrdenados) {
             row[getTipoInfo(tipo).label] = d.porTipo[tipo] ?? 0
           }
@@ -540,7 +542,20 @@ export default function UsoIAPage() {
                           stackId="cost"
                           fill={info.color}
                           radius={isLast ? [4, 4, 0, 0] : [0, 0, 0, 0]}
-                        />
+                        >
+                          {isLast && (
+                            <LabelList
+                              dataKey="_total"
+                              position="top"
+                              formatter={(value) => {
+                                const v = typeof value === 'number' ? value : Number(value)
+                                if (!v || v <= 0) return ''
+                                return v >= 0.1 ? `$${v.toFixed(2)}` : `$${v.toFixed(3)}`
+                              }}
+                              style={{ fontSize: 11, fontWeight: 600, fill: '#1f2937' }}
+                            />
+                          )}
+                        </Bar>
                       )
                     })}
                   </BarChart>
