@@ -63,6 +63,8 @@ import {
   RotateCcw,
   Warehouse,
   QrCode,
+  ClipboardCheck,
+  FileBarChart,
 } from 'lucide-react'
 import type { RolUsuario, SidebarSection, NotificationBadgeType } from '@/types/modelos'
 
@@ -98,6 +100,7 @@ export default function MobileSidebar() {
     logistica: false,
     aprovisionamiento: false,
     finanzas: false,
+    seguridad: false,
     administracion: false,
     gestion: false,
   })
@@ -295,6 +298,24 @@ export default function MobileSidebar() {
         { href: '/gastos/mis-requerimientos', label: 'Mis Requerimientos', icon: CreditCard },
         { href: '/gastos/mis-pedidos', label: 'Mis Pedidos Internos', icon: ShoppingCart },
         { href: '/gastos/requerimientos', label: 'Aprobar Requerimientos', icon: CheckCircle2, roles: ['admin', 'gerente', 'gestor', 'coordinador', 'coordinador_logistico', 'administracion'] as any },
+      ],
+    },
+    {
+      key: 'seguridad',
+      title: 'Seguridad',
+      icon: HardHat,
+      color: 'text-orange-400',
+      roles: ['admin', 'gerente', 'seguridad'],
+      links: [
+        { href: '/seguridad', label: 'Dashboard', icon: LayoutDashboard },
+        { href: '/seguridad/catalogo', label: 'Catálogo EPP', icon: Package },
+        { href: '/seguridad/stock', label: 'Stock EPP', icon: Warehouse },
+        { href: '/seguridad/entregas', label: 'Entregas', icon: ClipboardList },
+        { href: '/seguridad/reposiciones', label: 'Reposiciones', icon: Clock },
+        { href: '/seguridad/empleados', label: 'Empleados', icon: Users },
+        { href: '/seguridad/registros', label: 'Registros de campo', icon: ClipboardCheck },
+        { href: '/seguridad/reportes-semanales', label: 'Reportes semanales', icon: FileBarChart },
+        { href: '/seguridad/reportes', label: 'Reportes EPP', icon: BarChart3 },
       ],
     },
     {
