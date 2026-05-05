@@ -402,6 +402,8 @@ interface ClaudeRawResult {
   text: string
   inputTokens: number
   outputTokens: number
+  cacheCreation: number
+  cacheRead: number
 }
 
 async function callClaudeRaw(
@@ -414,7 +416,10 @@ async function callClaudeRaw(
   const response = await client.messages.create({
     model,
     max_tokens: maxTokens,
-    system: systemPrompt,
+    // Cache del system: en imports multi-hoja, hojas posteriores reutilizan el cache
+    system: [
+      { type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } },
+    ],
     messages: [{ role: 'user', content: userPrompt }],
   })
 
@@ -427,6 +432,8 @@ async function callClaudeRaw(
     text,
     inputTokens: response.usage?.input_tokens ?? 0,
     outputTokens: response.usage?.output_tokens ?? 0,
+    cacheCreation: response.usage?.cache_creation_input_tokens ?? 0,
+    cacheRead: response.usage?.cache_read_input_tokens ?? 0,
   }
 }
 
@@ -454,6 +461,8 @@ async function callClaudeJson(
       modelo: usedModel,
       tokensInput: result.inputTokens,
       tokensOutput: result.outputTokens,
+      tokensCacheCreation: result.cacheCreation,
+      tokensCacheRead: result.cacheRead,
       metadata: { sheet: sheetName },
     })
   }

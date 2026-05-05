@@ -112,7 +112,10 @@ export async function extractPdfProposal(
   const response = await client.messages.create({
     model,
     max_tokens: 4096,
-    system: SYSTEM_PROMPT,
+    // Cache del system: extraer varias propuestas en sesion reusa el cache
+    system: [
+      { type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } },
+    ],
     messages: [
       {
         role: 'user',
@@ -142,6 +145,8 @@ export async function extractPdfProposal(
       modelo: model,
       tokensInput: response.usage?.input_tokens ?? 0,
       tokensOutput: response.usage?.output_tokens ?? 0,
+      tokensCacheCreation: response.usage?.cache_creation_input_tokens ?? 0,
+      tokensCacheRead: response.usage?.cache_read_input_tokens ?? 0,
       duracionMs: Date.now() - start,
     })
   }

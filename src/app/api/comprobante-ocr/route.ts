@@ -201,7 +201,10 @@ export async function POST(request: NextRequest) {
     const message = await client.messages.create({
       model,
       max_tokens: 1024,
-      system: SYSTEM_PROMPT,
+      // Cache del system: subir varios comprobantes en sesion comparte el cache
+      system: [
+        { type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } },
+      ],
       messages: [
         {
           role: 'user',
@@ -224,6 +227,8 @@ export async function POST(request: NextRequest) {
       modelo: model,
       tokensInput: message.usage?.input_tokens ?? 0,
       tokensOutput: message.usage?.output_tokens ?? 0,
+      tokensCacheCreation: message.usage?.cache_creation_input_tokens ?? 0,
+      tokensCacheRead: message.usage?.cache_read_input_tokens ?? 0,
       duracionMs: Date.now() - ocrStart,
       metadata: { fileName: file.name, mimeType },
     })

@@ -318,13 +318,16 @@ async function preprocessPdfAttachment(
     `input_tokens=${usage?.input_tokens ?? '?'} output_tokens=${usage?.output_tokens ?? '?'}`
   )
 
-  // Track usage
+  // Track usage (cache fields capturados aunque pdf-preprocess no cachea
+  // hoy — el PDF domina el input y el system es chico via user prompt)
   trackUsage({
     userId: trackingCtx.userId,
     tipo: 'pdf-preprocessing',
     modelo: model,
     tokensInput: usage?.input_tokens ?? 0,
     tokensOutput: usage?.output_tokens ?? 0,
+    tokensCacheCreation: usage?.cache_creation_input_tokens ?? 0,
+    tokensCacheRead: usage?.cache_read_input_tokens ?? 0,
     conversacionId: trackingCtx.conversacionId,
     duracionMs: elapsed,
     metadata: { fileName, pages },

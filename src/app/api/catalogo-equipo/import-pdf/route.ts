@@ -172,7 +172,10 @@ Devuelve SOLO un JSON array:
     const message = await client.messages.create({
       model,
       max_tokens: 8192,
-      system: SYSTEM_PROMPT,
+      // Cache del system para abaratar imports sucesivos dentro del TTL de 5 min
+      system: [
+        { type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } },
+      ],
       messages: [
         {
           role: 'user',
@@ -202,6 +205,8 @@ Devuelve SOLO un JSON array:
       modelo: model,
       tokensInput: message.usage?.input_tokens ?? 0,
       tokensOutput: message.usage?.output_tokens ?? 0,
+      tokensCacheCreation: message.usage?.cache_creation_input_tokens ?? 0,
+      tokensCacheRead: message.usage?.cache_read_input_tokens ?? 0,
       duracionMs: Date.now() - scanStart,
       metadata: { fileName: file.name, catalogSize: existingCatalog.length },
     })
