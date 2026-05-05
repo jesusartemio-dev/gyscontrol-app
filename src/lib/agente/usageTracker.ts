@@ -86,6 +86,19 @@ export interface MonthlyUsage {
   llamadasTotal: number
   limiteMensual: number
   porcentajeUsado: number
+  /**
+   * Tendencia vs mes anterior en el mismo rango de días (día 1 al día actual).
+   * Ausente cuando no aplica (ej. consultas históricas) — la versión per-user
+   * no la calcula hoy.
+   */
+  tendencia?: {
+    /** Costo del mes anterior cubriendo del día 1 al mismo día del mes actual */
+    costoMesAnteriorMismoRango: number
+    /** Cambio porcentual; null si el mes anterior no tuvo gasto (división por cero) */
+    cambioPorcentaje: number | null
+    /** Mes anterior en formato YYYY-MM (para que la UI lo formatee) */
+    mesAnterior: string
+  }
 }
 
 /**
@@ -124,31 +137,63 @@ export async function getMonthlyUsage(userId: string): Promise<MonthlyUsage> {
 /**
  * Gets total monthly usage across ALL users (company-wide limit).
  * Counts every tracked tipo so the cap reflects the full IA spend.
+ * Incluye `tendencia` con la comparación contra el mismo rango de días del
+ * mes anterior — útil para detectar aceleración antes de llegar al cap.
  */
 export async function getCompanyMonthlyUsage(): Promise<MonthlyUsage> {
   const now = new Date()
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+  const year = now.getFullYear()
+  const month = now.getMonth() // 0-indexed
+  const dayOfMonth = now.getDate()
 
-  const [result, limiteMensual] = await Promise.all([
+  const monthStart = new Date(year, month, 1)
+
+  // Mes anterior, mismo rango: [primer día, día actual + 1) — clamp al último día
+  // del mes anterior si éste tiene menos días que el actual.
+  const prevMonthStart = new Date(year, month - 1, 1)
+  const lastDayPrevMonth = new Date(year, month, 0).getDate()
+  const prevMonthEndDay = Math.min(dayOfMonth, lastDayPrevMonth)
+  const prevMonthRangeEnd = new Date(year, month - 1, prevMonthEndDay + 1)
+
+  const [current, prevSameRange, limiteMensual] = await Promise.all([
     prisma.agenteUsage.aggregate({
-      where: {
-        createdAt: { gte: monthStart },
-      },
+      where: { createdAt: { gte: monthStart } },
       _sum: { costoEstimado: true },
       _count: true,
+    }),
+    prisma.agenteUsage.aggregate({
+      where: { createdAt: { gte: prevMonthStart, lt: prevMonthRangeEnd } },
+      _sum: { costoEstimado: true },
     }),
     getMonthlyLimit(),
   ])
 
-  const costoTotal = result._sum.costoEstimado ?? 0
+  const costoTotal = current._sum.costoEstimado ?? 0
+  const costoMesAnteriorMismoRango = prevSameRange._sum.costoEstimado ?? 0
+
+  // Cambio porcentual: si el mes anterior tuvo $0, no es comparable
+  let cambioPorcentaje: number | null = null
+  if (costoMesAnteriorMismoRango > 0) {
+    const pct = ((costoTotal - costoMesAnteriorMismoRango) / costoMesAnteriorMismoRango) * 100
+    cambioPorcentaje = Math.round(pct * 10) / 10
+  }
+
+  // YYYY-MM del mes anterior (handle wrap a diciembre del año previo)
+  const prevDate = new Date(year, month - 1, 1)
+  const mesAnterior = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`
 
   return {
     costoTotal: Math.round(costoTotal * 1000) / 1000,
-    llamadasTotal: result._count,
+    llamadasTotal: current._count,
     limiteMensual,
     porcentajeUsado: limiteMensual > 0
       ? Math.round((costoTotal / limiteMensual) * 1000) / 10
       : 0,
+    tendencia: {
+      costoMesAnteriorMismoRango: Math.round(costoMesAnteriorMismoRango * 1000) / 1000,
+      cambioPorcentaje,
+      mesAnterior,
+    },
   }
 }
 

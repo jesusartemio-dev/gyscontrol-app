@@ -8,6 +8,8 @@ import {
   DollarSign,
   Zap,
   TrendingUp,
+  TrendingDown,
+  Minus,
   BarChart3,
   RefreshCw,
   AlertTriangle,
@@ -40,6 +42,11 @@ interface MonthlyUsage {
   llamadasTotal: number
   limiteMensual: number
   porcentajeUsado: number
+  tendencia?: {
+    costoMesAnteriorMismoRango: number
+    cambioPorcentaje: number | null
+    mesAnterior: string
+  }
 }
 
 interface UsageStats {
@@ -379,8 +386,8 @@ export default function UsoIAPage() {
               </div>
             </div>
 
-            {/* Projection + Limit editor */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Projection + Tendencia + Limit editor */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {/* Projection */}
               <div className="rounded-lg border bg-white p-3">
                 <p className="text-xs text-muted-foreground mb-1">Proyeccion fin de mes</p>
@@ -397,6 +404,48 @@ export default function UsoIAPage() {
                   </p>
                 )}
               </div>
+
+              {/* Tendencia vs mes anterior */}
+              {limite.tendencia && (() => {
+                const t = limite.tendencia
+                const change = t.cambioPorcentaje
+                const isStable = change !== null && Math.abs(change) <= 5
+                const isUp = change !== null && change > 5
+                const isDown = change !== null && change < -5
+                const Icon = isUp ? TrendingUp : isDown ? TrendingDown : Minus
+                const colorClass = isUp
+                  ? 'text-red-600'
+                  : isDown
+                  ? 'text-emerald-600'
+                  : 'text-muted-foreground'
+                return (
+                  <div className="rounded-lg border bg-white p-3">
+                    <p className="text-xs text-muted-foreground mb-1">
+                      vs {formatYearMonth(t.mesAnterior)} (mismos dias)
+                    </p>
+                    {change === null ? (
+                      <>
+                        <p className="text-lg font-bold text-muted-foreground">—</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {t.costoMesAnteriorMismoRango === 0
+                            ? 'Sin uso registrado el mes anterior'
+                            : 'No comparable'}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className={`text-lg font-bold flex items-center gap-1.5 ${colorClass}`}>
+                          <Icon className="h-4 w-4" />
+                          {isStable ? '~' : ''}{change > 0 ? '+' : ''}{change.toFixed(1)}%
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          ${t.costoMesAnteriorMismoRango.toFixed(2)} en el mismo periodo
+                        </p>
+                      </>
+                    )}
+                  </div>
+                )
+              })()}
 
               {/* Limit editor */}
               <div className="rounded-lg border bg-white p-3">
