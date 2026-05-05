@@ -157,7 +157,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
 
     const montoContractual = body.montoContractual
-    const porcentajeAvance = body.porcentajeAvance
+    const porcentajeAvance = Math.round((body.porcentajeAvance || 0) * 100) / 100
     const montoAvance = Math.round(montoContractual * (porcentajeAvance / 100) * 100) / 100
 
     // Si no viene orden, asignar max + 1
@@ -252,7 +252,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       // Crear todas las partidas nuevas
       const partidasData = partidasInput.map((p: any, index: number) => {
         const montoContractual = p.montoContractual || 0
-        const porcentajeAvance = p.porcentajeAvance || 0
+        const porcentajeAvance = Math.round((p.porcentajeAvance || 0) * 100) / 100
         const montoAvance = Math.round(montoContractual * (porcentajeAvance / 100) * 100) / 100
 
         return {

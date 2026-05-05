@@ -67,8 +67,12 @@ export default function TablaPartidas({ valorizacionId, proyectoId, readOnly, ti
       const res = await fetch(apiBase)
       if (!res.ok) throw new Error('Error al cargar partidas')
       const data = await res.json()
-      setPartidas(data.partidas || [])
-      const total = (data.partidas || []).reduce((s: number, p: Partida) => s + p.montoAvance, 0)
+      const partidas: Partida[] = (data.partidas || []).map((p: Partida) => ({
+        ...p,
+        porcentajeAvance: Math.round(p.porcentajeAvance * 100) / 100,
+      }))
+      setPartidas(partidas)
+      const total = partidas.reduce((s: number, p: Partida) => s + p.montoAvance, 0)
       onMontoChange(Math.round(total * 100) / 100)
     } catch {
       toast.error('Error al cargar partidas')
@@ -169,7 +173,7 @@ export default function TablaPartidas({ valorizacionId, proyectoId, readOnly, ti
         p.montoContractual = parseFloat(value as string) || 0
         p.montoAvance = Math.round(p.montoContractual * (p.porcentajeAvance / 100) * 100) / 100
       } else if (field === 'porcentajeAvance') {
-        let pct = parseFloat(value as string) || 0
+        let pct = Math.round((parseFloat(value as string) || 0) * 100) / 100
         if (pct > 100) pct = 100
         if (pct < 0) pct = 0
         p.porcentajeAvance = pct
@@ -462,7 +466,7 @@ export default function TablaPartidas({ valorizacionId, proyectoId, readOnly, ti
 
                   // Tooltip mejorado para % anterior
                   const tooltipAnterior = tieneSugerencia
-                    ? `Valorizado en períodos anteriores: ${p.porcentajeAcumuladoAnterior}%\nAvance en cronograma: ${avanceCronograma}%\nDisponible para valorizar: ${Math.max(sugerenciaIncremento, 0)}%`
+                    ? `Valorizado en períodos anteriores: ${p.porcentajeAcumuladoAnterior.toFixed(2)}%\nAvance en cronograma: ${typeof avanceCronograma === 'number' ? avanceCronograma.toFixed(2) : avanceCronograma}%\nDisponible para valorizar: ${Math.max(sugerenciaIncremento, 0).toFixed(2)}%`
                     : 'Valorizado anteriormente'
 
                   return (
@@ -546,7 +550,7 @@ export default function TablaPartidas({ valorizacionId, proyectoId, readOnly, ti
                               {mostrarSugerenciaPositiva && (
                                 <div className="mt-1 flex items-center gap-1 rounded border border-blue-200 bg-blue-50 px-1.5 py-0.5">
                                   <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                                    Cron: {avanceCronograma}%
+                                    Cron: {typeof avanceCronograma === 'number' ? avanceCronograma.toFixed(2) : avanceCronograma}%
                                   </span>
                                   <button
                                     type="button"
@@ -561,7 +565,7 @@ export default function TablaPartidas({ valorizacionId, proyectoId, readOnly, ti
                               {alDia && (
                                 <div className="mt-1 flex items-center gap-1 rounded border border-green-200 bg-green-50 px-1.5 py-0.5">
                                   <span className="text-[10px] text-green-700 whitespace-nowrap">
-                                    Cron: {avanceCronograma}% - Al día
+                                    Cron: {typeof avanceCronograma === 'number' ? avanceCronograma.toFixed(2) : avanceCronograma}% - Al día
                                   </span>
                                 </div>
                               )}
