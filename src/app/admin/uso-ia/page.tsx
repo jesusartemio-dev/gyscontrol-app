@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import {
   DollarSign,
   Zap,
@@ -23,6 +24,7 @@ import {
   MessagesSquare,
   Settings2,
   FileUp,
+  Download,
 } from 'lucide-react'
 import {
   BarChart,
@@ -142,6 +144,50 @@ function getProgressTextColor(pct: number): string {
   return 'text-red-700'
 }
 
+// ── Drill-down ──────────────────────────────────────────
+
+interface CallRow {
+  id: string
+  fecha: string
+  usuario: string
+  userId: string
+  tipo: string
+  modelo: string
+  modeloFull: string
+  tokensInput: number
+  tokensOutput: number
+  tokensCacheCreation: number
+  tokensCacheRead: number
+  costoEstimado: number
+  duracionMs: number | null
+  conversacionId: string | null
+  fileName: string | null
+  sheet: string | null
+  pages: number | null
+}
+
+interface DrillFilter {
+  tipo?: string
+  userId?: string
+  /** Texto que se muestra en el titulo del modal */
+  label: string
+}
+
+function formatCallDate(iso: string): string {
+  const d = new Date(iso)
+  const dd = String(d.getDate()).padStart(2, '0')
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mn = String(d.getMinutes()).padStart(2, '0')
+  return `${dd}/${mm} ${hh}:${mn}`
+}
+
+function formatTokensCompact(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
+  return String(n)
+}
+
 export default function UsoIAPage() {
   const [periodo, setPeriodo] = useState<Periodo>('mes')
   const [selectedMonth, setSelectedMonth] = useState(getCurrentYearMonth)
@@ -153,6 +199,11 @@ export default function UsoIAPage() {
   const [limitMsg, setLimitMsg] = useState<string | null>(null)
   const [features, setFeatures] = useState<IAFeatureFlags | null>(null)
   const [savingFeature, setSavingFeature] = useState<string | null>(null)
+
+  // Drill-down state
+  const [drillFilter, setDrillFilter] = useState<DrillFilter | null>(null)
+  const [drillRows, setDrillRows] = useState<CallRow[]>([])
+  const [drillLoading, setDrillLoading] = useState(false)
 
   const isCurrentMonth = selectedMonth === getCurrentYearMonth()
 
@@ -185,6 +236,42 @@ export default function UsoIAPage() {
   useEffect(() => {
     fetchStats()
   }, [fetchStats])
+
+  /** Construye los params del periodo actual para los endpoints de drill-down/CSV */
+  const buildPeriodParams = useCallback(() => {
+    const params = new URLSearchParams()
+    if (isCurrentMonth) {
+      params.set('periodo', periodo)
+    } else {
+      params.set('mes', selectedMonth)
+    }
+    return params
+  }, [periodo, selectedMonth, isCurrentMonth])
+
+  // Fetch del drill-down cuando cambia el filtro
+  useEffect(() => {
+    if (!drillFilter) return
+    let cancelled = false
+    setDrillLoading(true)
+    const params = buildPeriodParams()
+    if (drillFilter.tipo) params.set('tipo', drillFilter.tipo)
+    if (drillFilter.userId) params.set('userId', drillFilter.userId)
+    params.set('limit', '100')
+    fetch(`/api/agente/usage/calls?${params}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((data) => { if (!cancelled) setDrillRows(data.rows ?? []) })
+      .catch(() => { if (!cancelled) setDrillRows([]) })
+      .finally(() => { if (!cancelled) setDrillLoading(false) })
+    return () => { cancelled = true }
+  }, [drillFilter, buildPeriodParams])
+
+  const handleExportCSV = useCallback((extra?: { tipo?: string; userId?: string }) => {
+    const params = buildPeriodParams()
+    params.set('format', 'csv')
+    if (extra?.tipo) params.set('tipo', extra.tipo)
+    if (extra?.userId) params.set('userId', extra.userId)
+    window.location.href = `/api/agente/usage/calls?${params}`
+  }, [buildPeriodParams])
 
   const handleSaveLimit = async () => {
     const value = parseFloat(limitInput)
@@ -304,6 +391,16 @@ export default function UsoIAPage() {
               </SelectContent>
             </Select>
           )}
+
+          <button
+            onClick={() => handleExportCSV()}
+            disabled={loading || !stats?.resumen.llamadasTotal}
+            className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm hover:bg-accent transition-colors disabled:opacity-50"
+            title="Exportar todas las llamadas del periodo a CSV"
+          >
+            <Download className="h-4 w-4" />
+            <span className="hidden sm:inline">CSV</span>
+          </button>
 
           <button
             onClick={fetchStats}
@@ -658,7 +755,11 @@ export default function UsoIAPage() {
                       ? (row.costo / stats.resumen.costoTotal) * 100
                       : 0
                     return (
-                      <tr key={row.tipo} className="border-b last:border-0">
+                      <tr
+                        key={row.tipo}
+                        className="border-b last:border-0 cursor-pointer hover:bg-muted/40 transition-colors"
+                        onClick={() => setDrillFilter({ tipo: row.tipo, label: info.label })}
+                      >
                         <td className="py-2">
                           <div className="flex flex-col gap-0.5">
                             <span
@@ -743,7 +844,11 @@ export default function UsoIAPage() {
               </thead>
               <tbody>
                 {stats?.porUsuario.map((row) => (
-                  <tr key={row.userId} className="border-b last:border-0">
+                  <tr
+                    key={row.userId}
+                    className="border-b last:border-0 cursor-pointer hover:bg-muted/40 transition-colors"
+                    onClick={() => setDrillFilter({ userId: row.userId, label: row.nombre })}
+                  >
                     <td className="py-2 font-medium">{row.nombre}</td>
                     <td className="py-2 text-right">{row.llamadas}</td>
                     <td className="py-2 text-right font-medium">${row.costo.toFixed(3)}</td>
@@ -852,6 +957,105 @@ export default function UsoIAPage() {
           </Card>
         )
       })()}
+
+      {/* Drill-down sheet */}
+      <Sheet open={!!drillFilter} onOpenChange={(open) => { if (!open) setDrillFilter(null) }}>
+        <SheetContent side="right" className="w-full sm:max-w-2xl lg:max-w-3xl overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center justify-between gap-3">
+              <span>Llamadas — {drillFilter?.label}</span>
+              {drillFilter && (
+                <button
+                  onClick={() => handleExportCSV({ tipo: drillFilter.tipo, userId: drillFilter.userId })}
+                  className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium hover:bg-accent transition-colors"
+                  title="Exportar este detalle a CSV"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  CSV
+                </button>
+              )}
+            </SheetTitle>
+          </SheetHeader>
+          <div className="mt-4">
+            {drillLoading && (
+              <p className="text-sm text-muted-foreground py-8 text-center">Cargando…</p>
+            )}
+            {!drillLoading && drillRows.length === 0 && (
+              <p className="text-sm text-muted-foreground py-8 text-center">Sin llamadas en este periodo.</p>
+            )}
+            {!drillLoading && drillRows.length > 0 && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b text-left text-muted-foreground">
+                      <th className="pb-2 font-medium">Fecha</th>
+                      {!drillFilter?.tipo && <th className="pb-2 font-medium">Herramienta</th>}
+                      {!drillFilter?.userId && <th className="pb-2 font-medium">Usuario</th>}
+                      <th className="pb-2 font-medium">Modelo</th>
+                      <th className="pb-2 font-medium text-right">Tokens</th>
+                      <th className="pb-2 font-medium text-right">Costo</th>
+                      <th className="pb-2 font-medium text-right">Dur.</th>
+                      <th className="pb-2 font-medium">Detalle</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {drillRows.map((r) => {
+                      const tipoInfo = getTipoInfo(r.tipo)
+                      const totalTokens = r.tokensInput + r.tokensOutput + r.tokensCacheCreation + r.tokensCacheRead
+                      const cacheTokens = r.tokensCacheCreation + r.tokensCacheRead
+                      return (
+                        <tr key={r.id} className="border-b last:border-0 hover:bg-muted/40">
+                          <td className="py-2 tabular-nums whitespace-nowrap">{formatCallDate(r.fecha)}</td>
+                          {!drillFilter?.tipo && (
+                            <td className="py-2">
+                              <span
+                                className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium"
+                                style={{ backgroundColor: `${tipoInfo.color}1a`, color: tipoInfo.color }}
+                              >
+                                {tipoInfo.label}
+                              </span>
+                            </td>
+                          )}
+                          {!drillFilter?.userId && (
+                            <td className="py-2">{r.usuario}</td>
+                          )}
+                          <td className="py-2">
+                            <span className={`inline-flex rounded px-1.5 py-0.5 text-[11px] font-medium ${
+                              r.modelo === 'Sonnet' ? 'bg-purple-50 text-purple-700' :
+                              r.modelo === 'Haiku' ? 'bg-emerald-50 text-emerald-700' :
+                              'bg-gray-100 text-gray-700'
+                            }`}>
+                              {r.modelo}
+                            </span>
+                          </td>
+                          <td className="py-2 text-right tabular-nums">
+                            {formatTokensCompact(totalTokens)}
+                            {cacheTokens > 0 && (
+                              <span className="block text-[10px] text-emerald-600" title={`Cache leido: ${r.tokensCacheRead} | Cache escrito: ${r.tokensCacheCreation}`}>
+                                {formatTokensCompact(r.tokensCacheRead)} cache
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2 text-right tabular-nums font-medium">${r.costoEstimado.toFixed(4)}</td>
+                          <td className="py-2 text-right tabular-nums text-muted-foreground">
+                            {r.duracionMs != null ? `${(r.duracionMs / 1000).toFixed(1)}s` : '—'}
+                          </td>
+                          <td className="py-2 text-muted-foreground max-w-[180px] truncate" title={r.fileName ?? r.sheet ?? r.conversacionId ?? ''}>
+                            {r.fileName ?? (r.sheet ? `hoja: ${r.sheet}` : null) ?? (r.conversacionId ? `conv: ${r.conversacionId.slice(0, 8)}` : '—')}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+                <p className="text-[11px] text-muted-foreground mt-3">
+                  Mostrando las {drillRows.length} llamadas mas recientes.
+                </p>
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }
