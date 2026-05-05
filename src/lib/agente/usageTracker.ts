@@ -4,6 +4,12 @@
 import { prisma } from '@/lib/prisma'
 
 // ── Cost tables (USD per 1M tokens) ──────────────────────
+// Anthropic prompt caching:
+//   - cache writes cost 1.25x del input base
+//   - cache reads cost 0.10x del input base (90% mas barato)
+
+const CACHE_WRITE_MULTIPLIER = 1.25
+const CACHE_READ_MULTIPLIER = 0.10
 
 const MODEL_COSTS: Record<string, { input: number; output: number }> = {
   'claude-sonnet-4-5-20250929': { input: 3.0, output: 15.0 },
@@ -12,9 +18,20 @@ const MODEL_COSTS: Record<string, { input: number; output: number }> = {
 
 const DEFAULT_COST = { input: 3.0, output: 15.0 } // Assume Sonnet pricing if unknown
 
-function calculateCost(model: string, inputTokens: number, outputTokens: number): number {
+function calculateCost(
+  model: string,
+  inputTokens: number,
+  outputTokens: number,
+  cacheCreationTokens: number = 0,
+  cacheReadTokens: number = 0,
+): number {
   const costs = MODEL_COSTS[model] || DEFAULT_COST
-  return (inputTokens * costs.input + outputTokens * costs.output) / 1_000_000
+  return (
+    inputTokens * costs.input +
+    cacheCreationTokens * costs.input * CACHE_WRITE_MULTIPLIER +
+    cacheReadTokens * costs.input * CACHE_READ_MULTIPLIER +
+    outputTokens * costs.output
+  ) / 1_000_000
 }
 
 // ── Track usage (fire-and-forget) ─────────────────────────
@@ -23,8 +40,13 @@ export interface TrackUsageParams {
   userId: string
   tipo: string
   modelo: string
+  /** Tokens "frescos" (no leídos ni escritos al cache) */
   tokensInput: number
   tokensOutput: number
+  /** Tokens escritos al cache de prompts (cuestan 1.25x del input base) */
+  tokensCacheCreation?: number
+  /** Tokens leídos del cache de prompts (cuestan 0.10x del input base) */
+  tokensCacheRead?: number
   conversacionId?: string | null
   duracionMs?: number
   metadata?: Record<string, unknown>
@@ -35,7 +57,15 @@ export interface TrackUsageParams {
  * Runs async without blocking — errors are logged but never thrown.
  */
 export function trackUsage(params: TrackUsageParams): void {
-  const costoEstimado = calculateCost(params.modelo, params.tokensInput, params.tokensOutput)
+  const cacheCreation = params.tokensCacheCreation ?? 0
+  const cacheRead = params.tokensCacheRead ?? 0
+  const costoEstimado = calculateCost(
+    params.modelo,
+    params.tokensInput,
+    params.tokensOutput,
+    cacheCreation,
+    cacheRead,
+  )
 
   // Fire and forget — don't await, don't block
   prisma.agenteUsage
@@ -46,6 +76,8 @@ export function trackUsage(params: TrackUsageParams): void {
         modelo: params.modelo,
         tokensInput: params.tokensInput,
         tokensOutput: params.tokensOutput,
+        tokensCacheCreation: cacheCreation,
+        tokensCacheRead: cacheRead,
         costoEstimado,
         conversacionId: params.conversacionId ?? undefined,
         duracionMs: params.duracionMs ?? undefined,
@@ -230,6 +262,15 @@ export interface UsageStats {
     llamadasTotal: number
     tokensInputTotal: number
     tokensOutputTotal: number
+    /** Tokens escritos al cache (1.25x base input) */
+    tokensCacheCreationTotal: number
+    /** Tokens leidos del cache (0.10x base input) */
+    tokensCacheReadTotal: number
+    /**
+     * Costo USD que se hubiera pagado SIN caching (todos los cache reads
+     * cobrados a precio de input normal). Permite calcular el ahorro.
+     */
+    costoSinCache: number
   }
   /**
    * Daily totals + per-tipo breakdown (so the UI can render a stacked bar
@@ -290,6 +331,8 @@ export async function getUsageStats(
       modelo: true,
       tokensInput: true,
       tokensOutput: true,
+      tokensCacheCreation: true,
+      tokensCacheRead: true,
       costoEstimado: true,
       duracionMs: true,
       createdAt: true,
@@ -304,13 +347,25 @@ export async function getUsageStats(
     llamadasTotal: records.length,
     tokensInputTotal: 0,
     tokensOutputTotal: 0,
+    tokensCacheCreationTotal: 0,
+    tokensCacheReadTotal: 0,
+    costoSinCache: 0,
   }
   for (const r of records) {
     resumen.costoTotal += r.costoEstimado
     resumen.tokensInputTotal += r.tokensInput
     resumen.tokensOutputTotal += r.tokensOutput
+    resumen.tokensCacheCreationTotal += r.tokensCacheCreation
+    resumen.tokensCacheReadTotal += r.tokensCacheRead
+    // Costo hipotetico sin cache: cada cache read a precio de input normal,
+    // y los cache writes pagan input plano (no el 1.25x)
+    const costs = MODEL_COSTS[r.modelo] || DEFAULT_COST
+    const totalInputEquivalent = r.tokensInput + r.tokensCacheCreation + r.tokensCacheRead
+    resumen.costoSinCache +=
+      (totalInputEquivalent * costs.input + r.tokensOutput * costs.output) / 1_000_000
   }
   resumen.costoTotal = Math.round(resumen.costoTotal * 1000) / 1000
+  resumen.costoSinCache = Math.round(resumen.costoSinCache * 1000) / 1000
 
   // Por día (con breakdown por tipo para stacked chart)
   const dayMap = new Map<string, { costo: number; llamadas: number; porTipo: Record<string, number> }>()

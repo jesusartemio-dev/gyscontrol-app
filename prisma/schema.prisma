@@ -1434,16 +1434,69 @@ model RegistroHorasCampo {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  proyecto    Proyecto                  @relation(fields: [proyectoId], references: [id])
-  proyectoEdt ProyectoEdt?              @relation(fields: [proyectoEdtId], references: [id])
-  supervisor  User                      @relation("RegistrosCampoSupervisor", fields: [supervisorId], references: [id])
-  aprobadoPor User?                     @relation("RegistrosCampoAprobador", fields: [aprobadoPorId], references: [id])
-  tareas      RegistroHorasCampoTarea[]
+  proyecto           Proyecto                  @relation(fields: [proyectoId], references: [id])
+  proyectoEdt        ProyectoEdt?              @relation(fields: [proyectoEdtId], references: [id])
+  supervisor         User                      @relation("RegistrosCampoSupervisor", fields: [supervisorId], references: [id])
+  aprobadoPor        User?                     @relation("RegistrosCampoAprobador", fields: [aprobadoPorId], references: [id])
+  tareas             RegistroHorasCampoTarea[]
+  registrosSeguridad RegistroSeguridad[]
 
   @@index([proyectoId, estado, fechaTrabajo])
   @@index([supervisorId, estado])
   @@index([estado, createdAt(sort: Desc)])
   @@map("registro_horas_campo")
+}
+
+// Registro de actividades de seguridad asociado a una jornada de campo.
+// Captura charlas NDAD, inspecciones, observaciones, etc. que el ingeniero de
+// seguridad realiza durante la jornada del proyecto.
+model RegistroSeguridad {
+  id                   String                @id @default(cuid())
+  registroHorasCampoId String
+  ingenieroId          String
+  tipo                 TipoRegistroSeguridad
+  descripcion          String
+  asistentes           Int?
+  observaciones        String?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  jornada   RegistroHorasCampo      @relation(fields: [registroHorasCampoId], references: [id], onDelete: Cascade)
+  ingeniero User                    @relation("RegistrosSeguridadIngeniero", fields: [ingenieroId], references: [id])
+  fotos     RegistroSeguridadFoto[]
+
+  @@index([registroHorasCampoId])
+  @@index([ingenieroId, createdAt(sort: Desc)])
+  @@index([tipo, createdAt(sort: Desc)])
+  @@map("registro_seguridad")
+}
+
+enum TipoRegistroSeguridad {
+  charla
+  inspeccion
+  observacion
+  incidente
+  actividad_general
+  riesgo_critico
+  medio_ambiente
+  prevencion_salud
+}
+
+model RegistroSeguridadFoto {
+  id                  String   @id @default(cuid())
+  registroSeguridadId String
+  nombreArchivo       String
+  urlArchivo          String
+  driveFileId         String?
+  tipoArchivo         String?
+  tamano              Int?
+  orden               Int      @default(0)
+  createdAt           DateTime @default(now())
+
+  registro RegistroSeguridad @relation(fields: [registroSeguridadId], references: [id], onDelete: Cascade)
+
+  @@index([registroSeguridadId, orden])
+  @@map("registro_seguridad_foto")
 }
 
 // Tarea dentro de un registro de campo
@@ -4048,17 +4101,19 @@ model AgenteConversacionMensaje {
 }
 
 model AgenteUsage {
-  id             String   @id @default(cuid())
-  userId         String
-  conversacionId String?
-  tipo           String // 'chat', 'chat-simple', 'pdf-preprocessing', 'excel-extraction', 'pdf-extraction', 'ocr'
-  modelo         String // model ID used
-  tokensInput    Int
-  tokensOutput   Int
-  costoEstimado  Float // USD
-  duracionMs     Int?
-  metadata       Json?
-  createdAt      DateTime @default(now())
+  id                  String   @id @default(cuid())
+  userId              String
+  conversacionId      String?
+  tipo                String // 'chat', 'chat-simple', 'pdf-preprocessing', 'excel-extraction', 'pdf-extraction', 'ocr'
+  modelo              String // model ID used
+  tokensInput         Int // fresh input tokens (no cache)
+  tokensOutput        Int
+  tokensCacheCreation Int      @default(0) // tokens escritos al cache (1.25x base input)
+  tokensCacheRead     Int      @default(0) // tokens leidos del cache (0.10x base input)
+  costoEstimado       Float // USD
+  duracionMs          Int?
+  metadata            Json?
+  createdAt           DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

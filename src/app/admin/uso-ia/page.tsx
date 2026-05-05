@@ -55,6 +55,10 @@ interface UsageStats {
     llamadasTotal: number
     tokensInputTotal: number
     tokensOutputTotal: number
+    tokensCacheCreationTotal: number
+    tokensCacheReadTotal: number
+    /** Costo USD que se hubiera pagado SIN caching */
+    costoSinCache: number
   }
   porDia: Array<{
     fecha: string
@@ -763,30 +767,91 @@ export default function UsoIAPage() {
         </Card>
       </div>
 
-      {/* Token details */}
-      {stats && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Detalle de tokens</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <p className="text-muted-foreground">Tokens de entrada</p>
-                <p className="text-lg font-semibold">
-                  {(stats.resumen.tokensInputTotal / 1000).toFixed(1)}K
-                </p>
+      {/* Tokens y caching */}
+      {stats && (() => {
+        const r = stats.resumen
+        const totalInputEq = r.tokensInputTotal + r.tokensCacheCreationTotal + r.tokensCacheReadTotal
+        const cacheTotal = r.tokensCacheCreationTotal + r.tokensCacheReadTotal
+        const hitRate = totalInputEq > 0 ? (r.tokensCacheReadTotal / totalInputEq) * 100 : 0
+        const ahorro = r.costoSinCache - r.costoTotal
+        const ahorroPct = r.costoSinCache > 0 ? (ahorro / r.costoSinCache) * 100 : 0
+        const formatTokens = (n: number) =>
+          n >= 1_000_000 ? `${(n / 1_000_000).toFixed(2)}M`
+          : n >= 1_000 ? `${(n / 1_000).toFixed(1)}K`
+          : `${n}`
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Tokens y caching de prompts</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Input fresco</p>
+                  <p className="text-lg font-semibold">{formatTokens(r.tokensInputTotal)}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Output</p>
+                  <p className="text-lg font-semibold">{formatTokens(r.tokensOutputTotal)}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground" title="Tokens escritos al cache (cuestan 1.25x del input base)">
+                    Cache creado
+                  </p>
+                  <p className="text-lg font-semibold text-amber-600">
+                    {formatTokens(r.tokensCacheCreationTotal)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground" title="Tokens leidos del cache (cuestan 0.10x del input base)">
+                    Cache leido
+                  </p>
+                  <p className="text-lg font-semibold text-emerald-600">
+                    {formatTokens(r.tokensCacheReadTotal)}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-muted-foreground">Tokens de salida</p>
-                <p className="text-lg font-semibold">
-                  {(stats.resumen.tokensOutputTotal / 1000).toFixed(1)}K
-                </p>
+
+              <div className="rounded-lg border bg-muted/30 p-3">
+                {cacheTotal === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Caching de prompts aun no registra actividad en este periodo.
+                    Una vez que el chat tenga llamadas dentro de los 5 min de TTL,
+                    veras hit rate y ahorro acumulado aqui.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Hit rate del cache</p>
+                      <p className="text-lg font-bold">
+                        {hitRate.toFixed(1)}%
+                        <span className="ml-1 text-xs font-normal text-muted-foreground">
+                          ({formatTokens(r.tokensCacheReadTotal)} de {formatTokens(totalInputEq)})
+                        </span>
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Costo sin cache</p>
+                      <p className="text-lg font-semibold text-muted-foreground line-through">
+                        ${r.costoSinCache.toFixed(3)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Ahorro acumulado</p>
+                      <p className={`text-lg font-bold ${ahorro > 0 ? 'text-emerald-600' : 'text-muted-foreground'}`}>
+                        {ahorro > 0 ? '−' : ''}${Math.abs(ahorro).toFixed(3)}
+                        <span className="ml-1 text-xs font-normal text-muted-foreground">
+                          ({ahorroPct >= 0 ? '−' : '+'}{Math.abs(ahorroPct).toFixed(1)}%)
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+            </CardContent>
+          </Card>
+        )
+      })()}
     </div>
   )
 }

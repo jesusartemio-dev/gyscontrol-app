@@ -426,7 +426,7 @@ async function callClaudeWithRetry(
   params: {
     model: string
     max_tokens: number
-    system: string
+    system: string | Anthropic.Messages.TextBlockParam[]
     tools: Anthropic.Messages.Tool[]
     messages: Anthropic.Messages.MessageParam[]
   },
@@ -699,10 +699,17 @@ export async function POST(request: NextRequest) {
             phase: 'generating',
           })
 
+          // System como bloque con cache_control: dentro del TTL del cache (5 min),
+          // las siguientes llamadas con el mismo system pagan ~10% del input normal.
+          // Conversaciones de chat (multiples turnos + tool rounds) son el caso ideal.
+          const systemBlocks: Anthropic.Messages.TextBlockParam[] = [
+            { type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } },
+          ]
+
           // Llamada a Claude con exponential backoff en rate limit
           const response = await callClaudeWithRetry(
             client,
-            { model, max_tokens: maxTokens, system: systemPrompt, tools, messages: anthropicMessages },
+            { model, max_tokens: maxTokens, system: systemBlocks, tools, messages: anthropicMessages },
             controller,
             encoder,
             retryCtx
@@ -710,9 +717,12 @@ export async function POST(request: NextRequest) {
 
           // ── Usage logging + tracking ──
           const usage = response.usage
+          const cacheCreation = usage?.cache_creation_input_tokens ?? 0
+          const cacheRead = usage?.cache_read_input_tokens ?? 0
           console.info(
             `[chat] model=${model} round=${toolRound} ` +
-            `input_tokens=${usage?.input_tokens ?? '?'} output_tokens=${usage?.output_tokens ?? '?'} ` +
+            `input=${usage?.input_tokens ?? '?'} output=${usage?.output_tokens ?? '?'} ` +
+            `cache_write=${cacheCreation} cache_read=${cacheRead} ` +
             `tools=${tools.length} messages=${anthropicMessages.length} ` +
             `simple=${simple} maxTokens=${maxTokens}`
           )
@@ -722,6 +732,8 @@ export async function POST(request: NextRequest) {
             modelo: model,
             tokensInput: usage?.input_tokens ?? 0,
             tokensOutput: usage?.output_tokens ?? 0,
+            tokensCacheCreation: cacheCreation,
+            tokensCacheRead: cacheRead,
             conversacionId: activeConversacionId,
             metadata: { round: toolRound, toolCount: tools.length },
           })
