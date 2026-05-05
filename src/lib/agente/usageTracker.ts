@@ -89,8 +89,9 @@ export interface MonthlyUsage {
 }
 
 /**
- * Gets the current month's chat usage cost for a specific user.
- * Only counts chat types (not ocr, excel).
+ * Gets the current month's total IA usage cost for a specific user.
+ * Counts every tracked tipo (chat, ocr, excel, pdf, scan, import-catalogo, etc.)
+ * — the monthly limit is a global IA budget, not a chat-only cap.
  */
 export async function getMonthlyUsage(userId: string): Promise<MonthlyUsage> {
   const now = new Date()
@@ -100,7 +101,6 @@ export async function getMonthlyUsage(userId: string): Promise<MonthlyUsage> {
     prisma.agenteUsage.aggregate({
       where: {
         userId,
-        tipo: { in: ['chat', 'chat-simple', 'pdf-preprocess'] },
         createdAt: { gte: monthStart },
       },
       _sum: { costoEstimado: true },
@@ -123,6 +123,7 @@ export async function getMonthlyUsage(userId: string): Promise<MonthlyUsage> {
 
 /**
  * Gets total monthly usage across ALL users (company-wide limit).
+ * Counts every tracked tipo so the cap reflects the full IA spend.
  */
 export async function getCompanyMonthlyUsage(): Promise<MonthlyUsage> {
   const now = new Date()
@@ -131,7 +132,6 @@ export async function getCompanyMonthlyUsage(): Promise<MonthlyUsage> {
   const [result, limiteMensual] = await Promise.all([
     prisma.agenteUsage.aggregate({
       where: {
-        tipo: { in: ['chat', 'chat-simple', 'pdf-preprocess'] },
         createdAt: { gte: monthStart },
       },
       _sum: { costoEstimado: true },
@@ -186,7 +186,17 @@ export interface UsageStats {
     tokensInputTotal: number
     tokensOutputTotal: number
   }
-  porDia: Array<{ fecha: string; costo: number; llamadas: number }>
+  /**
+   * Daily totals + per-tipo breakdown (so the UI can render a stacked bar
+   * without re-querying). `porTipo` keys are the raw `tipo` codes; consumers
+   * map them to friendly labels via `getTipoInfo`.
+   */
+  porDia: Array<{
+    fecha: string
+    costo: number
+    llamadas: number
+    porTipo: Record<string, number>
+  }>
   porTipo: Array<{ tipo: string; costo: number; llamadas: number }>
   porModelo: Array<{ modelo: string; costo: number; llamadas: number }>
   porUsuario: Array<{ userId: string; nombre: string; costo: number; llamadas: number }>
@@ -244,17 +254,25 @@ export async function getUsageStats(
   }
   resumen.costoTotal = Math.round(resumen.costoTotal * 1000) / 1000
 
-  // Por día
-  const dayMap = new Map<string, { costo: number; llamadas: number }>()
+  // Por día (con breakdown por tipo para stacked chart)
+  const dayMap = new Map<string, { costo: number; llamadas: number; porTipo: Record<string, number> }>()
   for (const r of records) {
     const fecha = r.createdAt.toISOString().split('T')[0]
-    const entry = dayMap.get(fecha) || { costo: 0, llamadas: 0 }
+    const entry = dayMap.get(fecha) || { costo: 0, llamadas: 0, porTipo: {} }
     entry.costo += r.costoEstimado
     entry.llamadas += 1
+    entry.porTipo[r.tipo] = (entry.porTipo[r.tipo] ?? 0) + r.costoEstimado
     dayMap.set(fecha, entry)
   }
   const porDia = Array.from(dayMap.entries())
-    .map(([fecha, v]) => ({ fecha, costo: Math.round(v.costo * 1000) / 1000, llamadas: v.llamadas }))
+    .map(([fecha, v]) => ({
+      fecha,
+      costo: Math.round(v.costo * 1000) / 1000,
+      llamadas: v.llamadas,
+      porTipo: Object.fromEntries(
+        Object.entries(v.porTipo).map(([tipo, c]) => [tipo, Math.round(c * 1000) / 1000])
+      ),
+    }))
     .sort((a, b) => a.fecha.localeCompare(b.fecha))
 
   // Por tipo

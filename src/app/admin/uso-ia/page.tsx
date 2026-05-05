@@ -30,7 +30,9 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  Legend,
 } from 'recharts'
+import { getTipoInfo } from '@/lib/agente/aiTipos'
 
 interface MonthlyUsage {
   costoTotal: number
@@ -46,7 +48,12 @@ interface UsageStats {
     tokensInputTotal: number
     tokensOutputTotal: number
   }
-  porDia: Array<{ fecha: string; costo: number; llamadas: number }>
+  porDia: Array<{
+    fecha: string
+    costo: number
+    llamadas: number
+    porTipo: Record<string, number>
+  }>
   porTipo: Array<{ tipo: string; costo: number; llamadas: number }>
   porModelo: Array<{ modelo: string; costo: number; llamadas: number }>
   porUsuario: Array<{ userId: string; nombre: string; costo: number; llamadas: number }>
@@ -476,37 +483,73 @@ export default function UsoIAPage() {
         </Card>
       </div>
 
-      {/* Chart: Cost per day */}
-      {stats && stats.porDia.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Costo por dia (USD)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stats.porDia}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis
-                    dataKey="fecha"
-                    tick={{ fontSize: 11 }}
-                    tickFormatter={(v: string) => {
-                      const parts = v.split('-')
-                      return `${parts[2]}/${parts[1]}`
-                    }}
-                  />
-                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => `$${v.toFixed(1)}`} />
-                  <Tooltip
-                    formatter={(value: number) => [`$${value.toFixed(3)}`, 'Costo']}
-                    labelFormatter={(label: string) => `Fecha: ${label}`}
-                  />
-                  <Bar dataKey="costo" fill="#2563eb" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Chart: Cost per day stacked by tipo */}
+      {stats && stats.porDia.length > 0 && (() => {
+        // Tipos presentes en el período, ordenados por costo total desc
+        const tipoTotals = new Map<string, number>()
+        for (const d of stats.porDia) {
+          for (const [tipo, c] of Object.entries(d.porTipo)) {
+            tipoTotals.set(tipo, (tipoTotals.get(tipo) ?? 0) + c)
+          }
+        }
+        const tiposOrdenados = Array.from(tipoTotals.entries())
+          .sort((a, b) => b[1] - a[1])
+          .map(([tipo]) => tipo)
+
+        // Reshape: cada datapoint tiene { fecha, [label]: costo, ... } para recharts
+        const chartData = stats.porDia.map((d) => {
+          const row: Record<string, string | number> = { fecha: d.fecha }
+          for (const tipo of tiposOrdenados) {
+            row[getTipoInfo(tipo).label] = d.porTipo[tipo] ?? 0
+          }
+          return row
+        })
+
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Costo por día por herramienta (USD)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[340px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData} margin={{ top: 8, right: 8, bottom: 8, left: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis
+                      dataKey="fecha"
+                      tick={{ fontSize: 11 }}
+                      tickFormatter={(v: string) => {
+                        const parts = v.split('-')
+                        return `${parts[2]}/${parts[1]}`
+                      }}
+                    />
+                    <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => `$${v.toFixed(1)}`} />
+                    <Tooltip
+                      formatter={(value: number, name: string) => [`$${value.toFixed(3)}`, name]}
+                      labelFormatter={(label: string) => `Fecha: ${label}`}
+                      contentStyle={{ fontSize: 12 }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
+                    {tiposOrdenados.map((tipo, idx) => {
+                      const info = getTipoInfo(tipo)
+                      const isLast = idx === tiposOrdenados.length - 1
+                      return (
+                        <Bar
+                          key={tipo}
+                          dataKey={info.label}
+                          stackId="cost"
+                          fill={info.color}
+                          radius={isLast ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                        />
+                      )
+                    })}
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        )
+      })()}
 
       {/* Tables */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -525,17 +568,27 @@ export default function UsoIAPage() {
                 </tr>
               </thead>
               <tbody>
-                {stats?.porTipo.map((row) => (
-                  <tr key={row.tipo} className="border-b last:border-0">
-                    <td className="py-2">
-                      <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
-                        {row.tipo}
-                      </span>
-                    </td>
-                    <td className="py-2 text-right">{row.llamadas}</td>
-                    <td className="py-2 text-right font-medium">${row.costo.toFixed(3)}</td>
-                  </tr>
-                ))}
+                {stats?.porTipo.map((row) => {
+                  const info = getTipoInfo(row.tipo)
+                  return (
+                    <tr key={row.tipo} className="border-b last:border-0">
+                      <td className="py-2">
+                        <span
+                          className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium"
+                          style={{ backgroundColor: `${info.color}1a`, color: info.color }}
+                        >
+                          <span
+                            className="h-2 w-2 rounded-full"
+                            style={{ backgroundColor: info.color }}
+                          />
+                          {info.label}
+                        </span>
+                      </td>
+                      <td className="py-2 text-right">{row.llamadas}</td>
+                      <td className="py-2 text-right font-medium">${row.costo.toFixed(3)}</td>
+                    </tr>
+                  )
+                })}
                 {(!stats || stats.porTipo.length === 0) && (
                   <tr>
                     <td colSpan={3} className="py-4 text-center text-muted-foreground">
