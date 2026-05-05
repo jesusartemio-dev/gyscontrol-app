@@ -55,7 +55,16 @@ interface UsageStats {
     llamadas: number
     porTipo: Record<string, number>
   }>
-  porTipo: Array<{ tipo: string; costo: number; llamadas: number }>
+  porTipo: Array<{
+    tipo: string
+    costo: number
+    llamadas: number
+    tokensInput: number
+    tokensOutput: number
+    duracionMsPromedio: number | null
+    costoPromedio: number
+    modelos: Record<string, { llamadas: number; costo: number }>
+  }>
   porModelo: Array<{ modelo: string; costo: number; llamadas: number }>
   porUsuario: Array<{ userId: string; nombre: string; costo: number; llamadas: number }>
   limite: MonthlyUsage
@@ -567,99 +576,105 @@ export default function UsoIAPage() {
       })()}
 
       {/* Tables */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* By type */}
+      <div className="space-y-6">
+        {/* Por herramienta IA (unifica tipo + modelo + costo prom) */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Por tipo de operacion</CardTitle>
+            <CardTitle className="text-base">Por herramienta IA</CardTitle>
           </CardHeader>
           <CardContent>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-muted-foreground">
-                  <th className="pb-2 font-medium">Tipo</th>
-                  <th className="pb-2 font-medium text-right">Llamadas</th>
-                  <th className="pb-2 font-medium text-right">Costo</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stats?.porTipo.map((row) => {
-                  const info = getTipoInfo(row.tipo)
-                  return (
-                    <tr key={row.tipo} className="border-b last:border-0">
-                      <td className="py-2">
-                        <span
-                          className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium"
-                          style={{ backgroundColor: `${info.color}1a`, color: info.color }}
-                        >
-                          <span
-                            className="h-2 w-2 rounded-full"
-                            style={{ backgroundColor: info.color }}
-                          />
-                          {info.label}
-                        </span>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-muted-foreground">
+                    <th className="pb-2 font-medium">Herramienta</th>
+                    <th className="pb-2 font-medium">Modelo</th>
+                    <th className="pb-2 font-medium text-right">Llamadas</th>
+                    <th className="pb-2 font-medium text-right">Costo prom / llamada</th>
+                    <th className="pb-2 font-medium text-right">Costo total</th>
+                    <th className="pb-2 font-medium text-right">% del total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats?.porTipo.map((row) => {
+                    const info = getTipoInfo(row.tipo)
+                    const modeloEntries = Object.entries(row.modelos).sort(
+                      ([, a], [, b]) => b.costo - a.costo
+                    )
+                    const pct = stats.resumen.costoTotal > 0
+                      ? (row.costo / stats.resumen.costoTotal) * 100
+                      : 0
+                    return (
+                      <tr key={row.tipo} className="border-b last:border-0">
+                        <td className="py-2">
+                          <div className="flex flex-col gap-0.5">
+                            <span
+                              className="inline-flex w-fit items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium"
+                              style={{ backgroundColor: `${info.color}1a`, color: info.color }}
+                            >
+                              <span
+                                className="h-2 w-2 rounded-full"
+                                style={{ backgroundColor: info.color }}
+                              />
+                              {info.label}
+                            </span>
+                            {row.duracionMsPromedio != null && (
+                              <span className="pl-2 text-[11px] text-muted-foreground">
+                                ~{(row.duracionMsPromedio / 1000).toFixed(1)}s prom
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-2">
+                          <div className="flex flex-wrap gap-1">
+                            {modeloEntries.map(([modelo, x]) => (
+                              <span
+                                key={modelo}
+                                className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${
+                                  modelo === 'Sonnet'
+                                    ? 'bg-purple-50 text-purple-700'
+                                    : modelo === 'Haiku'
+                                    ? 'bg-emerald-50 text-emerald-700'
+                                    : 'bg-gray-100 text-gray-700'
+                                }`}
+                                title={`${x.llamadas} llamada${x.llamadas !== 1 ? 's' : ''} · $${x.costo.toFixed(3)}`}
+                              >
+                                {modelo}
+                                {modeloEntries.length > 1 && (
+                                  <span className="ml-1 opacity-70">({x.llamadas})</span>
+                                )}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="py-2 text-right">{row.llamadas}</td>
+                        <td className="py-2 text-right tabular-nums text-muted-foreground">
+                          ${row.costoPromedio.toFixed(4)}
+                        </td>
+                        <td className="py-2 text-right font-medium tabular-nums">
+                          ${row.costo.toFixed(3)}
+                        </td>
+                        <td className="py-2 text-right tabular-nums text-muted-foreground">
+                          {pct.toFixed(1)}%
+                        </td>
+                      </tr>
+                    )
+                  })}
+                  {(!stats || stats.porTipo.length === 0) && (
+                    <tr>
+                      <td colSpan={6} className="py-4 text-center text-muted-foreground">
+                        Sin datos
                       </td>
-                      <td className="py-2 text-right">{row.llamadas}</td>
-                      <td className="py-2 text-right font-medium">${row.costo.toFixed(3)}</td>
                     </tr>
-                  )
-                })}
-                {(!stats || stats.porTipo.length === 0) && (
-                  <tr>
-                    <td colSpan={3} className="py-4 text-center text-muted-foreground">
-                      Sin datos
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </CardContent>
-        </Card>
-
-        {/* By model */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Por modelo</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-muted-foreground">
-                  <th className="pb-2 font-medium">Modelo</th>
-                  <th className="pb-2 font-medium text-right">Llamadas</th>
-                  <th className="pb-2 font-medium text-right">Costo</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stats?.porModelo.map((row) => (
-                  <tr key={row.modelo} className="border-b last:border-0">
-                    <td className="py-2">
-                      <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ${
-                        row.modelo === 'Sonnet'
-                          ? 'bg-purple-50 text-purple-700'
-                          : 'bg-emerald-50 text-emerald-700'
-                      }`}>
-                        {row.modelo}
-                      </span>
-                    </td>
-                    <td className="py-2 text-right">{row.llamadas}</td>
-                    <td className="py-2 text-right font-medium">${row.costo.toFixed(3)}</td>
-                  </tr>
-                ))}
-                {(!stats || stats.porModelo.length === 0) && (
-                  <tr>
-                    <td colSpan={3} className="py-4 text-center text-muted-foreground">
-                      Sin datos
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </CardContent>
         </Card>
 
         {/* By user */}
-        <Card className="lg:col-span-2">
+        <Card>
           <CardHeader>
             <CardTitle className="text-base">Por usuario</CardTitle>
           </CardHeader>

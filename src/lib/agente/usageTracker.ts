@@ -197,7 +197,19 @@ export interface UsageStats {
     llamadas: number
     porTipo: Record<string, number>
   }>
-  porTipo: Array<{ tipo: string; costo: number; llamadas: number }>
+  porTipo: Array<{
+    tipo: string
+    costo: number
+    llamadas: number
+    tokensInput: number
+    tokensOutput: number
+    /** Promedio de duración en ms (null si ningún registro tenía duracionMs) */
+    duracionMsPromedio: number | null
+    /** Costo / llamada para esta herramienta */
+    costoPromedio: number
+    /** Modelos usados por este tipo, con su conteo y costo. Friendly name (Sonnet/Haiku). */
+    modelos: Record<string, { llamadas: number; costo: number }>
+  }>
   porModelo: Array<{ modelo: string; costo: number; llamadas: number }>
   porUsuario: Array<{ userId: string; nombre: string; costo: number; llamadas: number }>
 }
@@ -234,6 +246,7 @@ export async function getUsageStats(
       tokensInput: true,
       tokensOutput: true,
       costoEstimado: true,
+      duracionMs: true,
       createdAt: true,
       userId: true,
     },
@@ -275,16 +288,66 @@ export async function getUsageStats(
     }))
     .sort((a, b) => a.fecha.localeCompare(b.fecha))
 
-  // Por tipo
-  const tipoMap = new Map<string, { costo: number; llamadas: number }>()
+  // Por tipo (con tokens, duracion promedio y breakdown de modelos)
+  interface TipoAcc {
+    costo: number
+    llamadas: number
+    tokensInput: number
+    tokensOutput: number
+    duracionMsTotal: number
+    duracionMsCount: number
+    modelos: Map<string, { llamadas: number; costo: number }>
+  }
+  const tipoMap = new Map<string, TipoAcc>()
   for (const r of records) {
-    const entry = tipoMap.get(r.tipo) || { costo: 0, llamadas: 0 }
+    let entry = tipoMap.get(r.tipo)
+    if (!entry) {
+      entry = {
+        costo: 0,
+        llamadas: 0,
+        tokensInput: 0,
+        tokensOutput: 0,
+        duracionMsTotal: 0,
+        duracionMsCount: 0,
+        modelos: new Map(),
+      }
+      tipoMap.set(r.tipo, entry)
+    }
     entry.costo += r.costoEstimado
     entry.llamadas += 1
-    tipoMap.set(r.tipo, entry)
+    entry.tokensInput += r.tokensInput
+    entry.tokensOutput += r.tokensOutput
+    // duracion no siempre se registra (campo opcional en el schema)
+    if (r.duracionMs != null) {
+      entry.duracionMsTotal += r.duracionMs
+      entry.duracionMsCount += 1
+    }
+    const friendly = r.modelo.includes('haiku') ? 'Haiku' : r.modelo.includes('sonnet') ? 'Sonnet' : r.modelo
+    const m = entry.modelos.get(friendly) ?? { llamadas: 0, costo: 0 }
+    m.llamadas += 1
+    m.costo += r.costoEstimado
+    entry.modelos.set(friendly, m)
   }
   const porTipo = Array.from(tipoMap.entries())
-    .map(([tipo, v]) => ({ tipo, costo: Math.round(v.costo * 1000) / 1000, llamadas: v.llamadas }))
+    .map(([tipo, v]) => ({
+      tipo,
+      costo: Math.round(v.costo * 1000) / 1000,
+      llamadas: v.llamadas,
+      tokensInput: v.tokensInput,
+      tokensOutput: v.tokensOutput,
+      duracionMsPromedio: v.duracionMsCount > 0
+        ? Math.round(v.duracionMsTotal / v.duracionMsCount)
+        : null,
+      costoPromedio: v.llamadas > 0
+        ? Math.round((v.costo / v.llamadas) * 10000) / 10000
+        : 0,
+      modelos: Object.fromEntries(
+        Array.from(v.modelos.entries()).map(([m, x]) => [
+          m,
+          { llamadas: x.llamadas, costo: Math.round(x.costo * 1000) / 1000 },
+        ])
+      ),
+    }))
     .sort((a, b) => b.costo - a.costo)
 
   // Por modelo (friendly name)
