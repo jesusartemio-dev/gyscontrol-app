@@ -20,7 +20,9 @@ export const TIPO_INFO: Record<string, TipoInfo> = {
   'pdf-extraction':      { label: 'Importación PDF',        color: '#f59e0b' }, // amber-500
   'ocr':                 { label: 'OCR Comprobantes',       color: '#ef4444' }, // red-500
   'scan-cotizacion':     { label: 'Escanear PDF Cotización',color: '#ec4899' }, // pink-500
-  'import-catalogo-pdf': { label: 'Importar Catálogo PDF',  color: '#06b6d4' }, // cyan-500
+  'import-catalogo-pdf':        { label: 'Importar Catálogo PDF',  color: '#06b6d4' }, // cyan-500
+  'ssoma-documento':            { label: 'SSOMA — Generar docs',   color: '#84cc16' }, // lime-500
+  'ssoma-documento-regenerar':  { label: 'SSOMA — Regenerar doc',  color: '#65a30d' }, // lime-600
 }
 
 export function getTipoInfo(tipo: string): TipoInfo {

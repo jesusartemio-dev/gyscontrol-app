@@ -18,7 +18,7 @@ const MODEL_COSTS: Record<string, { input: number; output: number }> = {
 
 const DEFAULT_COST = { input: 3.0, output: 15.0 } // Assume Sonnet pricing if unknown
 
-function calculateCost(
+export function calculateCost(
   model: string,
   inputTokens: number,
   outputTokens: number,

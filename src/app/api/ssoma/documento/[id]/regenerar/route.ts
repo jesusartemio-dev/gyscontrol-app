@@ -14,6 +14,7 @@ import {
 } from '@/lib/ssoma/prompts'
 import type { SsomaPromptData, SsomaActividadesAltoRiesgo } from '@/lib/ssoma/tipos'
 import { getModelForTask } from '@/lib/agente/models'
+import { calculateCost } from '@/lib/agente/usageTracker'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -206,7 +207,7 @@ export async function POST(
 
       const totalInput = res1.usage.input_tokens + res2.usage.input_tokens
       const totalOutput = res1.usage.output_tokens + res2.usage.output_tokens
-      const costoEstimado = totalInput * 0.000003 + totalOutput * 0.000015
+      const costoEstimado = calculateCost(ipercModel, totalInput, totalOutput)
 
       const usage = await prisma.agenteUsage.create({
         data: {
@@ -283,9 +284,7 @@ export async function POST(
 
     const contenido = response.content[0].type === 'text' ? response.content[0].text : ''
     const duracionMs = Date.now() - startMs
-    const costoEstimado =
-      response.usage.input_tokens * 0.000003 +
-      response.usage.output_tokens * 0.000015
+    const costoEstimado = calculateCost(docModel, response.usage.input_tokens, response.usage.output_tokens)
 
     const usage = await prisma.agenteUsage.create({
       data: {
