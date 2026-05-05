@@ -60,6 +60,8 @@ import {
   RotateCcw,
   Warehouse,
   QrCode,
+  ClipboardCheck,
+  FileBarChart,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -335,7 +337,9 @@ export default function Sidebar() {
         { href: '/seguridad/entregas', label: 'Entregas', icon: ClipboardList },
         { href: '/seguridad/reposiciones', label: 'Reposiciones', icon: Clock },
         { href: '/seguridad/empleados', label: 'Empleados', icon: Users },
-        { href: '/seguridad/reportes', label: 'Reportes', icon: BarChart3 },
+        { href: '/seguridad/registros', label: 'Registros de campo', icon: ClipboardCheck },
+        { href: '/seguridad/reportes-semanales', label: 'Reportes semanales', icon: FileBarChart },
+        { href: '/seguridad/reportes', label: 'Reportes EPP', icon: BarChart3 },
       ],
     },
     // 4.6. Administración - Gestión financiera y administrativa

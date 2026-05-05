@@ -180,6 +180,11 @@ export async function uploadFile(options: {
   return res.data
 }
 
+export async function deleteFile(fileId: string): Promise<void> {
+  const drive = getDriveClient()
+  await drive.files.delete({ fileId, supportsAllDrives: true })
+}
+
 export async function createFolder(options: {
   parentId: string
   folderName: string

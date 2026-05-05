@@ -1108,6 +1108,7 @@ model Proyecto {
   solicitudesHerramienta     SolicitudHerramienta[]
   devolucionesMaterial       DevolucionMaterial[]
   entregasEpp                EntregaEPP[]
+  reportesSemanalesSeguridad ReporteSemanalSeguridad[]
 
   @@index([clienteId, estado, createdAt(sort: Desc)], map: "idx_proyecto_cliente_estado_fecha")
   @@index([comercialId, estado, fechaInicio], map: "idx_proyecto_comercial_estado_inicio")
@@ -1499,6 +1500,66 @@ model RegistroSeguridadFoto {
   @@map("registro_seguridad_foto")
 }
 
+// Reporte semanal de seguridad que agrupa los registros de campo de una semana ISO.
+// El ingeniero lo redacta, lo envía a revisión y el gerente lo aprueba o rechaza.
+model ReporteSemanalSeguridad {
+  id          String                 @id @default(cuid())
+  proyectoId  String
+  ingenieroId String
+  semanaIso   String                 // e.g. "2026-W19"
+  fechaInicio DateTime
+  fechaFin    DateTime
+  estado      EstadoReporteSeguridad @default(borrador)
+
+  // Campos narrativos
+  resumenEjecutivo String?
+
+  // KPI override (null = usar valor calculado en vivo)
+  horasHombre          Float?
+  diasSinAccidentes    Int?
+  incidentesCount      Int?
+  accidentesCount      Int?
+  horasCapacitacion    Float?
+  personasCapacitadas  Int?
+
+  // Reporte COVID 19 (todos opcionales — si todos null, se omite del PPT)
+  totalPersonas    Int?
+  trabajadoresObra Int?
+  homeOffice       Int?
+  casosSospechosos Int?
+  casosInfectados  Int?
+  casosCurados     Int?
+  fallecidos       Int?
+  grupoRiesgo      Int?
+
+  // Revisión
+  aprobadorId   String?
+  notasRevision String?
+  enviadoAt     DateTime?
+  aprobadoAt    DateTime?
+  rechazadoAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  proyecto   Proyecto @relation(fields: [proyectoId], references: [id])
+  ingeniero  User     @relation("ReportesSeguridadIngeniero", fields: [ingenieroId], references: [id])
+  aprobador  User?    @relation("ReportesSeguridadAprobador", fields: [aprobadorId], references: [id])
+
+  @@unique([proyectoId, semanaIso])
+  @@index([proyectoId, semanaIso])
+  @@index([ingenieroId, semanaIso])
+  @@index([estado, semanaIso(sort: Desc)])
+  @@map("reporte_semanal_seguridad")
+}
+
+enum EstadoReporteSeguridad {
+  borrador
+  enviado
+  aprobado
+  rechazado
+}
+
 // Tarea dentro de un registro de campo
 // Puede ser una tarea del cronograma o una tarea extra (nombreTareaExtra)
 model RegistroHorasCampoTarea {
@@ -1692,6 +1753,11 @@ model User {
   devolucionesRegistradas                  DevolucionMaterial[]        @relation("DevolucionRegistradoPor")
   devolucionesDevueltas                    DevolucionMaterial[]        @relation("DevolucionDevueltoPor")
   entregasEppEntregadas                    EntregaEPP[]                @relation("EntregaEppEntregador")
+  // Registros de seguridad (charlas NDAD, inspecciones, observaciones)
+  registrosSeguridad                       RegistroSeguridad[]         @relation("RegistrosSeguridadIngeniero")
+  // Reportes semanales de seguridad
+  reportesSeguridadCreados                 ReporteSemanalSeguridad[]   @relation("ReportesSeguridadIngeniero")
+  reportesSeguridadAprobados               ReporteSemanalSeguridad[]   @relation("ReportesSeguridadAprobador")
 
   @@map("user")
 }

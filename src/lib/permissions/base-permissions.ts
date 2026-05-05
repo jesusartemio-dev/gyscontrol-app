@@ -407,6 +407,49 @@ export const CRM_PERMISSIONS: BasePermission[] = [
   }
 ];
 
+// ✅ Permisos de Registros de Seguridad (charlas NDAD, inspecciones, observaciones)
+export const SECURITY_RECORD_PERMISSIONS: BasePermission[] = [
+  {
+    name: 'security_records.create',
+    description: 'Crear registros de seguridad de campo',
+    resource: 'security_records',
+    action: 'create',
+    isSystemPermission: true
+  },
+  {
+    name: 'security_records.view_own',
+    description: 'Ver los propios registros de seguridad creados',
+    resource: 'security_records',
+    action: 'view_own',
+    isSystemPermission: true
+  },
+  {
+    name: 'security_records.view_all',
+    description: 'Ver todos los registros de seguridad de cualquier ingeniero',
+    resource: 'security_records',
+    action: 'view_all',
+    isSystemPermission: true
+  },
+  {
+    name: 'security_records.edit_own',
+    description: 'Editar los propios registros de seguridad',
+    resource: 'security_records',
+    action: 'edit_own',
+    isSystemPermission: true
+  },
+  {
+    name: 'security_records.delete_own',
+    description: 'Eliminar los propios registros de seguridad',
+    resource: 'security_records',
+    action: 'delete_own',
+    isSystemPermission: true
+  }
+];
+
+// Roles que tienen acceso a los registros de seguridad por defecto.
+// Mantener alineado con el array que las API routes usan inline para validar.
+export const SECURITY_RECORD_ALLOWED_ROLES = ['admin', 'gerente', 'seguridad'] as const;
+
 // ✅ TODOS LOS PERMISOS DEL SISTEMA
 export const ALL_BASE_PERMISSIONS: BasePermission[] = [
   ...USER_PERMISSIONS,
@@ -419,7 +462,8 @@ export const ALL_BASE_PERMISSIONS: BasePermission[] = [
   ...REPORT_PERMISSIONS,
   ...CONFIG_PERMISSIONS,
   ...AUDIT_PERMISSIONS,
-  ...CRM_PERMISSIONS
+  ...CRM_PERMISSIONS,
+  ...SECURITY_RECORD_PERMISSIONS
 ];
 
 // ✅ Función helper para obtener permisos por recurso
