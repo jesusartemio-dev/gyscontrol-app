@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { Camera, X } from 'lucide-react'
+import { Camera, FolderOpen, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -25,7 +25,8 @@ function genId() {
 }
 
 export function FotosUploader({ fotos, onChange, max = 3, disabled }: Props) {
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputCamaraRef = useRef<HTMLInputElement>(null)
+  const inputArchivoRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     return () => {
@@ -45,7 +46,8 @@ export function FotosUploader({ fotos, onChange, max = 3, disabled }: Props) {
       aAgregar.push({ id: genId(), file, previewUrl: URL.createObjectURL(file) })
     }
     onChange([...fotos, ...aAgregar])
-    if (inputRef.current) inputRef.current.value = ''
+    if (inputCamaraRef.current) inputCamaraRef.current.value = ''
+    if (inputArchivoRef.current) inputArchivoRef.current.value = ''
   }
 
   const eliminar = (id: string) => {
@@ -79,20 +81,32 @@ export function FotosUploader({ fotos, onChange, max = 3, disabled }: Props) {
         {!lleno && !disabled && (
           <button
             type="button"
-            onClick={() => inputRef.current?.click()}
+            onClick={() => inputCamaraRef.current?.click()}
             className={cn(
               'aspect-square rounded-md border border-dashed flex flex-col items-center justify-center gap-1',
               'text-muted-foreground hover:bg-muted/50 transition',
             )}
           >
             <Camera className="h-6 w-6" />
-            <span className="text-[10px]">Agregar</span>
+            <span className="text-[10px]">Cámara</span>
           </button>
         )}
       </div>
 
+      {/* Input cámara directa */}
       <input
-        ref={inputRef}
+        ref={inputCamaraRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        multiple
+        className="hidden"
+        onChange={(e) => agregar(e.target.files)}
+        disabled={disabled || lleno}
+      />
+      {/* Input galería / archivos */}
+      <input
+        ref={inputArchivoRef}
         type="file"
         accept="image/*"
         multiple
@@ -104,15 +118,26 @@ export function FotosUploader({ fotos, onChange, max = 3, disabled }: Props) {
       <div className="flex items-center justify-between text-[11px] text-muted-foreground">
         <span>{fotos.length} / {max}</span>
         {!lleno && !disabled && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-7 text-xs"
-            onClick={() => inputRef.current?.click()}
-          >
-            <Camera className="h-3.5 w-3.5 mr-1" /> Tomar foto
-          </Button>
+          <div className="flex gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => inputCamaraRef.current?.click()}
+            >
+              <Camera className="h-3.5 w-3.5 mr-1" /> Cámara
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => inputArchivoRef.current?.click()}
+            >
+              <FolderOpen className="h-3.5 w-3.5 mr-1" /> Archivos
+            </Button>
+          </div>
         )}
       </div>
     </div>
