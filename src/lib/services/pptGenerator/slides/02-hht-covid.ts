@@ -183,13 +183,17 @@ export function generarSlideHhtCovid(
     slide.addTable([headerRow, dataRow, totalRow], {
       ...HHT_COVID.TABLA_HHT,
       y: 1.45,
-      h: 2.8,
+      h: 2.5,
       colW,
       border: { type: 'solid', color: COLORS.GRAY_LIGHT, pt: 0.5 },
     })
   }
 
   // ─── Tabla COVID ───────────────────────────────────────────────────────────
+  // Posiciones COVID ajustadas para no solapar la tabla HHT (que termina en y=3.95)
+  const COVID_TITULO_Y = 4.05
+  const COVID_TABLA_Y = 4.55
+
   const r = agregado.reporte
   const covidCampos = [
     r.totalPersonas,
@@ -206,6 +210,7 @@ export function generarSlideHhtCovid(
   if (algunoCovid) {
     slide.addText('Reporte Covid 19', {
       ...HHT_COVID.TITULO_COVID,
+      y: COVID_TITULO_Y,
       fontFace: FONTS.SECTION,
       fontSize: 16,
       bold: true,
@@ -247,6 +252,7 @@ export function generarSlideHhtCovid(
 
     slide.addTable([hdrCovid, dataCovid], {
       ...HHT_COVID.TABLA_COVID,
+      y: COVID_TABLA_Y,
       colW: covidColW,
       border: { type: 'solid', color: COLORS.GRAY_LIGHT, pt: 0.5 },
     })
