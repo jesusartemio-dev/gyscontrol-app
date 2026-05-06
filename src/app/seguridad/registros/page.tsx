@@ -7,7 +7,7 @@ import { ArrowLeft, ClipboardCheck, Loader2, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { FiltrosRegistros, type FiltrosRegistrosValor } from '@/components/seguridad/registros/FiltrosRegistros'
-import { RegistroSeguridadCard } from '@/components/seguridad/registros/RegistroSeguridadCard'
+import { GrupoJornada, type RegistroFila } from '@/components/seguridad/registros/GrupoJornada'
 import type { TipoRegistroSeguridad } from '@/lib/validators/registroSeguridad'
 
 interface RegistroLista {
@@ -85,6 +85,24 @@ export default function RegistrosSeguridadListaPage() {
 
   const registros = registrosQuery.data ?? []
 
+  const grupos = useMemo(() => {
+    const map = new Map<string, { jornada: RegistroLista['jornada']; registros: RegistroFila[] }>()
+    for (const r of registros) {
+      if (!map.has(r.jornada.id)) map.set(r.jornada.id, { jornada: r.jornada, registros: [] })
+      map.get(r.jornada.id)!.registros.push({
+        id: r.id,
+        tipo: r.tipo,
+        descripcion: r.descripcion,
+        asistentes: r.asistentes,
+        fotos: r.fotos.map((f) => ({ id: f.id, nombreArchivo: f.nombreArchivo })),
+      })
+    }
+    return Array.from(map.values()).sort(
+      (a, b) =>
+        new Date(b.jornada.fechaTrabajo).getTime() - new Date(a.jornada.fechaTrabajo).getTime(),
+    )
+  }, [registros])
+
   return (
     <div className="container mx-auto p-4 sm:p-6 space-y-4 max-w-4xl">
       <div className="flex items-center gap-3">
@@ -144,8 +162,13 @@ export default function RegistrosSeguridadListaPage() {
               <Loader2 className="h-3 w-3 animate-spin" /> Actualizando…
             </div>
           )}
-          {registros.map((r) => (
-            <RegistroSeguridadCard key={r.id} registro={r} />
+          {grupos.map((g, i) => (
+            <GrupoJornada
+              key={g.jornada.id}
+              jornada={g.jornada}
+              registros={g.registros}
+              defaultOpen={i === 0}
+            />
           ))}
         </div>
       )}
