@@ -99,11 +99,25 @@ const ESTADO_CLASS: Record<JornadaActiva['estado'], string> = {
   pendiente: 'bg-amber-100 text-amber-700 border-amber-200',
 }
 
-function formatHora(iso: string): string {
-  return new Date(iso).toLocaleTimeString('es-PE', {
-    hour: '2-digit',
-    minute: '2-digit',
+function formatFechaCorta(iso: string): string {
+  return new Date(iso).toLocaleDateString('es-PE', {
+    day: '2-digit',
+    month: 'short',
+    year: '2-digit',
   })
+}
+
+function diasDesde(iso: string): number {
+  const ahora = new Date()
+  const fecha = new Date(iso)
+  const ms = inicioDelDiaCliente(ahora).getTime() - inicioDelDiaCliente(fecha).getTime()
+  return Math.round(ms / (1000 * 60 * 60 * 24))
+}
+
+function inicioDelDiaCliente(d: Date): Date {
+  const x = new Date(d)
+  x.setHours(0, 0, 0, 0)
+  return x
 }
 
 export function SelectorJornada({ value, onChange, filtroProyectoId, filtroFechaDesde, filtroFechaHasta }: Props) {
@@ -159,7 +173,7 @@ export function SelectorJornada({ value, onChange, filtroProyectoId, filtroFecha
             Jornada activa
           </h3>
           <p className="text-xs text-muted-foreground">
-            Elige la jornada del día contra la que quieres registrar tu actividad.
+            Elige cualquier jornada en curso o pendiente contra la que quieres registrar tu actividad.
           </p>
         </div>
         <Button
@@ -198,9 +212,9 @@ export function SelectorJornada({ value, onChange, filtroProyectoId, filtroFecha
       ) : jornadas.length === 0 ? (
         <div className="rounded-md border border-dashed py-6 px-3 text-center space-y-2">
           <CalendarDays className="h-6 w-6 mx-auto text-muted-foreground" />
-          <p className="text-sm font-medium">No hay jornadas abiertas hoy</p>
+          <p className="text-sm font-medium">No hay jornadas abiertas</p>
           <p className="text-xs text-muted-foreground">
-            Pídele a un supervisor que abra la suya.
+            Pídele a un supervisor que inicie la suya.
           </p>
           <Button
             type="button"
@@ -248,7 +262,15 @@ export function SelectorJornada({ value, onChange, filtroProyectoId, filtroFecha
                     <User className="h-3 w-3" /> {j.supervisor.name ?? '—'}
                   </span>
                   <span className="flex items-center gap-1 justify-end">
-                    <CalendarDays className="h-3 w-3" /> {formatHora(j.createdAt)}
+                    <CalendarDays className="h-3 w-3" />
+                    {formatFechaCorta(j.fechaTrabajo)}
+                    {(() => {
+                      const d = diasDesde(j.fechaTrabajo)
+                      if (d === 0) return <span className="text-emerald-600 font-medium">· hoy</span>
+                      if (d === 1) return <span>· ayer</span>
+                      if (d > 1) return <span className="text-amber-600">· hace {d} d</span>
+                      return null
+                    })()}
                   </span>
                   {j.ubicacion && (
                     <span className="col-span-2 flex items-center gap-1">

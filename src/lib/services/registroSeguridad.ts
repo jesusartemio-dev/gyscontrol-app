@@ -25,18 +25,23 @@ export interface ListarJornadasActivasOpts {
 }
 
 /**
- * Devuelve jornadas en estado `iniciado` o `pendiente` cuya fechaTrabajo está dentro
- * del rango indicado (default: hoy). Si soloAsignadas=true se requiere ingenieroId y
- * filtra por proyectos donde el ingeniero está activo en PersonalProyecto.
+ * Devuelve jornadas en estado `iniciado` o `pendiente`. Por defecto NO filtra por fecha
+ * — una jornada abierta hace una semana sigue siendo válida para registrar evidencias.
+ * Si se pasa `fecha` o `fechaDesde/fechaHasta`, restringe al rango indicado.
+ * Si soloAsignadas=true se requiere ingenieroId y filtra por proyectos donde el ingeniero
+ * está activo en PersonalProyecto.
  */
 export async function listarJornadasActivasDelDia(opts: ListarJornadasActivasOpts = {}) {
   const tieneRango = opts.fechaDesde && opts.fechaHasta
-  const desde = tieneRango ? inicioDelDia(opts.fechaDesde!) : inicioDelDia(opts.fecha ?? new Date())
-  const hasta = tieneRango ? finDelDia(opts.fechaHasta!) : finDelDia(opts.fecha ?? new Date())
-
+  const tieneFecha = !!opts.fecha
   const where: Prisma.RegistroHorasCampoWhereInput = {
     estado: { in: ['iniciado', 'pendiente'] },
-    fechaTrabajo: { gte: desde, lte: hasta },
+  }
+
+  if (tieneRango) {
+    where.fechaTrabajo = { gte: inicioDelDia(opts.fechaDesde!), lte: finDelDia(opts.fechaHasta!) }
+  } else if (tieneFecha) {
+    where.fechaTrabajo = { gte: inicioDelDia(opts.fecha!), lte: finDelDia(opts.fecha!) }
   }
 
   if (opts.proyectoId) where.proyectoId = opts.proyectoId
@@ -76,7 +81,7 @@ export async function listarJornadasActivasDelDia(opts: ListarJornadasActivasOpt
       },
       evidenciaSeguridad: { select: { id: true, estado: true } },
     },
-    orderBy: { createdAt: 'desc' },
+    orderBy: [{ fechaTrabajo: 'desc' }, { createdAt: 'desc' }],
   })
 }
 
