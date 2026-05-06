@@ -1,7 +1,6 @@
 'use client'
 
 import { use, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
@@ -9,7 +8,9 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import {
   ArrowLeft,
   CalendarDays,
+  CheckCircle2,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
   Image as ImageIcon,
   Loader2,
@@ -17,6 +18,7 @@ import {
   LockOpen,
   Plus,
   Save,
+  Shield,
   Trash2,
   User,
   Users,
@@ -57,6 +59,8 @@ import {
   type CrearRegistroSeguridadInput,
   type TipoRegistroSeguridad,
 } from '@/lib/validators/registroSeguridad'
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface FotoLista {
   id: string
@@ -105,6 +109,8 @@ interface EvidenciaDetalle {
   registros: RegistroLista[]
 }
 
+// ─── Constants ───────────────────────────────────────────────────────────────
+
 const TIPO_COLOR: Record<TipoRegistroSeguridad, string> = {
   charla: 'bg-blue-100 text-blue-700 border-blue-200',
   inspeccion: 'bg-emerald-100 text-emerald-700 border-emerald-200',
@@ -116,23 +122,32 @@ const TIPO_COLOR: Record<TipoRegistroSeguridad, string> = {
   prevencion_salud: 'bg-violet-100 text-violet-700 border-violet-200',
 }
 
-const TIPO_BORDER: Record<TipoRegistroSeguridad, string> = {
-  charla: 'border-l-blue-500',
-  inspeccion: 'border-l-green-500',
-  observacion: 'border-l-yellow-500',
+const TIPO_BORDER_L: Record<TipoRegistroSeguridad, string> = {
+  charla: 'border-l-blue-400',
+  inspeccion: 'border-l-emerald-500',
+  observacion: 'border-l-amber-400',
   incidente: 'border-l-red-500',
   actividad_general: 'border-l-gray-400',
-  riesgo_critico: 'border-l-orange-600',
-  medio_ambiente: 'border-l-emerald-600',
-  prevencion_salud: 'border-l-cyan-500',
+  riesgo_critico: 'border-l-rose-500',
+  medio_ambiente: 'border-l-teal-500',
+  prevencion_salud: 'border-l-violet-500',
 }
+
+/** Orden exacto del PPTX semanal — sirve de checklist mínimo */
+const SECCIONES_PPTX: { tipo: TipoRegistroSeguridad; slide: string }[] = [
+  { tipo: 'charla',           slide: '03' },
+  { tipo: 'inspeccion',       slide: '04' },
+  { tipo: 'incidente',        slide: '05A' },
+  { tipo: 'observacion',      slide: '05B' },
+  { tipo: 'actividad_general',slide: '06' },
+  { tipo: 'riesgo_critico',   slide: '07' },
+  { tipo: 'medio_ambiente',   slide: '08' },
+  { tipo: 'prevencion_salud', slide: '09' },
+]
 
 const formatFechaLarga = (s: string) =>
   new Date(s).toLocaleDateString('es-PE', {
-    weekday: 'long',
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
+    weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
   })
 
 const formatHora = (s: string) =>
@@ -142,9 +157,7 @@ async function subirFoto(registroId: string, file: File) {
   const fd = new FormData()
   fd.append('file', file)
   const res = await fetch(`/api/seguridad/registros/${registroId}/fotos`, {
-    method: 'POST',
-    body: fd,
-    credentials: 'include',
+    method: 'POST', body: fd, credentials: 'include',
   })
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
@@ -153,20 +166,24 @@ async function subirFoto(registroId: string, file: File) {
   return res.json()
 }
 
+// ─── Page ────────────────────────────────────────────────────────────────────
+
 export default function EvidenciaSeguridadPage({
   params,
 }: {
   params: Promise<{ id: string }>
 }) {
   const { id } = use(params)
-  const router = useRouter()
   const queryClient = useQueryClient()
   const { data: session } = useSession()
+
   const [confirmCerrar, setConfirmCerrar] = useState(false)
   const [confirmEliminarRegistro, setConfirmEliminarRegistro] = useState<string | null>(null)
-  const [cuadrillaAbierta, setCuadrillaAbierta] = useState(true)
+  const [cuadrillaAbierta, setCuadrillaAbierta] = useState(false)
   const [modalAbierto, setModalAbierto] = useState(false)
   const [fotos, setFotos] = useState<FotoLocal[]>([])
+  // Set de tipos que el usuario ha toggleado manualmente (invierte el default)
+  const [toggledSections, setToggledSections] = useState<Set<TipoRegistroSeguridad>>(new Set())
 
   const query = useQuery<EvidenciaDetalle>({
     queryKey: ['seguridad', 'evidencia', id],
@@ -189,6 +206,8 @@ export default function EvidenciaSeguridadPage({
   })
 
   const tipo = form.watch('tipo')
+
+  // ── Mutations ──────────────────────────────────────────────────────────────
 
   const crearMutation = useMutation({
     mutationFn: async (input: CrearRegistroSeguridadInput) => {
@@ -213,34 +232,20 @@ export default function EvidenciaSeguridadPage({
         evidenciaSeguridadId: id,
         asistentes: data.tipo === 'charla' ? data.asistentes ?? null : null,
       })
-
       let fallos = 0
       for (const foto of fotos) {
-        try {
-          await subirFoto(creado.id, foto.file)
-        } catch (err) {
-          console.error('Error subiendo foto:', err)
-          fallos++
-        }
+        try { await subirFoto(creado.id, foto.file) }
+        catch { fallos++ }
       }
-
       queryClient.invalidateQueries({ queryKey: ['seguridad', 'evidencia', id] })
       queryClient.invalidateQueries({ queryKey: ['seguridad', 'evidencias'] })
       queryClient.invalidateQueries({ queryKey: ['seguridad', 'registros'] })
-
       if (fallos > 0) {
         toast.warning(`Registro creado, pero ${fallos} foto${fallos > 1 ? 's' : ''} no se pudo subir.`)
       } else {
         toast.success('Registro agregado')
       }
-
-      form.reset({
-        evidenciaSeguridadId: id,
-        tipo: data.tipo,
-        descripcion: '',
-        asistentes: null,
-        observaciones: null,
-      })
+      form.reset({ evidenciaSeguridadId: id, tipo: data.tipo, descripcion: '', asistentes: null, observaciones: null })
       setFotos([])
       setModalAbierto(false)
     } catch (err) {
@@ -256,10 +261,7 @@ export default function EvidenciaSeguridadPage({
         credentials: 'include',
         body: JSON.stringify({ estado: 'cerrada' }),
       })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.error ?? 'No se pudo cerrar')
-      }
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'No se pudo cerrar')
     },
     onSuccess: () => {
       toast.success('Evidencia cerrada')
@@ -278,10 +280,7 @@ export default function EvidenciaSeguridadPage({
         credentials: 'include',
         body: JSON.stringify({ estado: 'abierta' }),
       })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.error ?? 'No se pudo reabrir')
-      }
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'No se pudo reabrir')
     },
     onSuccess: () => {
       toast.success('Evidencia reabierta')
@@ -294,13 +293,9 @@ export default function EvidenciaSeguridadPage({
   const eliminarRegistroMutation = useMutation({
     mutationFn: async (registroId: string) => {
       const res = await fetch(`/api/seguridad/registros/${registroId}`, {
-        method: 'DELETE',
-        credentials: 'include',
+        method: 'DELETE', credentials: 'include',
       })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.error ?? 'No se pudo eliminar')
-      }
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'No se pudo eliminar')
     },
     onSuccess: () => {
       toast.success('Registro eliminado')
@@ -310,6 +305,8 @@ export default function EvidenciaSeguridadPage({
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Error al eliminar'),
   })
+
+  // ── Loading / error ────────────────────────────────────────────────────────
 
   if (query.isLoading) {
     return (
@@ -325,9 +322,7 @@ export default function EvidenciaSeguridadPage({
     return (
       <div className="container mx-auto p-4 max-w-3xl">
         <Link href="/seguridad/evidencias">
-          <Button variant="ghost" size="sm">
-            <ArrowLeft className="h-4 w-4 mr-1" /> Volver
-          </Button>
+          <Button variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-1" /> Volver</Button>
         </Link>
         <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           No se pudo cargar la evidencia.
@@ -335,6 +330,8 @@ export default function EvidenciaSeguridadPage({
       </div>
     )
   }
+
+  // ── Derived state ──────────────────────────────────────────────────────────
 
   const ev = query.data
   const role = session?.user?.role
@@ -346,11 +343,43 @@ export default function EvidenciaSeguridadPage({
   const totalTrabajadores = new Set(
     ev.jornada.tareas.flatMap((t) => t.miembros.map((m) => m.usuarioId)),
   ).size
-
   const enviando = form.formState.isSubmitting || crearMutation.isPending
+
+  /** Secciones con registros abren por default; vacías cierran. El usuario puede invertir. */
+  const isSectionOpen = (tipoSec: TipoRegistroSeguridad) => {
+    const hasRecords = ev.registros.some((r) => r.tipo === tipoSec)
+    const toggled = toggledSections.has(tipoSec)
+    return hasRecords ? !toggled : toggled
+  }
+
+  const toggleSection = (tipoSec: TipoRegistroSeguridad) => {
+    setToggledSections((prev) => {
+      const next = new Set(prev)
+      if (next.has(tipoSec)) next.delete(tipoSec)
+      else next.add(tipoSec)
+      return next
+    })
+  }
+
+  const openModal = (tipoInicial: TipoRegistroSeguridad) => {
+    form.setValue('tipo', tipoInicial)
+    form.setValue('descripcion', '')
+    form.setValue('asistentes', null)
+    form.setValue('observaciones', null)
+    setFotos([])
+    setModalAbierto(true)
+  }
+
+  const seccionesConRegistros = SECCIONES_PPTX.filter(({ tipo: t }) =>
+    ev.registros.some((r) => r.tipo === t),
+  ).length
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div className="container mx-auto p-3 sm:p-4 space-y-3 max-w-3xl">
+
+      {/* ── Nav ──────────────────────────────────────────────── */}
       <div className="flex items-center gap-2">
         <Link href="/seguridad/evidencias">
           <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
@@ -361,121 +390,99 @@ export default function EvidenciaSeguridadPage({
         </div>
       </div>
 
-      {/* ── Header card ───────────────────────────────────── */}
+      {/* ── Header card ──────────────────────────────────────── */}
       <Card>
         <CardContent className="p-4 space-y-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <div className="flex items-center gap-2">
-              <Badge
-                className={cn(
-                  'text-xs border',
-                  evidenciaAbierta
-                    ? 'bg-green-100 text-green-700 border-green-200'
-                    : 'bg-gray-200 text-gray-700 border-gray-300',
-                )}
-              >
-                {evidenciaAbierta ? <LockOpen className="h-3 w-3 mr-1" /> : <Lock className="h-3 w-3 mr-1" />}
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge className={cn('text-xs border', evidenciaAbierta
+                ? 'bg-green-100 text-green-700 border-green-200'
+                : 'bg-gray-200 text-gray-700 border-gray-300')}>
+                {evidenciaAbierta
+                  ? <LockOpen className="h-3 w-3 mr-1" />
+                  : <Lock className="h-3 w-3 mr-1" />}
                 Evidencia {ev.estado}
               </Badge>
-              <Badge
-                className={cn(
-                  'text-xs border capitalize',
-                  jornadaActiva
-                    ? 'bg-blue-100 text-blue-700 border-blue-200'
-                    : 'bg-gray-100 text-gray-600 border-gray-200',
-                )}
-              >
+              <Badge className={cn('text-xs border capitalize', jornadaActiva
+                ? 'bg-blue-100 text-blue-700 border-blue-200'
+                : 'bg-gray-100 text-gray-600 border-gray-200')}>
                 Jornada {ev.jornada.estado}
               </Badge>
             </div>
             <div className="flex items-center gap-2">
               {puedeCerrar && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8"
-                  onClick={() => setConfirmCerrar(true)}
-                  disabled={cerrarMutation.isPending}
-                >
+                <Button variant="outline" size="sm" className="h-8"
+                  onClick={() => setConfirmCerrar(true)} disabled={cerrarMutation.isPending}>
                   <Lock className="h-3.5 w-3.5 mr-1" /> Cerrar evidencia
                 </Button>
               )}
               {!evidenciaAbierta && isBypass && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8"
-                  onClick={() => reabrirMutation.mutate()}
-                  disabled={reabrirMutation.isPending}
-                >
+                <Button variant="outline" size="sm" className="h-8"
+                  onClick={() => reabrirMutation.mutate()} disabled={reabrirMutation.isPending}>
                   <LockOpen className="h-3.5 w-3.5 mr-1" /> Reabrir
                 </Button>
               )}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-1.5 gap-x-4 text-sm">
             <div className="flex items-center gap-2">
-              <CalendarDays className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Fecha:</span>
+              <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
               <span className="font-medium capitalize">{formatFechaLarga(ev.jornada.fechaTrabajo)}</span>
             </div>
             <div className="flex items-center gap-2">
-              <User className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Supervisor:</span>
+              <User className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-muted-foreground text-xs">Supervisor:</span>
               <span className="font-medium">{ev.jornada.supervisor.name ?? '—'}</span>
             </div>
             <div className="flex items-center gap-2">
-              <User className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Abierta por:</span>
+              <User className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-muted-foreground text-xs">Abierta por:</span>
               <span className="font-medium">{ev.creadoPor.name ?? '—'}</span>
             </div>
             {ev.fechaCierre && (
               <div className="flex items-center gap-2">
-                <Lock className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground">Cerrada:</span>
-                <span className="font-medium">{formatFechaLarga(ev.fechaCierre)} {formatHora(ev.fechaCierre)}</span>
+                <Lock className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="text-muted-foreground text-xs">Cerrada:</span>
+                <span className="font-medium">{formatHora(ev.fechaCierre)}</span>
               </div>
             )}
           </div>
 
           {ev.observaciones && (
             <div className="text-sm border-t pt-2">
-              <span className="text-xs uppercase tracking-wide text-muted-foreground">Observaciones</span>
-              <p className="mt-1 whitespace-pre-wrap">{ev.observaciones}</p>
+              <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Observaciones</p>
+              <p className="whitespace-pre-wrap">{ev.observaciones}</p>
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* ── Cuadrilla card ────────────────────────────────── */}
+      {/* ── Cuadrilla card (colapsada por default) ───────────── */}
       {ev.jornada.tareas.length > 0 && (
         <Card className="border-orange-200 bg-orange-50/40">
-          <button
-            type="button"
-            onClick={() => setCuadrillaAbierta((v) => !v)}
-            className="w-full text-left"
-          >
+          <button type="button" onClick={() => setCuadrillaAbierta((v) => !v)} className="w-full text-left">
             <div className="flex items-center justify-between p-3">
               <div className="flex items-center gap-2">
                 <Users className="h-4 w-4 text-orange-700" />
                 <span className="text-xs font-semibold text-orange-700">Cuadrilla y tareas</span>
                 <span className="text-[11px] text-muted-foreground">
                   {totalTrabajadores} trabajador{totalTrabajadores === 1 ? '' : 'es'}
+                  {' · '}{ev.jornada.tareas.length} tarea{ev.jornada.tareas.length === 1 ? '' : 's'}
                 </span>
               </div>
-              {cuadrillaAbierta ? (
-                <ChevronUp className="h-4 w-4 text-orange-700" />
-              ) : (
-                <ChevronDown className="h-4 w-4 text-orange-700" />
-              )}
+              {cuadrillaAbierta
+                ? <ChevronUp className="h-4 w-4 text-orange-700" />
+                : <ChevronDown className="h-4 w-4 text-orange-700" />}
             </div>
           </button>
           {cuadrillaAbierta && (
             <CardContent className="p-3 pt-0 space-y-1">
               {ev.jornada.tareas.map((t) => (
                 <div key={t.id} className="text-xs leading-snug">
-                  <span className="font-medium">• {t.proyectoTarea?.nombre ?? t.nombreTareaExtra ?? 'Tarea'}</span>
+                  <span className="font-medium">
+                    • {t.proyectoTarea?.nombre ?? t.nombreTareaExtra ?? 'Tarea'}
+                  </span>
                   {t.miembros.length > 0 && (
                     <span className="text-muted-foreground ml-1">
                       — {t.miembros.length} pers · {t.miembros.reduce((s, m) => s + (m.horas ?? 0), 0).toFixed(1)} h
@@ -488,97 +495,7 @@ export default function EvidenciaSeguridadPage({
         </Card>
       )}
 
-      {/* ── Lista de registros ────────────────────────────── */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold flex items-center gap-2">
-            <ImageIcon className="h-4 w-4 text-orange-600" />
-            Evidencias registradas ({ev.registros.length})
-          </h2>
-          {puedeEscribir && (
-            <Button
-              size="sm"
-              className="h-8 bg-orange-600 hover:bg-orange-700"
-              onClick={() => setModalAbierto(true)}
-            >
-              <Plus className="h-4 w-4 mr-1" /> Agregar
-            </Button>
-          )}
-        </div>
-
-        {ev.registros.length === 0 ? (
-          <div className="rounded-md border border-dashed py-8 text-center text-sm text-muted-foreground">
-            Aún no hay evidencias.{puedeEscribir ? ' Usa el botón "+ Agregar" para registrar la primera.' : ''}
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {ev.registros.map((r) => (
-              <Link
-                key={r.id}
-                href={`/seguridad/registros/${r.id}`}
-                className={cn(
-                  'flex items-start gap-3 p-3 bg-white border rounded-md hover:bg-orange-50/40 transition-colors border-l-4',
-                  TIPO_BORDER[r.tipo],
-                )}
-              >
-                <div className="h-12 w-12 shrink-0 rounded bg-muted overflow-hidden flex items-center justify-center">
-                  {r.fotos[0] ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img
-                      src={`/api/seguridad/registros/fotos/${r.fotos[0].id}/contenido`}
-                      alt={r.fotos[0].nombreArchivo}
-                      className="h-full w-full object-cover"
-                      loading="lazy"
-                      onError={(e) => { e.currentTarget.style.display = 'none' }}
-                    />
-                  ) : (
-                    <ImageIcon className="h-5 w-5 text-muted-foreground" />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Badge className={cn('text-[10px] border', TIPO_COLOR[r.tipo])}>
-                      {TIPO_REGISTRO_LABELS[r.tipo]}
-                    </Badge>
-                    <span className="text-[10px] text-muted-foreground">
-                      {formatHora(r.createdAt)} · {r.ingeniero.name ?? '—'}
-                    </span>
-                  </div>
-                  <p className="text-sm mt-1 line-clamp-2">{r.descripcion}</p>
-                  <div className="flex items-center gap-3 mt-1 text-[11px] text-muted-foreground">
-                    {r.asistentes != null && (
-                      <span className="flex items-center gap-1">
-                        <Users className="h-3 w-3" /> {r.asistentes}
-                      </span>
-                    )}
-                    {r.fotos.length > 0 && (
-                      <span className="flex items-center gap-1">
-                        <ImageIcon className="h-3 w-3" /> {r.fotos.length}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                {puedeEscribir && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 shrink-0 text-red-600 hover:text-red-700"
-                    onClick={(e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      setConfirmEliminarRegistro(r.id)
-                    }}
-                    aria-label="Eliminar registro"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                )}
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
-
+      {/* ── Aviso solo lectura ────────────────────────────────── */}
       {!puedeEscribir && (
         <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
           {!evidenciaAbierta
@@ -587,18 +504,173 @@ export default function EvidenciaSeguridadPage({
         </div>
       )}
 
-      {/* ── Modal: agregar evidencia ──────────────────────── */}
-      <Dialog
-        open={modalAbierto}
-        onOpenChange={(open) => {
-          if (!enviando) setModalAbierto(open)
-        }}
-      >
+      {/* ── Secciones en orden PPTX ──────────────────────────── */}
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="text-sm font-semibold flex items-center gap-2">
+            <Shield className="h-4 w-4 text-orange-600" />
+            Registros ({ev.registros.length})
+            <span className="text-[11px] font-normal text-muted-foreground">
+              {seccionesConRegistros}/{SECCIONES_PPTX.length} tipos completados
+            </span>
+          </h2>
+        </div>
+
+        {SECCIONES_PPTX.map(({ tipo: tipoSec, slide }) => {
+          const registrosTipo = ev.registros.filter((r) => r.tipo === tipoSec)
+          const open = isSectionOpen(tipoSec)
+          const tieneRegistros = registrosTipo.length > 0
+
+          return (
+            <div
+              key={tipoSec}
+              className={cn(
+                'border rounded-lg overflow-hidden',
+                tieneRegistros ? 'border-gray-200 bg-white' : 'border-dashed border-gray-200 bg-gray-50/40',
+              )}
+            >
+              {/* Cabecera de sección */}
+              <div className="flex items-center gap-1 px-3 py-2">
+                <button
+                  type="button"
+                  onClick={() => toggleSection(tipoSec)}
+                  className="flex items-center gap-2 flex-1 text-left min-w-0"
+                >
+                  {tieneRegistros
+                    ? <CheckCircle2 className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                    : (open
+                      ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    )}
+                  <Badge className={cn('text-[10px] border capitalize shrink-0', TIPO_COLOR[tipoSec])}>
+                    {TIPO_REGISTRO_LABELS[tipoSec]}
+                  </Badge>
+                  <span className="text-[11px] text-muted-foreground truncate">
+                    {tieneRegistros
+                      ? `${registrosTipo.length} registro${registrosTipo.length > 1 ? 's' : ''}`
+                      : 'sin registros'}
+                  </span>
+                  <span className="ml-auto text-[10px] text-muted-foreground font-mono shrink-0 mr-1">
+                    PPT {slide}
+                  </span>
+                </button>
+                {puedeEscribir && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2 text-xs shrink-0"
+                    onClick={() => openModal(tipoSec)}
+                  >
+                    <Plus className="h-3 w-3 mr-0.5" /> Agregar
+                  </Button>
+                )}
+              </div>
+
+              {/* Contenido de sección */}
+              {open && (
+                <div className="border-t border-gray-100">
+                  {registrosTipo.length === 0 ? (
+                    <div className="px-4 py-3 text-xs text-muted-foreground italic">
+                      {puedeEscribir
+                        ? 'Sin registros — usa "+ Agregar" para completar esta sección.'
+                        : 'Sin registros de este tipo.'}
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-gray-100">
+                      {registrosTipo.map((r) => (
+                        <Link
+                          key={r.id}
+                          href={`/seguridad/registros/${r.id}`}
+                          className={cn(
+                            'flex items-center gap-3 px-3 py-2.5 hover:bg-orange-50/40 transition-colors border-l-2',
+                            TIPO_BORDER_L[r.tipo],
+                          )}
+                        >
+                          {/* Thumbnail */}
+                          <div className="h-14 w-14 shrink-0 rounded bg-muted overflow-hidden flex items-center justify-center">
+                            {r.fotos[0] ? (
+                              /* eslint-disable-next-line @next/next/no-img-element */
+                              <img
+                                src={`/api/seguridad/registros/fotos/${r.fotos[0].id}/contenido`}
+                                alt={r.fotos[0].nombreArchivo}
+                                className="h-full w-full object-cover"
+                                loading="lazy"
+                                onError={(e) => { e.currentTarget.style.display = 'none' }}
+                              />
+                            ) : (
+                              <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                            )}
+                          </div>
+
+                          {/* Contenido */}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm line-clamp-2 leading-snug">{r.descripcion}</p>
+                            <div className="flex items-center gap-2 mt-1 text-[11px] text-muted-foreground flex-wrap">
+                              <span>{formatHora(r.createdAt)}</span>
+                              <span>·</span>
+                              <span>{r.ingeniero.name ?? '—'}</span>
+                              {r.asistentes != null && (
+                                <>
+                                  <span>·</span>
+                                  <span className="flex items-center gap-0.5">
+                                    <Users className="h-3 w-3" /> {r.asistentes} asist.
+                                  </span>
+                                </>
+                              )}
+                              {r.fotos.length > 0 && (
+                                <>
+                                  <span>·</span>
+                                  <span className="flex items-center gap-0.5">
+                                    <ImageIcon className="h-3 w-3" /> {r.fotos.length}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                            {r.observaciones && (
+                              <p className="text-[11px] text-muted-foreground italic mt-0.5 line-clamp-1">
+                                {r.observaciones}
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Eliminar */}
+                          {puedeEscribir && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 shrink-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                setConfirmEliminarRegistro(r.id)
+                              }}
+                              aria-label="Eliminar"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* ── Modal: agregar registro ───────────────────────────── */}
+      <Dialog open={modalAbierto} onOpenChange={(open) => { if (!enviando) setModalAbierto(open) }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Plus className="h-4 w-4 text-orange-600" />
-              Agregar evidencia
+              Agregar registro
+              <Badge className={cn('text-[10px] border ml-1', TIPO_COLOR[tipo])}>
+                {TIPO_REGISTRO_LABELS[tipo]}
+              </Badge>
             </DialogTitle>
           </DialogHeader>
 
@@ -663,31 +735,20 @@ export default function EvidenciaSeguridadPage({
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-2">
-              <Button
-                type="button"
-                variant="outline"
-                disabled={enviando}
-                onClick={() => setModalAbierto(false)}
-              >
+              <Button type="button" variant="outline" disabled={enviando} onClick={() => setModalAbierto(false)}>
                 Cancelar
               </Button>
-              <Button
-                type="submit"
-                disabled={enviando}
-                className="bg-orange-600 hover:bg-orange-700"
-              >
-                {enviando ? (
-                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Guardando…</>
-                ) : (
-                  <><Save className="h-4 w-4 mr-2" /> Guardar</>
-                )}
+              <Button type="submit" disabled={enviando} className="bg-orange-600 hover:bg-orange-700">
+                {enviando
+                  ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Guardando…</>
+                  : <><Save className="h-4 w-4 mr-2" /> Guardar</>}
               </Button>
             </div>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* ── Diálogos ──────────────────────────────────────── */}
+      {/* ── Confirmar cerrar ──────────────────────────────────── */}
       <AlertDialog open={confirmCerrar} onOpenChange={setConfirmCerrar}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -699,23 +760,19 @@ export default function EvidenciaSeguridadPage({
           <AlertDialogFooter>
             <AlertDialogCancel disabled={cerrarMutation.isPending}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={(e) => {
-                e.preventDefault()
-                cerrarMutation.mutate()
-              }}
+              onClick={(e) => { e.preventDefault(); cerrarMutation.mutate() }}
               disabled={cerrarMutation.isPending}
               className="bg-orange-600 hover:bg-orange-700"
             >
-              {cerrarMutation.isPending ? (
-                <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Cerrando…</>
-              ) : (
-                'Cerrar evidencia'
-              )}
+              {cerrarMutation.isPending
+                ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Cerrando…</>
+                : 'Cerrar evidencia'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* ── Confirmar eliminar registro ───────────────────────── */}
       <AlertDialog
         open={confirmEliminarRegistro !== null}
         onOpenChange={(open) => !open && setConfirmEliminarRegistro(null)}
@@ -737,11 +794,9 @@ export default function EvidenciaSeguridadPage({
               disabled={eliminarRegistroMutation.isPending}
               className="bg-red-600 hover:bg-red-700"
             >
-              {eliminarRegistroMutation.isPending ? (
-                <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Eliminando…</>
-              ) : (
-                'Eliminar'
-              )}
+              {eliminarRegistroMutation.isPending
+                ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Eliminando…</>
+                : 'Eliminar'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
