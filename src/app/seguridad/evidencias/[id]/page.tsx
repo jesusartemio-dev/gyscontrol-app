@@ -51,7 +51,6 @@ import {
 import { useSession } from 'next-auth/react'
 import { cn } from '@/lib/utils'
 
-import { SelectorTipoRegistro } from '@/components/seguridad/registros/SelectorTipoRegistro'
 import { FotosUploader, type FotoLocal } from '@/components/seguridad/registros/FotosUploader'
 import {
   crearRegistroSeguridadSchema,
@@ -675,15 +674,6 @@ export default function EvidenciaSeguridadPage({
           </DialogHeader>
 
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3 pt-2">
-            <div className="space-y-1.5">
-              <Label className="text-sm">Tipo</Label>
-              <SelectorTipoRegistro
-                value={tipo}
-                onChange={(t) => form.setValue('tipo', t as TipoRegistroSeguridad)}
-                disabled={enviando}
-              />
-            </div>
-
             <div className="space-y-1.5">
               <Label htmlFor="descripcion-modal" className="text-sm">Descripción</Label>
               <Textarea
