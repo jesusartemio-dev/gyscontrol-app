@@ -2,11 +2,17 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useSession } from 'next-auth/react'
 import { ChevronLeft, ChevronRight, FileBarChart, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { ReporteSeguridadCard } from '@/components/seguridad/reportes-semanales/ReporteSeguridadCard'
 import type { ReporteSeguridadDetalle } from '@/lib/services/reporteSeguridad'
 import { estadoReporteSeguridadEnum, ESTADO_REPORTE_LABELS } from '@/lib/validators/reporteSeguridad'
@@ -30,9 +36,31 @@ interface PaginatedResponse {
 const PAGE_SIZE = 20
 
 export default function ReportesSemanalesPage() {
+  const { data: session } = useSession()
+  const esAdmin = session?.user?.role === 'admin'
+  const queryClient = useQueryClient()
+
   const [filtroEstado, setFiltroEstado] = useState<string>('')
   const [filtroProyectoId, setFiltroProyectoId] = useState<string>('')
   const [page, setPage] = useState(1)
+  const [confirmEliminar, setConfirmEliminar] = useState<string | null>(null)
+
+  const eliminarMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/seguridad/reportes-semanales/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error ?? 'Error al eliminar')
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['seguridad', 'reportes-semanales'] })
+      setConfirmEliminar(null)
+    },
+  })
 
   // Lista de proyectos para el filtro
   const queryProyectos = useQuery<ProyectoMin[]>({
@@ -138,7 +166,13 @@ export default function ReportesSemanalesPage() {
       ) : (
         <>
           <div className="space-y-2">
-            {reportes.map((r) => <ReporteSeguridadCard key={r.id} reporte={r} />)}
+            {reportes.map((r) => (
+              <ReporteSeguridadCard
+                key={r.id}
+                reporte={r}
+                onDelete={esAdmin ? () => setConfirmEliminar(r.id) : undefined}
+              />
+            ))}
           </div>
 
           {pagination && pagination.totalPages > 1 && (
@@ -172,6 +206,27 @@ export default function ReportesSemanalesPage() {
           )}
         </>
       )}
+
+      <AlertDialog open={confirmEliminar !== null} onOpenChange={(open) => { if (!open) setConfirmEliminar(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar reporte semanal?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará el reporte junto con todos sus datos registrados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={eliminarMutation.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive hover:bg-destructive/90"
+              disabled={eliminarMutation.isPending}
+              onClick={() => { if (confirmEliminar) eliminarMutation.mutate(confirmEliminar) }}
+            >
+              {eliminarMutation.isPending ? 'Eliminando...' : 'Sí, eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

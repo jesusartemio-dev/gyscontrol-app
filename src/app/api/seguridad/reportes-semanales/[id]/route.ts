@@ -80,16 +80,11 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const { id } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    if (!ROLES_PERMITIDOS.includes(session.user.role))
-      return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
+    if (session.user.role !== 'admin')
+      return NextResponse.json({ error: 'Solo administradores pueden eliminar reportes' }, { status: 403 })
 
     const reporte = await prisma.reporteSemanalSeguridad.findUnique({ where: { id } })
     if (!reporte) return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
-    if (!puedeEditar(session.user.role, reporte.ingenieroId, session.user.id))
-      return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
-
-    if (reporte.estado === 'aprobado')
-      return NextResponse.json({ error: 'Un reporte aprobado no puede eliminarse' }, { status: 400 })
 
     await prisma.reporteSemanalSeguridad.delete({ where: { id } })
     return NextResponse.json({ ok: true })
