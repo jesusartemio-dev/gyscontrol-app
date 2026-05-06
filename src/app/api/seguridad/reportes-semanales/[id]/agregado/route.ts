@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { obtenerReporteAgregado } from '@/lib/services/reporteSeguridad'
 
-const ROLES_PERMITIDOS = ['admin', 'gerente', 'seguridad']
+const ROLES_PERMITIDOS = ['admin', 'gerente', 'gestor', 'seguridad']
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {

@@ -6,7 +6,7 @@ import { crearRegistroSeguridadSchema, tipoRegistroSeguridadEnum } from '@/lib/v
 import { REGISTRO_INCLUDE } from '@/lib/services/registroSeguridad'
 import type { Prisma } from '@prisma/client'
 
-const ROLES_PERMITIDOS = ['admin', 'gerente', 'seguridad']
+const ROLES_PERMITIDOS = ['admin', 'gerente', 'gestor', 'seguridad']
 const ROLES_BYPASS = ['admin', 'gerente']
 
 export async function GET(req: NextRequest) {

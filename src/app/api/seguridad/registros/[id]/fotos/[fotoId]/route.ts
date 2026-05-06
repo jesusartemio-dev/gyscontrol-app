@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { deleteFile } from '@/lib/services/googleDrive'
 import { puedeEscribirEvidencia } from '@/lib/services/evidenciaSeguridad'
 
-const ROLES_PERMITIDOS = ['admin', 'gerente', 'seguridad']
+const ROLES_PERMITIDOS = ['admin', 'gerente', 'gestor', 'seguridad']
 
 export async function DELETE(
   _req: NextRequest,

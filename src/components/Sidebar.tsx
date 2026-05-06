@@ -329,7 +329,7 @@ export default function Sidebar() {
       title: 'Seguridad',
       icon: HardHat,
       color: 'text-orange-400',
-      roles: ['admin', 'gerente', 'seguridad'],
+      roles: ['admin', 'gerente', 'gestor', 'seguridad'],
       links: [
         { href: '/seguridad', label: 'Dashboard', icon: LayoutDashboard },
         { href: '/seguridad/catalogo', label: 'Catálogo EPP', icon: Package },

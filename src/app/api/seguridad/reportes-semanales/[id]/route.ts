@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { actualizarReporteSeguridadSchema } from '@/lib/validators/reporteSeguridad'
 import { REPORTE_INCLUDE } from '@/lib/services/reporteSeguridad'
 
-const ROLES_PERMITIDOS = ['admin', 'gerente', 'seguridad']
+const ROLES_PERMITIDOS = ['admin', 'gerente', 'gestor', 'seguridad']
 const ROLES_REVISION = ['admin', 'gerente']
 
 function puedeEditar(role: string, ingenieroId: string, userId: string) {

@@ -9,7 +9,7 @@ import {
   reabrirEvidencia,
 } from '@/lib/services/evidenciaSeguridad'
 
-const ROLES_PERMITIDOS = ['admin', 'gerente', 'seguridad']
+const ROLES_PERMITIDOS = ['admin', 'gerente', 'gestor', 'seguridad']
 const ROLES_BYPASS = ['admin', 'gerente']
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

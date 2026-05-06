@@ -8,7 +8,7 @@ export default async function SeguridadLayout({ children }: { children: ReactNod
   if (!session?.user) redirect('/login')
 
   const role = session.user.role
-  if (!['admin', 'gerente', 'seguridad'].includes(role)) {
+  if (!['admin', 'gerente', 'gestor', 'seguridad'].includes(role)) {
     redirect('/')
   }
 

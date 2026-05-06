@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { uploadFile, createFolder, getAdminDriveId } from '@/lib/services/googleDrive'
 import { puedeEscribirEvidencia } from '@/lib/services/evidenciaSeguridad'
 
-const ROLES_PERMITIDOS = ['admin', 'gerente', 'seguridad']
+const ROLES_PERMITIDOS = ['admin', 'gerente', 'gestor', 'seguridad']
 const MAX_TAMANO_BYTES = 15 * 1024 * 1024 // 15MB
 
 async function getOrCreateRegistroFolder(registroId: string): Promise<string> {

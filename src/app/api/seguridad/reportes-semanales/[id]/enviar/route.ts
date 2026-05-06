@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { REPORTE_INCLUDE } from '@/lib/services/reporteSeguridad'
 
-const ROLES_PERMITIDOS = ['admin', 'gerente', 'seguridad']
+const ROLES_PERMITIDOS = ['admin', 'gerente', 'gestor', 'seguridad']
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {

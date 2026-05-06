@@ -5,7 +5,7 @@ import { obtenerReporteAgregado } from '@/lib/services/reporteSeguridad'
 import { generarPptReporteSeguridad } from '@/lib/services/pptGenerator'
 import { format } from 'date-fns'
 
-const ROLES_PERMITIDOS = ['admin', 'gerente', 'seguridad']
+const ROLES_PERMITIDOS = ['admin', 'gerente', 'gestor', 'seguridad']
 
 // El PPT puede demorar varios segundos (descarga de 20+ fotos de Drive)
 export const maxDuration = 60

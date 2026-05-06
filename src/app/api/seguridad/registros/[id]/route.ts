@@ -6,7 +6,7 @@ import { actualizarRegistroSeguridadSchema } from '@/lib/validators/registroSegu
 import { REGISTRO_INCLUDE } from '@/lib/services/registroSeguridad'
 import { puedeEscribirEvidencia } from '@/lib/services/evidenciaSeguridad'
 
-const ROLES_PERMITIDOS = ['admin', 'gerente', 'seguridad']
+const ROLES_PERMITIDOS = ['admin', 'gerente', 'gestor', 'seguridad']
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {

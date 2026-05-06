@@ -15,7 +15,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
     const role = session.user.role
-    if (!['admin', 'gerente', 'seguridad'].includes(role)) {
+    if (!['admin', 'gerente', 'gestor', 'seguridad'].includes(role)) {
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
     }
 

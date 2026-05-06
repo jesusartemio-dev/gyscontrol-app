@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { puedeEscribirEvidencia } from '@/lib/services/evidenciaSeguridad'
 import { z } from 'zod'
 
-const ROLES_PERMITIDOS = ['admin', 'gerente', 'seguridad']
+const ROLES_PERMITIDOS = ['admin', 'gerente', 'gestor', 'seguridad']
 
 const reordenSchema = z.object({
   ordenes: z

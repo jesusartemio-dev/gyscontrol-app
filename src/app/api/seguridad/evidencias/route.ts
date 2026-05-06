@@ -6,7 +6,7 @@ import { crearEvidenciaSeguridadSchema, estadoEvidenciaSeguridadEnum } from '@/l
 import { obtenerOCrearEvidencia } from '@/lib/services/evidenciaSeguridad'
 import type { Prisma } from '@prisma/client'
 
-const ROLES_PERMITIDOS = ['admin', 'gerente', 'seguridad']
+const ROLES_PERMITIDOS = ['admin', 'gerente', 'gestor', 'seguridad']
 
 export async function GET(req: NextRequest) {
   try {
