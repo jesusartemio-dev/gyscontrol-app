@@ -15,9 +15,11 @@ import {
   Lock,
   LockOpen,
   Plus,
+  Trash2,
   Users,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { useSession } from 'next-auth/react'
 
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -32,6 +34,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import {
   Dialog,
   DialogContent,
@@ -105,6 +117,8 @@ export default function EvidenciasListaPage() {
   const router = useRouter()
   const queryClient = useQueryClient()
   const searchParams = useSearchParams()
+  const { data: session } = useSession()
+  const esAdmin = session?.user?.role === 'admin'
 
   // Query params (de reporte semanal): proyectoId, semanaIso, tipo, reporteId
   const proyectoIdParam = searchParams.get('proyectoId') ?? ''
@@ -133,6 +147,7 @@ export default function EvidenciasListaPage() {
 
   const [dialogAbrir, setDialogAbrir] = useState(false)
   const [jornadaSel, setJornadaSel] = useState<JornadaActiva | null>(null)
+  const [confirmEliminar, setConfirmEliminar] = useState<string | null>(null)
 
   const proyectosQuery = useQuery<ProyectoOpt[]>({
     queryKey: ['proyectos', 'lista-min'],
@@ -192,6 +207,25 @@ export default function EvidenciasListaPage() {
       router.push(`/seguridad/evidencias/${ev.id}${qs ? `?${qs}` : ''}`)
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Error al abrir evidencia'),
+  })
+
+  const eliminarMutation = useMutation({
+    mutationFn: async (evidenciaId: string) => {
+      const res = await fetch(`/api/seguridad/evidencias/${evidenciaId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error ?? 'No se pudo eliminar la evidencia')
+      }
+    },
+    onSuccess: () => {
+      toast.success('Evidencia eliminada')
+      queryClient.invalidateQueries({ queryKey: ['seguridad', 'evidencias'] })
+      setConfirmEliminar(null)
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Error al eliminar'),
   })
 
   // Auto-abrir dialog si vino del reporte semanal
@@ -309,12 +343,11 @@ export default function EvidenciasListaPage() {
       ) : (
         <div className="space-y-2">
           {evidencias.map((ev) => (
-            <Link
+            <div
               key={ev.id}
-              href={`/seguridad/evidencias/${ev.id}`}
-              className="block border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow bg-white"
+              className="border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow bg-white"
             >
-              <div className="px-4 py-3 space-y-2">
+              <Link href={`/seguridad/evidencias/${ev.id}`} className="block px-4 py-3 space-y-2">
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div className="flex items-start gap-2 min-w-0 flex-1">
                     <HardHat className="h-4 w-4 text-orange-600 shrink-0 mt-0.5" />
@@ -385,11 +418,56 @@ export default function EvidenciasListaPage() {
                   </span>
                   <span className="ml-auto">Abierta por {ev.creadoPor.name ?? '—'}</span>
                 </div>
-              </div>
-            </Link>
+              </Link>
+
+              {esAdmin && (
+                <div className="px-4 pb-2 flex justify-end border-t border-gray-100 pt-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                    onClick={() => setConfirmEliminar(ev.id)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-1" /> Eliminar
+                  </Button>
+                </div>
+              )}
+            </div>
           ))}
         </div>
       )}
+
+      {/* ── AlertDialog: Confirmar eliminar ─────────────── */}
+      <AlertDialog
+        open={confirmEliminar !== null}
+        onOpenChange={(open) => !open && setConfirmEliminar(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar esta evidencia?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminarán también todos los registros y fotos asociados. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={eliminarMutation.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault()
+                if (confirmEliminar) eliminarMutation.mutate(confirmEliminar)
+              }}
+              disabled={eliminarMutation.isPending}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {eliminarMutation.isPending ? (
+                <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Eliminando…</>
+              ) : (
+                'Eliminar'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* ── Dialog: Nueva evidencia ──────────────────────── */}
       <Dialog open={dialogAbrir} onOpenChange={setDialogAbrir}>
