@@ -16,6 +16,7 @@ import {
   Loader2,
   Lock,
   LockOpen,
+  Pencil,
   Plus,
   Save,
   Shield,
@@ -180,6 +181,7 @@ export default function EvidenciaSeguridadPage({
   const [confirmEliminarRegistro, setConfirmEliminarRegistro] = useState<string | null>(null)
   const [cuadrillaAbierta, setCuadrillaAbierta] = useState(false)
   const [modalAbierto, setModalAbierto] = useState(false)
+  const [editandoRegistro, setEditandoRegistro] = useState<RegistroLista | null>(null)
   const [fotos, setFotos] = useState<FotoLocal[]>([])
   // Set de tipos que el usuario ha toggleado manualmente (invierte el default)
   const [toggledSections, setToggledSections] = useState<Set<TipoRegistroSeguridad>>(new Set())
@@ -224,31 +226,68 @@ export default function EvidenciaSeguridadPage({
     },
   })
 
+  const editarMutation = useMutation({
+    mutationFn: async ({ registroId, input }: { registroId: string; input: Partial<CrearRegistroSeguridadInput> }) => {
+      const res = await fetch(`/api/seguridad/registros/${registroId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(input),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error ?? 'No se pudo actualizar el registro')
+      }
+      return (await res.json()) as { id: string }
+    },
+  })
+
   const onSubmit = async (data: CrearRegistroSeguridadInput) => {
     try {
-      const creado = await crearMutation.mutateAsync({
-        ...data,
-        evidenciaSeguridadId: id,
-        asistentes: data.tipo === 'charla' ? data.asistentes ?? null : null,
-      })
+      let registroId: string
+
+      if (editandoRegistro) {
+        // Modo edición
+        const actualizado = await editarMutation.mutateAsync({
+          registroId: editandoRegistro.id,
+          input: {
+            tipo: data.tipo,
+            descripcion: data.descripcion,
+            asistentes: data.tipo === 'charla' ? data.asistentes ?? null : null,
+            observaciones: data.observaciones ?? null,
+          },
+        })
+        registroId = actualizado.id
+        toast.success('Registro actualizado')
+      } else {
+        // Modo creación
+        const creado = await crearMutation.mutateAsync({
+          ...data,
+          evidenciaSeguridadId: id,
+          asistentes: data.tipo === 'charla' ? data.asistentes ?? null : null,
+        })
+        registroId = creado.id
+        toast.success('Registro agregado')
+      }
+
       let fallos = 0
       for (const foto of fotos) {
-        try { await subirFoto(creado.id, foto.file) }
+        try { await subirFoto(registroId, foto.file) }
         catch { fallos++ }
       }
+      if (fallos > 0) {
+        toast.warning(`${fallos} foto${fallos > 1 ? 's' : ''} no se pudo subir.`)
+      }
+
       queryClient.invalidateQueries({ queryKey: ['seguridad', 'evidencia', id] })
       queryClient.invalidateQueries({ queryKey: ['seguridad', 'evidencias'] })
       queryClient.invalidateQueries({ queryKey: ['seguridad', 'registros'] })
-      if (fallos > 0) {
-        toast.warning(`Registro creado, pero ${fallos} foto${fallos > 1 ? 's' : ''} no se pudo subir.`)
-      } else {
-        toast.success('Registro agregado')
-      }
       form.reset({ evidenciaSeguridadId: id, tipo: data.tipo, descripcion: '', asistentes: null, observaciones: null })
       setFotos([])
+      setEditandoRegistro(null)
       setModalAbierto(false)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al crear registro')
+      toast.error(err instanceof Error ? err.message : 'Error al guardar registro')
     }
   }
 
@@ -342,7 +381,7 @@ export default function EvidenciaSeguridadPage({
   const totalTrabajadores = new Set(
     ev.jornada.tareas.flatMap((t) => t.miembros.map((m) => m.usuarioId)),
   ).size
-  const enviando = form.formState.isSubmitting || crearMutation.isPending
+  const enviando = form.formState.isSubmitting || crearMutation.isPending || editarMutation.isPending
 
   /** Secciones con registros abren por default; vacías cierran. El usuario puede invertir. */
   const isSectionOpen = (tipoSec: TipoRegistroSeguridad) => {
@@ -361,11 +400,22 @@ export default function EvidenciaSeguridadPage({
   }
 
   const openModal = (tipoInicial: TipoRegistroSeguridad) => {
-    form.setValue('tipo', tipoInicial)
-    form.setValue('descripcion', '')
-    form.setValue('asistentes', null)
-    form.setValue('observaciones', null)
+    form.reset({ evidenciaSeguridadId: id, tipo: tipoInicial, descripcion: '', asistentes: null, observaciones: null })
     setFotos([])
+    setEditandoRegistro(null)
+    setModalAbierto(true)
+  }
+
+  const openEditModal = (r: RegistroLista) => {
+    form.reset({
+      evidenciaSeguridadId: id,
+      tipo: r.tipo,
+      descripcion: r.descripcion,
+      asistentes: r.asistentes ?? null,
+      observaciones: r.observaciones ?? null,
+    })
+    setFotos([])
+    setEditandoRegistro(r)
     setModalAbierto(true)
   }
 
@@ -633,21 +683,36 @@ export default function EvidenciaSeguridadPage({
                             )}
                           </div>
 
-                          {/* Eliminar */}
+                          {/* Editar / Eliminar */}
                           {puedeEscribir && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 shrink-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                              onClick={(e) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                setConfirmEliminarRegistro(r.id)
-                              }}
-                              aria-label="Eliminar"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-orange-700 hover:bg-orange-50"
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  openEditModal(r)
+                                }}
+                                aria-label="Editar"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  setConfirmEliminarRegistro(r.id)
+                                }}
+                                aria-label="Eliminar"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
                           )}
                         </Link>
                       ))}
@@ -661,12 +726,14 @@ export default function EvidenciaSeguridadPage({
       </div>
 
       {/* ── Modal: agregar registro ───────────────────────────── */}
-      <Dialog open={modalAbierto} onOpenChange={(open) => { if (!enviando) setModalAbierto(open) }}>
+      <Dialog open={modalAbierto} onOpenChange={(open) => { if (!enviando) { setModalAbierto(open); if (!open) setEditandoRegistro(null) } }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Plus className="h-4 w-4 text-orange-600" />
-              Agregar registro
+              {editandoRegistro
+                ? <Pencil className="h-4 w-4 text-orange-600" />
+                : <Plus className="h-4 w-4 text-orange-600" />}
+              {editandoRegistro ? 'Editar registro' : 'Agregar registro'}
               <Badge className={cn('text-[10px] border ml-1', TIPO_COLOR[tipo])}>
                 {TIPO_REGISTRO_LABELS[tipo]}
               </Badge>
@@ -719,10 +786,21 @@ export default function EvidenciaSeguridadPage({
               />
             </div>
 
-            <div className="space-y-1.5">
-              <Label className="text-sm">Fotos (1 a 3)</Label>
-              <FotosUploader fotos={fotos} onChange={setFotos} max={3} disabled={enviando} />
-            </div>
+            {(!editandoRegistro || editandoRegistro.fotos.length < 3) && (
+              <div className="space-y-1.5">
+                <Label className="text-sm">
+                  {editandoRegistro
+                    ? `Agregar fotos (tiene ${editandoRegistro.fotos.length}/3)`
+                    : 'Fotos (1 a 3)'}
+                </Label>
+                <FotosUploader
+                  fotos={fotos}
+                  onChange={setFotos}
+                  max={3 - (editandoRegistro?.fotos.length ?? 0)}
+                  disabled={enviando}
+                />
+              </div>
+            )}
 
             <div className="flex items-center justify-end gap-2 pt-2">
               <Button type="button" variant="outline" disabled={enviando} onClick={() => setModalAbierto(false)}>
