@@ -36,12 +36,16 @@ interface RegistroDetalle {
   createdAt: string
   updatedAt: string
   ingenieroId: string
-  jornada: {
+  evidencia: {
     id: string
-    fechaTrabajo: string
-    estado: string
-    proyecto: { id: string; codigo: string; nombre: string }
-    supervisor: { id: string; name: string | null }
+    estado: 'abierta' | 'cerrada'
+    jornada: {
+      id: string
+      fechaTrabajo: string
+      estado: string
+      proyecto: { id: string; codigo: string; nombre: string }
+      supervisor: { id: string; name: string | null }
+    }
   }
   ingeniero: { id: string; name: string | null; email: string | null }
   fotos: Array<{
@@ -106,8 +110,14 @@ export default function DetalleRegistroSeguridadPage({
     },
     onSuccess: () => {
       toast.success('Registro eliminado')
+      const evidenciaId = query.data?.evidencia.id
       queryClient.invalidateQueries({ queryKey: ['seguridad', 'registros'] })
-      router.push('/seguridad/registros')
+      if (evidenciaId) {
+        queryClient.invalidateQueries({ queryKey: ['seguridad', 'evidencia', evidenciaId] })
+        router.push(`/seguridad/evidencias/${evidenciaId}`)
+      } else {
+        router.push('/seguridad/evidencias')
+      }
     },
     onError: (err) => {
       toast.error(err instanceof Error ? err.message : 'Error al eliminar')
@@ -144,12 +154,12 @@ export default function DetalleRegistroSeguridadPage({
   return (
     <div className="container mx-auto p-4 sm:p-6 space-y-4 max-w-3xl">
       <div className="flex items-center gap-2">
-        <Link href="/seguridad/registros">
+        <Link href={`/seguridad/evidencias/${r.evidencia.id}`}>
           <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
         </Link>
         <div className="flex-1">
           <h1 className="text-lg font-bold">Detalle de registro</h1>
-          <p className="text-xs text-muted-foreground">{r.jornada.proyecto.codigo}</p>
+          <p className="text-xs text-muted-foreground">{r.evidencia.jornada.proyecto.codigo}</p>
         </div>
         <Link href={`/seguridad/registros/${id}/editar`}>
           <Button variant="outline" size="sm">
@@ -173,12 +183,12 @@ export default function DetalleRegistroSeguridadPage({
             <Badge className={cn('text-xs capitalize border', TIPO_COLOR[r.tipo])}>
               {TIPO_REGISTRO_LABELS[r.tipo]}
             </Badge>
-            <span className="text-xs text-muted-foreground capitalize">{formatFechaLarga(r.jornada.fechaTrabajo)}</span>
+            <span className="text-xs text-muted-foreground capitalize">{formatFechaLarga(r.evidencia.jornada.fechaTrabajo)}</span>
           </div>
 
           <div>
-            <h2 className="font-semibold leading-tight">{r.jornada.proyecto.nombre}</h2>
-            <p className="text-xs font-mono text-muted-foreground">{r.jornada.proyecto.codigo}</p>
+            <h2 className="font-semibold leading-tight">{r.evidencia.jornada.proyecto.nombre}</h2>
+            <p className="text-xs font-mono text-muted-foreground">{r.evidencia.jornada.proyecto.codigo}</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
@@ -190,12 +200,12 @@ export default function DetalleRegistroSeguridadPage({
             <div className="flex items-center gap-2">
               <User className="h-4 w-4 text-muted-foreground" />
               <span className="text-muted-foreground">Supervisor:</span>
-              <span className="font-medium">{r.jornada.supervisor.name ?? '—'}</span>
+              <span className="font-medium">{r.evidencia.jornada.supervisor.name ?? '—'}</span>
             </div>
             <div className="flex items-center gap-2">
               <CalendarDays className="h-4 w-4 text-muted-foreground" />
               <span className="text-muted-foreground">Estado jornada:</span>
-              <span className="font-medium capitalize">{r.jornada.estado}</span>
+              <span className="font-medium capitalize">{r.evidencia.jornada.estado}</span>
             </div>
             {r.asistentes != null && (
               <div className="flex items-center gap-2">

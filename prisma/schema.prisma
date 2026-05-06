@@ -1440,7 +1440,7 @@ model RegistroHorasCampo {
   supervisor         User                      @relation("RegistrosCampoSupervisor", fields: [supervisorId], references: [id])
   aprobadoPor        User?                     @relation("RegistrosCampoAprobador", fields: [aprobadoPorId], references: [id])
   tareas             RegistroHorasCampoTarea[]
-  registrosSeguridad RegistroSeguridad[]
+  evidenciaSeguridad EvidenciaSeguridad?
 
   @@index([proyectoId, estado, fechaTrabajo])
   @@index([supervisorId, estado])
@@ -1448,12 +1448,38 @@ model RegistroHorasCampo {
   @@map("registro_horas_campo")
 }
 
-// Registro de actividades de seguridad asociado a una jornada de campo.
+// Contenedor 1:1 por jornada que agrupa todos los registros de seguridad
+// (charlas, inspecciones, observaciones, etc.) capturados durante esa jornada.
+// Se abre una sola vez al inicio del día y se acumulan registros mientras esté abierta.
+model EvidenciaSeguridad {
+  id                   String                   @id @default(cuid())
+  registroHorasCampoId String                   @unique
+  creadoPorId          String
+  estado               EstadoEvidenciaSeguridad @default(abierta)
+  observaciones        String?
+  fechaCierre          DateTime?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+
+  jornada   RegistroHorasCampo  @relation(fields: [registroHorasCampoId], references: [id], onDelete: Cascade)
+  creadoPor User                @relation("EvidenciasSeguridad", fields: [creadoPorId], references: [id])
+  registros RegistroSeguridad[]
+
+  @@index([creadoPorId])
+  @@map("evidencia_seguridad")
+}
+
+enum EstadoEvidenciaSeguridad {
+  abierta
+  cerrada
+}
+
+// Registro de actividades de seguridad asociado a una evidencia de jornada.
 // Captura charlas NDAD, inspecciones, observaciones, etc. que el ingeniero de
 // seguridad realiza durante la jornada del proyecto.
 model RegistroSeguridad {
   id                   String                @id @default(cuid())
-  registroHorasCampoId String
+  evidenciaSeguridadId String
   ingenieroId          String
   tipo                 TipoRegistroSeguridad
   descripcion          String
@@ -1462,11 +1488,11 @@ model RegistroSeguridad {
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
 
-  jornada   RegistroHorasCampo      @relation(fields: [registroHorasCampoId], references: [id], onDelete: Cascade)
+  evidencia EvidenciaSeguridad      @relation(fields: [evidenciaSeguridadId], references: [id], onDelete: Cascade)
   ingeniero User                    @relation("RegistrosSeguridadIngeniero", fields: [ingenieroId], references: [id])
   fotos     RegistroSeguridadFoto[]
 
-  @@index([registroHorasCampoId])
+  @@index([evidenciaSeguridadId])
   @@index([ingenieroId, createdAt(sort: Desc)])
   @@index([tipo, createdAt(sort: Desc)])
   @@map("registro_seguridad")
@@ -1755,6 +1781,7 @@ model User {
   entregasEppEntregadas                    EntregaEPP[]                @relation("EntregaEppEntregador")
   // Registros de seguridad (charlas NDAD, inspecciones, observaciones)
   registrosSeguridad                       RegistroSeguridad[]         @relation("RegistrosSeguridadIngeniero")
+  evidenciasSeguridadCreadas               EvidenciaSeguridad[]        @relation("EvidenciasSeguridad")
   // Reportes semanales de seguridad
   reportesSeguridadCreados                 ReporteSemanalSeguridad[]   @relation("ReportesSeguridadIngeniero")
   reportesSeguridadAprobados               ReporteSemanalSeguridad[]   @relation("ReportesSeguridadAprobador")

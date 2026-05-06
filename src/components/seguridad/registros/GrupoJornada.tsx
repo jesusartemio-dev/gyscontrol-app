@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Calendar, ChevronDown, HardHat, Image as ImageIcon, Users } from 'lucide-react'
+import { Calendar, ChevronDown, ExternalLink, HardHat, Image as ImageIcon, Users } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { TIPO_REGISTRO_LABELS, type TipoRegistroSeguridad } from '@/lib/validators/registroSeguridad'
@@ -25,6 +25,7 @@ export interface RegistroFila {
 interface Props {
   jornada: Jornada
   registros: RegistroFila[]
+  evidenciaId?: string
   defaultOpen?: boolean
 }
 
@@ -57,7 +58,7 @@ const formatFecha = (s: string) =>
     month: 'short',
   })
 
-export function GrupoJornada({ jornada, registros, defaultOpen = true }: Props) {
+export function GrupoJornada({ jornada, registros, evidenciaId, defaultOpen = true }: Props) {
   const [open, setOpen] = useState(defaultOpen)
 
   const { codigo, nombre } = jornada.proyecto
@@ -132,6 +133,18 @@ export function GrupoJornada({ jornada, registros, defaultOpen = true }: Props) 
           </div>
         </div>
       </button>
+
+      {evidenciaId && (
+        <div className="px-4 py-1.5 bg-orange-50/60 border-t border-gray-100 flex items-center justify-between">
+          <span className="text-[10px] text-muted-foreground">Evidencia de la jornada</span>
+          <Link
+            href={`/seguridad/evidencias/${evidenciaId}`}
+            className="text-[11px] text-orange-700 hover:text-orange-800 inline-flex items-center gap-1 font-medium"
+          >
+            Abrir cuaderno <ExternalLink className="h-3 w-3" />
+          </Link>
+        </div>
+      )}
 
       {/* ── Filas de registros ────────────────────────────── */}
       {open && (

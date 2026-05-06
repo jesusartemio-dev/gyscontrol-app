@@ -85,7 +85,7 @@ export function generarSlidesGridFotos(
       // Caption
       slide.addText(
         captionTextRuns({
-          fecha: formatearFechaCorta(registro.jornada.fechaTrabajo),
+          fecha: formatearFechaCorta(registro.evidencia.jornada.fechaTrabajo),
           tema: registro.descripcion,
           participantes: incluirParticipantes ? registro.asistentes : null,
         }),

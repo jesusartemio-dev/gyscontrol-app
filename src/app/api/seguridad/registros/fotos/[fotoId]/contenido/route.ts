@@ -6,11 +6,6 @@ import { descargarBufferDrive } from '@/lib/services/driveImageLoader'
 
 const ROLES_PERMITIDOS = ['admin', 'gerente', 'seguridad']
 
-function puedeVer(role: string, ingenieroId: string, userId: string): boolean {
-  if (role === 'admin' || role === 'gerente') return true
-  return role === 'seguridad' && ingenieroId === userId
-}
-
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ fotoId: string }> },
@@ -28,13 +23,9 @@ export async function GET(
 
     const foto = await prisma.registroSeguridadFoto.findUnique({
       where: { id: fotoId },
-      include: { registro: { select: { ingenieroId: true } } },
     })
     if (!foto) {
       return NextResponse.json({ error: 'Foto no encontrada' }, { status: 404 })
-    }
-    if (!puedeVer(session.user.role, foto.registro.ingenieroId, session.user.id)) {
-      return NextResponse.json({ error: 'Sin permisos para ver esta foto' }, { status: 403 })
     }
     if (!foto.driveFileId) {
       return NextResponse.json({ error: 'Foto sin driveFileId' }, { status: 404 })

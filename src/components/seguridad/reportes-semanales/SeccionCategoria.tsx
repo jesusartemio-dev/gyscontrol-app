@@ -35,7 +35,7 @@ export function SeccionCategoria({ tipo, registros, agregarContext }: Props) {
   const label = TIPO_REGISTRO_LABELS[tipo]
 
   const agregarHref = agregarContext
-    ? `/seguridad/registros/nuevo?tipo=${tipo}&proyectoId=${agregarContext.proyectoId}&semanaIso=${agregarContext.semanaIso}&reporteId=${agregarContext.reporteId}`
+    ? `/seguridad/evidencias?tipo=${tipo}&proyectoId=${agregarContext.proyectoId}&semanaIso=${agregarContext.semanaIso}&reporteId=${agregarContext.reporteId}`
     : null
 
   return (

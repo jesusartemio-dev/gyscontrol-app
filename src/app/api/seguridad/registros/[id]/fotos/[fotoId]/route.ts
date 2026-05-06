@@ -3,14 +3,9 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { deleteFile } from '@/lib/services/googleDrive'
+import { puedeEscribirEvidencia } from '@/lib/services/evidenciaSeguridad'
 
 const ROLES_PERMITIDOS = ['admin', 'gerente', 'seguridad']
-
-function puedeEditar(role: string, ingenieroId: string, userId: string): boolean {
-  if (role === 'admin' || role === 'gerente') return true
-  if (role === 'seguridad' && ingenieroId === userId) return true
-  return false
-}
 
 export async function DELETE(
   _req: NextRequest,
@@ -29,13 +24,29 @@ export async function DELETE(
 
     const foto = await prisma.registroSeguridadFoto.findUnique({
       where: { id: fotoId },
-      include: { registro: { select: { id: true, ingenieroId: true } } },
+      include: {
+        registro: {
+          select: {
+            id: true,
+            evidencia: { select: { estado: true, jornada: { select: { estado: true } } } },
+          },
+        },
+      },
     })
     if (!foto || foto.registro.id !== id) {
       return NextResponse.json({ error: 'Foto no encontrada' }, { status: 404 })
     }
-    if (!puedeEditar(session.user.role, foto.registro.ingenieroId, session.user.id)) {
-      return NextResponse.json({ error: 'Solo puedes eliminar fotos de tus propios registros' }, { status: 403 })
+    if (
+      !puedeEscribirEvidencia(
+        session.user.role,
+        foto.registro.evidencia.jornada.estado,
+        foto.registro.evidencia.estado,
+      )
+    ) {
+      return NextResponse.json(
+        { error: 'No se puede eliminar: la evidencia o jornada está cerrada' },
+        { status: 403 },
+      )
     }
 
     if (foto.driveFileId) {

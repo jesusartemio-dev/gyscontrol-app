@@ -92,10 +92,24 @@ async function crearJornada(proyectoId: string, supervisorId: string) {
   return j.id
 }
 
+async function obtenerOCrearEvidenciaSmoke(jornadaId: string, creadoPorId: string): Promise<string> {
+  const existente = await prisma.evidenciaSeguridad.findUnique({
+    where: { registroHorasCampoId: jornadaId },
+    select: { id: true },
+  })
+  if (existente) return existente.id
+  const ev = await prisma.evidenciaSeguridad.create({
+    data: { registroHorasCampoId: jornadaId, creadoPorId },
+    select: { id: true },
+  })
+  return ev.id
+}
+
 async function crearRegistro(jornadaId: string, ingenieroId: string, tipo: 'charla' | 'inspeccion' | 'incidente', desc: string, fotos = 0) {
+  const evidenciaSeguridadId = await obtenerOCrearEvidenciaSmoke(jornadaId, ingenieroId)
   const r = await prisma.registroSeguridad.create({
     data: {
-      registroHorasCampoId: jornadaId,
+      evidenciaSeguridadId,
       ingenieroId,
       tipo,
       descripcion: `${SMOKE_PREFIX} ${desc}`,
@@ -318,13 +332,14 @@ async function scenario5_paginacion(proyectoId: string, ingenieroId: string) {
 }
 
 async function scenario6_agregarRegistroEditor() {
-  // UX flow: link en SeccionCategoria → /seguridad/registros/nuevo?tipo=...&proyectoId=...&semanaIso=...&reporteId=...
+  // UX flow: link en SeccionCategoria → /seguridad/evidencias?tipo=...&proyectoId=...&semanaIso=...&reporteId=...
   // Validable solo en navegador. Verificación estática del código abajo.
   const SeccionCategoriaSrc = await fs.readFile(
     path.join(process.cwd(), 'src/components/seguridad/reportes-semanales/SeccionCategoria.tsx'),
     'utf-8',
   )
-  const buildsExpectedHref = SeccionCategoriaSrc.includes('/seguridad/registros/nuevo?tipo=') &&
+  // Verifica que SeccionCategoria apunta al nuevo flujo /seguridad/evidencias con los params correctos
+  const buildsExpectedHref = SeccionCategoriaSrc.includes('/seguridad/evidencias?tipo=') &&
     SeccionCategoriaSrc.includes('proyectoId=') &&
     SeccionCategoriaSrc.includes('semanaIso=') &&
     SeccionCategoriaSrc.includes('reporteId=')
@@ -332,13 +347,13 @@ async function scenario6_agregarRegistroEditor() {
     path.join(process.cwd(), 'src/app/seguridad/registros/nuevo/page.tsx'),
     'utf-8',
   )
+  // Verifica que /registros/nuevo es un shim que preserva los params y redirige a /seguridad/evidencias
   const readsAndRedirects = NuevoSrc.includes("searchParams.get('tipo')") &&
     NuevoSrc.includes("searchParams.get('reporteId')") &&
-    NuevoSrc.includes('reporteIdParam') &&
-    NuevoSrc.includes('/seguridad/reportes-semanales/')
+    NuevoSrc.includes('/seguridad/evidencias')
 
   if (buildsExpectedHref && readsAndRedirects) {
-    record('6. Agregar registro desde editor (verificación estática)', 'PASS', `link query params + redirect implementados`)
+    record('6. Agregar registro desde editor (verificación estática)', 'PASS', `SeccionCategoria → /seguridad/evidencias con params; /nuevo redirige a evidencias`)
   } else {
     record('6. Agregar registro desde editor', 'FAIL', `static check failed: href=${buildsExpectedHref} read=${readsAndRedirects}`)
   }

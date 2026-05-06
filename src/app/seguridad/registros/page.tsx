@@ -16,12 +16,16 @@ interface RegistroLista {
   descripcion: string
   asistentes: number | null
   createdAt: string
-  jornada: {
+  evidencia: {
     id: string
-    fechaTrabajo: string
-    estado: string
-    proyecto: { id: string; codigo: string; nombre: string }
-    supervisor: { id: string; name: string | null }
+    estado: 'abierta' | 'cerrada'
+    jornada: {
+      id: string
+      fechaTrabajo: string
+      estado: string
+      proyecto: { id: string; codigo: string; nombre: string }
+      supervisor: { id: string; name: string | null }
+    }
   }
   ingeniero: { id: string; name: string | null; email: string | null }
   fotos: Array<{
@@ -86,10 +90,24 @@ export default function RegistrosSeguridadListaPage() {
   const registros = registrosQuery.data ?? []
 
   const grupos = useMemo(() => {
-    const map = new Map<string, { jornada: RegistroLista['jornada']; registros: RegistroFila[] }>()
+    const map = new Map<
+      string,
+      {
+        evidenciaId: string
+        jornada: RegistroLista['evidencia']['jornada']
+        registros: RegistroFila[]
+      }
+    >()
     for (const r of registros) {
-      if (!map.has(r.jornada.id)) map.set(r.jornada.id, { jornada: r.jornada, registros: [] })
-      map.get(r.jornada.id)!.registros.push({
+      const jornadaId = r.evidencia.jornada.id
+      if (!map.has(jornadaId)) {
+        map.set(jornadaId, {
+          evidenciaId: r.evidencia.id,
+          jornada: r.evidencia.jornada,
+          registros: [],
+        })
+      }
+      map.get(jornadaId)!.registros.push({
         id: r.id,
         tipo: r.tipo,
         descripcion: r.descripcion,
@@ -118,9 +136,9 @@ export default function RegistrosSeguridadListaPage() {
             Charlas, inspecciones, observaciones y demás actividades de seguridad
           </p>
         </div>
-        <Link href="/seguridad/registros/nuevo">
+        <Link href="/seguridad/evidencias">
           <Button className="bg-orange-600 hover:bg-orange-700">
-            <Plus className="h-4 w-4 mr-1" /> Nuevo registro
+            <Plus className="h-4 w-4 mr-1" /> Nueva evidencia
           </Button>
         </Link>
       </div>
@@ -167,6 +185,7 @@ export default function RegistrosSeguridadListaPage() {
               key={g.jornada.id}
               jornada={g.jornada}
               registros={g.registros}
+              evidenciaId={g.evidenciaId}
               defaultOpen={i === 0}
             />
           ))}

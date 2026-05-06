@@ -4,15 +4,9 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { actualizarRegistroSeguridadSchema } from '@/lib/validators/registroSeguridad'
 import { REGISTRO_INCLUDE } from '@/lib/services/registroSeguridad'
+import { puedeEscribirEvidencia } from '@/lib/services/evidenciaSeguridad'
 
 const ROLES_PERMITIDOS = ['admin', 'gerente', 'seguridad']
-const ROLES_VER_TODO = ['admin', 'gerente']
-
-function puedeEditar(role: string, ingenieroId: string, userId: string): boolean {
-  if (role === 'admin' || role === 'gerente') return true
-  if (role === 'seguridad' && ingenieroId === userId) return true
-  return false
-}
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -31,13 +25,6 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     })
     if (!registro) {
       return NextResponse.json({ error: 'Registro no encontrado' }, { status: 404 })
-    }
-
-    if (
-      !ROLES_VER_TODO.includes(session.user.role) &&
-      registro.ingenieroId !== session.user.id
-    ) {
-      return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
     }
 
     return NextResponse.json(registro)
@@ -60,13 +47,26 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const { id } = await params
     const existente = await prisma.registroSeguridad.findUnique({
       where: { id },
-      select: { ingenieroId: true, tipo: true },
+      select: {
+        ingenieroId: true,
+        tipo: true,
+        evidencia: { select: { estado: true, jornada: { select: { estado: true } } } },
+      },
     })
     if (!existente) {
       return NextResponse.json({ error: 'Registro no encontrado' }, { status: 404 })
     }
-    if (!puedeEditar(session.user.role, existente.ingenieroId, session.user.id)) {
-      return NextResponse.json({ error: 'Solo puedes editar tus propios registros' }, { status: 403 })
+    if (
+      !puedeEscribirEvidencia(
+        session.user.role,
+        existente.evidencia.jornada.estado,
+        existente.evidencia.estado,
+      )
+    ) {
+      return NextResponse.json(
+        { error: 'No se puede editar: la evidencia o jornada está cerrada' },
+        { status: 403 },
+      )
     }
 
     const body = await req.json()
@@ -113,13 +113,24 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     const { id } = await params
     const existente = await prisma.registroSeguridad.findUnique({
       where: { id },
-      select: { ingenieroId: true },
+      select: {
+        evidencia: { select: { estado: true, jornada: { select: { estado: true } } } },
+      },
     })
     if (!existente) {
       return NextResponse.json({ error: 'Registro no encontrado' }, { status: 404 })
     }
-    if (!puedeEditar(session.user.role, existente.ingenieroId, session.user.id)) {
-      return NextResponse.json({ error: 'Solo puedes eliminar tus propios registros' }, { status: 403 })
+    if (
+      !puedeEscribirEvidencia(
+        session.user.role,
+        existente.evidencia.jornada.estado,
+        existente.evidencia.estado,
+      )
+    ) {
+      return NextResponse.json(
+        { error: 'No se puede eliminar: la evidencia o jornada está cerrada' },
+        { status: 403 },
+      )
     }
 
     await prisma.registroSeguridad.delete({ where: { id } })

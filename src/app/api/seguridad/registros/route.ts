@@ -7,6 +7,7 @@ import { REGISTRO_INCLUDE } from '@/lib/services/registroSeguridad'
 import type { Prisma } from '@prisma/client'
 
 const ROLES_PERMITIDOS = ['admin', 'gerente', 'seguridad']
+const ROLES_BYPASS = ['admin', 'gerente']
 
 export async function GET(req: NextRequest) {
   try {
@@ -23,6 +24,7 @@ export async function GET(req: NextRequest) {
     const fechaDesde = searchParams.get('fechaDesde')
     const fechaHasta = searchParams.get('fechaHasta')
     const ingenieroId = searchParams.get('ingenieroId')
+    const evidenciaId = searchParams.get('evidenciaId')
     const registroHorasCampoId = searchParams.get('registroHorasCampoId')
     const proyectoId = searchParams.get('proyectoId')
 
@@ -36,21 +38,27 @@ export async function GET(req: NextRequest) {
       where.tipo = parsed.data
     }
 
-    if (registroHorasCampoId) where.registroHorasCampoId = registroHorasCampoId
+    if (evidenciaId) where.evidenciaSeguridadId = evidenciaId
     if (ingenieroId) where.ingenieroId = ingenieroId
 
+    const evidenciaFilter: Prisma.EvidenciaSeguridadWhereInput = {}
+    if (registroHorasCampoId) evidenciaFilter.registroHorasCampoId = registroHorasCampoId
     if (fechaDesde || fechaHasta || proyectoId) {
-      where.jornada = {}
-      if (proyectoId) where.jornada.proyectoId = proyectoId
+      const jornadaFilter: Prisma.RegistroHorasCampoWhereInput = {}
+      if (proyectoId) jornadaFilter.proyectoId = proyectoId
       if (fechaDesde || fechaHasta) {
-        where.jornada.fechaTrabajo = {}
-        if (fechaDesde) where.jornada.fechaTrabajo.gte = new Date(fechaDesde)
+        jornadaFilter.fechaTrabajo = {}
+        if (fechaDesde) jornadaFilter.fechaTrabajo.gte = new Date(fechaDesde)
         if (fechaHasta) {
           const hasta = new Date(fechaHasta)
           hasta.setHours(23, 59, 59, 999)
-          where.jornada.fechaTrabajo.lte = hasta
+          jornadaFilter.fechaTrabajo.lte = hasta
         }
       }
+      evidenciaFilter.jornada = jornadaFilter
+    }
+    if (Object.keys(evidenciaFilter).length > 0) {
+      where.evidencia = evidenciaFilter
     }
 
     const registros = await prisma.registroSeguridad.findMany({
@@ -85,25 +93,39 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const { registroHorasCampoId, tipo, descripcion, asistentes, observaciones } = parsed.data
+    const { evidenciaSeguridadId, tipo, descripcion, asistentes, observaciones } = parsed.data
 
-    const jornada = await prisma.registroHorasCampo.findUnique({
-      where: { id: registroHorasCampoId },
-      select: { id: true, estado: true },
+    const evidencia = await prisma.evidenciaSeguridad.findUnique({
+      where: { id: evidenciaSeguridadId },
+      select: {
+        id: true,
+        estado: true,
+        jornada: { select: { id: true, estado: true } },
+      },
     })
-    if (!jornada) {
-      return NextResponse.json({ error: 'Jornada no encontrada' }, { status: 404 })
+    if (!evidencia) {
+      return NextResponse.json({ error: 'Evidencia no encontrada' }, { status: 404 })
     }
-    if (!['iniciado', 'pendiente'].includes(jornada.estado)) {
-      return NextResponse.json(
-        { error: 'No se pueden registrar actividades en jornadas aprobadas o rechazadas' },
-        { status: 400 },
-      )
+
+    const isBypass = ROLES_BYPASS.includes(session.user.role)
+    if (!isBypass) {
+      if (evidencia.estado !== 'abierta') {
+        return NextResponse.json(
+          { error: 'La evidencia está cerrada' },
+          { status: 400 },
+        )
+      }
+      if (!['iniciado', 'pendiente'].includes(evidencia.jornada.estado)) {
+        return NextResponse.json(
+          { error: 'No se pueden registrar actividades en jornadas aprobadas o rechazadas' },
+          { status: 400 },
+        )
+      }
     }
 
     const creado = await prisma.registroSeguridad.create({
       data: {
-        registroHorasCampoId,
+        evidenciaSeguridadId,
         ingenieroId: session.user.id,
         tipo,
         descripcion,

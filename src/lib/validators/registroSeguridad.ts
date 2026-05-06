@@ -25,7 +25,7 @@ export const TIPO_REGISTRO_LABELS: Record<TipoRegistroSeguridad, string> = {
 }
 
 export const crearRegistroSeguridadSchema = z.object({
-  registroHorasCampoId: z.string().min(1, 'Selecciona una jornada activa'),
+  evidenciaSeguridadId: z.string().min(1, 'Selecciona una evidencia activa'),
   tipo: tipoRegistroSeguridadEnum,
   descripcion: z.string().trim().min(3, 'La descripción es muy corta').max(2000, 'Máximo 2000 caracteres'),
   asistentes: z.number().int().nonnegative().nullable().optional(),

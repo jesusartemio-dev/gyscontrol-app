@@ -74,6 +74,7 @@ export async function listarJornadasActivasDelDia(opts: ListarJornadasActivasOpt
           },
         },
       },
+      evidenciaSeguridad: { select: { id: true, estado: true } },
     },
     orderBy: { createdAt: 'desc' },
   })
@@ -113,13 +114,19 @@ export async function obtenerJornadasDeSemana(
 }
 
 const REGISTRO_INCLUDE = {
-  jornada: {
+  evidencia: {
     select: {
       id: true,
-      fechaTrabajo: true,
       estado: true,
-      proyecto: { select: { id: true, codigo: true, nombre: true } },
-      supervisor: { select: { id: true, name: true } },
+      jornada: {
+        select: {
+          id: true,
+          fechaTrabajo: true,
+          estado: true,
+          proyecto: { select: { id: true, codigo: true, nombre: true } },
+          supervisor: { select: { id: true, name: true } },
+        },
+      },
     },
   },
   ingeniero: { select: { id: true, name: true, email: true } },
@@ -132,7 +139,7 @@ export type RegistroSeguridadDetalle = Prisma.RegistroSeguridadGetPayload<{
 
 export async function listarRegistrosSeguridadDeJornada(jornadaId: string) {
   return prisma.registroSeguridad.findMany({
-    where: { registroHorasCampoId: jornadaId },
+    where: { evidencia: { registroHorasCampoId: jornadaId } },
     include: REGISTRO_INCLUDE,
     orderBy: { createdAt: 'desc' },
   })
@@ -149,11 +156,13 @@ export async function listarRegistrosSeguridadDeSemana(
 ) {
   return prisma.registroSeguridad.findMany({
     where: {
-      jornada: {
-        proyectoId,
-        fechaTrabajo: {
-          gte: inicioDelDia(fechaInicio),
-          lte: finDelDia(fechaFin),
+      evidencia: {
+        jornada: {
+          proyectoId,
+          fechaTrabajo: {
+            gte: inicioDelDia(fechaInicio),
+            lte: finDelDia(fechaFin),
+          },
         },
       },
     },

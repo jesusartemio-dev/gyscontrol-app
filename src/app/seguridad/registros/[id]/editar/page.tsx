@@ -30,10 +30,14 @@ interface RegistroDetalle {
   asistentes: number | null
   observaciones: string | null
   ingenieroId: string
-  jornada: {
+  evidencia: {
     id: string
-    estado: string
-    proyecto: { id: string; codigo: string; nombre: string }
+    estado: 'abierta' | 'cerrada'
+    jornada: {
+      id: string
+      estado: string
+      proyecto: { id: string; codigo: string; nombre: string }
+    }
   }
 }
 
@@ -124,8 +128,12 @@ export default function EditarRegistroSeguridadPage({
   }
 
   const r = query.data
-  const jornada = r.jornada
-  const jornadaCerrada = jornada.estado === 'aprobado' || jornada.estado === 'rechazado'
+  const jornada = r.evidencia.jornada
+  const evidencia = r.evidencia
+  const jornadaCerrada =
+    jornada.estado === 'aprobado' ||
+    jornada.estado === 'rechazado' ||
+    evidencia.estado === 'cerrada'
 
   return (
     <div className="container mx-auto p-4 sm:p-6 space-y-4 max-w-2xl">
@@ -141,7 +149,11 @@ export default function EditarRegistroSeguridadPage({
 
       {jornadaCerrada && (
         <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
-          La jornada está en estado <strong>{jornada.estado}</strong>. No se puede modificar el registro.
+          {evidencia.estado === 'cerrada' ? (
+            <>La evidencia está cerrada. No se puede modificar el registro.</>
+          ) : (
+            <>La jornada está en estado <strong>{jornada.estado}</strong>. No se puede modificar el registro.</>
+          )}
         </div>
       )}
 

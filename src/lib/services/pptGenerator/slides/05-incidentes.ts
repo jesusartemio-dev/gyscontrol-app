@@ -39,7 +39,7 @@ export function generarSlideIncidentes(
       const isLast = i === incidentes.length - 1
       return [
         {
-          text: `• ${formatearFechaCorta(r.jornada.fechaTrabajo)}: `,
+          text: `• ${formatearFechaCorta(r.evidencia.jornada.fechaTrabajo)}: `,
           options: { bold: true, breakLine: false as const },
         },
         {
@@ -79,7 +79,7 @@ export function generarSlideIncidentes(
       const isLast = i === observaciones.length - 1
       return [
         {
-          text: `• ${formatearFechaCorta(r.jornada.fechaTrabajo)}: `,
+          text: `• ${formatearFechaCorta(r.evidencia.jornada.fechaTrabajo)}: `,
           options: { bold: true, breakLine: false as const },
         },
         {

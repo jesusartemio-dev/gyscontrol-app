@@ -3,26 +3,20 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { uploadFile, createFolder, getAdminDriveId } from '@/lib/services/googleDrive'
+import { puedeEscribirEvidencia } from '@/lib/services/evidenciaSeguridad'
 
 const ROLES_PERMITIDOS = ['admin', 'gerente', 'seguridad']
-const ROLES_VER_TODO = ['admin', 'gerente']
 const MAX_TAMANO_BYTES = 15 * 1024 * 1024 // 15MB
-
-function puedeEditar(role: string, ingenieroId: string, userId: string): boolean {
-  if (role === 'admin' || role === 'gerente') return true
-  if (role === 'seguridad' && ingenieroId === userId) return true
-  return false
-}
 
 async function getOrCreateRegistroFolder(registroId: string): Promise<string> {
   const registro = await prisma.registroSeguridad.findUnique({
     where: { id: registroId },
     select: {
-      jornada: { select: { proyecto: { select: { codigo: true } } } },
+      evidencia: { select: { jornada: { select: { proyecto: { select: { codigo: true } } } } } },
     },
   })
   const parentId = getAdminDriveId()
-  const codigo = registro?.jornada.proyecto.codigo ?? 'sin-proyecto'
+  const codigo = registro?.evidencia.jornada.proyecto.codigo ?? 'sin-proyecto'
   const folderName = `RegistrosSeguridad_${codigo}_${registroId}`
   const folder = await createFolder({ parentId, folderName })
   return folder.id!
@@ -41,16 +35,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     const { id } = await params
     const registro = await prisma.registroSeguridad.findUnique({
       where: { id },
-      select: { ingenieroId: true },
+      select: { id: true },
     })
     if (!registro) {
       return NextResponse.json({ error: 'Registro no encontrado' }, { status: 404 })
-    }
-    if (
-      !ROLES_VER_TODO.includes(session.user.role) &&
-      registro.ingenieroId !== session.user.id
-    ) {
-      return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
     }
 
     const fotos = await prisma.registroSeguridadFoto.findMany({
@@ -77,13 +65,24 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const { id } = await params
     const registro = await prisma.registroSeguridad.findUnique({
       where: { id },
-      select: { ingenieroId: true },
+      select: {
+        evidencia: { select: { estado: true, jornada: { select: { estado: true } } } },
+      },
     })
     if (!registro) {
       return NextResponse.json({ error: 'Registro no encontrado' }, { status: 404 })
     }
-    if (!puedeEditar(session.user.role, registro.ingenieroId, session.user.id)) {
-      return NextResponse.json({ error: 'Solo puedes subir fotos a tus propios registros' }, { status: 403 })
+    if (
+      !puedeEscribirEvidencia(
+        session.user.role,
+        registro.evidencia.jornada.estado,
+        registro.evidencia.estado,
+      )
+    ) {
+      return NextResponse.json(
+        { error: 'No se pueden subir fotos: la evidencia o jornada está cerrada' },
+        { status: 403 },
+      )
     }
 
     const formData = await req.formData()

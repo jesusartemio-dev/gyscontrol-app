@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { puedeEscribirEvidencia } from '@/lib/services/evidenciaSeguridad'
 import { z } from 'zod'
 
 const ROLES_PERMITIDOS = ['admin', 'gerente', 'seguridad']
-const ROLES_REVISION = ['admin', 'gerente']
 
 const reordenSchema = z.object({
   ordenes: z
@@ -28,12 +28,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     const registro = await prisma.registroSeguridad.findUnique({
       where: { id },
-      select: { id: true, ingenieroId: true },
+      select: {
+        id: true,
+        evidencia: { select: { estado: true, jornada: { select: { estado: true } } } },
+      },
     })
     if (!registro) return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
 
-    const puedeEditar = ROLES_REVISION.includes(session.user.role) || registro.ingenieroId === session.user.id
-    if (!puedeEditar) return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
+    if (
+      !puedeEscribirEvidencia(
+        session.user.role,
+        registro.evidencia.jornada.estado,
+        registro.evidencia.estado,
+      )
+    ) {
+      return NextResponse.json(
+        { error: 'No se puede reordenar: la evidencia o jornada está cerrada' },
+        { status: 403 },
+      )
+    }
 
     const body = await req.json()
     const parsed = reordenSchema.safeParse(body)

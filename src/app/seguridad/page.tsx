@@ -10,7 +10,7 @@ const TILES = [
   { href: '/seguridad/entregas', label: 'Entregas', icon: ClipboardList, color: 'text-orange-600 bg-orange-50', desc: 'Registrar y consultar entregas a empleados' },
   { href: '/seguridad/reposiciones', label: 'Reposiciones', icon: Clock, color: 'text-red-600 bg-red-50', desc: 'Items por vencer o vencidos para renovar' },
   { href: '/seguridad/empleados', label: 'Empleados', icon: Users, color: 'text-violet-600 bg-violet-50', desc: 'Tallas y EPPs asignados por empleado' },
-  { href: '/seguridad/registros', label: 'Registros de campo', icon: ClipboardCheck, color: 'text-amber-600 bg-amber-50', desc: 'Charlas NDAD, inspecciones, observaciones y fotos del día' },
+  { href: '/seguridad/evidencias', label: 'Evidencias diarias', icon: ClipboardCheck, color: 'text-amber-600 bg-amber-50', desc: 'Una evidencia por jornada · charlas, inspecciones, observaciones y fotos' },
   { href: '/seguridad/reportes-semanales', label: 'Reportes semanales', icon: FileBarChart, color: 'text-cyan-600 bg-cyan-50', desc: 'Resúmenes semanales de actividades de seguridad por proyecto' },
   { href: '/seguridad/reportes', label: 'Reportes EPP', icon: BarChart3, color: 'text-slate-600 bg-slate-50', desc: 'Consumos, costos y auditoría por empleado' },
 ]
