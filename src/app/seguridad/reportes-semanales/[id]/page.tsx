@@ -160,7 +160,12 @@ export default function EditorReporteSeguridadPage({
   useEffect(() => {
     if (query.data && draft === null) {
       const r = query.data.reporte
-      setDraft({
+      const personasEnCampo = query.data.kpiCalculado.personasEnCampo
+
+      // Si los campos COVID nunca se llenaron, pre-rellenar con valores calculados/0
+      const covidSinRellenar = r.totalPersonas == null
+
+      const newDraft = {
         resumenEjecutivo: r.resumenEjecutivo ?? '',
         horasHombre: r.horasHombre ?? null,
         diasSinAccidentes: r.diasSinAccidentes ?? null,
@@ -168,16 +173,30 @@ export default function EditorReporteSeguridadPage({
         accidentesCount: r.accidentesCount ?? null,
         horasCapacitacion: r.horasCapacitacion ?? null,
         personasCapacitadas: r.personasCapacitadas ?? null,
-        totalPersonas: r.totalPersonas ?? null,
-        trabajadoresObra: r.trabajadoresObra ?? null,
-        homeOffice: r.homeOffice ?? null,
-        casosSospechosos: r.casosSospechosos ?? null,
-        casosInfectados: r.casosInfectados ?? null,
-        casosCurados: r.casosCurados ?? null,
-        fallecidos: r.fallecidos ?? null,
-        grupoRiesgo: r.grupoRiesgo ?? null,
-      })
+        // COVID — pre-rellenar si son null
+        totalPersonas:    r.totalPersonas    ?? personasEnCampo,
+        trabajadoresObra: r.trabajadoresObra ?? personasEnCampo,
+        homeOffice:       r.homeOffice       ?? 0,
+        casosSospechosos: r.casosSospechosos ?? 0,
+        casosInfectados:  r.casosInfectados  ?? 0,
+        casosCurados:     r.casosCurados     ?? 0,
+        fallecidos:       r.fallecidos       ?? 0,
+        grupoRiesgo:      r.grupoRiesgo      ?? 0,
+      }
+
+      setDraft(newDraft)
+
+      // Persistir defaults inmediatamente para que el PPTX los recoja sin que el usuario toque nada
+      if (covidSinRellenar) {
+        fetch(`/api/seguridad/reportes-semanales/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(newDraft),
+        }).catch(() => { /* silencioso — el autosave al editar lo reintentará */ })
+      }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query.data, draft])
 
   const saveMutation = useMutation({
