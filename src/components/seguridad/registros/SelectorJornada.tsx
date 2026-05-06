@@ -165,38 +165,34 @@ export function SelectorJornada({ value, onChange, filtroProyectoId, filtroFecha
   }
 
   return (
-    <Card className="p-4 space-y-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="space-y-0.5">
-          <h3 className="font-semibold text-sm flex items-center gap-2">
-            <ClipboardList className="h-4 w-4 text-orange-600" />
-            Jornada activa
-          </h3>
-          <p className="text-xs text-muted-foreground">
-            Elige cualquier jornada en curso o pendiente contra la que quieres registrar tu actividad.
-          </p>
+    <Card className="p-3 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="font-semibold text-sm flex items-center gap-1.5">
+          <ClipboardList className="h-4 w-4 text-orange-600" />
+          Jornada
+        </h3>
+        <div className="flex items-center gap-2">
+          {!enModoFiltrado && (
+            <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
+              <Switch checked={soloAsignadas} onCheckedChange={setSoloAsignadas} className="scale-75 origin-right" />
+              Solo asignadas
+            </label>
+          )}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={() => query.refetch()}
+            disabled={query.isFetching}
+            aria-label="Refrescar"
+          >
+            <RefreshCw className={cn('h-3.5 w-3.5', query.isFetching && 'animate-spin')} />
+          </Button>
         </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          onClick={() => query.refetch()}
-          disabled={query.isFetching}
-          aria-label="Refrescar jornadas"
-        >
-          <RefreshCw className={cn('h-4 w-4', query.isFetching && 'animate-spin')} />
-        </Button>
       </div>
-
-      {enModoFiltrado ? (
-        <p className="text-xs text-orange-600">
-          Filtrado a un proyecto y rango específicos (desde el reporte semanal).
-        </p>
-      ) : (
-        <label className="flex items-center justify-between gap-2 text-xs">
-          <span className="text-muted-foreground">Solo mis proyectos asignados</span>
-          <Switch checked={soloAsignadas} onCheckedChange={setSoloAsignadas} />
-        </label>
+      {enModoFiltrado && (
+        <p className="text-[11px] text-orange-600">Filtrado al rango del reporte semanal.</p>
       )}
 
       {query.isLoading ? (
@@ -229,76 +225,62 @@ export function SelectorJornada({ value, onChange, filtroProyectoId, filtroFecha
           </Button>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-1">
           {jornadas.map((j) => {
             const seleccionada = j.id === value
+            const trabajadores = trabajadoresDeJornada(j).length
+            const dias = diasDesde(j.fechaTrabajo)
             return (
               <button
                 key={j.id}
                 type="button"
                 onClick={() => seleccionarJornada(j)}
                 className={cn(
-                  'w-full text-left rounded-md border p-3 transition min-h-[64px]',
+                  'w-full text-left rounded-md border px-3 py-2 transition',
                   'hover:border-orange-300 hover:bg-orange-50/40',
                   seleccionada
-                    ? 'border-orange-500 bg-orange-50 ring-2 ring-orange-200'
+                    ? 'border-orange-500 bg-orange-50 ring-1 ring-orange-200'
                     : 'border-gray-200 bg-white',
                 )}
                 aria-pressed={seleccionada}
               >
-                <div className="flex items-start justify-between gap-2 mb-1">
-                  <div className="font-medium text-sm leading-tight">
+                {/* Línea 1: nombre · código · badge */}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium text-[13px] leading-tight truncate">
                     {j.proyecto.nombre}
-                  </div>
-                  <Badge className={cn('text-[10px] capitalize border', ESTADO_CLASS[j.estado])}>
+                    <span className="ml-1.5 font-mono text-[10px] text-muted-foreground font-normal">
+                      {j.proyecto.codigo}
+                    </span>
+                  </span>
+                  <Badge className={cn('text-[10px] capitalize border shrink-0', ESTADO_CLASS[j.estado])}>
                     {j.estado}
                   </Badge>
                 </div>
-                <div className="text-[11px] font-mono text-muted-foreground">
-                  {j.proyecto.codigo}
-                </div>
-                <div className="mt-1.5 grid grid-cols-2 gap-1 text-[11px] text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <User className="h-3 w-3" /> {j.supervisor.name ?? '—'}
+                {/* Línea 2: supervisor · trabajadores · tareas · fecha */}
+                <div className="flex items-center gap-2 mt-0.5 text-[11px] text-muted-foreground flex-wrap">
+                  <span className="flex items-center gap-0.5">
+                    <User className="h-3 w-3 shrink-0" />
+                    {j.supervisor.name ?? '—'}
                   </span>
-                  <span className="flex items-center gap-1 justify-end">
-                    <CalendarDays className="h-3 w-3" />
-                    {formatFechaCorta(j.fechaTrabajo)}
-                    {(() => {
-                      const d = diasDesde(j.fechaTrabajo)
-                      if (d === 0) return <span className="text-emerald-600 font-medium">· hoy</span>
-                      if (d === 1) return <span>· ayer</span>
-                      if (d > 1) return <span className="text-amber-600">· hace {d} d</span>
-                      return null
-                    })()}
-                  </span>
-                  {j.ubicacion && (
-                    <span className="col-span-2 flex items-center gap-1">
-                      <MapPin className="h-3 w-3" /> {j.ubicacion}
-                    </span>
-                  )}
-                  <span className="col-span-2 flex items-center gap-1">
-                    <Users className="h-3 w-3" /> {trabajadoresDeJornada(j).length} trabajador{trabajadoresDeJornada(j).length === 1 ? '' : 'es'}
+                  <span className="flex items-center gap-0.5">
+                    <Users className="h-3 w-3 shrink-0" />
+                    {trabajadores} trab
                     {j.tareas.length > 0 && ` · ${j.tareas.length} tarea${j.tareas.length === 1 ? '' : 's'}`}
                   </span>
+                  {j.ubicacion && (
+                    <span className="flex items-center gap-0.5">
+                      <MapPin className="h-3 w-3 shrink-0" />
+                      <span className="truncate max-w-[80px]">{j.ubicacion}</span>
+                    </span>
+                  )}
+                  <span className="ml-auto flex items-center gap-0.5 shrink-0">
+                    <CalendarDays className="h-3 w-3" />
+                    {formatFechaCorta(j.fechaTrabajo)}
+                    {dias === 0 && <span className="text-emerald-600 font-medium">· hoy</span>}
+                    {dias === 1 && <span>· ayer</span>}
+                    {dias > 1 && <span className="text-amber-600">· hace {dias}d</span>}
+                  </span>
                 </div>
-                {j.tareas.length > 0 && (
-                  <div className="mt-1.5 pt-1.5 border-t border-dashed border-gray-200 space-y-0.5">
-                    {j.tareas.slice(0, 3).map((t) => (
-                      <div key={t.id} className="text-[11px] text-gray-600 truncate">
-                        • {nombreTarea(t)}
-                        {t.miembros.length > 0 && (
-                          <span className="text-muted-foreground ml-1">({t.miembros.length})</span>
-                        )}
-                      </div>
-                    ))}
-                    {j.tareas.length > 3 && (
-                      <div className="text-[10px] italic text-muted-foreground">
-                        + {j.tareas.length - 3} tarea{j.tareas.length - 3 === 1 ? '' : 's'} más…
-                      </div>
-                    )}
-                  </div>
-                )}
               </button>
             )
           })}
