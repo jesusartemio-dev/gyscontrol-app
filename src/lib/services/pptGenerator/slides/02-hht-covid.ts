@@ -63,7 +63,7 @@ export function generarSlideHhtCovid(
     ? Math.round(totalHHT / (nTrabajadores * nDias))
     : 0
 
-  const nombreProyecto = agregado.reporte.proyecto.nombre
+  const nombreProyecto = agregado.reporte.proyecto.descripcion ?? agregado.reporte.proyecto.nombre
   const rango = formatRangoFecha(agregado.reporte.fechaInicio, agregado.reporte.fechaFin)
 
   // ─── Actividades: una línea por jornada con día en negrita + subrayado ──────

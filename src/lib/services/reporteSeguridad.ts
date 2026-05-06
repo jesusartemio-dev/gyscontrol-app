@@ -6,7 +6,7 @@ import { listarRegistrosSeguridadDeSemana, obtenerJornadasDeSemana } from './reg
 // ─── Include helpers ─────────────────────────────────────────────────────────
 
 const REPORTE_INCLUDE = {
-  proyecto: { select: { id: true, codigo: true, nombre: true } },
+  proyecto: { select: { id: true, codigo: true, nombre: true, descripcion: true } },
   ingeniero: { select: { id: true, name: true, email: true } },
   aprobador: { select: { id: true, name: true } },
 } as const satisfies Prisma.ReporteSemanalSeguridadInclude
