@@ -13,7 +13,10 @@ export interface Frame {
 // ─── Header banner común (slides 3-9) ────────────────────────────────────────
 export function addHeaderBanner(pres: PptxGenJS, slide: PptxGenJS.Slide, title: string) {
   slide.addShape(pres.ShapeType.rect, {
-    ...HEADER_BANNER,
+    x: HEADER_BANNER.X,
+    y: HEADER_BANNER.Y,
+    w: HEADER_BANNER.W,
+    h: HEADER_BANNER.H,
     fill: { color: COLORS.ORANGE_PRIMARY },
     line: { color: COLORS.ORANGE_PRIMARY },
   })
