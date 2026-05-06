@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { rechazarReporteSeguridadSchema } from '@/lib/validators/reporteSeguridad'
 import { REPORTE_INCLUDE } from '@/lib/services/reporteSeguridad'
 
-const ROLES_REVISION = ['admin', 'gerente']
+const ROLES_REVISION = ['admin', 'gerente', 'gestor']
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {

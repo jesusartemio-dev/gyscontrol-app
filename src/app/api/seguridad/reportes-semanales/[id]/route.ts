@@ -6,7 +6,7 @@ import { actualizarReporteSeguridadSchema } from '@/lib/validators/reporteSeguri
 import { REPORTE_INCLUDE } from '@/lib/services/reporteSeguridad'
 
 const ROLES_PERMITIDOS = ['admin', 'gerente', 'gestor', 'seguridad']
-const ROLES_REVISION = ['admin', 'gerente']
+const ROLES_REVISION = ['admin', 'gerente', 'gestor']
 
 function puedeEditar(role: string, ingenieroId: string, userId: string) {
   if (ROLES_REVISION.includes(role)) return true

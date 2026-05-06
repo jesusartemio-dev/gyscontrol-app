@@ -392,7 +392,7 @@ export default function EvidenciaSeguridadPage({
 
   const ev = query.data
   const role = session?.user?.role
-  const isBypass = role === 'admin' || role === 'gerente'
+  const isBypass = role === 'admin' || role === 'gerente' || role === 'gestor'
   const jornadaActiva = ['iniciado', 'pendiente'].includes(ev.jornada.estado)
   const evidenciaAbierta = ev.estado === 'abierta'
   const puedeEscribir = isBypass || (jornadaActiva && evidenciaAbierta)

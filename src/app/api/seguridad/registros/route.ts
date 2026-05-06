@@ -7,7 +7,7 @@ import { REGISTRO_INCLUDE } from '@/lib/services/registroSeguridad'
 import type { Prisma } from '@prisma/client'
 
 const ROLES_PERMITIDOS = ['admin', 'gerente', 'gestor', 'seguridad']
-const ROLES_BYPASS = ['admin', 'gerente']
+const ROLES_BYPASS = ['admin', 'gerente', 'gestor']
 
 export async function GET(req: NextRequest) {
   try {

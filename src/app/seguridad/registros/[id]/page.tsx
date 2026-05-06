@@ -243,7 +243,7 @@ export default function DetalleRegistroSeguridadPage({
             fotos={r.fotos}
             editable={
               !!session?.user &&
-              (['admin', 'gerente'].includes(session.user.role) || session.user.id === r.ingenieroId)
+              (['admin', 'gerente', 'gestor'].includes(session.user.role) || session.user.id === r.ingenieroId)
             }
           />
         </CardContent>

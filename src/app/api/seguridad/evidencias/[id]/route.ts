@@ -10,7 +10,7 @@ import {
 } from '@/lib/services/evidenciaSeguridad'
 
 const ROLES_PERMITIDOS = ['admin', 'gerente', 'gestor', 'seguridad']
-const ROLES_BYPASS = ['admin', 'gerente']
+const ROLES_BYPASS = ['admin', 'gerente', 'gestor']
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -71,18 +71,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       )
     }
 
-    // Reabrir solo admin/gerente
+    // Reabrir solo admin/gerente/gestor
     if (parsed.data.estado === 'abierta' && existente.estado === 'cerrada' && !isBypass) {
       return NextResponse.json(
-        { error: 'Solo admin o gerente pueden reabrir una evidencia cerrada' },
+        { error: 'Solo admin, gerente o gestor pueden reabrir una evidencia cerrada' },
         { status: 403 },
       )
     }
 
-    // Cerrar: creador, admin o gerente
+    // Cerrar: creador, admin, gerente o gestor
     if (parsed.data.estado === 'cerrada' && !isBypass && !isCreador) {
       return NextResponse.json(
-        { error: 'Solo el creador, admin o gerente pueden cerrar una evidencia' },
+        { error: 'Solo el creador, admin, gerente o gestor pueden cerrar una evidencia' },
         { status: 403 },
       )
     }
@@ -119,7 +119,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
     if (!ROLES_BYPASS.includes(session.user.role)) {
-      return NextResponse.json({ error: 'Solo admin o gerente pueden eliminar evidencias' }, { status: 403 })
+      return NextResponse.json({ error: 'Solo admin, gerente o gestor pueden eliminar evidencias' }, { status: 403 })
     }
 
     const { id } = await params
