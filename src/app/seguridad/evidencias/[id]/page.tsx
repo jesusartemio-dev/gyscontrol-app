@@ -182,6 +182,7 @@ export default function EvidenciaSeguridadPage({
   const [cuadrillaAbierta, setCuadrillaAbierta] = useState(false)
   const [modalAbierto, setModalAbierto] = useState(false)
   const [editandoRegistro, setEditandoRegistro] = useState<RegistroLista | null>(null)
+  const [fotosExistentes, setFotosExistentes] = useState<FotoLista[]>([])
   const [fotos, setFotos] = useState<FotoLocal[]>([])
   // Set de tipos que el usuario ha toggleado manualmente (invierte el default)
   const [toggledSections, setToggledSections] = useState<Set<TipoRegistroSeguridad>>(new Set())
@@ -240,6 +241,24 @@ export default function EvidenciaSeguridadPage({
       }
       return (await res.json()) as { id: string }
     },
+  })
+
+  const eliminarFotoMutation = useMutation({
+    mutationFn: async ({ registroId, fotoId }: { registroId: string; fotoId: string }) => {
+      const res = await fetch(`/api/seguridad/registros/${registroId}/fotos/${fotoId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error ?? 'No se pudo eliminar la foto')
+      }
+    },
+    onSuccess: (_data, { fotoId }) => {
+      setFotosExistentes((prev) => prev.filter((f) => f.id !== fotoId))
+      queryClient.invalidateQueries({ queryKey: ['seguridad', 'evidencia', id] })
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Error al eliminar foto'),
   })
 
   const onSubmit = async (data: CrearRegistroSeguridadInput) => {
@@ -415,6 +434,7 @@ export default function EvidenciaSeguridadPage({
       observaciones: r.observaciones ?? null,
     })
     setFotos([])
+    setFotosExistentes(r.fotos)
     setEditandoRegistro(r)
     setModalAbierto(true)
   }
@@ -726,7 +746,7 @@ export default function EvidenciaSeguridadPage({
       </div>
 
       {/* ── Modal: agregar registro ───────────────────────────── */}
-      <Dialog open={modalAbierto} onOpenChange={(open) => { if (!enviando) { setModalAbierto(open); if (!open) setEditandoRegistro(null) } }}>
+      <Dialog open={modalAbierto} onOpenChange={(open) => { if (!enviando) { setModalAbierto(open); if (!open) { setEditandoRegistro(null); setFotosExistentes([]) } } }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -786,21 +806,48 @@ export default function EvidenciaSeguridadPage({
               />
             </div>
 
-            {(!editandoRegistro || editandoRegistro.fotos.length < 3) && (
-              <div className="space-y-1.5">
-                <Label className="text-sm">
-                  {editandoRegistro
-                    ? `Agregar fotos (tiene ${editandoRegistro.fotos.length}/3)`
-                    : 'Fotos (1 a 3)'}
-                </Label>
+            <div className="space-y-1.5">
+              <Label className="text-sm">Fotos</Label>
+
+              {/* Fotos existentes (solo en modo edición) */}
+              {editandoRegistro && fotosExistentes.length > 0 && (
+                <div className="flex gap-2 flex-wrap">
+                  {fotosExistentes.map((f) => (
+                    <div key={f.id} className="relative h-20 w-20 rounded-md overflow-hidden border border-gray-200 bg-muted group">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={`/api/seguridad/registros/fotos/${f.id}/contenido`}
+                        alt={f.nombreArchivo}
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                      />
+                      <button
+                        type="button"
+                        disabled={eliminarFotoMutation.isPending}
+                        onClick={() => eliminarFotoMutation.mutate({ registroId: editandoRegistro.id, fotoId: f.id })}
+                        className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                        aria-label="Eliminar foto"
+                      >
+                        <span className="text-[11px] font-bold leading-none">✕</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Subir fotos nuevas */}
+              {fotosExistentes.length < 3 && (
                 <FotosUploader
                   fotos={fotos}
                   onChange={setFotos}
-                  max={3 - (editandoRegistro?.fotos.length ?? 0)}
+                  max={3 - fotosExistentes.length}
                   disabled={enviando}
                 />
-              </div>
-            )}
+              )}
+              {editandoRegistro && fotosExistentes.length >= 3 && (
+                <p className="text-xs text-muted-foreground">Ya tiene 3 fotos. Elimina una para agregar otra.</p>
+              )}
+            </div>
 
             <div className="flex items-center justify-end gap-2 pt-2">
               <Button type="button" variant="outline" disabled={enviando} onClick={() => setModalAbierto(false)}>
