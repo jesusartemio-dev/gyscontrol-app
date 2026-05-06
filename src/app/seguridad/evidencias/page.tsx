@@ -8,6 +8,7 @@ import {
   ArrowLeft,
   CalendarDays,
   ClipboardCheck,
+  ExternalLink,
   HardHat,
   Image as ImageIcon,
   Loader2,
@@ -94,6 +95,12 @@ function hoyISO() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+function hace7DiasISO() {
+  const d = new Date()
+  d.setDate(d.getDate() - 6)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 export default function EvidenciasListaPage() {
   const router = useRouter()
   const queryClient = useQueryClient()
@@ -120,7 +127,7 @@ export default function EvidenciasListaPage() {
   }, [semanaIsoParam])
 
   const [filtroProyecto, setFiltroProyecto] = useState(proyectoIdParam)
-  const [filtroFechaDesde, setFiltroFechaDesde] = useState(rangoSemana?.fechaDesde ?? hoyISO())
+  const [filtroFechaDesde, setFiltroFechaDesde] = useState(rangoSemana?.fechaDesde ?? hace7DiasISO())
   const [filtroFechaHasta, setFiltroFechaHasta] = useState(rangoSemana?.fechaHasta ?? hoyISO())
   const [filtroEstado, setFiltroEstado] = useState<'todos' | 'abierta' | 'cerrada'>('todos')
 
@@ -415,6 +422,8 @@ export default function EvidenciasListaPage() {
             >
               {abrirEvidenciaMutation.isPending ? (
                 <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Abriendo…</>
+              ) : jornadaSel?.evidenciaSeguridad ? (
+                <><ExternalLink className="h-4 w-4 mr-1" /> Ir a evidencia</>
               ) : (
                 <><Plus className="h-4 w-4 mr-1" /> Abrir evidencia</>
               )}

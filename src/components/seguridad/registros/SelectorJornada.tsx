@@ -32,6 +32,7 @@ interface JornadaActiva {
   proyecto: { id: string; codigo: string; nombre: string }
   supervisor: { id: string; name: string | null }
   tareas: TareaJornada[]
+  evidenciaSeguridad?: { id: string; estado: string } | null
 }
 
 /** Nombre legible de la tarea (proyectoTarea.nombre o nombreTareaExtra) */
@@ -244,7 +245,7 @@ export function SelectorJornada({ value, onChange, filtroProyectoId, filtroFecha
                 )}
                 aria-pressed={seleccionada}
               >
-                {/* Línea 1: nombre · código · badge */}
+                {/* Línea 1: nombre · código · badge estado · badge evidencia */}
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-medium text-[13px] leading-tight truncate">
                     {j.proyecto.nombre}
@@ -252,9 +253,16 @@ export function SelectorJornada({ value, onChange, filtroProyectoId, filtroFecha
                       {j.proyecto.codigo}
                     </span>
                   </span>
-                  <Badge className={cn('text-[10px] capitalize border shrink-0', ESTADO_CLASS[j.estado])}>
-                    {j.estado}
-                  </Badge>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {j.evidenciaSeguridad && (
+                      <Badge className="text-[10px] border bg-orange-100 text-orange-700 border-orange-200">
+                        Con evidencia
+                      </Badge>
+                    )}
+                    <Badge className={cn('text-[10px] capitalize border', ESTADO_CLASS[j.estado])}>
+                      {j.estado}
+                    </Badge>
+                  </div>
                 </div>
                 {/* Línea 2: supervisor · trabajadores · tareas · fecha */}
                 <div className="flex items-center gap-2 mt-0.5 text-[11px] text-muted-foreground flex-wrap">
