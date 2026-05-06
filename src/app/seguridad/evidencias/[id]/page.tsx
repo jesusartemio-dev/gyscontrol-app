@@ -40,6 +40,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { useSession } from 'next-auth/react'
 import { cn } from '@/lib/utils'
 
@@ -159,6 +165,7 @@ export default function EvidenciaSeguridadPage({
   const [confirmCerrar, setConfirmCerrar] = useState(false)
   const [confirmEliminarRegistro, setConfirmEliminarRegistro] = useState<string | null>(null)
   const [cuadrillaAbierta, setCuadrillaAbierta] = useState(true)
+  const [modalAbierto, setModalAbierto] = useState(false)
   const [fotos, setFotos] = useState<FotoLocal[]>([])
 
   const query = useQuery<EvidenciaDetalle>({
@@ -227,7 +234,6 @@ export default function EvidenciaSeguridadPage({
         toast.success('Registro agregado')
       }
 
-      // Reset form pero mantener tipo
       form.reset({
         evidenciaSeguridadId: id,
         tipo: data.tipo,
@@ -236,6 +242,7 @@ export default function EvidenciaSeguridadPage({
         observaciones: null,
       })
       setFotos([])
+      setModalAbierto(false)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al crear registro')
     }
@@ -488,11 +495,20 @@ export default function EvidenciaSeguridadPage({
             <ImageIcon className="h-4 w-4 text-orange-600" />
             Evidencias registradas ({ev.registros.length})
           </h2>
+          {puedeEscribir && (
+            <Button
+              size="sm"
+              className="h-8 bg-orange-600 hover:bg-orange-700"
+              onClick={() => setModalAbierto(true)}
+            >
+              <Plus className="h-4 w-4 mr-1" /> Agregar
+            </Button>
+          )}
         </div>
 
         {ev.registros.length === 0 ? (
           <div className="rounded-md border border-dashed py-8 text-center text-sm text-muted-foreground">
-            Aún no hay evidencias. Agrega la primera con el formulario de abajo.
+            Aún no hay evidencias.{puedeEscribir ? ' Usa el botón "+ Agregar" para registrar la primera.' : ''}
           </div>
         ) : (
           <div className="space-y-2">
@@ -563,91 +579,6 @@ export default function EvidenciaSeguridadPage({
         )}
       </div>
 
-      {/* ── Formulario inline agregar ─────────────────────── */}
-      {puedeEscribir && (
-        <Card className="border-orange-200">
-          <CardContent className="p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <Plus className="h-4 w-4 text-orange-600" />
-              <h3 className="text-sm font-semibold">Agregar evidencia</h3>
-            </div>
-
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
-              <div className="space-y-1.5">
-                <Label className="text-sm">Tipo</Label>
-                <SelectorTipoRegistro
-                  value={tipo}
-                  onChange={(t) => form.setValue('tipo', t as TipoRegistroSeguridad)}
-                  disabled={enviando}
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="descripcion-inline" className="text-sm">Descripción</Label>
-                <Textarea
-                  id="descripcion-inline"
-                  placeholder="Qué se hizo, dónde, con quiénes…"
-                  rows={3}
-                  disabled={enviando}
-                  {...form.register('descripcion')}
-                />
-                {form.formState.errors.descripcion && (
-                  <p className="text-xs text-red-600">{form.formState.errors.descripcion.message}</p>
-                )}
-              </div>
-
-              {tipo === 'charla' && (
-                <div className="space-y-1.5">
-                  <Label htmlFor="asistentes-inline" className="text-sm">Asistentes</Label>
-                  <Input
-                    id="asistentes-inline"
-                    type="number"
-                    inputMode="numeric"
-                    min={0}
-                    step={1}
-                    placeholder={totalTrabajadores > 0 ? `Sugerencia: ${totalTrabajadores}` : 'Cantidad'}
-                    disabled={enviando}
-                    {...form.register('asistentes', {
-                      setValueAs: (v) => (v === '' || v == null ? null : Number(v)),
-                    })}
-                  />
-                </div>
-              )}
-
-              <div className="space-y-1.5">
-                <Label htmlFor="obs-inline" className="text-sm">Observaciones (opcional)</Label>
-                <Textarea
-                  id="obs-inline"
-                  placeholder="Notas adicionales"
-                  rows={2}
-                  disabled={enviando}
-                  {...form.register('observaciones', {
-                    setValueAs: (v) => (typeof v === 'string' && v.trim() === '' ? null : v),
-                  })}
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-sm">Fotos (1 a 3)</Label>
-                <FotosUploader fotos={fotos} onChange={setFotos} max={3} disabled={enviando} />
-              </div>
-
-              <Button
-                type="submit"
-                disabled={enviando}
-                className="w-full bg-orange-600 hover:bg-orange-700 h-11"
-              >
-                {enviando ? (
-                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Guardando…</>
-                ) : (
-                  <><Save className="h-4 w-4 mr-2" /> Agregar evidencia</>
-                )}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      )}
-
       {!puedeEscribir && (
         <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
           {!evidenciaAbierta
@@ -655,6 +586,106 @@ export default function EvidenciaSeguridadPage({
             : 'La jornada está aprobada o rechazada. No se pueden agregar más registros.'}
         </div>
       )}
+
+      {/* ── Modal: agregar evidencia ──────────────────────── */}
+      <Dialog
+        open={modalAbierto}
+        onOpenChange={(open) => {
+          if (!enviando) setModalAbierto(open)
+        }}
+      >
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="h-4 w-4 text-orange-600" />
+              Agregar evidencia
+            </DialogTitle>
+          </DialogHeader>
+
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3 pt-2">
+            <div className="space-y-1.5">
+              <Label className="text-sm">Tipo</Label>
+              <SelectorTipoRegistro
+                value={tipo}
+                onChange={(t) => form.setValue('tipo', t as TipoRegistroSeguridad)}
+                disabled={enviando}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="descripcion-modal" className="text-sm">Descripción</Label>
+              <Textarea
+                id="descripcion-modal"
+                placeholder="Qué se hizo, dónde, con quiénes…"
+                rows={3}
+                disabled={enviando}
+                {...form.register('descripcion')}
+              />
+              {form.formState.errors.descripcion && (
+                <p className="text-xs text-red-600">{form.formState.errors.descripcion.message}</p>
+              )}
+            </div>
+
+            {tipo === 'charla' && (
+              <div className="space-y-1.5">
+                <Label htmlFor="asistentes-modal" className="text-sm">Asistentes</Label>
+                <Input
+                  id="asistentes-modal"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  step={1}
+                  placeholder={totalTrabajadores > 0 ? `Sugerencia: ${totalTrabajadores}` : 'Cantidad'}
+                  disabled={enviando}
+                  {...form.register('asistentes', {
+                    setValueAs: (v) => (v === '' || v == null ? null : Number(v)),
+                  })}
+                />
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <Label htmlFor="obs-modal" className="text-sm">Observaciones (opcional)</Label>
+              <Textarea
+                id="obs-modal"
+                placeholder="Notas adicionales"
+                rows={2}
+                disabled={enviando}
+                {...form.register('observaciones', {
+                  setValueAs: (v) => (typeof v === 'string' && v.trim() === '' ? null : v),
+                })}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-sm">Fotos (1 a 3)</Label>
+              <FotosUploader fotos={fotos} onChange={setFotos} max={3} disabled={enviando} />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={enviando}
+                onClick={() => setModalAbierto(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={enviando}
+                className="bg-orange-600 hover:bg-orange-700"
+              >
+                {enviando ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Guardando…</>
+                ) : (
+                  <><Save className="h-4 w-4 mr-2" /> Guardar</>
+                )}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Diálogos ──────────────────────────────────────── */}
       <AlertDialog open={confirmCerrar} onOpenChange={setConfirmCerrar}>
