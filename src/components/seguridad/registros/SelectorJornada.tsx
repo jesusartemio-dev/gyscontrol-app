@@ -226,7 +226,7 @@ export function SelectorJornada({ value, onChange, filtroProyectoId, filtroFecha
           </Button>
         </div>
       ) : (
-        <div className="space-y-1 max-h-[50vh] overflow-y-auto pr-0.5">
+        <div className="space-y-1">
           {jornadas.map((j) => {
             const seleccionada = j.id === value
             const trabajadores = trabajadoresDeJornada(j).length

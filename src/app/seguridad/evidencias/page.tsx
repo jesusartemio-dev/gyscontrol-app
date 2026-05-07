@@ -471,15 +471,15 @@ export default function EvidenciasListaPage() {
 
       {/* ── Dialog: Nueva evidencia ──────────────────────── */}
       <Dialog open={dialogAbrir} onOpenChange={setDialogAbrir}>
-        <DialogContent className="w-[calc(100%-2rem)] sm:max-w-lg">
-          <DialogHeader>
+        <DialogContent className="w-[calc(100%-2rem)] sm:max-w-lg flex flex-col max-h-[90vh]">
+          <DialogHeader className="shrink-0">
             <DialogTitle>Abrir evidencia de seguridad</DialogTitle>
             <DialogDescription>
               Selecciona la jornada de campo. Si ya existe evidencia para esa jornada, te llevamos a ella.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="py-2">
+          <div className="py-2 overflow-y-auto flex-1 min-h-0">
             <SelectorJornada
               value={jornadaSel?.id ?? null}
               onChange={(_id, j) => setJornadaSel(j)}
