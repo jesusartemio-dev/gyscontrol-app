@@ -27,10 +27,10 @@ interface OrgChartProps {
   onNodoClick?: (nodo: OrgNodoCompleto) => void
 }
 
-const NODE_W = 240
-const NODE_H = 116
-const H_GAP = 40
-const V_GAP = 64
+const NODE_W = 190
+const NODE_H = 112
+const H_GAP = 20
+const V_GAP = 56
 
 interface LayoutNode {
   nodo: OrgNodoCompleto
@@ -101,7 +101,7 @@ function buildLayout(nodos: OrgNodoCompleto[]): {
   const allY = Object.values(positions).map(p => p.y)
   const minX = Math.min(...allX)
   const minY = Math.min(...allY)
-  const MARGIN = 28
+  const MARGIN = 20
   for (const id of Object.keys(positions)) {
     positions[id].x -= minX - MARGIN
     positions[id].y -= minY - MARGIN
