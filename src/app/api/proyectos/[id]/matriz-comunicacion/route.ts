@@ -181,6 +181,29 @@ export async function POST(
   }
 }
 
+// DELETE — eliminar la matriz completa (cascade filas)
+export async function DELETE(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+
+    const { id: proyectoId } = await params
+
+    const matriz = await prisma.matrizComunicacion.findUnique({ where: { proyectoId } })
+    if (!matriz) return NextResponse.json({ error: 'No existe matriz' }, { status: 404 })
+
+    await prisma.matrizComunicacion.delete({ where: { proyectoId } })
+
+    return NextResponse.json({ ok: true })
+  } catch (error) {
+    console.error('DELETE /api/proyectos/[id]/matriz-comunicacion:', error)
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
+  }
+}
+
 // PATCH — actualizar metadatos (version, estado)
 export async function PATCH(
   req: Request,

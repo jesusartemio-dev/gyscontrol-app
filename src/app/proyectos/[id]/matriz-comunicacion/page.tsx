@@ -6,6 +6,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Loader2, MessageSquare, Plus, Trash2, Download, Sparkles, Pencil, X, Check, FileText } from 'lucide-react'
 import { toast } from 'sonner'
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -63,6 +67,8 @@ export default function MatrizComunicacionPage() {
   const [creating, setCreating] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [exportingWord, setExportingWord] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   // Edit state
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -178,6 +184,21 @@ export default function MatrizComunicacionPage() {
     finally { setSavingRow(false) }
   }
 
+  async function handleDeleteMatriz() {
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/proyectos/${proyectoId}/matriz-comunicacion`, { method: 'DELETE' })
+      if (!res.ok) { const e = await res.json(); throw new Error(e.error ?? 'Error') }
+      setMatriz(null)
+      setShowDeleteDialog(false)
+      toast.success('Matriz eliminada')
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Error al eliminar')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   async function handleExportPdf() {
     if (!matriz || !proyectoInfo) return
     const { generarPdfMatriz } = await import('@/lib/matrizComunicacion/exportPdf')
@@ -276,6 +297,10 @@ export default function MatrizComunicacionPage() {
               ? <Loader2 size={13} className="animate-spin mr-1" />
               : <FileText size={13} className="mr-1" />}
             Word
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setShowDeleteDialog(true)}
+            className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700">
+            <Trash2 size={13} className="mr-1" />Eliminar y regenerar
           </Button>
         </div>
       </div>
@@ -423,6 +448,28 @@ export default function MatrizComunicacionPage() {
         <span><b>Medio:</b> I=Informe M=Minuta E=Email R=Reunión P=Planilla IE=Informe+Email</span>
         <span><b>Resp:</b> D=Dest. E=Emisor R=Autoriza S=Soporte V=Valida</span>
       </div>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar la Matriz de Comunicaciones?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminarán todas las filas y celdas. Podrás generar una nueva con IA.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteMatriz}
+              disabled={deleting}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              {deleting ? <Loader2 size={13} className="animate-spin mr-1" /> : null}
+              Sí, eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
