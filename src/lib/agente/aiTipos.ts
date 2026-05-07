@@ -35,6 +35,8 @@ export const TIPO_INFO: Record<string, TipoInfo> = {
   'ssoma-par-regenerar':             { label: 'SSOMA — PAR (regen)',             color: '#0f766e' }, // teal-700
   // SSOMA — errores de API (tokens = 0, costo = 0; metadata contiene docTipo y errorMessage)
   'ssoma-error': { label: 'SSOMA — Error API', color: '#dc2626' }, // red-600
+  // Matriz de Comunicaciones
+  'matriz-comunicacion': { label: 'Matriz de Comunicaciones', color: '#7c3aed' }, // violet-700
   // Tipos legacy — mantener para registros históricos
   'ssoma-documento':            { label: 'SSOMA — Generar docs (legacy)',   color: '#84cc16' }, // lime-500
   'ssoma-documento-regenerar':  { label: 'SSOMA — Regenerar doc (legacy)',  color: '#a3a3a3' }, // neutral-400

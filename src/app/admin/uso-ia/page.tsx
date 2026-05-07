@@ -94,6 +94,7 @@ interface IAFeatureFlags {
   scanCotizacionPDF: boolean
   importCatalogoPDF: boolean
   ssomaDocumentos: boolean
+  matrizComunicacion: boolean
 }
 
 const FEATURE_DEFS: { key: keyof IAFeatureFlags; label: string; desc: string; icon: React.ElementType }[] = [
@@ -105,6 +106,7 @@ const FEATURE_DEFS: { key: keyof IAFeatureFlags; label: string; desc: string; ic
   { key: 'scanCotizacionPDF', label: 'Escanear PDF Cotizacion', desc: 'Auto-deteccion de precios y entregas desde PDF del proveedor', icon: FileSearch },
   { key: 'importCatalogoPDF', label: 'Importar Catalogo PDF', desc: 'Extraer equipos de cotizaciones PDF con IA para agregar al catalogo', icon: FileUp },
   { key: 'ssomaDocumentos', label: 'SSOMA — Documentos', desc: 'Generacion de expedientes de seguridad (IPERC, PETS, EPP, Plan Emergencia, PAR)', icon: ShieldCheck },
+  { key: 'matrizComunicacion', label: 'Matriz de Comunicaciones', desc: 'Generacion automatica de matriz con IA usando organigrama y EDTs del proyecto', icon: MessageSquare },
 ]
 
 const MONTH_NAMES = [

@@ -6,6 +6,8 @@ import Anthropic from '@anthropic-ai/sdk'
 import { buildPromptMatriz, type MatrizFilaIA } from '@/lib/matrizComunicacion/prompt'
 import { getModelForTask } from '@/lib/agente/models'
 import { generarSiglas } from '@/lib/matrizComunicacion/utils'
+import { trackUsage, trackUsageError } from '@/lib/agente/usageTracker'
+import { isIAFeatureEnabled } from '@/lib/agente/featureFlags'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -87,7 +89,11 @@ export async function POST(
     let filasData: FilaInput[] = []
     let generadoConIA = false
 
+    const userId = (session.user as { id?: string }).id ?? session.user.email ?? 'unknown'
+
     if (generarConIA) {
+      const iaEnabled = await isIAFeatureEnabled('matrizComunicacion')
+      if (!iaEnabled) return NextResponse.json({ error: 'La generación con IA de Matriz de Comunicaciones está deshabilitada' }, { status: 403 })
       // Deduplicar por userId: si la misma persona aparece en varios nodos
       // (ej. nodo fijo GYS + nodo de proyecto), tomar solo la primera aparición
       const seenUserIds = new Set<string>()
@@ -139,10 +145,31 @@ export async function POST(
         edts,
       })
 
-      const response = await anthropic.messages.create({
-        model: getModelForTask('ssoma-document'),
-        max_tokens: 4096,
-        messages: [{ role: 'user', content: prompt }],
+      const modelo = getModelForTask('ssoma-document')
+      const startMs = Date.now()
+      let response: Awaited<ReturnType<typeof anthropic.messages.create>>
+      try {
+        response = await anthropic.messages.create({
+          model: modelo,
+          max_tokens: 4096,
+          messages: [{ role: 'user', content: prompt }],
+        })
+      } catch (err) {
+        trackUsageError({
+          userId, tipo: 'matriz-comunicacion', modelo,
+          duracionMs: Date.now() - startMs,
+          metadata: { proyectoId, errorMessage: String(err instanceof Error ? err.message : err).substring(0, 300) },
+        })
+        throw err
+      }
+      trackUsage({
+        userId, tipo: 'matriz-comunicacion', modelo,
+        tokensInput: response.usage.input_tokens,
+        tokensOutput: response.usage.output_tokens,
+        tokensCacheCreation: (response.usage as unknown as Record<string, number>).cache_creation_input_tokens ?? 0,
+        tokensCacheRead: (response.usage as unknown as Record<string, number>).cache_read_input_tokens ?? 0,
+        duracionMs: Date.now() - startMs,
+        metadata: { proyectoId, edtsTotal: edts.length, personalTotal: personal.length },
       })
 
       const raw = response.content[0].type === 'text' ? response.content[0].text : ''

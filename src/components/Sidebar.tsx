@@ -62,6 +62,7 @@ import {
   QrCode,
   ClipboardCheck,
   FileBarChart,
+  Sparkles,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -442,6 +443,8 @@ export default function Sidebar() {
         { href: '/configuracion/centros-costo', label: 'Centros de Costo', icon: CreditCard },
         // 👁️ Vistas del catálogo
         { href: '/configuracion/catalogo-columnas', label: 'Vistas Catálogo', icon: Wrench },
+        // 🤖 IA — monitoreo de uso y costos
+        { href: '/admin/uso-ia', label: 'Uso IA', icon: Sparkles },
       ],
     },
   ]
