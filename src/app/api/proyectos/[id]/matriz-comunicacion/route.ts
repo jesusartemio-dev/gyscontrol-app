@@ -72,16 +72,6 @@ export async function POST(
             },
           },
         },
-        proyectoEdt: {
-          where: { proyectoCronograma: { tipo: 'ejecucion' } },
-          orderBy: { orden: 'asc' },
-          select: {
-            nombre: true,
-            orden: true,
-            proyectoFase: { select: { nombre: true } },
-          },
-          take: 40,
-        },
       },
     })
 
@@ -122,14 +112,28 @@ export async function POST(
         }
       })
 
-      const edts = proyecto.proyectoEdt.map(e => ({
-        nombre: e.nombre,
-        fase: e.proyectoFase?.nombre ?? 'Sin fase',
-        orden: e.orden,
-      }))
+      // Query all EDTs for this project — no cronograma type filter so we get all
+      const proyectoEdtsRaw = await prisma.proyectoEdt.findMany({
+        where: { proyectoId },
+        include: { proyectoFase: { select: { nombre: true, orden: true } } },
+        orderBy: [{ proyectoFase: { orden: 'asc' } }, { orden: 'asc' }],
+        take: 60,
+      })
+      // Dedup by nombre across cronogramas
+      const seenEdtNames = new Set<string>()
+      const edts = proyectoEdtsRaw
+        .filter(e => {
+          if (seenEdtNames.has(e.nombre)) return false
+          seenEdtNames.add(e.nombre)
+          return true
+        })
+        .map(e => ({ nombre: e.nombre, fase: e.proyectoFase?.nombre ?? 'Sin fase', orden: e.orden }))
+      console.log('Total EDTs encontrados:', edts.length)
+      console.log('EDTs enviados al prompt:', edts.map(e => e.nombre))
+      console.log('Proyecto codigo:', proyecto.codigo)
 
       const prompt = buildPromptMatriz({
-        proyecto: { nombre: proyecto.nombre, codigo: proyecto.codigo },
+        proyecto: { nombre: proyecto.nombre, codigo: proyecto.codigo ?? '' },
         cliente: proyecto.cliente?.nombre ?? 'Cliente',
         personal,
         edts,

@@ -42,6 +42,7 @@ interface PersonalInfo {
 }
 
 interface OrgNodo {
+  userId: string | null
   cargoLabel: string
   empresaOverride: string | null
   telefonoOverride: string | null
@@ -206,7 +207,7 @@ export default function MatrizComunicacionPage() {
     generarPdfMatriz({
       proyecto: proyectoInfo.nombre,
       cliente: proyectoInfo.cliente,
-      codigoDocumento: `MX-${proyectoInfo.codigo}-GYS-001`,
+      codigoDocumento: `MX-${proyectoInfo.codigo || proyectoId}-GYS-001`,
       revision: matriz.version,
       fecha: today,
       personal,
@@ -496,8 +497,16 @@ function valorColor(v: string): string {
 
 function buildPersonal(nodos: OrgNodo[]): PersonalInfo[] {
   const usadas = new Set<string>()
+  const seenUserIds = new Set<string>()
   return nodos
-    .filter(n => n.user)
+    .filter(n => {
+      if (!n.user) return false
+      if (n.userId) {
+        if (seenUserIds.has(n.userId)) return false
+        seenUserIds.add(n.userId)
+      }
+      return true
+    })
     .map(n => {
       const nombre = n.user!.name
       const siglas = generarSiglas(nombre, usadas)

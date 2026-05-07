@@ -94,7 +94,7 @@ export async function GET(
     const today = new Date().toLocaleDateString('es-PE', {
       day: '2-digit', month: '2-digit', year: 'numeric',
     })
-    const codigo = `MX-${proyecto.codigo}-GYS-001`
+    const codigo = `MX-${proyecto.codigo || proyectoId.substring(0, 8)}-GYS-001`
 
     const buffer = await generarDocxMatriz({
       proyecto: proyecto.nombre,

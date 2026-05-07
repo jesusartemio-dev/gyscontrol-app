@@ -32,7 +32,7 @@ export function generarPdfMatriz(datos: DatosMatrizPdf): void {
   const doc = new jsPDF({ orientation: 'landscape', format: 'a4' })
   const azul: [number, number, number] = [46, 64, 87]
   const gris: [number, number, number] = [245, 245, 245]
-  const W = doc.internal.pageSize.getWidth()
+  const W = 297 // landscape A4 — hardcoded to avoid jsPDF returning portrait width
 
   // ── HEADER ────────────────────────────────────────
   doc.setFillColor(...azul)
@@ -147,7 +147,8 @@ export function generarPdfMatriz(datos: DatosMatrizPdf): void {
     ]
   })
 
-  const anchoSiglas = Math.min(10, Math.floor((W - 20 - 10 - 35 - 18 - 18) / Math.max(siglas.length, 1)))
+  // Fixed cols: 8+40+15+15=78mm, margins=20mm → 277-78=199mm for siglas
+  const anchoSiglas = Math.min(40, Math.floor(199 / Math.max(siglas.length, 1)))
 
   autoTable(doc, {
     startY: startYMatriz,
@@ -157,10 +158,10 @@ export function generarPdfMatriz(datos: DatosMatrizPdf): void {
     headStyles: { fillColor: azul, textColor: [255, 255, 255] as [number, number, number], fontStyle: 'bold', halign: 'center' },
     alternateRowStyles: { fillColor: gris },
     columnStyles: {
-      0: { cellWidth: 10, halign: 'center' as const },
-      1: { cellWidth: 35 },
-      2: { cellWidth: 18, halign: 'center' as const },
-      3: { cellWidth: 18, halign: 'center' as const },
+      0: { cellWidth: 8, halign: 'center' as const },
+      1: { cellWidth: 40 },
+      2: { cellWidth: 15, halign: 'center' as const },
+      3: { cellWidth: 15, halign: 'center' as const },
       ...Object.fromEntries(siglas.map((_, i) => [i + 4, { cellWidth: anchoSiglas, halign: 'center' as const }])),
     },
     margin: { left: 10, right: 10 },
