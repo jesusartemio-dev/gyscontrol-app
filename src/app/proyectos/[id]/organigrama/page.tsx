@@ -5,13 +5,13 @@ import { useParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import {
   Loader2, GitBranch, Plus, Trash2, Save, Lock, Download,
   X, Eye, Pencil, Users, Building2, Phone, Hash, RefreshCw,
+  ChevronDown,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import OrgChart, { OrgNodoCompleto } from '@/components/organigrama/OrgChart'
@@ -80,7 +80,7 @@ export default function OrganigramaProyectoPage() {
     init()
   }, [loadNodos])
 
-  // ── GENERAR ORGANIGRAMA ────────────────────────────────────────────────────
+  // ── GENERAR ────────────────────────────────────────────────────────────────
 
   const handleGenerar = async (plantillaId: string | null) => {
     setGenerating(true)
@@ -91,8 +91,7 @@ export default function OrganigramaProyectoPage() {
         body: JSON.stringify({ plantillaId: plantillaId || null }),
       })
       if (!res.ok) throw new Error()
-      const creados: OrgNodoCompleto[] = await res.json()
-      setNodos(creados)
+      setNodos(await res.json())
       toast.success('Organigrama generado')
     } catch {
       toast.error('Error al generar organigrama')
@@ -101,7 +100,7 @@ export default function OrganigramaProyectoPage() {
     }
   }
 
-  // ── PANEL LATERAL (Vista tab) ──────────────────────────────────────────────
+  // ── PANEL LATERAL ──────────────────────────────────────────────────────────
 
   const openPanel = (nodo: OrgNodoCompleto) => {
     setPanelNodo(nodo)
@@ -141,7 +140,7 @@ export default function OrganigramaProyectoPage() {
     }
   }
 
-  // ── EDICIÓN INLINE (Editar tab) ────────────────────────────────────────────
+  // ── EDICIÓN INLINE ─────────────────────────────────────────────────────────
 
   const startEditRow = (nodo: OrgNodoCompleto) => {
     setEditingRowId(nodo.id)
@@ -211,11 +210,7 @@ export default function OrganigramaProyectoPage() {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            cargoLabel: label,
-            parentId: newParentId || null,
-            orden: 0,
-          }),
+          body: JSON.stringify({ cargoLabel: label, parentId: newParentId || null, orden: 0 }),
         }
       )
       if (!res.ok) throw new Error()
@@ -238,7 +233,7 @@ export default function OrganigramaProyectoPage() {
       const html2canvas = (await import('html2canvas')).default
       const container = document.getElementById('org-chart-container')
       if (!container) { toast.error('No se encontró el organigrama'); return }
-      const canvas = await html2canvas(container, { backgroundColor: '#F9FAFB', scale: 2 })
+      const canvas = await html2canvas(container, { backgroundColor: '#F8FAFC', scale: 2 })
       const link = document.createElement('a')
       link.download = `organigrama-${proyectoId}.png`
       link.href = canvas.toDataURL()
@@ -249,12 +244,12 @@ export default function OrganigramaProyectoPage() {
     }
   }
 
-  // ── RENDER ─────────────────────────────────────────────────────────────────
+  // ── LOADING ────────────────────────────────────────────────────────────────
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+      <div className="flex items-center justify-center min-h-[500px]">
+        <Loader2 className="h-8 w-8 animate-spin text-indigo-400" />
       </div>
     )
   }
@@ -263,61 +258,73 @@ export default function OrganigramaProyectoPage() {
 
   if (nodos.length === 0) {
     return (
-      <div className="p-6 space-y-6">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-indigo-100 rounded-xl">
-            <GitBranch className="h-6 w-6 text-indigo-600" />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold">Organigrama del Proyecto</h2>
-            <p className="text-sm text-muted-foreground">Este proyecto no tiene organigrama aún</p>
-          </div>
-        </div>
-
-        <div className="max-w-lg space-y-5 bg-white rounded-xl border p-6">
-          <div className="space-y-2">
-            <Label>Usar plantilla</Label>
-            <Select value={selectedPlantillaId} onValueChange={setSelectedPlantillaId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar plantilla..." />
-              </SelectTrigger>
-              <SelectContent>
-                {plantillas.map(p => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.nombre}
-                    {p._count && (
-                      <span className="ml-2 text-xs text-muted-foreground">({p._count.nodos} nodos)</span>
-                    )}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+      <div className="min-h-[500px] flex items-center justify-center p-8">
+        <div className="max-w-md w-full space-y-6 text-center">
+          <div className="flex flex-col items-center gap-3">
+            <div className="p-4 bg-indigo-50 rounded-2xl">
+              <GitBranch className="h-10 w-10 text-indigo-500" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-gray-800">Sin organigrama</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Genera la estructura del equipo desde una plantilla o crea desde cero
+              </p>
+            </div>
           </div>
 
-          <Button
-            className="w-full"
-            disabled={!selectedPlantillaId || generating}
-            onClick={() => handleGenerar(selectedPlantillaId)}
-          >
-            {generating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <GitBranch className="h-4 w-4 mr-2" />}
-            Generar desde plantilla
-          </Button>
+          <div className="bg-white rounded-xl border shadow-sm p-5 space-y-4 text-left">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                Usar plantilla
+              </Label>
+              <Select value={selectedPlantillaId} onValueChange={setSelectedPlantillaId}>
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder="Seleccionar plantilla..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {plantillas.map(p => (
+                    <SelectItem key={p.id} value={p.id}>
+                      <span>{p.nombre}</span>
+                      {p._count && (
+                        <span className="ml-2 text-xs text-muted-foreground">
+                          ({p._count.nodos} nodos)
+                        </span>
+                      )}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          <div className="relative flex items-center gap-3">
-            <div className="flex-1 border-t" />
-            <span className="text-xs text-muted-foreground">o</span>
-            <div className="flex-1 border-t" />
+            <Button
+              className="w-full h-10"
+              disabled={!selectedPlantillaId || generating}
+              onClick={() => handleGenerar(selectedPlantillaId)}
+            >
+              {generating
+                ? <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                : <GitBranch className="h-4 w-4 mr-2" />}
+              Generar desde plantilla
+            </Button>
+
+            <div className="relative flex items-center">
+              <div className="flex-1 border-t" />
+              <span className="px-3 text-xs text-muted-foreground">o</span>
+              <div className="flex-1 border-t" />
+            </div>
+
+            <Button
+              variant="outline"
+              className="w-full h-10"
+              disabled={generating}
+              onClick={() => handleGenerar(null)}
+            >
+              {generating
+                ? <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                : <Plus className="h-4 w-4 mr-2" />}
+              Crear desde cero (solo nodos GYS)
+            </Button>
           </div>
-
-          <Button
-            variant="outline"
-            className="w-full"
-            disabled={generating}
-            onClick={() => handleGenerar(null)}
-          >
-            {generating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
-            Crear desde cero (solo nodos GYS)
-          </Button>
         </div>
       </div>
     )
@@ -325,287 +332,323 @@ export default function OrganigramaProyectoPage() {
 
   // ── ESTADO B: Organigrama existe ───────────────────────────────────────────
 
+  const nodosGys = nodos.filter(n => n.esFijoGys)
+  const nodosProyecto = nodos.filter(n => !n.esFijoGys)
+  const vacantes = nodos.filter(n => !n.user).length
+
   return (
-    <div className="p-6 space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-indigo-100 rounded-lg">
-            <GitBranch className="h-5 w-5 text-indigo-600" />
+    <div className="flex flex-col h-full">
+      {/* ── Toolbar ──────────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between px-6 py-3 border-b bg-white">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <GitBranch className="h-5 w-5 text-indigo-500" />
+            <span className="font-semibold text-gray-800">Organigrama</span>
           </div>
-          <div>
-            <h2 className="text-lg font-bold">Organigrama del Proyecto</h2>
-            <p className="text-sm text-muted-foreground">{nodos.length} nodos</p>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span className="px-2 py-0.5 bg-gray-100 rounded-full text-xs font-mono">
+              {nodos.length} nodos
+            </span>
+            {vacantes > 0 && (
+              <span className="px-2 py-0.5 bg-red-50 text-red-500 rounded-full text-xs font-medium">
+                {vacantes} vacante{vacantes > 1 ? 's' : ''}
+              </span>
+            )}
           </div>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          className="text-xs text-orange-600 border-orange-300 hover:bg-orange-50"
-          onClick={() => {
-            if (confirm('¿Regenerar el organigrama? Se perderán los cambios actuales.')) {
-              handleGenerar(selectedPlantillaId || null)
-            }
-          }}
-        >
-          <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-          Regenerar
-        </Button>
+
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 text-xs text-muted-foreground gap-1.5"
+            onClick={handleExportPng}
+          >
+            <Download className="h-3.5 w-3.5" />
+            Exportar PNG
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs text-orange-600 border-orange-200 hover:bg-orange-50 gap-1.5"
+            onClick={() => {
+              if (confirm('¿Regenerar el organigrama? Se perderán los cambios actuales.')) {
+                handleGenerar(selectedPlantillaId || null)
+              }
+            }}
+          >
+            {generating
+              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              : <RefreshCw className="h-3.5 w-3.5" />}
+            Regenerar
+          </Button>
+        </div>
       </div>
 
-      <Tabs defaultValue="vista">
-        <TabsList>
-          <TabsTrigger value="vista" className="gap-2">
-            <Eye className="h-4 w-4" />
-            Vista Organigrama
-          </TabsTrigger>
-          <TabsTrigger value="editar" className="gap-2">
-            <Pencil className="h-4 w-4" />
-            Editar Nodos
-          </TabsTrigger>
-        </TabsList>
+      {/* ── Tabs ─────────────────────────────────────────────────────────── */}
+      <Tabs defaultValue="vista" className="flex flex-col flex-1 min-h-0">
+        <div className="px-6 pt-3 pb-0 border-b bg-white">
+          <TabsList className="h-9 bg-gray-100/80 p-0.5 gap-0.5">
+            <TabsTrigger value="vista" className="h-8 px-4 text-sm gap-1.5 data-[state=active]:bg-white data-[state=active]:shadow-sm">
+              <Eye className="h-3.5 w-3.5" />
+              Vista
+            </TabsTrigger>
+            <TabsTrigger value="editar" className="h-8 px-4 text-sm gap-1.5 data-[state=active]:bg-white data-[state=active]:shadow-sm">
+              <Pencil className="h-3.5 w-3.5" />
+              Editar nodos
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* ── TAB VISTA ──────────────────────────────────────────────────── */}
-        <TabsContent value="vista" className="mt-4">
-          <div className="flex gap-4">
-            <div className="flex-1 min-w-0">
+        <TabsContent value="vista" className="flex-1 flex min-h-0 m-0">
+          <div className="flex flex-1 min-h-0 overflow-hidden">
+            {/* Chart area */}
+            <div className="flex-1 min-w-0 overflow-auto bg-slate-50">
               <OrgChart nodos={nodos} onNodoClick={openPanel} />
-              <div className="flex justify-end mt-3">
-                <Button variant="outline" size="sm" onClick={handleExportPng} className="gap-2">
-                  <Download className="h-4 w-4" />
-                  Exportar PNG
-                </Button>
-              </div>
             </div>
 
             {/* Panel de edición lateral */}
             {panelNodo && (
-              <div className="w-72 border rounded-xl bg-white p-4 space-y-4 flex-shrink-0">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
-                    Editar nodo
-                  </h3>
-                  <button onClick={() => setPanelNodo(null)} className="text-muted-foreground hover:text-foreground">
+              <div className="w-72 border-l bg-white flex flex-col flex-shrink-0 overflow-y-auto">
+                {/* Panel header */}
+                <div className={`px-4 py-3 border-b flex items-center justify-between ${panelNodo.esFijoGys ? 'bg-[#2E4057]' : 'bg-white'}`}>
+                  <div className={`text-sm font-semibold ${panelNodo.esFijoGys ? 'text-white' : 'text-gray-800'}`}>
+                    {panelNodo.esFijoGys ? '🔒 Nodo GYS' : 'Editar nodo'}
+                  </div>
+                  <button
+                    onClick={() => setPanelNodo(null)}
+                    className={`${panelNodo.esFijoGys ? 'text-white/60 hover:text-white' : 'text-gray-400 hover:text-gray-700'}`}
+                  >
                     <X className="h-4 w-4" />
                   </button>
                 </div>
 
-                {panelNodo.esFijoGys && (
-                  <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
-                    <Lock className="h-3.5 w-3.5 flex-shrink-0" />
-                    Nodo corporativo GYS
+                <div className="p-4 space-y-4 flex-1">
+                  {panelNodo.esFijoGys && (
+                    <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                      Cargo no editable. Solo puedes cambiar la persona asignada y datos de contacto.
+                    </p>
+                  )}
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">Cargo</Label>
+                    <Input
+                      value={panelCargo}
+                      onChange={e => setPanelCargo(e.target.value)}
+                      disabled={panelNodo.esFijoGys}
+                      className="h-8 text-sm"
+                    />
                   </div>
-                )}
 
-                <div className="space-y-1">
-                  <Label className="text-xs">Cargo</Label>
-                  <Input
-                    value={panelCargo}
-                    onChange={e => setPanelCargo(e.target.value)}
-                    disabled={panelNodo.esFijoGys}
-                    className="h-8 text-sm"
-                  />
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
+                      <Users className="h-3.5 w-3.5" /> Persona asignada
+                    </Label>
+                    <Select
+                      value={panelUserId || '__none__'}
+                      onValueChange={v => setPanelUserId(v === '__none__' ? '' : v)}
+                    >
+                      <SelectTrigger className="h-8 text-sm">
+                        <SelectValue placeholder="Sin asignar" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">— Sin asignar</SelectItem>
+                        {usuarios.map(u => (
+                          <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
+                      <Building2 className="h-3.5 w-3.5" /> Empresa (override)
+                    </Label>
+                    <Input
+                      value={panelEmpresa}
+                      onChange={e => setPanelEmpresa(e.target.value)}
+                      placeholder="GYS CONTROL INDUSTRIAL SAC"
+                      className="h-8 text-sm"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Phone className="h-3 w-3" /> Teléfono
+                      </Label>
+                      <Input
+                        value={panelTelefono}
+                        onChange={e => setPanelTelefono(e.target.value)}
+                        placeholder="Override"
+                        className="h-8 text-xs"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Hash className="h-3 w-3" /> CIP
+                      </Label>
+                      <Input
+                        value={panelCip}
+                        onChange={e => setPanelCip(e.target.value)}
+                        placeholder="Override"
+                        className="h-8 text-xs"
+                      />
+                    </div>
+                  </div>
                 </div>
 
-                <div className="space-y-1">
-                  <Label className="text-xs flex items-center gap-1.5"><Users className="h-3.5 w-3.5" /> Persona asignada</Label>
-                  <Select value={panelUserId || '__none__'} onValueChange={v => setPanelUserId(v === '__none__' ? '' : v)}>
-                    <SelectTrigger className="h-8 text-sm">
-                      <SelectValue placeholder="Sin asignar" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">Sin asignar</SelectItem>
-                      {usuarios.map(u => (
-                        <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="p-4 border-t">
+                  <Button onClick={handlePanelSave} disabled={panelSaving} className="w-full h-9">
+                    {panelSaving
+                      ? <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      : <Save className="h-4 w-4 mr-2" />}
+                    Guardar cambios
+                  </Button>
                 </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5" /> Empresa (override)</Label>
-                  <Input
-                    value={panelEmpresa}
-                    onChange={e => setPanelEmpresa(e.target.value)}
-                    placeholder="GYS CONTROL INDUSTRIAL SAC"
-                    className="h-8 text-sm"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" /> Teléfono (override)</Label>
-                  <Input
-                    value={panelTelefono}
-                    onChange={e => setPanelTelefono(e.target.value)}
-                    placeholder="Vacío = usar del empleado"
-                    className="h-8 text-sm"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs flex items-center gap-1.5"><Hash className="h-3.5 w-3.5" /> CIP (override)</Label>
-                  <Input
-                    value={panelCip}
-                    onChange={e => setPanelCip(e.target.value)}
-                    placeholder="Vacío = usar del empleado"
-                    className="h-8 text-sm"
-                  />
-                </div>
-
-                <Button onClick={handlePanelSave} disabled={panelSaving} className="w-full h-8 text-sm">
-                  {panelSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-                  Guardar
-                </Button>
               </div>
             )}
           </div>
         </TabsContent>
 
         {/* ── TAB EDITAR ─────────────────────────────────────────────────── */}
-        <TabsContent value="editar" className="mt-4 space-y-4">
-          <div className="rounded-lg border bg-white overflow-hidden">
+        <TabsContent value="editar" className="flex-1 overflow-auto m-0 p-6 space-y-4 bg-slate-50">
+          <div className="rounded-xl border bg-white overflow-hidden shadow-sm">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead className="w-8"></TableHead>
+                <TableRow className="bg-gray-50">
+                  <TableHead className="w-8 pl-4"></TableHead>
                   <TableHead>Cargo</TableHead>
-                  <TableHead>Persona</TableHead>
+                  <TableHead>Persona asignada</TableHead>
                   <TableHead>Empresa</TableHead>
                   <TableHead>Teléfono</TableHead>
                   <TableHead>CIP</TableHead>
-                  <TableHead className="w-[100px]">Acciones</TableHead>
+                  <TableHead className="w-[90px] text-right pr-4">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {nodos.map(nodo => {
                   const isEditing = editingRowId === nodo.id
                   return (
-                    <React.Fragment key={nodo.id}>
-                      <TableRow className={isEditing ? 'bg-indigo-50' : ''}>
-                        <TableCell className="p-2">
-                          {nodo.esFijoGys && (
-                            <Lock className="h-3.5 w-3.5 text-amber-500" aria-label="Nodo corporativo GYS" />
-                          )}
-                        </TableCell>
-                        <TableCell className="font-medium text-sm">
-                          {isEditing ? (
-                            <Input
-                              value={rowCargo}
-                              onChange={e => setRowCargo(e.target.value)}
-                              disabled={nodo.esFijoGys}
-                              className="h-7 text-xs w-40"
-                            />
-                          ) : (
-                            <span className={nodo.esFijoGys ? 'text-indigo-800 font-semibold' : ''}>
-                              {nodo.cargoLabel}
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {isEditing ? (
-                            <Select value={rowUserId || '__none__'} onValueChange={v => setRowUserId(v === '__none__' ? '' : v)}>
-                              <SelectTrigger className="h-7 text-xs w-40">
-                                <SelectValue placeholder="Sin asignar" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="__none__">Sin asignar</SelectItem>
-                                {usuarios.map(u => (
-                                  <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          ) : nodo.user ? (
-                            <div>
-                              <div className="font-medium text-xs">{nodo.user.name}</div>
-                              <div className="text-[10px] text-muted-foreground">{nodo.user.email}</div>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-red-400 italic">Vacante</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-xs">
-                          {isEditing ? (
-                            <Input
-                              value={rowEmpresa}
-                              onChange={e => setRowEmpresa(e.target.value)}
-                              placeholder="GYS CONTROL..."
-                              className="h-7 text-xs w-40"
-                            />
-                          ) : (
-                            <span className="text-muted-foreground">{nodo._empresa}</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-xs">
-                          {isEditing ? (
-                            <Input
-                              value={rowTelefono}
-                              onChange={e => setRowTelefono(e.target.value)}
-                              placeholder="Override"
-                              className="h-7 text-xs w-32"
-                            />
-                          ) : (
-                            nodo._telefono ?? <span className="text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-xs">
-                          {isEditing ? (
-                            <Input
-                              value={rowCip}
-                              onChange={e => setRowCip(e.target.value)}
-                              placeholder="Override"
-                              className="h-7 text-xs w-28"
-                            />
-                          ) : (
-                            nodo._cip ?? <span className="text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            {isEditing ? (
-                              <>
-                                <Button
-                                  size="sm"
-                                  className="h-7 px-2 text-xs"
-                                  disabled={rowSaving}
-                                  onClick={() => handleRowSave(nodo.id)}
-                                >
-                                  {rowSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-7 px-2 text-xs"
-                                  onClick={() => setEditingRowId(null)}
-                                >
-                                  <X className="h-3.5 w-3.5" />
-                                </Button>
-                              </>
-                            ) : (
-                              <>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-7 w-7 p-0"
-                                  onClick={() => startEditRow(nodo)}
-                                >
-                                  <Pencil className="h-3.5 w-3.5" />
-                                </Button>
-                                {!nodo.esFijoGys && (
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-7 w-7 p-0 text-red-500 hover:text-red-700"
-                                    onClick={() => handleDeleteNodo(nodo.id)}
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </Button>
-                                )}
-                              </>
-                            )}
+                    <TableRow
+                      key={nodo.id}
+                      className={isEditing ? 'bg-indigo-50/70' : nodo.esFijoGys ? 'bg-slate-50/50' : ''}
+                    >
+                      <TableCell className="pl-4 py-2">
+                        {nodo.esFijoGys && (
+                          <Lock className="h-3.5 w-3.5 text-amber-400" aria-label="Nodo corporativo GYS" />
+                        )}
+                      </TableCell>
+                      <TableCell className="py-2 font-medium text-sm">
+                        {isEditing ? (
+                          <Input
+                            value={rowCargo}
+                            onChange={e => setRowCargo(e.target.value)}
+                            disabled={nodo.esFijoGys}
+                            className="h-7 text-xs w-44"
+                          />
+                        ) : (
+                          <span className={nodo.esFijoGys ? 'text-[#2E4057] font-semibold text-xs uppercase tracking-wide' : 'text-sm'}>
+                            {nodo.cargoLabel}
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="py-2">
+                        {isEditing ? (
+                          <Select
+                            value={rowUserId || '__none__'}
+                            onValueChange={v => setRowUserId(v === '__none__' ? '' : v)}
+                          >
+                            <SelectTrigger className="h-7 text-xs w-44">
+                              <SelectValue placeholder="Sin asignar" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none__">— Sin asignar</SelectItem>
+                              {usuarios.map(u => (
+                                <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : nodo.user ? (
+                          <div>
+                            <div className="text-sm font-medium">{nodo.user.name}</div>
+                            <div className="text-xs text-muted-foreground">{nodo.user.email}</div>
                           </div>
-                        </TableCell>
-                      </TableRow>
-                    </React.Fragment>
+                        ) : (
+                          <span className="text-xs text-red-400 italic font-medium">Vacante</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="py-2 text-xs text-muted-foreground">
+                        {isEditing ? (
+                          <Input
+                            value={rowEmpresa}
+                            onChange={e => setRowEmpresa(e.target.value)}
+                            placeholder="GYS CONTROL..."
+                            className="h-7 text-xs w-40"
+                          />
+                        ) : (
+                          <span className="truncate max-w-[160px] block" title={nodo._empresa}>
+                            {nodo._empresa}
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="py-2 text-xs">
+                        {isEditing ? (
+                          <Input
+                            value={rowTelefono}
+                            onChange={e => setRowTelefono(e.target.value)}
+                            placeholder="Override"
+                            className="h-7 text-xs w-32"
+                          />
+                        ) : (
+                          nodo._telefono ?? <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="py-2 text-xs">
+                        {isEditing ? (
+                          <Input
+                            value={rowCip}
+                            onChange={e => setRowCip(e.target.value)}
+                            placeholder="Override"
+                            className="h-7 text-xs w-28"
+                          />
+                        ) : (
+                          nodo._cip ?? <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="py-2 pr-4">
+                        <div className="flex items-center justify-end gap-1">
+                          {isEditing ? (
+                            <>
+                              <Button size="sm" className="h-7 px-2" disabled={rowSaving} onClick={() => handleRowSave(nodo.id)}>
+                                {rowSaving
+                                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  : <Save className="h-3.5 w-3.5" />}
+                              </Button>
+                              <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setEditingRowId(null)}>
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => startEditRow(nodo)}>
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              {!nodo.esFijoGys && (
+                                <Button
+                                  size="sm" variant="ghost"
+                                  className="h-7 w-7 p-0 text-red-400 hover:text-red-600 hover:bg-red-50"
+                                  onClick={() => handleDeleteNodo(nodo.id)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
                   )
                 })}
               </TableBody>
@@ -614,22 +657,25 @@ export default function OrganigramaProyectoPage() {
 
           {/* Agregar nodo */}
           {addingNodo ? (
-            <div className="border rounded-lg bg-white p-4 space-y-3">
-              <h4 className="text-sm font-semibold">Nuevo nodo</h4>
+            <div className="bg-white border rounded-xl shadow-sm p-4 space-y-3">
+              <h4 className="text-sm font-semibold text-gray-700">Nuevo nodo</h4>
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-xs">Cargo *</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Cargo *</Label>
                   <Input
                     value={newCargo}
                     onChange={e => setNewCargo(e.target.value)}
                     placeholder="Ej: Técnico Electricista"
                     className="h-8 text-sm"
                     autoFocus
-                    onKeyDown={e => { if (e.key === 'Enter') handleAddNodo(); if (e.key === 'Escape') setAddingNodo(false) }}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') handleAddNodo()
+                      if (e.key === 'Escape') setAddingNodo(false)
+                    }}
                   />
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Nodo padre (opcional)</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Nodo padre (opcional)</Label>
                   <Select value={newParentId || '__none__'} onValueChange={v => setNewParentId(v === '__none__' ? '' : v)}>
                     <SelectTrigger className="h-8 text-sm">
                       <SelectValue placeholder="Sin padre (raíz)" />
@@ -645,7 +691,7 @@ export default function OrganigramaProyectoPage() {
               </div>
               <div className="flex gap-2">
                 <Button size="sm" onClick={handleAddNodo} disabled={addSaving}>
-                  {addSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  {addSaving && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />}
                   Agregar
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => { setAddingNodo(false); setNewCargo(''); setNewParentId('') }}>
@@ -654,7 +700,12 @@ export default function OrganigramaProyectoPage() {
               </div>
             </div>
           ) : (
-            <Button variant="outline" size="sm" onClick={() => setAddingNodo(true)} className="gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setAddingNodo(true)}
+              className="gap-2 bg-white"
+            >
               <Plus className="h-4 w-4" />
               Agregar nodo
             </Button>

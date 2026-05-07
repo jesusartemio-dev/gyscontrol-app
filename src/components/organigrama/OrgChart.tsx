@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useRef, useCallback } from 'react'
+import React, { useRef } from 'react'
 
 export interface OrgNodoCompleto {
   id: string
@@ -27,10 +27,10 @@ interface OrgChartProps {
   onNodoClick?: (nodo: OrgNodoCompleto) => void
 }
 
-const NODE_W = 220
-const NODE_H = 110
-const H_GAP = 32
-const V_GAP = 60
+const NODE_W = 240
+const NODE_H = 116
+const H_GAP = 40
+const V_GAP = 64
 
 interface LayoutNode {
   nodo: OrgNodoCompleto
@@ -55,7 +55,6 @@ function buildLayout(nodos: OrgNodoCompleto[]): {
     children[pid].push(n.id)
   }
 
-  // Sort children by orden
   for (const key of Object.keys(children)) {
     children[key].sort((a, b) => (byId[a]?.orden ?? 0) - (byId[b]?.orden ?? 0))
   }
@@ -63,7 +62,6 @@ function buildLayout(nodos: OrgNodoCompleto[]): {
   const positions: Record<string, { x: number; y: number }> = {}
   const widths: Record<string, number> = {}
 
-  // Compute subtree width (bottom-up)
   function subtreeWidth(id: string): number {
     const kids = children[id] ?? []
     if (kids.length === 0) {
@@ -80,7 +78,6 @@ function buildLayout(nodos: OrgNodoCompleto[]): {
   let totalRootWidth = roots.reduce((s, r) => s + subtreeWidth(r.id) + H_GAP, -H_GAP)
   if (roots.length === 0) totalRootWidth = 0
 
-  // Assign positions (top-down)
   function assignPositions(id: string, centerX: number, depth: number) {
     positions[id] = { x: centerX - NODE_W / 2, y: depth * (NODE_H + V_GAP) }
     const kids = children[id] ?? []
@@ -100,12 +97,11 @@ function buildLayout(nodos: OrgNodoCompleto[]): {
     curX += widths[root.id] + H_GAP
   }
 
-  // Normalize to 20px margin
   const allX = Object.values(positions).map(p => p.x)
   const allY = Object.values(positions).map(p => p.y)
   const minX = Math.min(...allX)
   const minY = Math.min(...allY)
-  const MARGIN = 20
+  const MARGIN = 28
   for (const id of Object.keys(positions)) {
     positions[id].x -= minX - MARGIN
     positions[id].y -= minY - MARGIN
@@ -121,7 +117,6 @@ function buildLayout(nodos: OrgNodoCompleto[]): {
     width: NODE_W,
   }))
 
-  // Build edges
   const edges: { x1: number; y1: number; x2: number; y2: number }[] = []
   for (const n of nodos) {
     if (!n.parentId) continue
@@ -144,14 +139,6 @@ function NodoCard({ node, onClick }: { node: LayoutNode; onClick?: (n: OrgNodoCo
   const isVacante = !nodo.user
   const isGys = nodo.esFijoGys
 
-  const bgClass = isGys
-    ? 'bg-[#2E4057] text-white border-[#2E4057]'
-    : isVacante
-      ? 'bg-white border-dashed border-red-300 text-gray-700'
-      : 'bg-white border-gray-200 text-gray-800'
-
-  const labelClass = isGys ? 'text-white/80' : 'text-gray-500'
-
   return (
     <foreignObject
       x={x}
@@ -162,44 +149,75 @@ function NodoCard({ node, onClick }: { node: LayoutNode; onClick?: (n: OrgNodoCo
       onClick={() => onClick?.(nodo)}
     >
       <div
-        className={`w-full h-full rounded-lg border-2 shadow-sm p-2.5 cursor-pointer hover:shadow-md transition-shadow flex flex-col justify-between ${bgClass}`}
         style={{ width: NODE_W, height: NODE_H }}
+        className={[
+          'rounded-xl border-2 shadow-sm cursor-pointer transition-all duration-150 flex flex-col',
+          'hover:shadow-md hover:scale-[1.02]',
+          isGys
+            ? 'bg-[#2E4057] border-[#1e2d3d] text-white'
+            : isVacante
+              ? 'bg-white border-dashed border-red-300 text-gray-600'
+              : 'bg-white border-gray-200 text-gray-800',
+        ].join(' ')}
       >
-        {/* Cargo */}
-        <div className={`text-[11px] font-bold uppercase tracking-wide leading-tight truncate ${isGys ? 'text-white' : 'text-indigo-700'}`}>
-          {nodo.cargoLabel}
+        {/* Franja superior — cargo */}
+        <div
+          className={[
+            'px-3 pt-2.5 pb-1.5 rounded-t-[10px]',
+            isGys ? 'bg-[#243347]' : isVacante ? 'bg-red-50' : 'bg-slate-50',
+          ].join(' ')}
+        >
+          <div
+            className={[
+              'text-[10px] font-bold uppercase tracking-widest leading-tight truncate',
+              isGys ? 'text-indigo-200' : isVacante ? 'text-red-400' : 'text-indigo-600',
+            ].join(' ')}
+          >
+            {nodo.cargoLabel}
+          </div>
         </div>
 
-        {isVacante ? (
-          <div className="text-xs text-red-400 font-medium italic mt-1">[VACANTE]</div>
-        ) : (
-          <div className="space-y-0.5 mt-1">
-            <div className={`text-xs font-semibold truncate ${isGys ? 'text-white' : 'text-gray-800'}`}>
-              {nodo.user!.name}
+        {/* Cuerpo */}
+        <div className="px-3 py-2 flex-1 flex flex-col justify-between">
+          {isVacante ? (
+            <div className="flex items-center gap-1.5 mt-1">
+              <div className="h-1.5 w-1.5 rounded-full bg-red-400 animate-pulse" />
+              <span className="text-xs text-red-400 font-semibold italic">VACANTE</span>
             </div>
-            {nodo._telefono && (
-              <div className={`text-[10px] truncate ${labelClass}`}>
-                Cel. {nodo._telefono}
+          ) : (
+            <div className="space-y-0.5">
+              <div className={`text-[13px] font-semibold truncate leading-tight ${isGys ? 'text-white' : 'text-gray-800'}`}>
+                {nodo.user!.name}
               </div>
-            )}
-            {nodo._cip && (
-              <div className={`text-[10px] truncate ${labelClass}`}>
-                CIP N° {nodo._cip}
+              {nodo._telefono && (
+                <div className={`text-[10px] truncate ${isGys ? 'text-indigo-300' : 'text-gray-400'}`}>
+                  📱 {nodo._telefono}
+                </div>
+              )}
+              {nodo._cip && (
+                <div className={`text-[10px] truncate ${isGys ? 'text-indigo-300' : 'text-gray-400'}`}>
+                  CIP {nodo._cip}
+                </div>
+              )}
+              <div className={`text-[10px] truncate ${isGys ? 'text-indigo-300/80' : 'text-gray-400'}`}>
+                {nodo.user!.email}
               </div>
-            )}
-            <div className={`text-[10px] truncate ${labelClass}`}>
-              {nodo.user!.email}
             </div>
-          </div>
-        )}
+          )}
+
+          {/* Empresa */}
+          {!isGys && (
+            <div className="text-[9px] text-gray-300 truncate mt-1 uppercase tracking-wide">
+              {nodo._empresa}
+            </div>
+          )}
+        </div>
       </div>
     </foreignObject>
   )
 }
 
 export default function OrgChart({ nodos, onNodoClick }: OrgChartProps) {
-  const containerRef = useRef<HTMLDivElement>(null)
-
   const { nodes, svgWidth, svgHeight, edges } = buildLayout(nodos)
 
   if (nodos.length === 0) {
@@ -212,16 +230,23 @@ export default function OrgChart({ nodos, onNodoClick }: OrgChartProps) {
 
   return (
     <div
-      ref={containerRef}
       id="org-chart-container"
-      className="overflow-auto bg-gray-50 rounded-lg border"
-      style={{ minHeight: 300 }}
+      className="overflow-auto bg-slate-50 rounded-none"
+      style={{ minHeight: 400 }}
     >
+      {/* Dot grid background */}
       <svg
         width={svgWidth}
         height={svgHeight}
         style={{ display: 'block', minWidth: svgWidth }}
       >
+        <defs>
+          <pattern id="dotgrid" x="0" y="0" width="24" height="24" patternUnits="userSpaceOnUse">
+            <circle cx="1" cy="1" r="1" fill="#CBD5E1" opacity="0.5" />
+          </pattern>
+        </defs>
+        <rect width={svgWidth} height={svgHeight} fill="url(#dotgrid)" />
+
         {/* Connector lines */}
         {edges.map((e, i) => {
           const midY = (e.y1 + e.y2) / 2
@@ -229,8 +254,9 @@ export default function OrgChart({ nodos, onNodoClick }: OrgChartProps) {
             <path
               key={i}
               d={`M ${e.x1} ${e.y1} C ${e.x1} ${midY}, ${e.x2} ${midY}, ${e.x2} ${e.y2}`}
-              stroke="#CBD5E1"
+              stroke="#94A3B8"
               strokeWidth={1.5}
+              strokeDasharray="0"
               fill="none"
             />
           )
