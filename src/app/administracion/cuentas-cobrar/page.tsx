@@ -865,7 +865,15 @@ export default function CuentasCobrarPage() {
             <p className="text-xs text-muted-foreground">Los campos marcados con <span className="text-red-500 font-bold">*</span> son obligatorios.</p>
             <div>
               <Label>Cliente <span className="text-red-500">*</span></Label>
-              <Select value={createForm.clienteId} onValueChange={v => updateCreateField('clienteId', v)}>
+              <Select
+                value={createForm.clienteId}
+                onValueChange={v => {
+                  const proyectoActual = proyectos.find(p => p.id === createForm.proyectoId)
+                  const limpiarProyecto = !!proyectoActual && proyectoActual.clienteId !== v
+                  setCreateForm(f => ({ ...f, clienteId: v, ...(limpiarProyecto ? { proyectoId: '' } : {}) }))
+                  setCreateErrors(prev => { const s = new Set(prev); s.delete('clienteId'); return s })
+                }}
+              >
                 <SelectTrigger className={createErrors.has('clienteId') ? 'border-red-500 ring-1 ring-red-500' : ''}><SelectValue placeholder="Seleccionar cliente" /></SelectTrigger>
                 <SelectContent>
                   {clientes.map(c => (
@@ -876,10 +884,17 @@ export default function CuentasCobrarPage() {
             </div>
             <div>
               <Label>Proyecto <span className="text-red-500">*</span></Label>
-              <Select value={createForm.proyectoId} onValueChange={v => updateCreateField('proyectoId', v)}>
+              <Select
+                value={createForm.proyectoId}
+                onValueChange={v => {
+                  const p = proyectos.find(x => x.id === v)
+                  setCreateForm(f => ({ ...f, proyectoId: v, ...(p?.clienteId ? { clienteId: p.clienteId } : {}) }))
+                  setCreateErrors(prev => { const s = new Set(prev); s.delete('proyectoId'); if (p?.clienteId) s.delete('clienteId'); return s })
+                }}
+              >
                 <SelectTrigger className={createErrors.has('proyectoId') ? 'border-red-500 ring-1 ring-red-500' : ''}><SelectValue placeholder="Seleccionar proyecto" /></SelectTrigger>
                 <SelectContent>
-                  {proyectos.map(p => (
+                  {(createForm.clienteId ? proyectos.filter(p => p.clienteId === createForm.clienteId) : proyectos).map(p => (
                     <SelectItem key={p.id} value={p.id}>{p.codigo} - {p.nombre}</SelectItem>
                   ))}
                 </SelectContent>
@@ -949,12 +964,16 @@ export default function CuentasCobrarPage() {
                 <Label>Orden de Compra (cliente)</Label>
                 <Input placeholder="8070008797" value={createForm.ordenCompraCliente} onChange={e => updateCreateField('ordenCompraCliente', e.target.value)} />
                 {createForm.proyectoId && (() => {
-                  const oc = proyectos.find(p => p.id === createForm.proyectoId)?.ordenCompraCliente
-                  return oc ? (
+                  const p = proyectos.find(x => x.id === createForm.proyectoId)
+                  if (!p) return null
+                  return (
                     <p className="text-xs text-muted-foreground mt-1">
-                      OC del proyecto: <span className="font-medium text-foreground">{oc}</span>
+                      <span className="font-mono font-medium text-foreground">{p.codigo}</span>
+                      {p.ordenCompraCliente
+                        ? <> · OC: <span className="font-medium text-foreground">{p.ordenCompraCliente}</span></>
+                        : ' · Sin OC registrada en el proyecto'}
                     </p>
-                  ) : null
+                  )
                 })()}
               </div>
             </div>
