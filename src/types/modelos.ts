@@ -1117,6 +1117,7 @@ export interface Proyecto {
   adelantoMonto?: number
   adelantoAmortizado?: number
   // Contrato
+  ordenCompraCliente?: string | null
   numeroContrato?: string | null
   fechaFirmaContrato?: string | null
   fechaInicioContrato?: string | null

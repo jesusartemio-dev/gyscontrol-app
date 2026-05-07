@@ -137,6 +137,7 @@ export default function SeccionContrato({ proyecto, onUpdateProyecto }: Props) {
     igvPct: '18',
     condicionPago: '',
     diasCredito: '',
+    ordenCompraCliente: '',
   })
 
   // Carta fianza modal
@@ -192,6 +193,7 @@ export default function SeccionContrato({ proyecto, onUpdateProyecto }: Props) {
       igvPct: String(proyecto.igvPct ?? 18),
       condicionPago: proyecto.condicionPago || '',
       diasCredito: proyecto.diasCredito != null ? String(proyecto.diasCredito) : '',
+      ordenCompraCliente: proyecto.ordenCompraCliente || '',
     })
     setEditingContrato(true)
   }
@@ -210,6 +212,7 @@ export default function SeccionContrato({ proyecto, onUpdateProyecto }: Props) {
       if (form.fechaFinContrato) payload.fechaFinContrato = form.fechaFinContrato
       if (form.condicionPago) payload.condicionPago = form.condicionPago
       if (form.diasCredito) payload.diasCredito = parseInt(form.diasCredito)
+      payload.ordenCompraCliente = form.ordenCompraCliente || null
 
       const res = await fetch(`/api/proyectos/${proyecto.id}`, {
         method: 'PUT',
@@ -467,6 +470,10 @@ export default function SeccionContrato({ proyecto, onUpdateProyecto }: Props) {
                         <Label className="text-xs">Días Crédito</Label>
                         <Input type="number" value={form.diasCredito} onChange={e => setForm({ ...form, diasCredito: e.target.value })} className="h-8 text-sm" />
                       </div>
+                      <div>
+                        <Label className="text-xs">OC del Cliente</Label>
+                        <Input value={form.ordenCompraCliente} onChange={e => setForm({ ...form, ordenCompraCliente: e.target.value })} placeholder="ej: 8070008797" className="h-8 text-sm" />
+                      </div>
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-2 text-sm">
@@ -504,6 +511,10 @@ export default function SeccionContrato({ proyecto, onUpdateProyecto }: Props) {
                           {proyecto.condicionPago || '—'}
                           {proyecto.diasCredito != null && proyecto.diasCredito > 0 && ` (${proyecto.diasCredito} días)`}
                         </div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-muted-foreground">OC del Cliente</div>
+                        <div className="font-medium">{proyecto.ordenCompraCliente || '—'}</div>
                       </div>
                     </div>
                   )}

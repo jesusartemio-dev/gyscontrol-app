@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     if (lightweight) {
       const proyectos = await prisma.proyecto.findMany({
         where,
-        select: { id: true, codigo: true, nombre: true, totalCliente: true, clienteId: true, moneda: true, tipoCambio: true, cotizacionId: true, descuentoComercialPct: true, igvPct: true, fondoGarantiaPct: true },
+        select: { id: true, codigo: true, nombre: true, totalCliente: true, clienteId: true, moneda: true, tipoCambio: true, cotizacionId: true, descuentoComercialPct: true, igvPct: true, fondoGarantiaPct: true, ordenCompraCliente: true },
         orderBy: { createdAt: 'desc' },
       })
       return NextResponse.json(proyectos)

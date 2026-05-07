@@ -52,6 +52,7 @@ interface Proyecto {
   codigo: string
   nombre: string
   clienteId?: string
+  ordenCompraCliente?: string | null
 }
 
 interface Valorizacion {
@@ -947,6 +948,14 @@ export default function CuentasCobrarPage() {
               <div>
                 <Label>Orden de Compra (cliente)</Label>
                 <Input placeholder="8070008797" value={createForm.ordenCompraCliente} onChange={e => updateCreateField('ordenCompraCliente', e.target.value)} />
+                {createForm.proyectoId && (() => {
+                  const oc = proyectos.find(p => p.id === createForm.proyectoId)?.ordenCompraCliente
+                  return oc ? (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      OC del proyecto: <span className="font-medium text-foreground">{oc}</span>
+                    </p>
+                  ) : null
+                })()}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">

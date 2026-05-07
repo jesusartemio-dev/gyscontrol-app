@@ -1058,6 +1058,7 @@ model Proyecto {
   fondoGarantiaPct           Float                       @default(0)
   descuentoComercialPct      Float                       @default(0)
   igvPct                     Float                       @default(18)
+  ordenCompraCliente         String?
   /// @deprecated — usar Valorizacion.condicionPago. Estos campos son legacy huérfanos sin uso operacional. Mantener solo por retrocompatibilidad.
   condicionPago              String?
   /// @deprecated — usar Valorizacion.diasCredito.
