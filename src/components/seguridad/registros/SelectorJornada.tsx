@@ -226,7 +226,7 @@ export function SelectorJornada({ value, onChange, filtroProyectoId, filtroFecha
           </Button>
         </div>
       ) : (
-        <div className="space-y-1">
+        <div className="space-y-1 max-h-[50vh] overflow-y-auto pr-0.5">
           {jornadas.map((j) => {
             const seleccionada = j.id === value
             const trabajadores = trabajadoresDeJornada(j).length
@@ -245,15 +245,15 @@ export function SelectorJornada({ value, onChange, filtroProyectoId, filtroFecha
                 )}
                 aria-pressed={seleccionada}
               >
-                {/* Línea 1: nombre · código · badge estado · badge evidencia */}
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium text-[13px] leading-tight truncate">
+                {/* Línea 1: nombre · código */}
+                <div className="flex items-start justify-between gap-2">
+                  <span className="font-medium text-[13px] leading-tight truncate min-w-0 flex-1">
                     {j.proyecto.nombre}
                     <span className="ml-1.5 font-mono text-[10px] text-muted-foreground font-normal">
                       {j.proyecto.codigo}
                     </span>
                   </span>
-                  <div className="flex items-center gap-1 shrink-0">
+                  <div className="flex items-center gap-1 shrink-0 flex-wrap justify-end">
                     {j.evidenciaSeguridad && (
                       <Badge className="text-[10px] border bg-orange-100 text-orange-700 border-orange-200">
                         Con evidencia
@@ -264,19 +264,19 @@ export function SelectorJornada({ value, onChange, filtroProyectoId, filtroFecha
                     </Badge>
                   </div>
                 </div>
-                {/* Línea 2: supervisor · trabajadores · tareas · fecha */}
-                <div className="flex items-center gap-2 mt-0.5 text-[11px] text-muted-foreground flex-wrap">
-                  <span className="flex items-center gap-0.5">
+                {/* Línea 2: supervisor · trabajadores · tareas */}
+                <div className="flex items-center gap-2 mt-0.5 text-[11px] text-muted-foreground min-w-0">
+                  <span className="flex items-center gap-0.5 min-w-0 shrink">
                     <User className="h-3 w-3 shrink-0" />
-                    {j.supervisor.name ?? '—'}
+                    <span className="truncate">{j.supervisor.name ?? '—'}</span>
                   </span>
-                  <span className="flex items-center gap-0.5">
+                  <span className="flex items-center gap-0.5 shrink-0">
                     <Users className="h-3 w-3 shrink-0" />
                     {trabajadores} trab
                     {j.tareas.length > 0 && ` · ${j.tareas.length} tarea${j.tareas.length === 1 ? '' : 's'}`}
                   </span>
                   {j.ubicacion && (
-                    <span className="flex items-center gap-0.5">
+                    <span className="flex items-center gap-0.5 min-w-0 shrink">
                       <MapPin className="h-3 w-3 shrink-0" />
                       <span className="truncate max-w-[80px]">{j.ubicacion}</span>
                     </span>
@@ -284,9 +284,9 @@ export function SelectorJornada({ value, onChange, filtroProyectoId, filtroFecha
                   <span className="ml-auto flex items-center gap-0.5 shrink-0">
                     <CalendarDays className="h-3 w-3" />
                     {formatFechaCorta(j.fechaTrabajo)}
-                    {dias === 0 && <span className="text-emerald-600 font-medium">· hoy</span>}
-                    {dias === 1 && <span>· ayer</span>}
-                    {dias > 1 && <span className="text-amber-600">· hace {dias}d</span>}
+                    {dias === 0 && <span className="text-emerald-600 font-medium ml-0.5">· hoy</span>}
+                    {dias === 1 && <span className="ml-0.5">· ayer</span>}
+                    {dias > 1 && <span className="text-amber-600 ml-0.5">· hace {dias}d</span>}
                   </span>
                 </div>
               </button>

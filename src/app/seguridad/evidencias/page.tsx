@@ -471,7 +471,7 @@ export default function EvidenciasListaPage() {
 
       {/* ── Dialog: Nueva evidencia ──────────────────────── */}
       <Dialog open={dialogAbrir} onOpenChange={setDialogAbrir}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="w-[calc(100%-2rem)] sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Abrir evidencia de seguridad</DialogTitle>
             <DialogDescription>
