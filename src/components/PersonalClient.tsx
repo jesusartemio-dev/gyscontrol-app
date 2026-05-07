@@ -69,6 +69,7 @@ const empleadoSchema = z.object({
   fechaCese: z.string().optional(),
   activo: z.boolean().default(true),
   documentoIdentidad: z.string().optional(),
+  cip: z.string().optional(),
   telefono: z.string().optional(),
   direccion: z.string().optional(),
   contactoEmergencia: z.string().optional(),
@@ -90,6 +91,7 @@ const defaultForm: EmpleadoForm = {
   fechaCese: '',
   activo: true,
   documentoIdentidad: '',
+  cip: '',
   telefono: '',
   direccion: '',
   contactoEmergencia: '',
@@ -291,6 +293,7 @@ export default function PersonalClient() {
       fechaCese: empleado.fechaCese ? empleado.fechaCese.split('T')[0] : '',
       activo: empleado.activo,
       documentoIdentidad: empleado.documentoIdentidad || '',
+      cip: empleado.cip || '',
       telefono: empleado.telefono || '',
       direccion: empleado.direccion || '',
       contactoEmergencia: empleado.contactoEmergencia || '',
@@ -341,6 +344,7 @@ export default function PersonalClient() {
         fechaCese: form.fechaCese || undefined,
         activo: form.activo,
         documentoIdentidad: form.documentoIdentidad || undefined,
+        cip: form.cip || undefined,
         telefono: form.telefono || undefined,
         direccion: form.direccion || undefined,
         contactoEmergencia: form.contactoEmergencia || undefined,
@@ -765,6 +769,11 @@ export default function PersonalClient() {
                                     DNI: {emp.documentoIdentidad}
                                   </span>
                                 )}
+                                {emp.cip && (
+                                  <span className="text-[10px] text-slate-400 font-mono">
+                                    CIP: {emp.cip}
+                                  </span>
+                                )}
                               </div>
                             </div>
                           </td>
@@ -1132,8 +1141,8 @@ export default function PersonalClient() {
                 )
               })()}
 
-              {/* Documento, Teléfono, Fechas - todo en una fila */}
-              <div className="grid grid-cols-4 gap-3">
+              {/* Documento, CIP, Teléfono, Fechas */}
+              <div className="grid grid-cols-5 gap-3">
                 <div className="space-y-1">
                   <Label htmlFor="documentoIdentidad" className="text-xs">DNI / CE</Label>
                   <Input
@@ -1141,6 +1150,16 @@ export default function PersonalClient() {
                     value={form.documentoIdentidad}
                     onChange={(e) => setForm({ ...form, documentoIdentidad: e.target.value })}
                     placeholder="12345678"
+                    className="h-9"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="cip" className="text-xs">CIP (N° colegiatura)</Label>
+                  <Input
+                    id="cip"
+                    value={form.cip ?? ''}
+                    onChange={(e) => setForm({ ...form, cip: e.target.value })}
+                    placeholder="ej: 152499"
                     className="h-9"
                   />
                 </div>

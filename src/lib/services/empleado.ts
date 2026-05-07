@@ -16,6 +16,7 @@ export interface EmpleadoPayload {
   fechaCese?: string
   activo?: boolean
   documentoIdentidad?: string
+  cip?: string
   telefono?: string
   direccion?: string
   contactoEmergencia?: string

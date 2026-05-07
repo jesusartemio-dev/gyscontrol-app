@@ -74,6 +74,7 @@ export async function POST(req: Request) {
         fechaCese: body.fechaCese ? new Date(body.fechaCese) : null,
         activo: body.activo ?? true,
         documentoIdentidad: body.documentoIdentidad,
+        cip: body.cip || null,
         telefono: body.telefono,
         direccion: body.direccion,
         contactoEmergencia: body.contactoEmergencia,

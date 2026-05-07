@@ -59,6 +59,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (body.fechaCese !== undefined) updateData.fechaCese = body.fechaCese ? new Date(body.fechaCese) : null
     if (body.activo !== undefined) updateData.activo = body.activo
     if (body.documentoIdentidad !== undefined) updateData.documentoIdentidad = body.documentoIdentidad
+    if (body.cip !== undefined) updateData.cip = body.cip || null
     if (body.telefono !== undefined) updateData.telefono = body.telefono
     if (body.direccion !== undefined) updateData.direccion = body.direccion
     if (body.contactoEmergencia !== undefined) updateData.contactoEmergencia = body.contactoEmergencia
