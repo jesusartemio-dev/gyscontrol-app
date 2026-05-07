@@ -93,13 +93,12 @@ export function FotosUploader({ fotos, onChange, max = 3, disabled }: Props) {
         )}
       </div>
 
-      {/* Input cámara directa */}
+      {/* Input cámara directa — sin multiple: capture+multiple es inconsistente en Android */}
       <input
         ref={inputCamaraRef}
         type="file"
         accept="image/*"
         capture="environment"
-        multiple
         className="hidden"
         onChange={(e) => agregar(e.target.files)}
         disabled={disabled || lleno}
