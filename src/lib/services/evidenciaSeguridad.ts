@@ -116,8 +116,8 @@ export async function reabrirEvidencia(id: string) {
   })
 }
 
-const ROLES_EDICION_TOTAL = ['admin', 'gerente'] as const
-const ROLES_PERMITIDOS = ['admin', 'gerente', 'seguridad'] as const
+const ROLES_EDICION_TOTAL = ['admin', 'gerente', 'gestor'] as const
+const ROLES_PERMITIDOS = ['admin', 'gerente', 'gestor', 'seguridad'] as const
 
 /**
  * Determina si un usuario puede agregar/editar registros dentro de una evidencia.
