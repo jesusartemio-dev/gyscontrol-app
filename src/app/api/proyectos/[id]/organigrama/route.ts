@@ -35,6 +35,33 @@ function resolveNodo(nodo: any) {
   }
 }
 
+export async function DELETE(_req: Request, { params }: Ctx) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+
+    const { id: proyectoId } = await params
+
+    // Verificar dependencias antes de eliminar
+    const matriz = await prisma.matrizComunicacion.findUnique({
+      where: { proyectoId },
+      select: { id: true },
+    })
+    if (matriz) {
+      return NextResponse.json(
+        { error: 'El organigrama no se puede eliminar porque existe una Matriz de Comunicaciones que depende de él. Elimina primero la Matriz de Comunicaciones.' },
+        { status: 409 }
+      )
+    }
+
+    await prisma.proyectoOrgNodo.deleteMany({ where: { proyectoId } })
+    return NextResponse.json({ ok: true })
+  } catch (error) {
+    console.error('Error eliminando organigrama proyecto:', error)
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
+  }
+}
+
 export async function GET(_req: Request, { params }: Ctx) {
   try {
     const session = await getServerSession(authOptions)

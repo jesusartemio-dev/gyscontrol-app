@@ -11,9 +11,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import {
   Loader2, GitBranch, Plus, Trash2, Save, Lock, Download,
   X, Eye, Pencil, Users, Building2, Phone, Hash, RefreshCw,
-  ChevronDown,
+  ChevronDown, AlertTriangle,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import OrgChart, { OrgNodoCompleto } from '@/components/organigrama/OrgChart'
 
 interface Plantilla { id: string; nombre: string; _count?: { nodos: number } }
@@ -28,6 +32,10 @@ export default function OrganigramaProyectoPage() {
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [selectedPlantillaId, setSelectedPlantillaId] = useState('')
+
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   // Panel lateral de edición (Vista tab)
   const [panelNodo, setPanelNodo] = useState<OrgNodoCompleto | null>(null)
@@ -226,6 +234,28 @@ export default function OrganigramaProyectoPage() {
     }
   }
 
+  // ── ELIMINAR ORGANIGRAMA ───────────────────────────────────────────────────
+
+  const handleEliminarOrganigrama = async () => {
+    setDeleting(true)
+    setDeleteError(null)
+    try {
+      const res = await fetch(`/api/proyectos/${proyectoId}/organigrama`, { method: 'DELETE' })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setDeleteError(data.error ?? 'Error al eliminar')
+        return
+      }
+      setNodos([])
+      setShowDeleteDialog(false)
+      toast.success('Organigrama eliminado')
+    } catch {
+      setDeleteError('Error de conexión')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   // ── EXPORTAR PNG ───────────────────────────────────────────────────────────
 
   const handleExportPng = async () => {
@@ -366,6 +396,15 @@ export default function OrganigramaProyectoPage() {
           >
             <Download className="h-3.5 w-3.5" />
             Exportar PNG
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 gap-1.5"
+            onClick={() => { setDeleteError(null); setShowDeleteDialog(true) }}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Eliminar
           </Button>
           <Button
             variant="outline"
@@ -712,6 +751,38 @@ export default function OrganigramaProyectoPage() {
           )}
         </TabsContent>
       </Tabs>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={open => { setShowDeleteDialog(open); if (!open) setDeleteError(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar el organigrama?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminarán todos los nodos y asignaciones de personal. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          {deleteError && (
+            <div className="flex gap-2 rounded-md bg-red-50 border border-red-200 px-3 py-2.5 text-sm text-red-700">
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span>{deleteError}</span>
+            </div>
+          )}
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            {!deleteError && (
+              <AlertDialogAction
+                onClick={e => { e.preventDefault(); handleEliminarOrganigrama() }}
+                disabled={deleting}
+                className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+              >
+                {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
+                Sí, eliminar
+              </AlertDialogAction>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
