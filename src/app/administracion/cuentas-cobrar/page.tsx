@@ -224,7 +224,7 @@ export default function CuentasCobrarPage() {
         fetch('/api/administracion/cuentas-cobrar'),
         fetch('/api/administracion/cuentas-bancarias'),
         fetch('/api/clientes'),
-        fetch('/api/proyectos?fields=id,codigo,nombre'),
+        fetch('/api/proyectos?fields=id,codigo,nombre&estadosActivos=true'),
       ])
       if (cxcRes.ok) setItems(await cxcRes.json())
       if (bancoRes.ok) {
