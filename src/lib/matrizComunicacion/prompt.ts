@@ -31,8 +31,6 @@ export interface MatrizFilaIA {
 
 export function buildPromptMatriz(data: MatrizPromptData): string {
   const siglasList = data.personal.map(p => p.siglas).join(', ')
-  const exampleSig0 = data.personal[0]?.siglas ?? 'P1'
-  const exampleSig1 = data.personal[1]?.siglas ?? 'P2'
 
   return `Eres el Gestor de Proyectos de GYS CONTROL INDUSTRIAL SAC.
 Genera la Matriz de Comunicaciones en formato GYS-GPR-MAC.
@@ -45,17 +43,12 @@ ${data.personal.map(p =>
   `- Siglas: ${p.siglas} | Nombre: ${p.nombre} | Cargo: ${p.cargo}`
 ).join('\n')}
 
-EDTs DEL CRONOGRAMA (una fila por EDT en la matriz):
-${data.edts.map((e, i) =>
-  `${i + 1}. ${e.nombre} (Fase: ${e.fase})`
-).join('\n')}
+FILAS OBLIGATORIAS — USA EXACTAMENTE ESTOS NOMBRES, NO INVENTES OTROS:
+${data.edts.map((e, i) => `${i + 1}. "${e.nombre}"`).join('\n')}
 
-FORMATO REQUERIDO — Ejemplo del documento real GYS-GPR-MAC:
-ID | ACTIVIDAD    | FREC | MEDIO | ${siglasList}
-1  | Comercial    | E    | E     | DV | DS | D | D | D | E
-2  | Gestión      | S    | E     | D  | DV | E | D | D | D
-3  | Seguridad    | E    | E     | D  | D  | D | D | E | D
-8  | Construcción | E    | IE    | DR | DS | R | S | E | D
+IMPORTANTE: El array "filas" del JSON debe tener EXACTAMENTE ${data.edts.length} objetos,
+uno por cada EDT listado arriba, en el mismo orden.
+El campo "edtNombre" debe ser EXACTAMENTE el nombre del EDT como está escrito arriba.
 
 FRECUENCIA: M=Mensual S=Semanal E=Eventual
 MEDIO: I=Informe M=Minuta E=Email R=Reunión P=Planilla IE=Informe+Email
@@ -75,29 +68,60 @@ CRITERIOS para asignar valores por cargo:
 - Ing. Seguridad/HSEQ: E en Seguridad, D en resto
 - Coord. Comercial: E en Comercial, D en resto
 
-Responde ÚNICAMENTE con JSON válido sin texto adicional:
-
-{
-  "filas": [
-    {
-      "orden": 1,
-      "edtNombre": "Comercial",
-      "frecuencia": "E",
-      "medio": "E",
-      "celdas": [
-        { "siglas": "${exampleSig0}", "valor": "DV" },
-        { "siglas": "${exampleSig1}", "valor": "DS" }
-      ]
-    }
-  ]
-}
-
 REGLAS CRÍTICAS:
 1. Genera exactamente ${data.edts.length} filas — una por EDT
 2. Cada fila debe tener exactamente ${data.personal.length} celdas
    (una por cada persona en el mismo orden que se listaron)
 3. Los valores son combinaciones de letras: D, E, R, S, V, DV, DS,
-   ER, SV, DR, ES (para medio usar también IE)
+   ER, SV, DR, ES — NO pongas "D" en todas las celdas, varía según cargo
 4. Ninguna celda debe quedar vacía — mínimo "D" si no hay rol claro
-5. No incluyas texto antes ni después del JSON`
+5. No incluyas texto antes ni después del JSON
+
+EJEMPLO OBLIGATORIO — así debe verse el JSON para un proyecto con
+JM (Gerente), PR (Gestor), APH (Supervisor), YA (HSEQ):
+
+{
+  "filas": [
+    {
+      "orden": 1,
+      "edtNombre": "Gestión",
+      "frecuencia": "S",
+      "medio": "E",
+      "celdas": [
+        { "siglas": "JM",  "valor": "DV" },
+        { "siglas": "PR",  "valor": "E"  },
+        { "siglas": "APH", "valor": "D"  },
+        { "siglas": "YA",  "valor": "D"  }
+      ]
+    },
+    {
+      "orden": 2,
+      "edtNombre": "Seguridad",
+      "frecuencia": "E",
+      "medio": "E",
+      "celdas": [
+        { "siglas": "JM",  "valor": "D"  },
+        { "siglas": "PR",  "valor": "D"  },
+        { "siglas": "APH", "valor": "D"  },
+        { "siglas": "YA",  "valor": "E"  }
+      ]
+    },
+    {
+      "orden": 3,
+      "edtNombre": "Construcción",
+      "frecuencia": "E",
+      "medio": "IE",
+      "celdas": [
+        { "siglas": "JM",  "valor": "DS" },
+        { "siglas": "PR",  "valor": "R"  },
+        { "siglas": "APH", "valor": "E"  },
+        { "siglas": "YA",  "valor": "D"  }
+      ]
+    }
+  ]
+}
+
+Aplica esta misma lógica para TODOS los EDTs del proyecto usando
+las siglas reales: ${siglasList}
+Responde ÚNICAMENTE con el JSON completo, sin texto adicional.`
 }

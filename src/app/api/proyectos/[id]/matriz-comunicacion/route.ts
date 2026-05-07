@@ -58,14 +58,16 @@ export async function POST(
           where: { userId: { not: null } },
           orderBy: { orden: 'asc' },
           select: {
+            userId: true,
             cargoLabel: true,
             empresaOverride: true,
             telefonoOverride: true,
+            cipOverride: true,
             user: {
               select: {
                 name: true,
                 email: true,
-                empleado: { select: { telefono: true } },
+                empleado: { select: { telefono: true, cip: true } },
               },
             },
           },
@@ -96,7 +98,16 @@ export async function POST(
     let generadoConIA = false
 
     if (generarConIA) {
-      const orgNodos = proyecto.orgNodos.filter(n => n.user?.name)
+      // Deduplicar por userId: si la misma persona aparece en varios nodos
+      // (ej. nodo fijo GYS + nodo de proyecto), tomar solo la primera aparición
+      const seenUserIds = new Set<string>()
+      const orgNodos = proyecto.orgNodos.filter(n => {
+        if (!n.user?.name || !n.userId) return false
+        if (seenUserIds.has(n.userId)) return false
+        seenUserIds.add(n.userId)
+        return true
+      })
+
       const usadas = new Set<string>()
       const personal = orgNodos.map(n => {
         const siglas = generarSiglas(n.user!.name!, usadas)
@@ -105,7 +116,7 @@ export async function POST(
           siglas,
           nombre: n.user!.name!,
           cargo: n.cargoLabel,
-          empresa: n.empresaOverride ?? 'GYS Control Industrial SAC',
+          empresa: n.empresaOverride ?? 'GYS CONTROL INDUSTRIAL SAC',
           celular: n.telefonoOverride ?? n.user?.empleado?.telefono ?? '',
           correo: n.user!.email,
         }

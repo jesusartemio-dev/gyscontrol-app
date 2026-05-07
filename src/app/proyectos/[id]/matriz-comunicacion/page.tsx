@@ -185,7 +185,7 @@ export default function MatrizComunicacionPage() {
     generarPdfMatriz({
       proyecto: proyectoInfo.nombre,
       cliente: proyectoInfo.cliente,
-      codigoDocumento: `${proyectoInfo.codigo}-MAC`,
+      codigoDocumento: `MX-${proyectoInfo.codigo}-GYS-001`,
       revision: matriz.version,
       fecha: today,
       personal,

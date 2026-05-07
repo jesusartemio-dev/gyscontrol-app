@@ -41,6 +41,7 @@ export async function GET(
             where: { userId: { not: null } },
             orderBy: { orden: 'asc' },
             select: {
+              userId: true,
               cargoLabel: true,
               empresaOverride: true,
               telefonoOverride: true,
@@ -60,9 +61,15 @@ export async function GET(
     if (!matriz) return NextResponse.json({ error: 'Matriz no encontrada' }, { status: 404 })
     if (!proyecto) return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 })
 
+    const seenUserIds = new Set<string>()
     const usadas = new Set<string>()
     const personal = proyecto.orgNodos
-      .filter(n => n.user?.name)
+      .filter(n => {
+        if (!n.user?.name || !n.userId) return false
+        if (seenUserIds.has(n.userId)) return false
+        seenUserIds.add(n.userId)
+        return true
+      })
       .map(n => {
         const siglas = generarSiglas(n.user!.name!, usadas)
         usadas.add(siglas)
@@ -70,7 +77,7 @@ export async function GET(
           siglas,
           nombre: n.user!.name!,
           cargo: n.cargoLabel,
-          empresa: n.empresaOverride ?? 'GYS Control Industrial SAC',
+          empresa: n.empresaOverride ?? 'GYS CONTROL INDUSTRIAL SAC',
           celular: n.telefonoOverride ?? n.user?.empleado?.telefono ?? '',
           correo: n.user!.email,
         }
@@ -87,7 +94,7 @@ export async function GET(
     const today = new Date().toLocaleDateString('es-PE', {
       day: '2-digit', month: '2-digit', year: 'numeric',
     })
-    const codigo = `${proyecto.codigo}-MAC`
+    const codigo = `MX-${proyecto.codigo}-GYS-001`
 
     const buffer = await generarDocxMatriz({
       proyecto: proyecto.nombre,
