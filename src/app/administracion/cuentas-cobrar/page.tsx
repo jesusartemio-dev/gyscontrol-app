@@ -895,7 +895,14 @@ export default function CuentasCobrarPage() {
                 <SelectTrigger className={createErrors.has('proyectoId') ? 'border-red-500 ring-1 ring-red-500' : ''}><SelectValue placeholder="Seleccionar proyecto" /></SelectTrigger>
                 <SelectContent>
                   {(createForm.clienteId ? proyectos.filter(p => p.clienteId === createForm.clienteId) : proyectos).map(p => (
-                    <SelectItem key={p.id} value={p.id}>{p.codigo} - {p.nombre}</SelectItem>
+                    <SelectItem key={p.id} value={p.id}>
+                      <span className="flex flex-col">
+                        <span>{p.codigo} - {p.nombre}</span>
+                        {p.ordenCompraCliente && (
+                          <span className="text-xs text-muted-foreground">OC: {p.ordenCompraCliente}</span>
+                        )}
+                      </span>
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
