@@ -83,3 +83,18 @@ export function getDocSpecs(
 
   return specs
 }
+
+// Maps a SsomaDocTipo to its aiTipos tracking key.
+// Used by API routes to record granular per-document usage instead of a
+// single "ssoma-documento" bucket.
+export function tipoTrackingSsoma(docTipo: string, regenerar = false): string {
+  const base: Record<string, string> = {
+    IPERC:           'ssoma-iperc',
+    PETS:            'ssoma-pets',
+    MATRIZ_EPP:      'ssoma-epp',
+    PLAN_EMERGENCIA: 'ssoma-plan-emergencia',
+    PAR:             'ssoma-par',
+  }
+  const key = base[docTipo] ?? 'ssoma-documento'
+  return regenerar ? `${key}-regenerar` : key
+}

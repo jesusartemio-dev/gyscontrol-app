@@ -6,15 +6,17 @@ import Anthropic from '@anthropic-ai/sdk'
 import {
   buildPromptPETS,
   buildPromptIPERC,
-  buildPromptIPERC_Part1,
-  buildPromptIPERC_Part2,
+  buildIPERCBaseText,
+  buildIPERCPart1Instructions,
+  buildIPERCPart2Instructions,
   buildPromptMatrizEPP,
   buildPromptPlanEmergencia,
   buildPromptPAR,
 } from '@/lib/ssoma/prompts'
+import { tipoTrackingSsoma } from '@/lib/ssoma/tipos'
 import type { SsomaPromptData, SsomaActividadesAltoRiesgo } from '@/lib/ssoma/tipos'
 import { getModelForTask } from '@/lib/agente/models'
-import { calculateCost } from '@/lib/agente/usageTracker'
+import { trackUsageAndGetId, trackUsageError, getCompanyMonthlyUsage } from '@/lib/agente/usageTracker'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -158,25 +160,52 @@ export async function POST(
         : [],
     }
 
-    // Select prompt by doc type — IPERC uses 2 parallel calls
-    if (doc.tipo === 'IPERC') {
-      const prompt1 = buildPromptIPERC_Part1(promptData, doc.codigoDocumento)
-      const prompt2 = buildPromptIPERC_Part2(promptData, doc.codigoDocumento)
+    // ── Límite mensual de IA (company-wide) ──────────────
+    try {
+      const monthlyUsage = await getCompanyMonthlyUsage()
+      if (monthlyUsage.costoTotal >= monthlyUsage.limiteMensual) {
+        return NextResponse.json(
+          { error: 'Se alcanzó el límite mensual de uso de IA. Contacta al administrador.', limitReached: true },
+          { status: 429 }
+        )
+      }
+    } catch {
+      // No bloquear la regeneración si el chequeo falla
+    }
 
+    // Select prompt by doc type — IPERC uses 2 parallel calls.
+    // Base text (project context + JSON schema + rules) is marked cacheable
+    // so regenerations within the 5-min TTL skip re-encoding those tokens.
+    if (doc.tipo === 'IPERC') {
       const ipercModel = getModelForTask('ssoma-iperc')
+      const ipercBase = buildIPERCBaseText(promptData)
+      const part1 = buildIPERCPart1Instructions(promptData)
+      const part2 = buildIPERCPart2Instructions()
+
       const startMs = Date.now()
       const [res1, res2] = await Promise.all([
         anthropic.messages.create({
-          model: ipercModel,
-          max_tokens: 8000,
-          messages: [{ role: 'user', content: prompt1 }],
+          model: ipercModel, max_tokens: 8000,
+          messages: [{ role: 'user', content: [
+            { type: 'text', text: ipercBase, cache_control: { type: 'ephemeral' } },
+            { type: 'text', text: part1 },
+          ]}],
         }),
         anthropic.messages.create({
-          model: ipercModel,
-          max_tokens: 8000,
-          messages: [{ role: 'user', content: prompt2 }],
+          model: ipercModel, max_tokens: 8000,
+          messages: [{ role: 'user', content: [
+            { type: 'text', text: ipercBase, cache_control: { type: 'ephemeral' } },
+            { type: 'text', text: part2 },
+          ]}],
         }),
-      ])
+      ]).catch((err: any) => {
+        trackUsageError({
+          userId, tipo: 'ssoma-error', modelo: ipercModel,
+          duracionMs: Date.now() - startMs,
+          metadata: { docTipo: 'IPERC', expedienteId: exp.id, proyectoId: proyecto.id, regeneracion: true, errorMessage: String(err?.message ?? err).substring(0, 300) },
+        })
+        throw err
+      })
       const duracionMs = Date.now() - startMs
 
       // Parse and merge filas from both parts
@@ -207,16 +236,18 @@ export async function POST(
 
       const totalInput = res1.usage.input_tokens + res2.usage.input_tokens
       const totalOutput = res1.usage.output_tokens + res2.usage.output_tokens
-      const costoEstimado = calculateCost(ipercModel, totalInput, totalOutput)
-
-      const usage = await prisma.agenteUsage.create({
-        data: {
+      const totalCacheCreation = (res1.usage.cache_creation_input_tokens ?? 0) + (res2.usage.cache_creation_input_tokens ?? 0)
+      const totalCacheRead = (res1.usage.cache_read_input_tokens ?? 0) + (res2.usage.cache_read_input_tokens ?? 0)
+      let usageId: string | null = null
+      try {
+        usageId = await trackUsageAndGetId({
           userId,
-          tipo: 'ssoma-documento-regenerar',
+          tipo: tipoTrackingSsoma('IPERC', true),
           modelo: ipercModel,
           tokensInput: totalInput,
           tokensOutput: totalOutput,
-          costoEstimado,
+          tokensCacheCreation: totalCacheCreation,
+          tokensCacheRead: totalCacheRead,
           duracionMs,
           metadata: {
             docTipo: 'IPERC',
@@ -226,16 +257,18 @@ export async function POST(
             filasP1: filas1.length,
             filasP2: filas2.length,
           },
-        },
-      })
+        })
+      } catch (err) {
+        console.error('[usageTracker] SSOMA IPERC regen tracking failed (doc will be updated without usage link):', err)
+      }
 
       const updated = await prisma.ssomaDocumento.update({
         where: { id },
         data: {
           contenidoTexto: contenido,
-          promptUsado: prompt1.substring(0, 500) + '\n---PART2---\n' + prompt2.substring(0, 500),
+          promptUsado: ipercBase.substring(0, 400) + '\n---PART1---\n' + part1.substring(0, 100),
           generadoPorId: userId,
-          agenteUsageId: usage.id,
+          agenteUsageId: usageId,
           estado: 'borrador',
         },
       })
@@ -280,20 +313,25 @@ export async function POST(
       model: docModel,
       max_tokens: maxTokens,
       messages: [{ role: 'user', content: prompt }],
+    }).catch((err: any) => {
+      trackUsageError({
+        userId, tipo: 'ssoma-error', modelo: docModel,
+        duracionMs: Date.now() - startMs,
+        metadata: { docTipo: doc.tipo, parSubtipo: doc.parSubtipo ?? null, expedienteId: exp.id, proyectoId: proyecto.id, regeneracion: true, errorMessage: String(err?.message ?? err).substring(0, 300) },
+      })
+      throw err
     })
 
     const contenido = response.content[0].type === 'text' ? response.content[0].text : ''
     const duracionMs = Date.now() - startMs
-    const costoEstimado = calculateCost(docModel, response.usage.input_tokens, response.usage.output_tokens)
-
-    const usage = await prisma.agenteUsage.create({
-      data: {
+    let usageId: string | null = null
+    try {
+      usageId = await trackUsageAndGetId({
         userId,
-        tipo: 'ssoma-documento-regenerar',
+        tipo: tipoTrackingSsoma(doc.tipo, true),
         modelo: docModel,
         tokensInput: response.usage.input_tokens,
         tokensOutput: response.usage.output_tokens,
-        costoEstimado,
         duracionMs,
         metadata: {
           docTipo: doc.tipo,
@@ -302,8 +340,10 @@ export async function POST(
           proyectoId: proyecto.id,
           regeneracion: true,
         },
-      },
-    })
+      })
+    } catch (err) {
+      console.error('[usageTracker] SSOMA doc regen tracking failed (doc will be updated without usage link):', err)
+    }
 
     // Update document content
     const updated = await prisma.ssomaDocumento.update({
@@ -312,7 +352,7 @@ export async function POST(
         contenidoTexto: contenido,
         promptUsado: prompt,
         generadoPorId: userId,
-        agenteUsageId: usage.id,
+        agenteUsageId: usageId,
         estado: 'borrador',
       },
     })

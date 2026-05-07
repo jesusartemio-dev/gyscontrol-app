@@ -89,6 +89,72 @@ export function trackUsage(params: TrackUsageParams): void {
     })
 }
 
+export interface TrackErrorParams {
+  userId: string
+  tipo: string
+  modelo: string
+  duracionMs?: number
+  metadata?: Record<string, unknown>
+}
+
+/**
+ * Records a failed AI API call (tokens = 0, cost = 0).
+ * Fire-and-forget — never throws.
+ */
+export function trackUsageError(params: TrackErrorParams): void {
+  prisma.agenteUsage
+    .create({
+      data: {
+        userId: params.userId,
+        tipo: params.tipo,
+        modelo: params.modelo,
+        tokensInput: 0,
+        tokensOutput: 0,
+        costoEstimado: 0,
+        duracionMs: params.duracionMs,
+        metadata: { error: true, ...params.metadata },
+      },
+    })
+    .catch((err) => {
+      console.error('[usageTracker] Failed to record error:', err)
+    })
+}
+
+/**
+ * Like trackUsage but awaits the insert and returns the created record's ID.
+ * Use when the caller needs to link the usage record to another entity
+ * (e.g. SsomaDocumento.agenteUsageId). Throws on database error.
+ */
+export async function trackUsageAndGetId(params: TrackUsageParams): Promise<string> {
+  const cacheCreation = params.tokensCacheCreation ?? 0
+  const cacheRead = params.tokensCacheRead ?? 0
+  const costoEstimado = calculateCost(
+    params.modelo,
+    params.tokensInput,
+    params.tokensOutput,
+    cacheCreation,
+    cacheRead,
+  )
+
+  const record = await prisma.agenteUsage.create({
+    data: {
+      userId: params.userId,
+      tipo: params.tipo,
+      modelo: params.modelo,
+      tokensInput: params.tokensInput,
+      tokensOutput: params.tokensOutput,
+      tokensCacheCreation: cacheCreation,
+      tokensCacheRead: cacheRead,
+      costoEstimado,
+      conversacionId: params.conversacionId ?? undefined,
+      duracionMs: params.duracionMs ?? undefined,
+      metadata: params.metadata ?? undefined,
+    },
+    select: { id: true },
+  })
+  return record.id
+}
+
 // ── Monthly usage limit check ────────────────────────────
 
 const DEFAULT_MONTHLY_LIMIT_USD = 25

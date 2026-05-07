@@ -1,5 +1,5 @@
 import { SsomaParSubtipo } from '@prisma/client'
-import { SsomaPromptData } from './tipos'
+import { SsomaPromptData, SsomaActividadesAltoRiesgo } from './tipos'
 
 // Helper para construir el contexto base que va en todos los prompts
 function contextoBase(d: SsomaPromptData): string {
@@ -131,6 +131,76 @@ ESTRUCTURA OBLIGATORIA — respeta exactamente este orden:
 Sé técnico y preciso. Usa terminología de automatización industrial. No texto genérico.`
 }
 
+// ── IPERC helpers ────────────────────────────────────────
+// ipercBase es la parte estable (contexto proyecto + esquema JSON + reglas).
+// Las instrucciones de cada parte son la porción variable.
+// La separación permite activar prompt caching en el base.
+
+function ipercPart1Instructions(a: SsomaActividadesAltoRiesgo): string {
+  return `
+
+Genera EXACTAMENTE 25 filas para estas actividades (PARTE 1 de 2):
+1. Movilización de personal y materiales a planta cliente
+2. Vigilancia COVID-19 / Dengue
+3. Exposición a radiación solar durante trabajos en exterior
+4. Sistema de bloqueo de energía LOTO
+5. Traslado y montaje de tableros eléctricos del proyecto
+6. Preparación, corte y roscado de tuberías conduit
+7. Tendido de bandejas portacables y tuberías por planta
+8. Cableado eléctrico de alimentación y fuerza
+9. Tendido de cables de instrumentación y comunicación
+10. Conexionado en tableros: terminales, borneras, PLC
+11. Montaje e instalación de instrumentos de campo
+12. Configuración y programación de PLC/SCADA
+13. Pruebas de continuidad, aislamiento y lazo (loop check)
+14. Comisionamiento y pruebas con cliente
+15. Orden y limpieza del área de trabajo
+${a.hayTrabajoElectrico ? `16. Intervención en tableros energizados
+17. Energización progresiva de tableros nuevos` : ''}
+${a.hayTrabajoAltura ? `18. Armado y desarmado de andamios
+19. Trabajo en plataforma Manlift
+20. Instalación de bandejas/conduit en zonas elevadas` : ''}
+${a.hayEspacioConfinado ? `21. Medición de atmósfera en espacio confinado
+22. Ingreso y trabajo dentro de tanque` : ''}
+${a.hayTrabajoCaliente ? `23. Esmerilado de estructuras y tuberías
+24. Soldadura de soportes` : ''}
+
+Genera exactamente 25 filas. No incluyas texto fuera del JSON.`
+}
+
+function ipercPart2Instructions(): string {
+  return `
+
+Genera EXACTAMENTE 25 filas para estas actividades (PARTE 2 de 2 — riesgos ambientales, ergonómicos y del entorno):
+1. Exposición a ruido continuo >85dB de equipos rotativos del cliente
+2. Radiación no ionizante de variadores de frecuencia y equipos eléctricos
+3. Esquirlas y proyección de partículas durante corte de conduit con esmeril
+4. Manipulación de herramientas manuales (cortes, golpes, atrapamiento)
+5. Tránsito de montacargas y vehículos dentro de planta cliente
+6. Caída de objetos desde niveles superiores durante trabajos simultáneos
+7. Exposición a sustancias químicas del proceso del cliente (vapores, derrames)
+8. Trabajos prolongados de pie en superficies de concreto (fatiga muscular)
+9. Posturas forzadas durante conexionado en tableros bajos o en altura
+10. Radiación no ionizante de pantallas HMI y equipos de programación
+11. Iluminación deficiente en zonas eléctricas, salas de control y sótanos
+12. Potencial contacto con superficies calientes de tuberías de proceso
+13. Estrés térmico por trabajo en exterior >30°C o cerca de equipos calientes
+14. Transitar por desniveles, rampas y escaleras fijas de planta
+15. Superficies resbalosas por derrames de aceite o producto de proceso
+16. Potencial derrame de aceite dieléctrico o sustancias de equipos nuevos
+17. Interferencia con operaciones del cliente en planta en marcha
+18. Fatiga mental por trabajo técnico repetitivo (programación, configuración)
+19. Estrés laboral por presión de plazos y coordinación con cliente
+20. Exposición a virus dengue/COVID en zonas endémicas
+21. Inhalación de partículas de polvo durante perforaciones y montaje
+22. Contacto eléctrico indirecto por trabajar junto a tableros energizados del cliente
+23. Mordedura de insectos o animales en zonas exteriores de planta
+24. Transporte manual de cargas pesadas (herramientas, cables, conduit)
+25. Trabajo en turnos extendidos (jornadas >10h, fatiga acumulada)
+
+Genera exactamente 25 filas. No incluyas texto fuera del JSON.`
+}
+
 // Base del prompt IPERC (estructura JSON + reglas) — compartido entre parte 1 y 2
 function ipercBase(d: SsomaPromptData): string {
   return `Eres el Ingeniero de Seguridad de GYS CONTROL INDUSTRIAL SAC.
@@ -178,69 +248,23 @@ REGLAS:
 }
 
 export function buildPromptIPERC_Part1(d: SsomaPromptData, _codigo: string): string {
-  const a = d.actividades
-  return `${ipercBase(d)}
-
-Genera EXACTAMENTE 25 filas para estas actividades (PARTE 1 de 2):
-1. Movilización de personal y materiales a planta cliente
-2. Vigilancia COVID-19 / Dengue
-3. Exposición a radiación solar durante trabajos en exterior
-4. Sistema de bloqueo de energía LOTO
-5. Traslado y montaje de tableros eléctricos del proyecto
-6. Preparación, corte y roscado de tuberías conduit
-7. Tendido de bandejas portacables y tuberías por planta
-8. Cableado eléctrico de alimentación y fuerza
-9. Tendido de cables de instrumentación y comunicación
-10. Conexionado en tableros: terminales, borneras, PLC
-11. Montaje e instalación de instrumentos de campo
-12. Configuración y programación de PLC/SCADA
-13. Pruebas de continuidad, aislamiento y lazo (loop check)
-14. Comisionamiento y pruebas con cliente
-15. Orden y limpieza del área de trabajo
-${a.hayTrabajoElectrico ? `16. Intervención en tableros energizados
-17. Energización progresiva de tableros nuevos` : ''}
-${a.hayTrabajoAltura ? `18. Armado y desarmado de andamios
-19. Trabajo en plataforma Manlift
-20. Instalación de bandejas/conduit en zonas elevadas` : ''}
-${a.hayEspacioConfinado ? `21. Medición de atmósfera en espacio confinado
-22. Ingreso y trabajo dentro de tanque` : ''}
-${a.hayTrabajoCaliente ? `23. Esmerilado de estructuras y tuberías
-24. Soldadura de soportes` : ''}
-
-Genera exactamente 25 filas. No incluyas texto fuera del JSON.`
+  return `${ipercBase(d)}${ipercPart1Instructions(d.actividades)}`
 }
 
 export function buildPromptIPERC_Part2(d: SsomaPromptData, _codigo: string): string {
-  return `${ipercBase(d)}
+  return `${ipercBase(d)}${ipercPart2Instructions()}`
+}
 
-Genera EXACTAMENTE 25 filas para estas actividades (PARTE 2 de 2 — riesgos ambientales, ergonómicos y del entorno):
-1. Exposición a ruido continuo >85dB de equipos rotativos del cliente
-2. Radiación no ionizante de variadores de frecuencia y equipos eléctricos
-3. Esquirlas y proyección de partículas durante corte de conduit con esmeril
-4. Manipulación de herramientas manuales (cortes, golpes, atrapamiento)
-5. Tránsito de montacargas y vehículos dentro de planta cliente
-6. Caída de objetos desde niveles superiores durante trabajos simultáneos
-7. Exposición a sustancias químicas del proceso del cliente (vapores, derrames)
-8. Trabajos prolongados de pie en superficies de concreto (fatiga muscular)
-9. Posturas forzadas durante conexionado en tableros bajos o en altura
-10. Radiación no ionizante de pantallas HMI y equipos de programación
-11. Iluminación deficiente en zonas eléctricas, salas de control y sótanos
-12. Potencial contacto con superficies calientes de tuberías de proceso
-13. Estrés térmico por trabajo en exterior >30°C o cerca de equipos calientes
-14. Transitar por desniveles, rampas y escaleras fijas de planta
-15. Superficies resbalosas por derrames de aceite o producto de proceso
-16. Potencial derrame de aceite dieléctrico o sustancias de equipos nuevos
-17. Interferencia con operaciones del cliente en planta en marcha
-18. Fatiga mental por trabajo técnico repetitivo (programación, configuración)
-19. Estrés laboral por presión de plazos y coordinación con cliente
-20. Exposición a virus dengue/COVID en zonas endémicas
-21. Inhalación de partículas de polvo durante perforaciones y montaje
-22. Contacto eléctrico indirecto por trabajar junto a tableros energizados del cliente
-23. Mordedura de insectos o animales en zonas exteriores de planta
-24. Transporte manual de cargas pesadas (herramientas, cables, conduit)
-25. Trabajo en turnos extendidos (jornadas >10h, fatiga acumulada)
-
-Genera exactamente 25 filas. No incluyas texto fuera del JSON.`
+// Parts split for prompt caching: callers send base as a cached content block
+// and instructions as the variable block so Anthropic can reuse the cached prefix.
+export function buildIPERCBaseText(d: SsomaPromptData): string {
+  return ipercBase(d)
+}
+export function buildIPERCPart1Instructions(d: SsomaPromptData): string {
+  return ipercPart1Instructions(d.actividades)
+}
+export function buildIPERCPart2Instructions(): string {
+  return ipercPart2Instructions()
 }
 
 // Wrapper de compatibilidad — genera un prompt único (para cuando no se usa split)
