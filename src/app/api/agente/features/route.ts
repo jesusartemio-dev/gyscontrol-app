@@ -36,6 +36,8 @@ export async function PUT(request: NextRequest) {
     'importacionExcel',
     'ocrComprobantes',
     'scanCotizacionPDF',
+    'importCatalogoPDF',
+    'ssomaDocumentos',
   ]
 
   // Only allow known boolean keys

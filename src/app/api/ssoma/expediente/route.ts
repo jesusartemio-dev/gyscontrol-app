@@ -17,6 +17,7 @@ import {
 import { getDocSpecs, tipoTrackingSsoma, type SsomaPromptData, type SsomaActividadesAltoRiesgo, type SsomaDocSpec } from '@/lib/ssoma/tipos'
 import { getModelForTask } from '@/lib/agente/models'
 import { trackUsageAndGetId, trackUsageError, getCompanyMonthlyUsage } from '@/lib/agente/usageTracker'
+import { isIAFeatureEnabled } from '@/lib/agente/featureFlags'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -241,6 +242,14 @@ export async function POST(req: Request) {
         case 'PAR':              return buildPromptPAR(promptData, spec.parSubtipo!, spec.codigoDocumento)
         default:                 return ''
       }
+    }
+
+    // ── Feature flag ─────────────────────────────────────
+    if (!(await isIAFeatureEnabled('ssomaDocumentos'))) {
+      return NextResponse.json(
+        { error: 'La generación de documentos SSOMA está deshabilitada por el administrador.' },
+        { status: 403 }
+      )
     }
 
     // ── Límite mensual de IA (company-wide) ──────────────

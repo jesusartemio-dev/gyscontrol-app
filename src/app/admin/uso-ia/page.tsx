@@ -93,6 +93,7 @@ interface IAFeatureFlags {
   ocrComprobantes: boolean
   scanCotizacionPDF: boolean
   importCatalogoPDF: boolean
+  ssomaDocumentos: boolean
 }
 
 const FEATURE_DEFS: { key: keyof IAFeatureFlags; label: string; desc: string; icon: React.ElementType }[] = [
@@ -103,6 +104,7 @@ const FEATURE_DEFS: { key: keyof IAFeatureFlags; label: string; desc: string; ic
   { key: 'ocrComprobantes', label: 'OCR Comprobantes', desc: 'Lectura automatica de facturas y boletas', icon: ScanLine },
   { key: 'scanCotizacionPDF', label: 'Escanear PDF Cotizacion', desc: 'Auto-deteccion de precios y entregas desde PDF del proveedor', icon: FileSearch },
   { key: 'importCatalogoPDF', label: 'Importar Catalogo PDF', desc: 'Extraer equipos de cotizaciones PDF con IA para agregar al catalogo', icon: FileUp },
+  { key: 'ssomaDocumentos', label: 'SSOMA — Documentos', desc: 'Generacion de expedientes de seguridad (IPERC, PETS, EPP, Plan Emergencia, PAR)', icon: ShieldCheck },
 ]
 
 const MONTH_NAMES = [
