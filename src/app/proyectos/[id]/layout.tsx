@@ -175,6 +175,7 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
     'comparacion': 'Comparación',
     'recursos': 'Recursos',
     'organigrama': 'Organigrama',
+    'matriz-comunicacion': 'Matriz de Comunicaciones',
   }
 
   // Build breadcrumb trail from path segments (e.g. listas/[id] → Listas > Detalle)

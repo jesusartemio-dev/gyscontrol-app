@@ -29,6 +29,7 @@ import {
   ShieldCheck,
   HardHat,
   GitBranch,
+  MessageSquare,
 } from 'lucide-react'
 
 import { Card, CardContent } from '@/components/ui/card'
@@ -510,6 +511,19 @@ export default function ProyectoHubPage() {
       href: `${baseUrl}/organigrama`,
       stats: [],
       badge: 'Equipo'
+    },
+    {
+      id: 'matriz-comunicacion',
+      title: 'Matriz de Comunicaciones',
+      description: 'Plan de comunicación del proyecto (GYS-GPR-MAC)',
+      icon: MessageSquare,
+      color: 'text-blue-500',
+      bgColor: 'bg-blue-50',
+      hoverBg: 'hover:bg-blue-50',
+      borderColor: 'border-blue-200',
+      href: `${baseUrl}/matriz-comunicacion`,
+      stats: [],
+      badge: 'Comunicación'
     },
   ]
 

@@ -1111,6 +1111,7 @@ model Proyecto {
   entregasEpp                EntregaEPP[]
   reportesSemanalesSeguridad ReporteSemanalSeguridad[]
   orgNodos                   ProyectoOrgNodo[]
+  matrizComunicacion         MatrizComunicacion?
 
   @@index([clienteId, estado, createdAt(sort: Desc)], map: "idx_proyecto_cliente_estado_fecha")
   @@index([comercialId, estado, fechaInicio], map: "idx_proyecto_comercial_estado_inicio")
@@ -3003,6 +3004,7 @@ model ProyectoEdt {
   user                 User?                @relation(fields: [responsableId], references: [id])
   proyectoTarea        ProyectoTarea[]
   registrosCampo       RegistroHorasCampo[]
+  matrizFilas          MatrizComunicacionFila[]
 
   @@unique([proyectoId, proyectoCronogramaId, nombre])
   @@index([estado, fechaFinPlan])
@@ -5154,4 +5156,47 @@ model ProyectoOrgNodo {
 
   @@index([proyectoId])
   @@map("proyecto_org_nodo")
+}
+
+model MatrizComunicacion {
+  id           String   @id @default(cuid())
+  proyectoId   String   @unique
+  version      String   @default("1.0")
+  estado       String   @default("borrador")
+  generadoConIA Boolean @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  proyecto Proyecto                 @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  filas    MatrizComunicacionFila[]
+
+  @@map("matriz_comunicacion")
+}
+
+model MatrizComunicacionFila {
+  id          String   @id @default(cuid())
+  matrizId    String
+  edtId       String?
+  orden       Int      @default(0)
+  // Qué comunicar
+  informacion String
+  // Quién la genera
+  emisor      String
+  // Siglas de receptores (JSON array: ["JM","CA","SS"])
+  receptores  String   @db.Text
+  // Medio: reunión, correo, informe, etc.
+  medio       String
+  // Frecuencia: diario, semanal, al evento, etc.
+  frecuencia  String
+  // Formato del documento / entregable
+  formato     String   @default("")
+  notas       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  matriz MatrizComunicacion @relation(fields: [matrizId], references: [id], onDelete: Cascade)
+  edt    ProyectoEdt?       @relation(fields: [edtId], references: [id], onDelete: SetNull)
+
+  @@index([matrizId])
+  @@map("matriz_comunicacion_fila")
 }
