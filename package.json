@@ -67,6 +67,7 @@
     "db:migrate:dev": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed:organigrama": "tsx prisma/seeds/organigrama.ts",
     "db:studio": "prisma studio",
     "db:validate": "prisma validate",
     "db:local:studio": "prisma studio",
