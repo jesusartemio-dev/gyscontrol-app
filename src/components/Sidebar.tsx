@@ -431,6 +431,7 @@ export default function Sidebar() {
         { href: '/catalogo/categorias-condicion', label: 'Categorías Condición', icon: FolderOpen },
         // 🏗️ Configuración de fases
         { href: '/configuracion/fases', label: 'Fases por Defecto', icon: GitBranch },
+        { href: '/configuracion/plantillas-organigrama', label: 'Plantillas Organigrama', icon: GitBranch },
         // 📅 Configuración de duraciones de cronograma
         { href: '/configuracion/duraciones-cronograma', label: 'Duraciones Cronograma', icon: Calendar },
         // 🗓️ Configuración de calendarios laborales

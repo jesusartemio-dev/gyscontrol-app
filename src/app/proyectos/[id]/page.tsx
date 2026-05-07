@@ -28,6 +28,7 @@ import {
   Clock,
   ShieldCheck,
   HardHat,
+  GitBranch,
 } from 'lucide-react'
 
 import { Card, CardContent } from '@/components/ui/card'
@@ -496,6 +497,19 @@ export default function ProyectoHubPage() {
       href: `${baseUrl}/ssoma`,
       stats: [],
       badge: 'Seguridad'
+    },
+    {
+      id: 'organigrama',
+      title: 'Organigrama',
+      description: 'Estructura del equipo del proyecto',
+      icon: GitBranch,
+      color: 'text-indigo-500',
+      bgColor: 'bg-indigo-50',
+      hoverBg: 'hover:bg-indigo-50',
+      borderColor: 'border-indigo-200',
+      href: `${baseUrl}/organigrama`,
+      stats: [],
+      badge: 'Equipo'
     },
   ]
 

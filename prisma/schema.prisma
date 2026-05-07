@@ -1110,6 +1110,7 @@ model Proyecto {
   devolucionesMaterial       DevolucionMaterial[]
   entregasEpp                EntregaEPP[]
   reportesSemanalesSeguridad ReporteSemanalSeguridad[]
+  orgNodos                   ProyectoOrgNodo[]
 
   @@index([clienteId, estado, createdAt(sort: Desc)], map: "idx_proyecto_cliente_estado_fecha")
   @@index([comercialId, estado, fechaInicio], map: "idx_proyecto_comercial_estado_inicio")
@@ -1364,6 +1365,8 @@ model Recurso {
   proyectoTareas                     ProyectoTarea[]
   tarifasClientes                    TarifaClienteRecurso[]
   lineasHH                           LineaHH[]
+  plantillaOrgNodos                  PlantillaOrgNodo[]
+  proyectoOrgNodos                   ProyectoOrgNodo[]
 
   @@map("recurso")
 }
@@ -1786,6 +1789,7 @@ model User {
   // Reportes semanales de seguridad
   reportesSeguridadCreados                 ReporteSemanalSeguridad[]   @relation("ReportesSeguridadIngeniero")
   reportesSeguridadAprobados               ReporteSemanalSeguridad[]   @relation("ReportesSeguridadAprobador")
+  orgNodos                                 ProyectoOrgNodo[]
 
   @@map("user")
 }
@@ -1836,6 +1840,7 @@ model Empleado {
   fechaCese            DateTime?
   activo               Boolean              @default(true)
   documentoIdentidad   String?
+  cip                  String?  // número de colegiatura
   telefono             String?
   direccion            String?
   contactoEmergencia   String?
@@ -5089,4 +5094,64 @@ enum EstadoEntregaEPPItem {
   perdido
   dañado
   baja
+}
+
+// ── ORGANIGRAMA ──────────────────────────────────────────────────────────────
+
+model PlantillaOrganigrama {
+  id          String   @id @default(cuid())
+  nombre      String
+  descripcion String?
+  activo      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  nodos PlantillaOrgNodo[]
+
+  @@map("plantilla_organigrama")
+}
+
+model PlantillaOrgNodo {
+  id           String   @id @default(cuid())
+  plantillaId  String
+  parentId     String?
+  orden        Int      @default(0)
+  cargoLabel   String
+  recursoId    String?
+  esObligatorio Boolean @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  plantilla PlantillaOrganigrama @relation(fields: [plantillaId], references: [id], onDelete: Cascade)
+  parent    PlantillaOrgNodo?    @relation("PlantillaJerarquia", fields: [parentId], references: [id])
+  hijos     PlantillaOrgNodo[]   @relation("PlantillaJerarquia")
+  recurso   Recurso?             @relation(fields: [recursoId], references: [id])
+
+  @@index([plantillaId])
+  @@map("plantilla_org_nodo")
+}
+
+model ProyectoOrgNodo {
+  id          String   @id @default(cuid())
+  proyectoId  String
+  parentId    String?
+  orden       Int      @default(0)
+  cargoLabel  String
+  recursoId   String?
+  userId      String?
+  cipOverride      String?
+  telefonoOverride String?
+  empresaOverride  String?
+  esFijoGys   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  proyecto Proyecto          @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  parent   ProyectoOrgNodo?  @relation("ProyectoOrgJerarquia", fields: [parentId], references: [id])
+  hijos    ProyectoOrgNodo[] @relation("ProyectoOrgJerarquia")
+  user     User?             @relation(fields: [userId], references: [id])
+  recurso  Recurso?          @relation(fields: [recursoId], references: [id])
+
+  @@index([proyectoId])
+  @@map("proyecto_org_nodo")
 }
