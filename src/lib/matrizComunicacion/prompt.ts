@@ -1,73 +1,103 @@
 export interface MatrizPromptData {
-  nombreProyecto: string
-  codigoProyecto: string
+  proyecto: { nombre: string; codigo: string }
   cliente: string
-  descripcion?: string
-  personal: { nombre: string; siglas: string; cargo: string }[]
-  edts: { nombre: string; descripcion?: string }[]
+  personal: Array<{
+    siglas: string
+    nombre: string
+    empresa: string
+    cargo: string
+    celular: string
+    correo: string
+  }>
+  edts: Array<{
+    nombre: string
+    fase: string
+    orden: number
+  }>
+}
+
+export interface CeldaIA {
+  siglas: string
+  valor: string
 }
 
 export interface MatrizFilaIA {
   orden: number
-  informacion: string
-  emisor: string
-  receptores: string[]
-  medio: string
+  edtNombre: string
   frecuencia: string
-  formato: string
-  notas?: string
+  medio: string
+  celdas: CeldaIA[]
 }
 
-export function buildPromptMatriz(d: MatrizPromptData): string {
-  const personalList = d.personal
-    .map(p => `  - ${p.siglas}: ${p.nombre} (${p.cargo})`)
-    .join('\n')
+export function buildPromptMatriz(data: MatrizPromptData): string {
+  const siglasList = data.personal.map(p => p.siglas).join(', ')
+  const exampleSig0 = data.personal[0]?.siglas ?? 'P1'
+  const exampleSig1 = data.personal[1]?.siglas ?? 'P2'
 
-  const edtList = d.edts
-    .map((e, i) => `  ${i + 1}. ${e.nombre}${e.descripcion ? ` — ${e.descripcion}` : ''}`)
-    .join('\n')
+  return `Eres el Gestor de Proyectos de GYS CONTROL INDUSTRIAL SAC.
+Genera la Matriz de Comunicaciones en formato GYS-GPR-MAC.
 
-  return `Eres un consultor de gestión de proyectos para GYS CONTROL INDUSTRIAL SAC.
-Genera la Matriz de Comunicaciones (GYS-GPR-MAC) del proyecto.
+PROYECTO: ${data.proyecto.nombre}
+CLIENTE: ${data.cliente}
 
-EMPRESA: GYS CONTROL INDUSTRIAL SAC — automatización y proyectos electromecánicos, Perú
-PROYECTO: ${d.nombreProyecto} (${d.codigoProyecto})
-CLIENTE: ${d.cliente}
-${d.descripcion ? `DESCRIPCIÓN: ${d.descripcion.substring(0, 400)}` : ''}
+PERSONAL DEL PROYECTO (una columna por persona en la matriz):
+${data.personal.map(p =>
+  `- Siglas: ${p.siglas} | Nombre: ${p.nombre} | Cargo: ${p.cargo}`
+).join('\n')}
 
-PERSONAL DEL PROYECTO (siglas → nombre, cargo):
-${personalList || '  (sin personal asignado)'}
+EDTs DEL CRONOGRAMA (una fila por EDT en la matriz):
+${data.edts.map((e, i) =>
+  `${i + 1}. ${e.nombre} (Fase: ${e.fase})`
+).join('\n')}
 
-ACTIVIDADES / EDTs DEL PROYECTO:
-${edtList || '  (sin EDTs definidas)'}
+FORMATO REQUERIDO — Ejemplo del documento real GYS-GPR-MAC:
+ID | ACTIVIDAD    | FREC | MEDIO | ${siglasList}
+1  | Comercial    | E    | E     | DV | DS | D | D | D | E
+2  | Gestión      | S    | E     | D  | DV | E | D | D | D
+3  | Seguridad    | E    | E     | D  | D  | D | D | E | D
+8  | Construcción | E    | IE    | DR | DS | R | S | E | D
 
-INSTRUCCIONES:
-Genera entre 12 y 20 filas de comunicación que cubran el ciclo de vida del proyecto:
-inicio, planificación, ejecución (avances, inspecciones, seguridad, compras, técnico),
-control de cambios, incidentes, cierres parciales y cierre final.
+FRECUENCIA: M=Mensual S=Semanal E=Eventual
+MEDIO: I=Informe M=Minuta E=Email R=Reunión P=Planilla IE=Informe+Email
+RESPONSABILIDAD (combinar letras):
+  D=Destinatario E=Emisor R=Autoriza S=Soporte V=Valida
+  Ejemplos: DV=Destinatario+Valida DS=Destinatario+Soporte
+            ER=Emisor+Autoriza SV=Soporte+Valida DR=Destinatario+Autoriza
 
-Para cada fila incluye:
-- informacion: qué se comunica (ej. "Informe de avance semanal")
-- emisor: cargo completo de quien genera (ej. "Gestor de Proyecto")
-- receptores: array con las SIGLAS del personal que recibe (ej. ["GY","JM","CA"])
-  Usa SOLO las siglas definidas arriba. Incluye siempre al menos al Gestor de Proyecto.
-- medio: Reunión | Correo electrónico | Informe escrito | WhatsApp/Teléfono | Sistema GYS
-- frecuencia: Diario | Semanal | Quincenal | Mensual | Al evento | Al inicio | Al cierre
-- formato: código o nombre del documento (ej. "GYS-GPR-001", "Correo", "Acta", "Informe")
-- notas: observación breve o vacío ""
+CRITERIOS para asignar valores por cargo:
+- Supervisor cliente externo: DV en técnico, DS en gestión
+- Gerente de Proyectos: D en mayoría, DV en técnico
+- Gestor de Proyecto: E en Gestión, R en Construcción/Comisionamiento
+- Ing. Residente/Programador: ER en Ingeniería, R en técnico
+- Cadista: DS en Ingeniería, R en Planos, E en Documentación
+- Coord. Construcción: DS en Construcción, SV en campo
+- Supervisor Proyecto: E en Construcción, ES en Comisionamiento
+- Ing. Seguridad/HSEQ: E en Seguridad, D en resto
+- Coord. Comercial: E en Comercial, D en resto
 
-RESPONDE ÚNICAMENTE con un array JSON válido, sin markdown ni explicaciones:
-[
-  {
-    "orden": 0,
-    "informacion": "...",
-    "emisor": "...",
-    "receptores": ["..."],
-    "medio": "...",
-    "frecuencia": "...",
-    "formato": "...",
-    "notas": ""
-  },
-  ...
-]`
+Responde ÚNICAMENTE con JSON válido sin texto adicional:
+
+{
+  "filas": [
+    {
+      "orden": 1,
+      "edtNombre": "Comercial",
+      "frecuencia": "E",
+      "medio": "E",
+      "celdas": [
+        { "siglas": "${exampleSig0}", "valor": "DV" },
+        { "siglas": "${exampleSig1}", "valor": "DS" }
+      ]
+    }
+  ]
+}
+
+REGLAS CRÍTICAS:
+1. Genera exactamente ${data.edts.length} filas — una por EDT
+2. Cada fila debe tener exactamente ${data.personal.length} celdas
+   (una por cada persona en el mismo orden que se listaron)
+3. Los valores son combinaciones de letras: D, E, R, S, V, DV, DS,
+   ER, SV, DR, ES (para medio usar también IE)
+4. Ninguna celda debe quedar vacía — mínimo "D" si no hay rol claro
+5. No incluyas texto antes ni después del JSON`
 }
