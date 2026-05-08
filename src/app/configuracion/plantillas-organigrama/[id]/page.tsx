@@ -8,9 +8,12 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { ArrowLeft, Plus, Trash2, Save, Loader2, GitBranch, ChevronRight } from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ArrowLeft, Plus, Trash2, Save, Loader2, GitBranch, ChevronRight, Eye } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
+import OrgChart, { OrgNodoCompleto } from '@/components/organigrama/OrgChart'
+import { NODOS_FIJOS_GYS } from '@/lib/organigrama/nodosGys'
 
 interface Recurso { id: string; nombre: string; tipo: string }
 interface NodoPlantilla {
@@ -31,6 +34,53 @@ interface Plantilla {
   nodos: NodoPlantilla[]
 }
 
+// Construye nodos sintéticos para la vista previa: GYS fijos + plantilla anclada bajo GERENCIA DE PROYECTOS
+function buildPreviewNodos(nodos: NodoPlantilla[]): OrgNodoCompleto[] {
+  const gysIdMap: Record<string, string> = {}
+
+  const gysNodos: OrgNodoCompleto[] = NODOS_FIJOS_GYS.map(def => {
+    const id = `gys-${def.cargoLabel.toLowerCase().replace(/[\s/]+/g, '-')}`
+    gysIdMap[def.cargoLabel] = id
+    return {
+      id,
+      parentId: def.parentLabel ? (gysIdMap[def.parentLabel] ?? null) : null,
+      orden: def.orden,
+      cargoLabel: def.cargoLabel,
+      esFijoGys: true,
+      cipOverride: null,
+      telefonoOverride: null,
+      empresaOverride: null,
+      user: null,
+      _telefono: null,
+      _cip: null,
+      _empresa: 'GYS CONTROL INDUSTRIAL SAC',
+    }
+  })
+
+  const anchorId = gysIdMap['GERENCIA DE PROYECTOS']
+
+  // Two-pass: assign IDs first, then resolve parentIds
+  const pltIdMap: Record<string, string> = {}
+  for (const n of nodos) pltIdMap[n.id] = `plt-${n.id}`
+
+  const pltNodos: OrgNodoCompleto[] = nodos.map(n => ({
+    id: pltIdMap[n.id],
+    parentId: n.parentId ? (pltIdMap[n.parentId] ?? anchorId) : anchorId,
+    orden: n.orden,
+    cargoLabel: n.cargoLabel,
+    esFijoGys: false,
+    cipOverride: null,
+    telefonoOverride: null,
+    empresaOverride: null,
+    user: null,
+    _telefono: null,
+    _cip: null,
+    _empresa: 'GYS CONTROL INDUSTRIAL SAC',
+  }))
+
+  return [...gysNodos, ...pltNodos]
+}
+
 export default function PlantillaEditorPage() {
   const params = useParams()
   const router = useRouter()
@@ -41,10 +91,9 @@ export default function PlantillaEditorPage() {
   const [loading, setLoading] = useState(true)
   const [selectedNodoId, setSelectedNodoId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [addingChild, setAddingChild] = useState<string | null>(null) // parentId del nuevo nodo
+  const [addingChild, setAddingChild] = useState<string | null>(null)
   const [newCargoLabel, setNewCargoLabel] = useState('')
 
-  // Form del nodo seleccionado
   const [formLabel, setFormLabel] = useState('')
   const [formRecursoId, setFormRecursoId] = useState('')
   const [formObligatorio, setFormObligatorio] = useState(true)
@@ -58,7 +107,7 @@ export default function PlantillaEditorPage() {
       if (!pRes.ok) { router.push('/configuracion/plantillas-organigrama'); return }
       const [p, r] = await Promise.all([pRes.json(), rRes.json()])
       setPlantilla(p)
-      setRecursos(Array.isArray(r) ? r.filter((x: any) => x.tipo === 'individual') : [])
+      setRecursos(Array.isArray(r) ? r.filter((x: Recurso) => x.tipo === 'individual') : [])
     } catch {
       toast.error('Error al cargar datos')
     } finally {
@@ -144,7 +193,6 @@ export default function PlantillaEditorPage() {
     }
   }
 
-  // Renderizar árbol recursivamente
   function renderNodos(parentId: string | null, level: number): React.ReactNode {
     const hijos = (plantilla?.nodos ?? [])
       .filter(n => n.parentId === parentId)
@@ -186,7 +234,6 @@ export default function PlantillaEditorPage() {
           </div>
         </div>
 
-        {/* Mini-form para agregar hijo */}
         {addingChild === nodo.id && (
           <div className="flex items-center gap-2 pl-8 pr-2 py-1" style={{ paddingLeft: `${28 + level * 20}px` }}>
             <Input
@@ -209,7 +256,6 @@ export default function PlantillaEditorPage() {
           </div>
         )}
 
-        {/* Hijos recursivos */}
         {renderNodos(nodo.id, level + 1)}
       </div>
     ))
@@ -226,6 +272,7 @@ export default function PlantillaEditorPage() {
   if (!plantilla) return null
 
   const totalNodos = plantilla.nodos.length
+  const previewNodos = buildPreviewNodos(plantilla.nodos)
 
   return (
     <div className="p-6 space-y-4">
@@ -244,115 +291,154 @@ export default function PlantillaEditorPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-5 gap-4 min-h-[500px]">
-        {/* ── Izquierda: árbol de nodos ────────────────────────────────── */}
-        <div className="col-span-2 border rounded-lg bg-white overflow-auto">
-          <div className="p-3 border-b flex items-center justify-between">
-            <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-              Estructura
-            </span>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-7 text-xs"
-              onClick={() => { setAddingChild('__root__'); setNewCargoLabel('') }}
-            >
-              <Plus className="h-3.5 w-3.5 mr-1" />
-              Nodo raíz
-            </Button>
-          </div>
+      <Tabs defaultValue="editor">
+        <TabsList>
+          <TabsTrigger value="editor">
+            <GitBranch className="h-3.5 w-3.5 mr-1.5" />
+            Estructura
+          </TabsTrigger>
+          <TabsTrigger value="preview">
+            <Eye className="h-3.5 w-3.5 mr-1.5" />
+            Vista previa
+          </TabsTrigger>
+        </TabsList>
 
-          <div className="p-2 space-y-0.5">
-            {/* Input para agregar nodo raíz */}
-            {addingChild === '__root__' && (
-              <div className="flex items-center gap-2 px-2 py-1">
-                <Input
-                  value={newCargoLabel}
-                  onChange={e => setNewCargoLabel(e.target.value)}
-                  placeholder="Cargo del nodo raíz..."
+        {/* ── TAB: Editor ───────────────────────────────────────────────── */}
+        <TabsContent value="editor">
+          <div className="grid grid-cols-5 gap-4 min-h-[500px]">
+            {/* Árbol */}
+            <div className="col-span-2 border rounded-lg bg-white overflow-auto">
+              <div className="p-3 border-b flex items-center justify-between">
+                <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                  Estructura
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
                   className="h-7 text-xs"
-                  autoFocus
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') handleAddNodo(null)
-                    if (e.key === 'Escape') setAddingChild(null)
-                  }}
-                />
-                <Button size="sm" className="h-7 px-2 text-xs" onClick={() => handleAddNodo(null)}>
-                  Agregar
-                </Button>
-                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setAddingChild(null)}>
-                  ✕
+                  onClick={() => { setAddingChild('__root__'); setNewCargoLabel('') }}
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1" />
+                  Nodo raíz
                 </Button>
               </div>
-            )}
-            {renderNodos(null, 0)}
-            {totalNodos === 0 && addingChild !== '__root__' && (
-              <div className="text-center py-8 text-muted-foreground text-sm">
-                Sin nodos. Agrega un nodo raíz para comenzar.
+
+              <div className="p-2 space-y-0.5">
+                {addingChild === '__root__' && (
+                  <div className="flex items-center gap-2 px-2 py-1">
+                    <Input
+                      value={newCargoLabel}
+                      onChange={e => setNewCargoLabel(e.target.value)}
+                      placeholder="Cargo del nodo raíz..."
+                      className="h-7 text-xs"
+                      autoFocus
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') handleAddNodo(null)
+                        if (e.key === 'Escape') setAddingChild(null)
+                      }}
+                    />
+                    <Button size="sm" className="h-7 px-2 text-xs" onClick={() => handleAddNodo(null)}>
+                      Agregar
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setAddingChild(null)}>
+                      ✕
+                    </Button>
+                  </div>
+                )}
+                {renderNodos(null, 0)}
+                {totalNodos === 0 && addingChild !== '__root__' && (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    Sin nodos. Agrega un nodo raíz para comenzar.
+                  </div>
+                )}
               </div>
+            </div>
+
+            {/* Formulario del nodo */}
+            <div className="col-span-3 border rounded-lg bg-white p-4">
+              {!selectedNodo ? (
+                <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground gap-2">
+                  <GitBranch className="h-10 w-10 opacity-30" />
+                  <p className="text-sm">Selecciona un nodo para editarlo</p>
+                  <p className="text-xs">o agrega uno nuevo desde el panel izquierdo</p>
+                </div>
+              ) : (
+                <div className="space-y-5">
+                  <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+                    Editar nodo
+                  </h3>
+
+                  <div className="space-y-2">
+                    <Label>Cargo / Título</Label>
+                    <Input
+                      value={formLabel}
+                      onChange={e => setFormLabel(e.target.value)}
+                      placeholder="Ej: Supervisor de Proyecto"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Recurso sugerido</Label>
+                    <Select value={formRecursoId || '__none__'} onValueChange={v => setFormRecursoId(v === '__none__' ? '' : v)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sin recurso sugerido" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Sin recurso</SelectItem>
+                        {recursos.map(r => (
+                          <SelectItem key={r.id} value={r.id}>{r.nombre}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Qué tipo de recurso ocupa este cargo (referencial)
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      checked={formObligatorio}
+                      onCheckedChange={setFormObligatorio}
+                    />
+                    <Label>Nodo obligatorio</Label>
+                  </div>
+
+                  <div className="pt-2">
+                    <Button onClick={handleSaveNodo} disabled={saving} className="w-full">
+                      {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                      Guardar cambios
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* ── TAB: Vista previa ─────────────────────────────────────────── */}
+        <TabsContent value="preview">
+          <div className="border rounded-lg bg-white overflow-hidden" style={{ height: 560 }}>
+            {totalNodos === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2">
+                <GitBranch className="h-10 w-10 opacity-30" />
+                <p className="text-sm">Agrega nodos en la pestaña Estructura para ver la vista previa</p>
+              </div>
+            ) : (
+              <>
+                <div className="px-4 py-2 border-b bg-slate-50 flex items-center gap-2 text-xs text-muted-foreground">
+                  <span className="inline-block w-3 h-3 rounded-sm bg-[#2E4057]" />
+                  <span>Nodos fijos GYS</span>
+                  <span className="ml-3 inline-block w-3 h-3 rounded-sm bg-white border border-slate-300" />
+                  <span>Nodos de esta plantilla (sin asignar)</span>
+                </div>
+                <div style={{ height: 520 }}>
+                  <OrgChart nodos={previewNodos} />
+                </div>
+              </>
             )}
           </div>
-        </div>
-
-        {/* ── Derecha: formulario del nodo seleccionado ─────────────────── */}
-        <div className="col-span-3 border rounded-lg bg-white p-4">
-          {!selectedNodo ? (
-            <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground gap-2">
-              <GitBranch className="h-10 w-10 opacity-30" />
-              <p className="text-sm">Selecciona un nodo para editarlo</p>
-              <p className="text-xs">o agrega uno nuevo desde el panel izquierdo</p>
-            </div>
-          ) : (
-            <div className="space-y-5">
-              <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
-                Editar nodo
-              </h3>
-
-              <div className="space-y-2">
-                <Label>Cargo / Título</Label>
-                <Input
-                  value={formLabel}
-                  onChange={e => setFormLabel(e.target.value)}
-                  placeholder="Ej: Supervisor de Proyecto"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Recurso sugerido</Label>
-                <Select value={formRecursoId || '__none__'} onValueChange={v => setFormRecursoId(v === '__none__' ? '' : v)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sin recurso sugerido" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Sin recurso</SelectItem>
-                    {recursos.map(r => (
-                      <SelectItem key={r.id} value={r.id}>{r.nombre}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Qué tipo de recurso ocupa este cargo (referencial)
-                </p>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <Switch
-                  checked={formObligatorio}
-                  onCheckedChange={setFormObligatorio}
-                />
-                <Label>Nodo obligatorio</Label>
-              </div>
-
-              <div className="pt-2">
-                <Button onClick={handleSaveNodo} disabled={saving} className="w-full">
-                  {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-                  Guardar cambios
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
