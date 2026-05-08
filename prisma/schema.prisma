@@ -5135,9 +5135,10 @@ model PlantillaOrgNodo {
   orden        Int      @default(0)
   cargoLabel   String
   recursoId    String?
-  esObligatorio Boolean @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  esObligatorio  Boolean  @default(true)
+  gysParentLabel String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   plantilla PlantillaOrganigrama @relation(fields: [plantillaId], references: [id], onDelete: Cascade)
   parent    PlantillaOrgNodo?    @relation("PlantillaJerarquia", fields: [parentId], references: [id])

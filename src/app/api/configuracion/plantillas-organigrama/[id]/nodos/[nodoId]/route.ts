@@ -12,7 +12,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
 
     const { nodoId } = await params
     const body = await req.json()
-    const { cargoLabel, parentId, orden, recursoId, esObligatorio } = body
+    const { cargoLabel, parentId, orden, recursoId, esObligatorio, gysParentLabel } = body
 
     const updated = await prisma.plantillaOrgNodo.update({
       where: { id: nodoId },
@@ -22,6 +22,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
         ...(orden !== undefined && { orden }),
         ...(recursoId !== undefined && { recursoId: recursoId || null }),
         ...(esObligatorio !== undefined && { esObligatorio }),
+        ...(gysParentLabel !== undefined && { gysParentLabel: gysParentLabel || null }),
       },
       include: {
         recurso: { select: { id: true, nombre: true, tipo: true } },

@@ -12,7 +12,7 @@ export async function POST(req: Request, { params }: Ctx) {
 
     const { id: plantillaId } = await params
     const body = await req.json()
-    const { cargoLabel, parentId, orden, recursoId, esObligatorio } = body
+    const { cargoLabel, parentId, orden, recursoId, esObligatorio, gysParentLabel } = body
 
     if (!cargoLabel?.trim()) {
       return NextResponse.json({ error: 'cargoLabel es requerido' }, { status: 400 })
@@ -30,6 +30,7 @@ export async function POST(req: Request, { params }: Ctx) {
         orden: orden ?? 0,
         recursoId: recursoId || null,
         esObligatorio: esObligatorio ?? true,
+        gysParentLabel: gysParentLabel || null,
       },
       include: {
         recurso: { select: { id: true, nombre: true, tipo: true } },

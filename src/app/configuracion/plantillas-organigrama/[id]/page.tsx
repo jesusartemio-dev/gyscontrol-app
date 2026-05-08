@@ -14,7 +14,7 @@ import {
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { ArrowLeft, Plus, Trash2, Save, Loader2, GitBranch, ChevronRight, ChevronUp, ChevronDown, Eye, Lock } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Save, Loader2, GitBranch, ChevronRight, ChevronUp, ChevronDown, Eye } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
 import OrgChart, { OrgNodoCompleto } from '@/components/organigrama/OrgChart'
@@ -29,6 +29,7 @@ interface NodoPlantilla {
   cargoLabel: string
   recursoId: string | null
   esObligatorio: boolean
+  gysParentLabel: string | null
   recurso: Recurso | null
 }
 
@@ -39,7 +40,7 @@ interface Plantilla {
   nodos: NodoPlantilla[]
 }
 
-// Construye nodos sintéticos para la vista previa: GYS fijos + plantilla anclada bajo GERENCIA DE PROYECTOS
+// Builds synthetic nodes for preview: GYS fixed + plantilla anchored correctly
 function buildPreviewNodos(nodos: NodoPlantilla[]): OrgNodoCompleto[] {
   const gysIdMap: Record<string, string> = {}
 
@@ -64,24 +65,33 @@ function buildPreviewNodos(nodos: NodoPlantilla[]): OrgNodoCompleto[] {
 
   const anchorId = gysIdMap['GERENCIA DE PROYECTOS']
 
-  // Two-pass: assign IDs first, then resolve parentIds
   const pltIdMap: Record<string, string> = {}
   for (const n of nodos) pltIdMap[n.id] = `plt-${n.id}`
 
-  const pltNodos: OrgNodoCompleto[] = nodos.map(n => ({
-    id: pltIdMap[n.id],
-    parentId: n.parentId ? (pltIdMap[n.parentId] ?? anchorId) : anchorId,
-    orden: n.orden,
-    cargoLabel: n.cargoLabel,
-    esFijoGys: false,
-    cipOverride: null,
-    telefonoOverride: null,
-    empresaOverride: null,
-    user: null,
-    _telefono: null,
-    _cip: null,
-    _empresa: 'GYS CONTROL INDUSTRIAL SAC',
-  }))
+  const pltNodos: OrgNodoCompleto[] = nodos.map(n => {
+    let parentId: string
+    if (n.parentId) {
+      parentId = pltIdMap[n.parentId] ?? anchorId
+    } else if (n.gysParentLabel) {
+      parentId = gysIdMap[n.gysParentLabel] ?? anchorId
+    } else {
+      parentId = anchorId
+    }
+    return {
+      id: pltIdMap[n.id],
+      parentId,
+      orden: n.orden,
+      cargoLabel: n.cargoLabel,
+      esFijoGys: false,
+      cipOverride: null,
+      telefonoOverride: null,
+      empresaOverride: null,
+      user: null,
+      _telefono: null,
+      _cip: null,
+      _empresa: 'GYS CONTROL INDUSTRIAL SAC',
+    }
+  })
 
   return [...gysNodos, ...pltNodos]
 }
@@ -95,7 +105,9 @@ export default function PlantillaEditorPage() {
   const [recursos, setRecursos] = useState<Recurso[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedNodoId, setSelectedNodoId] = useState<string | null>(null)
+  const [selectedGysLabel, setSelectedGysLabel] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  // addingChild: null | '__root__' | 'gys:<LABEL>' | <plantillaNodeId>
   const [addingChild, setAddingChild] = useState<string | null>(null)
   const [newCargoLabel, setNewCargoLabel] = useState('')
   const [deleteNodoId, setDeleteNodoId] = useState<string | null>(null)
@@ -164,7 +176,11 @@ export default function PlantillaEditorPage() {
     if (!nodo || !plantilla) return
 
     const siblings = plantilla.nodos
-      .filter(n => n.parentId === nodo.parentId)
+      .filter(n => {
+        if (n.parentId !== nodo.parentId) return false
+        if (nodo.parentId === null) return n.gysParentLabel === nodo.gysParentLabel
+        return true
+      })
       .sort((a, b) => a.orden - b.orden || a.id.localeCompare(b.id))
 
     const idx = siblings.findIndex(n => n.id === nodoId)
@@ -192,18 +208,43 @@ export default function PlantillaEditorPage() {
     }
   }
 
-  const handleAddNodo = async (parentId: string | null) => {
+  const handleAddNodo = async () => {
     const label = newCargoLabel.trim()
     if (!label) { toast.error('Escribe el cargo del nodo'); return }
-    const siblings = (plantilla?.nodos ?? []).filter(n => n.parentId === parentId)
+    if (!addingChild) return
+
+    let parentId: string | null = null
+    let gysParentLabel: string | null = null
+
+    if (addingChild === '__root__') {
+      // Legacy root button → anchors under GERENCIA DE PROYECTOS (null = default)
+      parentId = null
+      gysParentLabel = null
+    } else if (addingChild.startsWith('gys:')) {
+      const gysLabel = addingChild.slice(4)
+      parentId = null
+      // GERENCIA DE PROYECTOS is the default anchor → stored as null for backward compat
+      gysParentLabel = gysLabel === 'GERENCIA DE PROYECTOS' ? null : gysLabel
+    } else {
+      // Child of an existing plantilla node
+      parentId = addingChild
+      gysParentLabel = null
+    }
+
+    const siblings = (plantilla?.nodos ?? []).filter(n =>
+      parentId !== null
+        ? n.parentId === parentId
+        : n.parentId === null && n.gysParentLabel === gysParentLabel
+    )
     const nextOrden = siblings.length * 10
+
     try {
       const res = await fetch(
         `/api/configuracion/plantillas-organigrama/${plantillaId}/nodos`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cargoLabel: label, parentId, orden: nextOrden }),
+          body: JSON.stringify({ cargoLabel: label, parentId, gysParentLabel, orden: nextOrden }),
         }
       )
       if (!res.ok) throw new Error()
@@ -213,6 +254,7 @@ export default function PlantillaEditorPage() {
       setAddingChild(null)
       await loadData()
       setSelectedNodoId(created.id)
+      setSelectedGysLabel(null)
     } catch {
       toast.error('Error al agregar nodo')
     }
@@ -235,76 +277,17 @@ export default function PlantillaEditorPage() {
     }
   }
 
-  // Render GYS fixed nodes as read-only context in the tree
-  function renderGysTree() {
-    const byParent: Record<string, typeof NODOS_FIJOS_GYS> = {}
-    for (const def of NODOS_FIJOS_GYS) {
-      const key = def.parentLabel ?? '__root__'
-      if (!byParent[key]) byParent[key] = []
-      byParent[key].push(def)
-    }
-
-    function renderGysLevel(parentLabel: string | null, level: number): React.ReactNode {
-      const key = parentLabel ?? '__root__'
-      const items = byParent[key] ?? []
-      return items.sort((a, b) => a.orden - b.orden).map(def => {
-        const isGerencia = def.cargoLabel === 'GERENCIA DE PROYECTOS'
-        return (
-          <div key={def.cargoLabel}>
-            <div
-              className="flex items-center gap-1.5 px-2 py-1 rounded select-none"
-              style={{ paddingLeft: `${8 + level * 16}px` }}
-            >
-              <Lock className="h-3 w-3 text-[#4a6480] shrink-0" />
-              <span className="text-xs font-semibold text-[#2E4057] uppercase tracking-wide truncate">
-                {def.cargoLabel}
-              </span>
-              <span className="ml-1 text-[10px] px-1 py-0.5 bg-[#2E4057]/10 text-[#2E4057] rounded font-medium shrink-0">
-                GYS
-              </span>
-            </div>
-            {renderGysLevel(def.cargoLabel, level + 1)}
-            {/* Plantilla nodes anchor under GERENCIA DE PROYECTOS */}
-            {isGerencia && (
-              <div>
-                {addingChild === '__root__' && (
-                  <div className="flex items-center gap-2 py-1" style={{ paddingLeft: `${8 + (level + 1) * 16}px` }}>
-                    <Input
-                      value={newCargoLabel}
-                      onChange={e => setNewCargoLabel(e.target.value)}
-                      placeholder="Cargo del nodo raíz..."
-                      className="h-7 text-xs"
-                      autoFocus
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') handleAddNodo(null)
-                        if (e.key === 'Escape') setAddingChild(null)
-                      }}
-                    />
-                    <Button size="sm" className="h-7 px-2 text-xs" onClick={() => handleAddNodo(null)}>
-                      Agregar
-                    </Button>
-                    <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setAddingChild(null)}>✕</Button>
-                  </div>
-                )}
-                {renderNodos(null, level + 1)}
-                {(plantilla?.nodos ?? []).length === 0 && addingChild !== '__root__' && (
-                  <div className="text-xs text-muted-foreground italic py-1" style={{ paddingLeft: `${8 + (level + 1) * 16}px` }}>
-                    Sin nodos de plantilla
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )
-      })
-    }
-
-    return renderGysLevel(null, 0)
-  }
-
-  function renderNodos(parentId: string | null, level: number): React.ReactNode {
+  // Renders plantilla nodes with a given parentId.
+  // When parentId is null, gysFilter restricts to nodes with that gysParentLabel.
+  function renderNodos(parentId: string | null, level: number, gysFilter?: string | null): React.ReactNode {
     const hijos = (plantilla?.nodos ?? [])
-      .filter(n => n.parentId === parentId)
+      .filter(n => {
+        if (n.parentId !== parentId) return false
+        if (parentId === null && gysFilter !== undefined) {
+          return n.gysParentLabel === gysFilter
+        }
+        return true
+      })
       .sort((a, b) => a.orden - b.orden || a.id.localeCompare(b.id))
 
     return hijos.map((nodo, idx) => (
@@ -315,8 +298,8 @@ export default function PlantillaEditorPage() {
               ? 'bg-indigo-100 text-indigo-900'
               : 'hover:bg-muted/60'
           }`}
-          style={{ paddingLeft: `${8 + level * 20}px` }}
-          onClick={() => setSelectedNodoId(nodo.id)}
+          style={{ paddingLeft: `${8 + level * 16}px` }}
+          onClick={() => { setSelectedNodoId(nodo.id); setSelectedGysLabel(null) }}
         >
           <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
           <span className="text-sm flex-1 truncate font-medium">{nodo.cargoLabel}</span>
@@ -360,7 +343,7 @@ export default function PlantillaEditorPage() {
         </div>
 
         {addingChild === nodo.id && (
-          <div className="flex items-center gap-2 pl-8 pr-2 py-1" style={{ paddingLeft: `${28 + level * 20}px` }}>
+          <div className="flex items-center gap-2 py-1" style={{ paddingLeft: `${8 + (level + 1) * 16}px` }}>
             <Input
               value={newCargoLabel}
               onChange={e => setNewCargoLabel(e.target.value)}
@@ -368,11 +351,11 @@ export default function PlantillaEditorPage() {
               className="h-7 text-xs"
               autoFocus
               onKeyDown={e => {
-                if (e.key === 'Enter') handleAddNodo(nodo.id)
+                if (e.key === 'Enter') handleAddNodo()
                 if (e.key === 'Escape') setAddingChild(null)
               }}
             />
-            <Button size="sm" className="h-7 px-2 text-xs" onClick={() => handleAddNodo(nodo.id)}>
+            <Button size="sm" className="h-7 px-2 text-xs" onClick={handleAddNodo}>
               Agregar
             </Button>
             <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setAddingChild(null)}>
@@ -384,6 +367,91 @@ export default function PlantillaEditorPage() {
         {renderNodos(nodo.id, level + 1)}
       </div>
     ))
+  }
+
+  function renderGysTree() {
+    const byParent: Record<string, typeof NODOS_FIJOS_GYS> = {}
+    for (const def of NODOS_FIJOS_GYS) {
+      const key = def.parentLabel ?? '__root__'
+      if (!byParent[key]) byParent[key] = []
+      byParent[key].push(def)
+    }
+
+    function renderGysNode(def: typeof NODOS_FIJOS_GYS[0], level: number): React.ReactNode {
+      const isSelected = selectedGysLabel === def.cargoLabel
+      const gysKey = `gys:${def.cargoLabel}`
+      // GERENCIA DE PROYECTOS uses null as its filter (backward compat)
+      const filterVal = def.cargoLabel === 'GERENCIA DE PROYECTOS' ? null : def.cargoLabel
+      const showAddForm =
+        addingChild === gysKey ||
+        (def.cargoLabel === 'GERENCIA DE PROYECTOS' && addingChild === '__root__')
+
+      return (
+        <div key={def.cargoLabel}>
+          <div
+            className={`flex items-center gap-1.5 px-2 py-1.5 rounded cursor-pointer group transition-colors ${
+              isSelected ? 'bg-[#2E4057]/12 text-[#2E4057]' : 'hover:bg-[#2E4057]/6'
+            }`}
+            style={{ paddingLeft: `${8 + level * 16}px` }}
+            onClick={() => { setSelectedGysLabel(def.cargoLabel); setSelectedNodoId(null) }}
+          >
+            <ChevronRight className={`h-3.5 w-3.5 shrink-0 ${isSelected ? 'text-[#2E4057]' : 'text-[#4a6480]'}`} />
+            <span className={`text-xs font-bold uppercase tracking-wide truncate flex-1 ${
+              isSelected ? 'text-[#2E4057]' : 'text-[#2E4057]/70'
+            }`}>
+              {def.cargoLabel}
+            </span>
+            <span className="text-[10px] px-1 py-0.5 bg-[#2E4057]/10 text-[#2E4057] rounded font-medium shrink-0">
+              GYS
+            </span>
+            <button
+              className="hidden group-hover:flex p-0.5 rounded text-[#2E4057] hover:bg-[#2E4057]/15"
+              title={`Agregar nodo bajo ${def.cargoLabel}`}
+              onClick={e => {
+                e.stopPropagation()
+                setAddingChild(gysKey)
+                setNewCargoLabel('')
+                setSelectedGysLabel(def.cargoLabel)
+              }}
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          {(byParent[def.cargoLabel] ?? [])
+            .sort((a, b) => a.orden - b.orden)
+            .map(child => renderGysNode(child, level + 1))}
+
+          {renderNodos(null, level + 1, filterVal)}
+
+          {showAddForm && (
+            <div className="flex items-center gap-2 py-1" style={{ paddingLeft: `${8 + (level + 1) * 16}px` }}>
+              <Input
+                value={newCargoLabel}
+                onChange={e => setNewCargoLabel(e.target.value)}
+                placeholder={`Cargo bajo ${def.cargoLabel}...`}
+                className="h-7 text-xs"
+                autoFocus
+                onKeyDown={e => {
+                  if (e.key === 'Enter') handleAddNodo()
+                  if (e.key === 'Escape') setAddingChild(null)
+                }}
+              />
+              <Button size="sm" className="h-7 px-2 text-xs" onClick={handleAddNodo}>
+                Agregar
+              </Button>
+              <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setAddingChild(null)}>
+                ✕
+              </Button>
+            </div>
+          )}
+        </div>
+      )
+    }
+
+    return (byParent['__root__'] ?? [])
+      .sort((a, b) => a.orden - b.orden)
+      .map(def => renderGysNode(def, 0))
   }
 
   if (loading) {
@@ -453,9 +521,36 @@ export default function PlantillaEditorPage() {
               </div>
             </div>
 
-            {/* Formulario del nodo */}
+            {/* Panel derecho */}
             <div className="col-span-3 border rounded-lg bg-white p-4">
-              {!selectedNodo ? (
+              {selectedGysLabel ? (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] px-1.5 py-0.5 bg-[#2E4057]/10 text-[#2E4057] rounded font-bold uppercase tracking-wide">
+                      GYS
+                    </span>
+                    <h3 className="font-bold text-sm text-[#2E4057] uppercase tracking-wide">
+                      {selectedGysLabel}
+                    </h3>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Nodo corporativo fijo de GYS Control Industrial. Su cargo no es modificable en la plantilla.
+                    Puedes agregar nodos hijos bajo este cargo para estructurar el equipo del proyecto.
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full border-[#2E4057]/30 text-[#2E4057] hover:bg-[#2E4057]/8"
+                    onClick={() => {
+                      setAddingChild(`gys:${selectedGysLabel}`)
+                      setNewCargoLabel('')
+                    }}
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1.5" />
+                    Agregar nodo bajo {selectedGysLabel}
+                  </Button>
+                </div>
+              ) : !selectedNodo ? (
                 <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground gap-2">
                   <GitBranch className="h-10 w-10 opacity-30" />
                   <p className="text-sm">Selecciona un nodo para editarlo</p>

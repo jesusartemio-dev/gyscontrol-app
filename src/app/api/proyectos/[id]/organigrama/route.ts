@@ -169,8 +169,9 @@ export async function POST(req: Request, { params }: Ctx) {
         for (const pNodo of nodosOrdenados) {
           let resolvedParentId: string | null = null
           if (!pNodo.parentId) {
-            // Nodo raíz de plantilla → cuelga de GERENCIA DE PROYECTOS
-            resolvedParentId = anclaId
+            // Root plantilla node: anchor to its designated GYS node, or GERENCIA DE PROYECTOS by default
+            const anchor = (pNodo as any).gysParentLabel
+            resolvedParentId = anchor ? (gysIdMap[anchor] ?? anclaId) : anclaId
           } else {
             resolvedParentId = plantillaIdMap[pNodo.parentId] ?? anclaId
           }
