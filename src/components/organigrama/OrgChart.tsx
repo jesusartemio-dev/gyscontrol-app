@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useRef } from 'react'
+import React from 'react'
 
 export interface OrgNodoCompleto {
   id: string
@@ -25,26 +25,34 @@ export interface OrgNodoCompleto {
 interface OrgChartProps {
   nodos: OrgNodoCompleto[]
   onNodoClick?: (nodo: OrgNodoCompleto) => void
+  compact?: boolean
 }
 
-const NODE_W = 190
-const NODE_H = 112
-const H_GAP = 20
-const V_GAP = 56
+interface ChartDims {
+  NODE_W: number
+  NODE_H: number
+  H_GAP: number
+  V_GAP: number
+}
+
+const NORMAL_DIMS: ChartDims = { NODE_W: 190, NODE_H: 112, H_GAP: 20, V_GAP: 56 }
+const COMPACT_DIMS: ChartDims = { NODE_W: 148, NODE_H: 64, H_GAP: 10, V_GAP: 28 }
 
 interface LayoutNode {
   nodo: OrgNodoCompleto
   x: number
   y: number
   width: number
+  dims: ChartDims
 }
 
-function buildLayout(nodos: OrgNodoCompleto[]): {
+function buildLayout(nodos: OrgNodoCompleto[], dims: ChartDims): {
   nodes: LayoutNode[]
   svgWidth: number
   svgHeight: number
   edges: { x1: number; y1: number; x2: number; y2: number }[]
 } {
+  const { NODE_W, NODE_H, H_GAP, V_GAP } = dims
   if (nodos.length === 0) return { nodes: [], svgWidth: 0, svgHeight: 0, edges: [] }
 
   const byId = Object.fromEntries(nodos.map(n => [n.id, n]))
@@ -77,6 +85,7 @@ function buildLayout(nodos: OrgNodoCompleto[]): {
 
   let totalRootWidth = roots.reduce((s, r) => s + subtreeWidth(r.id) + H_GAP, -H_GAP)
   if (roots.length === 0) totalRootWidth = 0
+  void totalRootWidth
 
   function assignPositions(id: string, centerX: number, depth: number) {
     positions[id] = { x: centerX - NODE_W / 2, y: depth * (NODE_H + V_GAP) }
@@ -101,7 +110,7 @@ function buildLayout(nodos: OrgNodoCompleto[]): {
   const allY = Object.values(positions).map(p => p.y)
   const minX = Math.min(...allX)
   const minY = Math.min(...allY)
-  const MARGIN = 20
+  const MARGIN = 16
   for (const id of Object.keys(positions)) {
     positions[id].x -= minX - MARGIN
     positions[id].y -= minY - MARGIN
@@ -115,6 +124,7 @@ function buildLayout(nodos: OrgNodoCompleto[]): {
     x: positions[n.id]?.x ?? 0,
     y: positions[n.id]?.y ?? 0,
     width: NODE_W,
+    dims,
   }))
 
   const edges: { x1: number; y1: number; x2: number; y2: number }[] = []
@@ -135,9 +145,11 @@ function buildLayout(nodos: OrgNodoCompleto[]): {
 }
 
 function NodoCard({ node, onClick }: { node: LayoutNode; onClick?: (n: OrgNodoCompleto) => void }) {
-  const { nodo, x, y } = node
+  const { nodo, x, y, dims } = node
+  const { NODE_W, NODE_H } = dims
   const isVacante = !nodo.user
   const isGys = nodo.esFijoGys
+  const isCompact = NODE_W < 180
 
   return (
     <foreignObject
@@ -151,7 +163,7 @@ function NodoCard({ node, onClick }: { node: LayoutNode; onClick?: (n: OrgNodoCo
       <div
         style={{ width: NODE_W, height: NODE_H }}
         className={[
-          'rounded-xl border-2 shadow-sm cursor-pointer transition-all duration-150 flex flex-col',
+          'rounded-lg border-2 shadow-sm cursor-pointer transition-all duration-150 flex flex-col',
           'hover:shadow-md hover:scale-[1.02]',
           isGys
             ? 'bg-[#2E4057] border-[#1e2d3d] text-white'
@@ -163,13 +175,14 @@ function NodoCard({ node, onClick }: { node: LayoutNode; onClick?: (n: OrgNodoCo
         {/* Franja superior — cargo */}
         <div
           className={[
-            'px-3 pt-2.5 pb-1.5 rounded-t-[10px]',
+            isCompact ? 'px-2 pt-1.5 pb-1 rounded-t-md' : 'px-3 pt-2.5 pb-1.5 rounded-t-[10px]',
             isGys ? 'bg-[#243347]' : isVacante ? 'bg-red-50' : 'bg-slate-50',
           ].join(' ')}
         >
           <div
             className={[
-              'text-[10px] font-bold uppercase tracking-widest leading-tight truncate',
+              'font-bold uppercase tracking-widest leading-tight truncate',
+              isCompact ? 'text-[8px]' : 'text-[10px]',
               isGys ? 'text-indigo-200' : isVacante ? 'text-red-400' : 'text-indigo-600',
             ].join(' ')}
           >
@@ -178,35 +191,45 @@ function NodoCard({ node, onClick }: { node: LayoutNode; onClick?: (n: OrgNodoCo
         </div>
 
         {/* Cuerpo */}
-        <div className="px-3 py-2 flex-1 flex flex-col justify-between">
+        <div className={`${isCompact ? 'px-2 py-1' : 'px-3 py-2'} flex-1 flex flex-col justify-center`}>
           {isVacante ? (
-            <div className="flex items-center gap-1.5 mt-1">
-              <div className="h-1.5 w-1.5 rounded-full bg-red-400 animate-pulse" />
-              <span className="text-xs text-red-400 font-semibold italic">VACANTE</span>
+            <div className="flex items-center gap-1">
+              <div className={`rounded-full bg-red-400 animate-pulse ${isCompact ? 'h-1 w-1' : 'h-1.5 w-1.5'}`} />
+              <span className={`text-red-400 font-semibold italic ${isCompact ? 'text-[8px]' : 'text-xs'}`}>
+                VACANTE
+              </span>
             </div>
           ) : (
             <div className="space-y-0.5">
-              <div className={`text-[13px] font-semibold truncate leading-tight ${isGys ? 'text-white' : 'text-gray-800'}`}>
+              <div
+                className={`font-semibold truncate leading-tight ${isCompact ? 'text-[10px]' : 'text-[13px]'} ${
+                  isGys ? 'text-white' : 'text-gray-800'
+                }`}
+              >
                 {nodo.user!.name}
               </div>
-              {nodo._telefono && (
-                <div className={`text-[10px] truncate ${isGys ? 'text-indigo-300' : 'text-gray-400'}`}>
-                  📱 {nodo._telefono}
-                </div>
+              {!isCompact && (
+                <>
+                  {nodo._telefono && (
+                    <div className={`text-[10px] truncate ${isGys ? 'text-indigo-300' : 'text-gray-400'}`}>
+                      Tel: {nodo._telefono}
+                    </div>
+                  )}
+                  {nodo._cip && (
+                    <div className={`text-[10px] truncate ${isGys ? 'text-indigo-300' : 'text-gray-400'}`}>
+                      CIP {nodo._cip}
+                    </div>
+                  )}
+                  <div className={`text-[10px] truncate ${isGys ? 'text-indigo-300' : 'text-gray-400'}`}>
+                    {nodo.user!.email}
+                  </div>
+                </>
               )}
-              {nodo._cip && (
-                <div className={`text-[10px] truncate ${isGys ? 'text-indigo-300' : 'text-gray-400'}`}>
-                  CIP {nodo._cip}
-                </div>
-              )}
-              <div className={`text-[10px] truncate ${isGys ? 'text-indigo-300/80' : 'text-gray-400'}`}>
-                {nodo.user!.email}
-              </div>
             </div>
           )}
 
-          {/* Empresa */}
-          {!isGys && (
+          {/* Empresa — solo en modo normal */}
+          {!isCompact && !isGys && (
             <div className="text-[9px] text-gray-300 truncate mt-1 uppercase tracking-wide">
               {nodo._empresa}
             </div>
@@ -217,8 +240,9 @@ function NodoCard({ node, onClick }: { node: LayoutNode; onClick?: (n: OrgNodoCo
   )
 }
 
-export default function OrgChart({ nodos, onNodoClick }: OrgChartProps) {
-  const { nodes, svgWidth, svgHeight, edges } = buildLayout(nodos)
+export default function OrgChart({ nodos, onNodoClick, compact }: OrgChartProps) {
+  const dims = compact ? COMPACT_DIMS : NORMAL_DIMS
+  const { nodes, svgWidth, svgHeight, edges } = buildLayout(nodos, dims)
 
   if (nodos.length === 0) {
     return (
@@ -232,7 +256,7 @@ export default function OrgChart({ nodos, onNodoClick }: OrgChartProps) {
     <div
       id="org-chart-container"
       className="overflow-auto bg-slate-50 rounded-none"
-      style={{ minHeight: 400 }}
+      style={{ minHeight: compact ? 200 : 400 }}
     >
       {/* Dot grid background */}
       <svg

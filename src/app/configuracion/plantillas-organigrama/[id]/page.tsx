@@ -430,9 +430,10 @@ export default function PlantillaEditorPage() {
                   <span>Nodos fijos GYS</span>
                   <span className="ml-3 inline-block w-3 h-3 rounded-sm bg-white border border-slate-300" />
                   <span>Nodos de esta plantilla (sin asignar)</span>
+                  <span className="ml-auto opacity-60">Scroll para explorar</span>
                 </div>
-                <div style={{ height: 520 }}>
-                  <OrgChart nodos={previewNodos} />
+                <div style={{ height: 520, overflow: 'auto' }}>
+                  <OrgChart nodos={previewNodos} compact />
                 </div>
               </>
             )}
