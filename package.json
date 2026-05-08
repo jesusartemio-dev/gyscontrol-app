@@ -122,6 +122,7 @@
     "exceljs": "^4.4.0",
     "framer-motion": "^12.23.12",
     "googleapis": "^171.4.0",
+    "html-to-image": "^1.11.13",
     "html2canvas": "^1.4.1",
     "html5-qrcode": "^2.3.8",
     "jspdf": "^3.0.3",

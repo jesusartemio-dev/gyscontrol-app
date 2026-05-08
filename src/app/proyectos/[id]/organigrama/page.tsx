@@ -325,21 +325,18 @@ export default function OrganigramaProyectoPage() {
   const handleExportPdf = async () => {
     setPdfExporting(true)
     try {
-      const [{ jsPDF }, html2canvas] = await Promise.all([
+      const [{ jsPDF }, { toPng }] = await Promise.all([
         import('jspdf'),
-        import('html2canvas').then(m => m.default),
+        import('html-to-image'),
       ])
 
       const container = document.getElementById('org-chart-container')
       if (!container) { toast.error('No se encontró el organigrama'); return }
 
-      const chartCanvas = await html2canvas(container, {
+      const chartImg = await toPng(container, {
         backgroundColor: '#FFFFFF',
-        scale: 2,
-        logging: false,
-        useCORS: true,
+        pixelRatio: 2,
       })
-      const chartImg = chartCanvas.toDataURL('image/png')
 
       // Helper: fetch image → base64 dataURL
       const loadImg = async (url: string): Promise<string | null> => {
@@ -419,7 +416,7 @@ export default function OrganigramaProyectoPage() {
 
       // ── Gráfico del organigrama ──────────────────────────────────────
       const availH = H - y - M
-      const aspect = chartCanvas.width / chartCanvas.height
+      const aspect = container.scrollWidth / container.scrollHeight
       let cw = cW
       let ch = cw / aspect
       if (ch > availH) { ch = availH; cw = ch * aspect }
