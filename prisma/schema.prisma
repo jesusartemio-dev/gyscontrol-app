@@ -180,6 +180,7 @@ model Cliente {
   ultimoProyecto           DateTime?
   calificacionSatisfaccion Int?                   @default(3)
   frecuenciaCompraMeses    Int?
+  logoUrl                  String?
   cotizacion               Cotizacion[]
   proyecto                 Proyecto[]
   crmContactoCliente       CrmContactoCliente[]

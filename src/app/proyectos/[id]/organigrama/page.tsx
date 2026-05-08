@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import {
-  Loader2, GitBranch, Plus, Trash2, Save, Lock, Download,
+  Loader2, GitBranch, Plus, Trash2, Save, Lock, Download, FileText,
   X, Eye, Pencil, Users, Building2, Phone, Hash, RefreshCw,
   ChevronUp, ChevronDown, AlertTriangle,
 } from 'lucide-react'
@@ -22,6 +22,7 @@ import OrgChart, { OrgNodoCompleto } from '@/components/organigrama/OrgChart'
 
 interface Plantilla { id: string; nombre: string; _count?: { nodos: number } }
 interface UserOption { id: string; name: string; email: string }
+interface ProyectoInfo { nombre: string; cliente: { id: string; nombre: string; logoUrl?: string | null } | null }
 
 export default function OrganigramaProyectoPage() {
   const { id: proyectoId } = useParams<{ id: string }>()
@@ -32,6 +33,8 @@ export default function OrganigramaProyectoPage() {
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [selectedPlantillaId, setSelectedPlantillaId] = useState('')
+  const [proyectoInfo, setProyectoInfo] = useState<ProyectoInfo | null>(null)
+  const [pdfExporting, setPdfExporting] = useState(false)
 
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
@@ -74,19 +77,24 @@ export default function OrganigramaProyectoPage() {
 
   useEffect(() => {
     const init = async () => {
-      const [pRes, uRes] = await Promise.all([
+      const [pRes, uRes, projRes] = await Promise.all([
         fetch('/api/configuracion/plantillas-organigrama'),
         fetch('/api/admin/usuarios'),
+        fetch(`/api/proyectos/${proyectoId}`),
       ])
       if (pRes.ok) setPlantillas(await pRes.json())
       if (uRes.ok) {
         const data = await uRes.json()
         setUsuarios(Array.isArray(data) ? data : (data.users ?? []))
       }
+      if (projRes.ok) {
+        const p = await projRes.json()
+        setProyectoInfo({ nombre: p.nombre, cliente: p.cliente ?? null })
+      }
       await loadNodos()
     }
     init()
-  }, [loadNodos])
+  }, [loadNodos, proyectoId])
 
   // ── GENERAR ────────────────────────────────────────────────────────────────
 
@@ -312,6 +320,125 @@ export default function OrganigramaProyectoPage() {
     }
   }
 
+  // ── EXPORTAR PDF ───────────────────────────────────────────────────────────
+
+  const handleExportPdf = async () => {
+    setPdfExporting(true)
+    try {
+      const [{ jsPDF }, html2canvas] = await Promise.all([
+        import('jspdf'),
+        import('html2canvas').then(m => m.default),
+      ])
+
+      const container = document.getElementById('org-chart-container')
+      if (!container) { toast.error('No se encontró el organigrama'); return }
+
+      const chartCanvas = await html2canvas(container, {
+        backgroundColor: '#FFFFFF',
+        scale: 2,
+        logging: false,
+        useCORS: true,
+      })
+      const chartImg = chartCanvas.toDataURL('image/png')
+
+      // Helper: fetch image → base64 dataURL
+      const loadImg = async (url: string): Promise<string | null> => {
+        try {
+          const blob = await fetch(url).then(r => r.blob())
+          return await new Promise<string>(resolve => {
+            const reader = new FileReader()
+            reader.onloadend = () => resolve(reader.result as string)
+            reader.readAsDataURL(blob)
+          })
+        } catch { return null }
+      }
+
+      const clienteId = proyectoInfo?.cliente?.id ?? null
+      const [gysLogo, clienteLogo] = await Promise.all([
+        loadImg('/seguridad/plantilla-ppt/logo_gys.png'),
+        clienteId ? loadImg(`/api/clientes/${clienteId}/logo`) : Promise.resolve(null),
+      ])
+
+      // ── PDF A4 landscape ─────────────────────────────────────────────
+      const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
+      const W = pdf.internal.pageSize.getWidth()   // 297
+      const H = pdf.internal.pageSize.getHeight()  // 210
+      const M = 10
+      const cW = W - 2 * M  // 277
+
+      let y = M
+
+      // ── Encabezado (3 celdas) ────────────────────────────────────────
+      const hH = 26
+      const leftW = 52
+      const rightW = 44
+      const midW = cW - leftW - rightW
+
+      pdf.setDrawColor(0)
+      pdf.setLineWidth(0.4)
+      pdf.rect(M, y, cW, hH)
+      pdf.line(M + leftW, y, M + leftW, y + hH)
+      pdf.line(M + leftW + midW, y, M + leftW + midW, y + hH)
+
+      // Celda izquierda: logo cliente o nombre
+      if (clienteLogo) {
+        const lH = 16; const lW = lH * 2.2
+        pdf.addImage(clienteLogo, 'PNG', M + (leftW - lW) / 2, y + (hH - lH) / 2, lW, lH)
+      } else {
+        const nombre = proyectoInfo?.cliente?.nombre ?? ''
+        pdf.setFontSize(nombre.length > 12 ? 9 : 13)
+        pdf.setFont('helvetica', 'bold')
+        const lines = pdf.splitTextToSize(nombre, leftW - 4)
+        pdf.text(lines, M + leftW / 2, y + hH / 2, { align: 'center', baseline: 'middle' })
+      }
+
+      // Celda central: nombre del proyecto
+      pdf.setFontSize(9)
+      pdf.setFont('helvetica', 'normal')
+      const projLines = pdf.splitTextToSize(proyectoInfo?.nombre ?? '', midW - 6)
+      pdf.text(projLines, M + leftW + midW / 2, y + hH / 2, { align: 'center', baseline: 'middle' })
+
+      // Celda derecha: logo GYS
+      if (gysLogo) {
+        const lH = 14; const lW = lH * 2.15
+        pdf.addImage(gysLogo, 'PNG', M + leftW + midW + (rightW - lW) / 2, y + (hH - lH) / 2, lW, lH)
+      }
+
+      y += hH
+
+      // ── Título ORGANIGRAMA ───────────────────────────────────────────
+      const tH = 9
+      pdf.rect(M, y, cW, tH)
+      pdf.setFontSize(12)
+      pdf.setFont('helvetica', 'bold')
+      pdf.setTextColor(180, 20, 20)
+      pdf.text('ORGANIGRAMA', W / 2, y + tH / 2, { align: 'center', baseline: 'middle' })
+      pdf.setTextColor(0, 0, 0)
+
+      y += tH + 3
+
+      // ── Gráfico del organigrama ──────────────────────────────────────
+      const availH = H - y - M
+      const aspect = chartCanvas.width / chartCanvas.height
+      let cw = cW
+      let ch = cw / aspect
+      if (ch > availH) { ch = availH; cw = ch * aspect }
+      pdf.addImage(chartImg, 'PNG', M + (cW - cw) / 2, y, cw, ch)
+
+      const fileName = (proyectoInfo?.nombre ?? proyectoId)
+        .replace(/[^a-z0-9áéíóúñ\s-]/gi, '')
+        .trim()
+        .replace(/\s+/g, '-')
+      pdf.save(`organigrama-${fileName}.pdf`)
+      toast.success('PDF exportado')
+    } catch (e) {
+      console.error(e)
+      toast.error('Error al exportar PDF')
+    } finally {
+      setPdfExporting(false)
+    }
+  }
+
   // ── LOADING ────────────────────────────────────────────────────────────────
 
   if (loading) {
@@ -400,8 +527,6 @@ export default function OrganigramaProyectoPage() {
 
   // ── ESTADO B: Organigrama existe ───────────────────────────────────────────
 
-  const nodosGys = nodos.filter(n => n.esFijoGys)
-  const nodosProyecto = nodos.filter(n => !n.esFijoGys)
   const vacantes = nodos.filter(n => !n.user).length
 
   return (
@@ -430,10 +555,22 @@ export default function OrganigramaProyectoPage() {
             variant="ghost"
             size="sm"
             className="h-8 text-xs text-muted-foreground gap-1.5"
+            onClick={handleExportPdf}
+            disabled={pdfExporting}
+          >
+            {pdfExporting
+              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              : <FileText className="h-3.5 w-3.5" />}
+            Exportar PDF
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 text-xs text-muted-foreground gap-1.5"
             onClick={handleExportPng}
           >
             <Download className="h-3.5 w-3.5" />
-            Exportar PNG
+            PNG
           </Button>
           <Button
             variant="ghost"

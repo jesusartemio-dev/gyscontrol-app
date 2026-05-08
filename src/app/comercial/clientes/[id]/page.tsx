@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { motion } from 'framer-motion'
 import {
@@ -17,7 +17,10 @@ import {
   Edit3,
   Trash2,
   Plus,
-  BarChart3
+  BarChart3,
+  ImageIcon,
+  Upload,
+  X as XIcon,
 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -55,6 +58,7 @@ interface ClienteCRM extends Cliente {
   ultimoProyecto?: string
   estadoRelacion?: string
   calificacion?: number
+  logoUrl?: string | null
   proyecto?: ProyectoResumen[]
   cotizacion?: CotizacionResumen[]
 }
@@ -67,6 +71,8 @@ export default function ClienteDetailPage() {
   const [cliente, setCliente] = useState<ClienteCRM | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [logoUploading, setLogoUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const loadCliente = async () => {
@@ -87,6 +93,40 @@ export default function ClienteDetailPage() {
       loadCliente()
     }
   }, [clienteId])
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setLogoUploading(true)
+    try {
+      const form = new FormData()
+      form.append('logo', file)
+      const res = await fetch(`/api/clientes/${clienteId}/logo`, { method: 'POST', body: form })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Error al subir logo')
+      }
+      const { logoUrl } = await res.json()
+      setCliente(prev => prev ? { ...prev, logoUrl } : prev)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error al subir logo')
+    } finally {
+      setLogoUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  const handleLogoDelete = async () => {
+    setLogoUploading(true)
+    try {
+      await fetch(`/api/clientes/${clienteId}/logo`, { method: 'DELETE' })
+      setCliente(prev => prev ? { ...prev, logoUrl: null } : prev)
+    } catch {
+      alert('Error al eliminar logo')
+    } finally {
+      setLogoUploading(false)
+    }
+  }
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-PE', {
@@ -321,6 +361,74 @@ export default function ClienteDetailPage() {
                   <div>
                     <label className="text-sm font-medium text-gray-700">Frecuencia de Compra</label>
                     <p className="text-gray-900">{cliente.frecuenciaCompra || 'No especificada'}</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Logo del cliente */}
+              <Card className="lg:col-span-3">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <ImageIcon className="h-5 w-5" />
+                    Logo del Cliente
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-6">
+                    {/* Preview */}
+                    <div className="flex-shrink-0 w-40 h-24 border-2 border-dashed border-gray-200 rounded-lg flex items-center justify-center bg-gray-50 overflow-hidden">
+                      {cliente.logoUrl ? (
+                        <img
+                          src={`/api/clientes/${clienteId}/logo`}
+                          alt="Logo cliente"
+                          className="max-w-full max-h-full object-contain p-2"
+                        />
+                      ) : (
+                        <div className="text-center text-gray-400">
+                          <ImageIcon className="h-8 w-8 mx-auto mb-1" />
+                          <p className="text-xs">Sin logo</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Actions */}
+                    <div className="space-y-2">
+                      <p className="text-sm text-gray-600">
+                        Este logo aparece en el encabezado del PDF del organigrama del proyecto.
+                        <br />
+                        Formatos admitidos: PNG, JPG, SVG. Máximo 2 MB.
+                      </p>
+                      <div className="flex gap-2">
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleLogoUpload}
+                        />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={logoUploading}
+                          onClick={() => fileInputRef.current?.click()}
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          {logoUploading ? 'Subiendo...' : cliente.logoUrl ? 'Cambiar logo' : 'Subir logo'}
+                        </Button>
+                        {cliente.logoUrl && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-red-600 hover:text-red-700"
+                            disabled={logoUploading}
+                            onClick={handleLogoDelete}
+                          >
+                            <XIcon className="h-4 w-4 mr-2" />
+                            Eliminar
+                          </Button>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
