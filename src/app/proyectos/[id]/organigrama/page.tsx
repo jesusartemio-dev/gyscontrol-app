@@ -325,20 +325,14 @@ export default function OrganigramaProyectoPage() {
   const handleExportPdf = async () => {
     setPdfExporting(true)
     try {
-      const [{ jsPDF }, { toPng }] = await Promise.all([
+      const [{ jsPDF }, { buildLayout, NORMAL_DIMS }] = await Promise.all([
         import('jspdf'),
-        import('html-to-image'),
+        import('@/components/organigrama/OrgChart'),
       ])
 
-      const container = document.getElementById('org-chart-container')
-      if (!container) { toast.error('No se encontró el organigrama'); return }
+      const { nodes, edges, svgWidth, svgHeight } = buildLayout(nodos, NORMAL_DIMS)
+      const { NODE_W, NODE_H } = NORMAL_DIMS
 
-      const chartImg = await toPng(container, {
-        backgroundColor: '#FFFFFF',
-        pixelRatio: 2,
-      })
-
-      // Helper: fetch image → base64 dataURL
       const loadImg = async (url: string): Promise<string | null> => {
         try {
           const blob = await fetch(url).then(r => r.blob())
@@ -358,10 +352,10 @@ export default function OrganigramaProyectoPage() {
 
       // ── PDF A4 landscape ─────────────────────────────────────────────
       const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
-      const W = pdf.internal.pageSize.getWidth()   // 297
-      const H = pdf.internal.pageSize.getHeight()  // 210
+      const W = pdf.internal.pageSize.getWidth()
+      const H = pdf.internal.pageSize.getHeight()
       const M = 10
-      const cW = W - 2 * M  // 277
+      const cW = W - 2 * M
 
       let y = M
 
@@ -371,13 +365,12 @@ export default function OrganigramaProyectoPage() {
       const rightW = 44
       const midW = cW - leftW - rightW
 
-      pdf.setDrawColor(0)
+      pdf.setDrawColor(0, 0, 0)
       pdf.setLineWidth(0.4)
       pdf.rect(M, y, cW, hH)
       pdf.line(M + leftW, y, M + leftW, y + hH)
       pdf.line(M + leftW + midW, y, M + leftW + midW, y + hH)
 
-      // Celda izquierda: logo cliente o nombre
       if (clienteLogo) {
         const lH = 16; const lW = lH * 2.2
         pdf.addImage(clienteLogo, 'PNG', M + (leftW - lW) / 2, y + (hH - lH) / 2, lW, lH)
@@ -385,17 +378,17 @@ export default function OrganigramaProyectoPage() {
         const nombre = proyectoInfo?.cliente?.nombre ?? ''
         pdf.setFontSize(nombre.length > 12 ? 9 : 13)
         pdf.setFont('helvetica', 'bold')
-        const lines = pdf.splitTextToSize(nombre, leftW - 4)
-        pdf.text(lines, M + leftW / 2, y + hH / 2, { align: 'center', baseline: 'middle' })
+        pdf.setTextColor(0, 0, 0)
+        const cliLines = pdf.splitTextToSize(nombre, leftW - 4)
+        pdf.text(cliLines, M + leftW / 2, y + hH / 2, { align: 'center', baseline: 'middle' })
       }
 
-      // Celda central: nombre del proyecto
       pdf.setFontSize(9)
       pdf.setFont('helvetica', 'normal')
+      pdf.setTextColor(0, 0, 0)
       const projLines = pdf.splitTextToSize(proyectoInfo?.nombre ?? '', midW - 6)
       pdf.text(projLines, M + leftW + midW / 2, y + hH / 2, { align: 'center', baseline: 'middle' })
 
-      // Celda derecha: logo GYS
       if (gysLogo) {
         const lH = 14; const lW = lH * 2.15
         pdf.addImage(gysLogo, 'PNG', M + leftW + midW + (rightW - lW) / 2, y + (hH - lH) / 2, lW, lH)
@@ -405,6 +398,7 @@ export default function OrganigramaProyectoPage() {
 
       // ── Título ORGANIGRAMA ───────────────────────────────────────────
       const tH = 9
+      pdf.setDrawColor(0, 0, 0)
       pdf.rect(M, y, cW, tH)
       pdf.setFontSize(12)
       pdf.setFont('helvetica', 'bold')
@@ -414,18 +408,109 @@ export default function OrganigramaProyectoPage() {
 
       y += tH + 3
 
-      // ── Gráfico del organigrama ──────────────────────────────────────
+      // ── Gráfico jsPDF nativo (sin captura DOM — evita el error oklch) ─
       const availH = H - y - M
-      const aspect = container.scrollWidth / container.scrollHeight
-      let cw = cW
-      let ch = cw / aspect
-      if (ch > availH) { ch = availH; cw = ch * aspect }
-      pdf.addImage(chartImg, 'PNG', M + (cW - cw) / 2, y, cw, ch)
+      const sc = Math.min(cW / svgWidth, availH / svgHeight)
+      const offX = M + (cW - svgWidth * sc) / 2
+      const offY = y + (availH - svgHeight * sc) / 2
+
+      const px = (v: number) => offX + v * sc
+      const py = (v: number) => offY + v * sc
+      const sm = (v: number) => v * sc
+      const fz = (v: number, cap = 12) => Math.max(4, Math.min(cap, sm(v) * 2.835))
+
+      // Connector lines (cubic bezier)
+      pdf.setDrawColor(148, 163, 184)
+      pdf.setLineWidth(0.25)
+      for (const e of edges) {
+        const ex1 = px(e.x1), ey1 = py(e.y1)
+        const ex2 = px(e.x2), ey2 = py(e.y2)
+        const emy = (ey1 + ey2) / 2
+        pdf.lines(
+          [[0, emy - ey1, ex2 - ex1, emy - ey1, ex2 - ex1, ey2 - ey1]],
+          ex1, ey1, [1, 1], 'S'
+        )
+      }
+
+      // Nodes
+      const nW = sm(NODE_W)
+      const nH = sm(NODE_H)
+      const hdrH = sm(34)
+
+      for (const n of nodes) {
+        const nx = px(n.x)
+        const ny_ = py(n.y)
+        const isGys = n.nodo.esFijoGys
+        const isVacant = !n.nodo.user
+
+        // Full node fill
+        if (isGys) pdf.setFillColor(46, 64, 87)
+        else pdf.setFillColor(255, 255, 255)
+        if (isGys) pdf.setDrawColor(30, 45, 61)
+        else if (isVacant) pdf.setDrawColor(252, 165, 165)
+        else pdf.setDrawColor(229, 231, 235)
+        pdf.setLineWidth(0.35)
+        pdf.roundedRect(nx, ny_, nW, nH, 1, 1, 'FD')
+
+        // Header fill (1mm inset from sides avoids corner overflow)
+        if (isGys) pdf.setFillColor(36, 51, 71)
+        else if (isVacant) pdf.setFillColor(254, 242, 242)
+        else pdf.setFillColor(248, 250, 252)
+        pdf.rect(nx + 1, ny_ + 1, nW - 2, hdrH - 1, 'F')
+
+        // Re-draw border on top of header fill
+        if (isGys) pdf.setDrawColor(30, 45, 61)
+        else if (isVacant) pdf.setDrawColor(252, 165, 165)
+        else pdf.setDrawColor(229, 231, 235)
+        pdf.setLineWidth(0.35)
+        if (isVacant) pdf.setLineDashPattern([1.2, 0.8], 0)
+        pdf.roundedRect(nx, ny_, nW, nH, 1, 1, 'S')
+        if (isVacant) pdf.setLineDashPattern([], 0)
+
+        // Header separator
+        pdf.setLineWidth(0.2)
+        pdf.line(nx, ny_ + hdrH, nx + nW, ny_ + hdrH)
+
+        // Cargo label
+        pdf.setFont('helvetica', 'bold')
+        pdf.setFontSize(fz(10, 8))
+        if (isGys) pdf.setTextColor(199, 210, 254)
+        else if (isVacant) pdf.setTextColor(248, 113, 113)
+        else pdf.setTextColor(79, 70, 229)
+        const cargoLines = pdf.splitTextToSize(n.nodo.cargoLabel, nW - sm(8))
+        pdf.text(cargoLines, nx + nW / 2, ny_ + hdrH / 2, { align: 'center', baseline: 'middle' })
+
+        // Body
+        if (isVacant) {
+          pdf.setFont('helvetica', 'bolditalic')
+          pdf.setFontSize(fz(11, 9))
+          pdf.setTextColor(248, 113, 113)
+          pdf.text('VACANTE', nx + nW / 2, ny_ + hdrH + (nH - hdrH) / 2, { align: 'center', baseline: 'middle' })
+        } else {
+          pdf.setFont('helvetica', 'bold')
+          pdf.setFontSize(fz(13, 11))
+          if (isGys) pdf.setTextColor(255, 255, 255)
+          else pdf.setTextColor(31, 41, 55)
+          const nameLines = pdf.splitTextToSize(n.nodo.user!.name, nW - sm(8))
+          pdf.text(nameLines, nx + nW / 2, ny_ + hdrH + sm(14), { align: 'center', baseline: 'middle' })
+
+          pdf.setFont('helvetica', 'normal')
+          pdf.setFontSize(fz(10, 7))
+          if (isGys) pdf.setTextColor(165, 180, 252)
+          else pdf.setTextColor(156, 163, 175)
+          let dy = ny_ + hdrH + sm(28)
+          if (n.nodo._telefono) {
+            pdf.text(`Tel: ${n.nodo._telefono}`, nx + sm(5), dy)
+            dy += sm(12)
+          }
+          if (n.nodo._cip) {
+            pdf.text(`CIP ${n.nodo._cip}`, nx + sm(5), dy)
+          }
+        }
+      }
 
       const fileName = (proyectoInfo?.nombre ?? proyectoId)
-        .replace(/[^a-z0-9áéíóúñ\s-]/gi, '')
-        .trim()
-        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9áéíóúñ\s-]/gi, '').trim().replace(/\s+/g, '-')
       pdf.save(`organigrama-${fileName}.pdf`)
       toast.success('PDF exportado')
     } catch (e) {

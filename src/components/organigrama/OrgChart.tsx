@@ -35,10 +35,10 @@ interface ChartDims {
   V_GAP: number
 }
 
-const NORMAL_DIMS: ChartDims = { NODE_W: 190, NODE_H: 112, H_GAP: 20, V_GAP: 56 }
+export const NORMAL_DIMS: ChartDims = { NODE_W: 190, NODE_H: 112, H_GAP: 20, V_GAP: 56 }
 const COMPACT_DIMS: ChartDims = { NODE_W: 148, NODE_H: 64, H_GAP: 6, V_GAP: 28 }
 
-interface LayoutNode {
+export interface LayoutNode {
   nodo: OrgNodoCompleto
   x: number
   y: number
@@ -46,7 +46,7 @@ interface LayoutNode {
   dims: ChartDims
 }
 
-function buildLayout(nodos: OrgNodoCompleto[], dims: ChartDims): {
+export function buildLayout(nodos: OrgNodoCompleto[], dims: ChartDims): {
   nodes: LayoutNode[]
   svgWidth: number
   svgHeight: number
