@@ -112,14 +112,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Debe incluir al menos un item' }, { status: 400 })
     }
 
-    // Mutual exclusivity: proyectoId XOR centroCostoId
+    // Imputación: proyectoId XOR centroCostoId, o ninguno si es multi-proyecto
     const hasProyecto = !!payload.proyectoId
     const hasCentroCosto = !!payload.centroCostoId
+    const isMultiProyecto = !!payload.multiProyecto
     if (hasProyecto && hasCentroCosto) {
       return NextResponse.json({ error: 'Debe imputar a proyecto O centro de costo, no ambos' }, { status: 400 })
     }
-    if (!hasProyecto && !hasCentroCosto) {
-      return NextResponse.json({ error: 'Debe seleccionar un proyecto o centro de costo' }, { status: 400 })
+    if (!hasProyecto && !hasCentroCosto && !isMultiProyecto) {
+      return NextResponse.json({ error: 'Debe seleccionar un proyecto, centro de costo, o activar modo multi-proyecto' }, { status: 400 })
     }
 
     // Validate proveedor exists

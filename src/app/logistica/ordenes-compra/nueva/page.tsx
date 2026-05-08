@@ -46,6 +46,7 @@ interface ItemForm {
   listaEquipoItemId?: string
   catalogoEppId?: string | null
   sourceLabel?: string
+  proyectoCodigo?: string | null
 }
 
 const emptyItem: ItemForm = {
@@ -73,6 +74,7 @@ function NuevaOrdenCompraContent() {
   // Form state
   const [proveedorId, setProveedorId] = useState('')
   const [asignacion, setAsignacion] = useState<AsignacionValue>({ proyectoId: null, centroCostoId: null })
+  const [multiProyecto, setMultiProyecto] = useState(false)
   const [categoriaCosto, setCategoriaCosto] = useState('equipos')
   const [condicionPago, setCondicionPago] = useState('contado')
   const [formaPago, setFormaPago] = useState('')
@@ -124,7 +126,7 @@ function NuevaOrdenCompraContent() {
   const [manualEditIndex, setManualEditIndex] = useState<number | null>(null)
   const [manualForm, setManualForm] = useState({ codigo: '', descripcion: '', unidad: 'UND', cantidad: 1, precioUnitario: 0 })
 
-  const hasAsignacion = !!(asignacion.proyectoId || asignacion.centroCostoId)
+  const hasAsignacion = multiProyecto || !!(asignacion.proyectoId || asignacion.centroCostoId)
 
   useEffect(() => {
     getProveedores()
@@ -226,10 +228,11 @@ function NuevaOrdenCompraContent() {
 
   // ── Pedido selector ──────────────────────────────────────
   const cargarItemsDisponibles = useCallback(async (mostrarTodos: boolean) => {
-    if (!asignacion.proyectoId && !asignacion.centroCostoId) return
+    if (!multiProyecto && !asignacion.proyectoId && !asignacion.centroCostoId) return
     setLoadingItems(true)
     try {
-      const data = await fetchItemsDisponibles(asignacion, proveedorId || undefined, { mostrarTodos })
+      const scope = multiProyecto ? { multiProyecto: true } : asignacion
+      const data = await fetchItemsDisponibles(scope, proveedorId || undefined, { mostrarTodos })
       const existingIds = new Set(items.filter(i => i.pedidoEquipoItemId).map(i => i.pedidoEquipoItemId))
       setPedidoItemsDisp(data.items.filter(i => !existingIds.has(i.id)))
     } catch (err) {
@@ -237,14 +240,14 @@ function NuevaOrdenCompraContent() {
     } finally {
       setLoadingItems(false)
     }
-  }, [asignacion, proveedorId, items])
+  }, [asignacion, multiProyecto, proveedorId, items])
 
   const openSelector = useCallback(async () => {
-    if (!asignacion.proyectoId && !asignacion.centroCostoId) return
+    if (!multiProyecto && !asignacion.proyectoId && !asignacion.centroCostoId) return
     setSelectorOpen(true)
     setSelectedIds(new Set())
     await cargarItemsDisponibles(mostrarTodosLosItems)
-  }, [asignacion, cargarItemsDisponibles, mostrarTodosLosItems])
+  }, [asignacion, multiProyecto, cargarItemsDisponibles, mostrarTodosLosItems])
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
@@ -288,6 +291,7 @@ function NuevaOrdenCompraContent() {
       const cantidadFinal = cantidadEditada && cantidadEditada > 0 && cantidadEditada <= i.cantidad
         ? cantidadEditada
         : i.cantidad
+      const imputacion = i.proyectoCodigo ?? i.centroCostoNombre ?? null
       return {
         codigo: i.codigo,
         descripcion: i.descripcion,
@@ -298,7 +302,8 @@ function NuevaOrdenCompraContent() {
         pedidoEquipoItemId: i.id,
         listaEquipoItemId: i.listaEquipoItemId,
         catalogoEppId: i.catalogoEppId ?? null,
-        sourceLabel: i.pedidoCodigo,
+        sourceLabel: multiProyecto && imputacion ? `${i.pedidoCodigo} · ${imputacion}` : i.pedidoCodigo,
+        proyectoCodigo: i.proyectoCodigo ?? null,
       }
     })
 
@@ -471,7 +476,7 @@ function NuevaOrdenCompraContent() {
   // ── Submit ───────────────────────────────────────────────
   const handleSubmit = async () => {
     if (!proveedorId) return toast.error('Selecciona un proveedor')
-    if (!hasAsignacion) return toast.error('Selecciona un proyecto o centro de costo')
+    if (!hasAsignacion) return toast.error('Selecciona un proyecto, centro de costo, o activa modo multi-proyecto')
     if (items.length === 0) return toast.error('Agrega al menos un item')
 
     for (let i = 0; i < items.length; i++) {
@@ -488,8 +493,9 @@ function NuevaOrdenCompraContent() {
       setSaving(true)
       const payload = {
         proveedorId,
-        proyectoId: asignacion.proyectoId || undefined,
-        centroCostoId: asignacion.centroCostoId || undefined,
+        proyectoId: multiProyecto ? undefined : (asignacion.proyectoId || undefined),
+        centroCostoId: multiProyecto ? undefined : (asignacion.centroCostoId || undefined),
+        multiProyecto: multiProyecto || undefined,
         categoriaCosto: categoriaCosto as 'equipos' | 'servicios' | 'gastos',
         requiereRecepcion,
         condicionPago,
@@ -567,11 +573,37 @@ function NuevaOrdenCompraContent() {
             <CardTitle className="text-sm font-medium">Asignar a <span className="text-red-500">*</span></CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <SelectorAsignacion
-              value={asignacion}
-              onChange={(val) => { setAsignacion(val); setItems([]) }}
-              placeholder="Seleccionar proyecto o centro de costo"
-            />
+            {/* Toggle multi-proyecto */}
+            <div className="flex items-center gap-2">
+              <Switch
+                id="multi-proyecto"
+                checked={multiProyecto}
+                onCheckedChange={(v) => {
+                  setMultiProyecto(v)
+                  if (v) setAsignacion({ proyectoId: null, centroCostoId: null })
+                  setItems([])
+                }}
+              />
+              <Label htmlFor="multi-proyecto" className="text-xs cursor-pointer">
+                Consolidar múltiples proyectos
+              </Label>
+            </div>
+
+            {multiProyecto ? (
+              <div className="flex items-start gap-1.5 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md p-2.5">
+                <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-amber-600" />
+                <span>
+                  <strong>Modo consolidado:</strong> los ítems se imputarán a cada proyecto o centro de costo según su pedido de origen.
+                </span>
+              </div>
+            ) : (
+              <SelectorAsignacion
+                value={asignacion}
+                onChange={(val) => { setAsignacion(val); setItems([]) }}
+                placeholder="Seleccionar proyecto o centro de costo"
+              />
+            )}
+
             <div>
               <Label className="text-xs">Categoría</Label>
               <Select value={categoriaCosto} onValueChange={(v) => { setCategoriaCosto(v); setRequiereRecepcion(v === 'equipos') }}>

@@ -679,6 +679,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
             <span className="text-muted-foreground border-l pl-4">{formatPago(oc.condicionPago, (oc as any).formaPago, oc.diasCredito)} · {oc.moneda}</span>
             {oc.centroCosto && <span className="text-muted-foreground">CC: {oc.centroCosto.nombre}</span>}
             {oc.proyecto && <span className="text-muted-foreground">{oc.proyecto.codigo}</span>}
+            {!oc.proyecto && !oc.centroCosto && <span className="text-muted-foreground">Múltiples proyectos</span>}
             {(esBorrador || puedeEditarAdministrativo) && (
               <button
                 onClick={openHeaderEdit}
@@ -705,6 +706,9 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
             </Link>
             {oc.proyecto && (
               <span className="text-muted-foreground">Proyecto: {oc.proyecto.codigo} — {oc.proyecto.nombre}</span>
+            )}
+            {!oc.proyecto && !oc.centroCosto && (
+              <span className="text-muted-foreground italic">Múltiples proyectos</span>
             )}
           </>
         ) : (
@@ -1034,6 +1038,10 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
                   {oc.proyecto && <>
                     <span className="text-muted-foreground">Proyecto:</span>
                     <span className="font-medium">{oc.proyecto.nombre}</span>
+                  </>}
+                  {!oc.proyecto && !oc.centroCosto && <>
+                    <span className="text-muted-foreground">Imputación:</span>
+                    <span className="font-medium italic">Múltiples proyectos</span>
                   </>}
                   <span className="text-muted-foreground">Moneda:</span>
                   <span className="font-medium">{oc.moneda}</span>

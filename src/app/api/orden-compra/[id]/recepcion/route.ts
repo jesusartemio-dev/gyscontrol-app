@@ -48,14 +48,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         })
       }
 
-      // [2] Crear RecepcionPendiente para items de proyecto (con o sin pedido)
-      // No crear para OCs de centro de costo (sin proyectoId)
+      // [2] Crear RecepcionPendiente para:
+      //   - OCs de proyecto (existing.proyectoId no es null)
+      //   - OCs multi-proyecto: items que tienen pedidoEquipoItemId (la trazabilidad va por el pedido)
+      //   No crear para OCs puras de centro de costo (sin proyectoId y sin link a pedido)
       console.log('[recepcion] paso 2: creando recepciones pendientes, proyectoId:', existing.proyectoId)
       let creadas = 0
       for (const rec of recepciones) {
         const item = existing.items.find(i => i.id === rec.itemId)
         if (!item) continue
-        if (!existing.proyectoId) continue
+        if (!existing.proyectoId && !item.pedidoEquipoItemId) continue
 
         const cantidadEfectiva = Math.min(rec.cantidadRecibida, item.cantidad)
         if (cantidadEfectiva <= 0) continue

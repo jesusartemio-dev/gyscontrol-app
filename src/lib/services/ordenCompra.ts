@@ -137,17 +137,25 @@ export interface ItemDisponible {
   catalogoEppId?: string | null
   pedidoCodigo: string
   pedidoId: string
+  proyectoCodigo?: string | null
+  centroCostoNombre?: string | null
 }
 
 export async function fetchItemsDisponibles(
-  asignacion: { proyectoId?: string | null; centroCostoId?: string | null },
+  asignacion: { proyectoId?: string | null; centroCostoId?: string | null; multiProyecto?: boolean },
   proveedorId?: string,
   options: { mostrarTodos?: boolean } = {}
 ): Promise<{ items: ItemDisponible[] }> {
   const params = new URLSearchParams()
-  if (asignacion.proyectoId) params.set('proyectoId', asignacion.proyectoId)
-  else if (asignacion.centroCostoId) params.set('centroCostoId', asignacion.centroCostoId)
-  else throw new Error('Se requiere proyectoId o centroCostoId')
+  if (asignacion.multiProyecto) {
+    params.set('multiProyecto', 'true')
+  } else if (asignacion.proyectoId) {
+    params.set('proyectoId', asignacion.proyectoId)
+  } else if (asignacion.centroCostoId) {
+    params.set('centroCostoId', asignacion.centroCostoId)
+  } else {
+    throw new Error('Se requiere proyectoId, centroCostoId o multiProyecto')
+  }
   if (proveedorId) params.set('proveedorId', proveedorId)
   if (options.mostrarTodos) params.set('mostrarTodos', 'true')
   const res = await fetch(`${BASE_URL}/items-disponibles?${params}`)

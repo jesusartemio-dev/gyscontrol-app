@@ -4,16 +4,12 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
 /**
- * GET /api/orden-compra/items-disponibles?proyectoId=X|centroCostoId=X&proveedorId=Y&mostrarTodos=true|false
- * Returns pedido items available for OC creation (without existing OC).
- * Acepta proyectoId O centroCostoId (uno de los dos es requerido).
- *
- * Reglas de filtrado por proveedor:
- *   - Sin proveedorId: devuelve TODOS los items en pedidos activos.
- *   - Con proveedorId + mostrarTodos=false (default): solo items asignados al proveedor seleccionado
- *     (incluye caso legacy donde PEI.proveedorId NULL pero LEI.proveedorId apunta al proveedor).
- *   - Con proveedorId + mostrarTodos=true: devuelve TODOS los items disponibles del proyecto, incluyendo
- *     items asignados a otros proveedores (que se reasignarán) y items sin proveedor (se asignarán a esta OC).
+ * GET /api/orden-compra/items-disponibles
+ *   ?proyectoId=X   — items de un proyecto
+ *   ?centroCostoId=X — items de un centro de costo
+ *   ?multiProyecto=true — items de todos los proyectos/CCs (modo consolidado)
+ *   &proveedorId=Y  — filtrar por proveedor (opcional)
+ *   &mostrarTodos=true — mostrar también items de otros proveedores
  */
 export async function GET(req: Request) {
   try {
@@ -28,34 +24,36 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url)
     const proyectoId = searchParams.get('proyectoId') || undefined
     const centroCostoId = searchParams.get('centroCostoId') || undefined
-    if (!proyectoId && !centroCostoId) {
+    const multiProyecto = searchParams.get('multiProyecto') === 'true'
+
+    if (!proyectoId && !centroCostoId && !multiProyecto) {
       return NextResponse.json(
-        { error: 'Se requiere proyectoId o centroCostoId' },
+        { error: 'Se requiere proyectoId, centroCostoId o multiProyecto=true' },
         { status: 400 }
       )
     }
     const proveedorId = searchParams.get('proveedorId') || undefined
     const mostrarTodos = searchParams.get('mostrarTodos') === 'true'
 
-    // Filtro por proveedor:
-    //  - mostrarTodos=true: ignorar el filtro de proveedor (devuelve todo lo del proyecto)
-    //  - mostrarTodos=false + proveedorId: estricto (asignados a ese proveedor + sin asignar via LEI legacy)
-    //  - sin proveedorId: sin filtro
     let proveedorFilter: any = {}
     if (proveedorId && !mostrarTodos) {
       proveedorFilter = {
         OR: [
-          { proveedorId },                                                    // (a) ítem ya asignado al proveedor
-          { proveedorId: null, listaEquipoItem: { proveedorId } },             // (b) PEI sin proveedor pero LEI sí (caso legacy)
+          { proveedorId },
+          { proveedorId: null, listaEquipoItem: { proveedorId } },
         ],
       }
     }
 
-    // Items de pedidos elegibles (aprobado/atendido/parcial) con cantidad restante > 0
+    // En modo multiProyecto no filtramos por proyecto/CC
+    const scopeFilter = multiProyecto
+      ? {}
+      : (proyectoId ? { proyectoId } : { centroCostoId })
+
     const pedidoItems = await prisma.pedidoEquipoItem.findMany({
       where: {
         pedidoEquipo: {
-          ...(proyectoId ? { proyectoId } : { centroCostoId }),
+          ...scopeFilter,
           estado: { in: ['aprobado', 'atendido', 'parcial'] },
         },
         estado: { notIn: ['cancelado', 'entregado'] },
@@ -78,7 +76,12 @@ export async function GET(req: Request) {
         },
         ordenCompraItems: { select: { cantidad: true } },
         pedidoEquipo: {
-          select: { id: true, codigo: true },
+          select: {
+            id: true,
+            codigo: true,
+            proyecto: { select: { id: true, codigo: true } },
+            centroCosto: { select: { id: true, nombre: true } },
+          },
         },
         proveedor: {
           select: { id: true, nombre: true },
@@ -97,7 +100,6 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       items: itemsConRestante.map(item => {
-        // Resolver proveedor efectivo: PEI > LEI
         const proveedorEfectivoId = item.proveedorId ?? item.listaEquipoItem?.proveedorId ?? null
         const proveedorEfectivoNombre =
           item.proveedor?.nombre ?? item.proveedorNombre ?? item.listaEquipoItem?.proveedor?.nombre ?? null
@@ -111,12 +113,13 @@ export async function GET(req: Request) {
           precioMoneda: item.precioUnitarioMoneda || null,
           proveedorId: proveedorEfectivoId,
           proveedorNombre: proveedorEfectivoNombre,
-          // Indica si el item viene sin proveedor asignado (se confirmará al guardar)
           sinProveedorAsignado: !proveedorEfectivoId,
           listaEquipoItemId: item.listaEquipoItemId,
           catalogoEppId: item.catalogoEppId,
           pedidoCodigo: item.pedidoEquipo.codigo,
           pedidoId: item.pedidoEquipo.id,
+          proyectoCodigo: item.pedidoEquipo.proyecto?.codigo ?? null,
+          centroCostoNombre: item.pedidoEquipo.centroCosto?.nombre ?? null,
         }
       }),
     })

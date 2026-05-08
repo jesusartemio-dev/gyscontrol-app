@@ -199,6 +199,7 @@ export async function POST(req: Request) {
             proveedorId,
             pedidoEquipoId: pedido.id,
             proyectoId: pedido.proyectoId || null,
+            centroCostoId: pedido.centroCostoId || null,
             categoriaCosto: 'equipos',
             solicitanteId: session.user.id,
             // Condiciones comerciales: parámetro manual > cotización seleccionada > default
