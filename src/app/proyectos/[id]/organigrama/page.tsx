@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import {
   Loader2, GitBranch, Plus, Trash2, Save, Lock, Download,
   X, Eye, Pencil, Users, Building2, Phone, Hash, RefreshCw,
-  ChevronDown, AlertTriangle,
+  ChevronUp, ChevronDown, AlertTriangle,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -206,11 +206,49 @@ export default function OrganigramaProyectoPage() {
     }
   }
 
+  // ── REORDENAR NODO ─────────────────────────────────────────────────────────
+
+  const handleMoveNodo = async (nodoId: string, direction: 'up' | 'down') => {
+    const nodo = nodos.find(n => n.id === nodoId)
+    if (!nodo) return
+
+    const siblings = nodos
+      .filter(n => n.parentId === nodo.parentId)
+      .sort((a, b) => a.orden - b.orden || a.id.localeCompare(b.id))
+
+    const idx = siblings.findIndex(n => n.id === nodoId)
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1
+    if (swapIdx < 0 || swapIdx >= siblings.length) return
+
+    const reordered = [...siblings]
+    ;[reordered[idx], reordered[swapIdx]] = [reordered[swapIdx], reordered[idx]]
+
+    const updates = reordered
+      .map((n, i) => ({ id: n.id, newOrden: i * 10, currentOrden: n.orden }))
+      .filter(u => u.newOrden !== u.currentOrden)
+
+    try {
+      await Promise.all(updates.map(u =>
+        fetch(`/api/proyectos/${proyectoId}/organigrama/nodos/${u.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orden: u.newOrden }),
+        })
+      ))
+      await loadNodos()
+    } catch {
+      toast.error('Error al reordenar')
+    }
+  }
+
   // ── AGREGAR NODO ───────────────────────────────────────────────────────────
 
   const handleAddNodo = async () => {
     const label = newCargo.trim()
     if (!label) { toast.error('Escribe el cargo'); return }
+    const parentId = newParentId || null
+    const siblings = nodos.filter(n => n.parentId === parentId)
+    const nextOrden = siblings.length * 10
     setAddSaving(true)
     try {
       const res = await fetch(
@@ -218,7 +256,7 @@ export default function OrganigramaProyectoPage() {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cargoLabel: label, parentId: newParentId || null, orden: 0 }),
+          body: JSON.stringify({ cargoLabel: label, parentId, orden: nextOrden }),
         }
       )
       if (!res.ok) throw new Error()
@@ -553,6 +591,40 @@ export default function OrganigramaProyectoPage() {
 
         {/* ── TAB EDITAR ─────────────────────────────────────────────────── */}
         <TabsContent value="editar" className="flex-1 overflow-auto m-0 p-6 space-y-4 bg-slate-50">
+          {(() => {
+            // Sort nodes depth-first so siblings appear together in order
+            const byId = Object.fromEntries(nodos.map(n => [n.id, n]))
+            const childrenMap: Record<string, OrgNodoCompleto[]> = {}
+            for (const n of nodos) {
+              const pid = n.parentId ?? '__root__'
+              if (!childrenMap[pid]) childrenMap[pid] = []
+              childrenMap[pid].push(n)
+            }
+            for (const pid of Object.keys(childrenMap)) {
+              childrenMap[pid].sort((a, b) => a.orden - b.orden || a.id.localeCompare(b.id))
+            }
+            const sortedNodos: OrgNodoCompleto[] = []
+            const depthMap: Record<string, number> = {}
+            function walk(pid: string, depth: number) {
+              for (const n of (childrenMap[pid] ?? [])) {
+                depthMap[n.id] = depth
+                sortedNodos.push(n)
+                walk(n.id, depth + 1)
+              }
+            }
+            walk('__root__', 0)
+
+            // Sibling position info for ↑/↓ disabled state
+            const posMap: Record<string, { isFirst: boolean; isLast: boolean }> = {}
+            for (const pid of Object.keys(childrenMap)) {
+              const sorted = childrenMap[pid]
+              sorted.forEach((n, i) => {
+                posMap[n.id] = { isFirst: i === 0, isLast: i === sorted.length - 1 }
+              })
+            }
+            void byId
+
+            return (
           <div className="rounded-xl border bg-white overflow-hidden shadow-sm">
             <Table>
               <TableHeader>
@@ -563,12 +635,14 @@ export default function OrganigramaProyectoPage() {
                   <TableHead>Empresa</TableHead>
                   <TableHead>Teléfono</TableHead>
                   <TableHead>CIP</TableHead>
-                  <TableHead className="w-[90px] text-right pr-4">Acciones</TableHead>
+                  <TableHead className="w-[140px] text-right pr-4">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {nodos.map(nodo => {
+                {sortedNodos.map(nodo => {
                   const isEditing = editingRowId === nodo.id
+                  const depth = depthMap[nodo.id] ?? 0
+                  const pos = posMap[nodo.id]
                   return (
                     <TableRow
                       key={nodo.id}
@@ -580,6 +654,7 @@ export default function OrganigramaProyectoPage() {
                         )}
                       </TableCell>
                       <TableCell className="py-2 font-medium text-sm">
+                        <div style={{ paddingLeft: `${depth * 16}px` }}>
                         {isEditing ? (
                           <Input
                             value={rowCargo}
@@ -592,6 +667,7 @@ export default function OrganigramaProyectoPage() {
                             {nodo.cargoLabel}
                           </span>
                         )}
+                        </div>
                       </TableCell>
                       <TableCell className="py-2">
                         {isEditing ? (
@@ -671,6 +747,28 @@ export default function OrganigramaProyectoPage() {
                             </>
                           ) : (
                             <>
+                              {!nodo.esFijoGys && (
+                                <>
+                                  <Button
+                                    size="sm" variant="ghost"
+                                    className="h-7 w-7 p-0 text-gray-400 hover:text-gray-700"
+                                    disabled={pos?.isFirst}
+                                    onClick={() => handleMoveNodo(nodo.id, 'up')}
+                                    title="Mover arriba"
+                                  >
+                                    <ChevronUp className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button
+                                    size="sm" variant="ghost"
+                                    className="h-7 w-7 p-0 text-gray-400 hover:text-gray-700"
+                                    disabled={pos?.isLast}
+                                    onClick={() => handleMoveNodo(nodo.id, 'down')}
+                                    title="Mover abajo"
+                                  >
+                                    <ChevronDown className="h-3.5 w-3.5" />
+                                  </Button>
+                                </>
+                              )}
                               <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => startEditRow(nodo)}>
                                 <Pencil className="h-3.5 w-3.5" />
                               </Button>
@@ -693,6 +791,8 @@ export default function OrganigramaProyectoPage() {
               </TableBody>
             </Table>
           </div>
+            )
+          })()}
 
           {/* Agregar nodo */}
           {addingNodo ? (

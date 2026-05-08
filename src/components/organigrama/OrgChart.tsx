@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useRef, useEffect, useState } from 'react'
 
 export interface OrgNodoCompleto {
   id: string
@@ -36,7 +36,7 @@ interface ChartDims {
 }
 
 const NORMAL_DIMS: ChartDims = { NODE_W: 190, NODE_H: 112, H_GAP: 20, V_GAP: 56 }
-const COMPACT_DIMS: ChartDims = { NODE_W: 148, NODE_H: 64, H_GAP: 10, V_GAP: 28 }
+const COMPACT_DIMS: ChartDims = { NODE_W: 148, NODE_H: 64, H_GAP: 6, V_GAP: 28 }
 
 interface LayoutNode {
   nodo: OrgNodoCompleto
@@ -243,6 +243,22 @@ function NodoCard({ node, onClick }: { node: LayoutNode; onClick?: (n: OrgNodoCo
 export default function OrgChart({ nodos, onNodoClick, compact }: OrgChartProps) {
   const dims = compact ? COMPACT_DIMS : NORMAL_DIMS
   const { nodes, svgWidth, svgHeight, edges } = buildLayout(nodos, dims)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [scale, setScale] = useState(1)
+
+  useEffect(() => {
+    if (!compact) return
+    const el = containerRef.current
+    if (!el) return
+    const update = () => {
+      const w = el.clientWidth
+      setScale(w > 0 && svgWidth > w ? w / svgWidth : 1)
+    }
+    update()
+    const obs = new ResizeObserver(update)
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [svgWidth, compact])
 
   if (nodos.length === 0) {
     return (
@@ -252,17 +268,29 @@ export default function OrgChart({ nodos, onNodoClick, compact }: OrgChartProps)
     )
   }
 
+  const scaledH = Math.ceil(svgHeight * scale)
+
   return (
     <div
+      ref={containerRef}
       id="org-chart-container"
-      className="overflow-auto bg-slate-50 rounded-none"
-      style={{ minHeight: compact ? 200 : 400 }}
+      className="bg-slate-50 rounded-none"
+      style={{
+        minHeight: compact ? 200 : 400,
+        height: compact ? scaledH : undefined,
+        overflow: compact ? 'hidden' : 'auto',
+      }}
     >
       {/* Dot grid background */}
       <svg
         width={svgWidth}
         height={svgHeight}
-        style={{ display: 'block', minWidth: svgWidth }}
+        style={{
+          display: 'block',
+          minWidth: compact ? undefined : svgWidth,
+          transform: compact && scale < 1 ? `scale(${scale})` : undefined,
+          transformOrigin: 'top left',
+        }}
       >
         <defs>
           <pattern id="dotgrid" x="0" y="0" width="24" height="24" patternUnits="userSpaceOnUse">

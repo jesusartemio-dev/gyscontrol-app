@@ -9,7 +9,12 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ArrowLeft, Plus, Trash2, Save, Loader2, GitBranch, ChevronRight, Eye } from 'lucide-react'
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { ArrowLeft, Plus, Trash2, Save, Loader2, GitBranch, ChevronRight, ChevronUp, ChevronDown, Eye } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
 import OrgChart, { OrgNodoCompleto } from '@/components/organigrama/OrgChart'
@@ -93,6 +98,7 @@ export default function PlantillaEditorPage() {
   const [saving, setSaving] = useState(false)
   const [addingChild, setAddingChild] = useState<string | null>(null)
   const [newCargoLabel, setNewCargoLabel] = useState('')
+  const [deleteNodoId, setDeleteNodoId] = useState<string | null>(null)
 
   const [formLabel, setFormLabel] = useState('')
   const [formRecursoId, setFormRecursoId] = useState('')
@@ -153,16 +159,51 @@ export default function PlantillaEditorPage() {
     }
   }
 
+  const handleMoveNodo = async (nodoId: string, direction: 'up' | 'down') => {
+    const nodo = plantilla?.nodos.find(n => n.id === nodoId)
+    if (!nodo || !plantilla) return
+
+    const siblings = plantilla.nodos
+      .filter(n => n.parentId === nodo.parentId)
+      .sort((a, b) => a.orden - b.orden || a.id.localeCompare(b.id))
+
+    const idx = siblings.findIndex(n => n.id === nodoId)
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1
+    if (swapIdx < 0 || swapIdx >= siblings.length) return
+
+    const reordered = [...siblings]
+    ;[reordered[idx], reordered[swapIdx]] = [reordered[swapIdx], reordered[idx]]
+
+    const updates = reordered
+      .map((n, i) => ({ id: n.id, newOrden: i * 10, currentOrden: n.orden }))
+      .filter(u => u.newOrden !== u.currentOrden)
+
+    try {
+      await Promise.all(updates.map(u =>
+        fetch(`/api/configuracion/plantillas-organigrama/${plantillaId}/nodos/${u.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orden: u.newOrden }),
+        })
+      ))
+      await loadData()
+    } catch {
+      toast.error('Error al reordenar nodo')
+    }
+  }
+
   const handleAddNodo = async (parentId: string | null) => {
     const label = newCargoLabel.trim()
     if (!label) { toast.error('Escribe el cargo del nodo'); return }
+    const siblings = (plantilla?.nodos ?? []).filter(n => n.parentId === parentId)
+    const nextOrden = siblings.length * 10
     try {
       const res = await fetch(
         `/api/configuracion/plantillas-organigrama/${plantillaId}/nodos`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cargoLabel: label, parentId, orden: 0 }),
+          body: JSON.stringify({ cargoLabel: label, parentId, orden: nextOrden }),
         }
       )
       if (!res.ok) throw new Error()
@@ -178,7 +219,6 @@ export default function PlantillaEditorPage() {
   }
 
   const handleDeleteNodo = async (nodoId: string) => {
-    if (!confirm('¿Eliminar este nodo y todos sus hijos?')) return
     try {
       const res = await fetch(
         `/api/configuracion/plantillas-organigrama/${plantillaId}/nodos/${nodoId}`,
@@ -190,15 +230,17 @@ export default function PlantillaEditorPage() {
       await loadData()
     } catch {
       toast.error('Error al eliminar nodo')
+    } finally {
+      setDeleteNodoId(null)
     }
   }
 
   function renderNodos(parentId: string | null, level: number): React.ReactNode {
     const hijos = (plantilla?.nodos ?? [])
       .filter(n => n.parentId === parentId)
-      .sort((a, b) => a.orden - b.orden)
+      .sort((a, b) => a.orden - b.orden || a.id.localeCompare(b.id))
 
-    return hijos.map(nodo => (
+    return hijos.map((nodo, idx) => (
       <div key={nodo.id}>
         <div
           className={`flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer group transition-colors ${
@@ -216,7 +258,23 @@ export default function PlantillaEditorPage() {
               {nodo.recurso.nombre}
             </Badge>
           )}
-          <div className="hidden group-hover:flex items-center gap-1">
+          <div className="hidden group-hover:flex items-center gap-0.5">
+            <button
+              className="p-0.5 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Mover arriba"
+              disabled={idx === 0}
+              onClick={e => { e.stopPropagation(); handleMoveNodo(nodo.id, 'up') }}
+            >
+              <ChevronUp className="h-3.5 w-3.5" />
+            </button>
+            <button
+              className="p-0.5 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Mover abajo"
+              disabled={idx === hijos.length - 1}
+              onClick={e => { e.stopPropagation(); handleMoveNodo(nodo.id, 'down') }}
+            >
+              <ChevronDown className="h-3.5 w-3.5" />
+            </button>
             <button
               className="p-0.5 rounded text-indigo-600 hover:bg-indigo-100"
               title="Agregar hijo"
@@ -227,7 +285,7 @@ export default function PlantillaEditorPage() {
             <button
               className="p-0.5 rounded text-red-500 hover:bg-red-50"
               title="Eliminar nodo"
-              onClick={e => { e.stopPropagation(); handleDeleteNodo(nodo.id) }}
+              onClick={e => { e.stopPropagation(); setDeleteNodoId(nodo.id) }}
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>
@@ -440,6 +498,26 @@ export default function PlantillaEditorPage() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <AlertDialog open={!!deleteNodoId} onOpenChange={open => { if (!open) setDeleteNodoId(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar nodo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminará este nodo y todos sus nodos hijos. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => deleteNodoId && handleDeleteNodo(deleteNodoId)}
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
