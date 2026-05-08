@@ -15,9 +15,12 @@ const FALLBACK_COLOR = '#94a3b8' // slate-400
 export const TIPO_INFO: Record<string, TipoInfo> = {
   'chat':                { label: 'Chat',                   color: '#2563eb' }, // blue-600
   'chat-simple':         { label: 'Chat (rápido)',          color: '#60a5fa' }, // blue-400
-  // Análisis TDR standalone (independiente del chat)
-  'tdr-analisis-pdf-lectura':    { label: 'TDR — Lectura PDF',      color: '#f97316' }, // orange-500
-  'tdr-analisis-pdf-extraccion': { label: 'TDR — Extracción datos', color: '#ea580c' }, // orange-600
+  // Análisis TDR standalone — cotización
+  'tdr-analisis-pdf-lectura':    { label: 'TDR Cotización — Lectura PDF',      color: '#f97316' }, // orange-500
+  'tdr-analisis-pdf-extraccion': { label: 'TDR Cotización — Extracción datos', color: '#ea580c' }, // orange-600
+  // Análisis TDR standalone — proyecto
+  'tdr-proyecto-pdf-lectura':    { label: 'TDR Proyecto — Lectura PDF',      color: '#fb923c' }, // orange-400
+  'tdr-proyecto-pdf-extraccion': { label: 'TDR Proyecto — Extracción datos', color: '#c2410c' }, // orange-700
   'pdf-preprocessing':   { label: 'Pre-procesamiento PDF',  color: '#a855f7' }, // purple-500
   'excel-extraction':    { label: 'Importación Excel',      color: '#10b981' }, // emerald-500
   'pdf-extraction':      { label: 'Importación PDF',        color: '#f59e0b' }, // amber-500

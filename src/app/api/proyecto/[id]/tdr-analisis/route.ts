@@ -90,9 +90,11 @@ export async function GET(
   }
 }
 
-// ─── POST: importar desde cotización (snapshot inicial, idempotente) ─
+// ─── POST: importar desde cotización o crear vacío ───────────────
+// Body: {} o sin body → importar desde cotización
+// Body: { vacio: true } → crear registro vacío sin cotización
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
@@ -108,19 +110,38 @@ export async function POST(
     if (!proyecto) {
       return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 })
     }
-    if (!proyecto.cotizacionId) {
-      return NextResponse.json(
-        { error: 'Este proyecto no tiene cotización vinculada. El TDR solo se puede importar desde cotización.' },
-        { status: 400 },
-      )
-    }
 
     // Idempotente: si ya existe, devolver el existente
-    const existente = await prisma.proyectoTdrAnalisis.findUnique({
-      where: { proyectoId },
-    })
+    const existente = await prisma.proyectoTdrAnalisis.findUnique({ where: { proyectoId } })
     if (existente) {
       return NextResponse.json({ ...existente, cotizacionId: proyecto.cotizacionId })
+    }
+
+    // Detectar si se pide crear vacío
+    let vacio = false
+    try {
+      const body = await request.json()
+      vacio = body?.vacio === true
+    } catch { /* sin body → importar */ }
+
+    if (vacio) {
+      const creado = await prisma.proyectoTdrAnalisis.create({
+        data: {
+          proyectoId,
+          resumenTdr: '',
+          desconectadoDeOrigen: false,
+          fechaSnapshot: new Date(),
+        },
+      })
+      return NextResponse.json({ ...creado, cotizacionId: proyecto.cotizacionId }, { status: 201 })
+    }
+
+    // Importar desde cotización
+    if (!proyecto.cotizacionId) {
+      return NextResponse.json(
+        { error: 'Este proyecto no tiene cotización vinculada.' },
+        { status: 400 },
+      )
     }
 
     const tdrCotizacion = await prisma.cotizacionTdrAnalisis.findFirst({
