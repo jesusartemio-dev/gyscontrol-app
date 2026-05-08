@@ -14,7 +14,7 @@ import {
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { ArrowLeft, Plus, Trash2, Save, Loader2, GitBranch, ChevronRight, ChevronUp, ChevronDown, Eye } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Save, Loader2, GitBranch, ChevronRight, ChevronUp, ChevronDown, Eye, Lock } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
 import OrgChart, { OrgNodoCompleto } from '@/components/organigrama/OrgChart'
@@ -235,6 +235,73 @@ export default function PlantillaEditorPage() {
     }
   }
 
+  // Render GYS fixed nodes as read-only context in the tree
+  function renderGysTree() {
+    const byParent: Record<string, typeof NODOS_FIJOS_GYS> = {}
+    for (const def of NODOS_FIJOS_GYS) {
+      const key = def.parentLabel ?? '__root__'
+      if (!byParent[key]) byParent[key] = []
+      byParent[key].push(def)
+    }
+
+    function renderGysLevel(parentLabel: string | null, level: number): React.ReactNode {
+      const key = parentLabel ?? '__root__'
+      const items = byParent[key] ?? []
+      return items.sort((a, b) => a.orden - b.orden).map(def => {
+        const isGerencia = def.cargoLabel === 'GERENCIA DE PROYECTOS'
+        return (
+          <div key={def.cargoLabel}>
+            <div
+              className="flex items-center gap-1.5 px-2 py-1 rounded select-none"
+              style={{ paddingLeft: `${8 + level * 16}px` }}
+            >
+              <Lock className="h-3 w-3 text-[#4a6480] shrink-0" />
+              <span className="text-xs font-semibold text-[#2E4057] uppercase tracking-wide truncate">
+                {def.cargoLabel}
+              </span>
+              <span className="ml-1 text-[10px] px-1 py-0.5 bg-[#2E4057]/10 text-[#2E4057] rounded font-medium shrink-0">
+                GYS
+              </span>
+            </div>
+            {renderGysLevel(def.cargoLabel, level + 1)}
+            {/* Plantilla nodes anchor under GERENCIA DE PROYECTOS */}
+            {isGerencia && (
+              <div>
+                {addingChild === '__root__' && (
+                  <div className="flex items-center gap-2 py-1" style={{ paddingLeft: `${8 + (level + 1) * 16}px` }}>
+                    <Input
+                      value={newCargoLabel}
+                      onChange={e => setNewCargoLabel(e.target.value)}
+                      placeholder="Cargo del nodo raíz..."
+                      className="h-7 text-xs"
+                      autoFocus
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') handleAddNodo(null)
+                        if (e.key === 'Escape') setAddingChild(null)
+                      }}
+                    />
+                    <Button size="sm" className="h-7 px-2 text-xs" onClick={() => handleAddNodo(null)}>
+                      Agregar
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setAddingChild(null)}>✕</Button>
+                  </div>
+                )}
+                {renderNodos(null, level + 1)}
+                {(plantilla?.nodos ?? []).length === 0 && addingChild !== '__root__' && (
+                  <div className="text-xs text-muted-foreground italic py-1" style={{ paddingLeft: `${8 + (level + 1) * 16}px` }}>
+                    Sin nodos de plantilla
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )
+      })
+    }
+
+    return renderGysLevel(null, 0)
+  }
+
   function renderNodos(parentId: string | null, level: number): React.ReactNode {
     const hijos = (plantilla?.nodos ?? [])
       .filter(n => n.parentId === parentId)
@@ -382,33 +449,7 @@ export default function PlantillaEditorPage() {
               </div>
 
               <div className="p-2 space-y-0.5">
-                {addingChild === '__root__' && (
-                  <div className="flex items-center gap-2 px-2 py-1">
-                    <Input
-                      value={newCargoLabel}
-                      onChange={e => setNewCargoLabel(e.target.value)}
-                      placeholder="Cargo del nodo raíz..."
-                      className="h-7 text-xs"
-                      autoFocus
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') handleAddNodo(null)
-                        if (e.key === 'Escape') setAddingChild(null)
-                      }}
-                    />
-                    <Button size="sm" className="h-7 px-2 text-xs" onClick={() => handleAddNodo(null)}>
-                      Agregar
-                    </Button>
-                    <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setAddingChild(null)}>
-                      ✕
-                    </Button>
-                  </div>
-                )}
-                {renderNodos(null, 0)}
-                {totalNodos === 0 && addingChild !== '__root__' && (
-                  <div className="text-center py-8 text-muted-foreground text-sm">
-                    Sin nodos. Agrega un nodo raíz para comenzar.
-                  </div>
-                )}
+                {renderGysTree()}
               </div>
             </div>
 
