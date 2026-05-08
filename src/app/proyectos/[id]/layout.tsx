@@ -146,7 +146,7 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
 
   // Páginas que necesitan ancho completo (sin sidebar)
   // Includes specific page names AND path patterns for detail views
-  const fullWidthPages = ['cronograma', 'listas', 'pedidos', 'organigrama', 'matriz-comunicacion']
+  const fullWidthPages = ['cronograma', 'listas', 'pedidos', 'organigrama', 'matriz-comunicacion', 'tdr']
   const fullWidthPatterns = [
     '/listas/', // Lista detail view (e.g., /listas/[listaId])
     '/pedidos/', // Pedido detail view
@@ -176,6 +176,7 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
     'recursos': 'Recursos',
     'organigrama': 'Organigrama',
     'matriz-comunicacion': 'Matriz de Comunicaciones',
+    'tdr': 'Análisis TDR',
   }
 
   // Build breadcrumb trail from path segments (e.g. listas/[id] → Listas > Detalle)

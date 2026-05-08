@@ -30,6 +30,7 @@ import {
   HardHat,
   GitBranch,
   MessageSquare,
+  FileText,
 } from 'lucide-react'
 
 import { Card, CardContent } from '@/components/ui/card'
@@ -524,6 +525,19 @@ export default function ProyectoHubPage() {
       href: `${baseUrl}/matriz-comunicacion`,
       stats: [],
       badge: 'Comunicación'
+    },
+    {
+      id: 'tdr',
+      title: 'Análisis TDR',
+      description: 'Snapshot del análisis de Términos de Referencia',
+      icon: FileText,
+      color: 'text-violet-600',
+      bgColor: 'bg-violet-50',
+      hoverBg: 'hover:bg-violet-50',
+      borderColor: 'border-violet-200',
+      href: `${baseUrl}/tdr`,
+      stats: [],
+      badge: 'Referencia'
     },
   ]
 

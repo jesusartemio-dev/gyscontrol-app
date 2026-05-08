@@ -9,6 +9,8 @@ import { createProyectoFromCotizacionSchema } from '@/lib/validators/proyecto'
 import { z } from 'zod'
 import { Prisma, EstadoFase, EstadoTarea, EstadoActividad, EstadoEdt } from '@prisma/client'
 import { randomUUID } from 'crypto'
+import { calcularCompletitudGeneral } from '@/lib/tdr/completitud'
+import type { TdrAnalisisCore } from '@/types/tdr'
 
 // ✅ Tipo explícito para cotización con includes (5 niveles sin zonas)
 type CotizacionConIncludes = Prisma.CotizacionGetPayload<{
@@ -324,6 +326,47 @@ export async function POST(request: NextRequest) {
         },
       },
     })
+
+    // ─── Snapshot automático del análisis TDR de la cotización ──────────────────
+    // Envuelto en try/catch para que un fallo NO rompa la creación del proyecto.
+    // El snapshot puede crearse después con el botón "Importar de cotización".
+    try {
+      const tdrCot = await prisma.cotizacionTdrAnalisis.findFirst({
+        where: { cotizacionId: cotizacion.id },
+        orderBy: { createdAt: 'desc' },
+      })
+
+      if (tdrCot) {
+        const {
+          id: cotTdrId,
+          cotizacionId: _omit1,
+          createdAt: _omit2,
+          updatedAt: _omit3,
+          ...resto
+        } = tdrCot
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const snapshotCreado = await prisma.proyectoTdrAnalisis.create({
+          data: {
+            ...(resto as any),
+            proyectoId: proyecto.id,
+            cotizacionTdrOrigenId: cotTdrId,
+            desconectadoDeOrigen: false,
+            fechaSnapshot: new Date(),
+          },
+        })
+
+        const completitud = calcularCompletitudGeneral(snapshotCreado as unknown as TdrAnalisisCore)
+        await prisma.proyectoTdrAnalisis.update({
+          where: { id: snapshotCreado.id },
+          data: { bloquesCompletitud: completitud.bloques },
+        })
+
+        console.log(`✅ [TDR] Snapshot creado para proyecto ${proyecto.id} desde cotización ${cotizacion.id}`)
+      }
+    } catch (tdrError) {
+      console.error('[crearProyectoDesdeCotizacion] Error al crear snapshot TDR:', tdrError)
+    }
 
     // ✅ Fix #10: Transferir condiciones y exclusiones de cotización → proyecto
     if (cotizacion.cotizacionCondicion && cotizacion.cotizacionCondicion.length > 0) {

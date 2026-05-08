@@ -238,42 +238,65 @@ function compressToolResult(result: unknown): string {
  * para que el tool loop trabaje con texto liviano en vez del PDF completo.
  * Esto evita enviar el PDF N veces en cada round del tool loop.
  */
-const PDF_EXTRACTION_PROMPT = `You are a document extraction assistant. Extract a comprehensive structured summary from this document.
+const PDF_EXTRACTION_PROMPT = `You are a document extraction assistant. Extract a comprehensive structured summary from this TDR/specification document.
 
-Output the following sections (in Spanish):
+Output ALL the following sections (in Spanish). Be exhaustive — include every detail found in the document.
 
 ## DATOS GENERALES
 - Título/referencia del documento
-- Cliente/entidad
-- Fecha, código de referencia
+- Cliente/entidad contratante
+- Nombre/código del proyecto
+- Ubicación geográfica del proyecto
+- Fecha, número de páginas
+
+## RESUMEN EJECUTIVO
+- Narrativa de 2-4 párrafos describiendo el alcance general del proyecto
+- Puntos clave categorizados: entregables principales, ubicación, plazos críticos, condiciones especiales
 
 ## ALCANCE Y REQUERIMIENTOS TÉCNICOS
-- Lista detallada de todos los requerimientos técnicos
+- Lista detallada de todos los requerimientos técnicos con criticidad (alta/media/baja)
 - Sistemas solicitados (SCADA, PLC, instrumentación, etc.)
-- Equipos mencionados con modelos/marcas si los hay
-- Cantidades y especificaciones
+- Cantidades y especificaciones técnicas por ítem
 
-## SERVICIOS SOLICITADOS
-- Ingeniería, programación, comisionamiento, etc.
-- Entregables documentales (planos, manuales, protocolos)
+## EQUIPOS Y MATERIALES
+- Equipos identificados con nombre, cantidad, especificación técnica, precio estimado si se menciona
+- Indicar si los suministra el contratista o el cliente
+- Marcas sugeridas o requeridas
 
-## CONDICIONES CONTRACTUALES
-- Plazos de ejecución
-- Garantías requeridas
-- Penalidades
-- Forma de pago
+## SERVICIOS TÉCNICOS
+- Servicios de ingeniería, programación, comisionamiento, etc.
+- Horas estimadas por servicio si se mencionan
 
-## REQUISITOS ESPECIALES
-- Certificaciones, normas, estándares requeridos
-- Condiciones de sitio (altura, zona clasificada, etc.)
-- Personal requerido (certificaciones, experiencia mínima)
+## PERSONAL REQUERIDO
+- Roles, cantidad mínima requerida
+- Años de experiencia mínima por rol
+- Certificaciones o habilitaciones requeridas (CSPE, CIP, OSHA, etc.)
+- Indicar si es obligatorio o deseable
+
+## CRONOGRAMA Y PLAZOS
+- Fases del proyecto con duración estimada
+- Hitos contractuales clave: tipo (KOM/FAT/SAT/comisionamiento/as-built/otro), fecha estimada o días desde inicio
+
+## SSOMA Y NORMAS
+- Normas y estándares aplicables con código y nombre (IEC, NEC, NFPA, ASME, etc.)
+- Documentos previos requeridos antes del inicio (IPERC, ATS, seguros, etc.) con días de anticipación y responsable
+- Riesgos críticos identificados con probabilidad e impacto estimados
+
+## CONDICIONES COMERCIALES
+- Presupuesto estimado si se menciona (equipos, servicios, gastos, total en USD)
+- Penalidades contractuales: causa, tipo (% diario / monto fijo / % total), valor, tope máximo
+- Garantías exigidas: fiel cumplimiento (% y vigencia), adelanto (% y vigencia), responsabilidad civil (monto), servicio (meses)
+
+## ENTREGABLES DEL DOSSIER
+- Documentos a entregar organizados por fase: ingeniería / construcción / cierre
+- Formato (físico/digital/ambos)
 
 ## INFORMACIÓN FALTANTE O AMBIGUA
-- Puntos que no quedan claros
-- Especificaciones faltantes
-- Posibles contradicciones
+- Puntos que no quedan claros o son contradictorios
+- Especificaciones técnicas faltantes que impactan la cotización
+- Preguntas que se deben hacer al cliente
 
-Be thorough. Include ALL technical details, part numbers, specifications, and quantities mentioned in the document. This summary will be used to prepare a commercial quotation.`
+Be thorough. Include ALL technical details, part numbers, specifications, and quantities. This summary will be used to prepare a commercial quotation and feed a structured TDR analysis system.`
 
 async function preprocessPdfAttachment(
   client: Anthropic,

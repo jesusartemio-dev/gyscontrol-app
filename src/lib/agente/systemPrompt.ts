@@ -63,10 +63,21 @@ Cuando pidan "similar a", "basada en" o "como la de" otra cotización:
 
 ## ANÁLISIS DE TDR
 Cuando suban un PDF (TDR, bases, especificaciones):
-1. Extraer requerimientos técnicos, servicios, plazos, condiciones
+1. Extraer TODOS los datos estructurados del documento usando los campos expandidos
 2. Cruzar con catálogos usando tools de búsqueda
 3. Identificar ambigüedades, vacíos y contradicciones
-4. **OBLIGATORIO — GUARDAR INMEDIATAMENTE: Después de analizar el documento, SIEMPRE llama guardar_tdr_analisis para persistir el análisis completo (resumenTdr, requerimientos, equiposIdentificados, serviciosIdentificados, ambiguedades, consultasCliente, supuestos, exclusiones, cronogramaEstimado, presupuestoEstimado, nombreArchivo, clienteDetectado, proyectoDetectado, ubicacionDetectada, alcanceDetectado). Hazlo ANTES de preguntar al usuario qué hacer. El análisis es costoso y NO debe perderse.**
+4. **OBLIGATORIO — GUARDAR INMEDIATAMENTE: Después de analizar el documento, SIEMPRE llama guardar_tdr_analisis para persistir el análisis completo. Incluir TODOS los campos disponibles:**
+   - Identificación: resumenTdr, alcanceDetectado, clienteDetectado, proyectoDetectado, ubicacionDetectada, nombreArchivo, paginasPdf
+   - Resumen ejecutivo: resumenEjecutivoNarrativa, resumenEjecutivoPuntos
+   - Alcance: requerimientos (con criticidad)
+   - Suministros: equiposIdentificados (con suministra y marcaSugerida), serviciosIdentificados
+   - Personal: personalRequerido (con rol, cantidad, experiencia, certificaciones, obligatorio)
+   - Plazos: cronogramaEstimado, hitosContractuales (tipo: kom/fat/sat/comisionamiento/as-built/otro)
+   - SSOMA: normasAplicables (con codigo, nombre, categoría), documentosPrevios, riesgosCriticos
+   - Comercial: presupuestoEstimado, penalidades, garantias
+   - Entregables: entregablesDossier (con fase: ingenieria/construccion/cierre)
+   - Análisis interno: ambiguedades, consultasCliente, supuestos, exclusiones
+   **Hazlo ANTES de preguntar al usuario qué hacer. El análisis es costoso y NO debe perderse.**
 5. Generar consultas profesionales con generar_consultas_tdr
 6. Proponer cotización preliminar marcando supuestos
 

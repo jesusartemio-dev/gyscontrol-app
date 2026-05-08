@@ -829,6 +829,140 @@ export const analysisTools: AnthropicTool[] = [
             total: { type: 'number' },
           },
         },
+        // ── Campos extendidos ──
+        resumenEjecutivoNarrativa: { type: 'string', description: 'Narrativa ejecutiva del proyecto (2-4 párrafos)' },
+        resumenEjecutivoPuntos: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              categoria: { type: 'string', enum: ['entregable', 'ubicacion', 'plazo', 'condicion', 'otro'] },
+              texto: { type: 'string' },
+            },
+            required: ['categoria', 'texto'],
+          },
+          description: 'Puntos clave del resumen ejecutivo por categoría',
+        },
+        personalRequerido: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              rol: { type: 'string' },
+              cantidad: { type: 'number' },
+              experienciaAnios: { type: 'number' },
+              certificaciones: { type: 'array', items: { type: 'string' } },
+              obligatorio: { type: 'boolean' },
+            },
+            required: ['rol', 'cantidad', 'obligatorio'],
+          },
+          description: 'Personal requerido por el TDR (roles, experiencia, certificaciones)',
+        },
+        normasAplicables: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              codigo: { type: 'string' },
+              nombre: { type: 'string' },
+              categoria: { type: 'string', enum: ['electrica', 'mecanica', 'ssoma', 'calidad', 'otro'] },
+            },
+            required: ['codigo', 'nombre'],
+          },
+          description: 'Normas y estándares técnicos aplicables al proyecto',
+        },
+        documentosPrevios: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              nombre: { type: 'string' },
+              diasAnticipacion: { type: 'number' },
+              responsable: { type: 'string', enum: ['contratista', 'cliente'] },
+              obligatorio: { type: 'boolean' },
+            },
+            required: ['nombre', 'obligatorio'],
+          },
+          description: 'Documentos requeridos antes del inicio del proyecto (SSOMA, seguros, habilitaciones)',
+        },
+        entregablesDossier: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              nombre: { type: 'string' },
+              formato: { type: 'string', enum: ['fisico', 'digital', 'ambos'] },
+              fase: { type: 'string', enum: ['ingenieria', 'construccion', 'cierre'] },
+            },
+            required: ['nombre', 'fase'],
+          },
+          description: 'Entregables del dossier técnico organizados por fase del proyecto',
+        },
+        riesgosCriticos: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              riesgo: { type: 'string' },
+              probabilidad: { type: 'string', enum: ['alta', 'media', 'baja'] },
+              impacto: { type: 'string', enum: ['alta', 'media', 'baja'] },
+              mitigacion: { type: 'string' },
+            },
+            required: ['riesgo'],
+          },
+          description: 'Riesgos críticos identificados en el TDR con probabilidad e impacto',
+        },
+        hitosContractuales: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              nombre: { type: 'string' },
+              tipo: { type: 'string', enum: ['kom', 'fat', 'sat', 'comisionamiento', 'as-built', 'otro'] },
+              fechaEstimada: { type: 'string' },
+              diasDesdeInicio: { type: 'number' },
+            },
+            required: ['nombre', 'tipo'],
+          },
+          description: 'Hitos contractuales clave (KOM, FAT, SAT, comisionamiento, as-built)',
+        },
+        penalidades: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              causa: { type: 'string' },
+              tipo: { type: 'string', enum: ['porcentaje-diario', 'monto-fijo', 'porcentaje-total'] },
+              valor: { type: 'number' },
+              topeMaximo: { type: 'number' },
+            },
+            required: ['causa', 'tipo', 'valor'],
+          },
+          description: 'Penalidades contractuales por incumplimiento',
+        },
+        garantias: {
+          type: 'object',
+          properties: {
+            fielCumplimiento: {
+              type: 'object',
+              properties: { porcentaje: { type: 'number' }, vigencia: { type: 'string' } },
+            },
+            adelanto: {
+              type: 'object',
+              properties: { porcentaje: { type: 'number' }, vigencia: { type: 'string' } },
+            },
+            responsabilidadCivil: {
+              type: 'object',
+              properties: { monto: { type: 'number' }, moneda: { type: 'string' } },
+            },
+            servicio: {
+              type: 'object',
+              properties: { duracionMeses: { type: 'number' } },
+            },
+          },
+          description: 'Garantías exigidas: fiel cumplimiento, adelanto, responsabilidad civil, servicio',
+        },
+        paginasPdf: { type: 'number', description: 'Número de páginas del PDF analizado' },
       },
       required: ['cotizacionId', 'resumenTdr'],
     },

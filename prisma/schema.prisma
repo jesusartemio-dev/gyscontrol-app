@@ -376,9 +376,22 @@ model CotizacionTdrAnalisis {
   cronogramaEstimado  Json?
   presupuestoEstimado Json?
 
+  resumenEjecutivoNarrativa String? @db.Text
+  resumenEjecutivoPuntos    Json?
+  personalRequerido         Json?
+  normasAplicables          Json?
+  documentosPrevios         Json?
+  entregablesDossier        Json?
+  riesgosCriticos           Json?
+  hitosContractuales        Json?
+  penalidades               Json?
+  garantias                 Json?
+  bloquesCompletitud        Json?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([cotizacionId])
   @@map("cotizacion_tdr_analisis")
 }
 
@@ -1112,6 +1125,7 @@ model Proyecto {
   reportesSemanalesSeguridad ReporteSemanalSeguridad[]
   orgNodos                   ProyectoOrgNodo[]
   matrizComunicacion         MatrizComunicacion?
+  tdrAnalisis                ProyectoTdrAnalisis?
 
   @@index([clienteId, estado, createdAt(sort: Desc)], map: "idx_proyecto_cliente_estado_fecha")
   @@index([comercialId, estado, fechaInicio], map: "idx_proyecto_comercial_estado_inicio")
@@ -5199,4 +5213,50 @@ model MatrizComunicacionFila {
 
   @@index([matrizId])
   @@map("matriz_comunicacion_fila")
+}
+
+model ProyectoTdrAnalisis {
+  id         String   @id @default(cuid())
+  proyectoId String   @unique
+  proyecto   Proyecto @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+
+  cotizacionTdrOrigenId String?
+  desconectadoDeOrigen  Boolean  @default(false)
+  fechaSnapshot         DateTime @default(now())
+
+  resumenTdr                String  @db.Text
+  alcanceDetectado          String? @db.Text
+  resumenEjecutivoNarrativa String? @db.Text
+  resumenEjecutivoPuntos    Json?
+
+  requerimientos         Json?
+  equiposIdentificados   Json?
+  serviciosIdentificados Json?
+  ambiguedades           Json?
+  consultasCliente       Json?
+  supuestos              Json?
+  exclusiones            Json?
+  cronogramaEstimado     Json?
+  presupuestoEstimado    Json?
+  personalRequerido      Json?
+  normasAplicables       Json?
+  documentosPrevios      Json?
+  entregablesDossier     Json?
+  riesgosCriticos        Json?
+  hitosContractuales     Json?
+  penalidades            Json?
+  garantias              Json?
+
+  nombreArchivo      String?
+  paginasPdf         Int?
+  clienteDetectado   String?
+  proyectoDetectado  String?
+  ubicacionDetectada String?
+
+  bloquesCompletitud Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("proyecto_tdr_analisis")
 }

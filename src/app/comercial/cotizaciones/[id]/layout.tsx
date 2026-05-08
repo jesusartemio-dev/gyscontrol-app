@@ -72,7 +72,7 @@ export default function CotizacionLayout({ children }: CotizacionLayoutProps) {
   const isHubPage = pathname === `/comercial/cotizaciones/${id}`
 
   // Páginas que necesitan ancho completo (sin sidebar)
-  const fullWidthPages = ['cronograma', 'preview']
+  const fullWidthPages = ['cronograma', 'preview', 'tdr']
   const currentPageSegment = pathname.split('/').pop() || ''
   const needsFullWidth = fullWidthPages.includes(currentPageSegment)
 
