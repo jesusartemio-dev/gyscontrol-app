@@ -13,6 +13,7 @@ export interface IAFeatureFlags {
   importCatalogoPDF: boolean
   ssomaDocumentos: boolean
   matrizComunicacion: boolean
+  planTrabajo: boolean
 }
 
 const DEFAULT_FLAGS: IAFeatureFlags = {
@@ -25,6 +26,7 @@ const DEFAULT_FLAGS: IAFeatureFlags = {
   importCatalogoPDF: true,
   ssomaDocumentos: true,
   matrizComunicacion: true,
+  planTrabajo: true,
 }
 
 function parseFlags(raw: unknown): IAFeatureFlags {
@@ -40,6 +42,7 @@ function parseFlags(raw: unknown): IAFeatureFlags {
     importCatalogoPDF: typeof obj.importCatalogoPDF === 'boolean' ? obj.importCatalogoPDF : DEFAULT_FLAGS.importCatalogoPDF,
     ssomaDocumentos: typeof obj.ssomaDocumentos === 'boolean' ? obj.ssomaDocumentos : DEFAULT_FLAGS.ssomaDocumentos,
     matrizComunicacion: typeof obj.matrizComunicacion === 'boolean' ? obj.matrizComunicacion : DEFAULT_FLAGS.matrizComunicacion,
+    planTrabajo: typeof obj.planTrabajo === 'boolean' ? obj.planTrabajo : DEFAULT_FLAGS.planTrabajo,
   }
 }
 

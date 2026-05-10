@@ -1127,6 +1127,7 @@ model Proyecto {
   orgNodos                   ProyectoOrgNodo[]
   matrizComunicacion         MatrizComunicacion?
   tdrAnalisis                ProyectoTdrAnalisis?
+  planTrabajo                PlanTrabajo?
 
   @@index([clienteId, estado, createdAt(sort: Desc)], map: "idx_proyecto_cliente_estado_fecha")
   @@index([comercialId, estado, fechaInicio], map: "idx_proyecto_comercial_estado_inicio")
@@ -1806,6 +1807,7 @@ model User {
   reportesSeguridadCreados                 ReporteSemanalSeguridad[]   @relation("ReportesSeguridadIngeniero")
   reportesSeguridadAprobados               ReporteSemanalSeguridad[]   @relation("ReportesSeguridadAprobador")
   orgNodos                                 ProyectoOrgNodo[]
+  planTrabajoGeneraciones                  PlanTrabajoGeneracion[]
 
   @@map("user")
 }
@@ -5261,4 +5263,91 @@ model ProyectoTdrAnalisis {
   updatedAt DateTime @updatedAt
 
   @@map("proyecto_tdr_analisis")
+}
+
+// ============================================
+// PLAN DE TRABAJO (uno por proyecto)
+// ============================================
+
+model PlanTrabajo {
+  id         String   @id @default(cuid())
+  proyectoId String   @unique
+  proyecto   Proyecto @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+
+  // Estado de IA
+  generadoConIA           Boolean   @default(false)
+  fechaGeneracionIA       DateTime?
+  ultimaSeccionRegenerada String?
+  operacionIAEnCurso      String?
+  operacionIAIniciadaEn   DateTime?
+
+  // Cabecera del documento
+  codigoDocumento String?
+  numeroRevision  String    @default("A")
+  tipoEmision     String?
+  fechaEmision    DateTime?
+  numeroConsultor String?
+
+  // Firmantes (texto libre, no FK)
+  preparadoPor  String?
+  preparadoCargo String?
+  revisadoPor   String?
+  revisadoCargo  String?
+  aprobadoPor   String?
+  aprobadoCargo  String?
+
+  // Secciones de texto largo
+  objetivo       String? @db.Text
+  alcanceGeneral String? @db.Text
+
+  // Secciones estructuradas (columna Json nativa de Prisma)
+  alcanceDetallado     Json?
+  eppRequeridos        Json?
+  herramientasYEquipos Json?
+  restricciones        Json?
+  personalAsignado     Json?
+  matrizRaci           Json?
+  histogramas          Json?
+  cronogramaResumen    Json?
+  responsabilidades    Json?
+  referencias          Json?
+
+  // Toggles de inclusión en DOCX
+  incluirOrganigrama  Boolean @default(true)
+  incluirMatriz       Boolean @default(true)
+  incluirCronograma   Boolean @default(true)
+  incluirHistogramas  Boolean @default(true)
+  incluirTDR          Boolean @default(true)
+
+  // Tracking de completitud por sección
+  bloquesCompletitud Json?
+
+  generaciones PlanTrabajoGeneracion[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("plan_trabajo")
+}
+
+model PlanTrabajoGeneracion {
+  id            String      @id @default(cuid())
+  planTrabajoId String
+  planTrabajo   PlanTrabajo @relation(fields: [planTrabajoId], references: [id], onDelete: Cascade)
+
+  numeroRevision String
+  driveFileId    String
+  webViewLink    String
+  driveFolderId  String?
+  archivoNombre  String
+  tamanioBytes   Int
+
+  snapshotData Json
+
+  generadoPorId String
+  generadoPor   User     @relation(fields: [generadoPorId], references: [id])
+  generadoEn    DateTime @default(now())
+
+  @@index([planTrabajoId, generadoEn(sort: Desc)])
+  @@map("plan_trabajo_generacion")
 }

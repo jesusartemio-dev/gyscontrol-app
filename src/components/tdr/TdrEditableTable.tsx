@@ -222,7 +222,7 @@ export function TdrEditableTable<T extends object>({
         </Table>
       </div>
 
-      <div className="flex items-center justify-between">
+      <div className="sticky bottom-0 bg-white border-t pt-3 flex items-center justify-between">
         <Button type="button" variant="outline" size="sm" onClick={agregarFila}>
           <Plus className="mr-1 h-4 w-4" />
           Agregar fila

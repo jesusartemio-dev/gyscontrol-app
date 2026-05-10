@@ -31,6 +31,7 @@ import {
   GitBranch,
   MessageSquare,
   FileText,
+  BookOpen,
 } from 'lucide-react'
 
 import { Card, CardContent } from '@/components/ui/card'
@@ -538,6 +539,19 @@ export default function ProyectoHubPage() {
       href: `${baseUrl}/tdr`,
       stats: [],
       badge: 'Referencia'
+    },
+    {
+      id: 'plan-trabajo',
+      title: 'Plan de Trabajo',
+      description: 'Documento técnico de planificación del proyecto',
+      icon: BookOpen,
+      color: 'text-rose-600',
+      bgColor: 'bg-rose-50',
+      hoverBg: 'hover:bg-rose-50',
+      borderColor: 'border-rose-200',
+      href: `${baseUrl}/plan-trabajo`,
+      stats: [],
+      badge: 'Planificación'
     },
   ]
 
