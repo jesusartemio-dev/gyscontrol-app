@@ -33,6 +33,7 @@ async function ejecutarFaseA(
   const contextoSerializado = serializarContextoParaIA(contexto)
   const inicio = Date.now()
 
+  console.log(`[generar-ia] FaseA: llamando Haiku (modelo=${MODELS.haiku})`)
   const response = await anthropic.messages.create({
     model: MODELS.haiku,
     max_tokens: 4096,
@@ -44,6 +45,7 @@ async function ejecutarFaseA(
       },
     ],
   })
+  console.log(`[generar-ia] FaseA: Haiku OK — stop_reason=${response.stop_reason} in=${response.usage.input_tokens} out=${response.usage.output_tokens} ms=${Date.now()-inicio}`)
 
   trackUsage({
     userId,
@@ -69,6 +71,7 @@ async function ejecutarFaseB(
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const inicio = Date.now()
 
+  console.log(`[generar-ia] FaseB: llamando Sonnet (modelo=${MODELS.sonnet} max_tokens=16384)`)
   const response = await anthropic.messages.create({
     model: MODELS.sonnet,
     max_tokens: 16384,
@@ -93,6 +96,7 @@ async function ejecutarFaseB(
   })
 
   const usageRaw = response.usage as unknown as Record<string, number>
+  console.log(`[generar-ia] FaseB: Sonnet OK — stop_reason=${response.stop_reason} in=${response.usage.input_tokens} out=${response.usage.output_tokens} cache_create=${usageRaw.cache_creation_input_tokens ?? 0} cache_read=${usageRaw.cache_read_input_tokens ?? 0} ms=${Date.now()-inicio}`)
   trackUsage({
     userId,
     tipo: 'plan-trabajo.generar',
@@ -117,7 +121,18 @@ async function ejecutarFaseB(
     .replace(/\s*```\s*$/i, '')
     .trim()
 
-  return JSON.parse(jsonLimpio)
+  console.log(`[generar-ia] FaseB: texto=${texto.length} chars, jsonLimpio=${jsonLimpio.length} chars`)
+  try {
+    const parsed = JSON.parse(jsonLimpio)
+    const keys = typeof parsed === 'object' && parsed !== null ? Object.keys(parsed as object) : []
+    console.log(`[generar-ia] FaseB: JSON.parse OK — keys: ${keys.join(', ')}`)
+    return parsed
+  } catch (parseErr) {
+    console.error(`[generar-ia] FaseB: JSON.parse FALLÓ — stop_reason=${response.stop_reason} output_tokens=${response.usage.output_tokens}`)
+    console.error(`[generar-ia] FaseB: primeros 300 chars del texto: ${texto.slice(0, 300)}`)
+    console.error(`[generar-ia] FaseB: últimos 200 chars del texto: ${texto.slice(-200)}`)
+    throw parseErr
+  }
 }
 
 // ─── Endpoint ───────────────────────────────────────────────────────────────
@@ -203,9 +218,11 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
 
   // ─── SSE ───
   const encoder = new TextEncoder()
+  console.log(`[generar-ia] Stream creado — planId=${planId} proyectoId=${proyectoId}`)
 
   const stream = new ReadableStream({
     async start(controller) {
+      console.log(`[generar-ia] start() iniciado`)
       const send = (event: string, data: unknown) => {
         controller.enqueue(
           encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
@@ -216,6 +233,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
         // Fase A: Haiku resume el contexto
         send('status', { fase: 'A', mensaje: 'Analizando contexto del proyecto con Haiku...' })
         const resumenProyecto = await ejecutarFaseA(contexto, userId)
+        console.log(`[generar-ia] FaseA: resumen generado — ${resumenProyecto.length} chars`)
 
         // Fase B: Sonnet genera el JSON estructurado
         send('status', { fase: 'B', mensaje: 'Generando Plan de Trabajo con Sonnet...' })
@@ -224,10 +242,12 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
         // Validar secciones con Zod
         send('status', { fase: 'validacion', mensaje: 'Validando estructura del resultado...' })
         const { secciones, errores } = validarSeccionesPlan(planJson)
+        console.log(`[generar-ia] Validación: OK=[${Object.keys(secciones).join(',')}] ERR=[${Object.keys(errores).join(',')}]`)
 
         // Persistir secciones válidas
         send('status', { fase: 'persistencia', mensaje: 'Guardando secciones validadas...' })
         await guardarSecciones(proyectoId, secciones)
+        console.log(`[generar-ia] Guardado OK — ${Object.keys(secciones).length} secciones`)
 
         // Resultado final
         send('done', {
@@ -235,13 +255,16 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
           seccionesConError: Object.keys(errores),
           errores: Object.keys(errores).length > 0 ? errores : undefined,
         })
+        console.log(`[generar-ia] done enviado`)
       } catch (error: unknown) {
-        console.error('[plan-trabajo/generar-ia] Error:', error)
+        console.error('[generar-ia] ERROR en start():', error)
         const mensaje = error instanceof Error ? error.message : 'Error interno'
         send('error', { mensaje })
       } finally {
+        console.log(`[generar-ia] finally: liberando mutex planId=${planId}`)
         await liberarLockIA(planId)
         controller.close()
+        console.log(`[generar-ia] finally: stream cerrado`)
       }
     },
   })
