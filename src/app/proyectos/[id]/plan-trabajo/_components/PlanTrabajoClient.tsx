@@ -156,21 +156,28 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
     setGenerando(true)
     setMensajeGenerar('Iniciando...')
     try {
+      console.log('[handleGenerar] fetch iniciado')
       const res = await fetch(`/api/proyectos/${proyectoId}/plan-trabajo/generar-ia`, { method: 'POST' })
+      console.log('[handleGenerar] respuesta:', res.status, res.ok, res.headers.get('content-type'))
       if (!res.ok) {
         const e = await res.json().catch(() => ({}))
-        throw new Error(e.error ?? 'Error al iniciar generación')
+        console.log('[handleGenerar] error body:', e)
+        throw new Error((e as { error?: string }).error ?? 'Error al iniciar generación')
       }
+      console.log('[handleGenerar] leyendo SSE stream...')
       await readSSEStream(
         res,
-        (msg) => setMensajeGenerar(msg),
+        (msg) => { console.log('[handleGenerar] status:', msg); setMensajeGenerar(msg) },
         async (data) => {
+          console.log('[handleGenerar] done:', data)
           await fetchContexto()
           const n = (data.seccionesGuardadas as string[] | undefined)?.length ?? 0
           toast.success(`Plan generado: ${n} secciones guardadas`)
         }
       )
+      console.log('[handleGenerar] SSE terminado')
     } catch (err) {
+      console.error('[handleGenerar] error:', err)
       toast.error(err instanceof Error ? err.message : 'Error al generar')
     } finally {
       setGenerando(false)
