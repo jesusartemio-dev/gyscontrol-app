@@ -141,6 +141,271 @@ REGLAS GENERALES:
 - Lenguaje técnico de ingeniería peruana, formal pero claro.
 `.trim()
 
+export const PLAN_TRABAJO_OUTPUT_SCHEMA_LOTE_A = `
+ESQUEMA JSON DE OUTPUT — LOTE A (devolvé EXACTAMENTE este JSON con SOLO estas 6 secciones, sin markdown):
+
+{
+  "objetivo": "string — 1-2 párrafos",
+  "alcanceGeneral": "string — 2-4 párrafos",
+  "alcanceDetallado": [
+    {
+      "numero": "11.1",
+      "nombre": "string",
+      "descripcion": "string",
+      "ubicacion": "string (opcional, puede omitirse)",
+      "tieneRiesgoAltura": false,
+      "tieneRiesgoCaliente": false,
+      "tieneRiesgoElectrico": false,
+      "tieneRiesgoEspacioConfinado": false,
+      "servicioCotizadoRefId": "COPIA AQUÍ el id= del ITEM DE SERVICIO del contexto",
+      "edtRefId": "COPIA AQUÍ el id= del EDT del cronograma del contexto"
+    }
+  ],
+  "eppRequeridos": {
+    "basico": [{ "nombre": "string", "norma": "string (opcional)", "observaciones": "string (opcional)" }],
+    "bioseguridad": [],
+    "riesgoEspecifico": []
+  },
+  "restricciones": [
+    { "texto": "string", "categoria": "GENERAL" }
+  ],
+  "referencias": [
+    {
+      "codigoDocumento": "string (opcional)",
+      "titulo": "string",
+      "origen": "NORMATIVA"
+    }
+  ]
+}
+`.trim()
+
+export const PLAN_TRABAJO_OUTPUT_SCHEMA_LOTE_B = `
+ESQUEMA JSON DE OUTPUT — LOTE B (devolvé EXACTAMENTE este JSON con SOLO estas 6 secciones, sin markdown):
+
+{
+  "herramientasYEquipos": {
+    "equipos": [{ "nombre": "string", "cantidad": 1, "unidad": "und", "observaciones": "" }],
+    "herramientas": [],
+    "materiales": []
+  },
+  "personalAsignado": [
+    {
+      "nombre": "string",
+      "cargo": "string",
+      "empresa": "GYS CONTROL INDUSTRIAL SAC",
+      "siglas": "AB",
+      "cip": "string (opcional)",
+      "email": "string (opcional)",
+      "telefono": "string (opcional)",
+      "proyectoOrgNodoRefId": "COPIA AQUÍ el id= del NODO del organigrama del contexto"
+    }
+  ],
+  "matrizRaci": {
+    "filas": [
+      {
+        "edt": "Nombre del EDT",
+        "asignaciones": [
+          { "siglas": "AB", "rol": "R" }
+        ]
+      }
+    ]
+  },
+  "histogramas": {
+    "meses": ["2026-02"],
+    "equipoTrabajo": [
+      { "etiqueta": "Nombre Persona", "valoresPorMes": [1], "total": 1 }
+    ],
+    "horasHombre": [
+      { "etiqueta": "Nombre Persona o EDT", "valoresPorMes": [76], "total": 76 }
+    ]
+  },
+  "cronogramaResumen": {
+    "filas": [
+      {
+        "fase": "Fase 1",
+        "edt": "EDT nombre",
+        "actividad": "Actividad (opcional)",
+        "fechaInicio": "2026-01-01",
+        "fechaFin": "2026-01-31",
+        "horasPlan": 100
+      }
+    ]
+  },
+  "responsabilidades": {
+    "gerenteGeneral": ["string"],
+    "supervisor": ["string"],
+    "operario": ["string"],
+    "supervisorSeguridad": ["string"]
+  }
+}
+`.trim()
+
+// Configuración de secciones para generación secuencial
+export interface SeccionConfig {
+  id: string
+  label: string
+  schema: string
+  // Si necesita datos previos de otra sección para ser coherente
+  dependeDe?: string
+}
+
+export const SECCIONES_CONFIG: SeccionConfig[] = [
+  {
+    id: 'objetivo',
+    label: 'Objetivo',
+    schema: `{ "objetivo": "string — 1-2 párrafos descriptivos del propósito del trabajo" }`,
+  },
+  {
+    id: 'alcanceGeneral',
+    label: 'Alcance General',
+    schema: `{ "alcanceGeneral": "string — 2-4 párrafos con el alcance técnico, ubicación, cliente y compromisos contractuales" }`,
+  },
+  {
+    id: 'alcanceDetallado',
+    label: 'Alcance Detallado',
+    schema: `{
+  "alcanceDetallado": [
+    {
+      "numero": "11.1",
+      "nombre": "string",
+      "descripcion": "string",
+      "ubicacion": "string (opcional)",
+      "tieneRiesgoAltura": false,
+      "tieneRiesgoCaliente": false,
+      "tieneRiesgoElectrico": false,
+      "tieneRiesgoEspacioConfinado": false,
+      "servicioCotizadoRefId": "COPIA el id= del ITEM DE SERVICIO del contexto",
+      "edtRefId": "COPIA el id= del EDT del cronograma del contexto"
+    }
+  ]
+}`,
+  },
+  {
+    id: 'eppRequeridos',
+    label: 'EPP Requeridos',
+    schema: `{
+  "eppRequeridos": {
+    "basico": [{ "nombre": "string", "norma": "string (opcional)", "observaciones": "string (opcional)" }],
+    "bioseguridad": [],
+    "riesgoEspecifico": []
+  }
+}`,
+  },
+  {
+    id: 'herramientasYEquipos',
+    label: 'Herramientas y Equipos',
+    schema: `{
+  "herramientasYEquipos": {
+    "equipos": [{ "nombre": "string", "cantidad": 1, "unidad": "und", "observaciones": "" }],
+    "herramientas": [],
+    "materiales": []
+  }
+}`,
+  },
+  {
+    id: 'restricciones',
+    label: 'Restricciones',
+    schema: `{
+  "restricciones": [
+    { "texto": "string", "categoria": "GENERAL" }
+  ]
+}`,
+  },
+  {
+    id: 'personalAsignado',
+    label: 'Personal Asignado',
+    schema: `{
+  "personalAsignado": [
+    {
+      "nombre": "string",
+      "cargo": "string",
+      "empresa": "GYS CONTROL INDUSTRIAL SAC",
+      "siglas": "AB",
+      "cip": "string (opcional)",
+      "email": "string (opcional)",
+      "telefono": "string (opcional)",
+      "proyectoOrgNodoRefId": "COPIA el id= del NODO del organigrama del contexto"
+    }
+  ]
+}`,
+  },
+  {
+    id: 'matrizRaci',
+    label: 'Matriz RACI',
+    schema: `{
+  "matrizRaci": {
+    "filas": [
+      {
+        "edt": "Nombre del EDT",
+        "asignaciones": [
+          { "siglas": "AB", "rol": "R" }
+        ]
+      }
+    ]
+  }
+}`,
+    dependeDe: 'personalAsignado',
+  },
+  {
+    id: 'histogramas',
+    label: 'Histogramas',
+    schema: `{
+  "histogramas": {
+    "meses": ["2026-02"],
+    "equipoTrabajo": [
+      { "etiqueta": "Nombre Persona", "valoresPorMes": [1], "total": 1 }
+    ],
+    "horasHombre": [
+      { "etiqueta": "Nombre Persona o EDT", "valoresPorMes": [76], "total": 76 }
+    ]
+  }
+}`,
+  },
+  {
+    id: 'cronogramaResumen',
+    label: 'Cronograma Resumen',
+    schema: `{
+  "cronogramaResumen": {
+    "filas": [
+      {
+        "fase": "Fase 1",
+        "edt": "EDT nombre",
+        "actividad": "Actividad (opcional)",
+        "fechaInicio": "2026-01-01",
+        "fechaFin": "2026-01-31",
+        "horasPlan": 100
+      }
+    ]
+  }
+}`,
+  },
+  {
+    id: 'responsabilidades',
+    label: 'Responsabilidades',
+    schema: `{
+  "responsabilidades": {
+    "gerenteGeneral": ["string"],
+    "supervisor": ["string"],
+    "operario": ["string"],
+    "supervisorSeguridad": ["string"]
+  }
+}`,
+  },
+  {
+    id: 'referencias',
+    label: 'Referencias',
+    schema: `{
+  "referencias": [
+    {
+      "codigoDocumento": "string (opcional)",
+      "titulo": "string",
+      "origen": "NORMATIVA"
+    }
+  ]
+}`,
+  },
+]
+
 export const PLAN_TRABAJO_OUTPUT_SCHEMA = `
 ESQUEMA JSON DE OUTPUT (devolvé EXACTAMENTE este JSON sin markdown):
 

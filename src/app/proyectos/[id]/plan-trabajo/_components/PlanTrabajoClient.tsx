@@ -1,9 +1,17 @@
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { Loader2, BookOpen, Plus } from 'lucide-react'
+import { Loader2, BookOpen, Plus, Sparkles, X, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog'
 
 import type { PlanTrabajoContexto, SeccionRegenerable } from '@/types/planTrabajo'
 import type { PlanTrabajo } from '@prisma/client'
@@ -75,12 +83,13 @@ function parseSSEPart(part: string): { event: string; data: Record<string, unkno
 
 async function readSSEStream(
   res: Response,
-  onStatus: (msg: string) => void,
-  onDone: (data: Record<string, unknown>) => void
+  onStatus: (msg: string, progreso?: number) => void,
+  onDone: (data: Record<string, unknown>) => Promise<void>
 ): Promise<void> {
   const reader = res.body!.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
+  let doneCalled = false
   while (true) {
     const { done, value } = await reader.read()
     if (done) break
@@ -91,11 +100,12 @@ async function readSSEStream(
       const parsed = parseSSEPart(part)
       if (!parsed) continue
       const { event, data } = parsed
-      if (event === 'status') onStatus(String(data.mensaje ?? ''))
-      else if (event === 'done') onDone(data)
+      if (event === 'status') onStatus(String(data.mensaje ?? ''), typeof data.progreso === 'number' ? data.progreso : undefined)
+      else if (event === 'done') { doneCalled = true; await onDone(data) }
       else if (event === 'error') throw new Error(String(data.mensaje ?? 'Error interno'))
     }
   }
+  if (!doneCalled) throw new Error('La generación finalizó sin respuesta — revisá los logs del servidor')
 }
 
 type SeccionEditable =
@@ -121,6 +131,9 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
   const [regenerando, setRegenerando] = useState<SeccionRegenerable | null>(null)
   const [mensajeRegen, setMensajeRegen] = useState('')
   const [editandoSeccion, setEditandoSeccion] = useState<SeccionEditable | null>(null)
+  const [recienCreado, setRecienCreado] = useState(false)
+  const [progresoGenerar, setProgresoGenerar] = useState(0)
+  const [errorGeneracion, setErrorGeneracion] = useState<{ mensaje: string } | null>(null)
 
   const fetchContexto = useCallback(async () => {
     try {
@@ -142,6 +155,7 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
       const res = await fetch(`/api/proyectos/${proyectoId}/plan-trabajo`, { method: 'POST' })
       if (res.ok || res.status === 409) {
         await fetchContexto()
+        setRecienCreado(true)
         toast.success('Plan de Trabajo creado')
       } else {
         const e = await res.json().catch(() => ({}))
@@ -163,32 +177,38 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
       )
       return
     }
+    setRecienCreado(false)
+    setErrorGeneracion(null)
+    setProgresoGenerar(0)
     setGenerando(true)
     setMensajeGenerar('Iniciando...')
     try {
-      console.log('[handleGenerar] fetch iniciado')
       const res = await fetch(`/api/proyectos/${proyectoId}/plan-trabajo/generar-ia`, { method: 'POST' })
-      console.log('[handleGenerar] respuesta:', res.status, res.ok, res.headers.get('content-type'))
       if (!res.ok) {
         const e = await res.json().catch(() => ({}))
-        console.log('[handleGenerar] error body:', e)
         throw new Error((e as { error?: string }).error ?? 'Error al iniciar generación')
       }
-      console.log('[handleGenerar] leyendo SSE stream...')
       await readSSEStream(
         res,
-        (msg) => { console.log('[handleGenerar] status:', msg); setMensajeGenerar(msg) },
+        (msg, progreso) => {
+          setMensajeGenerar(msg)
+          if (progreso !== undefined) setProgresoGenerar(progreso)
+        },
         async (data) => {
-          console.log('[handleGenerar] done:', data)
+          setProgresoGenerar(100)
           await fetchContexto()
-          const n = (data.seccionesGuardadas as string[] | undefined)?.length ?? 0
-          toast.success(`Plan generado: ${n} secciones guardadas`)
+          const guardadas = (data.seccionesGuardadas as string[] | undefined) ?? []
+          const conError = (data.seccionesConError as string[] | undefined) ?? []
+          if (conError.length > 0) {
+            toast.warning(`${guardadas.length} secciones guardadas. ${conError.length} con error: ${conError.join(', ')}`)
+          } else {
+            toast.success(`Plan generado: ${guardadas.length} secciones guardadas`)
+          }
         }
       )
-      console.log('[handleGenerar] SSE terminado')
     } catch (err) {
-      console.error('[handleGenerar] error:', err)
-      toast.error(err instanceof Error ? err.message : 'Error al generar')
+      const mensaje = err instanceof Error ? err.message : 'Error al generar el Plan de Trabajo'
+      setErrorGeneracion({ mensaje })
     } finally {
       setGenerando(false)
       setMensajeGenerar('')
@@ -284,12 +304,51 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
 
   return (
     <div className="space-y-4 p-4">
+      {errorGeneracion && (
+        <Dialog open onOpenChange={() => setErrorGeneracion(null)}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-destructive">
+                <AlertTriangle size={18} />
+                Error al generar el Plan de Trabajo
+              </DialogTitle>
+              <DialogDescription className="text-sm leading-relaxed pt-1">
+                {errorGeneracion.mensaje}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setErrorGeneracion(null)}>
+                Cerrar
+              </Button>
+              <Button
+                onClick={() => { setErrorGeneracion(null); handleGenerar() }}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white"
+              >
+                Reintentar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
       <PreRequisitosPanel prerrequisitos={prerrequisitos} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <CabeceraEditor proyectoId={proyectoId} plan={plan} onUpdated={fetchContexto} />
         <TogglesPanel proyectoId={proyectoId} plan={plan} onUpdated={fetchContexto} />
       </div>
+
+      {recienCreado && (
+        <div className="flex items-center gap-3 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-800">
+          <Sparkles size={16} className="text-indigo-500 shrink-0" />
+          <span>
+            <strong>¡Plan creado!</strong> Ahora hacé click en <strong>Generar con IA</strong> para rellenar todas las secciones automáticamente.
+          </span>
+          <button onClick={() => setRecienCreado(false)} className="ml-auto text-indigo-300 hover:text-indigo-500 shrink-0">
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       <div className="flex items-center gap-2">
         <BotonGenerarIA
@@ -298,7 +357,9 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
           generando={generando}
           iaOcupada={iaOcupada}
           mensajeProgreso={mensajeGenerar}
+          progreso={progresoGenerar}
           onGenerar={handleGenerar}
+          destacar={recienCreado}
         />
         <BotonExportarDocx
           proyectoId={proyectoId}
