@@ -14,7 +14,8 @@ import { guardarSecciones } from '@/lib/planTrabajo/guardarSecciones'
 import { RESUMEN_PROYECTO_PROMPT } from '@/lib/planTrabajo/prompts/resumirProyecto'
 import {
   PLAN_TRABAJO_SYSTEM_INSTRUCCIONES,
-  PLAN_TRABAJO_OUTPUT_SCHEMA,
+  PLAN_TRABAJO_OUTPUT_SCHEMA_LOTE_A,
+  PLAN_TRABAJO_OUTPUT_SCHEMA_LOTE_B,
 } from '@/lib/planTrabajo/prompts/generarPlan'
 import type { PlanTrabajoContexto } from '@/types/planTrabajo'
 
@@ -63,15 +64,16 @@ async function ejecutarFaseA(
     .join('\n')
 }
 
-async function ejecutarFaseB(
+async function ejecutarFaseBLote(
+  loteId: 'A' | 'B',
+  schema: string,
   resumenProyecto: string,
   contexto: PlanTrabajoContexto,
   userId: string
-): Promise<unknown> {
+): Promise<Record<string, unknown>> {
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const inicio = Date.now()
 
-  console.log(`[generar-ia] FaseB: llamando Sonnet (modelo=${MODELS.sonnet} max_tokens=8192)`)
   const response = await anthropic.messages.create({
     model: MODELS.sonnet,
     max_tokens: 8192,
@@ -81,25 +83,21 @@ async function ejecutarFaseB(
         text: PLAN_TRABAJO_SYSTEM_INSTRUCCIONES,
         cache_control: { type: 'ephemeral' },
       },
-      {
-        type: 'text',
-        text: PLAN_TRABAJO_OUTPUT_SCHEMA,
-        cache_control: { type: 'ephemeral' },
-      },
     ],
     messages: [
       {
         role: 'user',
-        content: `RESUMEN EJECUTIVO DEL PROYECTO:\n\n${resumenProyecto}\n\nGenera el JSON del Plan de Trabajo.`,
+        content: `RESUMEN EJECUTIVO DEL PROYECTO:\n\n${resumenProyecto}\n\nGenera el Plan de Trabajo según el lote indicado. Devolvé ÚNICAMENTE el JSON sin markdown:\n\n${schema}`,
       },
     ],
   })
 
   const usageRaw = response.usage as unknown as Record<string, number>
-  console.log(`[generar-ia] FaseB: Sonnet OK — stop_reason=${response.stop_reason} in=${response.usage.input_tokens} out=${response.usage.output_tokens} cache_create=${usageRaw.cache_creation_input_tokens ?? 0} cache_read=${usageRaw.cache_read_input_tokens ?? 0} ms=${Date.now()-inicio}`)
+  console.log(`[generar-ia] FaseBLote${loteId}: stop_reason=${response.stop_reason} in=${response.usage.input_tokens} out=${response.usage.output_tokens} cache_create=${usageRaw.cache_creation_input_tokens ?? 0} cache_read=${usageRaw.cache_read_input_tokens ?? 0} ms=${Date.now()-inicio}`)
+
   trackUsage({
     userId,
-    tipo: 'plan-trabajo.generar',
+    tipo: `plan-trabajo.lote${loteId}`,
     modelo: MODELS.sonnet,
     tokensInput: response.usage.input_tokens,
     tokensOutput: response.usage.output_tokens,
@@ -109,30 +107,56 @@ async function ejecutarFaseB(
     metadata: { proyectoId: contexto.proyecto.id },
   })
 
+  if (response.stop_reason === 'max_tokens') {
+    throw new Error(`Lote ${loteId} excede el límite de tokens — el contenido es demasiado extenso`)
+  }
+
   const texto = response.content
     .filter((b): b is Anthropic.TextBlock => b.type === 'text')
     .map(b => b.text)
     .join('')
 
-  // Limpiar markdown si la IA lo incluyó por error
   const jsonLimpio = texto
     .replace(/^```json\s*/i, '')
     .replace(/^```\s*/i, '')
     .replace(/\s*```\s*$/i, '')
     .trim()
 
-  console.log(`[generar-ia] FaseB: texto=${texto.length} chars, jsonLimpio=${jsonLimpio.length} chars`)
-  try {
-    const parsed = JSON.parse(jsonLimpio)
-    const keys = typeof parsed === 'object' && parsed !== null ? Object.keys(parsed as object) : []
-    console.log(`[generar-ia] FaseB: JSON.parse OK — keys: ${keys.join(', ')}`)
-    return parsed
-  } catch (parseErr) {
-    console.error(`[generar-ia] FaseB: JSON.parse FALLÓ — stop_reason=${response.stop_reason} output_tokens=${response.usage.output_tokens}`)
-    console.error(`[generar-ia] FaseB: primeros 300 chars del texto: ${texto.slice(0, 300)}`)
-    console.error(`[generar-ia] FaseB: últimos 200 chars del texto: ${texto.slice(-200)}`)
-    throw parseErr
+  return JSON.parse(jsonLimpio) as Record<string, unknown>
+}
+
+async function ejecutarFaseB(
+  resumenProyecto: string,
+  contexto: PlanTrabajoContexto,
+  userId: string,
+  onLoteADone: () => void,
+  onLoteBDone: () => void,
+): Promise<{ secciones: Record<string, unknown>; erroresLote: string[] }> {
+  const [resultadoA, resultadoB] = await Promise.allSettled([
+    ejecutarFaseBLote('A', PLAN_TRABAJO_OUTPUT_SCHEMA_LOTE_A, resumenProyecto, contexto, userId)
+      .then(data => { onLoteADone(); return data }),
+    ejecutarFaseBLote('B', PLAN_TRABAJO_OUTPUT_SCHEMA_LOTE_B, resumenProyecto, contexto, userId)
+      .then(data => { onLoteBDone(); return data }),
+  ])
+
+  const secciones: Record<string, unknown> = {}
+  const erroresLote: string[] = []
+
+  if (resultadoA.status === 'fulfilled') {
+    Object.assign(secciones, resultadoA.value)
+  } else {
+    console.error('[generar-ia] LoteA FALLÓ:', resultadoA.reason)
+    erroresLote.push('loteA')
   }
+
+  if (resultadoB.status === 'fulfilled') {
+    Object.assign(secciones, resultadoB.value)
+  } else {
+    console.error('[generar-ia] LoteB FALLÓ:', resultadoB.reason)
+    erroresLote.push('loteB')
+  }
+
+  return { secciones, erroresLote }
 }
 
 // ─── Endpoint ───────────────────────────────────────────────────────────────
@@ -231,29 +255,41 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
 
       try {
         // Fase A: Haiku resume el contexto
-        send('status', { fase: 'A', mensaje: 'Analizando contexto del proyecto con Haiku...' })
+        send('status', { fase: 'A', mensaje: 'Analizando contexto del proyecto...', progreso: 5 })
         const resumenProyecto = await ejecutarFaseA(contexto, userId)
         console.log(`[generar-ia] FaseA: resumen generado — ${resumenProyecto.length} chars`)
 
-        // Fase B: Sonnet genera el JSON estructurado
-        send('status', { fase: 'B', mensaje: 'Generando Plan de Trabajo con Sonnet...' })
-        const planJson = await ejecutarFaseB(resumenProyecto, contexto, userId)
+        // Fase B: Sonnet genera 2 lotes en paralelo
+        send('status', { fase: 'B', mensaje: 'Generando secciones con IA...', progreso: 20 })
+
+        const { secciones: seccionesBrutas, erroresLote } = await ejecutarFaseB(
+          resumenProyecto,
+          contexto,
+          userId,
+          () => send('status', { fase: 'loteA', mensaje: 'Lote A completado', progreso: 55 }),
+          () => send('status', { fase: 'loteB', mensaje: 'Lote B completado', progreso: 75 }),
+        )
+
+        if (Object.keys(seccionesBrutas).length === 0) {
+          throw new Error('Todos los lotes fallaron en la generación')
+        }
 
         // Validar secciones con Zod
-        send('status', { fase: 'validacion', mensaje: 'Validando estructura del resultado...' })
-        const { secciones, errores } = validarSeccionesPlan(planJson)
-        console.log(`[generar-ia] Validación: OK=[${Object.keys(secciones).join(',')}] ERR=[${Object.keys(errores).join(',')}]`)
+        send('status', { fase: 'validacion', mensaje: 'Validando estructura del resultado...', progreso: 85 })
+        const { secciones, errores } = validarSeccionesPlan(seccionesBrutas)
+        const todosLosErrores = [...erroresLote, ...Object.keys(errores)]
+        console.log(`[generar-ia] Validación: OK=[${Object.keys(secciones).join(',')}] ERR=[${todosLosErrores.join(',')}]`)
 
         // Persistir secciones válidas
-        send('status', { fase: 'persistencia', mensaje: 'Guardando secciones validadas...' })
+        send('status', { fase: 'persistencia', mensaje: 'Guardando secciones en la base de datos...', progreso: 97 })
         await guardarSecciones(proyectoId, secciones)
         console.log(`[generar-ia] Guardado OK — ${Object.keys(secciones).length} secciones`)
 
         // Resultado final
         send('done', {
           seccionesGuardadas: Object.keys(secciones),
-          seccionesConError: Object.keys(errores),
-          errores: Object.keys(errores).length > 0 ? errores : undefined,
+          seccionesConError: todosLosErrores,
+          errores: todosLosErrores.length > 0 ? { ...errores } : undefined,
         })
         console.log(`[generar-ia] done enviado`)
       } catch (error: unknown) {
