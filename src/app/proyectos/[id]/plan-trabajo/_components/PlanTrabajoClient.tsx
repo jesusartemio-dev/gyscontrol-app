@@ -153,6 +153,16 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
   }
 
   const handleGenerar = async () => {
+    if (!contexto?.prerrequisitos.puedeGenerar) {
+      const faltantes = contexto?.prerrequisitos.bloqueantesFaltantes ?? []
+      toast.error(
+        faltantes.length > 0
+          ? `Faltan prerrequisitos: ${faltantes.join(' · ')}`
+          : 'Completá los prerrequisitos antes de generar',
+        { duration: 6000 }
+      )
+      return
+    }
     setGenerando(true)
     setMensajeGenerar('Iniciando...')
     try {

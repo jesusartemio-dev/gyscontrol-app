@@ -25,7 +25,7 @@ export function BotonGenerarIA({ puedeGenerar, iaHabilitada, generando, iaOcupad
     <div className="flex items-center gap-3 rounded-lg border bg-white p-4">
       <Button
         onClick={onGenerar}
-        disabled={generando || !puedeGenerar || iaOcupada}
+        disabled={generando || iaOcupada}
         className="bg-indigo-600 hover:bg-indigo-700 text-white shrink-0"
       >
         {generando
