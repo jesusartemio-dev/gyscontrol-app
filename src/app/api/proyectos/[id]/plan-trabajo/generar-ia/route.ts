@@ -145,15 +145,17 @@ async function ejecutarFaseB(
   if (resultadoA.status === 'fulfilled') {
     Object.assign(secciones, resultadoA.value)
   } else {
-    console.error('[generar-ia] LoteA FALLÓ:', resultadoA.reason)
-    erroresLote.push('loteA')
+    const msg = resultadoA.reason instanceof Error ? resultadoA.reason.message : String(resultadoA.reason)
+    console.error('[generar-ia] LoteA FALLÓ:', msg)
+    erroresLote.push(`loteA: ${msg}`)
   }
 
   if (resultadoB.status === 'fulfilled') {
     Object.assign(secciones, resultadoB.value)
   } else {
-    console.error('[generar-ia] LoteB FALLÓ:', resultadoB.reason)
-    erroresLote.push('loteB')
+    const msg = resultadoB.reason instanceof Error ? resultadoB.reason.message : String(resultadoB.reason)
+    console.error('[generar-ia] LoteB FALLÓ:', msg)
+    erroresLote.push(`loteB: ${msg}`)
   }
 
   return { secciones, erroresLote }
@@ -271,7 +273,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
         )
 
         if (Object.keys(seccionesBrutas).length === 0) {
-          throw new Error('Todos los lotes fallaron en la generación')
+          throw new Error(`Todos los lotes fallaron: ${erroresLote.join(' | ')}`)
         }
 
         // Validar secciones con Zod
