@@ -13,6 +13,7 @@ import { CabeceraEditor } from './CabeceraEditor'
 import { TogglesPanel } from './TogglesPanel'
 import { BotonGenerarIA } from './BotonGenerarIA'
 import { BotonExportarDocx } from './BotonExportarDocx'
+import { BotonEliminarPlan } from './BotonEliminarPlan'
 import { HistorialGeneraciones } from './HistorialGeneraciones'
 import { SeccionContainer } from './SeccionContainer'
 
@@ -289,6 +290,13 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
           disabled={generando}
         />
         <HistorialGeneraciones proyectoId={proyectoId} />
+        <div className="ml-auto">
+          <BotonEliminarPlan
+            proyectoId={proyectoId}
+            onEliminado={() => window.location.reload()}
+            disabled={generando || !!iaOcupada}
+          />
+        </div>
       </div>
 
       {iaOcupada && (

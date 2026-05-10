@@ -143,6 +143,30 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   return NextResponse.json({ data: withCompletitud })
 }
 
+// DELETE /api/proyectos/[id]/plan-trabajo
+// Elimina el PlanTrabajo (y sus generaciones por CASCADE en la FK)
+export async function DELETE(_req: NextRequest, { params }: Ctx) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  }
+
+  const { id: proyectoId } = await params
+
+  const plan = await prisma.planTrabajo.findUnique({
+    where: { proyectoId },
+    select: { id: true },
+  })
+
+  if (!plan) {
+    return NextResponse.json({ error: 'El plan no existe' }, { status: 404 })
+  }
+
+  await prisma.planTrabajo.delete({ where: { id: plan.id } })
+
+  return NextResponse.json({ ok: true })
+}
+
 // GET /api/proyectos/[id]/plan-trabajo
 // Devuelve el PlanTrabajo con generaciones
 export async function GET(_req: NextRequest, { params }: Ctx) {
