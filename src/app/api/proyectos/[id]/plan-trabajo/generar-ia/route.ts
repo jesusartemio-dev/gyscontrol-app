@@ -71,10 +71,10 @@ async function ejecutarFaseB(
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const inicio = Date.now()
 
-  console.log(`[generar-ia] FaseB: llamando Sonnet (modelo=${MODELS.sonnet} max_tokens=16384)`)
+  console.log(`[generar-ia] FaseB: llamando Sonnet (modelo=${MODELS.sonnet} max_tokens=8192)`)
   const response = await anthropic.messages.create({
     model: MODELS.sonnet,
-    max_tokens: 16384,
+    max_tokens: 8192,
     system: [
       {
         type: 'text',
