@@ -1,11 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import { Loader2, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-
-const SECCIONES_LOTE_A = ['Objetivo', 'Alcance General', 'Alcance Detallado', 'EPP Requeridos', 'Restricciones', 'Referencias']
-const SECCIONES_LOTE_B = ['Herramientas y Equipos', 'Personal Asignado', 'Matriz RACI', 'Histogramas', 'Cronograma Resumen', 'Responsabilidades']
 
 interface Props {
   puedeGenerar: boolean
@@ -19,21 +15,6 @@ interface Props {
 }
 
 export function BotonGenerarIA({ puedeGenerar, iaHabilitada, generando, iaOcupada, mensajeProgreso, progreso = 0, onGenerar, destacar }: Props) {
-  const [seccionIdx, setSeccionIdx] = useState(0)
-
-  useEffect(() => {
-    if (!generando) { setSeccionIdx(0); return }
-    const interval = setInterval(() => setSeccionIdx(i => i + 1), 2500)
-    return () => clearInterval(interval)
-  }, [generando])
-
-  const mensajeVisible = (): string => {
-    if (!generando) return mensajeProgreso
-    if (progreso >= 20 && progreso < 55) return `Generando ${SECCIONES_LOTE_A[seccionIdx % SECCIONES_LOTE_A.length]}...`
-    if (progreso >= 55 && progreso < 85) return `Generando ${SECCIONES_LOTE_B[seccionIdx % SECCIONES_LOTE_B.length]}...`
-    return mensajeProgreso
-  }
-
   if (!iaHabilitada) {
     return (
       <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 p-4 text-center">
@@ -57,7 +38,7 @@ export function BotonGenerarIA({ puedeGenerar, iaHabilitada, generando, iaOcupad
       {generando ? (
         <div className="flex-1 space-y-1.5 min-w-0">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-xs text-muted-foreground truncate">{mensajeVisible()}</span>
+            <span className="text-xs text-muted-foreground truncate">{mensajeProgreso}</span>
             {progreso > 0 && (
               <span className="text-xs font-medium text-indigo-600 shrink-0">{progreso}%</span>
             )}

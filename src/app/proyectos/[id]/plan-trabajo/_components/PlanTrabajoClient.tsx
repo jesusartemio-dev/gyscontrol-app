@@ -84,7 +84,8 @@ function parseSSEPart(part: string): { event: string; data: Record<string, unkno
 async function readSSEStream(
   res: Response,
   onStatus: (msg: string, progreso?: number) => void,
-  onDone: (data: Record<string, unknown>) => Promise<void>
+  onDone: (data: Record<string, unknown>) => Promise<void>,
+  onSeccion?: (id: string) => Promise<void>
 ): Promise<void> {
   const reader = res.body!.getReader()
   const decoder = new TextDecoder()
@@ -101,6 +102,7 @@ async function readSSEStream(
       if (!parsed) continue
       const { event, data } = parsed
       if (event === 'status') onStatus(String(data.mensaje ?? ''), typeof data.progreso === 'number' ? data.progreso : undefined)
+      else if (event === 'seccion') { if (onSeccion) await onSeccion(String(data.id ?? '')) }
       else if (event === 'done') { doneCalled = true; await onDone(data) }
       else if (event === 'error') throw new Error(String(data.mensaje ?? 'Error interno'))
     }
@@ -204,7 +206,8 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
           } else {
             toast.success(`Plan generado: ${guardadas.length} secciones guardadas`)
           }
-        }
+        },
+        async () => { await fetchContexto() }
       )
     } catch (err) {
       const mensaje = err instanceof Error ? err.message : 'Error al generar el Plan de Trabajo'

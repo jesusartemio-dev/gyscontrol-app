@@ -14,8 +14,7 @@ import { guardarSecciones } from '@/lib/planTrabajo/guardarSecciones'
 import { RESUMEN_PROYECTO_PROMPT } from '@/lib/planTrabajo/prompts/resumirProyecto'
 import {
   PLAN_TRABAJO_SYSTEM_INSTRUCCIONES,
-  PLAN_TRABAJO_OUTPUT_SCHEMA_LOTE_A,
-  PLAN_TRABAJO_OUTPUT_SCHEMA_LOTE_B,
+  SECCIONES_CONFIG,
 } from '@/lib/planTrabajo/prompts/generarPlan'
 import type { PlanTrabajoContexto } from '@/types/planTrabajo'
 
@@ -64,19 +63,26 @@ async function ejecutarFaseA(
     .join('\n')
 }
 
-async function ejecutarFaseBLote(
-  loteId: 'A' | 'B',
+async function generarSeccion(
+  seccionId: string,
   schema: string,
+  label: string,
   resumenProyecto: string,
   contexto: PlanTrabajoContexto,
-  userId: string
-): Promise<Record<string, unknown>> {
+  userId: string,
+  prevResultados: Record<string, unknown>
+): Promise<unknown> {
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const inicio = Date.now()
 
+  // matrizRaci necesita las siglas del personal ya generado para ser coherente
+  const contextoPrevio = seccionId === 'matrizRaci' && prevResultados.personalAsignado
+    ? `\n\nPERSONAL YA GENERADO (usá las mismas siglas en la matriz):\n${JSON.stringify(prevResultados.personalAsignado, null, 2)}`
+    : ''
+
   const response = await anthropic.messages.create({
     model: MODELS.sonnet,
-    max_tokens: 8192,
+    max_tokens: 4096,
     system: [
       {
         type: 'text',
@@ -87,17 +93,17 @@ async function ejecutarFaseBLote(
     messages: [
       {
         role: 'user',
-        content: `RESUMEN EJECUTIVO DEL PROYECTO:\n\n${resumenProyecto}\n\nGenera el Plan de Trabajo según el lote indicado. Devolvé ÚNICAMENTE el JSON sin markdown:\n\n${schema}`,
+        content: `RESUMEN EJECUTIVO DEL PROYECTO:\n\n${resumenProyecto}${contextoPrevio}\n\nGenera SOLO la sección "${label}". Devolvé ÚNICAMENTE este JSON sin markdown:\n\n${schema}`,
       },
     ],
   })
 
   const usageRaw = response.usage as unknown as Record<string, number>
-  console.log(`[generar-ia] FaseBLote${loteId}: stop_reason=${response.stop_reason} in=${response.usage.input_tokens} out=${response.usage.output_tokens} cache_create=${usageRaw.cache_creation_input_tokens ?? 0} cache_read=${usageRaw.cache_read_input_tokens ?? 0} ms=${Date.now()-inicio}`)
+  console.log(`[generar-ia] ${seccionId}: stop_reason=${response.stop_reason} in=${response.usage.input_tokens} out=${response.usage.output_tokens} cache_create=${usageRaw.cache_creation_input_tokens ?? 0} cache_read=${usageRaw.cache_read_input_tokens ?? 0} ms=${Date.now()-inicio}`)
 
   trackUsage({
     userId,
-    tipo: `plan-trabajo.lote${loteId}`,
+    tipo: `plan-trabajo.seccion.${seccionId}`,
     modelo: MODELS.sonnet,
     tokensInput: response.usage.input_tokens,
     tokensOutput: response.usage.output_tokens,
@@ -108,7 +114,7 @@ async function ejecutarFaseBLote(
   })
 
   if (response.stop_reason === 'max_tokens') {
-    throw new Error(`Lote ${loteId} excede el límite de tokens — el contenido es demasiado extenso`)
+    throw new Error(`Sección "${label}" excede el límite de tokens`)
   }
 
   const texto = response.content
@@ -122,43 +128,8 @@ async function ejecutarFaseBLote(
     .replace(/\s*```\s*$/i, '')
     .trim()
 
-  return JSON.parse(jsonLimpio) as Record<string, unknown>
-}
-
-async function ejecutarFaseB(
-  resumenProyecto: string,
-  contexto: PlanTrabajoContexto,
-  userId: string,
-  onLoteADone: () => void,
-  onLoteBDone: () => void,
-): Promise<{ secciones: Record<string, unknown>; erroresLote: string[] }> {
-  const [resultadoA, resultadoB] = await Promise.allSettled([
-    ejecutarFaseBLote('A', PLAN_TRABAJO_OUTPUT_SCHEMA_LOTE_A, resumenProyecto, contexto, userId)
-      .then(data => { onLoteADone(); return data }),
-    ejecutarFaseBLote('B', PLAN_TRABAJO_OUTPUT_SCHEMA_LOTE_B, resumenProyecto, contexto, userId)
-      .then(data => { onLoteBDone(); return data }),
-  ])
-
-  const secciones: Record<string, unknown> = {}
-  const erroresLote: string[] = []
-
-  if (resultadoA.status === 'fulfilled') {
-    Object.assign(secciones, resultadoA.value)
-  } else {
-    const msg = resultadoA.reason instanceof Error ? resultadoA.reason.message : String(resultadoA.reason)
-    console.error('[generar-ia] LoteA FALLÓ:', msg)
-    erroresLote.push(`loteA: ${msg}`)
-  }
-
-  if (resultadoB.status === 'fulfilled') {
-    Object.assign(secciones, resultadoB.value)
-  } else {
-    const msg = resultadoB.reason instanceof Error ? resultadoB.reason.message : String(resultadoB.reason)
-    console.error('[generar-ia] LoteB FALLÓ:', msg)
-    erroresLote.push(`loteB: ${msg}`)
-  }
-
-  return { secciones, erroresLote }
+  const parsed = JSON.parse(jsonLimpio)
+  return (parsed as Record<string, unknown>)[seccionId]
 }
 
 // ─── Endpoint ───────────────────────────────────────────────────────────────
@@ -172,7 +143,6 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
   const { id: proyectoId } = await params
   const userId = session.user.id
 
-  // Verificar acceso al proyecto
   const proyectoBase = await prisma.proyecto.findUnique({
     where: { id: proyectoId },
     select: {
@@ -200,19 +170,16 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     return Response.json({ error: 'Sin acceso a este proyecto' }, { status: 403 })
   }
 
-  // Verificar feature flag
   const enabled = await isIAFeatureEnabled('planTrabajo')
   if (!enabled) {
     return Response.json({ error: 'La funcionalidad de IA para Plan de Trabajo está deshabilitada' }, { status: 403 })
   }
 
-  // Cargar contexto completo
   const contexto = await cargarContextoPlanTrabajo(proyectoId)
   if (!contexto) {
     return Response.json({ error: 'Proyecto no encontrado' }, { status: 404 })
   }
 
-  // Verificar prerrequisitos
   if (!contexto.prerrequisitos.puedeGenerar) {
     return Response.json(
       {
@@ -223,7 +190,6 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     )
   }
 
-  // Verificar que el PlanTrabajo existe (debe crearse primero con POST /plan-trabajo)
   if (!contexto.planTrabajo) {
     return Response.json(
       { error: 'El Plan de Trabajo no existe — crearlo primero con POST /plan-trabajo' },
@@ -231,7 +197,6 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     )
   }
 
-  // Mutex: prevenir operaciones IA paralelas en el mismo plan
   const planId = contexto.planTrabajo.id
   const lock = await adquirirLockIA(planId, 'generar')
   if (!lock.ok) {
@@ -242,13 +207,11 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     )
   }
 
-  // ─── SSE ───
   const encoder = new TextEncoder()
   console.log(`[generar-ia] Stream creado — planId=${planId} proyectoId=${proyectoId}`)
 
   const stream = new ReadableStream({
     async start(controller) {
-      console.log(`[generar-ia] start() iniciado`)
       const send = (event: string, data: unknown) => {
         controller.enqueue(
           encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
@@ -261,48 +224,55 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
         const resumenProyecto = await ejecutarFaseA(contexto, userId)
         console.log(`[generar-ia] FaseA: resumen generado — ${resumenProyecto.length} chars`)
 
-        // Fase B: Sonnet genera 2 lotes en paralelo
-        send('status', { fase: 'B', mensaje: 'Generando secciones con IA...', progreso: 20 })
+        // Fase B: Sonnet genera cada sección secuencialmente y la guarda al instante
+        const total = SECCIONES_CONFIG.length
+        const planParcial: Record<string, unknown> = {}
+        const seccionesGuardadas: string[] = []
+        const seccionesConError: string[] = []
 
-        const { secciones: seccionesBrutas, erroresLote } = await ejecutarFaseB(
-          resumenProyecto,
-          contexto,
-          userId,
-          () => send('status', { fase: 'loteA', mensaje: 'Lote A completado', progreso: 55 }),
-          () => send('status', { fase: 'loteB', mensaje: 'Lote B completado', progreso: 75 }),
-        )
+        for (let i = 0; i < total; i++) {
+          const { id, label, schema } = SECCIONES_CONFIG[i]
+          const progreso = 10 + Math.round((i / total) * 82)
+          send('status', { fase: `seccion-${id}`, mensaje: `Generando ${label}...`, progreso })
 
-        if (Object.keys(seccionesBrutas).length === 0) {
-          throw new Error(`Todos los lotes fallaron: ${erroresLote.join(' | ')}`)
+          try {
+            const valor = await generarSeccion(id, schema, label, resumenProyecto, contexto, userId, planParcial)
+            planParcial[id] = valor
+
+            // Validar y guardar esta sección inmediatamente
+            const { secciones: seccionValidada } = validarSeccionesPlan({ [id]: valor })
+            if (Object.keys(seccionValidada).length > 0) {
+              await guardarSecciones(proyectoId, seccionValidada)
+              seccionesGuardadas.push(id)
+              send('seccion', { id })
+              console.log(`[generar-ia] ${id}: guardado OK`)
+            } else {
+              seccionesConError.push(id)
+              console.warn(`[generar-ia] ${id}: validación falló`)
+            }
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err)
+            console.error(`[generar-ia] ${id}: FALLÓ — ${msg}`)
+            seccionesConError.push(id)
+          }
         }
 
-        // Validar secciones con Zod
-        send('status', { fase: 'validacion', mensaje: 'Validando estructura del resultado...', progreso: 85 })
-        const { secciones, errores } = validarSeccionesPlan(seccionesBrutas)
-        const todosLosErrores = [...erroresLote, ...Object.keys(errores)]
-        console.log(`[generar-ia] Validación: OK=[${Object.keys(secciones).join(',')}] ERR=[${todosLosErrores.join(',')}]`)
+        if (seccionesGuardadas.length === 0) {
+          throw new Error('Ninguna sección pudo generarse correctamente')
+        }
 
-        // Persistir secciones válidas
-        send('status', { fase: 'persistencia', mensaje: 'Guardando secciones en la base de datos...', progreso: 97 })
-        await guardarSecciones(proyectoId, secciones)
-        console.log(`[generar-ia] Guardado OK — ${Object.keys(secciones).length} secciones`)
-
-        // Resultado final
         send('done', {
-          seccionesGuardadas: Object.keys(secciones),
-          seccionesConError: todosLosErrores,
-          errores: todosLosErrores.length > 0 ? { ...errores } : undefined,
+          seccionesGuardadas,
+          seccionesConError,
         })
-        console.log(`[generar-ia] done enviado`)
+        console.log(`[generar-ia] done — guardadas=${seccionesGuardadas.length} errores=${seccionesConError.length}`)
       } catch (error: unknown) {
         console.error('[generar-ia] ERROR en start():', error)
         const mensaje = error instanceof Error ? error.message : 'Error interno'
         send('error', { mensaje })
       } finally {
-        console.log(`[generar-ia] finally: liberando mutex planId=${planId}`)
         await liberarLockIA(planId)
         controller.close()
-        console.log(`[generar-ia] finally: stream cerrado`)
       }
     },
   })
