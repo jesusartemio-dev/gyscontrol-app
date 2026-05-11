@@ -75,6 +75,50 @@ export async function guardarSecciones(
 const TEXT_SECCIONES = new Set<string>(['objetivo', 'alcanceGeneral'])
 
 /**
+ * Guarda una o más secciones SIN recalcular bloquesCompletitud.
+ * Usar en generación paralela — llamar recalcularCompletitud al final.
+ */
+export async function guardarSeccionParalela(
+  proyectoId: string,
+  secciones: Record<string, unknown>
+): Promise<void> {
+  const objetivoUpdate = typeof secciones.objetivo === 'string' ? { objetivo: secciones.objetivo } : {}
+  const alcanceGeneralUpdate = typeof secciones.alcanceGeneral === 'string' ? { alcanceGeneral: secciones.alcanceGeneral } : {}
+
+  const jsonUpdate: Record<string, ReturnType<typeof toPrismaJsonNullable>> = {}
+  for (const campo of CAMPOS_JSON) {
+    if (secciones[campo] !== undefined) {
+      jsonUpdate[campo] = toPrismaJsonNullable(secciones[campo])
+    }
+  }
+
+  await prisma.planTrabajo.update({
+    where: { proyectoId },
+    data: {
+      generadoConIA: true,
+      fechaGeneracionIA: new Date(),
+      ...objetivoUpdate,
+      ...alcanceGeneralUpdate,
+      ...(jsonUpdate as Parameters<typeof prisma.planTrabajo.update>[0]['data']),
+    },
+  })
+}
+
+/**
+ * Recalcula y persiste bloquesCompletitud leyendo el estado actual del plan.
+ * Llamar una única vez después de guardar todas las secciones en paralelo.
+ */
+export async function recalcularCompletitud(proyectoId: string): Promise<void> {
+  const plan = await prisma.planTrabajo.findUnique({ where: { proyectoId } })
+  if (!plan) return
+  const bloques = calcularCompletitud(plan)
+  await prisma.planTrabajo.update({
+    where: { proyectoId },
+    data: { bloquesCompletitud: bloques as Parameters<typeof prisma.planTrabajo.update>[0]['data']['bloquesCompletitud'] },
+  })
+}
+
+/**
  * Persiste una única sección regenerada del Plan de Trabajo.
  * Actualiza `ultimaSeccionRegenerada` y recalcula `bloquesCompletitud`.
  */

@@ -10,7 +10,7 @@ import { cargarContextoPlanTrabajo } from '@/lib/planTrabajo/cargarContexto'
 import { adquirirLockIA, liberarLockIA } from '@/lib/planTrabajo/mutex'
 import { serializarContextoParaIA } from '@/lib/planTrabajo/contextoIA'
 import { validarSeccionesPlan } from '@/lib/planTrabajo/validarSecciones'
-import { guardarSecciones } from '@/lib/planTrabajo/guardarSecciones'
+import { guardarSeccionParalela, recalcularCompletitud } from '@/lib/planTrabajo/guardarSecciones'
 import { RESUMEN_PROYECTO_PROMPT } from '@/lib/planTrabajo/prompts/resumirProyecto'
 import {
   PLAN_TRABAJO_SYSTEM_INSTRUCCIONES,
@@ -228,30 +228,29 @@ export async function POST(req: NextRequest, { params }: Ctx) {
         const resumenProyecto = await ejecutarFaseA(contexto, userId, signal)
         console.log(`[generar-ia] FaseA: resumen generado — ${resumenProyecto.length} chars`)
 
-        // Fase B: Sonnet genera cada sección secuencialmente y la guarda al instante
-        const total = SECCIONES_CONFIG.length
+        // Fase B: Sonnet genera secciones EN PARALELO (reduce ~300s → ~60s)
         const planParcial: Record<string, unknown> = {}
         const seccionesGuardadas: string[] = []
         const seccionesConError: string[] = []
 
-        for (let i = 0; i < total; i++) {
-          if (signal.aborted) {
-            console.log(`[generar-ia] Cancelado por el cliente — deteniendo en sección ${i}`)
-            break
-          }
+        // matrizRaci necesita personalAsignado — se ejecuta al final
+        const seccionesParalelas = SECCIONES_CONFIG.filter(s => s.id !== 'matrizRaci')
+        const matrizConfig = SECCIONES_CONFIG.find(s => s.id === 'matrizRaci')!
 
-          const { id, label, schema, maxTokens } = SECCIONES_CONFIG[i]
-          const progreso = 10 + Math.round((i / total) * 82)
-          send('status', { fase: `seccion-${id}`, mensaje: `Generando ${label}...`, progreso })
-
+        const generarYGuardar = async (
+          config: (typeof SECCIONES_CONFIG)[number],
+          prevResultados: Record<string, unknown> = {}
+        ) => {
+          const { id, label, schema, maxTokens } = config
+          if (signal.aborted) return
+          send('status', { fase: `seccion-${id}`, mensaje: `Generando ${label}...` })
           try {
-            const valor = await generarSeccion(id, schema, label, resumenProyecto, contexto, userId, planParcial, signal, maxTokens)
+            const valor = await generarSeccion(id, schema, label, resumenProyecto, contexto, userId, prevResultados, signal, maxTokens)
             planParcial[id] = valor
 
-            // Validar y guardar esta sección inmediatamente
             const { secciones: seccionValidada, errores: erroresValidacion } = validarSeccionesPlan({ [id]: valor })
             if (Object.keys(seccionValidada).length > 0) {
-              await guardarSecciones(proyectoId, seccionValidada)
+              await guardarSeccionParalela(proyectoId, seccionValidada)
               seccionesGuardadas.push(id)
               send('seccion', { id })
               console.log(`[generar-ia] ${id}: guardado OK`)
@@ -262,11 +261,25 @@ export async function POST(req: NextRequest, { params }: Ctx) {
               console.warn(`[generar-ia] ${id}: ${motivo}`)
             }
           } catch (err) {
+            if (signal.aborted) return
             const motivo = err instanceof Error ? err.message : String(err)
             console.error(`[generar-ia] ${id}: FALLÓ — ${motivo}`)
             seccionesConError.push(id)
             send('seccion-error', { id, motivo })
           }
+        }
+
+        send('status', { fase: 'paralelo', mensaje: 'Generando secciones del plan...', progreso: 10 })
+        await Promise.allSettled(seccionesParalelas.map(config => generarYGuardar(config)))
+
+        // matrizRaci: secuencial después del paralelo para tener personalAsignado
+        if (!signal.aborted) {
+          await generarYGuardar(matrizConfig, { personalAsignado: planParcial.personalAsignado })
+        }
+
+        // Recalcular bloquesCompletitud una sola vez al final (evita race condition)
+        if (seccionesGuardadas.length > 0) {
+          await recalcularCompletitud(proyectoId)
         }
 
         if (seccionesGuardadas.length === 0 && !signal.aborted) {
