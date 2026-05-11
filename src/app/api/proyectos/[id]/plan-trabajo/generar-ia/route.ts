@@ -27,7 +27,8 @@ type Ctx = { params: Promise<{ id: string }> }
 
 async function ejecutarFaseA(
   contexto: PlanTrabajoContexto,
-  userId: string
+  userId: string,
+  signal?: AbortSignal
 ): Promise<string> {
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const contextoSerializado = serializarContextoParaIA(contexto)
@@ -44,7 +45,7 @@ async function ejecutarFaseA(
         content: `CONTEXTO DEL PROYECTO:\n\n${contextoSerializado}\n\nGenera el resumen ejecutivo técnico.`,
       },
     ],
-  })
+  }, { signal })
   console.log(`[generar-ia] FaseA: Haiku OK — stop_reason=${response.stop_reason} in=${response.usage.input_tokens} out=${response.usage.output_tokens} ms=${Date.now()-inicio}`)
 
   trackUsage({
@@ -70,7 +71,8 @@ async function generarSeccion(
   resumenProyecto: string,
   contexto: PlanTrabajoContexto,
   userId: string,
-  prevResultados: Record<string, unknown>
+  prevResultados: Record<string, unknown>,
+  signal?: AbortSignal
 ): Promise<unknown> {
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const inicio = Date.now()
@@ -96,7 +98,7 @@ async function generarSeccion(
         content: `RESUMEN EJECUTIVO DEL PROYECTO:\n\n${resumenProyecto}${contextoPrevio}\n\nGenera SOLO la sección "${label}". Devolvé ÚNICAMENTE este JSON sin markdown:\n\n${schema}`,
       },
     ],
-  })
+  }, { signal })
 
   const usageRaw = response.usage as unknown as Record<string, number>
   console.log(`[generar-ia] ${seccionId}: stop_reason=${response.stop_reason} in=${response.usage.input_tokens} out=${response.usage.output_tokens} cache_create=${usageRaw.cache_creation_input_tokens ?? 0} cache_read=${usageRaw.cache_read_input_tokens ?? 0} ms=${Date.now()-inicio}`)
@@ -134,7 +136,7 @@ async function generarSeccion(
 
 // ─── Endpoint ───────────────────────────────────────────────────────────────
 
-export async function POST(_req: NextRequest, { params }: Ctx) {
+export async function POST(req: NextRequest, { params }: Ctx) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) {
     return new Response('No autorizado', { status: 401 })
@@ -142,6 +144,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
 
   const { id: proyectoId } = await params
   const userId = session.user.id
+  const signal = req.signal
 
   const proyectoBase = await prisma.proyecto.findUnique({
     where: { id: proyectoId },
@@ -221,7 +224,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
       try {
         // Fase A: Haiku resume el contexto
         send('status', { fase: 'A', mensaje: 'Analizando contexto del proyecto...', progreso: 5 })
-        const resumenProyecto = await ejecutarFaseA(contexto, userId)
+        const resumenProyecto = await ejecutarFaseA(contexto, userId, signal)
         console.log(`[generar-ia] FaseA: resumen generado — ${resumenProyecto.length} chars`)
 
         // Fase B: Sonnet genera cada sección secuencialmente y la guarda al instante
@@ -231,12 +234,17 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
         const seccionesConError: string[] = []
 
         for (let i = 0; i < total; i++) {
+          if (signal.aborted) {
+            console.log(`[generar-ia] Cancelado por el cliente — deteniendo en sección ${i}`)
+            break
+          }
+
           const { id, label, schema } = SECCIONES_CONFIG[i]
           const progreso = 10 + Math.round((i / total) * 82)
           send('status', { fase: `seccion-${id}`, mensaje: `Generando ${label}...`, progreso })
 
           try {
-            const valor = await generarSeccion(id, schema, label, resumenProyecto, contexto, userId, planParcial)
+            const valor = await generarSeccion(id, schema, label, resumenProyecto, contexto, userId, planParcial, signal)
             planParcial[id] = valor
 
             // Validar y guardar esta sección inmediatamente
@@ -257,13 +265,14 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
           }
         }
 
-        if (seccionesGuardadas.length === 0) {
+        if (seccionesGuardadas.length === 0 && !signal.aborted) {
           throw new Error('Ninguna sección pudo generarse correctamente')
         }
 
         send('done', {
           seccionesGuardadas,
           seccionesConError,
+          cancelado: signal.aborted,
         })
         console.log(`[generar-ia] done — guardadas=${seccionesGuardadas.length} errores=${seccionesConError.length}`)
       } catch (error: unknown) {

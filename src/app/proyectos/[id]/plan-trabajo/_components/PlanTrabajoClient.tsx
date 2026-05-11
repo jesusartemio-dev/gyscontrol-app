@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Loader2, BookOpen, Plus, Sparkles, X, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -85,29 +85,44 @@ async function readSSEStream(
   res: Response,
   onStatus: (msg: string, progreso?: number) => void,
   onDone: (data: Record<string, unknown>) => Promise<void>,
-  onSeccion?: (id: string) => Promise<void>
+  onSeccion?: (id: string) => Promise<void>,
+  signal?: AbortSignal
 ): Promise<void> {
   const reader = res.body!.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
   let doneCalled = false
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    buffer += decoder.decode(value, { stream: true })
-    const parts = buffer.split('\n\n')
-    buffer = parts.pop()!
-    for (const part of parts) {
-      const parsed = parseSSEPart(part)
-      if (!parsed) continue
-      const { event, data } = parsed
-      if (event === 'status') onStatus(String(data.mensaje ?? ''), typeof data.progreso === 'number' ? data.progreso : undefined)
-      else if (event === 'seccion') { if (onSeccion) await onSeccion(String(data.id ?? '')) }
-      else if (event === 'done') { doneCalled = true; await onDone(data) }
-      else if (event === 'error') throw new Error(String(data.mensaje ?? 'Error interno'))
+
+  const abortHandler = () => reader.cancel().catch(() => {})
+  signal?.addEventListener('abort', abortHandler)
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const parts = buffer.split('\n\n')
+      buffer = parts.pop()!
+      for (const part of parts) {
+        const parsed = parseSSEPart(part)
+        if (!parsed) continue
+        const { event, data } = parsed
+        if (event === 'status') onStatus(String(data.mensaje ?? ''), typeof data.progreso === 'number' ? data.progreso : undefined)
+        else if (event === 'seccion') { if (onSeccion) await onSeccion(String(data.id ?? '')) }
+        else if (event === 'done') { doneCalled = true; await onDone(data) }
+        else if (event === 'error') throw new Error(String(data.mensaje ?? 'Error interno'))
+      }
     }
+  } catch (err) {
+    if (signal?.aborted) return
+    throw err
+  } finally {
+    signal?.removeEventListener('abort', abortHandler)
   }
-  if (!doneCalled) throw new Error('La generación finalizó sin respuesta — revisá los logs del servidor')
+
+  if (!doneCalled && !signal?.aborted) {
+    throw new Error('La generación finalizó sin respuesta — revisá los logs del servidor')
+  }
 }
 
 type SeccionEditable =
@@ -136,6 +151,7 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
   const [recienCreado, setRecienCreado] = useState(false)
   const [progresoGenerar, setProgresoGenerar] = useState(0)
   const [errorGeneracion, setErrorGeneracion] = useState<{ mensaje: string } | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
 
   const fetchContexto = useCallback(async () => {
     try {
@@ -168,6 +184,10 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
     }
   }
 
+  const handleCancelar = () => {
+    abortRef.current?.abort()
+  }
+
   const handleGenerar = async () => {
     if (!contexto?.prerrequisitos.puedeGenerar) {
       const faltantes = contexto?.prerrequisitos.bloqueantesFaltantes ?? []
@@ -184,8 +204,13 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
     setProgresoGenerar(0)
     setGenerando(true)
     setMensajeGenerar('Iniciando...')
+    const abort = new AbortController()
+    abortRef.current = abort
     try {
-      const res = await fetch(`/api/proyectos/${proyectoId}/plan-trabajo/generar-ia`, { method: 'POST' })
+      const res = await fetch(`/api/proyectos/${proyectoId}/plan-trabajo/generar-ia`, {
+        method: 'POST',
+        signal: abort.signal,
+      })
       if (!res.ok) {
         const e = await res.json().catch(() => ({}))
         throw new Error((e as { error?: string }).error ?? 'Error al iniciar generación')
@@ -201,18 +226,27 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
           await fetchContexto()
           const guardadas = (data.seccionesGuardadas as string[] | undefined) ?? []
           const conError = (data.seccionesConError as string[] | undefined) ?? []
-          if (conError.length > 0) {
+          const cancelado = data.cancelado === true
+          if (cancelado) {
+            toast.info(`Generación cancelada. ${guardadas.length} secciones guardadas.`)
+          } else if (conError.length > 0) {
             toast.warning(`${guardadas.length} secciones guardadas. ${conError.length} con error: ${conError.join(', ')}`)
           } else {
             toast.success(`Plan generado: ${guardadas.length} secciones guardadas`)
           }
         },
-        async () => { await fetchContexto() }
+        async () => { await fetchContexto() },
+        abort.signal
       )
     } catch (err) {
+      if (abort.signal.aborted) {
+        toast.info('Generación cancelada')
+        return
+      }
       const mensaje = err instanceof Error ? err.message : 'Error al generar el Plan de Trabajo'
       setErrorGeneracion({ mensaje })
     } finally {
+      abortRef.current = null
       setGenerando(false)
       setMensajeGenerar('')
     }
@@ -362,6 +396,7 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
           mensajeProgreso={mensajeGenerar}
           progreso={progresoGenerar}
           onGenerar={handleGenerar}
+          onCancelar={handleCancelar}
           destacar={recienCreado}
         />
         <BotonExportarDocx
