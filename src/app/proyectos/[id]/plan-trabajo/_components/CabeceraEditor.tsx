@@ -42,9 +42,9 @@ export function CabeceraEditor({ proyectoId, plan, onUpdated }: Props) {
 
   const p = plan as unknown as Record<string, string>
 
-  const startEdit = () => {
+  const startEdit = async () => {
     const userName = session?.user?.name ?? session?.user?.email ?? ''
-    setForm({
+    const defaultForm: FormState = {
       codigoDocumento: plan.codigoDocumento ?? '',
       numeroRevision: plan.numeroRevision ?? 'A',
       tipoEmision: plan.tipoEmision ?? 'B - Para Revisión',
@@ -54,8 +54,27 @@ export function CabeceraEditor({ proyectoId, plan, onUpdated }: Props) {
       revisadoCargo:   p.revisadoCargo   || 'Coordinador Ingeniería',
       aprobadoPor:     p.aprobadoPor     || 'Jesus Mamani',
       aprobadoCargo:   p.aprobadoCargo   || 'Gerente de Proyecto',
-    })
+    }
+    setForm(defaultForm)
     setEditing(true)
+
+    // Si algún firmante estaba vacío en la DB, guardar los defaults automáticamente
+    const firmantesFaltantes = !p.preparadoPor || !p.revisadoPor || !p.aprobadoPor
+    if (firmantesFaltantes) {
+      try {
+        const res = await fetch(`/api/proyectos/${proyectoId}/plan-trabajo`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(defaultForm),
+        })
+        if (res.ok) {
+          await onUpdated()
+          toast.success('Firmantes guardados por defecto — podés editarlos')
+        }
+      } catch {
+        // silencioso: el usuario puede guardar manualmente
+      }
+    }
   }
 
   const set = (key: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
