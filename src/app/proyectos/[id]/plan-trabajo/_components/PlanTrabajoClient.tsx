@@ -96,22 +96,29 @@ async function readSSEStream(
   const abortHandler = () => reader.cancel().catch(() => {})
   signal?.addEventListener('abort', abortHandler)
 
+  const procesarPart = async (part: string) => {
+    const parsed = parseSSEPart(part)
+    if (!parsed) return
+    const { event, data } = parsed
+    if (event === 'status') onStatus(String(data.mensaje ?? ''), typeof data.progreso === 'number' ? data.progreso : undefined)
+    else if (event === 'seccion') { if (onSeccion) await onSeccion(String(data.id ?? '')) }
+    else if (event === 'done') { doneCalled = true; await onDone(data) }
+    else if (event === 'error') throw new Error(String(data.mensaje ?? 'Error interno'))
+  }
+
   try {
     while (true) {
       const { done, value } = await reader.read()
-      if (done) break
+      if (done) {
+        // Flush decoder y procesar cualquier dato restante en el buffer
+        buffer += decoder.decode()
+        if (buffer.trim()) await procesarPart(buffer)
+        break
+      }
       buffer += decoder.decode(value, { stream: true })
       const parts = buffer.split('\n\n')
       buffer = parts.pop()!
-      for (const part of parts) {
-        const parsed = parseSSEPart(part)
-        if (!parsed) continue
-        const { event, data } = parsed
-        if (event === 'status') onStatus(String(data.mensaje ?? ''), typeof data.progreso === 'number' ? data.progreso : undefined)
-        else if (event === 'seccion') { if (onSeccion) await onSeccion(String(data.id ?? '')) }
-        else if (event === 'done') { doneCalled = true; await onDone(data) }
-        else if (event === 'error') throw new Error(String(data.mensaje ?? 'Error interno'))
-      }
+      for (const part of parts) await procesarPart(part)
     }
   } catch (err) {
     if (signal?.aborted) return
@@ -151,6 +158,7 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
   const [recienCreado, setRecienCreado] = useState(false)
   const [progresoGenerar, setProgresoGenerar] = useState(0)
   const [errorGeneracion, setErrorGeneracion] = useState<{ mensaje: string } | null>(null)
+  const [confirmandoRegenerar, setConfirmandoRegenerar] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
 
   const fetchContexto = useCallback(async () => {
@@ -188,17 +196,8 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
     abortRef.current?.abort()
   }
 
-  const handleGenerar = async () => {
-    if (!contexto?.prerrequisitos.puedeGenerar) {
-      const faltantes = contexto?.prerrequisitos.bloqueantesFaltantes ?? []
-      toast.error(
-        faltantes.length > 0
-          ? `Faltan prerrequisitos: ${faltantes.join(' · ')}`
-          : 'Completá los prerrequisitos antes de generar',
-        { duration: 6000 }
-      )
-      return
-    }
+  const iniciarGeneracion = async () => {
+    setConfirmandoRegenerar(false)
     setRecienCreado(false)
     setErrorGeneracion(null)
     setProgresoGenerar(0)
@@ -250,6 +249,27 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
       setGenerando(false)
       setMensajeGenerar('')
     }
+  }
+
+  const handleGenerar = async () => {
+    if (!contexto?.prerrequisitos.puedeGenerar) {
+      const faltantes = contexto?.prerrequisitos.bloqueantesFaltantes ?? []
+      toast.error(
+        faltantes.length > 0
+          ? `Faltan prerrequisitos: ${faltantes.join(' · ')}`
+          : 'Completá los prerrequisitos antes de generar',
+        { duration: 6000 }
+      )
+      return
+    }
+    // Si ya hay secciones generadas, pedir confirmación antes de sobreescribir
+    const bloquesActuales = (contexto?.planTrabajo as Record<string, unknown>)?.bloquesCompletitud as Record<string, boolean> | undefined
+    const seccionesCompletas = Object.values(bloquesActuales ?? {}).filter(Boolean).length
+    if (seccionesCompletas > 0) {
+      setConfirmandoRegenerar(true)
+      return
+    }
+    await iniciarGeneracion()
   }
 
   const handleRegen = async (seccion: SeccionRegenerable, instruccionesAdicionales?: string) => {
@@ -339,8 +359,40 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
     return Math.round((Date.now() - new Date(fecha).getTime()) / 60000)
   }
 
+  const seccionesCompletas = Object.values(bloques).filter(Boolean).length
+
   return (
     <div className="space-y-4 p-4">
+      {confirmandoRegenerar && (
+        <Dialog open onOpenChange={() => setConfirmandoRegenerar(false)}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-amber-600">
+                <AlertTriangle size={18} />
+                ¿Regenerar todo el plan?
+              </DialogTitle>
+              <DialogDescription className="text-sm leading-relaxed pt-1">
+                Ya tenés <strong>{seccionesCompletas} sección{seccionesCompletas !== 1 ? 'es' : ''} generada{seccionesCompletas !== 1 ? 's' : ''}</strong>.
+                Si regenerás todo, el contenido existente será sobreescrito.
+                <br /><br />
+                Para actualizar solo una sección usá el botón <span className="font-mono">↻</span> en cada sección individualmente.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setConfirmandoRegenerar(false)}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={iniciarGeneracion}
+                className="bg-amber-600 hover:bg-amber-700 text-white"
+              >
+                Sí, regenerar todo
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
       {errorGeneracion && (
         <Dialog open onOpenChange={() => setErrorGeneracion(null)}>
           <DialogContent className="sm:max-w-md">

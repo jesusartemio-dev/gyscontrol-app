@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useSession } from 'next-auth/react'
 import { Pencil, Save, X, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -34,39 +35,34 @@ type FormState = {
 }
 
 export function CabeceraEditor({ proyectoId, plan, onUpdated }: Props) {
+  const { data: session } = useSession()
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState<FormState>({
-    codigoDocumento: plan.codigoDocumento ?? '',
-    numeroRevision: plan.numeroRevision ?? 'A',
-    tipoEmision: plan.tipoEmision ?? 'B - Para Revisión',
-    preparadoPor: (plan as unknown as Record<string, string>).preparadoPor ?? '',
-    preparadoCargo: (plan as unknown as Record<string, string>).preparadoCargo ?? '',
-    revisadoPor: (plan as unknown as Record<string, string>).revisadoPor ?? '',
-    revisadoCargo: (plan as unknown as Record<string, string>).revisadoCargo ?? '',
-    aprobadoPor: (plan as unknown as Record<string, string>).aprobadoPor ?? '',
-    aprobadoCargo: (plan as unknown as Record<string, string>).aprobadoCargo ?? '',
-  })
+  const [form, setForm] = useState<FormState | null>(null)
+
+  const p = plan as unknown as Record<string, string>
 
   const startEdit = () => {
+    const userName = session?.user?.name ?? session?.user?.email ?? ''
     setForm({
       codigoDocumento: plan.codigoDocumento ?? '',
       numeroRevision: plan.numeroRevision ?? 'A',
       tipoEmision: plan.tipoEmision ?? 'B - Para Revisión',
-      preparadoPor: (plan as unknown as Record<string, string>).preparadoPor ?? '',
-      preparadoCargo: (plan as unknown as Record<string, string>).preparadoCargo ?? '',
-      revisadoPor: (plan as unknown as Record<string, string>).revisadoPor ?? '',
-      revisadoCargo: (plan as unknown as Record<string, string>).revisadoCargo ?? '',
-      aprobadoPor: (plan as unknown as Record<string, string>).aprobadoPor ?? '',
-      aprobadoCargo: (plan as unknown as Record<string, string>).aprobadoCargo ?? '',
+      preparadoPor:    p.preparadoPor    || userName,
+      preparadoCargo:  p.preparadoCargo  || 'Ing. de Proyectos',
+      revisadoPor:     p.revisadoPor     || 'Heber Conza',
+      revisadoCargo:   p.revisadoCargo   || 'Coordinador Ingeniería',
+      aprobadoPor:     p.aprobadoPor     || 'Jesus Mamani',
+      aprobadoCargo:   p.aprobadoCargo   || 'Gerente de Proyecto',
     })
     setEditing(true)
   }
 
   const set = (key: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    setForm(f => ({ ...f, [key]: e.target.value }))
+    setForm(f => f ? { ...f, [key]: e.target.value } : f)
 
   const handleSave = async () => {
+    if (!form) return
     setSaving(true)
     try {
       const res = await fetch(`/api/proyectos/${proyectoId}/plan-trabajo`, {
@@ -88,8 +84,6 @@ export function CabeceraEditor({ proyectoId, plan, onUpdated }: Props) {
     }
   }
 
-  const p = plan as unknown as Record<string, string>
-
   return (
     <div className="rounded-lg border bg-white p-4 space-y-3">
       <div className="flex items-center justify-between">
@@ -110,7 +104,7 @@ export function CabeceraEditor({ proyectoId, plan, onUpdated }: Props) {
         )}
       </div>
 
-      {editing ? (
+      {editing && form ? (
         <div className="space-y-4">
           {/* Identificación */}
           <div className="space-y-2">
@@ -142,8 +136,8 @@ export function CabeceraEditor({ proyectoId, plan, onUpdated }: Props) {
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Firmantes</p>
             {([
               ['preparadoPor', 'preparadoCargo', 'Preparado por'],
-              ['revisadoPor', 'revisadoCargo', 'Revisado por'],
-              ['aprobadoPor', 'aprobadoCargo', 'Aprobado por'],
+              ['revisadoPor',  'revisadoCargo',  'Revisado por'],
+              ['aprobadoPor',  'aprobadoCargo',  'Aprobado por'],
             ] as [keyof FormState, keyof FormState, string][]).map(([nombreKey, cargoKey, label]) => (
               <div key={nombreKey} className="grid grid-cols-2 gap-2">
                 <div>
@@ -168,18 +162,15 @@ export function CabeceraEditor({ proyectoId, plan, onUpdated }: Props) {
           </div>
 
           {/* Firmantes — vista */}
-          {(p.preparadoPor || p.revisadoPor || p.aprobadoPor) && (
+          {(p.preparadoPor || p.revisadoPor || p.aprobadoPor) ? (
             <div className="border-t pt-2 grid grid-cols-1 gap-1.5">
               {p.preparadoPor && <Row label="Preparado por" value={`${p.preparadoPor}${p.preparadoCargo ? ` · ${p.preparadoCargo}` : ''}`} />}
-              {p.revisadoPor && <Row label="Revisado por" value={`${p.revisadoPor}${p.revisadoCargo ? ` · ${p.revisadoCargo}` : ''}`} />}
-              {p.aprobadoPor && <Row label="Aprobado por" value={`${p.aprobadoPor}${p.aprobadoCargo ? ` · ${p.aprobadoCargo}` : ''}`} />}
+              {p.revisadoPor  && <Row label="Revisado por"  value={`${p.revisadoPor}${p.revisadoCargo   ? ` · ${p.revisadoCargo}`   : ''}`} />}
+              {p.aprobadoPor  && <Row label="Aprobado por"  value={`${p.aprobadoPor}${p.aprobadoCargo   ? ` · ${p.aprobadoCargo}`   : ''}`} />}
             </div>
-          )}
-
-          {/* Hint cuando faltan firmantes */}
-          {!p.preparadoPor && (
-            <p className="text-xs text-amber-600 italic">
-              Completá los firmantes (Preparado/Revisado/Aprobado por) antes de exportar.
+          ) : (
+            <p className="text-xs text-amber-600 italic border-t pt-2">
+              Completá los firmantes antes de exportar — hacé click en el lápiz ✏️.
             </p>
           )}
         </div>
