@@ -102,6 +102,12 @@ async function readSSEStream(
     const { event, data } = parsed
     if (event === 'status') onStatus(String(data.mensaje ?? ''), typeof data.progreso === 'number' ? data.progreso : undefined)
     else if (event === 'seccion') { if (onSeccion) await onSeccion(String(data.id ?? '')) }
+    else if (event === 'seccion-error') {
+      const id = String(data.id ?? '')
+      const motivo = String(data.motivo ?? 'error desconocido')
+      console.warn(`[IA] Sección ${id} falló: ${motivo}`)
+      toast.warning(`Sección "${id}" no se pudo generar: ${motivo.slice(0, 120)}`)
+    }
     else if (event === 'done') { doneCalled = true; await onDone(data) }
     else if (event === 'error') throw new Error(String(data.mensaje ?? 'Error interno'))
   }

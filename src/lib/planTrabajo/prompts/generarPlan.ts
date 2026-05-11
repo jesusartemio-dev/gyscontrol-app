@@ -262,7 +262,7 @@ export interface SeccionConfig {
   id: string
   label: string
   schema: string
-  // Si necesita datos previos de otra sección para ser coherente
+  maxTokens?: number   // override del límite por defecto (4096)
   dependeDe?: string
 }
 
@@ -280,6 +280,7 @@ export const SECCIONES_CONFIG: SeccionConfig[] = [
   {
     id: 'alcanceDetallado',
     label: 'Alcance Detallado',
+    maxTokens: 8192,
     schema: `{
   "alcanceDetallado": [
     {

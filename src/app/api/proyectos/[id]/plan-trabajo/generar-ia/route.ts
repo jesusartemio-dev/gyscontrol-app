@@ -72,7 +72,8 @@ async function generarSeccion(
   contexto: PlanTrabajoContexto,
   userId: string,
   prevResultados: Record<string, unknown>,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  maxTokens = 4096
 ): Promise<unknown> {
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const inicio = Date.now()
@@ -84,7 +85,7 @@ async function generarSeccion(
 
   const response = await anthropic.messages.create({
     model: MODELS.sonnet,
-    max_tokens: 4096,
+    max_tokens: maxTokens,
     system: [
       {
         type: 'text',
@@ -239,29 +240,32 @@ export async function POST(req: NextRequest, { params }: Ctx) {
             break
           }
 
-          const { id, label, schema } = SECCIONES_CONFIG[i]
+          const { id, label, schema, maxTokens } = SECCIONES_CONFIG[i]
           const progreso = 10 + Math.round((i / total) * 82)
           send('status', { fase: `seccion-${id}`, mensaje: `Generando ${label}...`, progreso })
 
           try {
-            const valor = await generarSeccion(id, schema, label, resumenProyecto, contexto, userId, planParcial, signal)
+            const valor = await generarSeccion(id, schema, label, resumenProyecto, contexto, userId, planParcial, signal, maxTokens)
             planParcial[id] = valor
 
             // Validar y guardar esta sección inmediatamente
-            const { secciones: seccionValidada } = validarSeccionesPlan({ [id]: valor })
+            const { secciones: seccionValidada, errores: erroresValidacion } = validarSeccionesPlan({ [id]: valor })
             if (Object.keys(seccionValidada).length > 0) {
               await guardarSecciones(proyectoId, seccionValidada)
               seccionesGuardadas.push(id)
               send('seccion', { id })
               console.log(`[generar-ia] ${id}: guardado OK`)
             } else {
+              const motivo = erroresValidacion[id] ?? 'validación falló'
               seccionesConError.push(id)
-              console.warn(`[generar-ia] ${id}: validación falló`)
+              send('seccion-error', { id, motivo })
+              console.warn(`[generar-ia] ${id}: ${motivo}`)
             }
           } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err)
-            console.error(`[generar-ia] ${id}: FALLÓ — ${msg}`)
+            const motivo = err instanceof Error ? err.message : String(err)
+            console.error(`[generar-ia] ${id}: FALLÓ — ${motivo}`)
             seccionesConError.push(id)
+            send('seccion-error', { id, motivo })
           }
         }
 
