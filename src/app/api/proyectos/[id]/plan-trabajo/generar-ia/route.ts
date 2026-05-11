@@ -73,10 +73,12 @@ async function generarSeccion(
   userId: string,
   prevResultados: Record<string, unknown>,
   signal?: AbortSignal,
-  maxTokens = 8192
+  maxTokens = 8192,
+  modeloConfig: 'haiku' | 'sonnet' = 'sonnet'
 ): Promise<unknown> {
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const inicio = Date.now()
+  const modelo = modeloConfig === 'haiku' ? MODELS.haiku : MODELS.sonnet
 
   const contextoPrevio =
     seccionId === 'alcanceDetallado' && contexto.cronograma.cronogramaSeleccionado
@@ -86,7 +88,7 @@ async function generarSeccion(
         : ''
 
   const response = await anthropic.messages.create({
-    model: MODELS.sonnet,
+    model: modelo,
     max_tokens: maxTokens,
     system: [
       {
@@ -109,7 +111,7 @@ async function generarSeccion(
   trackUsage({
     userId,
     tipo: `plan-trabajo.seccion.${seccionId}`,
-    modelo: MODELS.sonnet,
+    modelo,
     tokensInput: response.usage.input_tokens,
     tokensOutput: response.usage.output_tokens,
     tokensCacheCreation: usageRaw.cache_creation_input_tokens ?? 0,
@@ -243,11 +245,11 @@ export async function POST(req: NextRequest, { params }: Ctx) {
           config: (typeof SECCIONES_CONFIG)[number],
           prevResultados: Record<string, unknown> = {}
         ) => {
-          const { id, label, schema, maxTokens } = config
+          const { id, label, schema, maxTokens, modelo } = config
           if (signal.aborted) return
           send('status', { fase: `seccion-${id}`, mensaje: `Generando ${label}...` })
           try {
-            const valor = await generarSeccion(id, schema, label, resumenProyecto, contexto, userId, prevResultados, signal, maxTokens)
+            const valor = await generarSeccion(id, schema, label, resumenProyecto, contexto, userId, prevResultados, signal, maxTokens, modelo)
             planParcial[id] = valor
 
             const { secciones: seccionValidada, errores: erroresValidacion } = validarSeccionesPlan({ [id]: valor })

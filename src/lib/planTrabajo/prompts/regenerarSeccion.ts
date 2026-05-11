@@ -44,9 +44,9 @@ CAMPOS:
 - faseAbreviatura: igual a faseNombre — NO uses abreviaturas como EJEC/PROC
 - edtCodigo: código si aplica (CON, COM, ING, etc.), sino ""
 - edtRefId: ID del EDT del cronograma (aparece como "edtId" en la directiva o "EDT [id=...]" en el contexto)
-- descripcion: párrafo narrativo CONCISO de 40-60 palabras. NO bullets.
+- descripcion: oración técnica de 20-30 palabras que describa el flujo del EDT. NO bullets.
 - subItems.actividadNombre: nombre descriptivo; listá los códigos técnicos al agrupar (E013, E062...)
-- subItems.descripcion: párrafo CONCISO de 30-50 palabras con las tareas embebidas en texto narrativo`,
+- subItems.descripcion: oración técnica de 15-20 palabras describiendo la actividad o grupo`,
     schema: `{ "alcanceDetallado": [{ "numeracion": "11.1", "edtNombre": "Construcción", "edtCodigo": "CON", "faseNombre": "EJECUCIÓN", "faseAbreviatura": "EJECUCIÓN", "ubicacion": "Site cliente (opcional)", "descripcion": "Párrafo narrativo 80-120 palabras...", "subItems": [{ "numeracion": "11.1.1", "actividadNombre": "Instalación de Sistemas de Extractor (E013, E062, E503, E2013, E3003)", "descripcion": "Párrafo narrativo agrupando instalaciones similares..." }], "edtRefId": "ID del EDT del cronograma" }] }`,
   },
 

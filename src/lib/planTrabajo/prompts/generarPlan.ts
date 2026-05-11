@@ -48,18 +48,17 @@ CRITERIOS DE CALIDAD:
    - faseAbreviatura: igual a faseNombre (NO uses abreviaturas como EJEC/PROC)
    - edtCodigo: código del EDT si aplica (CON, COM, ING, etc.), sino ""
    - edtRefId: ID del EDT del cronograma (campo edtId de la estructura)
-   - descripcion: párrafo narrativo CONCISO de 40-60 palabras del flujo de trabajo
+   - descripcion: oración técnica de 20-30 palabras que describa el flujo del EDT
 
    SUBITEMS:
    - actividadNombre: nombre del grupo o actividad (puede ser agrupado con sus códigos)
    - numeracion: 11.X.Y secuencial
-   - descripcion: párrafo CONCISO de 30-50 palabras; mencioná las tareas
-     representativas en el párrafo (no como lista)
+   - descripcion: oración técnica de 15-20 palabras describiendo la actividad o grupo
 
-   DESCRIPCIONES (NARRATIVA, CONCISA):
-   - Párrafos cortos y técnicos — priorizá precisión sobre extensión.
+   DESCRIPCIONES (TÉCNICAS, BREVES):
+   - Oraciones cortas y precisas — NO párrafos largos.
    - NO enumeres ni uses bullets dentro de la descripción.
-   - Indicá ubicación física cuando se pueda inferir del contexto.
+   - Priorizá códigos técnicos y datos concretos sobre extensión narrativa.
 
 3. EPP:
    - basico: casco ANSI Z89.1-2014, lentes Z87+, zapatos dieléctricos, guantes, chaleco.
@@ -283,7 +282,8 @@ export interface SeccionConfig {
   id: string
   label: string
   schema: string
-  maxTokens?: number   // override del límite por defecto (4096)
+  maxTokens?: number          // override del límite por defecto (8192)
+  modelo?: 'haiku' | 'sonnet' // secciones simples pueden usar Haiku (~10x más barato)
   dependeDe?: string
 }
 
@@ -301,7 +301,7 @@ export const SECCIONES_CONFIG: SeccionConfig[] = [
   {
     id: 'alcanceDetallado',
     label: 'Alcance Detallado',
-    maxTokens: 16000,
+    maxTokens: 8192,
     schema: `{
   "alcanceDetallado": [
     {
@@ -327,6 +327,7 @@ export const SECCIONES_CONFIG: SeccionConfig[] = [
   {
     id: 'eppRequeridos',
     label: 'EPP Requeridos',
+    modelo: 'haiku',
     schema: `{
   "eppRequeridos": {
     "basico": [{ "nombre": "string", "norma": "string (opcional)", "observaciones": "string (opcional)" }],
@@ -349,6 +350,7 @@ export const SECCIONES_CONFIG: SeccionConfig[] = [
   {
     id: 'restricciones',
     label: 'Restricciones',
+    modelo: 'haiku',
     schema: `{
   "restricciones": [
     { "texto": "string", "categoria": "GENERAL" }
@@ -426,6 +428,7 @@ export const SECCIONES_CONFIG: SeccionConfig[] = [
   {
     id: 'responsabilidades',
     label: 'Responsabilidades',
+    modelo: 'haiku',
     schema: `{
   "responsabilidades": {
     "gerenteGeneral": ["string"],
@@ -438,6 +441,7 @@ export const SECCIONES_CONFIG: SeccionConfig[] = [
   {
     id: 'referencias',
     label: 'Referencias',
+    modelo: 'haiku',
     schema: `{
   "referencias": [
     {
