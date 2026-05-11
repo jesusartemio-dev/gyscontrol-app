@@ -43,6 +43,10 @@ const bodySchema = z.object({
 
 // ─── Helper ─────────────────────────────────────────────────────────────────
 
+const MAX_TOKENS_POR_SECCION: Partial<Record<SeccionRegenerable, number>> = {
+  alcanceDetallado: 16000,
+}
+
 async function ejecutarSonnetRegeneracion(
   contextoSerializado: string,
   estadoRelevante: string,
@@ -54,6 +58,7 @@ async function ejecutarSonnetRegeneracion(
 ): Promise<unknown> {
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const inicio = Date.now()
+  const maxTokens = MAX_TOKENS_POR_SECCION[seccion] ?? 8192
 
   // Contexto del proyecto + instrucciones de sección en el user message.
   // El system (PLAN_TRABAJO_SYSTEM_INSTRUCCIONES) es constante → cache hits entre llamadas.
@@ -70,7 +75,7 @@ async function ejecutarSonnetRegeneracion(
 
   const response = await anthropic.messages.create({
     model: MODELS.sonnet,
-    max_tokens: 8192,
+    max_tokens: maxTokens,
     system: [
       {
         type: 'text',
@@ -80,6 +85,10 @@ async function ejecutarSonnetRegeneracion(
     ],
     messages: [{ role: 'user', content: promptUsuario }],
   })
+
+  if (response.stop_reason === 'max_tokens') {
+    throw new Error(`Sección "${seccion}" excede el límite de tokens (${maxTokens})`)
+  }
 
   const usageRaw = response.usage as unknown as Record<string, number>
   trackUsage({

@@ -31,10 +31,11 @@ NUMERACIÓN: Propia del plan de trabajo — 11.1, 11.2, 11.3... (no copies la nu
 
 ESTRUCTURA:
 - Organizá por Fase → EDT. Podés crear una entrada por EDT o por grupo lógico.
-- Para los subItems (actividades): NO es obligatorio listar cada actividad por separado.
-  Podés agrupar actividades similares o repetitivas en un solo subItem.
-  Ejemplo: en vez de 5 subItems "Instalación de Extractor E013/E062/E503/E2013/E3003",
-  usá UN subItem "Instalación de Sistemas de Extractor (E013, E062, E503, E2013, E3003)".
+- Para los subItems: MÁXIMO 5 subItems por EDT. Si hay más de 5 actividades, DEBÉS agrupar.
+  Agrupá actividades similares o repetitivas en UN solo subItem con sus códigos.
+  Ejemplo CORRECTO: UN subItem "Instalación de Sistemas de Extractor (E013, E062, E503, E2013, E3003)"
+  en vez de 5 subItems casi idénticos.
+  Actividades técnicamente muy distintas sí pueden ir separadas.
 
 CAMPOS:
 - numeracion: 11.1, 11.2... (EDTs); 11.X.Y (subItems) — secuencial del documento

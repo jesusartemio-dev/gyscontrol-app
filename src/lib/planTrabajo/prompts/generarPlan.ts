@@ -27,14 +27,13 @@ CRITERIOS DE CALIDAD:
    - Organizá por Fase → EDT. Podés crear una entrada por EDT o una por grupo
      lógico a tu criterio. No es obligatorio replicar la estructura del cronograma.
 
-   AGRUPACIÓN INTELIGENTE DE ACTIVIDADES:
-   - NO tenés que listar cada actividad del cronograma como subItem separado.
-   - Podés agrupar actividades similares o repetitivas en un solo subItem.
-   - Ejemplo correcto: en vez de 5 subItems "Instalación de Extractor E013",
-     "Instalación de Extractor E062", etc., usar UN subItem:
-     "Instalación de Sistemas de Extractor (E013, E062, E503, E2013, E3003)"
-     con una descripción que cubra el proceso común de todas.
-   - Podés también separar actividades técnicamente distintas aunque sean del mismo EDT.
+   AGRUPACIÓN INTELIGENTE DE ACTIVIDADES (OBLIGATORIO):
+   - MÁXIMO 5 subItems por EDT. Si el EDT tiene más de 5 actividades, DEBÉS agrupar.
+   - Agrupá actividades similares o repetitivas en UN solo subItem.
+   - Ejemplo CORRECTO: en vez de 7+ subItems individuales para extractores,
+     usar UN subItem "Instalación de Sistemas de Extractor (E013, E062, E503, E2013, E3003)".
+   - Actividades técnicamente muy distintas sí pueden ir en subItems separados.
+   - Si el EDT tiene ≤ 5 actividades distintas, podés dejarlas individuales.
 
    CÓDIGOS TÉCNICOS (OBLIGATORIO):
    - Preservá los códigos de equipos, instrumentos y sistemas del cronograma.
@@ -302,7 +301,7 @@ export const SECCIONES_CONFIG: SeccionConfig[] = [
   {
     id: 'alcanceDetallado',
     label: 'Alcance Detallado',
-    maxTokens: 8192,
+    maxTokens: 16000,
     schema: `{
   "alcanceDetallado": [
     {
