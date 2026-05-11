@@ -25,6 +25,31 @@ type Ctx = { params: Promise<{ id: string }> }
 
 // ─── Helpers internos ───────────────────────────────────────────────────────
 
+function buildDirectivaCronograma(
+  cron: NonNullable<PlanTrabajoContexto['cronograma']['cronogramaSeleccionado']>
+): string {
+  const estructura = cron.fases.map((f, fi) => ({
+    faseNombre: f.nombre,
+    edts: f.edts.map((e, ei) => ({
+      edtId: e.id,
+      edtNombre: e.nombre,
+      numeracion: `${f.orden ?? fi + 1}.${e.orden ?? ei + 1}`,
+      actividades: e.actividades.map((a, ai) => ({
+        actividadNombre: a.nombre,
+        numeracion: `${f.orden ?? fi + 1}.${e.orden ?? ei + 1}.${a.orden ?? ai + 1}`,
+      })),
+    })),
+  }))
+  return (
+    '\n\nESTRUCTURA OBLIGATORIA DEL CRONOGRAMA — seguí este JSON al pie de la letra:\n' +
+    '• Una entrada en alcanceDetallado por cada EDT, en el mismo orden.\n' +
+    '• edtNombre, faseNombre y numeracion deben ser EXACTAMENTE los de esta estructura.\n' +
+    '• Si el EDT tiene actividades, incluilas TODAS como subItems con actividadNombre y numeracion EXACTOS.\n' +
+    '• NO omitas ningún EDT. NO omitas ninguna actividad.\n\n' +
+    JSON.stringify(estructura, null, 2)
+  )
+}
+
 async function ejecutarFaseA(
   contexto: PlanTrabajoContexto,
   userId: string,
@@ -78,10 +103,12 @@ async function generarSeccion(
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const inicio = Date.now()
 
-  // matrizRaci necesita las siglas del personal ya generado para ser coherente
-  const contextoPrevio = seccionId === 'matrizRaci' && prevResultados.personalAsignado
-    ? `\n\nPERSONAL YA GENERADO (usá las mismas siglas en la matriz):\n${JSON.stringify(prevResultados.personalAsignado, null, 2)}`
-    : ''
+  const contextoPrevio =
+    seccionId === 'alcanceDetallado' && contexto.cronograma.cronogramaSeleccionado
+      ? buildDirectivaCronograma(contexto.cronograma.cronogramaSeleccionado)
+      : seccionId === 'matrizRaci' && prevResultados.personalAsignado
+        ? `\n\nPERSONAL YA GENERADO (usá las mismas siglas en la matriz):\n${JSON.stringify(prevResultados.personalAsignado, null, 2)}`
+        : ''
 
   const response = await anthropic.messages.create({
     model: MODELS.sonnet,

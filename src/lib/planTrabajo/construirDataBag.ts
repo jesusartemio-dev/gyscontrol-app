@@ -136,14 +136,15 @@ export function construirDataBag(
     // y como string formateado para el placeholder {alcanceDetalladoFormateado}
     alcanceDetallado: alcanceDetallado.map(a => ({
       numero: a.numeracion,
-      nombre: `${a.faseAbreviatura} · ${a.edtNombre}`,
+      nombre: `${a.numeracion}. ${a.edtNombre}`,
       descripcion: a.descripcion + (
         a.subItems?.map(s => `\n      ${s.numeracion} ${s.actividadNombre}: ${s.descripcion}`).join('') ?? ''
       ),
       ubicacion: a.ubicacion ?? '',
     })),
     alcanceDetalladoFormateado: alcanceDetallado.map(a => {
-      const titulo = `${a.numeracion}  ${a.faseAbreviatura} · ${a.edtNombre}${a.ubicacion ? `  |  ${a.ubicacion}` : ''}`
+      const fase = a.faseNombre || a.faseAbreviatura || ''
+      const titulo = `${a.numeracion}.  ${fase ? `${fase.toUpperCase()} — ` : ''}${a.edtNombre}${a.ubicacion ? `  |  ${a.ubicacion}` : ''}`
       const cuerpo = a.descripcion
       const subs = (a.subItems ?? []).map(s =>
         `      ${s.numeracion}  ${s.actividadNombre}\n      ${s.descripcion}`
