@@ -73,7 +73,7 @@ async function generarSeccion(
   userId: string,
   prevResultados: Record<string, unknown>,
   signal?: AbortSignal,
-  maxTokens = 4096
+  maxTokens = 8192
 ): Promise<unknown> {
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const inicio = Date.now()

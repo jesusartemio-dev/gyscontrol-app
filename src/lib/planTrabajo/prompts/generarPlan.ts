@@ -49,18 +49,18 @@ CRITERIOS DE CALIDAD:
    - faseAbreviatura: igual a faseNombre (NO uses abreviaturas como EJEC/PROC)
    - edtCodigo: código del EDT si aplica (CON, COM, ING, etc.), sino ""
    - edtRefId: ID del EDT del cronograma (campo edtId de la estructura)
-   - descripcion: párrafo narrativo de 80-120 palabras del flujo de trabajo
+   - descripcion: párrafo narrativo CONCISO de 40-60 palabras del flujo de trabajo
 
    SUBITEMS:
-   - actividadNombre: nombre del grupo o actividad (puede ser agrupado)
+   - actividadNombre: nombre del grupo o actividad (puede ser agrupado con sus códigos)
    - numeracion: 11.X.Y secuencial
-   - descripcion: párrafo de 50-100 palabras; incluí las tareas representativas
-     del cronograma embebidas en el párrafo, no como lista
+   - descripcion: párrafo CONCISO de 30-50 palabras; mencioná las tareas
+     representativas en el párrafo (no como lista)
 
-   DESCRIPCIONES (NARRATIVA, no bullets):
-   - Párrafos que describan el flujo real, no una enumeración de tareas.
-   - Usá la info de tareas del cronograma para enriquecer el texto.
-   - Indicá ubicación física específica cuando se pueda inferir.
+   DESCRIPCIONES (NARRATIVA, CONCISA):
+   - Párrafos cortos y técnicos — priorizá precisión sobre extensión.
+   - NO enumeres ni uses bullets dentro de la descripción.
+   - Indicá ubicación física cuando se pueda inferir del contexto.
 
 3. EPP:
    - basico: casco ANSI Z89.1-2014, lentes Z87+, zapatos dieléctricos, guantes, chaleco.
