@@ -72,7 +72,7 @@ export const planPersonalSchema = z.object({
   empresa: z.string().optional(),
   siglas: z.string().optional(),
   cip: z.string().optional(),
-  email: z.string().email().optional(),
+  email: z.string().optional(),
   telefono: z.string().optional(),
   proyectoOrgNodoRefId: z.string().optional(),
 })
@@ -128,7 +128,7 @@ export const planResponsabilidadesSchema = z.object({
 export const planReferenciaSchema = z.object({
   codigoDocumento: z.string().optional(),
   titulo: z.string().min(1),
-  origen: z.enum(['TDR', 'COTIZACION', 'NORMATIVA', 'MANUAL']),
+  origen: z.enum(['TDR', 'COTIZACION', 'NORMATIVA', 'MANUAL']).catch('NORMATIVA'),
 })
 
 // ─── Schema de actualización de cabecera y toggles (PATCH) ───

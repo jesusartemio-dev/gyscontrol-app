@@ -301,7 +301,7 @@ export const SECCIONES_CONFIG: SeccionConfig[] = [
   {
     id: 'alcanceDetallado',
     label: 'Alcance Detallado',
-    maxTokens: 8192,
+    maxTokens: 16000,
     schema: `{
   "alcanceDetallado": [
     {
