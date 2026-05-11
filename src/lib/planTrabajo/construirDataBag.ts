@@ -1,6 +1,6 @@
 import type { PlanTrabajo, Cliente, Proyecto } from '@prisma/client'
 import type {
-  PlanAlcanceItem,
+  PlanAlcanceDetalladoEdt,
   PlanEPP,
   PlanHerramientasYEquipos,
   PlanRestriccion,
@@ -46,7 +46,7 @@ export function construirDataBag(
   const epp = (plan.eppRequeridos as PlanEPP | null) ?? { basico: [], bioseguridad: [], riesgoEspecifico: [] }
   const herramientas = (plan.herramientasYEquipos as PlanHerramientasYEquipos | null) ?? { equipos: [], herramientas: [], materiales: [] }
   const restricciones = (plan.restricciones as PlanRestriccion[] | null) ?? []
-  const alcanceDetallado = (plan.alcanceDetallado as PlanAlcanceItem[] | null) ?? []
+  const alcanceDetallado = (plan.alcanceDetallado as PlanAlcanceDetalladoEdt[] | null) ?? []
   const histogramas = (plan.histogramas as PlanHistogramas | null) ?? { meses: [], equipoTrabajo: [], horasHombre: [] }
   const cronograma = (plan.cronogramaResumen as PlanCronograma | null) ?? { filas: [] }
   const referencias = (plan.referencias as PlanReferencia[] | null) ?? []
@@ -132,13 +132,24 @@ export function construirDataBag(
     // Restricciones
     restricciones: restricciones.map(r => ({ texto: r.texto, categoria: r.categoria ?? '' })),
 
-    // Alcance detallado
+    // Alcance detallado — se pasa como array aplanado para el template loop
+    // y como string formateado para el placeholder {alcanceDetalladoFormateado}
     alcanceDetallado: alcanceDetallado.map(a => ({
-      numero: a.numero,
-      nombre: a.nombre,
-      descripcion: a.descripcion,
+      numero: a.numeracion,
+      nombre: `${a.faseAbreviatura} · ${a.edtNombre}`,
+      descripcion: a.descripcion + (
+        a.subItems?.map(s => `\n      ${s.numeracion} ${s.actividadNombre}: ${s.descripcion}`).join('') ?? ''
+      ),
       ubicacion: a.ubicacion ?? '',
     })),
+    alcanceDetalladoFormateado: alcanceDetallado.map(a => {
+      const titulo = `${a.numeracion}  ${a.faseAbreviatura} · ${a.edtNombre}${a.ubicacion ? `  |  ${a.ubicacion}` : ''}`
+      const cuerpo = a.descripcion
+      const subs = (a.subItems ?? []).map(s =>
+        `      ${s.numeracion}  ${s.actividadNombre}\n      ${s.descripcion}`
+      ).join('\n\n')
+      return [titulo, cuerpo, subs].filter(Boolean).join('\n')
+    }).join('\n\n'),
 
     // Histogramas (solo etiqueta + total, V1)
     histogramaEquipoTrabajo: histogramas.equipoTrabajo.map(f => ({ etiqueta: f.etiqueta, total: f.total })),

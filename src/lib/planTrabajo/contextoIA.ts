@@ -274,13 +274,18 @@ export function serializarEstadoActualPlan(
 
     if (seccion === 'alcanceDetallado' && Array.isArray(valor)) {
       for (const a of valor as Array<Record<string, unknown>>) {
-        const flags = [
-          a.tieneRiesgoAltura && 'altura',
-          a.tieneRiesgoCaliente && 'caliente',
-          a.tieneRiesgoElectrico && 'eléctrico',
-          a.tieneRiesgoEspacioConfinado && 'espacio confinado',
-        ].filter(Boolean).join(', ')
-        partes.push(`- ${String(a.numero)} ${String(a.nombre)}${flags ? ` [riesgos: ${flags}]` : ''}`)
+        // Nuevo formato (basado en EDTs)
+        if (a.edtNombre !== undefined) {
+          partes.push(`- ${String(a.numeracion)} [${String(a.faseAbreviatura)}] ${String(a.edtNombre)}`)
+          if (Array.isArray(a.subItems)) {
+            for (const s of a.subItems as Array<Record<string, unknown>>) {
+              partes.push(`  · ${String(s.numeracion)} ${String(s.actividadNombre)}`)
+            }
+          }
+        } else {
+          // Formato legacy (basado en servicios de cotización)
+          partes.push(`- ${String(a.numero)} ${String(a.nombre)}`)
+        }
       }
       partes.push('')
       continue

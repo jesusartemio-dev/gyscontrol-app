@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import {
-  planAlcanceItemSchema,
+  planAlcanceDetalladoEdtSchema,
   planEPPSchema,
   planHerramientasYEquiposSchema,
   planRestriccionSchema,
@@ -19,7 +19,7 @@ export interface ValidacionResultado {
 }
 
 const SECCIONES_JSON = [
-  { key: 'alcanceDetallado', schema: z.array(planAlcanceItemSchema) },
+  { key: 'alcanceDetallado', schema: z.array(planAlcanceDetalladoEdtSchema) },
   { key: 'eppRequeridos', schema: planEPPSchema },
   { key: 'herramientasYEquipos', schema: planHerramientasYEquiposSchema },
   { key: 'restricciones', schema: z.array(planRestriccionSchema) },
@@ -81,7 +81,7 @@ export function validarSeccionesPlan(raw: unknown): ValidacionResultado {
 }
 
 const SECCION_SCHEMAS: Partial<Record<SeccionRegenerable, z.ZodType>> = {
-  alcanceDetallado: z.array(planAlcanceItemSchema),
+  alcanceDetallado: z.array(planAlcanceDetalladoEdtSchema),
   eppRequeridos: planEPPSchema,
   herramientasYEquipos: planHerramientasYEquiposSchema,
   restricciones: z.array(planRestriccionSchema),

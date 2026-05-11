@@ -19,11 +19,18 @@ El resumen debe cubrir:
    - Gastos cotizados relevantes para SSOMA (andamios, manlift, EPP, viáticos).
 
 3. CRONOGRAMA DE PLANIFICACIÓN
-   - Fases del proyecto con sus fechas (YYYY-MM-DD).
-   - Para cada EDT [id=...] incluí el ID textual, nombre, fechas planificadas
-     y horas. Ejemplo: "EDT HMI [id=17e58f56-...]: 2026-02-03 → 2026-02-05 (18h)"
-   - Actividades con fechas y horas.
-   - Tareas con horas estimadas, personas estimadas y fechas.
+   IMPORTANTE: mantené la jerarquía Fase → EDT → Actividad → Tarea. NO aplanes
+   a lista de actividades sueltas. El siguiente paso de generación necesita esta
+   jerarquía para construir el alcance detallado correctamente.
+
+   Para cada FASE:
+   - Nombre de la fase (ej: PLANIFICACIÓN, INGENIERÍA, PROCURA, EJECUCIÓN, CIERRE)
+   - Para cada EDT dentro de la fase:
+     * Código del EDT (ej: PLAN, ING, CON, COM — extraelo del nombre si no está explícito)
+     * Nombre completo del EDT y su ID: "EDT Construcción [id=17e58f56-...]: 2026-02-03 → 2026-02-05 (18h)"
+     * Si el código es CON o COM: listá cada Actividad con sus tareas más
+       representativas (nombre de tarea, horas, personas).
+     * Si el código es otro: solo listá las actividades sin tareas.
    - Incluí los totales del "RESUMEN NUMÉRICO" al final del contexto.
 
 4. ORGANIZACIÓN

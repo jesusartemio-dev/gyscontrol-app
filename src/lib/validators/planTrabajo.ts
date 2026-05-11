@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 // ─── Schemas para secciones JSON (usados en Fase 2 para validar output de IA) ───
 
+// ─── Legacy (formato basado en servicios de cotización) ───
 export const planAlcanceItemSchema = z.object({
   numero: z.string(),
   nombre: z.string().min(1),
@@ -12,6 +13,26 @@ export const planAlcanceItemSchema = z.object({
   tieneRiesgoElectrico: z.boolean(),
   tieneRiesgoEspacioConfinado: z.boolean(),
   servicioCotizadoRefId: z.string().optional(),
+  edtRefId: z.string().optional(),
+})
+
+// ─── Nuevo formato (basado en EDTs del cronograma de planificación) ───
+export const planAlcanceDetalladoSubItemSchema = z.object({
+  numeracion: z.string().min(1),
+  actividadNombre: z.string().min(1),
+  descripcion: z.string().min(60),
+  actividadRefId: z.string().optional(),
+})
+
+export const planAlcanceDetalladoEdtSchema = z.object({
+  numeracion: z.string().min(1),
+  edtNombre: z.string().min(1),
+  edtCodigo: z.string().min(1),
+  faseNombre: z.string().min(1),
+  faseAbreviatura: z.string().min(1),
+  ubicacion: z.string().optional(),
+  descripcion: z.string().min(60),
+  subItems: z.array(planAlcanceDetalladoSubItemSchema).optional(),
   edtRefId: z.string().optional(),
 })
 
@@ -139,7 +160,7 @@ export const planTrabajoUpdateSchema = z.object({
 // ─── Schema de actualización de secciones JSON estructuradas ───
 
 export const planTrabajoPatchSeccionSchema = z.object({
-  alcanceDetallado: z.array(planAlcanceItemSchema).nullish(),
+  alcanceDetallado: z.array(planAlcanceDetalladoEdtSchema).nullish(),
   eppRequeridos: planEPPSchema.nullish(),
   herramientasYEquipos: planHerramientasYEquiposSchema.nullish(),
   restricciones: z.array(planRestriccionSchema).nullish(),

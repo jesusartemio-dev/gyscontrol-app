@@ -4,7 +4,27 @@ import type { PlanTrabajo, PlanTrabajoGeneracion } from '@prisma/client'
 // SECCIONES ESTRUCTURADAS (campos Json)
 // ============================================
 
-// ─── Alcance detallado ───
+// ─── Alcance detallado (formato nuevo — basado en EDTs del cronograma) ───
+export interface PlanAlcanceDetalladoSubItem {
+  numeracion: string       // "11.5.1"
+  actividadNombre: string
+  descripcion: string
+  actividadRefId?: string
+}
+
+export interface PlanAlcanceDetalladoEdt {
+  numeracion: string       // "11.1"
+  edtNombre: string
+  edtCodigo: string        // "CON", "ING", "PLAN", etc.
+  faseNombre: string       // "EJECUCIÓN"
+  faseAbreviatura: string  // "EJEC"
+  ubicacion?: string
+  descripcion: string
+  subItems?: PlanAlcanceDetalladoSubItem[]
+  edtRefId?: string
+}
+
+// ─── Alcance detallado (formato legacy — basado en servicios de cotización) ───
 export interface PlanAlcanceItem {
   numero: string
   nombre: string

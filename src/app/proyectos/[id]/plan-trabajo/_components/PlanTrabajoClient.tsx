@@ -52,7 +52,7 @@ import { HistogramasEditor } from './editores/HistogramasEditor'
 import { MatrizRaciEditor } from './editores/MatrizRaciEditor'
 
 import type {
-  PlanAlcanceItem,
+  PlanAlcanceDetalladoEdt,
   PlanEPP,
   PlanHerramientasYEquipos,
   PlanRestriccion,
@@ -494,7 +494,7 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
       )}
       {editandoSeccion === 'alcanceDetallado' && (
         <AlcanceDetalladoEditor
-          valor={(plan.alcanceDetallado as PlanAlcanceItem[] | null) ?? []}
+          valor={(plan.alcanceDetallado as PlanAlcanceDetalladoEdt[] | null) ?? []}
           onSave={(v) => handleSaveSeccion('alcanceDetallado', v)}
           onCancel={() => setEditandoSeccion(null)}
         />

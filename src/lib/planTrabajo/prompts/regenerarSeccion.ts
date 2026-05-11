@@ -24,17 +24,20 @@ const CONFIGS: Record<SeccionRegenerable, SeccionConfig> = {
   },
 
   alcanceDetallado: {
-    instruccion: `Generá una entrada por cada ITEM DE SERVICIO del contexto.
-- Numeración consecutiva: 11.1, 11.2, ...
-- descripcion: 3-5 frases técnicas que explican el trabajo a realizar para ese ítem.
-- ubicacion: ubicación específica dentro de la planta si se puede inferir (opcional).
-- Identificá correctamente los riesgos: altura (trabajo sobre andamios o plataformas), caliente (soldadura,
-  esmerilado), eléctrico (tableros, cableado en tensión), espacio confinado.
-REFERENCIAS — IDs OBLIGATORIOS:
-- servicioCotizadoRefId: COPIA EXACTAMENTE el id= del "ITEM DE SERVICIO [id=...]" correspondiente.
-- edtRefId: COPIA EXACTAMENTE el id= del "EDT [id=...]" del cronograma correspondiente.
-- NO inventes IDs. Si no hay correspondencia directa, dejá el campo como string vacío "".`,
-    schema: `{ "alcanceDetallado": [{ "numero": "11.1", "nombre": "string", "descripcion": "string", "ubicacion": "string opcional", "tieneRiesgoAltura": false, "tieneRiesgoCaliente": false, "tieneRiesgoElectrico": false, "tieneRiesgoEspacioConfinado": false, "servicioCotizadoRefId": "uuid-exacto-del-contexto", "edtRefId": "uuid-exacto-del-contexto" }] }`,
+    instruccion: `Generá una entrada por cada EDT del Cronograma de Planificación.
+NO uses los servicios de la cotización como unidad de alcance — esos aportan contexto técnico.
+La estructura viene del cronograma: una fila de alcance por EDT.
+
+- Numeración continua: 11.1, 11.2, 11.3...
+- edtNombre: nombre del EDT del cronograma.
+- edtCodigo: código del EDT (ej: CON, ING, PLAN, PROC, COM, CIERRE — inferilo del nombre si no está explícito).
+- faseNombre: nombre de la fase del cronograma (PLANIFICACIÓN, INGENIERÍA, PROCURA, EJECUCIÓN, CIERRE).
+- faseAbreviatura: PLAN, ING, PROC, EJEC o CIERRE según corresponda.
+- descripcion: párrafo narrativo de 80-150 palabras con el flujo de trabajo del EDT. NO bullets.
+- subItems: SOLO si el código del EDT contiene "CON" o "COM". En ese caso, una entrada por Actividad
+  del cronograma, con descripción narrativa que embeba las tareas.
+- edtRefId: COPIA EXACTAMENTE el id= del "EDT [id=...]" del cronograma. NO inventes IDs.`,
+    schema: `{ "alcanceDetallado": [{ "numeracion": "11.1", "edtNombre": "Construcción", "edtCodigo": "CON", "faseNombre": "EJECUCIÓN", "faseAbreviatura": "EJEC", "ubicacion": "Site cliente (opcional)", "descripcion": "Párrafo narrativo 80-150 palabras...", "subItems": [{ "numeracion": "11.1.1", "actividadNombre": "string", "descripcion": "string" }], "edtRefId": "uuid-exacto-del-EDT-en-cronograma" }] }`,
   },
 
   eppRequeridos: {

@@ -14,19 +14,31 @@ CRITERIOS DE CALIDAD:
      compromisos contractuales.
 
 2. ALCANCE DETALLADO:
-   - Una entrada por cada ITEM DE SERVICIO del cronograma de cotización.
-   - Numeración consecutiva (11.1, 11.2, ...).
-   - Descripción técnica de 3-5 frases cada uno.
-   - Identificá los riesgos correctamente (altura, caliente, eléctrico, espacio confinado).
+   REGLA DE ORO: La estructura se basa EXCLUSIVAMENTE en los EDTs del Cronograma
+   de Planificación. NO uses los servicios de la cotización para definir los ítems.
+   La cotización aporta contexto técnico (equipos, horas, roles), no estructura.
 
-   REFERENCIAS — IDs OBLIGATORIOS:
-   - El campo "servicioCotizadoRefId" debe contener el ID exacto del
-     "ITEM DE SERVICIO [id=...]" del contexto que corresponde a este ítem
-     de alcance. COPIA EL ID TAL CUAL aparece entre los corchetes.
-   - El campo "edtRefId" debe contener el ID del "EDT [id=...]" del cronograma
-     de planificación que corresponde a este ítem. COPIA EL ID TAL CUAL.
-   - NO inventes IDs. NO uses "TBD", "N/A" ni placeholders.
-   - Si no encontrás correspondencia, dejá el campo como string vacío "".
+   - Una entrada por cada EDT del cronograma de planificación.
+   - Numeración continua: 11.1, 11.2, 11.3...
+   - Título del EDT: "[ABREV_FASE] · [Nombre del EDT]"
+     Abreviaturas: PLANIFICACIÓN→PLAN, INGENIERÍA→ING, PROCURA→PROC,
+     EJECUCIÓN→EJEC, CIERRE→CIERRE
+
+   DESGLOSE A SUBITEMS:
+   - SI el código del EDT contiene "CON" o "COM" (construcción/comisionamiento):
+     desglosar cada Actividad como subItem con numeración 11.X.Y
+   - SI NO: narrar todo en la descripción del EDT sin subItems
+
+   DESCRIPCIONES (NARRATIVA, no bullets):
+   - Cada descripción debe ser un párrafo narrativo de 80-150 palabras que
+     describa el flujo de trabajo real del EDT o actividad.
+   - Mencioná las tareas más representativas embebidas en el párrafo,
+     no como lista.
+   - Indicá ubicación física específica cuando se pueda inferir del contexto.
+
+   REFERENCIA DE TRAZABILIDAD:
+   - edtRefId: COPIA EXACTAMENTE el id= del "EDT [id=...]" del cronograma.
+   - NO inventes IDs. Si no hay correspondencia, dejá el campo como string vacío "".
 
 3. EPP:
    - basico: casco ANSI Z89.1-2014, lentes Z87+, zapatos dieléctricos, guantes, chaleco.
@@ -149,16 +161,21 @@ ESQUEMA JSON DE OUTPUT — LOTE A (devolvé EXACTAMENTE este JSON con SOLO estas
   "alcanceGeneral": "string — 2-4 párrafos",
   "alcanceDetallado": [
     {
-      "numero": "11.1",
-      "nombre": "string",
-      "descripcion": "string",
-      "ubicacion": "string (opcional, puede omitirse)",
-      "tieneRiesgoAltura": false,
-      "tieneRiesgoCaliente": false,
-      "tieneRiesgoElectrico": false,
-      "tieneRiesgoEspacioConfinado": false,
-      "servicioCotizadoRefId": "COPIA AQUÍ el id= del ITEM DE SERVICIO del contexto",
-      "edtRefId": "COPIA AQUÍ el id= del EDT del cronograma del contexto"
+      "numeracion": "11.1",
+      "edtNombre": "Construcción",
+      "edtCodigo": "CON",
+      "faseNombre": "EJECUCIÓN",
+      "faseAbreviatura": "EJEC",
+      "ubicacion": "Site cliente / Sección 50 (opcional, omitir si no aplica)",
+      "descripcion": "Párrafo narrativo de 80-150 palabras...",
+      "subItems": [
+        {
+          "numeracion": "11.1.1",
+          "actividadNombre": "Nombre Actividad del cronograma",
+          "descripcion": "Párrafo narrativo de la actividad con tareas embebidas..."
+        }
+      ],
+      "edtRefId": "COPIA el id= del EDT del cronograma del contexto"
     }
   ],
   "eppRequeridos": {
@@ -266,15 +283,20 @@ export const SECCIONES_CONFIG: SeccionConfig[] = [
     schema: `{
   "alcanceDetallado": [
     {
-      "numero": "11.1",
-      "nombre": "string",
-      "descripcion": "string",
-      "ubicacion": "string (opcional)",
-      "tieneRiesgoAltura": false,
-      "tieneRiesgoCaliente": false,
-      "tieneRiesgoElectrico": false,
-      "tieneRiesgoEspacioConfinado": false,
-      "servicioCotizadoRefId": "COPIA el id= del ITEM DE SERVICIO del contexto",
+      "numeracion": "11.1",
+      "edtNombre": "Construcción",
+      "edtCodigo": "CON",
+      "faseNombre": "EJECUCIÓN",
+      "faseAbreviatura": "EJEC",
+      "ubicacion": "Site cliente / Área (opcional)",
+      "descripcion": "Párrafo narrativo de 80-150 palabras describiendo el flujo de trabajo del EDT...",
+      "subItems": [
+        {
+          "numeracion": "11.1.1",
+          "actividadNombre": "Nombre Actividad del cronograma",
+          "descripcion": "Párrafo narrativo de la actividad con sus tareas embebidas..."
+        }
+      ],
       "edtRefId": "COPIA el id= del EDT del cronograma del contexto"
     }
   ]
@@ -414,16 +436,15 @@ ESQUEMA JSON DE OUTPUT (devolvé EXACTAMENTE este JSON sin markdown):
   "alcanceGeneral": "string — 2-4 párrafos",
   "alcanceDetallado": [
     {
-      "numero": "11.1",
-      "nombre": "string",
-      "descripcion": "string",
-      "ubicacion": "string (opcional, puede omitirse)",
-      "tieneRiesgoAltura": false,
-      "tieneRiesgoCaliente": false,
-      "tieneRiesgoElectrico": false,
-      "tieneRiesgoEspacioConfinado": false,
-      "servicioCotizadoRefId": "COPIA AQUÍ el id= del ITEM DE SERVICIO del contexto",
-      "edtRefId": "COPIA AQUÍ el id= del EDT del cronograma del contexto"
+      "numeracion": "11.1",
+      "edtNombre": "Construcción",
+      "edtCodigo": "CON",
+      "faseNombre": "EJECUCIÓN",
+      "faseAbreviatura": "EJEC",
+      "ubicacion": "Site cliente / Sección 50 (opcional)",
+      "descripcion": "Párrafo narrativo de 80-150 palabras...",
+      "subItems": [{ "numeracion": "11.1.1", "actividadNombre": "string", "descripcion": "string" }],
+      "edtRefId": "COPIA el id= del EDT del cronograma"
     }
   ],
   "eppRequeridos": {
