@@ -21,19 +21,50 @@ const TIPOS_EMISION = [
   'D - Aprobado para Construcción',
 ]
 
+type FormState = {
+  codigoDocumento: string
+  numeroRevision: string
+  tipoEmision: string
+  preparadoPor: string
+  preparadoCargo: string
+  revisadoPor: string
+  revisadoCargo: string
+  aprobadoPor: string
+  aprobadoCargo: string
+}
+
 export function CabeceraEditor({ proyectoId, plan, onUpdated }: Props) {
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [codigo, setCodigo] = useState(plan.codigoDocumento ?? '')
-  const [revision, setRevision] = useState(plan.numeroRevision ?? 'A')
-  const [tipo, setTipo] = useState(plan.tipoEmision ?? 'B - Para Revisión')
+  const [form, setForm] = useState<FormState>({
+    codigoDocumento: plan.codigoDocumento ?? '',
+    numeroRevision: plan.numeroRevision ?? 'A',
+    tipoEmision: plan.tipoEmision ?? 'B - Para Revisión',
+    preparadoPor: (plan as unknown as Record<string, string>).preparadoPor ?? '',
+    preparadoCargo: (plan as unknown as Record<string, string>).preparadoCargo ?? '',
+    revisadoPor: (plan as unknown as Record<string, string>).revisadoPor ?? '',
+    revisadoCargo: (plan as unknown as Record<string, string>).revisadoCargo ?? '',
+    aprobadoPor: (plan as unknown as Record<string, string>).aprobadoPor ?? '',
+    aprobadoCargo: (plan as unknown as Record<string, string>).aprobadoCargo ?? '',
+  })
 
   const startEdit = () => {
-    setCodigo(plan.codigoDocumento ?? '')
-    setRevision(plan.numeroRevision ?? 'A')
-    setTipo(plan.tipoEmision ?? 'B - Para Revisión')
+    setForm({
+      codigoDocumento: plan.codigoDocumento ?? '',
+      numeroRevision: plan.numeroRevision ?? 'A',
+      tipoEmision: plan.tipoEmision ?? 'B - Para Revisión',
+      preparadoPor: (plan as unknown as Record<string, string>).preparadoPor ?? '',
+      preparadoCargo: (plan as unknown as Record<string, string>).preparadoCargo ?? '',
+      revisadoPor: (plan as unknown as Record<string, string>).revisadoPor ?? '',
+      revisadoCargo: (plan as unknown as Record<string, string>).revisadoCargo ?? '',
+      aprobadoPor: (plan as unknown as Record<string, string>).aprobadoPor ?? '',
+      aprobadoCargo: (plan as unknown as Record<string, string>).aprobadoCargo ?? '',
+    })
     setEditing(true)
   }
+
+  const set = (key: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setForm(f => ({ ...f, [key]: e.target.value }))
 
   const handleSave = async () => {
     setSaving(true)
@@ -41,7 +72,7 @@ export function CabeceraEditor({ proyectoId, plan, onUpdated }: Props) {
       const res = await fetch(`/api/proyectos/${proyectoId}/plan-trabajo`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ codigoDocumento: codigo, numeroRevision: revision, tipoEmision: tipo }),
+        body: JSON.stringify(form),
       })
       if (!res.ok) {
         const e = await res.json().catch(() => ({}))
@@ -57,12 +88,14 @@ export function CabeceraEditor({ proyectoId, plan, onUpdated }: Props) {
     }
   }
 
+  const p = plan as unknown as Record<string, string>
+
   return (
     <div className="rounded-lg border bg-white p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-semibold text-gray-700">Identificación del Documento</span>
+        <span className="text-sm font-semibold text-gray-700">Cabecera del Documento</span>
         {!editing ? (
-          <Button variant="ghost" size="sm" className="h-7 px-2" onClick={startEdit}>
+          <Button variant="ghost" size="sm" className="h-7 px-2" onClick={startEdit} title="Editar cabecera">
             <Pencil className="h-3.5 w-3.5" />
           </Button>
         ) : (
@@ -78,44 +111,90 @@ export function CabeceraEditor({ proyectoId, plan, onUpdated }: Props) {
       </div>
 
       {editing ? (
-        <div className="space-y-2">
-          <div>
-            <Label className="text-xs">Código documento</Label>
-            <Input value={codigo} onChange={e => setCodigo(e.target.value)} className="h-8 text-sm" />
+        <div className="space-y-4">
+          {/* Identificación */}
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Identificación</p>
+            <div>
+              <Label className="text-xs">Código documento</Label>
+              <Input value={form.codigoDocumento} onChange={set('codigoDocumento')} className="h-8 text-sm" />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs">Revisión</Label>
+                <Input value={form.numeroRevision} onChange={set('numeroRevision')} className="h-8 text-sm" maxLength={4} />
+              </div>
+              <div>
+                <Label className="text-xs">Tipo de emisión</Label>
+                <select
+                  value={form.tipoEmision}
+                  onChange={set('tipoEmision')}
+                  className="w-full h-8 text-xs border rounded-md px-2 bg-white"
+                >
+                  {TIPOS_EMISION.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+            </div>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <Label className="text-xs">Revisión</Label>
-              <Input value={revision} onChange={e => setRevision(e.target.value)} className="h-8 text-sm" maxLength={4} />
-            </div>
-            <div>
-              <Label className="text-xs">Tipo de emisión</Label>
-              <select
-                value={tipo}
-                onChange={e => setTipo(e.target.value)}
-                className="w-full h-8 text-xs border rounded-md px-2 bg-white"
-              >
-                {TIPOS_EMISION.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </div>
+
+          {/* Firmantes */}
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Firmantes</p>
+            {([
+              ['preparadoPor', 'preparadoCargo', 'Preparado por'],
+              ['revisadoPor', 'revisadoCargo', 'Revisado por'],
+              ['aprobadoPor', 'aprobadoCargo', 'Aprobado por'],
+            ] as [keyof FormState, keyof FormState, string][]).map(([nombreKey, cargoKey, label]) => (
+              <div key={nombreKey} className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-xs">{label}</Label>
+                  <Input value={form[nombreKey]} onChange={set(nombreKey)} className="h-8 text-sm" placeholder="Nombre" />
+                </div>
+                <div>
+                  <Label className="text-xs">Cargo</Label>
+                  <Input value={form[cargoKey]} onChange={set(cargoKey)} className="h-8 text-sm" placeholder="Cargo" />
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-1.5 text-sm">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground w-24 shrink-0">Código:</span>
-            <span className="font-mono text-xs">{plan.codigoDocumento ?? '—'}</span>
+        <div className="space-y-3">
+          {/* Identificación — vista */}
+          <div className="grid grid-cols-1 gap-1.5">
+            <Row label="Código" value={plan.codigoDocumento} />
+            <Row label="Revisión" value={plan.numeroRevision} mono />
+            <Row label="Tipo emisión" value={plan.tipoEmision} />
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground w-24 shrink-0">Revisión:</span>
-            <span className="font-mono text-xs">{plan.numeroRevision ?? '—'}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground w-24 shrink-0">Tipo emisión:</span>
-            <span className="text-xs">{plan.tipoEmision ?? '—'}</span>
-          </div>
+
+          {/* Firmantes — vista */}
+          {(p.preparadoPor || p.revisadoPor || p.aprobadoPor) && (
+            <div className="border-t pt-2 grid grid-cols-1 gap-1.5">
+              {p.preparadoPor && <Row label="Preparado por" value={`${p.preparadoPor}${p.preparadoCargo ? ` · ${p.preparadoCargo}` : ''}`} />}
+              {p.revisadoPor && <Row label="Revisado por" value={`${p.revisadoPor}${p.revisadoCargo ? ` · ${p.revisadoCargo}` : ''}`} />}
+              {p.aprobadoPor && <Row label="Aprobado por" value={`${p.aprobadoPor}${p.aprobadoCargo ? ` · ${p.aprobadoCargo}` : ''}`} />}
+            </div>
+          )}
+
+          {/* Hint cuando faltan firmantes */}
+          {!p.preparadoPor && (
+            <p className="text-xs text-amber-600 italic">
+              Completá los firmantes (Preparado/Revisado/Aprobado por) antes de exportar.
+            </p>
+          )}
         </div>
       )}
+    </div>
+  )
+}
+
+function Row({ label, value, mono }: { label: string; value?: string | null; mono?: boolean }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-xs text-muted-foreground w-24 shrink-0">{label}:</span>
+      <span className={`text-xs ${mono ? 'font-mono' : ''} ${!value ? 'text-muted-foreground italic' : ''}`}>
+        {value ?? '—'}
+      </span>
     </div>
   )
 }

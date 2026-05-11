@@ -30,7 +30,7 @@ export function validarParaExportar({ plan, proyecto }: InputValidar): Validacio
   }
 
   if (!plan.preparadoPor || plan.preparadoPor.trim() === '') {
-    errores.push("Falta 'Preparado por' en la cabecera.")
+    errores.push("Falta 'Preparado por' — completalo en la Cabecera del Documento (lápiz ✏️).")
   }
 
   // === ADVERTENCIAS (no bloquean pero avisan) ===
@@ -49,11 +49,11 @@ export function validarParaExportar({ plan, proyecto }: InputValidar): Validacio
   }
 
   if (!plan.revisadoPor || plan.revisadoPor.trim() === '') {
-    advertencias.push("Falta 'Revisado por' en la cabecera.")
+    advertencias.push("Falta 'Revisado por' — completalo en la Cabecera del Documento (lápiz ✏️).")
   }
 
   if (!plan.aprobadoPor || plan.aprobadoPor.trim() === '') {
-    advertencias.push("Falta 'Aprobado por' en la cabecera.")
+    advertencias.push("Falta 'Aprobado por' — completalo en la Cabecera del Documento (lápiz ✏️).")
   }
 
   return { ok: errores.length === 0, errores, advertencias }
