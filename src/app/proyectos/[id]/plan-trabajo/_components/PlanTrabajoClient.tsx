@@ -352,7 +352,9 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
 
   const plan = planTrabajo as PlanTrabajo & { generaciones: unknown[]; operacionIAEnCurso?: string | null; operacionIAIniciadaEn?: Date | null }
   const bloques = (plan.bloquesCompletitud ?? {}) as Record<string, boolean>
-  const iaOcupada = !!plan.operacionIAEnCurso
+  const LOCK_EXPIRY_MS = 10 * 60 * 1000
+  const lockAge = plan.operacionIAIniciadaEn ? Date.now() - new Date(plan.operacionIAIniciadaEn).getTime() : Infinity
+  const iaOcupada = !!plan.operacionIAEnCurso && lockAge < LOCK_EXPIRY_MS
 
   function minutosTranscurridos(fecha: Date | null | undefined): number {
     if (!fecha) return 0
