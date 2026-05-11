@@ -27,7 +27,7 @@ export const planAlcanceDetalladoSubItemSchema = z.object({
 export const planAlcanceDetalladoEdtSchema = z.object({
   numeracion: z.string().min(1),
   edtNombre: z.string().min(1),
-  edtCodigo: z.string().min(1),
+  edtCodigo: z.string(),
   faseNombre: z.string().min(1),
   faseAbreviatura: z.string().min(1),
   ubicacion: z.string().optional(),
