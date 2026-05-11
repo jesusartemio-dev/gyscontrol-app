@@ -14,36 +14,53 @@ CRITERIOS DE CALIDAD:
      compromisos contractuales.
 
 2. ALCANCE DETALLADO:
-   REGLA FUNDAMENTAL: El mensaje incluye al inicio una sección
-   "ESTRUCTURA OBLIGATORIA DEL CRONOGRAMA". Esa sección es un JSON con las
-   fases, EDTs y actividades del proyecto. Tu salida DEBE incluir UNA entrada
-   por cada EDT de esa lista, en el mismo orden.
-   NO omitas ningún EDT. NO agregues EDTs que no estén en la estructura.
+   CONTEXTO: El mensaje incluye la ESTRUCTURA COMPLETA DEL CRONOGRAMA con fases,
+   EDTs, actividades y tareas. Usá esa información como base técnica.
+
+   NUMERACIÓN DEL DOCUMENTO:
+   - Numeración propia del plan: 11.1, 11.2, 11.3… (EDTs o grupos principales)
+   - SubItems: 11.X.Y
+   - NO copiés la numeración del cronograma (4.2, 4.4, etc.) — esos índices son
+     del cronograma de planificación, no del documento del plan de trabajo.
+
+   ESTRUCTURA:
+   - Organizá por Fase → EDT. Podés crear una entrada por EDT o una por grupo
+     lógico a tu criterio. No es obligatorio replicar la estructura del cronograma.
+
+   AGRUPACIÓN INTELIGENTE DE ACTIVIDADES:
+   - NO tenés que listar cada actividad del cronograma como subItem separado.
+   - Podés agrupar actividades similares o repetitivas en un solo subItem.
+   - Ejemplo correcto: en vez de 5 subItems "Instalación de Extractor E013",
+     "Instalación de Extractor E062", etc., usar UN subItem:
+     "Instalación de Sistemas de Extractor (E013, E062, E503, E2013, E3003)"
+     con una descripción que cubra el proceso común de todas.
+   - Podés también separar actividades técnicamente distintas aunque sean del mismo EDT.
+
+   CÓDIGOS TÉCNICOS (OBLIGATORIO):
+   - Preservá los códigos de equipos, instrumentos y sistemas del cronograma.
+   - Ejemplos: E013, E062, 440 VAC, ATEX, H2, PLC, SCADA, etc.
+   - Cuando agrupes elementos similares, listá los códigos entre paréntesis.
+   - Estos códigos son trazables con el proyecto real y no deben omitirse ni inventarse.
 
    CAMPOS POR ENTRADA (EDT):
-   - numeracion: EXACTAMENTE el valor del campo "numeracion" de la directiva
-     (ej: "4.2", "1.1") — NO uses "11.X" ni ningún otro prefijo inventado
-   - edtNombre: EXACTAMENTE el valor del campo "edtNombre" de la directiva
-   - faseNombre: EXACTAMENTE el valor del campo "faseNombre" de la directiva
-   - faseAbreviatura: igual a faseNombre (nombre completo, NO abreviaturas como EJEC/PROC)
-   - edtCodigo: si el nombre del EDT tiene código reconocible (CON, COM, ING, PLAN), ponelo;
-     si no, string vacío ""
-   - edtRefId: COPIA EXACTAMENTE el campo "edtId" de la directiva
-   - descripcion: párrafo narrativo de 80-120 palabras del flujo de trabajo del EDT
+   - numeracion: secuencial del documento (ej: "11.1", "11.2") — no del cronograma
+   - edtNombre: nombre descriptivo del EDT (puede ser el del cronograma)
+   - faseNombre: nombre completo de la fase (PLANIFICACIÓN, EJECUCIÓN, etc.)
+   - faseAbreviatura: igual a faseNombre (NO uses abreviaturas como EJEC/PROC)
+   - edtCodigo: código del EDT si aplica (CON, COM, ING, etc.), sino ""
+   - edtRefId: ID del EDT del cronograma (campo edtId de la estructura)
+   - descripcion: párrafo narrativo de 80-120 palabras del flujo de trabajo
 
-   SUBITEMS (actividades):
-   - Si el EDT tiene actividades en la directiva (campo "actividades" no vacío):
-     generá UN subItem por CADA actividad listada, en el mismo orden.
-     * actividadNombre: EXACTAMENTE el "actividadNombre" de la directiva
-     * numeracion: EXACTAMENTE el "numeracion" de la actividad en la directiva
-     * descripcion: párrafo de 50-100 palabras describiendo la actividad
-   - Si el EDT no tiene actividades en la directiva: subItems = []
+   SUBITEMS:
+   - actividadNombre: nombre del grupo o actividad (puede ser agrupado)
+   - numeracion: 11.X.Y secuencial
+   - descripcion: párrafo de 50-100 palabras; incluí las tareas representativas
+     del cronograma embebidas en el párrafo, no como lista
 
    DESCRIPCIONES (NARRATIVA, no bullets):
-   - Cada descripción debe ser un párrafo narrativo que describa el flujo de
-     trabajo real del EDT o actividad.
-   - Mencioná las tareas más representativas embebidas en el párrafo.
-   - Indicá ubicación física específica cuando se pueda inferir del contexto.
+   - Párrafos que describan el flujo real, no una enumeración de tareas.
+   - Usá la info de tareas del cronograma para enriquecer el texto.
+   - Indicá ubicación física específica cuando se pueda inferir.
 
 3. EPP:
    - basico: casco ANSI Z89.1-2014, lentes Z87+, zapatos dieléctricos, guantes, chaleco.
@@ -166,7 +183,7 @@ ESQUEMA JSON DE OUTPUT — LOTE A (devolvé EXACTAMENTE este JSON con SOLO estas
   "alcanceGeneral": "string — 2-4 párrafos",
   "alcanceDetallado": [
     {
-      "numeracion": "4.2",
+      "numeracion": "11.1",
       "edtNombre": "Construcción",
       "edtCodigo": "CON",
       "faseNombre": "EJECUCIÓN",
@@ -175,12 +192,12 @@ ESQUEMA JSON DE OUTPUT — LOTE A (devolvé EXACTAMENTE este JSON con SOLO estas
       "descripcion": "Párrafo narrativo de 80-120 palabras...",
       "subItems": [
         {
-          "numeracion": "4.2.1",
-          "actividadNombre": "Nombre EXACTO de la actividad según la directiva del cronograma",
-          "descripcion": "Párrafo narrativo de la actividad..."
+          "numeracion": "11.1.1",
+          "actividadNombre": "Instalación de Sistemas de Extractor (E013, E062, E503, E2013, E3003)",
+          "descripcion": "Párrafo narrativo agrupando las instalaciones similares..."
         }
       ],
-      "edtRefId": "COPIA el edtId de la directiva del cronograma"
+      "edtRefId": "ID del EDT del cronograma"
     }
   ],
   "eppRequeridos": {
@@ -289,8 +306,8 @@ export const SECCIONES_CONFIG: SeccionConfig[] = [
     schema: `{
   "alcanceDetallado": [
     {
-      "numeracion": "4.2",
-      "edtNombre": "Nombre EXACTO del EDT según la directiva del cronograma",
+      "numeracion": "11.1",
+      "edtNombre": "Nombre del EDT (puede agrupar lógicamente si aplica)",
       "edtCodigo": "CON",
       "faseNombre": "EJECUCIÓN",
       "faseAbreviatura": "EJECUCIÓN",
@@ -298,12 +315,12 @@ export const SECCIONES_CONFIG: SeccionConfig[] = [
       "descripcion": "Párrafo narrativo de 80-120 palabras describiendo el flujo de trabajo del EDT...",
       "subItems": [
         {
-          "numeracion": "4.2.1",
-          "actividadNombre": "Nombre EXACTO de la actividad según la directiva del cronograma",
-          "descripcion": "Párrafo narrativo de la actividad..."
+          "numeracion": "11.1.1",
+          "actividadNombre": "Instalación de Sistemas de Extractor (E013, E062, E503, E2013, E3003)",
+          "descripcion": "Párrafo narrativo agrupando las instalaciones similares con sus tareas..."
         }
       ],
-      "edtRefId": "COPIA el edtId de la directiva del cronograma"
+      "edtRefId": "ID del EDT del cronograma"
     }
   ]
 }`,
@@ -442,15 +459,15 @@ ESQUEMA JSON DE OUTPUT (devolvé EXACTAMENTE este JSON sin markdown):
   "alcanceGeneral": "string — 2-4 párrafos",
   "alcanceDetallado": [
     {
-      "numeracion": "4.2",
-      "edtNombre": "Nombre EXACTO según directiva",
+      "numeracion": "11.1",
+      "edtNombre": "Nombre del EDT (puede agrupar lógicamente)",
       "edtCodigo": "CON",
       "faseNombre": "EJECUCIÓN",
       "faseAbreviatura": "EJECUCIÓN",
       "ubicacion": "Site cliente / Sección 50 (opcional)",
       "descripcion": "Párrafo narrativo de 80-120 palabras...",
-      "subItems": [{ "numeracion": "4.2.1", "actividadNombre": "Nombre EXACTO según directiva", "descripcion": "string" }],
-      "edtRefId": "COPIA el edtId de la directiva"
+      "subItems": [{ "numeracion": "11.1.1", "actividadNombre": "Instalación de Sistemas de Extractor (E013, E062)", "descripcion": "string" }],
+      "edtRefId": "ID del EDT del cronograma"
     }
   ],
   "eppRequeridos": {

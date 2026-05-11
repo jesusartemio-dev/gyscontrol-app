@@ -28,24 +28,22 @@ type Ctx = { params: Promise<{ id: string }> }
 function buildDirectivaCronograma(
   cron: NonNullable<PlanTrabajoContexto['cronograma']['cronogramaSeleccionado']>
 ): string {
-  const estructura = cron.fases.map((f, fi) => ({
+  const estructura = cron.fases.map(f => ({
     faseNombre: f.nombre,
-    edts: f.edts.map((e, ei) => ({
+    edts: f.edts.map(e => ({
       edtId: e.id,
       edtNombre: e.nombre,
-      numeracion: `${f.orden ?? fi + 1}.${e.orden ?? ei + 1}`,
-      actividades: e.actividades.map((a, ai) => ({
+      actividades: e.actividades.map(a => ({
         actividadNombre: a.nombre,
-        numeracion: `${f.orden ?? fi + 1}.${e.orden ?? ei + 1}.${a.orden ?? ai + 1}`,
+        tareas: a.tareas.map(t => t.nombre),
       })),
     })),
   }))
   return (
-    '\n\nESTRUCTURA OBLIGATORIA DEL CRONOGRAMA — seguí este JSON al pie de la letra:\n' +
-    '• Una entrada en alcanceDetallado por cada EDT, en el mismo orden.\n' +
-    '• edtNombre, faseNombre y numeracion deben ser EXACTAMENTE los de esta estructura.\n' +
-    '• Si el EDT tiene actividades, incluilas TODAS como subItems con actividadNombre y numeracion EXACTOS.\n' +
-    '• NO omitas ningún EDT. NO omitas ninguna actividad.\n\n' +
+    '\n\nESTRUCTURA COMPLETA DEL CRONOGRAMA (Fase → EDT → Actividad → Tarea):\n' +
+    'Usá esta información como base técnica para construir el alcanceDetallado.\n' +
+    'NO tenés que crear una entrada por cada EDT ni listar cada actividad por separado.\n' +
+    'Podés agrupar actividades similares o repetitivas en un solo subItem con sus códigos.\n\n' +
     JSON.stringify(estructura, null, 2)
   )
 }
