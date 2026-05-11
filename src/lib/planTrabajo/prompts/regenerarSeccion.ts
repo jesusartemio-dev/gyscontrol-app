@@ -24,20 +24,29 @@ const CONFIGS: Record<SeccionRegenerable, SeccionConfig> = {
   },
 
   alcanceDetallado: {
-    instruccion: `Generá una entrada por cada EDT del Cronograma de Planificación.
-NO uses los servicios de la cotización como unidad de alcance — esos aportan contexto técnico.
-La estructura viene del cronograma: una fila de alcance por EDT.
+    instruccion: `El mensaje incluye la ESTRUCTURA COMPLETA DEL CRONOGRAMA (Fase → EDT → Actividad → Tarea).
+Usá esa información como base técnica para construir el alcance detallado.
 
-- Numeración continua: 11.1, 11.2, 11.3...
-- edtNombre: nombre del EDT del cronograma.
-- edtCodigo: código del EDT (ej: CON, ING, PLAN, PROC, COM, CIERRE — inferilo del nombre si no está explícito).
-- faseNombre: nombre de la fase del cronograma (PLANIFICACIÓN, INGENIERÍA, PROCURA, EJECUCIÓN, CIERRE).
-- faseAbreviatura: PLAN, ING, PROC, EJEC o CIERRE según corresponda.
-- descripcion: párrafo narrativo de 80-150 palabras con el flujo de trabajo del EDT. NO bullets.
-- subItems: SOLO si el código del EDT contiene "CON" o "COM". En ese caso, una entrada por Actividad
-  del cronograma, con descripción narrativa que embeba las tareas.
-- edtRefId: COPIA EXACTAMENTE el id= del "EDT [id=...]" del cronograma. NO inventes IDs.`,
-    schema: `{ "alcanceDetallado": [{ "numeracion": "11.1", "edtNombre": "Construcción", "edtCodigo": "CON", "faseNombre": "EJECUCIÓN", "faseAbreviatura": "EJEC", "ubicacion": "Site cliente (opcional)", "descripcion": "Párrafo narrativo 80-150 palabras...", "subItems": [{ "numeracion": "11.1.1", "actividadNombre": "string", "descripcion": "string" }], "edtRefId": "uuid-exacto-del-EDT-en-cronograma" }] }`,
+NUMERACIÓN: Propia del plan de trabajo — 11.1, 11.2, 11.3... (no copies la numeración 4.2, 4.4 del cronograma).
+
+ESTRUCTURA:
+- Organizá por Fase → EDT. Podés crear una entrada por EDT o por grupo lógico.
+- Para los subItems (actividades): NO es obligatorio listar cada actividad por separado.
+  Podés agrupar actividades similares o repetitivas en un solo subItem.
+  Ejemplo: en vez de 5 subItems "Instalación de Extractor E013/E062/E503/E2013/E3003",
+  usá UN subItem "Instalación de Sistemas de Extractor (E013, E062, E503, E2013, E3003)".
+
+CAMPOS:
+- numeracion: 11.1, 11.2... (EDTs); 11.X.Y (subItems) — secuencial del documento
+- edtNombre: nombre del EDT (puede ser el del cronograma)
+- faseNombre: nombre completo de la fase (PLANIFICACIÓN, EJECUCIÓN, etc.)
+- faseAbreviatura: igual a faseNombre — NO uses abreviaturas como EJEC/PROC
+- edtCodigo: código si aplica (CON, COM, ING, etc.), sino ""
+- edtRefId: ID del EDT del cronograma (aparece como "edtId" en la directiva o "EDT [id=...]" en el contexto)
+- descripcion: párrafo narrativo de 80-120 palabras. NO bullets.
+- subItems.actividadNombre: nombre descriptivo; listá los códigos técnicos al agrupar (E013, E062...)
+- subItems.descripcion: párrafo de 50-100 palabras con las tareas embebidas en texto narrativo`,
+    schema: `{ "alcanceDetallado": [{ "numeracion": "11.1", "edtNombre": "Construcción", "edtCodigo": "CON", "faseNombre": "EJECUCIÓN", "faseAbreviatura": "EJECUCIÓN", "ubicacion": "Site cliente (opcional)", "descripcion": "Párrafo narrativo 80-120 palabras...", "subItems": [{ "numeracion": "11.1.1", "actividadNombre": "Instalación de Sistemas de Extractor (E013, E062, E503, E2013, E3003)", "descripcion": "Párrafo narrativo agrupando instalaciones similares..." }], "edtRefId": "ID del EDT del cronograma" }] }`,
   },
 
   eppRequeridos: {

@@ -9,7 +9,7 @@ import { trackUsage } from '@/lib/agente/usageTracker'
 import { isIAFeatureEnabled } from '@/lib/agente/featureFlags'
 import { cargarContextoPlanTrabajo } from '@/lib/planTrabajo/cargarContexto'
 import { adquirirLockIA, liberarLockIA } from '@/lib/planTrabajo/mutex'
-import { serializarContextoParaIA, serializarEstadoActualPlan } from '@/lib/planTrabajo/contextoIA'
+import { serializarContextoParaIA, serializarEstadoActualPlan, buildDirectivaCronograma } from '@/lib/planTrabajo/contextoIA'
 import { validarSeccionIndividual } from '@/lib/planTrabajo/validarSecciones'
 import { guardarSeccionIndividual } from '@/lib/planTrabajo/guardarSecciones'
 import { PLAN_TRABAJO_SYSTEM_INSTRUCCIONES } from '@/lib/planTrabajo/prompts/generarPlan'
@@ -49,7 +49,8 @@ async function ejecutarSonnetRegeneracion(
   seccion: SeccionRegenerable,
   instruccionesAdicionales: string | undefined,
   proyectoId: string,
-  userId: string
+  userId: string,
+  directivaExtra = ''
 ): Promise<unknown> {
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const inicio = Date.now()
@@ -61,6 +62,7 @@ async function ejecutarSonnetRegeneracion(
     '',
     '=== CONTEXTO DEL PROYECTO ===',
     contextoSerializado,
+    ...(directivaExtra ? ['', directivaExtra] : []),
     '',
     '=== SECCIONES RELEVANTES DEL PLAN ACTUAL ===',
     estadoRelevante,
@@ -212,6 +214,12 @@ export async function POST(req: NextRequest, { params }: Ctx) {
         const contextoSerializado = serializarContextoParaIA(contexto)
         const estadoRelevante = serializarEstadoActualPlan(planActual, seccion)
 
+        // Para alcanceDetallado: inyectar la directiva estructurada del cronograma
+        const directivaCronograma =
+          seccion === 'alcanceDetallado' && contexto.cronograma.cronogramaSeleccionado
+            ? buildDirectivaCronograma(contexto.cronograma.cronogramaSeleccionado)
+            : ''
+
         send('status', {
           fase: 'generando',
           mensaje: `Generando sección "${seccion}" con Sonnet...`,
@@ -222,7 +230,8 @@ export async function POST(req: NextRequest, { params }: Ctx) {
           seccion,
           instruccionesAdicionales,
           proyectoId,
-          userId
+          userId,
+          directivaCronograma
         )
 
         send('status', { fase: 'validacion', mensaje: 'Validando estructura del resultado...' })

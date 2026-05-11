@@ -1,6 +1,34 @@
 import type { PlanTrabajoContexto, OrgNodoContexto, SeccionRegenerable } from '@/types/planTrabajo'
 import type { PlanTrabajo } from '@prisma/client'
 
+/**
+ * Construye la directiva JSON del cronograma (Fase → EDT → Actividad → Tarea)
+ * para inyectarla en el prompt de alcanceDetallado.
+ * Usada tanto en generar-ia como en regenerar-seccion.
+ */
+export function buildDirectivaCronograma(
+  cron: NonNullable<PlanTrabajoContexto['cronograma']['cronogramaSeleccionado']>
+): string {
+  const estructura = cron.fases.map(f => ({
+    faseNombre: f.nombre,
+    edts: f.edts.map(e => ({
+      edtId: e.id,
+      edtNombre: e.nombre,
+      actividades: e.actividades.map(a => ({
+        actividadNombre: a.nombre,
+        tareas: a.tareas.map(t => t.nombre),
+      })),
+    })),
+  }))
+  return (
+    '\n\nESTRUCTURA COMPLETA DEL CRONOGRAMA (Fase → EDT → Actividad → Tarea):\n' +
+    'Usá esta información como base técnica para construir el alcanceDetallado.\n' +
+    'NO tenés que crear una entrada por cada EDT ni listar cada actividad por separado.\n' +
+    'Podés agrupar actividades similares o repetitivas en un solo subItem con sus códigos.\n\n' +
+    JSON.stringify(estructura, null, 2)
+  )
+}
+
 function fmtDate(d: Date | string | null | undefined): string {
   if (!d) return '(sin fecha)'
   const date = typeof d === 'string' ? new Date(d) : d

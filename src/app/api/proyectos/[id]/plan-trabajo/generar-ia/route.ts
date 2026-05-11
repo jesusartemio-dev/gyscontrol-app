@@ -8,7 +8,7 @@ import { trackUsage } from '@/lib/agente/usageTracker'
 import { isIAFeatureEnabled } from '@/lib/agente/featureFlags'
 import { cargarContextoPlanTrabajo } from '@/lib/planTrabajo/cargarContexto'
 import { adquirirLockIA, liberarLockIA } from '@/lib/planTrabajo/mutex'
-import { serializarContextoParaIA } from '@/lib/planTrabajo/contextoIA'
+import { serializarContextoParaIA, buildDirectivaCronograma } from '@/lib/planTrabajo/contextoIA'
 import { validarSeccionesPlan } from '@/lib/planTrabajo/validarSecciones'
 import { guardarSeccionParalela, recalcularCompletitud } from '@/lib/planTrabajo/guardarSecciones'
 import { RESUMEN_PROYECTO_PROMPT } from '@/lib/planTrabajo/prompts/resumirProyecto'
@@ -24,29 +24,6 @@ export const dynamic = 'force-dynamic'
 type Ctx = { params: Promise<{ id: string }> }
 
 // ─── Helpers internos ───────────────────────────────────────────────────────
-
-function buildDirectivaCronograma(
-  cron: NonNullable<PlanTrabajoContexto['cronograma']['cronogramaSeleccionado']>
-): string {
-  const estructura = cron.fases.map(f => ({
-    faseNombre: f.nombre,
-    edts: f.edts.map(e => ({
-      edtId: e.id,
-      edtNombre: e.nombre,
-      actividades: e.actividades.map(a => ({
-        actividadNombre: a.nombre,
-        tareas: a.tareas.map(t => t.nombre),
-      })),
-    })),
-  }))
-  return (
-    '\n\nESTRUCTURA COMPLETA DEL CRONOGRAMA (Fase → EDT → Actividad → Tarea):\n' +
-    'Usá esta información como base técnica para construir el alcanceDetallado.\n' +
-    'NO tenés que crear una entrada por cada EDT ni listar cada actividad por separado.\n' +
-    'Podés agrupar actividades similares o repetitivas en un solo subItem con sus códigos.\n\n' +
-    JSON.stringify(estructura, null, 2)
-  )
-}
 
 async function ejecutarFaseA(
   contexto: PlanTrabajoContexto,
