@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Plus, RefreshCw, Loader2, Info } from 'lucide-react'
+import { Plus, RefreshCw, Loader2, Info, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -193,6 +193,20 @@ export default function IpercClient({ proyectoId }: Props) {
     })
   }
 
+  // ─── Eliminar IPERC completo ───────────────────────────────────────────────
+  const handleEliminarIperc = async () => {
+    if (!confirm('¿Eliminar el IPERC completo? Se borrarán todas las filas. Esta acción no se puede deshacer.')) return
+    try {
+      const res = await fetch(`/api/proyectos/${proyectoId}/iperc`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Error al eliminar')
+      setContexto(prev => prev ? { ...prev, iperc: null } : prev)
+      setCobertura(null)
+      toast.success('IPERC eliminado')
+    } catch {
+      toast.error('Error al eliminar el IPERC')
+    }
+  }
+
   // ─── Updated cabecera ──────────────────────────────────────────────────────
   const handleIpercUpdated = (iperc: IpercCompleto) => {
     setContexto(prev => prev ? { ...prev, iperc } : prev)
@@ -231,15 +245,29 @@ export default function IpercClient({ proyectoId }: Props) {
           <h2 className="text-lg font-semibold">IPERC</h2>
           <p className="text-xs text-muted-foreground">{proyecto.nombre}</p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={fetchContexto}
-          disabled={loading}
-          className="h-8"
-        >
-          <RefreshCw className="h-3.5 w-3.5" />
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchContexto}
+            disabled={loading}
+            className="h-8"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+          </Button>
+          {iperc && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleEliminarIperc}
+              disabled={isGenerando}
+              className="h-8 text-destructive border-destructive/40 hover:bg-destructive/10"
+            >
+              <Trash2 className="h-3.5 w-3.5 mr-1" />
+              Eliminar IPERC
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Pre-requisitos */}
