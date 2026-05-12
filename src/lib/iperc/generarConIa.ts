@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { prisma } from '@/lib/prisma'
-import { MODELS } from '@/lib/agente/models'
+import { getModelForTask } from '@/lib/agente/models'
 import { trackUsage, calculateCost } from '@/lib/agente/usageTracker'
 import { adquirirLock, completarLock, fallarLock } from '@/lib/iperc/mutex'
 import { RESUMIR_PLAN_TRABAJO_IPERC_PROMPT } from '@/lib/iperc/prompts/resumirPlanTrabajo'
@@ -12,8 +12,8 @@ import {
 import { validarYParsearLote, type FilaIpercIa } from '@/lib/iperc/validarFilas'
 
 const MAX_FILAS = 150
-const TAREAS_POR_LOTE = 15
-const MAX_TAREAS_MUESTREADAS = 120
+const TAREAS_POR_LOTE = 10
+const MAX_TAREAS_MUESTREADAS = 80
 
 function muestrearTareasRepresentativas(
   todasLasTareas: TareaParaIperc[]
@@ -153,8 +153,10 @@ async function resumirConHaiku(
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const inicio = Date.now()
 
+  const modeloResumen = getModelForTask('chat-simple')
+
   const resp = await anthropic.messages.create({
-    model: MODELS.haiku,
+    model: modeloResumen,
     max_tokens: 4000,
     temperature: 0.3,
     system: RESUMIR_PLAN_TRABAJO_IPERC_PROMPT,
@@ -164,7 +166,7 @@ async function resumirConHaiku(
   trackUsage({
     userId,
     tipo: 'iperc.resumen',
-    modelo: MODELS.haiku,
+    modelo: modeloResumen,
     tokensInput: resp.usage.input_tokens,
     tokensOutput: resp.usage.output_tokens,
     duracionMs: Date.now() - inicio,
@@ -193,9 +195,11 @@ async function generarLoteConSonnet(
 
   const userMessage = buildPromptLote(resumenProyecto, tareas, resumenPrevias)
 
+  const modelo = getModelForTask('ssoma-iperc')
+
   const resp = await (anthropic.messages.create as any)({
-    model: MODELS.sonnet,
-    max_tokens: 20000,
+    model: modelo,
+    max_tokens: 8192,
     temperature: 0.2,
     system: [
       {
@@ -211,7 +215,7 @@ async function generarLoteConSonnet(
   trackUsage({
     userId,
     tipo: 'iperc.lote',
-    modelo: MODELS.sonnet,
+    modelo,
     tokensInput: resp.usage.input_tokens,
     tokensOutput: resp.usage.output_tokens,
     tokensCacheCreation: usageRaw.cache_creation_input_tokens ?? 0,
@@ -386,8 +390,8 @@ export async function generarConIa(
     // 7. Calcular totales de uso
     // Estimación conservadora basada en tokens típicos por lote
     const duracionMs = Date.now() - startMs
-    totalCostoUsd = calculateCost(MODELS.haiku, 3000, 1500) +
-      calculateCost(MODELS.sonnet, 8000 * totalLotes, 4000 * totalLotes)
+    totalCostoUsd = calculateCost(getModelForTask('chat-simple'), 3000, 1500) +
+      calculateCost(getModelForTask('ssoma-iperc'), 8000 * totalLotes, 4000 * totalLotes)
 
     // 8. Completar generacion record
     await completarLock(generacionId, {

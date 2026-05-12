@@ -115,7 +115,19 @@ export default function IpercClient({ proyectoId }: Props) {
             setStatusMsg(msg)
             if (prog != null) setProgreso(prog)
           },
-          onFilasParciales: () => {},
+          onFilasParciales: (filas) => {
+            const nuevas = filas as IpercFila[]
+            setContexto(prev => {
+              if (!prev?.iperc) return prev
+              const existentes = new Set(prev.iperc.filas.map(f => f.id))
+              const sinDuplicar = nuevas.filter(f => !existentes.has(f.id))
+              if (sinDuplicar.length === 0) return prev
+              return {
+                ...prev,
+                iperc: { ...prev.iperc, filas: [...prev.iperc.filas, ...sinDuplicar] },
+              }
+            })
+          },
           onCompletado: async (data) => {
             setProgreso(100)
             setStatusMsg('Completado')
