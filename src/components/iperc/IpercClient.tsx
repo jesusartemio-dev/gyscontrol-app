@@ -9,6 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { CabeceraIperc } from './CabeceraIperc'
 import { PreRequisitosPanelIperc } from './PreRequisitosPanelIperc'
 import { BotonGenerarIaIperc } from './BotonGenerarIaIperc'
+import { SeleccionEdtsModal } from './SeleccionEdtsModal'
 import { TablaFilasIperc } from './TablaFilasIperc'
 import { EditorFilaSheet } from './EditorFilaSheet'
 import { readSSEStreamIperc } from '@/lib/iperc/sse-consumer'
@@ -30,13 +31,16 @@ export default function IpercClient({ proyectoId }: Props) {
   const [progreso, setProgreso] = useState<number | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
-  // Coverage info shown after generation
+  // Info shown after generation
   const [cobertura, setCobertura] = useState<{
-    totalTareasProyecto: number
-    tareasMuestreadas: number
     totalFilas: number
-    coberturaPct: number
+    totalTareas: number
+    edtsEvaluados: number
+    modelosUsados: { sonnet: number; haiku: number }
   } | null>(null)
+
+  // EDT selection modal
+  const [modalEdtsOpen, setModalEdtsOpen] = useState(false)
 
   // Editor sheet state
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -85,9 +89,15 @@ export default function IpercClient({ proyectoId }: Props) {
     }
   }
 
+  // ─── Abrir modal de selección de EDTs ─────────────────────────────────────
+  const handleAbrirModal = () => {
+    setModalEdtsOpen(true)
+  }
+
   // ─── Generar con IA ────────────────────────────────────────────────────────
-  const handleGenerarIA = async () => {
+  const handleGenerarIA = async (edtIds: string[]) => {
     if (!contexto?.iperc) return
+    setModalEdtsOpen(false)
     const ctrl = new AbortController()
     abortRef.current = ctrl
     setGenerando(true)
@@ -99,7 +109,7 @@ export default function IpercClient({ proyectoId }: Props) {
       const res = await fetch(`/api/proyectos/${proyectoId}/iperc/generar-ia`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ edtIds }),
         signal: ctrl.signal,
       })
 
@@ -133,13 +143,13 @@ export default function IpercClient({ proyectoId }: Props) {
             setStatusMsg('Completado')
             await fetchContexto()
             toast.success('IPERC generado con IA')
-            const totalTareasProyecto = typeof data.totalTareasProyecto === 'number' ? data.totalTareasProyecto : 0
-            const tareasMuestreadas = typeof data.tareasMuestreadas === 'number' ? data.tareasMuestreadas : 0
             const totalFilas = typeof data.totalFilas === 'number' ? data.totalFilas : 0
-            const coberturaPct = typeof data.coberturaPct === 'number' ? data.coberturaPct : 100
-            if (totalTareasProyecto > tareasMuestreadas) {
-              setCobertura({ totalTareasProyecto, tareasMuestreadas, totalFilas, coberturaPct })
-            }
+            const totalTareas = typeof data.totalTareas === 'number' ? data.totalTareas : 0
+            const edtsEvaluados = typeof data.edtsEvaluados === 'number' ? data.edtsEvaluados : 0
+            const modelosUsados = data.modelosUsados && typeof data.modelosUsados === 'object'
+              ? data.modelosUsados as { sonnet: number; haiku: number }
+              : { sonnet: 0, haiku: 0 }
+            setCobertura({ totalFilas, totalTareas, edtsEvaluados, modelosUsados })
           },
         },
         ctrl.signal
@@ -321,7 +331,7 @@ export default function IpercClient({ proyectoId }: Props) {
               preRequisitosCumple={preRequisitos.cumple}
               statusMsg={statusMsg}
               progreso={progreso}
-              onClick={handleGenerarIA}
+              onClick={handleAbrirModal}
             />
 
             <Button
@@ -357,21 +367,35 @@ export default function IpercClient({ proyectoId }: Props) {
             onDelete={handleEliminarFila}
           />
 
-          {/* Cobertura de muestreo */}
+          {/* Resumen post-generación */}
           {cobertura && (
             <Alert className="border-blue-200 bg-blue-50">
               <Info className="h-4 w-4 text-blue-600" />
-              <AlertTitle className="text-blue-800 text-sm">Cobertura del IPERC generado</AlertTitle>
+              <AlertTitle className="text-blue-800 text-sm">IPERC generado con IA</AlertTitle>
               <AlertDescription className="text-blue-700 text-xs">
-                Se generaron <strong>{cobertura.totalFilas} filas</strong> a partir de{' '}
-                <strong>{cobertura.tareasMuestreadas} tareas</strong> del cronograma
-                ({cobertura.coberturaPct}% de las {cobertura.totalTareasProyecto} totales).
-                Las tareas restantes pueden agregarse manualmente con el botón "Agregar fila".
+                <strong>{cobertura.totalFilas} filas</strong> generadas a partir de{' '}
+                <strong>{cobertura.totalTareas} tareas</strong> en{' '}
+                <strong>{cobertura.edtsEvaluados} {cobertura.edtsEvaluados === 1 ? 'EDT' : 'EDTs'}</strong>.
+                {(cobertura.modelosUsados.sonnet > 0 || cobertura.modelosUsados.haiku > 0) && (
+                  <> Modelos: {[
+                    cobertura.modelosUsados.sonnet > 0 ? `Sonnet (${cobertura.modelosUsados.sonnet} ${cobertura.modelosUsados.sonnet === 1 ? 'lote' : 'lotes'})` : null,
+                    cobertura.modelosUsados.haiku > 0 ? `Haiku (${cobertura.modelosUsados.haiku} ${cobertura.modelosUsados.haiku === 1 ? 'lote' : 'lotes'})` : null,
+                  ].filter(Boolean).join(', ')}.</>
+                )}
               </AlertDescription>
             </Alert>
           )}
         </>
       )}
+
+      {/* Modal selección de EDTs */}
+      <SeleccionEdtsModal
+        open={modalEdtsOpen}
+        proyectoId={proyectoId}
+        onClose={() => setModalEdtsOpen(false)}
+        onConfirmar={handleGenerarIA}
+        generando={generando}
+      />
 
       {/* Editor Sheet */}
       <EditorFilaSheet

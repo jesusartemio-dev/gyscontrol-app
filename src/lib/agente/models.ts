@@ -24,7 +24,7 @@ const TASK_DEFAULTS: Record<AITask, string> = {
   'excel-extraction': MODELS.haiku,
   'pdf-extraction': MODELS.haiku,
   'ocr': MODELS.haiku,
-  'ssoma-iperc': MODELS.haiku,     // Generación por lotes (catálogo estructurado) → Haiku (override: AI_SSOMA_IPERC_MODEL)
+  'ssoma-iperc': MODELS.sonnet,    // IPERC alto riesgo (EJECUCIÓN): razonamiento complejo → Sonnet (override: AI_SSOMA_IPERC_MODEL)
   'ssoma-document': MODELS.sonnet, // Procedimientos técnicos de seguridad → Sonnet
   'ssoma-epp': MODELS.haiku,       // Listas de EPP por rol (referencia estándar) → Haiku
 }

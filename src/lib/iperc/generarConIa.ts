@@ -11,45 +11,22 @@ import {
 } from '@/lib/iperc/prompts/generarLoteIperc'
 import { validarYParsearLote, type FilaIpercIa } from '@/lib/iperc/validarFilas'
 
-const MAX_FILAS = 150
-const TAREAS_POR_LOTE = 10
-const MAX_TAREAS_MUESTREADAS = 80
+const MAX_FILAS = 200
+const LOTE_ALTO_RIESGO = 10  // Sonnet para EJECUCIÓN y fases de campo
+const LOTE_NORMAL = 15       // Haiku para otras fases
 
-function muestrearTareasRepresentativas(
-  todasLasTareas: TareaParaIperc[]
-): TareaParaIperc[] {
-  if (todasLasTareas.length <= MAX_TAREAS_MUESTREADAS) return todasLasTareas
+const REGEX_ALTO_RIESGO = /ejecuci|montaje|obra|instalaci|construcci|comisionamiento/i
 
-  const porEdt = new Map<string, TareaParaIperc[]>()
-  for (const t of todasLasTareas) {
-    const key = t.edt ?? 'sin_edt'
-    if (!porEdt.has(key)) porEdt.set(key, [])
-    porEdt.get(key)!.push(t)
-  }
-
-  const total = todasLasTareas.length
-  const muestra: TareaParaIperc[] = []
-  for (const tareasEdt of porEdt.values()) {
-    const cuota = Math.max(1, Math.floor(MAX_TAREAS_MUESTREADAS * tareasEdt.length / total))
-    muestra.push(...tareasEdt.slice(0, cuota))
-  }
-
-  if (muestra.length < MAX_TAREAS_MUESTREADAS) {
-    const yaMuestreadas = new Set(muestra.map(t => t.tareaId))
-    for (const t of todasLasTareas) {
-      if (muestra.length >= MAX_TAREAS_MUESTREADAS) break
-      if (!yaMuestreadas.has(t.tareaId)) muestra.push(t)
-    }
-  }
-
-  return muestra.slice(0, MAX_TAREAS_MUESTREADAS)
+function esFaseAltoRiesgo(nombre: string): boolean {
+  const n = nombre.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
+  return REGEX_ALTO_RIESGO.test(n)
 }
 
 type SendFn = (event: string, data: unknown) => void
 
 // ─── Carga de contexto ──────────────────────────────────────────────────────
 
-async function cargarContexto(proyectoId: string) {
+async function cargarContexto(proyectoId: string, edtIds: string[]) {
   const [proyecto, iperc, cronograma] = await Promise.all([
     prisma.proyecto.findUnique({
       where: { id: proyectoId },
@@ -74,19 +51,19 @@ async function cargarContexto(proyectoId: string) {
   })
 
   const edts = await prisma.proyectoEdt.findMany({
-    where: { proyectoCronogramaId: cronograma.id },
+    where: { proyectoCronogramaId: cronograma.id, id: { in: edtIds } },
     select: { id: true, nombre: true, orden: true, proyectoFaseId: true },
     orderBy: { orden: 'asc' },
   })
 
   const actividades = await prisma.proyectoActividad.findMany({
-    where: { proyectoCronogramaId: cronograma.id },
+    where: { proyectoCronogramaId: cronograma.id, proyectoEdtId: { in: edtIds } },
     select: { id: true, nombre: true, orden: true, proyectoEdtId: true },
     orderBy: { orden: 'asc' },
   })
 
   const tareas = await prisma.proyectoTarea.findMany({
-    where: { proyectoCronogramaId: cronograma.id },
+    where: { proyectoCronogramaId: cronograma.id, proyectoEdtId: { in: edtIds } },
     select: {
       id: true,
       nombre: true,
@@ -99,52 +76,63 @@ async function cargarContexto(proyectoId: string) {
     orderBy: [{ proyectoEdtId: 'asc' }, { orden: 'asc' }],
   })
 
-  // Mapas para lookup rápido
-  const faseMap = new Map(fases.map(f => [f.id, f.nombre]))
-  const edtMap = new Map(edts.map(e => [e.id, { nombre: e.nombre, faseId: e.proyectoFaseId }]))
+  const faseMap = new Map(fases.map(f => [f.id, f]))
+  const edtMap = new Map(edts.map(e => [e.id, e]))
   const actMap = new Map(actividades.map(a => [a.id, a.nombre]))
 
   const tareasParaIperc: TareaParaIperc[] = tareas.map(t => {
     const edt = edtMap.get(t.proyectoEdtId)
-    const faseName = edt?.faseId ? (faseMap.get(edt.faseId) ?? 'EJECUCIÓN') : 'EJECUCIÓN'
-    const edtName = edt?.nombre ?? 'General'
-    const actName = t.proyectoActividadId ? (actMap.get(t.proyectoActividadId) ?? t.nombre) : t.nombre
+    const fase = edt?.proyectoFaseId ? faseMap.get(edt.proyectoFaseId) : null
+    const edtNombre = edt?.nombre ?? 'General'
+    const faseNombre = fase?.nombre ?? 'EJECUCIÓN'
+    const esAltoRiesgo = esFaseAltoRiesgo(faseNombre)
+    // actividad = actividad.nombre si existe, si no = edt.nombre (nunca tarea.nombre)
+    const actNombre = t.proyectoActividadId ? (actMap.get(t.proyectoActividadId) ?? edtNombre) : edtNombre
     return {
       tareaId: t.id,
       actividadId: t.proyectoActividadId ?? null,
-      proceso: faseName,
-      edt: edtName,
-      actividad: actName,
+      proceso: edtNombre,
+      edt: edtNombre,
+      faseNombre,
+      esAltoRiesgo,
+      actividad: actNombre,
       tarea: t.nombre,
       horasEstimadas: t.horasEstimadas ? Number(t.horasEstimadas) : null,
       personasEstimadas: t.personasEstimadas,
     }
   })
 
+  const edtsNombres = edts.map(e => e.nombre)
+
   const contextoTexto = `
 PROYECTO: ${proyecto.nombre} (${proyecto.codigo ?? 'sin código'})
-CRONOGRAMA DE PLANIFICACIÓN — ${tareas.length} tareas en ${fases.length} fases
+EDTs SELECCIONADOS PARA IPERC: ${edtsNombres.join(', ')}
+TOTAL TAREAS A EVALUAR: ${tareas.length}
 
 ${fases.map(fase => {
-  const edtsDeFase = edts.filter(e => e.proyectoFaseId === fase.id)
-  return `## FASE: ${fase.nombre}\n${edtsDeFase.map(edt => {
-    const actsDEdt = actividades.filter(a => a.proyectoEdtId === edt.id)
-    return `  EDT: ${edt.nombre}\n${actsDEdt.map(act => {
-      const tareasDEAct = tareas.filter(t => t.proyectoActividadId === act.id)
-      return `    Actividad: ${act.nombre}\n${tareasDEAct.map(t =>
-        `      - Tarea: ${t.nombre} | ${t.horasEstimadas ?? '?'}h | ${t.personasEstimadas} pers | id=${t.id}`
-      ).join('\n')}`
+    const edtsDeFase = edts.filter(e => e.proyectoFaseId === fase.id)
+    if (edtsDeFase.length === 0) return null
+    return `## FASE: ${fase.nombre}\n${edtsDeFase.map(edt => {
+      const actsDEdt = actividades.filter(a => a.proyectoEdtId === edt.id)
+      const tareasSinAct = tareas.filter(t => t.proyectoEdtId === edt.id && !t.proyectoActividadId)
+      return `  EDT: ${edt.nombre}\n${actsDEdt.map(act => {
+        const tareasDEAct = tareas.filter(t => t.proyectoActividadId === act.id)
+        return `    Actividad: ${act.nombre}\n${tareasDEAct.map(t =>
+          `      - ${t.nombre} | ${t.horasEstimadas ?? '?'}h | ${t.personasEstimadas} pers | id=${t.id}`
+        ).join('\n')}`
+      }).join('\n')}${tareasSinAct.length > 0 ? '\n' + tareasSinAct.map(t =>
+        `    - ${t.nombre} | ${t.horasEstimadas ?? '?'}h | ${t.personasEstimadas} pers | id=${t.id}`
+      ).join('\n') : ''}`
     }).join('\n')}`
-  }).join('\n')}`
-}).join('\n\n')}
+  }).filter(Boolean).join('\n\n')}
   `.trim()
 
-  return { iperc, tareasParaIperc, contextoTexto }
+  return { iperc, tareasParaIperc, contextoTexto, edtsNombres }
 }
 
-// ─── Resumen con Haiku ──────────────────────────────────────────────────────
+// ─── Resumen ────────────────────────────────────────────────────────────────
 
-async function resumirConHaiku(
+async function resumir(
   contextoTexto: string,
   userId: string,
   proyectoId: string,
@@ -152,11 +140,10 @@ async function resumirConHaiku(
 ): Promise<string> {
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const inicio = Date.now()
-
-  const modeloResumen = getModelForTask('chat-simple')
+  const modelo = getModelForTask('chat-simple')
 
   const resp = await anthropic.messages.create({
-    model: modeloResumen,
+    model: modelo,
     max_tokens: 4000,
     temperature: 0.3,
     system: RESUMIR_PLAN_TRABAJO_IPERC_PROMPT,
@@ -166,7 +153,7 @@ async function resumirConHaiku(
   trackUsage({
     userId,
     tipo: 'iperc.resumen',
-    modelo: modeloResumen,
+    modelo,
     tokensInput: resp.usage.input_tokens,
     tokensOutput: resp.usage.output_tokens,
     duracionMs: Date.now() - inicio,
@@ -179,12 +166,13 @@ async function resumirConHaiku(
     .join('\n')
 }
 
-// ─── Lote con Sonnet ────────────────────────────────────────────────────────
+// ─── Lote ────────────────────────────────────────────────────────────────────
 
-async function generarLoteConSonnet(
+async function generarLote(
   resumenProyecto: string,
   tareas: TareaParaIperc[],
   resumenPrevias: string,
+  modelo: string,
   userId: string,
   proyectoId: string,
   loteIndex: number,
@@ -194,8 +182,6 @@ async function generarLoteConSonnet(
   const inicio = Date.now()
 
   const userMessage = buildPromptLote(resumenProyecto, tareas, resumenPrevias)
-
-  const modelo = getModelForTask('ssoma-iperc')
 
   const resp = await (anthropic.messages.create as any)({
     model: modelo,
@@ -242,26 +228,25 @@ async function generarLoteConSonnet(
 export async function generarConIa(
   proyectoId: string,
   userId: string,
+  edtIds: string[],
   send: SendFn,
   signal?: AbortSignal,
 ): Promise<void> {
   const startMs = Date.now()
 
-  // 1. Cargar contexto
   send('status', { mensaje: 'Cargando contexto del proyecto...', progreso: 5 })
-  const ctx = await cargarContexto(proyectoId)
+  const ctx = await cargarContexto(proyectoId, edtIds)
   if (!ctx) {
     send('error', { mensaje: 'No se pudo cargar el contexto (IPERC, cronograma o proyecto no encontrado)' })
     return
   }
 
-  const { iperc, tareasParaIperc, contextoTexto } = ctx
+  const { iperc, tareasParaIperc, contextoTexto, edtsNombres } = ctx
   if (tareasParaIperc.length === 0) {
-    send('error', { mensaje: 'El cronograma de planificación no tiene tareas' })
+    send('error', { mensaje: 'Los EDTs seleccionados no tienen tareas' })
     return
   }
 
-  // 2. Adquirir mutex
   const lock = await adquirirLock(iperc.id)
   if (!lock.ok) {
     const segs = Math.round((Date.now() - lock.conflicto!.iniciadaEn.getTime()) / 1000)
@@ -270,144 +255,142 @@ export async function generarConIa(
   }
 
   const generacionId = lock.generacionId!
-  let totalTokens = 0
-  let totalCostoUsd = 0
+  const modeloSonnet = getModelForTask('ssoma-iperc')
+  const modeloHaiku = getModelForTask('ssoma-epp')
+
+  send('inicio', {
+    edtsSeleccionados: edtsNombres,
+    totalTareas: tareasParaIperc.length,
+    models: { sonnet: modeloSonnet, haiku: modeloHaiku },
+  })
 
   try {
-    // 3. Eliminar filas existentes
     send('status', { mensaje: 'Eliminando filas anteriores...', progreso: 8 })
     await prisma.ipercFila.deleteMany({ where: { ipercId: iperc.id } })
 
-    // 4. Resumen con Haiku
-    send('status', { mensaje: 'Analizando contexto con IA (Haiku)...', progreso: 12 })
-    const resumenProyecto = await resumirConHaiku(contextoTexto, userId, proyectoId, signal)
+    send('status', { mensaje: 'Analizando contexto con IA...', progreso: 12 })
+    const resumenProyecto = await resumir(contextoTexto, userId, proyectoId, signal)
     if (signal?.aborted) throw new Error('Cancelado por el usuario')
 
-    // 5. Partir en lotes y procesar con Sonnet
-    const totalTareasProyecto = tareasParaIperc.length
-    const tareasLimitadas = muestrearTareasRepresentativas(tareasParaIperc)
-    const tareasMuestreadas = tareasLimitadas.length
-    const coberturaPct = Math.round((tareasMuestreadas / totalTareasProyecto) * 100)
-    const coberturaStr = tareasMuestreadas < totalTareasProyecto
-      ? ` (muestra representativa: ${tareasMuestreadas}/${totalTareasProyecto} tareas, ${coberturaPct}%)`
-      : ''
+    // Separar tareas por tipo: alto riesgo (Sonnet) vs normal (Haiku)
+    const tareasAltoRiesgo = tareasParaIperc.filter(t => t.esAltoRiesgo)
+    const tareasNormales = tareasParaIperc.filter(t => !t.esAltoRiesgo)
+
+    const grupos: Array<{ tareas: TareaParaIperc[]; modelo: string; tamLote: number }> = []
+    if (tareasAltoRiesgo.length > 0) grupos.push({ tareas: tareasAltoRiesgo, modelo: modeloSonnet, tamLote: LOTE_ALTO_RIESGO })
+    if (tareasNormales.length > 0) grupos.push({ tareas: tareasNormales, modelo: modeloHaiku, tamLote: LOTE_NORMAL })
+
+    const totalLotes = grupos.reduce((acc, g) => acc + Math.ceil(g.tareas.length / g.tamLote), 0)
 
     send('status', {
-      mensaje: `Generando ${tareasMuestreadas} tareas en lotes de ${TAREAS_POR_LOTE}${coberturaStr}...`,
+      mensaje: `Generando ${tareasParaIperc.length} tareas en ${totalLotes} lotes (${tareasAltoRiesgo.length} Sonnet, ${tareasNormales.length} Haiku)...`,
       progreso: 14,
-      totalTareasProyecto,
-      tareasMuestreadas,
+      totalTareas: tareasParaIperc.length,
     })
 
-    const totalLotes = Math.ceil(tareasLimitadas.length / TAREAS_POR_LOTE)
     const todasLasFilas: FilaIpercIa[] = []
     let filasGuardadas = 0
+    let loteGlobal = 0
+    let lotesConSonnet = 0
+    let lotesConHaiku = 0
 
-    for (let loteIdx = 0; loteIdx < totalLotes; loteIdx++) {
-      if (signal?.aborted) throw new Error('Cancelado por el usuario')
-      if (filasGuardadas >= MAX_FILAS) break
+    for (const { tareas, modelo, tamLote } of grupos) {
+      const totalLotesGrupo = Math.ceil(tareas.length / tamLote)
 
-      const inicio = loteIdx * TAREAS_POR_LOTE
-      const fin = Math.min(inicio + TAREAS_POR_LOTE, tareasLimitadas.length)
-      const lote = tareasLimitadas.slice(inicio, fin)
+      for (let loteIdx = 0; loteIdx < totalLotesGrupo; loteIdx++) {
+        if (signal?.aborted) throw new Error('Cancelado por el usuario')
+        if (filasGuardadas >= MAX_FILAS) break
 
-      const progreso = Math.round(15 + ((loteIdx / totalLotes) * 75))
-      send('lote_iniciado', { lote: loteIdx + 1, totalLotes, tareas: lote.length, progreso })
+        loteGlobal++
+        const inicio = loteIdx * tamLote
+        const fin = Math.min(inicio + tamLote, tareas.length)
+        const lote = tareas.slice(inicio, fin)
 
-      // Resumen breve de filas ya generadas (para que Sonnet tenga contexto)
-      const resumenPrevias = todasLasFilas.length > 0
-        ? todasLasFilas.slice(-5).map(f => `- ${f.proceso}/${f.actividad}/${f.tarea}: ${f.peligro}`).join('\n')
-        : ''
+        const progreso = Math.round(15 + (loteGlobal / totalLotes) * 75)
+        send('lote_iniciado', { lote: loteGlobal, totalLotes, tareas: lote.length, progreso, modelo })
 
-      const filasLote = await generarLoteConSonnet(
-        resumenProyecto,
-        lote,
-        resumenPrevias,
-        userId,
-        proyectoId,
-        loteIdx + 1,
-        signal,
-      )
+        const resumenPrevias = todasLasFilas.length > 0
+          ? todasLasFilas.slice(-5).map(f => `- ${f.proceso}/${f.actividad}/${f.tarea}: ${f.peligro}`).join('\n')
+          : ''
 
-      if (filasLote.length === 0) {
-        send('lote_error', { lote: loteIdx + 1, mensaje: 'El lote no generó filas válidas' })
-        continue
-      }
-
-      // 6. Guardar filas en DB con auto-numeración
-      const insertadas = await prisma.$transaction(async (tx) => {
-        const existentes = await tx.ipercFila.count({ where: { ipercId: iperc.id } })
-        const rows = filasLote.slice(0, MAX_FILAS - filasGuardadas)
-
-        return await Promise.all(
-          rows.map((fila, i) =>
-            tx.ipercFila.create({
-              data: {
-                ipercId: iperc.id,
-                numero: existentes + i + 1,
-                proceso: fila.proceso,
-                actividad: fila.actividad,
-                tarea: fila.tarea,
-                puestoTrabajo: fila.puestoTrabajo,
-                factorRiesgo: fila.factorRiesgo,
-                condicionActividad: fila.condicionActividad,
-                peligro: fila.peligro,
-                riesgo: fila.riesgo,
-                consecuencia: fila.consecuencia,
-                severidad: fila.severidad,
-                probabilidad: fila.probabilidad,
-                eliminar: fila.eliminar,
-                sustituir: fila.sustituir,
-                controlIngenieria: fila.controlIngenieria,
-                controlAdministrativo: fila.controlAdministrativo,
-                controlReceptor: fila.controlReceptor,
-                severidadResidual: fila.severidadResidual,
-                probabilidadResidual: fila.probabilidadResidual,
-                accionesMejora: fila.accionesMejora,
-                responsables: fila.responsables,
-                tareaCronogramaRefId: fila.tareaId,
-                actividadCronogramaRefId: fila.actividadId ?? null,
-              },
-            })
-          )
+        const filasLote = await generarLote(
+          resumenProyecto, lote, resumenPrevias, modelo, userId, proyectoId, loteGlobal, signal,
         )
-      })
 
-      todasLasFilas.push(...filasLote.slice(0, insertadas.length))
-      filasGuardadas += insertadas.length
+        if (modelo === modeloSonnet) lotesConSonnet++
+        else lotesConHaiku++
 
-      send('lote_completado', {
-        lote: loteIdx + 1,
-        filasGeneradas: insertadas.length,
-        totalFilas: filasGuardadas,
-      })
+        if (filasLote.length === 0) {
+          send('lote_error', { lote: loteGlobal, mensaje: 'El lote no generó filas válidas' })
+          continue
+        }
 
-      send('filas_parciales', {
-        filas: insertadas,
-      })
+        const insertadas = await prisma.$transaction(async (tx) => {
+          const existentes = await tx.ipercFila.count({ where: { ipercId: iperc.id } })
+          const rows = filasLote.slice(0, MAX_FILAS - filasGuardadas)
+          return await Promise.all(
+            rows.map((fila, i) =>
+              tx.ipercFila.create({
+                data: {
+                  ipercId: iperc.id,
+                  numero: existentes + i + 1,
+                  proceso: fila.proceso,
+                  actividad: fila.actividad,
+                  tarea: fila.tarea,
+                  puestoTrabajo: fila.puestoTrabajo,
+                  factorRiesgo: fila.factorRiesgo,
+                  condicionActividad: fila.condicionActividad,
+                  peligro: fila.peligro,
+                  riesgo: fila.riesgo,
+                  consecuencia: fila.consecuencia,
+                  severidad: fila.severidad,
+                  probabilidad: fila.probabilidad,
+                  eliminar: fila.eliminar,
+                  sustituir: fila.sustituir,
+                  controlIngenieria: fila.controlIngenieria,
+                  controlAdministrativo: fila.controlAdministrativo,
+                  controlReceptor: fila.controlReceptor,
+                  severidadResidual: fila.severidadResidual,
+                  probabilidadResidual: fila.probabilidadResidual,
+                  accionesMejora: fila.accionesMejora,
+                  responsables: fila.responsables,
+                  tareaCronogramaRefId: fila.tareaId,
+                  actividadCronogramaRefId: fila.actividadId ?? null,
+                },
+              })
+            )
+          )
+        })
+
+        todasLasFilas.push(...filasLote.slice(0, insertadas.length))
+        filasGuardadas += insertadas.length
+
+        send('lote_completado', { lote: loteGlobal, filasGeneradas: insertadas.length, totalFilas: filasGuardadas })
+        send('filas_parciales', { filas: insertadas })
+      }
     }
 
-    // 7. Calcular totales de uso
-    // Estimación conservadora basada en tokens típicos por lote
     const duracionMs = Date.now() - startMs
-    totalCostoUsd = calculateCost(getModelForTask('chat-simple'), 3000, 1500) +
-      calculateCost(getModelForTask('ssoma-iperc'), 8000 * totalLotes, 4000 * totalLotes)
+    const costoUsd =
+      calculateCost(getModelForTask('chat-simple'), 3000, 1500) +
+      calculateCost(modeloSonnet, 8000 * lotesConSonnet, 4000 * lotesConSonnet) +
+      calculateCost(modeloHaiku, 5000 * lotesConHaiku, 3000 * lotesConHaiku)
 
-    // 8. Completar generacion record
     await completarLock(generacionId, {
       snapshotFilas: todasLasFilas,
-      tokens: totalTokens,
-      costoUsd: totalCostoUsd,
+      tokens: 0,
+      costoUsd,
       duracionMs,
     })
 
     send('completado', {
       totalFilas: filasGuardadas,
+      totalTareas: tareasParaIperc.length,
+      edtsSeleccionados: edtsNombres,
+      edtsEvaluados: edtIds.length,
+      modelosUsados: { sonnet: lotesConSonnet, haiku: lotesConHaiku },
       duracionMs,
-      costoUsd: Math.round(totalCostoUsd * 10000) / 10000,
-      totalTareasProyecto,
-      tareasMuestreadas,
-      coberturaPct,
+      costoUsd: Math.round(costoUsd * 10000) / 10000,
     })
   } catch (err) {
     if (signal?.aborted) {

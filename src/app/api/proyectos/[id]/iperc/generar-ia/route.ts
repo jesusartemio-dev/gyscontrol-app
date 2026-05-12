@@ -66,6 +66,26 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     )
   }
 
+  const body = await req.json().catch(() => ({}))
+  const edtIds: string[] = Array.isArray(body.edtIds) ? body.edtIds.filter((id: unknown) => typeof id === 'string') : []
+  if (edtIds.length === 0) {
+    return Response.json({ error: 'Se requieren EDTs seleccionados (edtIds no puede estar vacío)' }, { status: 400 })
+  }
+
+  const cronograma = await prisma.proyectoCronograma.findUnique({
+    where: { proyectoId_tipo: { proyectoId, tipo: 'planificacion' } },
+    select: { id: true },
+  })
+  if (!cronograma) {
+    return Response.json({ error: 'Cronograma de planificación no encontrado' }, { status: 409 })
+  }
+  const edtsValidos = await prisma.proyectoEdt.count({
+    where: { id: { in: edtIds }, proyectoCronogramaId: cronograma.id },
+  })
+  if (edtsValidos !== edtIds.length) {
+    return Response.json({ error: 'Algunos EDTs no pertenecen al cronograma de este proyecto' }, { status: 400 })
+  }
+
   const encoder = new TextEncoder()
   const signal = req.signal
 
@@ -78,7 +98,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       }
 
       try {
-        await generarConIa(proyectoId, userId, send, signal)
+        await generarConIa(proyectoId, userId, edtIds, send, signal)
       } catch (err) {
         const mensaje = err instanceof Error ? err.message : 'Error interno'
         send('error', { mensaje })

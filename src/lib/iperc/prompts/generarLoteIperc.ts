@@ -35,7 +35,7 @@ INSTRUCCIONES
 
 Para cada tarea en el lote:
 
-1. PROCESO: usa el nombre de la Fase del cronograma (ej: "EJECUCIÓN", "INGENIERÍA")
+1. PROCESO: usa EXACTAMENTE el nombre del EDT (ej: "Tableros Eléctricos", "Construcción Civil")
 2. ACTIVIDAD: usa el nombre exacto de la actividad del cronograma
 3. TAREA: usa el nombre exacto de la tarea del cronograma
 4. PUESTO DE TRABAJO: infiere del tipo de tarea (ej: "Electricista", "Instrumentista", "Supervisor SSOMA", "Técnico de Automatización")
@@ -108,9 +108,11 @@ Una fila por tarea. Estructura exacta:
 export interface TareaParaIperc {
   tareaId: string
   actividadId: string | null
-  proceso: string
+  proceso: string     // = edt.nombre (correcto)
   edt: string
-  actividad: string
+  faseNombre: string
+  esAltoRiesgo: boolean
+  actividad: string   // = actividad.nombre || edt.nombre
   tarea: string
   horasEstimadas: number | null
   personasEstimadas: number
