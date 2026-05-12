@@ -37,6 +37,7 @@ export default function IpercClient({ proyectoId }: Props) {
     totalTareas: number
     edtsEvaluados: number
     modelosUsados: { sonnet: number; haiku: number }
+    lotesFallidos: number
   } | null>(null)
 
   // EDT selection modal
@@ -146,10 +147,14 @@ export default function IpercClient({ proyectoId }: Props) {
             const totalFilas = typeof data.totalFilas === 'number' ? data.totalFilas : 0
             const totalTareas = typeof data.totalTareas === 'number' ? data.totalTareas : 0
             const edtsEvaluados = typeof data.edtsEvaluados === 'number' ? data.edtsEvaluados : 0
+            const lotesFallidos = typeof data.lotesFallidos === 'number' ? data.lotesFallidos : 0
             const modelosUsados = data.modelosUsados && typeof data.modelosUsados === 'object'
               ? data.modelosUsados as { sonnet: number; haiku: number }
               : { sonnet: 0, haiku: 0 }
-            setCobertura({ totalFilas, totalTareas, edtsEvaluados, modelosUsados })
+            setCobertura({ totalFilas, totalTareas, edtsEvaluados, modelosUsados, lotesFallidos })
+          },
+          onLoteFallido: (num, msg) => {
+            toast.warning(`Lote ${num} falló: ${msg}. Los otros lotes continúan.`)
           },
         },
         ctrl.signal
@@ -372,15 +377,22 @@ export default function IpercClient({ proyectoId }: Props) {
             <Alert className="border-blue-200 bg-blue-50">
               <Info className="h-4 w-4 text-blue-600" />
               <AlertTitle className="text-blue-800 text-sm">IPERC generado con IA</AlertTitle>
-              <AlertDescription className="text-blue-700 text-xs">
-                <strong>{cobertura.totalFilas} filas</strong> generadas a partir de{' '}
-                <strong>{cobertura.totalTareas} tareas</strong> en{' '}
-                <strong>{cobertura.edtsEvaluados} {cobertura.edtsEvaluados === 1 ? 'EDT' : 'EDTs'}</strong>.
-                {(cobertura.modelosUsados.sonnet > 0 || cobertura.modelosUsados.haiku > 0) && (
-                  <> Modelos: {[
-                    cobertura.modelosUsados.sonnet > 0 ? `Sonnet (${cobertura.modelosUsados.sonnet} ${cobertura.modelosUsados.sonnet === 1 ? 'lote' : 'lotes'})` : null,
-                    cobertura.modelosUsados.haiku > 0 ? `Haiku (${cobertura.modelosUsados.haiku} ${cobertura.modelosUsados.haiku === 1 ? 'lote' : 'lotes'})` : null,
-                  ].filter(Boolean).join(', ')}.</>
+              <AlertDescription className="text-blue-700 text-xs space-y-1">
+                <p>
+                  <strong>{cobertura.totalFilas} filas</strong> generadas a partir de{' '}
+                  <strong>{cobertura.totalTareas} tareas</strong> en{' '}
+                  <strong>{cobertura.edtsEvaluados} {cobertura.edtsEvaluados === 1 ? 'EDT' : 'EDTs'}</strong>.
+                  {(cobertura.modelosUsados.sonnet > 0 || cobertura.modelosUsados.haiku > 0) && (
+                    <> Modelos: {[
+                      cobertura.modelosUsados.sonnet > 0 ? `Sonnet (${cobertura.modelosUsados.sonnet} ${cobertura.modelosUsados.sonnet === 1 ? 'lote' : 'lotes'})` : null,
+                      cobertura.modelosUsados.haiku > 0 ? `Haiku (${cobertura.modelosUsados.haiku} ${cobertura.modelosUsados.haiku === 1 ? 'lote' : 'lotes'})` : null,
+                    ].filter(Boolean).join(', ')}.</>
+                  )}
+                </p>
+                {cobertura.lotesFallidos > 0 && (
+                  <p className="text-amber-600">
+                    ⚠ {cobertura.lotesFallidos} {cobertura.lotesFallidos === 1 ? 'lote falló' : 'lotes fallaron'} — algunas tareas no tienen filas. Podés agregarlas manualmente.
+                  </p>
                 )}
               </AlertDescription>
             </Alert>

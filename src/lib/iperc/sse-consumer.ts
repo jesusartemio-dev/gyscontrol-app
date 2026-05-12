@@ -2,6 +2,7 @@ export interface SSEIpercCallbacks {
   onStatus: (msg: string, progreso?: number) => void
   onFilasParciales: (filas: unknown[]) => void
   onCompletado: (data: Record<string, unknown>) => Promise<void>
+  onLoteFallido?: (lote: number, mensaje: string) => void
 }
 
 function parseSSEPart(
@@ -27,7 +28,7 @@ export async function readSSEStreamIperc(
   callbacks: SSEIpercCallbacks,
   signal?: AbortSignal
 ): Promise<void> {
-  const { onStatus, onFilasParciales, onCompletado } = callbacks
+  const { onStatus, onFilasParciales, onCompletado, onLoteFallido } = callbacks
   const reader = res.body!.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
@@ -57,7 +58,13 @@ export async function readSSEStreamIperc(
       case 'lote_completado':
         onStatus(
           `Lote ${data.lote} completado — ${data.filasGeneradas} filas (${data.filasPorTareaPromedio ?? '?'}/tarea) · total ${data.totalFilas}`,
-          undefined
+          typeof data.progreso === 'number' ? data.progreso : undefined
+        )
+        break
+      case 'lote_fallido':
+        onLoteFallido?.(
+          typeof data.lote === 'number' ? data.lote : 0,
+          String(data.mensaje ?? 'Error desconocido')
         )
         break
       case 'filas_parciales':

@@ -12,16 +12,59 @@ import {
 import { validarYParsearLote, type FilaIpercIa } from '@/lib/iperc/validarFilas'
 
 const MAX_FILAS = 200
-// Haiku genera 2-3 filas/tarea. 8 tareas × 2.5 filas × 400 tok = 8 000 tok → cabe en 8 192.
-// Sonnet sería ~150 tok/s → 8 tareas × 2.5 filas × 700 tok / 150 = 93s/lote → timeout 300s.
-const LOTE_ALTO_RIESGO = 8   // campo/instalación (Haiku)
-const LOTE_NORMAL = 12       // administrativo (Haiku)
+const PARALELISMO = 3 // llamadas concurrentes a Anthropic
+
+// Sonnet: calidad para EJECUCIÓN, paralelismo 3 compensa la lentitud (3×140s → 140s total)
+// Haiku: fases administrativas (INGENIERÍA, PROCURA), rápido y barato
+const CFG_ALTO_RIESGO = { tamLote: 10, maxTokens: 16000 }
+const CFG_NORMAL = { tamLote: 15, maxTokens: 8192 }
 
 const REGEX_ALTO_RIESGO = /ejecuci|montaje|obra|instalaci|construcci|comisionamiento/i
 
 function esFaseAltoRiesgo(nombre: string): boolean {
   const n = nombre.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
   return REGEX_ALTO_RIESGO.test(n)
+}
+
+// ─── Semáforo para concurrencia ─────────────────────────────────────────────
+
+class Semaphore {
+  private queue: Array<() => void> = []
+  private count: number
+
+  constructor(limit: number) { this.count = limit }
+
+  acquire(): Promise<void> {
+    if (this.count > 0) { this.count--; return Promise.resolve() }
+    return new Promise(resolve => this.queue.push(resolve))
+  }
+
+  release(): void {
+    if (this.queue.length > 0) this.queue.shift()!()
+    else this.count++
+  }
+}
+
+// ─── Mutex para escrituras DB seriales ──────────────────────────────────────
+
+class Mutex {
+  private queue: Array<() => void> = []
+  private locked = false
+
+  async acquire(): Promise<() => void> {
+    if (!this.locked) {
+      this.locked = true
+      return this.doRelease.bind(this)
+    }
+    return new Promise(resolve => {
+      this.queue.push(() => resolve(this.doRelease.bind(this)))
+    })
+  }
+
+  private doRelease(): void {
+    if (this.queue.length > 0) this.queue.shift()!()
+    else this.locked = false
+  }
 }
 
 type SendFn = (event: string, data: unknown) => void
@@ -88,7 +131,6 @@ async function cargarContexto(proyectoId: string, edtIds: string[]) {
     const edtNombre = edt?.nombre ?? 'General'
     const faseNombre = fase?.nombre ?? 'EJECUCIÓN'
     const esAltoRiesgo = esFaseAltoRiesgo(faseNombre)
-    // actividad = actividad.nombre si existe, si no = edt.nombre (nunca tarea.nombre)
     const actNombre = t.proyectoActividadId ? (actMap.get(t.proyectoActividadId) ?? edtNombre) : edtNombre
     return {
       tareaId: t.id,
@@ -168,12 +210,11 @@ async function resumir(
     .join('\n')
 }
 
-// ─── Lote ────────────────────────────────────────────────────────────────────
+// ─── Generación de un lote ───────────────────────────────────────────────────
 
 async function generarLote(
   resumenProyecto: string,
   tareas: TareaParaIperc[],
-  resumenPrevias: string,
   modelo: string,
   maxTokens: number,
   userId: string,
@@ -184,7 +225,8 @@ async function generarLote(
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const inicio = Date.now()
 
-  const userMessage = buildPromptLote(resumenProyecto, tareas, resumenPrevias)
+  // Sin resumenPrevias en modo paralelo (los lotes corren simultáneamente)
+  const userMessage = buildPromptLote(resumenProyecto, tareas, '')
 
   const resp = await (anthropic.messages.create as any)({
     model: modelo,
@@ -226,6 +268,133 @@ async function generarLote(
   return filasValidas
 }
 
+// ─── Procesamiento paralelo ──────────────────────────────────────────────────
+
+interface LoteParalelo {
+  idx: number
+  tareas: TareaParaIperc[]
+  modelo: string
+  maxTokens: number
+}
+
+async function procesarEnParalelo(
+  lotes: LoteParalelo[],
+  resumenProyecto: string,
+  ipercId: string,
+  userId: string,
+  proyectoId: string,
+  send: SendFn,
+  signal?: AbortSignal,
+): Promise<{ filasGuardadas: number; lotesFallidos: number; lotesConSonnet: number; lotesConHaiku: number }> {
+  const totalLotes = lotes.length
+  const modeloSonnet = getModelForTask('ssoma-iperc')
+
+  let filasGuardadas = 0
+  let lotesTerminados = 0
+  let lotesFallidos = 0
+  let lotesConSonnet = 0
+  let lotesConHaiku = 0
+
+  // Mutex garantiza escrituras DB seriales → número secuencial sin colisiones
+  const mutex = new Mutex()
+
+  const saveFilas = async (filas: FilaIpercIa[]): Promise<unknown[]> => {
+    const release = await mutex.acquire()
+    try {
+      if (filasGuardadas >= MAX_FILAS || filas.length === 0) return []
+      const rows = filas.slice(0, MAX_FILAS - filasGuardadas)
+      const startNum = filasGuardadas + 1
+      const insertadas = await prisma.$transaction(
+        rows.map((fila, i) =>
+          prisma.ipercFila.create({
+            data: {
+              ipercId,
+              numero: startNum + i,
+              proceso: fila.proceso,
+              actividad: fila.actividad,
+              tarea: fila.tarea,
+              puestoTrabajo: fila.puestoTrabajo,
+              factorRiesgo: fila.factorRiesgo,
+              condicionActividad: fila.condicionActividad,
+              peligro: fila.peligro,
+              riesgo: fila.riesgo,
+              consecuencia: fila.consecuencia,
+              severidad: fila.severidad,
+              probabilidad: fila.probabilidad,
+              eliminar: fila.eliminar,
+              sustituir: fila.sustituir,
+              controlIngenieria: fila.controlIngenieria,
+              controlAdministrativo: fila.controlAdministrativo,
+              controlReceptor: fila.controlReceptor,
+              severidadResidual: fila.severidadResidual,
+              probabilidadResidual: fila.probabilidadResidual,
+              accionesMejora: fila.accionesMejora,
+              responsables: fila.responsables,
+              tareaCronogramaRefId: fila.tareaId,
+              actividadCronogramaRefId: fila.actividadId ?? null,
+            },
+          })
+        )
+      )
+      filasGuardadas += insertadas.length
+      return insertadas
+    } finally {
+      release()
+    }
+  }
+
+  const sem = new Semaphore(PARALELISMO)
+
+  const promises = lotes.map(async (lote) => {
+    await sem.acquire()
+    try {
+      if (signal?.aborted) return
+
+      const progreso = Math.round(15 + (lote.idx / totalLotes) * 75)
+      send('lote_iniciado', { lote: lote.idx + 1, totalLotes, tareas: lote.tareas.length, progreso, modelo: lote.modelo })
+
+      const filasLote = await generarLote(
+        resumenProyecto, lote.tareas, lote.modelo, lote.maxTokens, userId, proyectoId, lote.idx + 1, signal,
+      )
+
+      if (lote.modelo === modeloSonnet) lotesConSonnet++
+      else lotesConHaiku++
+
+      if (filasLote.length === 0) {
+        lotesFallidos++
+        send('lote_fallido', { lote: lote.idx + 1, mensaje: 'El lote no generó filas válidas' })
+        return
+      }
+
+      const insertadas = await saveFilas(filasLote)
+
+      lotesTerminados++
+      const progresoFinal = Math.round(15 + (lotesTerminados / totalLotes) * 75)
+      send('lote_completado', {
+        lote: lote.idx + 1,
+        filasGeneradas: insertadas.length,
+        tareasEnLote: lote.tareas.length,
+        filasPorTareaPromedio: lote.tareas.length > 0 ? (insertadas.length / lote.tareas.length).toFixed(1) : '0',
+        totalFilas: filasGuardadas,
+        progreso: progresoFinal,
+      })
+      send('filas_parciales', { filas: insertadas })
+    } catch (err) {
+      if (signal?.aborted) return
+      lotesFallidos++
+      const mensaje = err instanceof Error ? err.message : String(err)
+      console.error(`[iperc.generar] Lote ${lote.idx + 1} falló:`, mensaje)
+      send('lote_fallido', { lote: lote.idx + 1, mensaje })
+    } finally {
+      sem.release()
+    }
+  })
+
+  await Promise.allSettled(promises)
+
+  return { filasGuardadas, lotesFallidos, lotesConSonnet, lotesConHaiku }
+}
+
 // ─── Función principal ──────────────────────────────────────────────────────
 
 export async function generarConIa(
@@ -261,9 +430,31 @@ export async function generarConIa(
   const modeloSonnet = getModelForTask('ssoma-iperc')
   const modeloHaiku = getModelForTask('ssoma-epp')
 
+  const tareasAltoRiesgo = tareasParaIperc.filter(t => t.esAltoRiesgo)
+  const tareasNormales = tareasParaIperc.filter(t => !t.esAltoRiesgo)
+
+  // Partir tareas en lotes
+  function chunk<T>(arr: T[], size: number): T[][] {
+    const chunks: T[][] = []
+    for (let i = 0; i < arr.length; i += size) chunks.push(arr.slice(i, i + size))
+    return chunks
+  }
+
+  let loteIdx = 0
+  const lotes: LoteParalelo[] = [
+    ...chunk(tareasAltoRiesgo, CFG_ALTO_RIESGO.tamLote).map(tareas => ({
+      idx: loteIdx++, tareas, modelo: modeloSonnet, maxTokens: CFG_ALTO_RIESGO.maxTokens,
+    })),
+    ...chunk(tareasNormales, CFG_NORMAL.tamLote).map(tareas => ({
+      idx: loteIdx++, tareas, modelo: modeloHaiku, maxTokens: CFG_NORMAL.maxTokens,
+    })),
+  ]
+
   send('inicio', {
     edtsSeleccionados: edtsNombres,
     totalTareas: tareasParaIperc.length,
+    totalLotes: lotes.length,
+    paralelismo: PARALELISMO,
     models: { sonnet: modeloSonnet, haiku: modeloHaiku },
   })
 
@@ -275,110 +466,21 @@ export async function generarConIa(
     const resumenProyecto = await resumir(contextoTexto, userId, proyectoId, signal)
     if (signal?.aborted) throw new Error('Cancelado por el usuario')
 
-    // Separar tareas por tipo: alto riesgo (Sonnet) vs normal (Haiku)
-    const tareasAltoRiesgo = tareasParaIperc.filter(t => t.esAltoRiesgo)
-    const tareasNormales = tareasParaIperc.filter(t => !t.esAltoRiesgo)
-
-    // Ambos grupos usan Haiku (rápido, <300s). max_tokens 8 192 alcanza para 8 tareas × 2-3 filas.
-    const grupos: Array<{ tareas: TareaParaIperc[]; modelo: string; tamLote: number; maxTokens: number }> = []
-    if (tareasAltoRiesgo.length > 0) grupos.push({ tareas: tareasAltoRiesgo, modelo: modeloSonnet, tamLote: LOTE_ALTO_RIESGO, maxTokens: 8192 })
-    if (tareasNormales.length > 0) grupos.push({ tareas: tareasNormales, modelo: modeloHaiku, tamLote: LOTE_NORMAL, maxTokens: 8192 })
-
-    const totalLotes = grupos.reduce((acc, g) => acc + Math.ceil(g.tareas.length / g.tamLote), 0)
-
+    const lotesAltoRiesgo = lotes.filter(l => l.modelo === modeloSonnet).length
+    const lotesNormales = lotes.filter(l => l.modelo === modeloHaiku).length
     send('status', {
-      mensaje: `Generando ${tareasParaIperc.length} tareas en ${totalLotes} lotes (${tareasAltoRiesgo.length} Sonnet, ${tareasNormales.length} Haiku)...`,
+      mensaje: `Generando ${tareasParaIperc.length} tareas en ${lotes.length} lotes paralelos (máx ${PARALELISMO} simultáneos)…`,
       progreso: 14,
+      totalLotes: lotes.length,
       totalTareas: tareasParaIperc.length,
+      lotesAltoRiesgo,
+      lotesNormales,
     })
 
-    const todasLasFilas: FilaIpercIa[] = []
-    let filasGuardadas = 0
-    let loteGlobal = 0
-    let lotesConSonnet = 0
-    let lotesConHaiku = 0
+    const { filasGuardadas, lotesFallidos, lotesConSonnet, lotesConHaiku } =
+      await procesarEnParalelo(lotes, resumenProyecto, iperc.id, userId, proyectoId, send, signal)
 
-    for (const { tareas, modelo, tamLote, maxTokens } of grupos) {
-      const totalLotesGrupo = Math.ceil(tareas.length / tamLote)
-
-      for (let loteIdx = 0; loteIdx < totalLotesGrupo; loteIdx++) {
-        if (signal?.aborted) throw new Error('Cancelado por el usuario')
-        if (filasGuardadas >= MAX_FILAS) break
-
-        loteGlobal++
-        const inicio = loteIdx * tamLote
-        const fin = Math.min(inicio + tamLote, tareas.length)
-        const lote = tareas.slice(inicio, fin)
-
-        const progreso = Math.round(15 + (loteGlobal / totalLotes) * 75)
-        send('lote_iniciado', { lote: loteGlobal, totalLotes, tareas: lote.length, progreso, modelo })
-
-        const resumenPrevias = todasLasFilas.length > 0
-          ? todasLasFilas.slice(-5).map(f => `- ${f.proceso}/${f.actividad}/${f.tarea}: ${f.peligro}`).join('\n')
-          : ''
-
-        const filasLote = await generarLote(
-          resumenProyecto, lote, resumenPrevias, modelo, maxTokens, userId, proyectoId, loteGlobal, signal,
-        )
-
-        if (modelo === modeloSonnet) lotesConSonnet++
-        else lotesConHaiku++
-
-        if (filasLote.length === 0) {
-          send('lote_error', { lote: loteGlobal, mensaje: 'El lote no generó filas válidas' })
-          continue
-        }
-
-        const insertadas = await prisma.$transaction(async (tx) => {
-          const existentes = await tx.ipercFila.count({ where: { ipercId: iperc.id } })
-          const rows = filasLote.slice(0, MAX_FILAS - filasGuardadas)
-          return await Promise.all(
-            rows.map((fila, i) =>
-              tx.ipercFila.create({
-                data: {
-                  ipercId: iperc.id,
-                  numero: existentes + i + 1,
-                  proceso: fila.proceso,
-                  actividad: fila.actividad,
-                  tarea: fila.tarea,
-                  puestoTrabajo: fila.puestoTrabajo,
-                  factorRiesgo: fila.factorRiesgo,
-                  condicionActividad: fila.condicionActividad,
-                  peligro: fila.peligro,
-                  riesgo: fila.riesgo,
-                  consecuencia: fila.consecuencia,
-                  severidad: fila.severidad,
-                  probabilidad: fila.probabilidad,
-                  eliminar: fila.eliminar,
-                  sustituir: fila.sustituir,
-                  controlIngenieria: fila.controlIngenieria,
-                  controlAdministrativo: fila.controlAdministrativo,
-                  controlReceptor: fila.controlReceptor,
-                  severidadResidual: fila.severidadResidual,
-                  probabilidadResidual: fila.probabilidadResidual,
-                  accionesMejora: fila.accionesMejora,
-                  responsables: fila.responsables,
-                  tareaCronogramaRefId: fila.tareaId,
-                  actividadCronogramaRefId: fila.actividadId ?? null,
-                },
-              })
-            )
-          )
-        })
-
-        todasLasFilas.push(...filasLote.slice(0, insertadas.length))
-        filasGuardadas += insertadas.length
-
-        send('lote_completado', {
-          lote: loteGlobal,
-          filasGeneradas: insertadas.length,
-          tareasEnLote: lote.length,
-          filasPorTareaPromedio: (insertadas.length / lote.length).toFixed(1),
-          totalFilas: filasGuardadas,
-        })
-        send('filas_parciales', { filas: insertadas })
-      }
-    }
+    if (signal?.aborted) throw new Error('Cancelado por el usuario')
 
     const duracionMs = Date.now() - startMs
     const costoUsd =
@@ -387,7 +489,7 @@ export async function generarConIa(
       calculateCost(modeloHaiku, 5000 * lotesConHaiku, 3000 * lotesConHaiku)
 
     await completarLock(generacionId, {
-      snapshotFilas: todasLasFilas,
+      snapshotFilas: [],
       tokens: 0,
       costoUsd,
       duracionMs,
@@ -399,6 +501,7 @@ export async function generarConIa(
       edtsSeleccionados: edtsNombres,
       edtsEvaluados: edtIds.length,
       modelosUsados: { sonnet: lotesConSonnet, haiku: lotesConHaiku },
+      lotesFallidos,
       duracionMs,
       costoUsd: Math.round(costoUsd * 10000) / 10000,
     })
