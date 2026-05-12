@@ -12,6 +12,7 @@ import { serializarContextoParaIA, buildDirectivaCronograma } from '@/lib/planTr
 import { validarSeccionesPlan } from '@/lib/planTrabajo/validarSecciones'
 import { guardarSeccionParalela, recalcularCompletitud } from '@/lib/planTrabajo/guardarSecciones'
 import { RESUMEN_PROYECTO_PROMPT } from '@/lib/planTrabajo/prompts/resumirProyecto'
+import { parseJsonIA } from '@/lib/planTrabajo/parseJsonIA'
 import {
   PLAN_TRABAJO_SYSTEM_INSTRUCCIONES,
   SECCIONES_CONFIG,
@@ -129,14 +130,8 @@ async function generarSeccion(
     .map(b => b.text)
     .join('')
 
-  const jsonLimpio = texto
-    .replace(/^```json\s*/i, '')
-    .replace(/^```\s*/i, '')
-    .replace(/\s*```\s*$/i, '')
-    .trim()
-
-  const parsed = JSON.parse(jsonLimpio)
-  return (parsed as Record<string, unknown>)[seccionId]
+  const parsed = parseJsonIA(texto) as Record<string, unknown>
+  return parsed[seccionId]
 }
 
 // ─── Endpoint ───────────────────────────────────────────────────────────────

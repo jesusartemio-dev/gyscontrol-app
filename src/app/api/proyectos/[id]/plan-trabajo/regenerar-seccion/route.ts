@@ -14,6 +14,7 @@ import { validarSeccionIndividual } from '@/lib/planTrabajo/validarSecciones'
 import { guardarSeccionIndividual } from '@/lib/planTrabajo/guardarSecciones'
 import { PLAN_TRABAJO_SYSTEM_INSTRUCCIONES } from '@/lib/planTrabajo/prompts/generarPlan'
 import { buildPromptRegeneracion } from '@/lib/planTrabajo/prompts/regenerarSeccion'
+import { parseJsonIA } from '@/lib/planTrabajo/parseJsonIA'
 import type { SeccionRegenerable } from '@/types/planTrabajo'
 
 export const maxDuration = 300
@@ -108,13 +109,7 @@ async function ejecutarSonnetRegeneracion(
     .map(b => b.text)
     .join('')
 
-  const jsonLimpio = texto
-    .replace(/^```json\s*/i, '')
-    .replace(/^```\s*/i, '')
-    .replace(/\s*```\s*$/i, '')
-    .trim()
-
-  return JSON.parse(jsonLimpio)
+  return parseJsonIA(texto)
 }
 
 // ─── Endpoint ───────────────────────────────────────────────────────────────
