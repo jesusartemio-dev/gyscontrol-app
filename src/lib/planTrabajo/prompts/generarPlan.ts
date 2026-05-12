@@ -48,17 +48,18 @@ CRITERIOS DE CALIDAD:
    - faseAbreviatura: igual a faseNombre (NO uses abreviaturas como EJEC/PROC)
    - edtCodigo: código del EDT si aplica (CON, COM, ING, etc.), sino ""
    - edtRefId: ID del EDT del cronograma (campo edtId de la estructura)
-   - descripcion: oración técnica de 20-30 palabras que describa el flujo del EDT
+   - descripcion: UNA oración técnica de ≤ 12 palabras describiendo el flujo del EDT
 
    SUBITEMS:
    - actividadNombre: nombre del grupo o actividad (puede ser agrupado con sus códigos)
    - numeracion: 11.X.Y secuencial
-   - descripcion: oración técnica de 15-20 palabras describiendo la actividad o grupo
+   - descripcion: UNA frase técnica de ≤ 10 palabras describiendo la actividad o grupo
 
-   DESCRIPCIONES (TÉCNICAS, BREVES):
-   - Oraciones cortas y precisas — NO párrafos largos.
-   - NO enumeres ni uses bullets dentro de la descripción.
-   - Priorizá códigos técnicos y datos concretos sobre extensión narrativa.
+   PRESUPUESTO DE TOKENS (CRÍTICO):
+   - El JSON completo de alcanceDetallado NO debe superar 3500 palabras totales.
+   - Si superás ese límite, agrupá más EDTs o acortá descripciones.
+   - MÁXIMO 3 subItems por EDT. Solo 4-5 si son técnicamente muy distintos.
+   - Descripciones: NO párrafos. UNA oración corta y técnica.
 
 3. EPP:
    - basico: casco ANSI Z89.1-2014, lentes Z87+, zapatos dieléctricos, guantes, chaleco.
@@ -301,22 +302,22 @@ export const SECCIONES_CONFIG: SeccionConfig[] = [
   {
     id: 'alcanceDetallado',
     label: 'Alcance Detallado',
-    maxTokens: 16000,
+    maxTokens: 4096,
     schema: `{
   "alcanceDetallado": [
     {
       "numeracion": "11.1",
-      "edtNombre": "Nombre del EDT (puede agrupar lógicamente si aplica)",
+      "edtNombre": "Construcción Mecánica",
       "edtCodigo": "CON",
       "faseNombre": "EJECUCIÓN",
       "faseAbreviatura": "EJECUCIÓN",
-      "ubicacion": "Site cliente / Área (opcional)",
-      "descripcion": "Párrafo narrativo de 80-120 palabras describiendo el flujo de trabajo del EDT...",
+      "ubicacion": "Site cliente (opcional)",
+      "descripcion": "Instalación y montaje de sistemas mecánicos en planta cliente.",
       "subItems": [
         {
           "numeracion": "11.1.1",
           "actividadNombre": "Instalación de Sistemas de Extractor (E013, E062, E503, E2013, E3003)",
-          "descripcion": "Párrafo narrativo agrupando las instalaciones similares con sus tareas..."
+          "descripcion": "Montaje e interconexión de extractores en zonas ATEX."
         }
       ],
       "edtRefId": "ID del EDT del cronograma"

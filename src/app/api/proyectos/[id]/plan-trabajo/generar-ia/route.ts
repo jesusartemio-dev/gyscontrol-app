@@ -237,12 +237,8 @@ export async function POST(req: NextRequest, { params }: Ctx) {
         const seccionesGuardadas: string[] = []
         const seccionesConError: string[] = []
 
-        // alcanceDetallado y matrizRaci se ejecutan secuencialmente después del paralelo:
-        //   - alcanceDetallado: necesita 16K tokens → demasiado lento para el paralelo (timeout 300s)
-        //   - matrizRaci: necesita personalAsignado ya generado
-        const SECUENCIALES = ['alcanceDetallado', 'matrizRaci']
-        const seccionesParalelas = SECCIONES_CONFIG.filter(s => !SECUENCIALES.includes(s.id))
-        const alcanceConfig = SECCIONES_CONFIG.find(s => s.id === 'alcanceDetallado')!
+        // matrizRaci necesita personalAsignado — se ejecuta al final
+        const seccionesParalelas = SECCIONES_CONFIG.filter(s => s.id !== 'matrizRaci')
         const matrizConfig = SECCIONES_CONFIG.find(s => s.id === 'matrizRaci')!
 
         const generarYGuardar = async (
@@ -279,11 +275,6 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
         send('status', { fase: 'paralelo', mensaje: 'Generando secciones del plan...', progreso: 10 })
         await Promise.allSettled(seccionesParalelas.map(config => generarYGuardar(config)))
-
-        // alcanceDetallado: secuencial con 16K tokens (evita timeout en paralelo)
-        if (!signal.aborted) {
-          await generarYGuardar(alcanceConfig)
-        }
 
         // matrizRaci: secuencial después del paralelo para tener personalAsignado
         if (!signal.aborted) {
