@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Plus, RefreshCw, Loader2, Info, Trash2 } from 'lucide-react'
+import { Plus, RefreshCw, Loader2, Info, Trash2, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -46,6 +46,9 @@ export default function IpercClient({ proyectoId }: Props) {
   // Editor sheet state
   const [sheetOpen, setSheetOpen] = useState(false)
   const [filaEditando, setFilaEditando] = useState<IpercFila | null>(null)
+
+  // Export state
+  const [descargando, setDescargando] = useState(false)
 
   // ─── Fetch contexto ────────────────────────────────────────────────────────
   const fetchContexto = useCallback(async () => {
@@ -234,6 +237,36 @@ export default function IpercClient({ proyectoId }: Props) {
     }
   }
 
+  // ─── Exportar Excel ────────────────────────────────────────────────────────
+  const handleExportarExcel = async () => {
+    if (!iperc || iperc.filas.length === 0) {
+      toast.error('No hay filas para exportar')
+      return
+    }
+    setDescargando(true)
+    try {
+      const res = await fetch(`/api/proyectos/${proyectoId}/iperc/exportar-xlsx`, { method: 'POST' })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Error desconocido' }))
+        throw new Error(err.error)
+      }
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${iperc.codigoDocumento}.xlsx`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      window.URL.revokeObjectURL(url)
+      toast.success('Excel descargado correctamente')
+    } catch (e) {
+      toast.error(`Error al exportar: ${e instanceof Error ? e.message : 'Error'}`)
+    } finally {
+      setDescargando(false)
+    }
+  }
+
   // ─── Updated cabecera ──────────────────────────────────────────────────────
   const handleIpercUpdated = (iperc: IpercCompleto) => {
     setContexto(prev => prev ? { ...prev, iperc } : prev)
@@ -348,6 +381,19 @@ export default function IpercClient({ proyectoId }: Props) {
             >
               <Plus className="h-4 w-4 mr-1" />
               Agregar fila
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9"
+              onClick={handleExportarExcel}
+              disabled={descargando || isGenerando || iperc.filas.length === 0}
+            >
+              {descargando
+                ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                : <Download className="h-4 w-4 mr-1" />}
+              {descargando ? 'Generando…' : 'Exportar Excel'}
             </Button>
 
             {iperc.filas.length > 0 && (
