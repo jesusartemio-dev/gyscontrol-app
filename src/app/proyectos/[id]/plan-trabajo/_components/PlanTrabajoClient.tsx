@@ -165,6 +165,7 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
   const [progresoGenerar, setProgresoGenerar] = useState(0)
   const [errorGeneracion, setErrorGeneracion] = useState<{ mensaje: string } | null>(null)
   const [confirmandoRegenerar, setConfirmandoRegenerar] = useState(false)
+  const [errorAcceso, setErrorAcceso] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
   const fetchContexto = useCallback(async () => {
@@ -173,7 +174,12 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
       if (res.ok) {
         const { data } = await res.json()
         setContexto(data)
+      } else {
+        const body = await res.json().catch(() => ({}))
+        setErrorAcceso(body.error ?? `Error ${res.status}`)
       }
+    } catch {
+      setErrorAcceso('No se pudo cargar el Plan de Trabajo')
     } finally {
       setLoading(false)
     }
@@ -325,6 +331,14 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="animate-spin text-muted-foreground" size={28} />
+      </div>
+    )
+  }
+
+  if (errorAcceso) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-sm text-muted-foreground">{errorAcceso}</p>
       </div>
     )
   }
