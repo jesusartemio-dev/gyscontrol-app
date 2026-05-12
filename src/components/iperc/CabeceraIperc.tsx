@@ -173,7 +173,13 @@ export function CabeceraIperc({ proyectoId, iperc, onUpdated }: Props) {
       <div>
         <div className="flex items-center justify-between mb-1.5">
           <p className="text-xs text-muted-foreground">Evaluadores</p>
-          <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={addEvaluador}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-xs"
+            onClick={addEvaluador}
+            disabled={evaluadores.length >= 5}
+          >
             <Plus className="h-3 w-3 mr-1" />
             Agregar
           </Button>

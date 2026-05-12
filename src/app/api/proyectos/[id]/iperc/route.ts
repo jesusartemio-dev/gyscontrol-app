@@ -9,6 +9,12 @@ type Ctx = { params: Promise<{ id: string }> }
 
 const ROLES_CON_ACCESO = ['admin', 'gerente', 'gestor', 'seguridad', 'comercial']
 
+const EVALUADORES_DEFAULT = [
+  { nombre: 'Ing. Yony Apaza Arpasi',        cargo: 'Supervisor SSOMA' },
+  { nombre: 'Ing. Jesús Mamani Velásquez',    cargo: 'Responsable SSOMA' },
+  { nombre: 'Ing. Carlos Sihuayro Ancco',     cargo: 'Especialista SSOMA' },
+]
+
 async function verificarAcceso(proyectoId: string, userId: string, role: string) {
   const proy = await prisma.proyecto.findUnique({
     where: { id: proyectoId },
@@ -81,11 +87,14 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
   const { evaluadores, fechaElaboracion, fechaActualizacion, ...rest } = parsed.data
 
+  const evaluadoresFinal =
+    evaluadores && evaluadores.length > 0 ? evaluadores : EVALUADORES_DEFAULT
+
   const iperc = await prisma.iperc.create({
     data: {
       proyectoId,
       ...rest,
-      ...(evaluadores !== undefined && { evaluadores }),
+      evaluadores: evaluadoresFinal,
       ...(fechaElaboracion !== undefined && { fechaElaboracion }),
       ...(fechaActualizacion !== undefined && { fechaActualizacion }),
     },

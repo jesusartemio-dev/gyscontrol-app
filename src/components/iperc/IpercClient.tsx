@@ -79,7 +79,6 @@ export default function IpercClient({ proyectoId }: Props) {
         body: JSON.stringify({
           codigoDocumento: codigo,
           area: 'INSTALACIONES',
-          evaluadores: [],
         }),
       })
       if (!res.ok) {
