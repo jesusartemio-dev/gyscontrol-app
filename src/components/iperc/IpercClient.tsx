@@ -415,6 +415,8 @@ export default function IpercClient({ proyectoId }: Props) {
             filas={iperc.filas}
             onEdit={handleEditarFila}
             onDelete={handleEliminarFila}
+            onGenerar={handleAbrirModal}
+            onAgregar={handleAgregarFila}
           />
 
           {/* Resumen post-generación */}
