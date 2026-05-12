@@ -150,11 +150,12 @@ export async function POST(req: Request, { params }: Ctx) {
           const pendientes = [...nodos]
           const creados = new Set<string>()
           let intentos = 0
-          while (pendientes.length > 0 && intentos < pendientes.length * 2) {
+          while (pendientes.length > 0 && intentos < pendientes.length) {
             const nodo = pendientes.shift()!
             if (!nodo.parentId || creados.has(nodo.parentId)) {
               result.push(nodo)
               creados.add(nodo.id)
+              intentos = 0
             } else {
               pendientes.push(nodo)
               intentos++

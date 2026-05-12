@@ -1128,6 +1128,7 @@ model Proyecto {
   matrizComunicacion         MatrizComunicacion?
   tdrAnalisis                ProyectoTdrAnalisis?
   planTrabajo                PlanTrabajo?
+  iperc                      Iperc?
 
   @@index([clienteId, estado, createdAt(sort: Desc)], map: "idx_proyecto_cliente_estado_fecha")
   @@index([comercialId, estado, fechaInicio], map: "idx_proyecto_comercial_estado_inicio")
@@ -5350,4 +5351,95 @@ model PlanTrabajoGeneracion {
 
   @@index([planTrabajoId, generadoEn(sort: Desc)])
   @@map("plan_trabajo_generacion")
+}
+
+// ─── IPERC (Identificación de Peligros, Evaluación de Riesgos y Controles) ──
+
+model Iperc {
+  id                 String   @id @default(cuid())
+  proyectoId         String   @unique
+  proyecto           Proyecto @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+
+  codigoDocumento    String
+  revision           String   @default("01")
+  fechaElaboracion   DateTime @default(now())
+  fechaActualizacion DateTime @default(now())
+  gerencia           String   @default("PROYECTOS")
+  area               String
+  evaluadores        Json     @default("[]")
+
+  estado             String   @default("borrador") // borrador | revisado | aprobado
+
+  filas              IpercFila[]
+  generaciones       IpercGeneracion[]
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@map("iperc")
+}
+
+model IpercFila {
+  id      String @id @default(cuid())
+  ipercId String
+  iperc   Iperc  @relation(fields: [ipercId], references: [id], onDelete: Cascade)
+
+  numero Int
+
+  proceso   String
+  actividad String
+  tarea     String
+
+  puestoTrabajo      String
+  factorRiesgo       String
+  condicionActividad String
+  peligro            String
+  riesgo             String
+  consecuencia       String
+
+  severidad    Int
+  probabilidad String
+
+  eliminar              String @default("NA")
+  sustituir             String @default("NA")
+  controlIngenieria     String @default("")
+  controlAdministrativo String @default("")
+  controlReceptor       String @default("")
+
+  severidadResidual    Int
+  probabilidadResidual String
+
+  accionesMejora  String @default("")
+  responsables    String @default("")
+
+  tareaCronogramaRefId     String?
+  actividadCronogramaRefId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ipercId])
+  @@index([ipercId, numero])
+  @@map("iperc_fila")
+}
+
+model IpercGeneracion {
+  id      String @id @default(cuid())
+  ipercId String
+  iperc   Iperc  @relation(fields: [ipercId], references: [id], onDelete: Cascade)
+
+  estado      String
+  modeloUsado String
+  tokens      Int?
+  costoUsd    Float?
+  duracionMs  Int?
+
+  snapshotFilas Json
+
+  errorMensaje String?
+
+  createdAt DateTime @default(now())
+
+  @@index([ipercId, createdAt])
+  @@map("iperc_generacion")
 }

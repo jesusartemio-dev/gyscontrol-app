@@ -14,6 +14,7 @@ export interface IAFeatureFlags {
   ssomaDocumentos: boolean
   matrizComunicacion: boolean
   planTrabajo: boolean
+  iperc: boolean
 }
 
 const DEFAULT_FLAGS: IAFeatureFlags = {
@@ -27,6 +28,7 @@ const DEFAULT_FLAGS: IAFeatureFlags = {
   ssomaDocumentos: true,
   matrizComunicacion: true,
   planTrabajo: true,
+  iperc: true,
 }
 
 function parseFlags(raw: unknown): IAFeatureFlags {
@@ -43,6 +45,7 @@ function parseFlags(raw: unknown): IAFeatureFlags {
     ssomaDocumentos: typeof obj.ssomaDocumentos === 'boolean' ? obj.ssomaDocumentos : DEFAULT_FLAGS.ssomaDocumentos,
     matrizComunicacion: typeof obj.matrizComunicacion === 'boolean' ? obj.matrizComunicacion : DEFAULT_FLAGS.matrizComunicacion,
     planTrabajo: typeof obj.planTrabajo === 'boolean' ? obj.planTrabajo : DEFAULT_FLAGS.planTrabajo,
+    iperc: typeof obj.iperc === 'boolean' ? obj.iperc : DEFAULT_FLAGS.iperc,
   }
 }
 
