@@ -56,7 +56,7 @@ export async function readSSEStreamIperc(
         break
       case 'lote_completado':
         onStatus(
-          `Lote ${data.lote} completado — ${data.totalFilas} filas en total`,
+          `Lote ${data.lote} completado — ${data.filasGeneradas} filas (${data.filasPorTareaPromedio ?? '?'}/tarea) · total ${data.totalFilas}`,
           undefined
         )
         break

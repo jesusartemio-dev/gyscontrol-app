@@ -173,6 +173,7 @@ async function generarLote(
   tareas: TareaParaIperc[],
   resumenPrevias: string,
   modelo: string,
+  maxTokens: number,
   userId: string,
   proyectoId: string,
   loteIndex: number,
@@ -185,7 +186,7 @@ async function generarLote(
 
   const resp = await (anthropic.messages.create as any)({
     model: modelo,
-    max_tokens: 8192,
+    max_tokens: maxTokens,
     temperature: 0.2,
     system: [
       {
@@ -276,9 +277,11 @@ export async function generarConIa(
     const tareasAltoRiesgo = tareasParaIperc.filter(t => t.esAltoRiesgo)
     const tareasNormales = tareasParaIperc.filter(t => !t.esAltoRiesgo)
 
-    const grupos: Array<{ tareas: TareaParaIperc[]; modelo: string; tamLote: number }> = []
-    if (tareasAltoRiesgo.length > 0) grupos.push({ tareas: tareasAltoRiesgo, modelo: modeloSonnet, tamLote: LOTE_ALTO_RIESGO })
-    if (tareasNormales.length > 0) grupos.push({ tareas: tareasNormales, modelo: modeloHaiku, tamLote: LOTE_NORMAL })
+    // Alto riesgo: Sonnet + max 16 000 tokens (10 tareas × 4 filas × ~350 tok = 14 000)
+    // Normal: Haiku + max 8 192 tokens (15 tareas × 2 filas × ~250 tok = 7 500)
+    const grupos: Array<{ tareas: TareaParaIperc[]; modelo: string; tamLote: number; maxTokens: number }> = []
+    if (tareasAltoRiesgo.length > 0) grupos.push({ tareas: tareasAltoRiesgo, modelo: modeloSonnet, tamLote: LOTE_ALTO_RIESGO, maxTokens: 16000 })
+    if (tareasNormales.length > 0) grupos.push({ tareas: tareasNormales, modelo: modeloHaiku, tamLote: LOTE_NORMAL, maxTokens: 8192 })
 
     const totalLotes = grupos.reduce((acc, g) => acc + Math.ceil(g.tareas.length / g.tamLote), 0)
 
@@ -294,7 +297,7 @@ export async function generarConIa(
     let lotesConSonnet = 0
     let lotesConHaiku = 0
 
-    for (const { tareas, modelo, tamLote } of grupos) {
+    for (const { tareas, modelo, tamLote, maxTokens } of grupos) {
       const totalLotesGrupo = Math.ceil(tareas.length / tamLote)
 
       for (let loteIdx = 0; loteIdx < totalLotesGrupo; loteIdx++) {
@@ -314,7 +317,7 @@ export async function generarConIa(
           : ''
 
         const filasLote = await generarLote(
-          resumenProyecto, lote, resumenPrevias, modelo, userId, proyectoId, loteGlobal, signal,
+          resumenProyecto, lote, resumenPrevias, modelo, maxTokens, userId, proyectoId, loteGlobal, signal,
         )
 
         if (modelo === modeloSonnet) lotesConSonnet++
@@ -365,7 +368,13 @@ export async function generarConIa(
         todasLasFilas.push(...filasLote.slice(0, insertadas.length))
         filasGuardadas += insertadas.length
 
-        send('lote_completado', { lote: loteGlobal, filasGeneradas: insertadas.length, totalFilas: filasGuardadas })
+        send('lote_completado', {
+          lote: loteGlobal,
+          filasGeneradas: insertadas.length,
+          tareasEnLote: lote.length,
+          filasPorTareaPromedio: (insertadas.length / lote.length).toFixed(1),
+          totalFilas: filasGuardadas,
+        })
         send('filas_parciales', { filas: insertadas })
       }
     }

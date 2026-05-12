@@ -9,7 +9,8 @@ de instalaciones electromecánicas en Perú, conforme al D.S. 024-2016-EM (Regla
 Salud Ocupacional en Minería) y estándares OHSAS 18001.
 
 Tu tarea es generar filas de la matriz IPERC para un lote de tareas del cronograma del proyecto.
-Para cada tarea, debes identificar el peligro más relevante y generar UNA fila IPERC completa.
+Para cada tarea debes identificar TODOS los factores de riesgo aplicables y generar MÚLTIPLES filas
+IPERC — una por cada factor de riesgo relevante. Un IPERC profesional cubre 2-4 peligros por tarea.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 CATÁLOGO DE PELIGROS (usa EXACTAMENTE estos valores)
@@ -61,6 +62,51 @@ Para cada tarea en el lote:
 19. ACCIONES DE MEJORA: acciones de seguimiento o mejora continua (puede ser "NA" si no aplica).
 20. RESPONSABLES: cargo responsable de implementar los controles (ej: "Supervisor SSOMA", "Residente de obra").
 
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+EVALUACIÓN MULTI-FACTOR (CRÍTICO)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Cada tarea involucra MÚLTIPLES factores de riesgo simultáneamente. NO generes una sola fila por
+tarea — analizá TODOS los factores aplicables y generá una fila por cada uno.
+
+REGLAS DE COBERTURA POR TIPO DE TAREA:
+
+1. Tareas de INSTALACIÓN ELÉCTRICA (cableado, conexionado, montaje de tableros): mínimo 3 filas:
+   - ELÉCTRICO: contacto eléctrico directo/indirecto, riesgo de arco eléctrico
+   - LOCATIVO si la tarea es en altura (>1.8m): caída a diferente nivel
+   - ERGONÓMICO: postura forzada, manipulación de carga
+   - MECÁNICO si usa herramientas: objetos punzocortantes, herramientas manuales
+
+2. Tareas de COMISIONAMIENTO / PRUEBAS ELÉCTRICAS: mínimo 2 filas:
+   - ELÉCTRICO: energización del sistema, contacto indirecto, arco eléctrico
+   - PSICOSOCIAL o ERGONÓMICO: fatiga mental por trabajo de precisión prolongado
+
+3. Tareas con SOLDADURA / ESMERILADO: mínimo 3 filas:
+   - FÍSICO: radiación no ionizante (luz UV/IR), ruido
+   - QUÍMICO: humos metálicos de soldadura
+   - MECÁNICO: proyección de fragmentos, chispas
+   - FISICOQUÍMICO: atmósfera explosiva si hay gases/líquidos inflamables cercanos
+
+4. Tareas en ESPACIOS CONFINADOS (extractores, ductos, salas cerradas): mínimo 3 filas:
+   - FISICOQUÍMICO: deficiencia de oxígeno, atmósfera inflamable o tóxica
+   - LOCATIVO: espacio reducido, acceso/egreso difícil
+   - PSICOSOCIAL: carga mental por condiciones de trabajo especiales
+
+5. Tareas de MONTAJE / INSTALACIÓN MECÁNICA (equipos, estructuras): mínimo 2-3 filas:
+   - MECÁNICO: aplastamiento, golpe por objetos, herramientas manuales
+   - ERGONÓMICO: manipulación manual de cargas, posturas forzadas
+   - LOCATIVO si hay trabajo en altura: caída a diferente nivel
+
+6. Tareas ADMINISTRATIVAS / OFICINA / PROCURA (ingeniería, compras): 1-2 filas:
+   - ERGONÓMICO: trabajo prolongado en pantalla, postura sedente
+   - PSICOSOCIAL si hay alta carga laboral: estrés, fatiga
+
+REGLA FINAL:
+- Tareas de campo / instalación: genera 2-4 filas (EXPECTATIVA MÍNIMA: 2)
+- Tareas administrativas/oficina: genera 1-2 filas
+- NO repitas el mismo peligro × misma severidad en una misma tarea
+- Cada fila debe ser distintiva en factorRiesgo y peligro
+
 REGLAS CRÍTICAS:
 - La probabilidad residual SIEMPRE debe ser menor o igual que la inicial (los controles reducen el riesgo).
 - El riesgo residual (severidadResidual × probabilidadResidual) debe ser menor que el riesgo inicial.
@@ -75,7 +121,7 @@ FORMATO DE SALIDA
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Devuelve ÚNICAMENTE un array JSON válido, sin markdown, sin explicaciones, sin comentarios.
-Una fila por tarea. Estructura exacta:
+MÚLTIPLES filas por tarea (mismo tareaId/actividadId, diferente factorRiesgo y peligro). Estructura exacta:
 
 [
   {
@@ -133,5 +179,5 @@ export function buildPromptLote(
     ? `\n\nFILAS IPERC YA GENERADAS EN LOTES ANTERIORES (para contexto y consistencia):\n${resumenFilasPrevias}`
     : ''
 
-  return `RESUMEN DEL PROYECTO:\n\n${resumenProyecto}${previoStr}\n\nLOTE DE TAREAS A PROCESAR (genera UNA fila IPERC por tarea):\n\n${tareasStr}\n\nDevuelve el array JSON con ${tareas.length} filas IPERC.`
+  return `RESUMEN DEL PROYECTO:\n\n${resumenProyecto}${previoStr}\n\nLOTE DE TAREAS A PROCESAR (genera 2-4 filas IPERC por tarea de campo, 1-2 por tareas administrativas):\n\n${tareasStr}\n\nDevuelve el array JSON. Cada tarea generará múltiples filas. Total esperado: entre ${tareas.length * 2} y ${tareas.length * 4} filas.`
 }
