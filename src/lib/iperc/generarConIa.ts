@@ -222,7 +222,7 @@ async function generarLote(
   loteIndex: number,
   signal?: AbortSignal,
 ): Promise<FilaIpercIa[]> {
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, maxRetries: 4 })
   const inicio = Date.now()
 
   // Sin resumenPrevias en modo paralelo (los lotes corren simultáneamente)
@@ -350,6 +350,10 @@ async function procesarEnParalelo(
     try {
       if (signal?.aborted) return
 
+      // Stagger concurrent calls: 500ms × index to avoid simultaneous API bursts
+      if (lote.idx > 0) await new Promise(r => setTimeout(r, lote.idx * 500))
+      if (signal?.aborted) return
+
       const progreso = Math.round(15 + (lote.idx / totalLotes) * 75)
       send('lote_iniciado', { lote: lote.idx + 1, totalLotes, tareas: lote.tareas.length, progreso, modelo: lote.modelo })
 
@@ -382,7 +386,10 @@ async function procesarEnParalelo(
     } catch (err) {
       if (signal?.aborted) return
       lotesFallidos++
-      const mensaje = err instanceof Error ? err.message : String(err)
+      let mensaje = err instanceof Error ? err.message : String(err)
+      if (mensaje.includes('overloaded_error') || mensaje.includes('529') || mensaje.toLowerCase().includes('overloaded')) {
+        mensaje = 'Servidor Anthropic saturado — se reintentó 4 veces sin éxito. Intentá de nuevo en unos minutos.'
+      }
       console.error(`[iperc.generar] Lote ${lote.idx + 1} falló:`, mensaje)
       send('lote_fallido', { lote: lote.idx + 1, mensaje })
     } finally {
