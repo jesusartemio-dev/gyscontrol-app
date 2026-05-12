@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Plus, RefreshCw, Loader2 } from 'lucide-react'
+import { Plus, RefreshCw, Loader2, Info } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { CabeceraIperc } from './CabeceraIperc'
 import { PreRequisitosPanelIperc } from './PreRequisitosPanelIperc'
 import { BotonGenerarIaIperc } from './BotonGenerarIaIperc'
@@ -28,6 +29,14 @@ export default function IpercClient({ proyectoId }: Props) {
   const [statusMsg, setStatusMsg] = useState('')
   const [progreso, setProgreso] = useState<number | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+
+  // Coverage info shown after generation
+  const [cobertura, setCobertura] = useState<{
+    totalTareasProyecto: number
+    tareasMuestreadas: number
+    totalFilas: number
+    coberturaPct: number
+  } | null>(null)
 
   // Editor sheet state
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -84,6 +93,7 @@ export default function IpercClient({ proyectoId }: Props) {
     setGenerando(true)
     setStatusMsg('Iniciando…')
     setProgreso(0)
+    setCobertura(null)
 
     try {
       const res = await fetch(`/api/proyectos/${proyectoId}/iperc/generar-ia`, {
@@ -106,11 +116,18 @@ export default function IpercClient({ proyectoId }: Props) {
             if (prog != null) setProgreso(prog)
           },
           onFilasParciales: () => {},
-          onCompletado: async () => {
+          onCompletado: async (data) => {
             setProgreso(100)
             setStatusMsg('Completado')
             await fetchContexto()
             toast.success('IPERC generado con IA')
+            const totalTareasProyecto = typeof data.totalTareasProyecto === 'number' ? data.totalTareasProyecto : 0
+            const tareasMuestreadas = typeof data.tareasMuestreadas === 'number' ? data.tareasMuestreadas : 0
+            const totalFilas = typeof data.totalFilas === 'number' ? data.totalFilas : 0
+            const coberturaPct = typeof data.coberturaPct === 'number' ? data.coberturaPct : 100
+            if (totalTareasProyecto > tareasMuestreadas) {
+              setCobertura({ totalTareasProyecto, tareasMuestreadas, totalFilas, coberturaPct })
+            }
           },
         },
         ctrl.signal
@@ -299,6 +316,20 @@ export default function IpercClient({ proyectoId }: Props) {
             onEdit={handleEditarFila}
             onDelete={handleEliminarFila}
           />
+
+          {/* Cobertura de muestreo */}
+          {cobertura && (
+            <Alert className="border-blue-200 bg-blue-50">
+              <Info className="h-4 w-4 text-blue-600" />
+              <AlertTitle className="text-blue-800 text-sm">Cobertura del IPERC generado</AlertTitle>
+              <AlertDescription className="text-blue-700 text-xs">
+                Se generaron <strong>{cobertura.totalFilas} filas</strong> a partir de{' '}
+                <strong>{cobertura.tareasMuestreadas} tareas</strong> del cronograma
+                ({cobertura.coberturaPct}% de las {cobertura.totalTareasProyecto} totales).
+                Las tareas restantes pueden agregarse manualmente con el botón "Agregar fila".
+              </AlertDescription>
+            </Alert>
+          )}
         </>
       )}
 

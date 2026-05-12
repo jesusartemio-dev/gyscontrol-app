@@ -12,7 +12,38 @@ import {
 import { validarYParsearLote, type FilaIpercIa } from '@/lib/iperc/validarFilas'
 
 const MAX_FILAS = 150
-const TAREAS_POR_LOTE = 10
+const TAREAS_POR_LOTE = 15
+const MAX_TAREAS_MUESTREADAS = 120
+
+function muestrearTareasRepresentativas(
+  todasLasTareas: TareaParaIperc[]
+): TareaParaIperc[] {
+  if (todasLasTareas.length <= MAX_TAREAS_MUESTREADAS) return todasLasTareas
+
+  const porEdt = new Map<string, TareaParaIperc[]>()
+  for (const t of todasLasTareas) {
+    const key = t.edt ?? 'sin_edt'
+    if (!porEdt.has(key)) porEdt.set(key, [])
+    porEdt.get(key)!.push(t)
+  }
+
+  const total = todasLasTareas.length
+  const muestra: TareaParaIperc[] = []
+  for (const tareasEdt of porEdt.values()) {
+    const cuota = Math.max(1, Math.floor(MAX_TAREAS_MUESTREADAS * tareasEdt.length / total))
+    muestra.push(...tareasEdt.slice(0, cuota))
+  }
+
+  if (muestra.length < MAX_TAREAS_MUESTREADAS) {
+    const yaMuestreadas = new Set(muestra.map(t => t.tareaId))
+    for (const t of todasLasTareas) {
+      if (muestra.length >= MAX_TAREAS_MUESTREADAS) break
+      if (!yaMuestreadas.has(t.tareaId)) muestra.push(t)
+    }
+  }
+
+  return muestra.slice(0, MAX_TAREAS_MUESTREADAS)
+}
 
 type SendFn = (event: string, data: unknown) => void
 
@@ -162,10 +193,9 @@ async function generarLoteConSonnet(
 
   const userMessage = buildPromptLote(resumenProyecto, tareas, resumenPrevias)
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const resp = await (anthropic.messages.create as any)({
     model: MODELS.sonnet,
-    max_tokens: 16384,
+    max_tokens: 20000,
     temperature: 0.2,
     system: [
       {
@@ -250,7 +280,21 @@ export async function generarConIa(
     if (signal?.aborted) throw new Error('Cancelado por el usuario')
 
     // 5. Partir en lotes y procesar con Sonnet
-    const tareasLimitadas = tareasParaIperc.slice(0, MAX_FILAS)
+    const totalTareasProyecto = tareasParaIperc.length
+    const tareasLimitadas = muestrearTareasRepresentativas(tareasParaIperc)
+    const tareasMuestreadas = tareasLimitadas.length
+    const coberturaPct = Math.round((tareasMuestreadas / totalTareasProyecto) * 100)
+    const coberturaStr = tareasMuestreadas < totalTareasProyecto
+      ? ` (muestra representativa: ${tareasMuestreadas}/${totalTareasProyecto} tareas, ${coberturaPct}%)`
+      : ''
+
+    send('status', {
+      mensaje: `Generando ${tareasMuestreadas} tareas en lotes de ${TAREAS_POR_LOTE}${coberturaStr}...`,
+      progreso: 14,
+      totalTareasProyecto,
+      tareasMuestreadas,
+    })
+
     const totalLotes = Math.ceil(tareasLimitadas.length / TAREAS_POR_LOTE)
     const todasLasFilas: FilaIpercIa[] = []
     let filasGuardadas = 0
@@ -357,6 +401,9 @@ export async function generarConIa(
       totalFilas: filasGuardadas,
       duracionMs,
       costoUsd: Math.round(totalCostoUsd * 10000) / 10000,
+      totalTareasProyecto,
+      tareasMuestreadas,
+      coberturaPct,
     })
   } catch (err) {
     if (signal?.aborted) {
