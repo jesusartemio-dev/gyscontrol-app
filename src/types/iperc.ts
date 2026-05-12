@@ -45,6 +45,23 @@ export interface IpercConRelaciones extends Iperc {
   generaciones: IpercGeneracion[]
 }
 
+export type IpercCompleto = IpercConRelaciones
+
+// ─── Contexto completo para la página IPERC ─────────────────────────────────
+export interface IpercContexto {
+  proyecto: {
+    id: string
+    codigo: string
+    nombre: string
+    clienteNombre: string
+  }
+  iperc: IpercCompleto | null
+  preRequisitos: { cumple: boolean; faltantes: string[] }
+  generacionActiva: IpercGeneracion | null
+  iaHabilitada: boolean
+  ultimaGeneracion: IpercGeneracion | null
+}
+
 // ─── Payload para crear fila ─────────────────────────────────────────────────
 export interface IpercFilaCreatePayload {
   proceso: string

@@ -553,6 +553,19 @@ export default function ProyectoHubPage() {
       stats: [],
       badge: 'Planificación'
     },
+    {
+      id: 'iperc',
+      title: 'IPERC',
+      description: 'Identificación de Peligros y Evaluación de Riesgos',
+      icon: AlertTriangle,
+      color: 'text-orange-500',
+      bgColor: 'bg-orange-50',
+      hoverBg: 'hover:bg-orange-50',
+      borderColor: 'border-orange-200',
+      href: `${baseUrl}/iperc`,
+      stats: [],
+      badge: 'SSOMA'
+    },
   ]
 
   return (
