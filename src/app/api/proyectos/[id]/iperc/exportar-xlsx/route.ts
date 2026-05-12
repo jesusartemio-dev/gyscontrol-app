@@ -66,10 +66,17 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
   )
   formData.append('dataBag', JSON.stringify(dataBag))
 
+  const internalHeaders: HeadersInit = {}
+  if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
+    internalHeaders['x-vercel-protection-bypass'] = process.env.VERCEL_AUTOMATION_BYPASS_SECRET
+    internalHeaders['x-vercel-set-bypass-cookie'] = 'true'
+  }
+
   let pythonRes: Response
   try {
     pythonRes = await fetch(`${baseUrl}/api/iperc/render-xlsx`, {
       method: 'POST',
+      headers: internalHeaders,
       body: formData,
     })
   } catch (e) {
