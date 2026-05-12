@@ -12,8 +12,10 @@ import {
 import { validarYParsearLote, type FilaIpercIa } from '@/lib/iperc/validarFilas'
 
 const MAX_FILAS = 200
-const LOTE_ALTO_RIESGO = 10  // Sonnet para EJECUCIÓN y fases de campo
-const LOTE_NORMAL = 15       // Haiku para otras fases
+// Haiku genera 2-3 filas/tarea. 8 tareas × 2.5 filas × 400 tok = 8 000 tok → cabe en 8 192.
+// Sonnet sería ~150 tok/s → 8 tareas × 2.5 filas × 700 tok / 150 = 93s/lote → timeout 300s.
+const LOTE_ALTO_RIESGO = 8   // campo/instalación (Haiku)
+const LOTE_NORMAL = 12       // administrativo (Haiku)
 
 const REGEX_ALTO_RIESGO = /ejecuci|montaje|obra|instalaci|construcci|comisionamiento/i
 
@@ -277,10 +279,9 @@ export async function generarConIa(
     const tareasAltoRiesgo = tareasParaIperc.filter(t => t.esAltoRiesgo)
     const tareasNormales = tareasParaIperc.filter(t => !t.esAltoRiesgo)
 
-    // Alto riesgo: Sonnet + max 16 000 tokens (10 tareas × 4 filas × ~350 tok = 14 000)
-    // Normal: Haiku + max 8 192 tokens (15 tareas × 2 filas × ~250 tok = 7 500)
+    // Ambos grupos usan Haiku (rápido, <300s). max_tokens 8 192 alcanza para 8 tareas × 2-3 filas.
     const grupos: Array<{ tareas: TareaParaIperc[]; modelo: string; tamLote: number; maxTokens: number }> = []
-    if (tareasAltoRiesgo.length > 0) grupos.push({ tareas: tareasAltoRiesgo, modelo: modeloSonnet, tamLote: LOTE_ALTO_RIESGO, maxTokens: 16000 })
+    if (tareasAltoRiesgo.length > 0) grupos.push({ tareas: tareasAltoRiesgo, modelo: modeloSonnet, tamLote: LOTE_ALTO_RIESGO, maxTokens: 8192 })
     if (tareasNormales.length > 0) grupos.push({ tareas: tareasNormales, modelo: modeloHaiku, tamLote: LOTE_NORMAL, maxTokens: 8192 })
 
     const totalLotes = grupos.reduce((acc, g) => acc + Math.ceil(g.tareas.length / g.tamLote), 0)

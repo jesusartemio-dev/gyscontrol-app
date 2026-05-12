@@ -24,7 +24,7 @@ const TASK_DEFAULTS: Record<AITask, string> = {
   'excel-extraction': MODELS.haiku,
   'pdf-extraction': MODELS.haiku,
   'ocr': MODELS.haiku,
-  'ssoma-iperc': MODELS.sonnet,    // IPERC alto riesgo (EJECUCIÓN): razonamiento complejo → Sonnet (override: AI_SSOMA_IPERC_MODEL)
+  'ssoma-iperc': MODELS.haiku,     // IPERC lotes: Haiku es 4-5× más rápido que Sonnet → cabe en Vercel 300s (override: AI_SSOMA_IPERC_MODEL)
   'ssoma-document': MODELS.sonnet, // Procedimientos técnicos de seguridad → Sonnet
   'ssoma-epp': MODELS.haiku,       // Listas de EPP por rol (referencia estándar) → Haiku
 }

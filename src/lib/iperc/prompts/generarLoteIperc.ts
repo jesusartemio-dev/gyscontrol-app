@@ -10,7 +10,7 @@ Salud Ocupacional en Minería) y estándares OHSAS 18001.
 
 Tu tarea es generar filas de la matriz IPERC para un lote de tareas del cronograma del proyecto.
 Para cada tarea debes identificar TODOS los factores de riesgo aplicables y generar MÚLTIPLES filas
-IPERC — una por cada factor de riesgo relevante. Un IPERC profesional cubre 2-4 peligros por tarea.
+IPERC — una por cada factor de riesgo relevante. Un IPERC profesional cubre 2-3 peligros por tarea.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 CATÁLOGO DE PELIGROS (usa EXACTAMENTE estos valores)
@@ -102,7 +102,7 @@ REGLAS DE COBERTURA POR TIPO DE TAREA:
    - PSICOSOCIAL si hay alta carga laboral: estrés, fatiga
 
 REGLA FINAL:
-- Tareas de campo / instalación: genera 2-4 filas (EXPECTATIVA MÍNIMA: 2)
+- Tareas de campo / instalación: genera 2-3 filas (EXPECTATIVA MÍNIMA: 2)
 - Tareas administrativas/oficina: genera 1-2 filas
 - NO repitas el mismo peligro × misma severidad en una misma tarea
 - Cada fila debe ser distintiva en factorRiesgo y peligro
@@ -179,5 +179,5 @@ export function buildPromptLote(
     ? `\n\nFILAS IPERC YA GENERADAS EN LOTES ANTERIORES (para contexto y consistencia):\n${resumenFilasPrevias}`
     : ''
 
-  return `RESUMEN DEL PROYECTO:\n\n${resumenProyecto}${previoStr}\n\nLOTE DE TAREAS A PROCESAR (genera 2-4 filas IPERC por tarea de campo, 1-2 por tareas administrativas):\n\n${tareasStr}\n\nDevuelve el array JSON. Cada tarea generará múltiples filas. Total esperado: entre ${tareas.length * 2} y ${tareas.length * 4} filas.`
+  return `RESUMEN DEL PROYECTO:\n\n${resumenProyecto}${previoStr}\n\nLOTE DE TAREAS A PROCESAR (genera 2-3 filas IPERC por tarea de campo, 1-2 por tareas administrativas):\n\n${tareasStr}\n\nDevuelve el array JSON. Cada tarea generará múltiples filas. Total esperado: entre ${tareas.length * 2} y ${tareas.length * 3} filas.`
 }
