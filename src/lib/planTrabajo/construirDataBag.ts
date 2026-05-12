@@ -1,6 +1,7 @@
 import type { PlanTrabajo, Cliente, Proyecto } from '@prisma/client'
 import type {
   PlanAlcanceDetalladoEdt,
+  PlanAlcanceItem,
   PlanEPP,
   PlanHerramientasYEquipos,
   PlanRestriccion,
@@ -46,7 +47,7 @@ export function construirDataBag(
   const epp = (plan.eppRequeridos as PlanEPP | null) ?? { basico: [], bioseguridad: [], riesgoEspecifico: [] }
   const herramientas = (plan.herramientasYEquipos as PlanHerramientasYEquipos | null) ?? { equipos: [], herramientas: [], materiales: [] }
   const restricciones = (plan.restricciones as PlanRestriccion[] | null) ?? []
-  const alcanceDetallado = (plan.alcanceDetallado as PlanAlcanceDetalladoEdt[] | null) ?? []
+  const alcanceDetallado = (plan.alcanceDetallado as Array<PlanAlcanceDetalladoEdt | PlanAlcanceItem> | null) ?? []
   const histogramas = (plan.histogramas as PlanHistogramas | null) ?? { meses: [], equipoTrabajo: [], horasHombre: [] }
   const cronograma = (plan.cronogramaResumen as PlanCronograma | null) ?? { filas: [] }
   const referencias = (plan.referencias as PlanReferencia[] | null) ?? []
@@ -132,24 +133,48 @@ export function construirDataBag(
     // Restricciones
     restricciones: restricciones.map(r => ({ texto: r.texto, categoria: r.categoria ?? '' })),
 
-    // Alcance detallado — se pasa como array aplanado para el template loop
-    // y como string formateado para el placeholder {alcanceDetalladoFormateado}
-    alcanceDetallado: alcanceDetallado.map(a => ({
-      numero: a.numeracion,
-      nombre: `${a.numeracion}. ${a.edtNombre}`,
-      descripcion: a.descripcion + (
-        a.subItems?.map(s => `\n      ${s.numeracion} ${s.actividadNombre}: ${s.descripcion}`).join('') ?? ''
-      ),
-      ubicacion: a.ubicacion ?? '',
-    })),
+    // Alcance detallado — formato v3 con loop anidado {#subItems}
+    // Compatible con formato legacy (PlanAlcanceItem) y nuevo (PlanAlcanceDetalladoEdt)
+    alcanceDetallado: alcanceDetallado.map(a => {
+      if ('edtNombre' in a && a.edtNombre) {
+        const n = a as PlanAlcanceDetalladoEdt
+        return {
+          numero: n.numeracion,
+          nombre: `${n.numeracion}. ${n.edtNombre}`,
+          fase: n.faseNombre ?? '',
+          codigo: n.edtCodigo ?? '',
+          descripcion: n.descripcion,
+          ubicacion: n.ubicacion ?? '',
+          subItems: (n.subItems ?? []).map(s => ({
+            subnumero: s.numeracion,
+            subnombre: s.actividadNombre,
+            subdescripcion: s.descripcion,
+          })),
+        }
+      }
+      const l = a as PlanAlcanceItem
+      return {
+        numero: l.numero ?? '',
+        nombre: l.nombre ?? '',
+        fase: '',
+        codigo: '',
+        descripcion: l.descripcion ?? '',
+        ubicacion: l.ubicacion ?? '',
+        subItems: [],
+      }
+    }),
     alcanceDetalladoFormateado: alcanceDetallado.map(a => {
-      const fase = a.faseNombre || a.faseAbreviatura || ''
-      const titulo = `${a.numeracion}.  ${fase ? `${fase.toUpperCase()} — ` : ''}${a.edtNombre}${a.ubicacion ? `  |  ${a.ubicacion}` : ''}`
-      const cuerpo = a.descripcion
-      const subs = (a.subItems ?? []).map(s =>
-        `      ${s.numeracion}  ${s.actividadNombre}\n      ${s.descripcion}`
-      ).join('\n\n')
-      return [titulo, cuerpo, subs].filter(Boolean).join('\n')
+      if ('edtNombre' in a && a.edtNombre) {
+        const n = a as PlanAlcanceDetalladoEdt
+        const fase = n.faseNombre || n.faseAbreviatura || ''
+        const titulo = `${n.numeracion}.  ${fase ? `${fase.toUpperCase()} — ` : ''}${n.edtNombre}${n.ubicacion ? `  |  ${n.ubicacion}` : ''}`
+        const subs = (n.subItems ?? []).map(s =>
+          `      ${s.numeracion}  ${s.actividadNombre}\n      ${s.descripcion}`
+        ).join('\n\n')
+        return [titulo, n.descripcion, subs].filter(Boolean).join('\n')
+      }
+      const l = a as PlanAlcanceItem
+      return [l.nombre, l.descripcion].filter(Boolean).join('\n')
     }).join('\n\n'),
 
     // Histogramas (solo etiqueta + total, V1)
