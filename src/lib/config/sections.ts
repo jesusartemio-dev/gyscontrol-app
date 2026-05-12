@@ -62,7 +62,7 @@ export const DEFAULT_ROLE_SECTIONS: Record<RoleKey, SectionKey[]> = {
   coordinador: ['proyectos', 'documentos', 'mi-trabajo', 'supervision', 'gastos'],
   coordinador_logistico: ['logistica', 'documentos', 'mi-trabajo', 'supervision', 'gastos'],
   proyectos: ['proyectos', 'documentos', 'mi-trabajo', 'supervision', 'gastos'],
-  seguridad: ['mi-trabajo', 'seguridad'],
+  seguridad: ['proyectos', 'mi-trabajo', 'seguridad'],
   comercial: ['comercial', 'crm', 'documentos', 'mi-trabajo'],
   presupuestos: ['comercial', 'mi-trabajo'],
   logistico: ['logistica', 'documentos', 'mi-trabajo', 'gastos'],
