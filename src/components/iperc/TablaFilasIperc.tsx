@@ -27,7 +27,7 @@ const COLS = [
   { key: 'num',       label: '#',         w: 48  },
   { key: 'proceso',   label: 'Proceso',   w: 130 },
   { key: 'actividad', label: 'Actividad', w: 145 },
-  { key: 'tarea',     label: 'Tarea',     w: 160 },
+  { key: 'tarea',     label: 'Tarea',     w: 240 },
   { key: 'puesto',    label: 'Puesto',    w: 125 },
   { key: 'factor',    label: 'Factor',    w: 120 },
   { key: 'condicion', label: 'Condición', w: 100 },
@@ -229,7 +229,7 @@ export function TablaFilasIperc({ filas, onEdit, onDelete, onGenerar, onAgregar 
   const rowVirtualizer = useVirtualizer({
     count: filas.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => 52,
+    estimateSize: () => 60,
     overscan: 10,
   })
 
@@ -323,7 +323,16 @@ export function TablaFilasIperc({ filas, onEdit, onDelete, onGenerar, onAgregar 
 
                 {/* Tarea */}
                 <div className="px-2.5 shrink-0 overflow-hidden" style={{ width: COLS[3].w, minWidth: COLS[3].w }}>
-                  <CeldaConTooltip text={fila.tarea} className="text-xs" />
+                  <Tooltip delayDuration={400}>
+                    <TooltipTrigger asChild>
+                      <span className="text-xs font-medium leading-snug line-clamp-2 cursor-default block">
+                        {fila.tarea}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-sm text-xs leading-relaxed">
+                      {fila.tarea}
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
 
                 {/* Puesto */}
