@@ -566,6 +566,19 @@ export default function ProyectoHubPage() {
       stats: [],
       badge: 'SSOMA'
     },
+    {
+      id: 'mpp',
+      title: 'MPP',
+      description: 'Matriz de Puestos y Personal — EPPs por puesto de trabajo',
+      icon: ShieldCheck,
+      color: 'text-cyan-600',
+      bgColor: 'bg-cyan-50',
+      hoverBg: 'hover:bg-cyan-50',
+      borderColor: 'border-cyan-200',
+      href: `${baseUrl}/mpp`,
+      stats: [],
+      badge: 'SSOMA'
+    },
   ]
 
   return (
