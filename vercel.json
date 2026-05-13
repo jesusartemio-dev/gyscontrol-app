@@ -8,6 +8,9 @@
   "functions": {
     "api/iperc/render-xlsx.py": {
       "maxDuration": 60
+    },
+    "api/mpp/render-xlsx.py": {
+      "maxDuration": 60
     }
   }
 }

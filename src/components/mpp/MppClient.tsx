@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Plus, RefreshCw, Trash2 } from 'lucide-react'
+import { Download, Loader2, Plus, RefreshCw, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { CabeceraMpp } from './CabeceraMpp'
@@ -73,6 +73,7 @@ export default function MppClient({ proyectoId }: Props) {
   const [statusMsg, setStatusMsg] = useState('')
   const [progreso, setProgreso] = useState<number | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+  const [descargando, setDescargando] = useState(false)
 
   const preRequisitosOk = Boolean(contexto?.ipercExiste && contexto?.ipercTieneFilas)
 
@@ -230,6 +231,37 @@ export default function MppClient({ proyectoId }: Props) {
     }
   }
 
+  const handleExportarExcel = async () => {
+    if (!mpp || mpp.items.length === 0) {
+      toast.error('MPP sin items, no se puede exportar')
+      return
+    }
+    setDescargando(true)
+    try {
+      const res = await fetch(`/api/proyectos/${proyectoId}/mpp/exportar-xlsx`, {
+        method: 'POST',
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Error desconocido' }))
+        throw new Error((err as { error?: string }).error ?? 'Error')
+      }
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${mpp.codigoDocumento}.xlsx`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      window.URL.revokeObjectURL(url)
+      toast.success('Excel descargado correctamente')
+    } catch (e) {
+      toast.error(`Error al exportar: ${e instanceof Error ? e.message : 'Error'}`)
+    } finally {
+      setDescargando(false)
+    }
+  }
+
   const handleItemsChange = (newItems: MppItem[]) => {
     setMpp(prev => prev ? { ...prev, items: newItems } : prev)
   }
@@ -322,6 +354,18 @@ export default function MppClient({ proyectoId }: Props) {
               progreso={progreso}
               onClick={handleGenerarIA}
             />
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9"
+              onClick={handleExportarExcel}
+              disabled={descargando || generando || mpp.items.length === 0}
+            >
+              {descargando
+                ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                : <Download className="h-4 w-4 mr-1" />}
+              {descargando ? 'Generando Excel…' : 'Exportar Excel'}
+            </Button>
           </div>
 
           <TablaAsignacionesMpp
