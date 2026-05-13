@@ -51,5 +51,5 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     include: { catalogo: true },
   })
 
-  return NextResponse.json({ data: updated })
+  return NextResponse.json({ item: updated })
 }

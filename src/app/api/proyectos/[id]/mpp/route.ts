@@ -49,7 +49,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     },
   })
 
-  return NextResponse.json({ data: mpp ?? null })
+  return NextResponse.json({ mpp: mpp ?? null })
 }
 
 // POST /api/proyectos/[id]/mpp
@@ -116,7 +116,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     },
   })
 
-  return NextResponse.json({ data: mpp }, { status: 201 })
+  return NextResponse.json({ mpp }, { status: 201 })
 }
 
 // PATCH /api/proyectos/[id]/mpp
@@ -148,7 +148,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     },
   })
 
-  return NextResponse.json({ data: updated })
+  return NextResponse.json({ mpp: updated })
 }
 
 // DELETE /api/proyectos/[id]/mpp

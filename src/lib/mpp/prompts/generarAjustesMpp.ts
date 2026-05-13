@@ -1,4 +1,5 @@
 import type { ContextoMpp } from '../cargarContexto'
+import { PUESTOS_MPP } from '../catalogos/puestos'
 
 export interface AjusteMpp {
   eppNombre: string
@@ -84,7 +85,10 @@ RESPONDÉ EN FORMATO JSON ESTRICTO (sin texto antes ni después):
 
 REGLAS CRÍTICAS:
 - Los nombres de EPPs DEBEN coincidir EXACTAMENTE con los del catálogo de arriba (case sensitive).
-- Los puestos DEBEN ser uno de: ${contexto.iperc.resumenPorPuesto.map((r) => r.puesto).join(', ')}.
+- Los puestos DEBEN ser EXACTAMENTE uno de estos 10 puestos estándar GYS (sin variaciones):
+${PUESTOS_MPP.map((p) => `  "${p}"`).join('\n')}
+- NO uses puestos del IPERC si no están en la lista de 10 de arriba. Si un puesto del IPERC
+  como "Almacenero" o "Conductor" no está en los 10, mapéalo al más cercano o ignoralo.
 - Genera entre 0 y 30 ajustes. Si no hay nada que cambiar, devolvé "ajustes": [].
 - Sé conservador: solo ajustes claramente justificados por el IPERC.
 - "razon" en una sola frase corta, en español.
