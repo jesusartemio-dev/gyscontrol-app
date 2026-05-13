@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { prisma } from '@/lib/prisma'
 import { cargarContextoMpp } from './cargarContexto'
 import { construirPromptAjustes, type AjusteMpp } from './prompts/generarAjustesMpp'
+import { PUESTOS_MPP } from './catalogos/puestos'
 
 const MODEL_HAIKU = 'claude-haiku-4-5-20251001'
 
@@ -100,9 +101,22 @@ export async function* generarMppConIa(
 
   const ajustesPropuestos: AjusteMpp[] = parsed.ajustes ?? []
 
+  // Filtrar ajustes con puestos no estándar antes de aplicarlos
+  const puestosValidos = new Set<string>(PUESTOS_MPP)
+  const ajustesValidos = ajustesPropuestos.filter((ajuste) => {
+    if (!puestosValidos.has(ajuste.puesto)) {
+      console.warn(`[mpp ia] Puesto inválido "${ajuste.puesto}" en ajuste, ignorado`)
+      return false
+    }
+    return true
+  })
+  const ajustesPuestosIgnorados = ajustesPropuestos.length - ajustesValidos.length
+
   yield {
     type: 'ajustes_recibidos',
     cantidad: ajustesPropuestos.length,
+    validos: ajustesValidos.length,
+    puestosIgnorados: ajustesPuestosIgnorados,
     resumen: parsed.resumen,
   }
 
@@ -114,10 +128,10 @@ export async function* generarMppConIa(
 
   const nombresEppValidos = new Set(catalogo.map((c) => c.nombre))
 
-  // Clasificar ajustes
+  // Clasificar ajustes por EPP válido
   let aplicados = 0
-  let ignorados = 0
-  for (const ajuste of ajustesPropuestos) {
+  let ignorados = ajustesPuestosIgnorados
+  for (const ajuste of ajustesValidos) {
     if (nombresEppValidos.has(ajuste.eppNombre)) {
       aplicados++
     } else {
@@ -141,24 +155,24 @@ export async function* generarMppConIa(
       },
     })
 
-    for (let idx = 0; idx < catalogo.length; idx++) {
-      const epp = catalogo[idx]
+    for (const epp of catalogo) {
       const defaults = epp.asignacionesDefault as string[]
 
-      // Partir de los defaults
+      // Inicializar las 10 keys fijas (false por defecto)
       const asignaciones: Record<string, boolean> = {}
-      for (const puesto of defaults) {
-        asignaciones[puesto] = true
+      for (const puesto of PUESTOS_MPP) {
+        asignaciones[puesto] = false
       }
-
-      // Aplicar ajustes de la IA para este EPP
-      for (const ajuste of ajustesPropuestos) {
+      // Activar los defaults válidos
+      for (const puesto of defaults) {
+        if (puestosValidos.has(puesto)) {
+          asignaciones[puesto] = true
+        }
+      }
+      // Aplicar ajustes IA ya filtrados (solo puestos estándar)
+      for (const ajuste of ajustesValidos) {
         if (ajuste.eppNombre === epp.nombre && nombresEppValidos.has(ajuste.eppNombre)) {
-          if (ajuste.accion === 'agregar') {
-            asignaciones[ajuste.puesto] = true
-          } else if (ajuste.accion === 'quitar') {
-            asignaciones[ajuste.puesto] = false
-          }
+          asignaciones[ajuste.puesto] = ajuste.accion === 'agregar'
         }
       }
 
