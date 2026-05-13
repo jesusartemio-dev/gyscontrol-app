@@ -19,10 +19,8 @@ export const mppPatchSchema = mppCabeceraSchema.partial()
 export type MppPatchInput = z.infer<typeof mppPatchSchema>
 
 export const mppItemPatchSchema = z.object({
-  cantidad: z.number().int().min(1).optional(),
-  periodo: z.enum(['mensual', 'trimestral', 'semestral', 'anual', 'obra']).optional(),
-  requiere: z.boolean().optional(),
-  nota: z.string().optional(),
+  // asignaciones: { [puesto: string]: boolean }
+  asignaciones: z.record(z.string(), z.boolean()).optional(),
 })
 
 export type MppItemPatchInput = z.infer<typeof mppItemPatchSchema>

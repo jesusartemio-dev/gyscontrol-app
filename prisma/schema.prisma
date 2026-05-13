@@ -1129,6 +1129,7 @@ model Proyecto {
   tdrAnalisis                ProyectoTdrAnalisis?
   planTrabajo                PlanTrabajo?
   iperc                      Iperc?
+  mpp                        Mpp?
 
   @@index([clienteId, estado, createdAt(sort: Desc)], map: "idx_proyecto_cliente_estado_fecha")
   @@index([comercialId, estado, fechaInicio], map: "idx_proyecto_comercial_estado_inicio")
@@ -5442,4 +5443,93 @@ model IpercGeneracion {
 
   @@index([ipercId, createdAt])
   @@map("iperc_generacion")
+}
+
+// ─── MPP (Matriz de EPP por Puesto) ─────────────────────────────────────────
+
+model MppEppCatalogo {
+  id          String @id @default(cuid())
+  codigo      String @unique
+  nombre      String
+  categoria   String
+  unidad      String
+  descripcion String @default("")
+  orden       Int    @default(0)
+
+  asignacionesDefault Json @default("[]") // string[] de puestos que lo usan por defecto
+
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items MppItem[]
+
+  @@map("mpp_epp_catalogo")
+}
+
+model Mpp {
+  id         String   @id @default(cuid())
+  proyectoId String   @unique
+  proyecto   Proyecto @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+
+  codigoDocumento    String
+  revision           String   @default("01")
+  fechaElaboracion   DateTime @default(now())
+  fechaActualizacion DateTime @default(now())
+  area               String   @default("")
+  gerencia           String   @default("PROYECTOS")
+  evaluadores        Json     @default("[]")
+  elaboradoPor       String   @default("")
+  revisadoPor        String   @default("")
+  aprobadoPor        String   @default("")
+  observaciones      String   @default("")
+
+  estado String @default("borrador") // borrador | revisado | aprobado
+
+  items        MppItem[]
+  generaciones MppGeneracion[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("mpp")
+}
+
+model MppItem {
+  id     String @id @default(cuid())
+  mppId  String
+  mpp    Mpp    @relation(fields: [mppId], references: [id], onDelete: Cascade)
+
+  catalogoId String
+  catalogo   MppEppCatalogo @relation(fields: [catalogoId], references: [id])
+
+  // asignaciones: { [puesto: string]: boolean } — true=asignado, false=excluido explícitamente
+  asignaciones Json @default("{}")
+  orden        Int  @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([mppId, catalogoId])
+  @@index([mppId])
+  @@map("mpp_item")
+}
+
+model MppGeneracion {
+  id    String @id @default(cuid())
+  mppId String
+  mpp   Mpp    @relation(fields: [mppId], references: [id], onDelete: Cascade)
+
+  estado           String
+  modelo           String
+  promptTokens     Int?
+  outputTokens     Int?
+  ajustesAplicados Int?
+  totalItems       Int?
+  errorMensaje     String?
+
+  createdAt DateTime @default(now())
+
+  @@index([mppId, createdAt])
+  @@map("mpp_generacion")
 }
