@@ -48,9 +48,6 @@ export async function* generarMppConIa(
       area: true,
       gerencia: true,
       evaluadores: true,
-      elaboradoPor: true,
-      revisadoPor: true,
-      aprobadoPor: true,
       observaciones: true,
     },
   })
@@ -112,7 +109,7 @@ export async function* generarMppConIa(
   // Cargar catálogo completo para crear los MppItems
   const catalogo = await prisma.mppEppCatalogo.findMany({
     where: { activo: true },
-    orderBy: [{ orden: 'asc' }, { categoria: 'asc' }],
+    orderBy: { orden: 'asc' },
   })
 
   const nombresEppValidos = new Set(catalogo.map((c) => c.nombre))
@@ -139,9 +136,6 @@ export async function* generarMppConIa(
         area: mppPrevio?.area ?? contexto.proyecto.nombre,
         gerencia: mppPrevio?.gerencia ?? 'PROYECTOS',
         evaluadores: (mppPrevio?.evaluadores as object) ?? EVALUADORES_DEFAULT,
-        elaboradoPor: mppPrevio?.elaboradoPor ?? '',
-        revisadoPor: mppPrevio?.revisadoPor ?? '',
-        aprobadoPor: mppPrevio?.aprobadoPor ?? '',
         observaciones: mppPrevio?.observaciones ?? '',
         estado: 'borrador',
       },
@@ -171,9 +165,9 @@ export async function* generarMppConIa(
       await tx.mppItem.create({
         data: {
           mppId: created.id,
-          catalogoId: epp.id,
+          mppEppCatalogoId: epp.id,
           asignaciones,
-          orden: idx,
+          orden: epp.orden,
         },
       })
     }

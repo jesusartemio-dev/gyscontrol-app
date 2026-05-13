@@ -5448,22 +5448,23 @@ model IpercGeneracion {
 // ─── MPP (Matriz de EPP por Puesto) ─────────────────────────────────────────
 
 model MppEppCatalogo {
-  id          String @id @default(cuid())
-  codigo      String @unique
-  nombre      String
-  categoria   String
-  unidad      String
-  descripcion String @default("")
-  orden       Int    @default(0)
+  id          String  @id @default(cuid())
+  orden       Int     @unique
+  nombre      String  @db.Text
+  riesgo      String  @db.Text
+  parteCuerpo String
+  durabilidad String?
 
-  asignacionesDefault Json @default("[]") // string[] de puestos que lo usan por defecto
+  asignacionesDefault Json // string[] de puestos que lo usan por defecto
 
   activo    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  items MppItem[]
+  mppItems MppItem[]
 
+  @@index([parteCuerpo])
+  @@index([activo])
   @@map("mpp_epp_catalogo")
 }
 
@@ -5479,9 +5480,6 @@ model Mpp {
   area               String   @default("")
   gerencia           String   @default("PROYECTOS")
   evaluadores        Json     @default("[]")
-  elaboradoPor       String   @default("")
-  revisadoPor        String   @default("")
-  aprobadoPor        String   @default("")
   observaciones      String   @default("")
 
   estado String @default("borrador") // borrador | revisado | aprobado
@@ -5496,22 +5494,23 @@ model Mpp {
 }
 
 model MppItem {
-  id     String @id @default(cuid())
-  mppId  String
-  mpp    Mpp    @relation(fields: [mppId], references: [id], onDelete: Cascade)
+  id    String @id @default(cuid())
+  mppId String
+  mpp   Mpp    @relation(fields: [mppId], references: [id], onDelete: Cascade)
 
-  catalogoId String
-  catalogo   MppEppCatalogo @relation(fields: [catalogoId], references: [id])
+  mppEppCatalogoId String
+  mppEppCatalogo   MppEppCatalogo @relation(fields: [mppEppCatalogoId], references: [id])
 
-  // asignaciones: { [puesto: string]: boolean } — true=asignado, false=excluido explícitamente
-  asignaciones Json @default("{}")
-  orden        Int  @default(0)
+  orden        Int
+  asignaciones Json    // { [puesto: string]: boolean }
+  observaciones String? @db.Text
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([mppId, catalogoId])
+  @@unique([mppId, mppEppCatalogoId])
   @@index([mppId])
+  @@index([orden])
   @@map("mpp_item")
 }
 

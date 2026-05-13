@@ -103,7 +103,7 @@ export async function cargarContextoMpp(proyectoId: string): Promise<ContextoMpp
 
   const catalogo = await prisma.mppEppCatalogo.findMany({
     where: { activo: true },
-    orderBy: [{ orden: 'asc' }, { categoria: 'asc' }],
+    orderBy: { orden: 'asc' },
   })
   const defaultsActuales: Record<string, string[]> = {}
   for (const epp of catalogo) {

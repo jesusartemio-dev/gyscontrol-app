@@ -1,14 +1,14 @@
 export const PUESTOS_MPP = [
-  'Supervisor SSOMA',
-  'Ingeniero de Proyectos',
-  'Técnico Electricista',
-  'Técnico Mecánico',
-  'Operador de Equipos',
+  'Ing. Supervisor de Proyecto',
+  'Ingeniero de seguridad',
+  'Ing. Programador',
+  'Técnico instrumentista',
+  'Técnico Electrónico',
+  'Sup. De Andamio',
+  'Técnico Andamiero',
+  'Operador de manlift',
   'Soldador',
-  'Rigger / Aparejador',
-  'Ayudante de Obra',
-  'Almacenero',
-  'Conductor / Chofer',
+  'Técnico Auxiliar',
 ] as const
 
 export type PuestoMpp = (typeof PUESTOS_MPP)[number]

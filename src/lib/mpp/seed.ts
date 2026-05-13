@@ -6,16 +6,16 @@ export async function seedMppEppCatalogo() {
   let actualizados = 0
 
   for (const epp of EPP_CATALOGO_SEED) {
-    const existing = await prisma.mppEppCatalogo.findUnique({ where: { codigo: epp.codigo } })
+    const existing = await prisma.mppEppCatalogo.findUnique({ where: { orden: epp.orden } })
 
     if (existing) {
       await prisma.mppEppCatalogo.update({
-        where: { codigo: epp.codigo },
+        where: { orden: epp.orden },
         data: {
           nombre: epp.nombre,
-          categoria: epp.categoria,
-          unidad: epp.unidad,
-          descripcion: epp.descripcion ?? '',
+          riesgo: epp.riesgo,
+          parteCuerpo: epp.parteCuerpo,
+          durabilidad: epp.durabilidad ?? null,
           asignacionesDefault: epp.asignacionesDefault,
         },
       })
@@ -23,11 +23,11 @@ export async function seedMppEppCatalogo() {
     } else {
       await prisma.mppEppCatalogo.create({
         data: {
-          codigo: epp.codigo,
+          orden: epp.orden,
           nombre: epp.nombre,
-          categoria: epp.categoria,
-          unidad: epp.unidad,
-          descripcion: epp.descripcion ?? '',
+          riesgo: epp.riesgo,
+          parteCuerpo: epp.parteCuerpo,
+          durabilidad: epp.durabilidad ?? null,
           asignacionesDefault: epp.asignacionesDefault,
         },
       })

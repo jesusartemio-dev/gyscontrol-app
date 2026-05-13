@@ -6,9 +6,8 @@ export const mppCabeceraSchema = z.object({
   fechaElaboracion: z.coerce.date().optional(),
   fechaActualizacion: z.coerce.date().optional(),
   area: z.string().optional(),
-  elaboradoPor: z.string().optional(),
-  revisadoPor: z.string().optional(),
-  aprobadoPor: z.string().optional(),
+  gerencia: z.string().optional(),
+  observaciones: z.string().optional(),
   estado: z.enum(['borrador', 'revisado', 'aprobado']).optional(),
 })
 

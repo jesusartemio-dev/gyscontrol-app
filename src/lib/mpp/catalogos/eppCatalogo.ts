@@ -1,440 +1,63 @@
 export type EppCatalogoSeed = {
-  codigo: string
+  orden: number
   nombre: string
-  categoria: string
-  unidad: string
-  descripcion?: string
+  riesgo: string
+  parteCuerpo: string
+  durabilidad?: string
   asignacionesDefault: string[]
 }
 
 export const EPP_CATALOGO_SEED: EppCatalogoSeed[] = [
-  // ── CABEZA ────────────────────────────────────────────────────────────────
-  {
-    codigo: 'CAB-001',
-    nombre: 'Casco de seguridad clase E',
-    categoria: 'Cabeza',
-    unidad: 'unidad',
-    asignacionesDefault: [
-      'Supervisor SSOMA', 'Ingeniero de Proyectos', 'Técnico Electricista',
-      'Técnico Mecánico', 'Operador de Equipos', 'Soldador',
-      'Rigger / Aparejador', 'Ayudante de Obra', 'Almacenero',
-    ],
-  },
-  {
-    codigo: 'CAB-002',
-    nombre: 'Casco con suspensión ratchet',
-    categoria: 'Cabeza',
-    unidad: 'unidad',
-    asignacionesDefault: ['Soldador', 'Técnico Electricista'],
-  },
-  {
-    codigo: 'CAB-003',
-    nombre: 'Capucha ignífuga',
-    categoria: 'Cabeza',
-    unidad: 'unidad',
-    asignacionesDefault: ['Soldador'],
-  },
-
-  // ── OJOS / CARA ───────────────────────────────────────────────────────────
-  {
-    codigo: 'OJO-001',
-    nombre: 'Lentes de seguridad claro',
-    categoria: 'Ojos y Cara',
-    unidad: 'unidad',
-    asignacionesDefault: [
-      'Supervisor SSOMA', 'Ingeniero de Proyectos', 'Técnico Electricista',
-      'Técnico Mecánico', 'Operador de Equipos', 'Soldador',
-      'Rigger / Aparejador', 'Ayudante de Obra',
-    ],
-  },
-  {
-    codigo: 'OJO-002',
-    nombre: 'Lentes de seguridad oscuro',
-    categoria: 'Ojos y Cara',
-    unidad: 'unidad',
-    asignacionesDefault: ['Operador de Equipos', 'Conductor / Chofer'],
-  },
-  {
-    codigo: 'OJO-003',
-    nombre: 'Careta de soldar automática',
-    categoria: 'Ojos y Cara',
-    unidad: 'unidad',
-    asignacionesDefault: ['Soldador'],
-  },
-  {
-    codigo: 'OJO-004',
-    nombre: 'Careta facial completa policarbonato',
-    categoria: 'Ojos y Cara',
-    unidad: 'unidad',
-    asignacionesDefault: ['Técnico Electricista', 'Técnico Mecánico'],
-  },
-  {
-    codigo: 'OJO-005',
-    nombre: 'Goggle antipolvo / antisalpicadura',
-    categoria: 'Ojos y Cara',
-    unidad: 'unidad',
-    asignacionesDefault: ['Ayudante de Obra', 'Almacenero'],
-  },
-
-  // ── OÍDOS ─────────────────────────────────────────────────────────────────
-  {
-    codigo: 'OID-001',
-    nombre: 'Tapones auditivos desechables NRR 33',
-    categoria: 'Oídos',
-    unidad: 'par',
-    asignacionesDefault: [
-      'Técnico Electricista', 'Técnico Mecánico', 'Operador de Equipos',
-      'Soldador', 'Ayudante de Obra',
-    ],
-  },
-  {
-    codigo: 'OID-002',
-    nombre: 'Orejeras de copa NRR 25',
-    categoria: 'Oídos',
-    unidad: 'unidad',
-    asignacionesDefault: ['Operador de Equipos'],
-  },
-
-  // ── VÍAS RESPIRATORIAS ────────────────────────────────────────────────────
-  {
-    codigo: 'RES-001',
-    nombre: 'Mascarilla desechable KN95',
-    categoria: 'Respiratorio',
-    unidad: 'unidad',
-    asignacionesDefault: [
-      'Supervisor SSOMA', 'Ingeniero de Proyectos', 'Ayudante de Obra', 'Almacenero',
-    ],
-  },
-  {
-    codigo: 'RES-002',
-    nombre: 'Respirador media cara + filtros P100',
-    categoria: 'Respiratorio',
-    unidad: 'unidad',
-    asignacionesDefault: ['Soldador', 'Técnico Mecánico'],
-  },
-  {
-    codigo: 'RES-003',
-    nombre: 'Filtro para vapores orgánicos OV/P100',
-    categoria: 'Respiratorio',
-    unidad: 'par',
-    asignacionesDefault: ['Soldador', 'Técnico Mecánico'],
-  },
-  {
-    codigo: 'RES-004',
-    nombre: 'Respirador cara completa doble filtro',
-    categoria: 'Respiratorio',
-    unidad: 'unidad',
-    asignacionesDefault: ['Técnico Electricista'],
-  },
-
-  // ── MANOS ─────────────────────────────────────────────────────────────────
-  {
-    codigo: 'MAN-001',
-    nombre: 'Guantes de cuero multiflex',
-    categoria: 'Manos',
-    unidad: 'par',
-    asignacionesDefault: [
-      'Técnico Mecánico', 'Operador de Equipos', 'Rigger / Aparejador',
-      'Ayudante de Obra', 'Almacenero',
-    ],
-  },
-  {
-    codigo: 'MAN-002',
-    nombre: 'Guantes dieléctricos clase 00 (1000V)',
-    categoria: 'Manos',
-    unidad: 'par',
-    asignacionesDefault: ['Técnico Electricista'],
-  },
-  {
-    codigo: 'MAN-003',
-    nombre: 'Guantes de soldador tipo mosquetero',
-    categoria: 'Manos',
-    unidad: 'par',
-    asignacionesDefault: ['Soldador'],
-  },
-  {
-    codigo: 'MAN-004',
-    nombre: 'Guantes anticorte nivel 5',
-    categoria: 'Manos',
-    unidad: 'par',
-    asignacionesDefault: ['Técnico Mecánico'],
-  },
-  {
-    codigo: 'MAN-005',
-    nombre: 'Guantes nitrilo desechables',
-    categoria: 'Manos',
-    unidad: 'caja x100',
-    asignacionesDefault: ['Supervisor SSOMA', 'Ingeniero de Proyectos'],
-  },
-
-  // ── PIES ──────────────────────────────────────────────────────────────────
-  {
-    codigo: 'PIE-001',
-    nombre: 'Botas de seguridad punta de acero',
-    categoria: 'Pies',
-    unidad: 'par',
-    asignacionesDefault: [
-      'Supervisor SSOMA', 'Ingeniero de Proyectos', 'Técnico Electricista',
-      'Técnico Mecánico', 'Operador de Equipos', 'Soldador',
-      'Rigger / Aparejador', 'Ayudante de Obra', 'Almacenero',
-    ],
-  },
-  {
-    codigo: 'PIE-002',
-    nombre: 'Botas dieléctricas sin punta metálica',
-    categoria: 'Pies',
-    unidad: 'par',
-    asignacionesDefault: ['Técnico Electricista'],
-  },
-  {
-    codigo: 'PIE-003',
-    nombre: 'Botas de jebe caña alta (lluvia/lodo)',
-    categoria: 'Pies',
-    unidad: 'par',
-    asignacionesDefault: ['Ayudante de Obra'],
-  },
-  {
-    codigo: 'PIE-004',
-    nombre: 'Zapatos de seguridad tipo deportivo ESD',
-    categoria: 'Pies',
-    unidad: 'par',
-    asignacionesDefault: ['Conductor / Chofer', 'Almacenero'],
-  },
-
-  // ── CUERPO / ROPA ─────────────────────────────────────────────────────────
-  {
-    codigo: 'ROP-001',
-    nombre: 'Mameluco drill naranja alta visibilidad',
-    categoria: 'Ropa de Trabajo',
-    unidad: 'unidad',
-    asignacionesDefault: [
-      'Técnico Electricista', 'Técnico Mecánico', 'Operador de Equipos',
-      'Ayudante de Obra',
-    ],
-  },
-  {
-    codigo: 'ROP-002',
-    nombre: 'Mameluco ignífugo FR',
-    categoria: 'Ropa de Trabajo',
-    unidad: 'unidad',
-    asignacionesDefault: ['Soldador', 'Técnico Electricista'],
-  },
-  {
-    codigo: 'ROP-003',
-    nombre: 'Chaleco de alta visibilidad clase 2',
-    categoria: 'Ropa de Trabajo',
-    unidad: 'unidad',
-    asignacionesDefault: [
-      'Supervisor SSOMA', 'Ingeniero de Proyectos', 'Rigger / Aparejador',
-      'Conductor / Chofer', 'Almacenero',
-    ],
-  },
-  {
-    codigo: 'ROP-004',
-    nombre: 'Delantal de cuero para soldador',
-    categoria: 'Ropa de Trabajo',
-    unidad: 'unidad',
-    asignacionesDefault: ['Soldador'],
-  },
-  {
-    codigo: 'ROP-005',
-    nombre: 'Polo manga larga con protección UV',
-    categoria: 'Ropa de Trabajo',
-    unidad: 'unidad',
-    asignacionesDefault: ['Operador de Equipos', 'Conductor / Chofer'],
-  },
-  {
-    codigo: 'ROP-006',
-    nombre: 'Impermeable de PVC con capucha',
-    categoria: 'Ropa de Trabajo',
-    unidad: 'unidad',
-    asignacionesDefault: ['Ayudante de Obra', 'Operador de Equipos'],
-  },
-  {
-    codigo: 'ROP-007',
-    nombre: 'Pantalón de seguridad drill con refuerzo',
-    categoria: 'Ropa de Trabajo',
-    unidad: 'unidad',
-    asignacionesDefault: [
-      'Técnico Electricista', 'Técnico Mecánico', 'Rigger / Aparejador',
-    ],
-  },
-
-  // ── CAÍDAS ────────────────────────────────────────────────────────────────
-  {
-    codigo: 'CAI-001',
-    nombre: 'Arnés de cuerpo completo 4 argollas ANSI',
-    categoria: 'Trabajo en Altura',
-    unidad: 'unidad',
-    asignacionesDefault: [
-      'Técnico Electricista', 'Técnico Mecánico', 'Soldador',
-      'Rigger / Aparejador', 'Ayudante de Obra',
-    ],
-  },
-  {
-    codigo: 'CAI-002',
-    nombre: 'Línea de vida doble con absorbedor 1.8m',
-    categoria: 'Trabajo en Altura',
-    unidad: 'unidad',
-    asignacionesDefault: [
-      'Técnico Electricista', 'Técnico Mecánico', 'Soldador',
-      'Rigger / Aparejador', 'Ayudante de Obra',
-    ],
-  },
-  {
-    codigo: 'CAI-003',
-    nombre: 'Cuerda de seguridad de vida 15m',
-    categoria: 'Trabajo en Altura',
-    unidad: 'unidad',
-    asignacionesDefault: ['Rigger / Aparejador'],
-  },
-  {
-    codigo: 'CAI-004',
-    nombre: 'Conector de posicionamiento',
-    categoria: 'Trabajo en Altura',
-    unidad: 'unidad',
-    asignacionesDefault: ['Técnico Electricista', 'Técnico Mecánico'],
-  },
-  {
-    codigo: 'CAI-005',
-    nombre: 'Casco con barboquejo para altura',
-    categoria: 'Trabajo en Altura',
-    unidad: 'unidad',
-    asignacionesDefault: ['Rigger / Aparejador', 'Técnico Electricista'],
-  },
-
-  // ── ELÉCTRICO ─────────────────────────────────────────────────────────────
-  {
-    codigo: 'ELE-001',
-    nombre: 'Casco dieléctrico clase E',
-    categoria: 'Eléctrico',
-    unidad: 'unidad',
-    asignacionesDefault: ['Técnico Electricista'],
-  },
-  {
-    codigo: 'ELE-002',
-    nombre: 'Alfombra dieléctrica 1m x 1m',
-    categoria: 'Eléctrico',
-    unidad: 'unidad',
-    asignacionesDefault: ['Técnico Electricista'],
-  },
-  {
-    codigo: 'ELE-003',
-    nombre: 'Detector de tensión sin contacto',
-    categoria: 'Eléctrico',
-    unidad: 'unidad',
-    asignacionesDefault: ['Técnico Electricista'],
-  },
-
-  // ── SOLDADURA ─────────────────────────────────────────────────────────────
-  {
-    codigo: 'SOL-001',
-    nombre: 'Mangas de cuero para soldador',
-    categoria: 'Soldadura',
-    unidad: 'par',
-    asignacionesDefault: ['Soldador'],
-  },
-  {
-    codigo: 'SOL-002',
-    nombre: 'Escarpines de cuero',
-    categoria: 'Soldadura',
-    unidad: 'par',
-    asignacionesDefault: ['Soldador'],
-  },
-  {
-    codigo: 'SOL-003',
-    nombre: 'Manta ignífuga fibra de vidrio 1.5x1.5m',
-    categoria: 'Soldadura',
-    unidad: 'unidad',
-    asignacionesDefault: ['Soldador'],
-  },
-
-  // ── IZAJE / RIGGER ────────────────────────────────────────────────────────
-  {
-    codigo: 'IZA-001',
-    nombre: 'Guantes de rigger anticorte',
-    categoria: 'Izaje',
-    unidad: 'par',
-    asignacionesDefault: ['Rigger / Aparejador'],
-  },
-  {
-    codigo: 'IZA-002',
-    nombre: 'Casco de rigger con protector de cuello',
-    categoria: 'Izaje',
-    unidad: 'unidad',
-    asignacionesDefault: ['Rigger / Aparejador'],
-  },
-
-  // ── SEÑALIZACIÓN / EMERGENCIA ─────────────────────────────────────────────
-  {
-    codigo: 'SEN-001',
-    nombre: 'Chaleco de rescate tipo III',
-    categoria: 'Emergencia',
-    unidad: 'unidad',
-    asignacionesDefault: ['Supervisor SSOMA'],
-  },
-  {
-    codigo: 'SEN-002',
-    nombre: 'Linterna frontal LED recargable',
-    categoria: 'Emergencia',
-    unidad: 'unidad',
-    asignacionesDefault: [
-      'Técnico Electricista', 'Técnico Mecánico', 'Supervisor SSOMA',
-    ],
-  },
-
-  // ── CONDUCCIÓN ────────────────────────────────────────────────────────────
-  {
-    codigo: 'CON-001',
-    nombre: 'Cinturón de seguridad 3 puntos (control)',
-    categoria: 'Conducción',
-    unidad: 'unidad',
-    asignacionesDefault: ['Conductor / Chofer'],
-  },
-  {
-    codigo: 'CON-002',
-    nombre: 'Gafas de sol polarizadas para conducir',
-    categoria: 'Conducción',
-    unidad: 'unidad',
-    asignacionesDefault: ['Conductor / Chofer'],
-  },
-
-  // ── VARIOS ────────────────────────────────────────────────────────────────
-  {
-    codigo: 'VAR-001',
-    nombre: 'Protector solar SPF 50+',
-    categoria: 'Varios',
-    unidad: 'frasco',
-    asignacionesDefault: [
-      'Operador de Equipos', 'Conductor / Chofer', 'Ayudante de Obra',
-    ],
-  },
-  {
-    codigo: 'VAR-002',
-    nombre: 'Crema barrera para manos',
-    categoria: 'Varios',
-    unidad: 'frasco',
-    asignacionesDefault: ['Técnico Mecánico', 'Soldador'],
-  },
-  {
-    codigo: 'VAR-003',
-    nombre: 'Botiquín personal básico',
-    categoria: 'Varios',
-    unidad: 'kit',
-    asignacionesDefault: ['Supervisor SSOMA'],
-  },
-  {
-    codigo: 'VAR-004',
-    nombre: 'Kit de bloqueo LOTO personal',
-    categoria: 'Varios',
-    unidad: 'kit',
-    asignacionesDefault: ['Técnico Electricista', 'Técnico Mecánico'],
-  },
-  {
-    codigo: 'VAR-005',
-    nombre: 'Rodilleras de trabajo articuladas',
-    categoria: 'Varios',
-    unidad: 'par',
-    asignacionesDefault: ['Ayudante de Obra', 'Técnico Mecánico'],
-  },
+  { orden: 1, nombre: 'CASCO PLASTICO TIPO JOCKEY/ Color Azul', riesgo: '1. Caida de materiales. 2. Contacto directo / indirecto con tensión eléctrica.', parteCuerpo: 'CABEZA', durabilidad: '1 año', asignacionesDefault: ['Técnico instrumentista', 'Técnico Electrónico', 'Técnico Andamiero', 'Operador de manlift', 'Soldador', 'Técnico Auxiliar'] },
+  { orden: 2, nombre: 'CASCO PLASTICO TIPO JOCKEY/ Color blanco', riesgo: '1. Caida de materiales. 2. Contacto directo / indirecto con tensión eléctrica.', parteCuerpo: 'CABEZA', durabilidad: '1 año', asignacionesDefault: ['Ing. Supervisor de Proyecto', 'Ingeniero de seguridad', 'Ing. Programador', 'Sup. De Andamio'] },
+  { orden: 3, nombre: 'TAFILETE FAS-TRACK PARA CASCO', riesgo: '1. exposición a tirones de cabello. 2. inestabilidad del casco', parteCuerpo: 'CABEZA', durabilidad: '6 meses', asignacionesDefault: ['Ing. Supervisor de Proyecto', 'Ingeniero de seguridad', 'Ing. Programador', 'Técnico instrumentista', 'Técnico Electrónico', 'Sup. De Andamio', 'Técnico Andamiero', 'Operador de manlift', 'Soldador', 'Técnico Auxiliar'] },
+  { orden: 4, nombre: 'BARBIQUEJO ELASTICO', riesgo: '1. Caida de materiales. 2. Contacto directo / indirecto con tensión eléctrica.', parteCuerpo: 'CABEZA', durabilidad: '4 meses', asignacionesDefault: ['Ing. Supervisor de Proyecto', 'Ingeniero de seguridad', 'Ing. Programador', 'Técnico instrumentista', 'Técnico Electrónico', 'Sup. De Andamio', 'Técnico Andamiero', 'Operador de manlift', 'Soldador', 'Técnico Auxiliar'] },
+  { orden: 5, nombre: 'PROTECTOR DE OIDO PARA CASCO', riesgo: '1. Exposición a ruido. 2. Golpe de ruido.', parteCuerpo: 'AUDITIVAS', durabilidad: '1 año', asignacionesDefault: ['Ing. Supervisor de Proyecto', 'Ingeniero de seguridad', 'Ing. Programador', 'Técnico instrumentista', 'Técnico Electrónico', 'Sup. De Andamio', 'Técnico Andamiero', 'Operador de manlift', 'Técnico Auxiliar'] },
+  { orden: 6, nombre: 'TAPON PROTECTOR DE OIDO', riesgo: '1. Exposición a ruido. 2. Golpe de ruido.', parteCuerpo: 'AUDITIVAS', durabilidad: '0.5 mes', asignacionesDefault: ['Técnico instrumentista', 'Técnico Electrónico', 'Sup. De Andamio', 'Técnico Andamiero', 'Operador de manlift', 'Soldador', 'Técnico Auxiliar'] },
+  { orden: 7, nombre: 'GAFA TIPO GOGGLE ALTIMETER MSA', riesgo: '1. Proyección de particulas. 2. Salpicadura de sustancias químicas peligrosas. 3. Exposición a material particulado.', parteCuerpo: 'VISUAL', durabilidad: '3 meses', asignacionesDefault: ['Ing. Supervisor de Proyecto', 'Ingeniero de seguridad', 'Ing. Programador', 'Técnico instrumentista', 'Técnico Electrónico', 'Sup. De Andamio', 'Técnico Andamiero', 'Soldador', 'Técnico Auxiliar'] },
+  { orden: 8, nombre: 'GAFA TIPO GOGGLE MASTER MSA', riesgo: '1. Proyección de particulas. 2. Salpicadura de sustancias químicas peligrosas. 3. Exposición a material particulado.', parteCuerpo: 'VISUAL', durabilidad: '6 Meses', asignacionesDefault: ['Ing. Supervisor de Proyecto', 'Ingeniero de seguridad', 'Ing. Programador', 'Técnico instrumentista', 'Técnico Electrónico', 'Sup. De Andamio', 'Técnico Andamiero', 'Técnico Auxiliar'] },
+  { orden: 9, nombre: 'LENTE DE SEGURIDAD HYDROBLAST-2 GOGGLES', riesgo: '1. Proyección de particulas. 2. Salpicadura de sustancias químicas peligrosas. 3. Exposición a material particulado', parteCuerpo: 'VISUAL', durabilidad: '6 Meses', asignacionesDefault: ['Ing. Supervisor de Proyecto', 'Ingeniero de seguridad', 'Ing. Programador', 'Técnico instrumentista', 'Técnico Electrónico', 'Sup. De Andamio', 'Técnico Andamiero', 'Operador de manlift', 'Soldador', 'Técnico Auxiliar'] },
+  { orden: 10, nombre: 'LIQUIDO ANTIEMPAANTE', riesgo: 'Previene que los lentes se empaen', parteCuerpo: 'VISUAL', durabilidad: '3 Meses', asignacionesDefault: ['Ing. Supervisor de Proyecto', 'Ingeniero de seguridad', 'Ing. Programador', 'Técnico instrumentista', 'Técnico Electrónico', 'Sup. De Andamio', 'Técnico Andamiero', 'Operador de manlift', 'Soldador', 'Técnico Auxiliar'] },
+  { orden: 11, nombre: 'RESPIRADOR CARA COMPLETA ADVANGE 4000', riesgo: '1. Inhalación de material particulado, humos, nieblas, gases, vapores. 2. Proyección a particulas.', parteCuerpo: 'RESPIRATORIA', durabilidad: '1 año', asignacionesDefault: ['Ing. Programador', 'Técnico instrumentista', 'Técnico Electrónico', 'Técnico Andamiero'] },
+  { orden: 12, nombre: 'RESPIRADOR MSA ADVANTAGE 420', riesgo: '1. Inhalación de material particulado, humos, nieblas, gases, vapores.', parteCuerpo: 'RESPIRATORIA', durabilidad: '1 año', asignacionesDefault: ['Ing. Supervisor de Proyecto', 'Ingeniero de seguridad', 'Ing. Programador', 'Técnico instrumentista', 'Técnico Electrónico', 'Sup. De Andamio', 'Técnico Andamiero', 'Operador de manlift', 'Soldador', 'Técnico Auxiliar'] },
+  { orden: 13, nombre: 'CARTUCHO GASES ACID Y VAPORES GMC + P100', riesgo: '1. Inhalación de material particulado, humos, nieblas, gases, vapores.', parteCuerpo: 'RESPIRATORIA', durabilidad: 'Dependerá de la concentración agentes ambientales en el aire', asignacionesDefault: ['Ing. Supervisor de Proyecto', 'Ingeniero de seguridad', 'Ing. Programador', 'Técnico instrumentista', 'Técnico Electrónico', 'Sup. De Andamio', 'Técnico Andamiero', 'Operador de manlift', 'Técnico Auxiliar'] },
+  { orden: 14, nombre: 'FILTROS FLEXIBLES P100', riesgo: '1. Inhalación de material particulado, humos, nieblas, gases, vapores.', parteCuerpo: 'RESPIRATORIA', durabilidad: 'Dependerá de la concentración agentes ambientales en el aire', asignacionesDefault: ['Soldador'] },
+  { orden: 15, nombre: 'CARETA DE PROTECCION PARA ARCO ELECTRICO', riesgo: '1. Arco electrico 2. Proyección de particulas. 3. Proyección de particulas incandescentes.', parteCuerpo: 'FACIAL', durabilidad: '6 meses', asignacionesDefault: ['Técnico instrumentista', 'Técnico Electrónico'] },
+  { orden: 16, nombre: 'CARETA FACIAL', riesgo: '1. Proyección de particulas. 2. Proyección de particulas incandescentes.', parteCuerpo: 'FACIAL', durabilidad: '6 Meses', asignacionesDefault: ['Ing. Supervisor de Proyecto', 'Ingeniero de seguridad', 'Técnico Auxiliar'] },
+  { orden: 17, nombre: 'GUANTES DE CUERO', riesgo: '1. Golpeado con / Golpeado por: 2. Cortes.', parteCuerpo: 'MANOS', durabilidad: '1 Mes', asignacionesDefault: ['Técnico instrumentista', 'Técnico Electrónico', 'Sup. De Andamio', 'Técnico Andamiero', 'Operador de manlift', 'Soldador', 'Técnico Auxiliar'] },
+  { orden: 18, nombre: 'GUANTE ESCALIBUR 4 ANTICORTE', riesgo: '1. Golpeado con / golpeado por. 2. Contacto con superficies abrasivas. 3. Cortes.', parteCuerpo: 'MANOS', durabilidad: '3 Meses', asignacionesDefault: ['Ing. Programador', 'Técnico instrumentista', 'Técnico Electrónico', 'Sup. De Andamio', 'Técnico Andamiero', 'Técnico Auxiliar'] },
+  { orden: 19, nombre: 'HYFLEX 11-727', riesgo: 'Contacto con / golpeado por. Contacto con superficies abrasivas. Cortes.', parteCuerpo: 'MANOS', durabilidad: '1 Mes', asignacionesDefault: ['Ing. Supervisor de Proyecto', 'Ingeniero de seguridad', 'Ing. Programador', 'Técnico instrumentista', 'Técnico Electrónico', 'Operador de manlift', 'Soldador', 'Técnico Auxiliar'] },
+  { orden: 20, nombre: 'HYFLEX 11-840', riesgo: '1. Golpeado con / golpeado por. 2. Contacto con superficies abrasivas. 3. Cortes.', parteCuerpo: 'MANOS', durabilidad: '1 Mes', asignacionesDefault: ['Ing. Supervisor de Proyecto', 'Ingeniero de seguridad', 'Ing. Programador', 'Técnico instrumentista', 'Técnico Electrónico', 'Sup. De Andamio', 'Técnico Andamiero', 'Técnico Auxiliar'] },
+  { orden: 21, nombre: 'GUANTES DE INSTRUMENTACIÓN G40', riesgo: 'Trabajo ligero de mantenimiento Electrónico y para supervisión', parteCuerpo: 'MANOS', durabilidad: '1 Mes', asignacionesDefault: ['Ing. Supervisor de Proyecto', 'Ingeniero de seguridad', 'Ing. Programador', 'Técnico instrumentista', 'Técnico Electrónico', 'Sup. De Andamio', 'Técnico Andamiero', 'Operador de manlift', 'Técnico Auxiliar'] },
+  { orden: 22, nombre: 'GUANTE DE NITRILO KLEENGUARD G-10', riesgo: 'Contacto con / salpicadura con sustancias químicas peligrosas.', parteCuerpo: 'MANOS', durabilidad: '1 Mes', asignacionesDefault: ['Ing. Supervisor de Proyecto', 'Técnico instrumentista', 'Técnico Electrónico'] },
+  { orden: 23, nombre: 'GUANTES ANSELL ALPHATEC', riesgo: 'Contacto con / salpicadura con sustancias químicas peligrosas.', parteCuerpo: 'MANOS', durabilidad: '2 Mes', asignacionesDefault: ['Ing. Supervisor de Proyecto', 'Técnico instrumentista', 'Técnico Electrónico', 'Técnico Andamiero', 'Técnico Auxiliar'] },
+  { orden: 24, nombre: 'GUANTE DE NITRILO SOLVEX', riesgo: 'Contacto con / salpicadura con sustancias químicas peligrosas.', parteCuerpo: 'MANOS', durabilidad: '2 Meses', asignacionesDefault: ['Técnico instrumentista', 'Técnico Electrónico'] },
+  { orden: 25, nombre: 'GUANTES DIELECTRICO', riesgo: 'Riesgo electrico por tension', parteCuerpo: 'MANOS', durabilidad: '1 año', asignacionesDefault: ['Ing. Supervisor de Proyecto', 'Ing. Programador', 'Técnico instrumentista', 'Técnico Electrónico'] },
+  { orden: 26, nombre: 'ZAPATO DE SEGURIDAD 120 PU', riesgo: '1. Contacto con / golpeado por. 2. Contacto con acidos y agentes abrasivos y hidrocarburos.', parteCuerpo: 'CALZADO', durabilidad: '1 año', asignacionesDefault: ['Ing. Supervisor de Proyecto', 'Ingeniero de seguridad', 'Ing. Programador', 'Técnico instrumentista', 'Técnico Electrónico', 'Sup. De Andamio', 'Técnico Andamiero', 'Operador de manlift', 'Técnico Auxiliar'] },
+  { orden: 27, nombre: 'ZAPATOS DE SEGURIDAD BOTIN CON ELASTICO', riesgo: '1. Protección en trabajos de soldadura, fundición, con riesgos de caída de objetos, en tareas de contacto eléctrico y otras actividades de alta exigencia mecánica.', parteCuerpo: 'CALZADO', durabilidad: '1 año', asignacionesDefault: ['Ing. Supervisor de Proyecto', 'Ingeniero de seguridad', 'Soldador'] },
+  { orden: 28, nombre: 'BOTA METATARSAL', riesgo: '1. Contacto con / golpeado por. 2. Contacto con acidos, agentes abrasivos y hidrocarburos.', parteCuerpo: 'CALZADO', durabilidad: '1 año', asignacionesDefault: ['Técnico instrumentista', 'Técnico Electrónico', 'Técnico Andamiero', 'Técnico Auxiliar'] },
+  { orden: 29, nombre: 'BOTAS MUSLERA', riesgo: '1. Contacto con / golpeado por. 2. Contacto con acidos, agentes abrasivos y hidrocarburos.', parteCuerpo: 'CALZADO', durabilidad: '3 meses', asignacionesDefault: ['Técnico instrumentista', 'Técnico Electrónico', 'Técnico Andamiero', 'Técnico Auxiliar'] },
+  { orden: 30, nombre: 'BOTA PANTALON', riesgo: '1. Contacto con / golpeado por. 2. Contacto con acidos, agentes abrasivos y hidrocarburos.', parteCuerpo: 'CALZADO', durabilidad: '1 año', asignacionesDefault: ['Técnico instrumentista', 'Técnico Electrónico', 'Técnico Andamiero', 'Técnico Auxiliar'] },
+  { orden: 31, nombre: 'CAPUCHA 3 EN 1', riesgo: '1. Contacto con productos químicos. 2. Contacto con superficies calientes. 3. Contacto directo / indirecto con energia eléctrica.', parteCuerpo: 'CABEZA', durabilidad: '6 meses', asignacionesDefault: ['Ing. Supervisor de Proyecto', 'Ingeniero de seguridad', 'Ing. Programador', 'Técnico instrumentista', 'Técnico Electrónico', 'Sup. De Andamio', 'Técnico Andamiero', 'Operador de manlift', 'Soldador', 'Técnico Auxiliar'] },
+  { orden: 32, nombre: 'UNIFORME TRIPLE PROTECCIÓN (ANTIÁCIDO, ANTIFLAMA, DIELECTRICO)', riesgo: '1. Contacto con productos químicos. 2. Contacto con superficies calientes. 3. Contacto directo / indirecto con energia eléctrica.', parteCuerpo: 'CORPORAL', durabilidad: '1 año', asignacionesDefault: ['Ing. Supervisor de Proyecto', 'Ingeniero de seguridad', 'Ing. Programador', 'Técnico instrumentista', 'Técnico Electrónico', 'Sup. De Andamio', 'Técnico Andamiero', 'Operador de manlift', 'Soldador', 'Técnico Auxiliar'] },
+  { orden: 33, nombre: 'TRAJE DESCARTABLE MICROGARD 2000', riesgo: 'Protección de riesgo biológico líquido y de partículas y de sustancias químicas de bajo nivel de concentración.', parteCuerpo: 'CORPORAL', durabilidad: 'Descartable', asignacionesDefault: ['Ing. Programador', 'Técnico instrumentista', 'Técnico Electrónico', 'Sup. De Andamio', 'Técnico Andamiero', 'Operador de manlift', 'Técnico Auxiliar'] },
+  { orden: 34, nombre: 'MANDIL DE CUERO CROMO PARA SOLDADOR', riesgo: 'Proyeccion de particulas incandescentes.', parteCuerpo: 'CORPORAL', durabilidad: '3 Meses', asignacionesDefault: ['Técnico instrumentista', 'Técnico Electrónico', 'Técnico Auxiliar'] },
+  { orden: 35, nombre: 'CONJUNTO DE CUERO', riesgo: 'Ropa de cuero para soldadura y trabajos en caliente', parteCuerpo: 'CORPORAL', durabilidad: '3 meses', asignacionesDefault: ['Técnico instrumentista', 'Técnico Electrónico', 'Soldador', 'Técnico Auxiliar'] },
+  { orden: 36, nombre: 'GUANTES DE SOLDADOR', riesgo: 'Protección de las manos antes las chispas y material con altas temperaturas', parteCuerpo: 'MANOS', durabilidad: '6 meses', asignacionesDefault: ['Soldador'] },
+  { orden: 37, nombre: 'CAPUCHA DE CUERO', riesgo: 'Proyección de particulas incandecentes', parteCuerpo: 'CABEZA', durabilidad: '6 meses', asignacionesDefault: ['Técnico instrumentista', 'Técnico Electrónico', 'Soldador', 'Técnico Auxiliar'] },
+  { orden: 38, nombre: 'ESCARPIN DE SEGURIDAD', riesgo: 'Proyeccion de particulas incandescentes.', parteCuerpo: 'CALZADO', durabilidad: '3 Meses', asignacionesDefault: ['Técnico instrumentista', 'Técnico Electrónico', 'Soldador', 'Técnico Auxiliar'] },
+  { orden: 39, nombre: 'CARETA DE SOLDADOR', riesgo: 'Protegen los ojos y cara del trabajador contra quemaduras por radiación, chispas, salpicaduras y pedazos de metal caliente presentes en las tareas de soldadura', parteCuerpo: 'FACIAL', durabilidad: '1 año', asignacionesDefault: ['Soldador'] },
+  { orden: 40, nombre: 'LUNA OSCURA PARA SOLDAR', riesgo: 'GRADOS: #10 #11 #12', parteCuerpo: 'FACIAL', durabilidad: '-', asignacionesDefault: ['Soldador'] },
+  { orden: 41, nombre: 'RETRACTIL DOBLE 3M - CLASE 2', riesgo: '1. Caída a distinto nivel.', parteCuerpo: 'ANTICAIDA', durabilidad: '5 años', asignacionesDefault: ['Técnico instrumentista', 'Técnico Electrónico', 'Sup. De Andamio', 'Técnico Andamiero', 'Soldador', 'Técnico Auxiliar'] },
+  { orden: 42, nombre: 'BLOQUE RETRACTIL', riesgo: '1. Caída a distinto nivel.', parteCuerpo: 'ANTICAIDA', durabilidad: '5 Años', asignacionesDefault: ['Técnico instrumentista', 'Técnico Electrónico', 'Sup. De Andamio', 'Técnico Andamiero', 'Técnico Auxiliar'] },
+  { orden: 43, nombre: 'RETRACTIL DOBLE MSA', riesgo: '1. Caída a distinto nivel.', parteCuerpo: 'ANTICAIDA', durabilidad: '5 años', asignacionesDefault: ['Técnico instrumentista', 'Técnico Electrónico', 'Sup. De Andamio', 'Técnico Andamiero', 'Operador de manlift', 'Técnico Auxiliar'] },
+  { orden: 44, nombre: 'ARNES DE CUERPO COMPLETO DE 4 ANILLOS', riesgo: '1. Caída a distinto nivel.', parteCuerpo: 'ANTICAIDA', durabilidad: '5 Años', asignacionesDefault: ['Técnico instrumentista', 'Técnico Electrónico', 'Sup. De Andamio', 'Técnico Andamiero', 'Operador de manlift', 'Técnico Auxiliar'] },
+  { orden: 45, nombre: 'ARNES', riesgo: '1. Caída a distinto nivel.', parteCuerpo: 'ANTICAIDA', durabilidad: '5 Años', asignacionesDefault: ['Técnico instrumentista', 'Técnico Electrónico', 'Sup. De Andamio', 'Técnico Andamiero', 'Soldador', 'Técnico Auxiliar'] },
+  { orden: 46, nombre: 'RODILLERAS PROFESIONAL POLIESTER', riesgo: 'Protección de la abrasión, impactos y cortes', parteCuerpo: 'RODILLA', durabilidad: '1 Mes', asignacionesDefault: ['Técnico instrumentista', 'Técnico Electrónico', 'Técnico Andamiero', 'Soldador', 'Técnico Auxiliar'] },
+  { orden: 47, nombre: 'GUANTE TEJIDO DE POLIETILENO ATLAS - PALMA DOBLE IMPREGNACIÓN', riesgo: '1. Golpeado con / golpeado por. 2. Contacto con superficies abrasivas. 3. Cortes.', parteCuerpo: 'MANOS', durabilidad: '1 Mes', asignacionesDefault: ['Sup. De Andamio', 'Técnico Andamiero', 'Técnico Auxiliar'] },
+  { orden: 48, nombre: 'HOMBRERAS', riesgo: '1. Protege de impactos', parteCuerpo: 'HOMBROS', durabilidad: '-', asignacionesDefault: ['Técnico instrumentista', 'Técnico Electrónico', 'Técnico Andamiero', 'Técnico Auxiliar'] },
+  { orden: 49, nombre: 'DRIZA', riesgo: 'Evita caída de herramientas', parteCuerpo: 'ACCESORIO', durabilidad: '-', asignacionesDefault: ['Técnico instrumentista', 'Técnico Electrónico', 'Técnico Andamiero', 'Técnico Auxiliar'] },
+  { orden: 50, nombre: 'CINTURON DE HERRAMIENTA', riesgo: 'Soporte de herramientas para trabajos en altura', parteCuerpo: 'ACCESORIO', durabilidad: '-', asignacionesDefault: ['Técnico instrumentista', 'Técnico Electrónico', 'Técnico Andamiero', 'Técnico Auxiliar'] },
+  { orden: 51, nombre: 'PORTA ARRACA', riesgo: 'Soporte de herramientas para trabajos en altura', parteCuerpo: 'ACCESORIO', durabilidad: '-', asignacionesDefault: ['Técnico instrumentista', 'Técnico Electrónico', 'Técnico Andamiero', 'Técnico Auxiliar'] },
+  { orden: 52, nombre: 'RESPIRADOR KN95', riesgo: 'Contacto con / exposición al COVID-19', parteCuerpo: 'RESPIRATORIA', durabilidad: '3 a 4 días', asignacionesDefault: ['Ing. Supervisor de Proyecto', 'Ingeniero de seguridad', 'Ing. Programador', 'Técnico instrumentista', 'Técnico Electrónico', 'Sup. De Andamio', 'Técnico Andamiero', 'Operador de manlift', 'Soldador', 'Técnico Auxiliar'] },
 ]

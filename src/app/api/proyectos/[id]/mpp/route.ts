@@ -42,7 +42,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     where: { proyectoId },
     include: {
       items: {
-        include: { catalogo: true },
+        include: { mppEppCatalogo: true },
         orderBy: { orden: 'asc' },
       },
       generaciones: { orderBy: { createdAt: 'desc' }, take: 5 },
@@ -87,7 +87,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
   const catalogos = await prisma.mppEppCatalogo.findMany({
     where: { activo: true },
-    orderBy: [{ orden: 'asc' }, { categoria: 'asc' }, { codigo: 'asc' }],
+    orderBy: { orden: 'asc' },
   })
 
   const mpp = await prisma.mpp.create({
@@ -98,19 +98,19 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       ...(fechaElaboracion !== undefined && { fechaElaboracion }),
       ...(fechaActualizacion !== undefined && { fechaActualizacion }),
       items: {
-        create: catalogos.map((cat, idx) => {
+        create: catalogos.map((cat) => {
           const puestos = cat.asignacionesDefault as string[]
           const asignaciones: Record<string, boolean> = {}
           for (const puesto of puestos) {
             asignaciones[puesto] = true
           }
-          return { catalogoId: cat.id, asignaciones, orden: idx }
+          return { mppEppCatalogoId: cat.id, asignaciones, orden: cat.orden }
         }),
       },
     },
     include: {
       items: {
-        include: { catalogo: true },
+        include: { mppEppCatalogo: true },
         orderBy: { orden: 'asc' },
       },
     },

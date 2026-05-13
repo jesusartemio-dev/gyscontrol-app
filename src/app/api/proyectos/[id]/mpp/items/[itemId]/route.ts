@@ -48,7 +48,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   const updated = await prisma.mppItem.update({
     where: { id: itemId },
     data: parsed.data,
-    include: { catalogo: true },
+    include: { mppEppCatalogo: true },
   })
 
   return NextResponse.json({ item: updated })

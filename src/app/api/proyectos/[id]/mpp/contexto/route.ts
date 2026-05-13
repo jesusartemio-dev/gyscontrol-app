@@ -16,7 +16,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
   const [catalogos, iperc, mpp] = await Promise.all([
     prisma.mppEppCatalogo.findMany({
       where: { activo: true },
-      orderBy: [{ categoria: 'asc' }, { nombre: 'asc' }],
+      orderBy: { orden: 'asc' },
     }),
     prisma.iperc.findUnique({
       where: { proyectoId },
