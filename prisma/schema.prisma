@@ -1130,6 +1130,7 @@ model Proyecto {
   planTrabajo                PlanTrabajo?
   iperc                      Iperc?
   mpp                        Mpp?
+  pets                       Pets?
 
   @@index([clienteId, estado, createdAt(sort: Desc)], map: "idx_proyecto_cliente_estado_fecha")
   @@index([comercialId, estado, fechaInicio], map: "idx_proyecto_comercial_estado_inicio")
@@ -5531,4 +5532,41 @@ model MppGeneracion {
 
   @@index([mppId, createdAt])
   @@map("mpp_generacion")
+}
+
+// ─── PETS (Procedimiento Escrito de Trabajo Seguro) ──────────────────────────
+
+model Pets {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  proyectoId String   @unique
+  proyecto   Proyecto @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+
+  codigoDocumento String?
+  revision        String?   @default("01")
+  fechaEmision    DateTime?
+  fechaAprobacion DateTime?
+  area            String?   @default("Proyectos")
+  alcance         String?   @db.Text
+
+  preparadoPor   String?
+  preparadoCargo String?
+  revisadoPor1   String?
+  revisadoCargo1 String?
+  revisadoPor2   String?
+  revisadoCargo2 String?
+  aprobadoPor    String?
+  aprobadoCargo  String?
+
+  contenido Json?
+
+  iaEnCurso  Boolean   @default(false)
+  iaExpiraEn DateTime?
+
+  estado String? @default("borrador")
+
+  @@map("pets")
+  @@index([proyectoId])
 }
