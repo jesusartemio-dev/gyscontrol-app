@@ -42,7 +42,7 @@
     "test:server": "jest --testEnvironment=node src/__tests__/lib/**/*.test.ts src/__tests__/app/api/**/*.test.ts",
     "test:ci": "npm run test:client && npm run test:server",
     "analyze": "cross-env ANALYZE=true next build",
-    "type-check": "tsc --noEmit",
+    "type-check": "node --max-old-space-size=6144 node_modules/typescript/bin/tsc --noEmit",
     "format:check": "prettier --check .",
     "audit:consistency": "tsx scripts/audit-consistency.ts",
     "audit:models": "tsx scripts/audit-consistency.ts --phase=models",
