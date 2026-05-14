@@ -406,7 +406,7 @@ export default function ResumenTotalesProyecto({ proyecto, costosReales, costoPl
             )}
 
             {/* Total final */}
-            <motion.div
+            {puedeVerCliente && <motion.div
               initial={{ scale: 0.95 }}
               animate={{ scale: 1 }}
               transition={{ duration: 0.3, delay: 0.5 }}
@@ -423,16 +423,14 @@ export default function ResumenTotalesProyecto({ proyecto, costosReales, costoPl
               </div>
 
               {/* Rentabilidad total */}
-              {puedeVerCliente && (
-                <div className="flex items-center justify-between mt-1 pt-1 border-t border-green-400">
-                  <span className="text-green-100 text-xs">Rentabilidad</span>
-                  <Badge variant="secondary" className="bg-white/20 text-white border-white/30 text-xs">
-                    <TrendingUp className="h-2 w-2 mr-1" />
-                    {rentabilidadTotal.valor}
-                  </Badge>
-                </div>
-              )}
-            </motion.div>
+              <div className="flex items-center justify-between mt-1 pt-1 border-t border-green-400">
+                <span className="text-green-100 text-xs">Rentabilidad</span>
+                <Badge variant="secondary" className="bg-white/20 text-white border-white/30 text-xs">
+                  <TrendingUp className="h-2 w-2 mr-1" />
+                  {rentabilidadTotal.valor}
+                </Badge>
+              </div>
+            </motion.div>}
           </motion.div>
         </CardContent>
       </Card>

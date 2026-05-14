@@ -709,10 +709,12 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
                       {proyecto.diasGarantia ?? 365}d
                     </span>
                   )}
-                  <span className="text-muted-foreground">|</span>
-                  <span className="font-semibold text-gray-900">
-                    {formatCurrency(proyecto.grandTotal || 0)}
-                  </span>
+                  {puedeVerCliente && <>
+                    <span className="text-muted-foreground">|</span>
+                    <span className="font-semibold text-gray-900">
+                      {formatCurrency(proyecto.grandTotal || 0)}
+                    </span>
+                  </>}
                   <span className="text-muted-foreground">|</span>
                   {editingHeader ? (
                     <div className="flex items-center gap-1">
