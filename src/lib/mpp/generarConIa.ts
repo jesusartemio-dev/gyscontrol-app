@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { cargarContextoMpp } from './cargarContexto'
 import { construirPromptAjustes, type AjusteMpp } from './prompts/generarAjustesMpp'
 import { PUESTOS_MPP } from './catalogos/puestos'
+import { trackUsage } from '@/lib/agente/usageTracker'
 
 const MODEL_HAIKU = 'claude-haiku-4-5-20251001'
 
@@ -26,7 +27,8 @@ const EVALUADORES_DEFAULT = [
 ]
 
 export async function* generarMppConIa(
-  proyectoId: string
+  proyectoId: string,
+  userId?: string,
 ): AsyncGenerator<object, ResultadoGeneracionMpp, unknown> {
   yield { type: 'inicio', mensaje: 'Cargando contexto del proyecto e IPERC...' }
 
@@ -79,6 +81,16 @@ export async function* generarMppConIa(
 
   const promptTokens = aiResponse.usage.input_tokens
   const outputTokens = aiResponse.usage.output_tokens
+
+  if (userId) {
+    trackUsage({
+      userId,
+      tipo: 'mpp.generar',
+      modelo: MODEL_HAIKU,
+      tokensInput: promptTokens,
+      tokensOutput: outputTokens,
+    })
+  }
 
   yield { type: 'respuesta_recibida', promptTokens, outputTokens }
 

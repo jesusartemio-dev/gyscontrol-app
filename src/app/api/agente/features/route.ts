@@ -38,6 +38,11 @@ export async function PUT(request: NextRequest) {
     'scanCotizacionPDF',
     'importCatalogoPDF',
     'ssomaDocumentos',
+    'matrizComunicacion',
+    'planTrabajo',
+    'iperc',
+    'pets',
+    'mpp',
   ]
 
   // Only allow known boolean keys

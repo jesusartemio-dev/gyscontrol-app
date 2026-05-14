@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { validarPreRequisitosMpp } from '@/lib/mpp/validarPreRequisitos'
 import { generarMppConIa, type ResultadoGeneracionMpp } from '@/lib/mpp/generarConIa'
+import { isIAFeatureEnabled } from '@/lib/agente/featureFlags'
 
 export const maxDuration = 120
 
@@ -22,6 +23,10 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
 
   if (!ROLES_CON_ACCESO.includes(session.user.role)) {
     return new Response('Sin permiso para esta operación', { status: 403 })
+  }
+
+  if (!await isIAFeatureEnabled('mpp')) {
+    return Response.json({ error: 'La generación IA de MPP está deshabilitada' }, { status: 503 })
   }
 
   const prereq = await validarPreRequisitosMpp(proyectoId)
@@ -60,7 +65,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
       }
 
       try {
-        const generator = generarMppConIa(proyectoId)
+        const generator = generarMppConIa(proyectoId, session.user.id)
         let result: ResultadoGeneracionMpp | undefined
 
         while (true) {

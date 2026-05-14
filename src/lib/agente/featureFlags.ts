@@ -15,6 +15,8 @@ export interface IAFeatureFlags {
   matrizComunicacion: boolean
   planTrabajo: boolean
   iperc: boolean
+  pets: boolean
+  mpp: boolean
 }
 
 const DEFAULT_FLAGS: IAFeatureFlags = {
@@ -29,6 +31,8 @@ const DEFAULT_FLAGS: IAFeatureFlags = {
   matrizComunicacion: true,
   planTrabajo: true,
   iperc: true,
+  pets: true,
+  mpp: true,
 }
 
 function parseFlags(raw: unknown): IAFeatureFlags {
@@ -46,6 +50,8 @@ function parseFlags(raw: unknown): IAFeatureFlags {
     matrizComunicacion: typeof obj.matrizComunicacion === 'boolean' ? obj.matrizComunicacion : DEFAULT_FLAGS.matrizComunicacion,
     planTrabajo: typeof obj.planTrabajo === 'boolean' ? obj.planTrabajo : DEFAULT_FLAGS.planTrabajo,
     iperc: typeof obj.iperc === 'boolean' ? obj.iperc : DEFAULT_FLAGS.iperc,
+    pets: typeof obj.pets === 'boolean' ? obj.pets : DEFAULT_FLAGS.pets,
+    mpp: typeof obj.mpp === 'boolean' ? obj.mpp : DEFAULT_FLAGS.mpp,
   }
 }
 

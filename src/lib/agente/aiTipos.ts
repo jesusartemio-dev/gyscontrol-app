@@ -46,10 +46,36 @@ export const TIPO_INFO: Record<string, TipoInfo> = {
   // Tipos legacy — mantener para registros históricos
   'ssoma-documento':            { label: 'SSOMA — Generar docs (legacy)',   color: '#84cc16' }, // lime-500
   'ssoma-documento-regenerar':  { label: 'SSOMA — Regenerar doc (legacy)',  color: '#a3a3a3' }, // neutral-400
+  // Plan de Trabajo
+  'plan-trabajo.generar':       { label: 'Plan de Trabajo — Generar',       color: '#0284c7' }, // sky-600
+  'plan-trabajo.regenerar':     { label: 'Plan de Trabajo — Regenerar sección', color: '#0369a1' }, // sky-700
+  // IPERC
+  'iperc.resumen':              { label: 'IPERC — Resumen IA',              color: '#dc2626' }, // red-600
+  'iperc.lote':                 { label: 'IPERC — Generación por lote',     color: '#b91c1c' }, // red-700
+  // PETS granular
+  'pets.indice':                { label: 'PETS — Índice',                   color: '#16a34a' }, // green-600
+  'pets.restricciones':         { label: 'PETS — Restricciones',            color: '#15803d' }, // green-700
+  'pets.regenerar.etapa':       { label: 'PETS — Regenerar etapa',          color: '#166534' }, // green-800
+  'pets.regenerar.paso':        { label: 'PETS — Regenerar paso',           color: '#14532d' }, // green-900
+  // MPP
+  'mpp.generar':                { label: 'MPP — Generar',                   color: '#7c3aed' }, // violet-700
 }
 
+// Prefix-based fallback rules for dynamic tipo codes like 'pets.etapa.A'
+const TIPO_PREFIX_RULES: Array<{ prefix: string; info: TipoInfo }> = [
+  { prefix: 'pets.etapa.',      info: { label: 'PETS — Generar etapa',    color: '#22c55e' } }, // green-500
+  { prefix: 'plan-trabajo.',    info: { label: 'Plan de Trabajo',          color: '#0284c7' } },
+  { prefix: 'iperc.',           info: { label: 'IPERC',                   color: '#dc2626' } },
+  { prefix: 'pets.',            info: { label: 'PETS',                    color: '#16a34a' } },
+  { prefix: 'mpp.',             info: { label: 'MPP',                     color: '#7c3aed' } },
+]
+
 export function getTipoInfo(tipo: string): TipoInfo {
-  return TIPO_INFO[tipo] ?? { label: tipo, color: FALLBACK_COLOR }
+  if (tipo in TIPO_INFO) return TIPO_INFO[tipo]
+  for (const { prefix, info } of TIPO_PREFIX_RULES) {
+    if (tipo.startsWith(prefix)) return info
+  }
+  return { label: tipo, color: FALLBACK_COLOR }
 }
 
 export function getTipoLabel(tipo: string): string {

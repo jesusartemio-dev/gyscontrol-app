@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { regenerarEtapaPets } from '@/lib/pets/regenerarConIa'
+import { isIAFeatureEnabled } from '@/lib/agente/featureFlags'
 
 export const maxDuration = 300
 export const dynamic = 'force-dynamic'
@@ -42,6 +43,10 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   const { id: proyectoId } = await params
   const acceso = await verificarAcceso(proyectoId, session.user.id, session.user.role)
   if (!acceso.ok) return NextResponse.json({ error: acceso.error }, { status: acceso.status })
+
+  if (!await isIAFeatureEnabled('pets')) {
+    return NextResponse.json({ error: 'La regeneración IA de PETS está deshabilitada' }, { status: 503 })
+  }
 
   const body = await req.json().catch(() => null)
   const parsed = bodySchema.safeParse(body)

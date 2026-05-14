@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { generarPetsConIa } from '@/lib/pets/generarConIa'
+import { isIAFeatureEnabled } from '@/lib/agente/featureFlags'
 
 export const maxDuration = 300
 export const dynamic = 'force-dynamic'
@@ -40,6 +41,10 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
 
   const acceso = await verificarAcceso(proyectoId, userId, session.user.role)
   if (!acceso.ok) return NextResponse.json({ error: acceso.error }, { status: acceso.status })
+
+  if (!await isIAFeatureEnabled('pets')) {
+    return NextResponse.json({ error: 'La generación IA de PETS está deshabilitada' }, { status: 503 })
+  }
 
   const pets = await prisma.pets.findUnique({ where: { proyectoId }, select: { id: true } })
   if (!pets) {
