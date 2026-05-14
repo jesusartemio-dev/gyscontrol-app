@@ -3,11 +3,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
-import { Loader2, Plus, Brain, Download, RefreshCw } from 'lucide-react'
+import { Loader2, Plus, Brain, Download, RefreshCw, Pencil, Check } from 'lucide-react'
 import { petsContenidoSchema } from '@/lib/validators/pets'
 import type { PetsContenido } from '@/lib/validators/pets'
 import { PetsViewer } from './PetsViewer'
 import { PetsGenerator } from './PetsGenerator'
+import { PetsEditorPanel } from './PetsEditorPanel'
+import { PasoEditorModal } from './PasoEditorModal'
 
 interface PetsRecord {
   id: string
@@ -29,6 +31,13 @@ export function PetsClient({ proyectoId }: Props) {
   const [mode, setMode] = useState<Mode>('idle')
   const [contenido, setContenido] = useState<PetsContenido | null>(null)
   const [loadingCreate, setLoadingCreate] = useState(false)
+  const [modoEdicion, setModoEdicion] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [pasoEditando, setPasoEditando] = useState<{
+    etapaIdx: number
+    pasoIdx: number
+  } | null>(null)
+  const [agregarPasoEn, setAgregarPasoEn] = useState<number | null>(null)
 
   const cargarPets = useCallback(async () => {
     try {
@@ -94,6 +103,26 @@ export function PetsClient({ proyectoId }: Props) {
       toast.error(e instanceof Error ? e.message : 'Error al exportar DOCX')
     } finally {
       setMode('idle')
+    }
+  }
+
+  const guardarContenido = async (nuevo: PetsContenido): Promise<void> => {
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/proyectos/${proyectoId}/pets/contenido`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(nuevo),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? `Error HTTP ${res.status}`)
+      setContenido(nuevo)
+      toast.success('Guardado')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Error al guardar')
+      throw e
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -163,7 +192,7 @@ export function PetsClient({ proyectoId }: Props) {
     )
   }
 
-  // Has contenido — show viewer + actions
+  // Has contenido — show viewer or editor + actions
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -177,15 +206,33 @@ export function PetsClient({ proyectoId }: Props) {
         </div>
         <div className="flex gap-2">
           <Button
+            variant={modoEdicion ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setModoEdicion(!modoEdicion)}
+            disabled={saving || mode !== 'idle'}
+          >
+            {modoEdicion ? (
+              <>
+                <Check className="h-4 w-4 mr-1.5" />
+                Listo
+              </>
+            ) : (
+              <>
+                <Pencil className="h-4 w-4 mr-1.5" />
+                Editar
+              </>
+            )}
+          </Button>
+          <Button
             variant="outline"
             size="sm"
             onClick={() => setMode('generando')}
-            disabled={mode !== 'idle'}
+            disabled={mode !== 'idle' || saving}
           >
             <RefreshCw className="h-4 w-4 mr-1.5" />
             Regenerar
           </Button>
-          <Button size="sm" onClick={exportarDocx} disabled={mode !== 'idle'}>
+          <Button size="sm" onClick={exportarDocx} disabled={mode !== 'idle' || saving}>
             {mode === 'exporting' ? (
               <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
             ) : (
@@ -195,7 +242,40 @@ export function PetsClient({ proyectoId }: Props) {
           </Button>
         </div>
       </div>
-      <PetsViewer contenido={contenido} />
+
+      {modoEdicion ? (
+        <PetsEditorPanel
+          contenido={contenido}
+          onGuardar={guardarContenido}
+          onEditarPaso={(eIdx, pIdx) => setPasoEditando({ etapaIdx: eIdx, pasoIdx: pIdx })}
+          onAgregarPaso={(eIdx) => setAgregarPasoEn(eIdx)}
+          saving={saving}
+        />
+      ) : (
+        <PetsViewer contenido={contenido} />
+      )}
+
+      {pasoEditando && (
+        <PasoEditorModal
+          proyectoId={proyectoId}
+          contenido={contenido}
+          etapaIndex={pasoEditando.etapaIdx}
+          pasoIndex={pasoEditando.pasoIdx}
+          onClose={() => setPasoEditando(null)}
+          onSaved={(nuevo) => setContenido(nuevo)}
+        />
+      )}
+
+      {agregarPasoEn !== null && (
+        <PasoEditorModal
+          proyectoId={proyectoId}
+          contenido={contenido}
+          etapaIndex={agregarPasoEn}
+          pasoIndex={null}
+          onClose={() => setAgregarPasoEn(null)}
+          onSaved={(nuevo) => setContenido(nuevo)}
+        />
+      )}
     </div>
   )
 }
