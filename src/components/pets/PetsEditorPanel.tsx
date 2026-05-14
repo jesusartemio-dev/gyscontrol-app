@@ -22,12 +22,21 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { GripVertical, Trash2, Plus, Edit2, Loader2 } from 'lucide-react'
+import { GripVertical, Trash2, Plus, Edit2, Loader2, Sparkles } from 'lucide-react'
 import type { PetsContenido } from '@/lib/validators/pets'
+import type { EstadoRegenerar } from './useRegenerarPetsSSE'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -40,6 +49,9 @@ interface Props {
   onEditarPaso: (etapaIdx: number, pasoIdx: number) => void
   onAgregarPaso: (etapaIdx: number) => void
   saving: boolean
+  estadoRegen: EstadoRegenerar
+  onRegenerarEtapa: (etapaIdx: number) => void
+  onRegenerarPaso: (etapaIdx: number, pasoIdx: number) => void
 }
 
 // ── Helper: editable string list ──────────────────────────────────────────────
@@ -99,20 +111,39 @@ function StringListEditor({
 function SortablePaso({
   id,
   paso,
+  etapaIdx,
+  pasoIdx,
   onEditar,
   onEliminar,
+  onConfirmarRegen,
   canDelete,
   disabled,
+  estadoRegen,
 }: {
   id: string
   paso: Paso
+  etapaIdx: number
+  pasoIdx: number
   onEditar: () => void
   onEliminar: () => void
+  onConfirmarRegen: () => void
   canDelete: boolean
   disabled: boolean
+  estadoRegen: EstadoRegenerar
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id })
+
+  const esteRegenerando =
+    estadoRegen.activo &&
+    estadoRegen.alcance === 'paso' &&
+    estadoRegen.etapaIndex === etapaIdx &&
+    estadoRegen.pasoIndex === pasoIdx
+
+  const ultimoMensaje =
+    estadoRegen.activo && estadoRegen.mensajes.length > 0
+      ? estadoRegen.mensajes[estadoRegen.mensajes.length - 1]
+      : null
 
   return (
     <div
@@ -122,8 +153,19 @@ function SortablePaso({
         transition,
         opacity: isDragging ? 0.4 : 1,
       }}
-      className="flex items-center gap-1.5 py-1.5 px-2 rounded border border-gray-200 bg-white group"
+      className="relative flex items-center gap-1.5 py-1.5 px-2 rounded border border-gray-200 bg-white group"
     >
+      {esteRegenerando && (
+        <div className="absolute inset-0 bg-white/90 rounded flex flex-col items-center justify-center gap-1 z-10">
+          <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+          {ultimoMensaje && (
+            <p className="text-xs text-gray-500 px-2 text-center">{ultimoMensaje}</p>
+          )}
+          {estadoRegen.activo && estadoRegen.error && (
+            <p className="text-xs text-red-500 px-2 text-center">{estadoRegen.error}</p>
+          )}
+        </div>
+      )}
       <div
         {...attributes}
         {...listeners}
@@ -142,9 +184,20 @@ function SortablePaso({
           type="button"
           variant="ghost"
           size="icon"
+          className="h-6 w-6 text-purple-500 hover:text-purple-700"
+          onClick={onConfirmarRegen}
+          disabled={disabled || estadoRegen.activo}
+          title="Regenerar paso con IA"
+        >
+          <Sparkles className="h-3 w-3" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
           className="h-6 w-6"
           onClick={onEditar}
-          disabled={disabled}
+          disabled={disabled || estadoRegen.activo}
           title="Editar paso"
         >
           <Edit2 className="h-3 w-3" />
@@ -155,7 +208,7 @@ function SortablePaso({
           size="icon"
           className="h-6 w-6 text-red-500"
           onClick={onEliminar}
-          disabled={!canDelete || disabled}
+          disabled={!canDelete || disabled || estadoRegen.activo}
           title="Eliminar paso"
         >
           <Trash2 className="h-3 w-3" />
@@ -175,8 +228,11 @@ function SortableEtapa({
   onGuardar,
   onEditarPaso,
   onAgregarPaso,
+  onConfirmarRegenEtapa,
+  onConfirmarRegenPaso,
   saving,
   canDelete,
+  estadoRegen,
 }: {
   id: string
   etapa: Etapa
@@ -185,8 +241,11 @@ function SortableEtapa({
   onGuardar: (nuevo: PetsContenido) => Promise<void>
   onEditarPaso: (eIdx: number, pIdx: number) => void
   onAgregarPaso: (eIdx: number) => void
+  onConfirmarRegenEtapa: () => void
+  onConfirmarRegenPaso: (pasoIdx: number) => void
   saving: boolean
   canDelete: boolean
+  estadoRegen: EstadoRegenerar
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id })
@@ -195,6 +254,16 @@ function SortableEtapa({
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   )
   const pasoIds = etapa.pasos.map((_, i) => `paso-${etapaIdx}-${i}`)
+
+  const esteRegenerando =
+    estadoRegen.activo &&
+    estadoRegen.alcance === 'etapa' &&
+    estadoRegen.etapaIndex === etapaIdx
+
+  const ultimoMensaje =
+    estadoRegen.activo && estadoRegen.mensajes.length > 0
+      ? estadoRegen.mensajes[estadoRegen.mensajes.length - 1]
+      : null
 
   const handlePasoDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
@@ -227,6 +296,7 @@ function SortableEtapa({
   }
 
   const letra = etapa.letra ?? String.fromCharCode(65 + etapaIdx)
+  const anyDisabled = saving || estadoRegen.activo
 
   return (
     <div
@@ -236,8 +306,19 @@ function SortableEtapa({
         transition,
         opacity: isDragging ? 0.4 : 1,
       }}
-      className="rounded-md border border-gray-200 bg-gray-50/50"
+      className="relative rounded-md border border-gray-200 bg-gray-50/50"
     >
+      {esteRegenerando && (
+        <div className="absolute inset-0 bg-white/90 rounded-md flex flex-col items-center justify-center gap-2 z-10">
+          <Loader2 className="h-5 w-5 animate-spin text-purple-500" />
+          {ultimoMensaje && (
+            <p className="text-xs text-gray-500 px-4 text-center">{ultimoMensaje}</p>
+          )}
+          {estadoRegen.activo && estadoRegen.error && (
+            <p className="text-xs text-red-500 px-4 text-center">{estadoRegen.error}</p>
+          )}
+        </div>
+      )}
       <div className="flex items-center gap-2 px-2.5 py-2">
         <div
           {...attributes}
@@ -255,9 +336,20 @@ function SortableEtapa({
             type="button"
             variant="ghost"
             size="icon"
+            className="h-6 w-6 text-purple-500 hover:text-purple-700"
+            onClick={onConfirmarRegenEtapa}
+            disabled={anyDisabled}
+            title="Regenerar etapa con IA"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
             className="h-6 w-6"
             onClick={() => onAgregarPaso(etapaIdx)}
-            disabled={saving}
+            disabled={anyDisabled}
             title="Agregar paso"
           >
             <Plus className="h-3.5 w-3.5" />
@@ -268,7 +360,7 @@ function SortableEtapa({
             size="icon"
             className="h-6 w-6 text-red-500"
             onClick={eliminarEtapa}
-            disabled={!canDelete || saving}
+            disabled={!canDelete || anyDisabled}
             title="Eliminar etapa"
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -287,10 +379,14 @@ function SortableEtapa({
                 key={`paso-${etapaIdx}-${pIdx}`}
                 id={`paso-${etapaIdx}-${pIdx}`}
                 paso={paso}
+                etapaIdx={etapaIdx}
+                pasoIdx={pIdx}
                 onEditar={() => onEditarPaso(etapaIdx, pIdx)}
                 onEliminar={() => eliminarPaso(pIdx)}
+                onConfirmarRegen={() => onConfirmarRegenPaso(pIdx)}
                 canDelete={etapa.pasos.length > 1}
                 disabled={saving}
+                estadoRegen={estadoRegen}
               />
             ))}
           </SortableContext>
@@ -387,18 +483,8 @@ function PersonalSection({
 
   return (
     <div className="space-y-3">
-      <StringListEditor
-        items={roles}
-        onChange={setRoles}
-        minItems={1}
-        placeholder="Rol..."
-      />
-      <Button
-        size="sm"
-        className="h-7 text-xs"
-        onClick={guardar}
-        disabled={saving || guardando}
-      >
+      <StringListEditor items={roles} onChange={setRoles} minItems={1} placeholder="Rol..." />
+      <Button size="sm" className="h-7 text-xs" onClick={guardar} disabled={saving || guardando}>
         {guardando && <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />}
         Guardar
       </Button>
@@ -452,7 +538,11 @@ function EppSection({
       </div>
       <div>
         <p className="text-xs font-semibold text-gray-500 uppercase mb-1.5">Específico</p>
-        <StringListEditor items={especifico} onChange={setEspecifico} placeholder="Equipo específico..." />
+        <StringListEditor
+          items={especifico}
+          onChange={setEspecifico}
+          placeholder="Equipo específico..."
+        />
       </div>
       <div>
         <p className="text-xs font-semibold text-gray-500 uppercase mb-1.5">Referencia MPP</p>
@@ -463,12 +553,7 @@ function EppSection({
           placeholder="Código de referencia MPP..."
         />
       </div>
-      <Button
-        size="sm"
-        className="h-7 text-xs"
-        onClick={guardar}
-        disabled={saving || guardando}
-      >
+      <Button size="sm" className="h-7 text-xs" onClick={guardar} disabled={saving || guardando}>
         {guardando && <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />}
         Guardar
       </Button>
@@ -530,12 +615,7 @@ function RecursosSection({
         <p className="text-xs font-semibold text-gray-500 uppercase mb-1.5">Materiales</p>
         <StringListEditor items={materiales} onChange={setMateriales} placeholder="Material..." />
       </div>
-      <Button
-        size="sm"
-        className="h-7 text-xs"
-        onClick={guardar}
-        disabled={saving || guardando}
-      >
+      <Button size="sm" className="h-7 text-xs" onClick={guardar} disabled={saving || guardando}>
         {guardando && <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />}
         Guardar
       </Button>
@@ -604,12 +684,7 @@ function RestriccionesSection({
           <Plus className="h-3 w-3" /> Agregar
         </Button>
       </div>
-      <Button
-        size="sm"
-        className="h-7 text-xs"
-        onClick={guardar}
-        disabled={saving || guardando}
-      >
+      <Button size="sm" className="h-7 text-xs" onClick={guardar} disabled={saving || guardando}>
         {guardando && <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />}
         Guardar
       </Button>
@@ -695,12 +770,7 @@ function CambiosSection({
           <Plus className="h-3 w-3" /> Agregar
         </Button>
       </div>
-      <Button
-        size="sm"
-        className="h-7 text-xs"
-        onClick={guardar}
-        disabled={saving || guardando}
-      >
+      <Button size="sm" className="h-7 text-xs" onClick={guardar} disabled={saving || guardando}>
         {guardando && <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />}
         Guardar
       </Button>
@@ -710,17 +780,26 @@ function CambiosSection({
 
 // ── Main export ───────────────────────────────────────────────────────────────
 
+type ConfirmPending =
+  | { tipo: 'etapa'; etapaIdx: number; titulo: string; pasosCount: number }
+  | { tipo: 'paso'; etapaIdx: number; pasoIdx: number; que: string }
+
 export function PetsEditorPanel({
   contenido,
   onGuardar,
   onEditarPaso,
   onAgregarPaso,
   saving,
+  estadoRegen,
+  onRegenerarEtapa,
+  onRegenerarPaso,
 }: Props) {
   const outerSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   )
   const etapaIds = contenido.procedimiento.etapas.map((_, i) => `etapa-${i}`)
+
+  const [confirmPending, setConfirmPending] = useState<ConfirmPending | null>(null)
 
   const handleEtapaDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
@@ -735,81 +814,136 @@ export function PetsEditorPanel({
     await onGuardar(nuevo)
   }
 
+  const confirmar = () => {
+    if (!confirmPending) return
+    if (confirmPending.tipo === 'etapa') {
+      onRegenerarEtapa(confirmPending.etapaIdx)
+    } else {
+      onRegenerarPaso(confirmPending.etapaIdx, confirmPending.pasoIdx)
+    }
+    setConfirmPending(null)
+  }
+
   return (
-    <Accordion type="multiple" defaultValue={['procedimiento']} className="space-y-2">
-      <AccordionItem value="procedimiento" className="border rounded-lg px-3">
-        <AccordionTrigger className="text-sm font-semibold py-2.5">
-          Procedimiento ({contenido.procedimiento.etapas.length} etapas)
-        </AccordionTrigger>
-        <AccordionContent className="pb-3">
-          <div className="space-y-2">
-            <DndContext
-              sensors={outerSensors}
-              collisionDetection={closestCenter}
-              onDragEnd={handleEtapaDragEnd}
-            >
-              <SortableContext items={etapaIds} strategy={verticalListSortingStrategy}>
-                {contenido.procedimiento.etapas.map((etapa, i) => (
-                  <SortableEtapa
-                    key={`etapa-${i}`}
-                    id={`etapa-${i}`}
-                    etapa={etapa}
-                    etapaIdx={i}
-                    contenido={contenido}
-                    onGuardar={onGuardar}
-                    onEditarPaso={onEditarPaso}
-                    onAgregarPaso={onAgregarPaso}
-                    saving={saving}
-                    canDelete={contenido.procedimiento.etapas.length > 1}
-                  />
-                ))}
-              </SortableContext>
-            </DndContext>
-            <NuevaEtapaForm contenido={contenido} onGuardar={onGuardar} saving={saving} />
-          </div>
-        </AccordionContent>
-      </AccordionItem>
+    <>
+      {/* Dialog de confirmación para regeneración IA */}
+      <Dialog open={!!confirmPending} onOpenChange={(open) => { if (!open) setConfirmPending(null) }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Sparkles className="h-4 w-4 text-purple-500" />
+              Regenerar con IA
+            </DialogTitle>
+            <DialogDescription className="text-sm pt-1">
+              {confirmPending?.tipo === 'etapa'
+                ? `Vas a reemplazar el contenido de los ${confirmPending.pasosCount} pasos de la etapa "${confirmPending.titulo}" con uno nuevo generado por IA. Los cambios manuales previos se perderán.`
+                : `Vas a reemplazar el contenido (cómo) del paso "${confirmPending?.que}" con uno generado por IA. El qué y los responsables se mantienen.`}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" size="sm" onClick={() => setConfirmPending(null)}>
+              Cancelar
+            </Button>
+            <Button size="sm" onClick={confirmar}>
+              <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+              Continuar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      <AccordionItem value="personal" className="border rounded-lg px-3">
-        <AccordionTrigger className="text-sm font-semibold py-2.5">
-          Personal ({contenido.personal.length})
-        </AccordionTrigger>
-        <AccordionContent className="pb-3">
-          <PersonalSection contenido={contenido} onGuardar={onGuardar} saving={saving} />
-        </AccordionContent>
-      </AccordionItem>
+      <Accordion type="multiple" defaultValue={['procedimiento']} className="space-y-2">
+        <AccordionItem value="procedimiento" className="border rounded-lg px-3">
+          <AccordionTrigger className="text-sm font-semibold py-2.5">
+            Procedimiento ({contenido.procedimiento.etapas.length} etapas)
+          </AccordionTrigger>
+          <AccordionContent className="pb-3">
+            <div className="space-y-2">
+              <DndContext
+                sensors={outerSensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleEtapaDragEnd}
+              >
+                <SortableContext items={etapaIds} strategy={verticalListSortingStrategy}>
+                  {contenido.procedimiento.etapas.map((etapa, i) => (
+                    <SortableEtapa
+                      key={`etapa-${i}`}
+                      id={`etapa-${i}`}
+                      etapa={etapa}
+                      etapaIdx={i}
+                      contenido={contenido}
+                      onGuardar={onGuardar}
+                      onEditarPaso={onEditarPaso}
+                      onAgregarPaso={onAgregarPaso}
+                      onConfirmarRegenEtapa={() =>
+                        setConfirmPending({
+                          tipo: 'etapa',
+                          etapaIdx: i,
+                          titulo: etapa.titulo,
+                          pasosCount: etapa.pasos.length,
+                        })
+                      }
+                      onConfirmarRegenPaso={(pIdx) =>
+                        setConfirmPending({
+                          tipo: 'paso',
+                          etapaIdx: i,
+                          pasoIdx: pIdx,
+                          que: etapa.pasos[pIdx]?.que ?? '',
+                        })
+                      }
+                      saving={saving}
+                      canDelete={contenido.procedimiento.etapas.length > 1}
+                      estadoRegen={estadoRegen}
+                    />
+                  ))}
+                </SortableContext>
+              </DndContext>
+              <NuevaEtapaForm contenido={contenido} onGuardar={onGuardar} saving={saving} />
+            </div>
+          </AccordionContent>
+        </AccordionItem>
 
-      <AccordionItem value="epp" className="border rounded-lg px-3">
-        <AccordionTrigger className="text-sm font-semibold py-2.5">EPP</AccordionTrigger>
-        <AccordionContent className="pb-3">
-          <EppSection contenido={contenido} onGuardar={onGuardar} saving={saving} />
-        </AccordionContent>
-      </AccordionItem>
+        <AccordionItem value="personal" className="border rounded-lg px-3">
+          <AccordionTrigger className="text-sm font-semibold py-2.5">
+            Personal ({contenido.personal.length})
+          </AccordionTrigger>
+          <AccordionContent className="pb-3">
+            <PersonalSection contenido={contenido} onGuardar={onGuardar} saving={saving} />
+          </AccordionContent>
+        </AccordionItem>
 
-      <AccordionItem value="recursos" className="border rounded-lg px-3">
-        <AccordionTrigger className="text-sm font-semibold py-2.5">Recursos</AccordionTrigger>
-        <AccordionContent className="pb-3">
-          <RecursosSection contenido={contenido} onGuardar={onGuardar} saving={saving} />
-        </AccordionContent>
-      </AccordionItem>
+        <AccordionItem value="epp" className="border rounded-lg px-3">
+          <AccordionTrigger className="text-sm font-semibold py-2.5">EPP</AccordionTrigger>
+          <AccordionContent className="pb-3">
+            <EppSection contenido={contenido} onGuardar={onGuardar} saving={saving} />
+          </AccordionContent>
+        </AccordionItem>
 
-      <AccordionItem value="restricciones" className="border rounded-lg px-3">
-        <AccordionTrigger className="text-sm font-semibold py-2.5">
-          Restricciones ({contenido.restricciones.length})
-        </AccordionTrigger>
-        <AccordionContent className="pb-3">
-          <RestriccionesSection contenido={contenido} onGuardar={onGuardar} saving={saving} />
-        </AccordionContent>
-      </AccordionItem>
+        <AccordionItem value="recursos" className="border rounded-lg px-3">
+          <AccordionTrigger className="text-sm font-semibold py-2.5">Recursos</AccordionTrigger>
+          <AccordionContent className="pb-3">
+            <RecursosSection contenido={contenido} onGuardar={onGuardar} saving={saving} />
+          </AccordionContent>
+        </AccordionItem>
 
-      <AccordionItem value="cambios" className="border rounded-lg px-3">
-        <AccordionTrigger className="text-sm font-semibold py-2.5">
-          Control de cambios
-        </AccordionTrigger>
-        <AccordionContent className="pb-3">
-          <CambiosSection contenido={contenido} onGuardar={onGuardar} saving={saving} />
-        </AccordionContent>
-      </AccordionItem>
-    </Accordion>
+        <AccordionItem value="restricciones" className="border rounded-lg px-3">
+          <AccordionTrigger className="text-sm font-semibold py-2.5">
+            Restricciones ({contenido.restricciones.length})
+          </AccordionTrigger>
+          <AccordionContent className="pb-3">
+            <RestriccionesSection contenido={contenido} onGuardar={onGuardar} saving={saving} />
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="cambios" className="border rounded-lg px-3">
+          <AccordionTrigger className="text-sm font-semibold py-2.5">
+            Control de cambios
+          </AccordionTrigger>
+          <AccordionContent className="pb-3">
+            <CambiosSection contenido={contenido} onGuardar={onGuardar} saving={saving} />
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+    </>
   )
 }

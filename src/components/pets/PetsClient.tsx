@@ -10,6 +10,7 @@ import { PetsViewer } from './PetsViewer'
 import { PetsGenerator } from './PetsGenerator'
 import { PetsEditorPanel } from './PetsEditorPanel'
 import { PasoEditorModal } from './PasoEditorModal'
+import { useRegenerarPetsSSE } from './useRegenerarPetsSSE'
 
 interface PetsRecord {
   id: string
@@ -38,6 +39,8 @@ export function PetsClient({ proyectoId }: Props) {
     pasoIdx: number
   } | null>(null)
   const [agregarPasoEn, setAgregarPasoEn] = useState<number | null>(null)
+
+  const { estado: estadoRegen, regenerarEtapa, regenerarPaso } = useRegenerarPetsSSE(proyectoId)
 
   const cargarPets = useCallback(async () => {
     try {
@@ -154,7 +157,7 @@ export function PetsClient({ proyectoId }: Props) {
     )
   }
 
-  // Generating
+  // Generating (full)
   if (mode === 'generando') {
     return (
       <div className="space-y-4 p-1">
@@ -192,6 +195,8 @@ export function PetsClient({ proyectoId }: Props) {
     )
   }
 
+  const regenActivo = estadoRegen.activo
+
   // Has contenido — show viewer or editor + actions
   return (
     <div className="space-y-4">
@@ -227,12 +232,16 @@ export function PetsClient({ proyectoId }: Props) {
             variant="outline"
             size="sm"
             onClick={() => setMode('generando')}
-            disabled={mode !== 'idle' || saving}
+            disabled={mode !== 'idle' || saving || regenActivo}
           >
             <RefreshCw className="h-4 w-4 mr-1.5" />
             Regenerar
           </Button>
-          <Button size="sm" onClick={exportarDocx} disabled={mode !== 'idle' || saving}>
+          <Button
+            size="sm"
+            onClick={exportarDocx}
+            disabled={mode !== 'idle' || saving || regenActivo}
+          >
             {mode === 'exporting' ? (
               <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
             ) : (
@@ -247,9 +256,18 @@ export function PetsClient({ proyectoId }: Props) {
         <PetsEditorPanel
           contenido={contenido}
           onGuardar={guardarContenido}
-          onEditarPaso={(eIdx, pIdx) => setPasoEditando({ etapaIdx: eIdx, pasoIdx: pIdx })}
-          onAgregarPaso={(eIdx) => setAgregarPasoEn(eIdx)}
+          onEditarPaso={(eIdx, pIdx) => {
+            if (regenActivo) return
+            setPasoEditando({ etapaIdx: eIdx, pasoIdx: pIdx })
+          }}
+          onAgregarPaso={(eIdx) => {
+            if (regenActivo) return
+            setAgregarPasoEn(eIdx)
+          }}
           saving={saving}
+          estadoRegen={estadoRegen}
+          onRegenerarEtapa={(etapaIdx) => regenerarEtapa(etapaIdx, cargarPets)}
+          onRegenerarPaso={(etapaIdx, pasoIdx) => regenerarPaso(etapaIdx, pasoIdx, cargarPets)}
         />
       ) : (
         <PetsViewer contenido={contenido} />
