@@ -579,6 +579,19 @@ export default function ProyectoHubPage() {
       stats: [],
       badge: 'SSOMA'
     },
+    {
+      id: 'pets',
+      title: 'PETS',
+      description: 'Procedimiento Escrito de Trabajo Seguro',
+      icon: ClipboardList,
+      color: 'text-emerald-600',
+      bgColor: 'bg-emerald-50',
+      hoverBg: 'hover:bg-emerald-50',
+      borderColor: 'border-emerald-200',
+      href: `${baseUrl}/pets`,
+      stats: [],
+      badge: 'SSOMA'
+    },
   ]
 
   return (
