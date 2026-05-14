@@ -102,9 +102,10 @@ interface Props {
   proyecto: Proyecto
   costosReales?: CostosReales
   costoPlanificado?: number
+  puedeVerCliente?: boolean
 }
 
-export default function ResumenTotalesProyecto({ proyecto, costosReales, costoPlanificado = 0 }: Props) {
+export default function ResumenTotalesProyecto({ proyecto, costosReales, costoPlanificado = 0, puedeVerCliente = false }: Props) {
   // Calculate stats
   const equiposCount = proyecto.equipos?.length || 0
   const serviciosCount = proyecto.servicios?.length || 0
@@ -233,10 +234,12 @@ export default function ResumenTotalesProyecto({ proyecto, costosReales, costoPl
                           {categoria.count}
                         </Badge>
                       </div>
-                      <Badge variant="outline" className={`${rentabilidad.color} border-current text-xs`}>
-                        <Percent className="h-2 w-2 mr-1" />
-                        {rentabilidad.valor}
-                      </Badge>
+                      {puedeVerCliente && (
+                        <Badge variant="outline" className={`${rentabilidad.color} border-current text-xs`}>
+                          <Percent className="h-2 w-2 mr-1" />
+                          {rentabilidad.valor}
+                        </Badge>
+                      )}
                     </div>
 
                     {/* Ppto vs Real progress */}
@@ -330,7 +333,7 @@ export default function ResumenTotalesProyecto({ proyecto, costosReales, costoPl
             className="space-y-2"
           >
             {/* Totales intermedios */}
-            <div className="grid grid-cols-2 gap-2 text-sm">
+            <div className={`grid gap-2 text-sm ${puedeVerCliente ? 'grid-cols-2' : 'grid-cols-1'}`}>
               <div className="p-2 bg-blue-50 rounded-lg border border-blue-200">
                 <div className="flex items-center gap-1 mb-0.5">
                   <Target className="h-3 w-3 text-blue-600 flex-shrink-0" />
@@ -341,15 +344,17 @@ export default function ResumenTotalesProyecto({ proyecto, costosReales, costoPl
                 </span>
               </div>
 
-              <div className="p-2 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-1 mb-0.5">
-                  <DollarSign className="h-3 w-3 text-gray-600 flex-shrink-0" />
-                  <span className="text-[10px] font-medium text-gray-700">Cliente</span>
+              {puedeVerCliente && (
+                <div className="p-2 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-1 mb-0.5">
+                    <DollarSign className="h-3 w-3 text-gray-600 flex-shrink-0" />
+                    <span className="text-[10px] font-medium text-gray-700">Cliente</span>
+                  </div>
+                  <span className="text-xs font-semibold text-gray-800 block truncate" title={formatCurrency(totalCliente)}>
+                    {formatCurrency(totalCliente)}
+                  </span>
                 </div>
-                <span className="text-xs font-semibold text-gray-800 block truncate" title={formatCurrency(totalCliente)}>
-                  {formatCurrency(totalCliente)}
-                </span>
-              </div>
+              )}
             </div>
 
             {/* Plan vs Ejecutado Summary */}
@@ -418,13 +423,15 @@ export default function ResumenTotalesProyecto({ proyecto, costosReales, costoPl
               </div>
 
               {/* Rentabilidad total */}
-              <div className="flex items-center justify-between mt-1 pt-1 border-t border-green-400">
-                <span className="text-green-100 text-xs">Rentabilidad</span>
-                <Badge variant="secondary" className="bg-white/20 text-white border-white/30 text-xs">
-                  <TrendingUp className="h-2 w-2 mr-1" />
-                  {rentabilidadTotal.valor}
-                </Badge>
-              </div>
+              {puedeVerCliente && (
+                <div className="flex items-center justify-between mt-1 pt-1 border-t border-green-400">
+                  <span className="text-green-100 text-xs">Rentabilidad</span>
+                  <Badge variant="secondary" className="bg-white/20 text-white border-white/30 text-xs">
+                    <TrendingUp className="h-2 w-2 mr-1" />
+                    {rentabilidadTotal.valor}
+                  </Badge>
+                </div>
+              )}
             </motion.div>
           </motion.div>
         </CardContent>

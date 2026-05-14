@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useSession } from 'next-auth/react'
 import { useParams, useRouter, usePathname } from 'next/navigation'
 import { motion } from 'framer-motion'
 import {
@@ -54,10 +55,14 @@ interface ProyectoLayoutProps {
   children: React.ReactNode
 }
 
+const ROLES_FINANCIERO_CLIENTE = ['admin', 'gerente', 'coordinador', 'gestor']
+
 export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
   const { id } = useParams()
   const router = useRouter()
   const pathname = usePathname()
+  const { data: session } = useSession()
+  const puedeVerCliente = ROLES_FINANCIERO_CLIENTE.includes(session?.user?.role ?? '')
   const [proyecto, setProyecto] = useState<Proyecto | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -777,7 +782,7 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
                     </Button>
                   )}
 
-                  <ResumenTotalesProyecto proyecto={proyecto} costosReales={costosReales} costoPlanificado={cronogramaStats.costoPlanificado} />
+                  <ResumenTotalesProyecto proyecto={proyecto} costosReales={costosReales} costoPlanificado={cronogramaStats.costoPlanificado} puedeVerCliente={puedeVerCliente} />
 
                   {!isHubPage && (
                     <Button
