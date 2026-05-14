@@ -27,25 +27,8 @@ export const TIPO_INFO: Record<string, TipoInfo> = {
   'ocr':                 { label: 'OCR Comprobantes',       color: '#ef4444' }, // red-500
   'scan-cotizacion':     { label: 'Escanear PDF Cotización',color: '#ec4899' }, // pink-500
   'import-catalogo-pdf':        { label: 'Importar Catálogo PDF',  color: '#06b6d4' }, // cyan-500
-  // SSOMA — creación por tipo de documento
-  'ssoma-iperc':              { label: 'SSOMA — IPERC',              color: '#65a30d' }, // lime-600
-  'ssoma-pets':               { label: 'SSOMA — PETS',               color: '#16a34a' }, // green-600
-  'ssoma-epp':                { label: 'SSOMA — Matriz EPP',         color: '#0891b2' }, // cyan-600
-  'ssoma-plan-emergencia':    { label: 'SSOMA — Plan Emergencia',    color: '#059669' }, // emerald-600
-  'ssoma-par':                { label: 'SSOMA — PAR',                color: '#0d9488' }, // teal-600
-  // SSOMA — regeneración por tipo de documento
-  'ssoma-iperc-regenerar':           { label: 'SSOMA — IPERC (regen)',           color: '#4d7c0f' }, // lime-700
-  'ssoma-pets-regenerar':            { label: 'SSOMA — PETS (regen)',            color: '#15803d' }, // green-700
-  'ssoma-epp-regenerar':             { label: 'SSOMA — Matriz EPP (regen)',      color: '#0e7490' }, // cyan-700
-  'ssoma-plan-emergencia-regenerar': { label: 'SSOMA — Plan Emergencia (regen)', color: '#047857' }, // emerald-700
-  'ssoma-par-regenerar':             { label: 'SSOMA — PAR (regen)',             color: '#0f766e' }, // teal-700
-  // SSOMA — errores de API (tokens = 0, costo = 0; metadata contiene docTipo y errorMessage)
-  'ssoma-error': { label: 'SSOMA — Error API', color: '#dc2626' }, // red-600
   // Matriz de Comunicaciones
   'matriz-comunicacion': { label: 'Matriz de Comunicaciones', color: '#7c3aed' }, // violet-700
-  // Tipos legacy — mantener para registros históricos
-  'ssoma-documento':            { label: 'SSOMA — Generar docs (legacy)',   color: '#84cc16' }, // lime-500
-  'ssoma-documento-regenerar':  { label: 'SSOMA — Regenerar doc (legacy)',  color: '#a3a3a3' }, // neutral-400
   // Plan de Trabajo
   'plan-trabajo.generar':       { label: 'Plan de Trabajo — Generar',       color: '#0284c7' }, // sky-600
   'plan-trabajo.regenerar':     { label: 'Plan de Trabajo — Regenerar sección', color: '#0369a1' }, // sky-700

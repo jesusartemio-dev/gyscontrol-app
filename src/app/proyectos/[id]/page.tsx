@@ -489,19 +489,6 @@ export default function ProyectoHubPage() {
       badge: 'Ejecución'
     },
     {
-      id: 'ssoma',
-      title: 'SSOMA',
-      description: 'Habilitaci\u00f3n \u00b7 Documentos \u00b7 Personal',
-      icon: ShieldCheck,
-      color: 'text-red-500',
-      bgColor: 'bg-red-50',
-      hoverBg: 'hover:bg-red-50',
-      borderColor: 'border-red-200',
-      href: `${baseUrl}/ssoma`,
-      stats: [],
-      badge: 'Seguridad'
-    },
-    {
       id: 'organigrama',
       title: 'Organigrama',
       description: 'Estructura del equipo del proyecto',

@@ -37,7 +37,6 @@ export async function PUT(request: NextRequest) {
     'ocrComprobantes',
     'scanCotizacionPDF',
     'importCatalogoPDF',
-    'ssomaDocumentos',
     'matrizComunicacion',
     'planTrabajo',
     'iperc',

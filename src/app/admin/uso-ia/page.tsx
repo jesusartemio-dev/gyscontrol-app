@@ -93,7 +93,6 @@ interface IAFeatureFlags {
   ocrComprobantes: boolean
   scanCotizacionPDF: boolean
   importCatalogoPDF: boolean
-  ssomaDocumentos: boolean
   matrizComunicacion: boolean
   planTrabajo: boolean
   iperc: boolean
@@ -109,7 +108,6 @@ const FEATURE_DEFS: { key: keyof IAFeatureFlags; label: string; desc: string; ic
   { key: 'ocrComprobantes', label: 'OCR Comprobantes', desc: 'Lectura automatica de facturas y boletas', icon: ScanLine },
   { key: 'scanCotizacionPDF', label: 'Escanear PDF Cotizacion', desc: 'Auto-deteccion de precios y entregas desde PDF del proveedor', icon: FileSearch },
   { key: 'importCatalogoPDF', label: 'Importar Catalogo PDF', desc: 'Extraer equipos de cotizaciones PDF con IA para agregar al catalogo', icon: FileUp },
-  { key: 'ssomaDocumentos', label: 'SSOMA — Documentos', desc: 'Generacion de expedientes de seguridad (EPP, Plan Emergencia, PAR)', icon: ShieldCheck },
   { key: 'matrizComunicacion', label: 'Matriz de Comunicaciones', desc: 'Generacion automatica de matriz con IA usando organigrama y EDTs del proyecto', icon: MessageSquare },
   { key: 'planTrabajo', label: 'Plan de Trabajo', desc: 'Generacion y regeneracion de secciones del Plan de Trabajo con IA', icon: FileSearch },
   { key: 'iperc', label: 'IPERC', desc: 'Generacion del IPERC (resumen e identificacion de peligros por lote) con IA', icon: ShieldCheck },
