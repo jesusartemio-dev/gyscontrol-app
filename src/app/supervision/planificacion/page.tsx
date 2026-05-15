@@ -53,6 +53,12 @@ import { computeSeleccionRectangulo, toggleCeldaEnSeleccion } from '@/lib/planif
 
 const DEPT_ORDER = ['INGENIERIA', 'CONSTRUCCION', 'GESTION', 'PROYECTOS']
 const ROLES_PERMITIDOS = ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos']
+const FILTROS_KEY = 'gyscontrol:planificacion:filtros'
+
+function loadFiltros(): { rango?: Rango; departamentosSeleccionados?: string[]; proyectoFiltro?: string } {
+  if (typeof window === 'undefined') return {}
+  try { return JSON.parse(localStorage.getItem(FILTROS_KEY) ?? '{}') } catch { return {} }
+}
 
 type Rango = '1' | '2' | '4' | 'mes'
 type TextMode = 'full' | 'short' | 'mini' | 'none'
@@ -535,7 +541,7 @@ function SortablePersonaRow({
     <div
       ref={setNodeRef}
       style={style}
-      className="h-10 border-b hover:bg-muted/20 items-center"
+      className="h-8 border-b hover:bg-muted/20 items-center"
     >
       <div className="flex items-center gap-1 px-2 overflow-hidden">
         <button
@@ -544,15 +550,15 @@ function SortablePersonaRow({
           tabIndex={-1}
           className="shrink-0 text-muted-foreground/30 hover:text-muted-foreground cursor-grab active:cursor-grabbing p-0.5"
         >
-          <GripVertical className="h-3.5 w-3.5" />
+          <GripVertical className="h-3 w-3" />
         </button>
-        <div className="shrink-0 h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-semibold text-primary">
+        <div className="shrink-0 h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center text-[9px] font-semibold text-primary">
           {persona.iniciales}
         </div>
         <div className="min-w-0 ml-1">
-          <p className="text-sm font-medium truncate leading-none">{abreviarNombre(persona.nombre)}</p>
+          <p className="text-xs font-medium truncate leading-none">{abreviarNombre(persona.nombre)}</p>
           {persona.cargo && (
-            <p className="text-xs text-muted-foreground truncate">{abreviarCargo(persona.cargo)}</p>
+            <p className="text-[10px] text-muted-foreground truncate leading-none">{abreviarCargo(persona.cargo)}</p>
           )}
         </div>
       </div>
@@ -599,7 +605,7 @@ function SortablePersonaRow({
             data-celda-userid={persona.userId}
             data-celda-fecha={dateKey}
             className={cn(
-              'relative h-full px-0.5 py-1',
+              'relative h-full px-0.5 py-0.5',
               isWeekend && 'bg-muted/40',
               isHoy && 'border-l-2 border-blue-500',
             )}
@@ -728,10 +734,10 @@ export default function PlanificacionPage() {
   const role = (session?.user as any)?.role as string | undefined
 
   const [semanaInicio, setSemanaInicio] = useState<string>(currentMondayUTC)
-  const [rango, setRango] = useState<Rango>('1')
+  const [rango, setRango] = useState<Rango>(() => loadFiltros().rango ?? '1')
   const [mesBase, setMesBase] = useState<{ anio: number; mes: number } | null>(null)
-  const [departamentosSeleccionados, setDepartamentosSeleccionados] = useState<string[]>([])
-  const [proyectoFiltro, setProyectoFiltro] = useState<string>('__all__')
+  const [departamentosSeleccionados, setDepartamentosSeleccionados] = useState<string[]>(() => loadFiltros().departamentosSeleccionados ?? [])
+  const [proyectoFiltro, setProyectoFiltro] = useState<string>(() => loadFiltros().proyectoFiltro ?? '__all__')
   const [busqueda, setBusqueda] = useState('')
   const [data, setData] = useState<SemanaResponse | null>(null)
   const [departamentos, setDepartamentos] = useState<Departamento[]>([])
@@ -775,6 +781,10 @@ export default function PlanificacionPage() {
       defaults.length > 0 ? defaults : departamentos.slice(0, 4).map((d) => d.id),
     )
   }, [departamentos])
+
+  useEffect(() => {
+    try { localStorage.setItem(FILTROS_KEY, JSON.stringify({ rango, departamentosSeleccionados, proyectoFiltro })) } catch {}
+  }, [rango, departamentosSeleccionados, proyectoFiltro])
 
   const numSemanas = useMemo(() => rangoToSemanas(rango, mesBase), [rango, mesBase])
   const textMode = useMemo(() => textModeForSemanas(numSemanas), [numSemanas])
