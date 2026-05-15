@@ -57,12 +57,15 @@ export default function AsignacionMasivaModal({ open, onClose, onDone, celdas }:
       setEsExcepcional(false)
       return
     }
+    // Pre-marcar excepcional cuando la selección ya incluye fines de semana
+    setEsExcepcional(tieneFinDeSemana)
     setCargandoProyectos(true)
     fetch('/api/planificacion/proyectos-activos')
       .then((r) => r.json())
       .then(setProyectos)
       .catch(() => {})
       .finally(() => setCargandoProyectos(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   const handleConfirm = async () => {

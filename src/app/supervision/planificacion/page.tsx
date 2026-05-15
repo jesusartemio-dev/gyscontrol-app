@@ -1474,20 +1474,21 @@ export default function PlanificacionPage() {
               <div style={{ display: 'grid', gridTemplateColumns: gridCols }} className="text-xs font-medium text-muted-foreground border-b mb-0.5 pb-1">
                 <div className="px-3">Persona</div>
                 {diasHeader.map(({ dateKey, d, isHoy, isWeekend }) => {
-                  const dayName = textMode === 'full'
+                  const dayName = (textMode === 'full' || textMode === 'short')
                     ? d.toLocaleDateString('es', { weekday: 'short', timeZone: 'UTC' })
                     : d.toLocaleDateString('es', { weekday: 'narrow', timeZone: 'UTC' })
                   const dayNum = d.getUTCDate()
+                  const showDayName = textMode === 'full' || textMode === 'short'
                   return (
                     <div
                       key={dateKey}
                       className={cn(
-                        'text-center px-0.5 rounded',
+                        'text-center px-0.5 rounded truncate',
                         isWeekend && 'text-muted-foreground/60',
                         isHoy && 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-l-2 border-blue-500',
                       )}
                     >
-                      {textMode === 'full' ? `${dayName} ${dayNum}` : dayNum}
+                      {showDayName ? `${dayName} ${dayNum}` : dayNum}
                       {isHoy && textMode === 'full' && (
                         <span className="ml-1 text-[9px] bg-blue-500 text-white rounded px-1 py-px leading-none">
                           Hoy
