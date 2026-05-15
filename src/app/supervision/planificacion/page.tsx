@@ -40,6 +40,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import AsignacionCeldaModal from '@/components/planificacion/AsignacionCeldaModal'
+import AsignacionMasivaModal from '@/components/planificacion/AsignacionMasivaModal'
 import AusenciaDetailModal from '@/components/planificacion/AusenciaDetailModal'
 import CopiarSemanaModal from '@/components/planificacion/CopiarSemanaModal'
 import { abreviarCargo, abreviarNombre } from '@/lib/planificacion/format'
@@ -48,6 +49,7 @@ import {
   CeldaDetalleModal,
   type CeldaDetalleData,
 } from '@/components/planificacion/CeldaDetalleModal'
+import { computeSeleccionRectangulo } from '@/lib/planificacion/seleccion'
 
 const DEPT_ORDER = ['INGENIERIA', 'CONSTRUCCION', 'GESTION', 'PROYECTOS']
 const ROLES_PERMITIDOS = ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos']
@@ -131,6 +133,23 @@ type DiaHeader = { dateKey: string; d: Date; isHoy: boolean; isWeekend: boolean 
 
 // ── Drag-extend types ─────────────────────────────────────────────────────────
 type TurnoDia = 'dia_completo'
+
+// ── Multi-select types ────────────────────────────────────────────────────────
+type SeleccionState =
+  | { type: 'idle' }
+  | {
+      type: 'selecting'
+      origenUserId: string
+      origenFecha: string
+      actualUserId: string
+      actualFecha: string
+    }
+  | {
+      type: 'selected'
+      celdas: Set<string> // "userId|fecha"
+      anchorUserId: string // for Shift+click extension
+      anchorFecha: string
+    }
 type CeldaPreviewEstado =
   | 'libre'
   | 'ya_asignada_mismo'
@@ -258,29 +277,46 @@ function CeldaDia({
   isWeekend,
   textMode,
   dragHandleEnabled,
+  isSelected,
+  isInSelectionRect,
   onClickEmpty,
   onClickProyecto,
   onClickAusencia,
   onDragHandleMouseDown,
+  onMouseDownEmpty,
 }: {
   celda: CeldaEntry[]
   dimmed: boolean
   isWeekend: boolean
   textMode: TextMode
   dragHandleEnabled: boolean
+  isSelected?: boolean
+  isInSelectionRect?: boolean
   onClickEmpty: () => void
   onClickProyecto: () => void
   onClickAusencia: () => void
   onDragHandleMouseDown?: (e: React.MouseEvent) => void
+  onMouseDownEmpty?: (e: React.MouseEvent) => void
 }) {
   if (!celda || celda.length === 0) {
     return (
       <div
-        className="group relative flex items-center justify-center h-full border border-dashed border-transparent hover:border-border cursor-pointer rounded"
+        className={cn(
+          'group relative flex items-center justify-center h-full border border-dashed cursor-pointer rounded transition-colors',
+          isSelected
+            ? 'border-blue-500 border-solid bg-blue-100/50 dark:bg-blue-900/30'
+            : isInSelectionRect
+              ? 'border-blue-300 border-solid bg-blue-50/60 dark:bg-blue-950/20'
+              : 'border-transparent hover:border-border',
+        )}
         onClick={onClickEmpty}
+        onMouseDown={onMouseDownEmpty}
       >
-        {textMode !== 'none' && (
+        {textMode !== 'none' && !isSelected && !isInSelectionRect && (
           <span className="text-muted-foreground/30 group-hover:text-muted-foreground text-lg font-light">+</span>
+        )}
+        {isSelected && (
+          <span className="text-blue-500 text-sm font-semibold">✓</span>
         )}
       </div>
     )
@@ -454,10 +490,14 @@ function SortablePersonaRow({
   gridCols,
   dragState,
   dragHandleEnabled,
+  seleccionKeys,
+  seleccionRectKeys,
+  seleccionEnabled,
   onClickEmpty,
   onClickProyecto,
   onClickAusencia,
   onDragStart,
+  onCeldaMouseDown,
 }: {
   persona: PersonaEntry
   diasHeader: DiaHeader[]
@@ -468,10 +508,14 @@ function SortablePersonaRow({
   gridCols: string
   dragState: DragState
   dragHandleEnabled: boolean
+  seleccionKeys: Set<string>
+  seleccionRectKeys: Set<string>
+  seleccionEnabled: boolean
   onClickEmpty: (fecha: string) => void
   onClickProyecto: (fecha: string, celda: CeldaEntry) => void
   onClickAusencia: (fecha: string, celda: CeldaEntry) => void
   onDragStart: (info: Omit<DragStateExtending, 'type' | 'direction' | 'celdasPreview' | 'fechaFin'>) => void
+  onCeldaMouseDown: (userId: string, fecha: string, e: React.MouseEvent) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: persona.userId,
@@ -541,6 +585,14 @@ function SortablePersonaRow({
               }
             : undefined
 
+        const cellKey = `${persona.userId}|${dateKey}`
+        const isSelected = seleccionKeys.has(cellKey)
+        const isInSelectionRect = seleccionRectKeys.has(cellKey)
+        const handleMouseDownEmpty =
+          seleccionEnabled && celdasDia.length === 0
+            ? (e: React.MouseEvent) => onCeldaMouseDown(persona.userId, dateKey, e)
+            : undefined
+
         return (
           <div
             key={dateKey}
@@ -558,10 +610,13 @@ function SortablePersonaRow({
               isWeekend={isWeekend}
               textMode={textMode}
               dragHandleEnabled={dragHandleEnabled}
+              isSelected={isSelected}
+              isInSelectionRect={isInSelectionRect}
               onClickEmpty={isDragActive ? () => {} : () => onClickEmpty(dateKey)}
               onClickProyecto={isDragActive ? () => {} : () => onClickProyecto(dateKey, celdasDia[0])}
               onClickAusencia={isDragActive ? () => {} : () => onClickAusencia(dateKey, celdasDia[0])}
               onDragHandleMouseDown={handleDragMouseDown}
+              onMouseDownEmpty={handleMouseDownEmpty}
             />
             {previewCell && dragState.type === 'extending' && (
               <DragPreviewOverlay
@@ -694,6 +749,8 @@ export default function PlanificacionPage() {
 
   const [dragInfo, setDragInfo] = useState<DragInfo>({ type: 'idle' })
   const [modalDetalle, setModalDetalle] = useState<CeldaDetalleData | null>(null)
+  const [seleccionState, setSeleccionState] = useState<SeleccionState>({ type: 'idle' })
+  const [modalMasivo, setModalMasivo] = useState(false)
   const viewport = useViewport()
   const isDesktop = viewport === 'desktop'
   const isReadOnly = !isDesktop
@@ -741,6 +798,15 @@ export default function PlanificacionPage() {
 
   const dragStateRef = useRef<DragState>(dragState)
   dragStateRef.current = dragState
+
+  // Selection: only active on desktop 1–2 week views
+  const seleccionEnabled = numSemanas <= 2 && isDesktop
+
+  // Refs to avoid stale closures in selection mouseup/keyboard handlers
+  const seleccionRef = useRef<SeleccionState>({ type: 'idle' })
+  seleccionRef.current = seleccionState
+  const orderedUserIdsRef = useRef<string[]>([])
+  const fechasOrdenadasRef = useRef<string[]>([])
 
   useEffect(() => {
     if (!semanaInicio) return
@@ -828,6 +894,37 @@ export default function PlanificacionPage() {
     })
   }, [semanaInicio, hoyKey, numSemanas])
 
+  // Flat ordered user list matching visual row order — for rectangle computation
+  const orderedUserIds = useMemo(
+    () => gruposPorDepartamento.flatMap((g) => g.personas.map((p) => p.userId)),
+    [gruposPorDepartamento],
+  )
+  const fechasOrdenadas = useMemo(() => diasHeader.map((d) => d.dateKey), [diasHeader])
+
+  // Keep refs current every render (avoids stale closures in mouseup/keyboard effects)
+  orderedUserIdsRef.current = orderedUserIds
+  fechasOrdenadasRef.current = fechasOrdenadas
+
+  // Preview rectangle during drag-select (computed from live data, no API call)
+  const seleccionRectKeys = useMemo((): Set<string> => {
+    if (seleccionState.type !== 'selecting') return new Set()
+    return computeSeleccionRectangulo(
+      seleccionState.origenUserId,
+      seleccionState.origenFecha,
+      seleccionState.actualUserId,
+      seleccionState.actualFecha,
+      orderedUserIds,
+      fechasOrdenadas,
+      (userId, fecha) => data?.personas.find((p) => p.userId === userId)?.dias[fecha] ?? [],
+    )
+  }, [seleccionState, orderedUserIds, fechasOrdenadas, data])
+
+  // Final confirmed selection keys
+  const seleccionKeys = useMemo(
+    (): Set<string> => (seleccionState.type === 'selected' ? seleccionState.celdas : new Set()),
+    [seleccionState],
+  )
+
   const handleDragEnd = useCallback((deptId: string, event: DragEndEvent) => {
     const { active, over } = event
     if (!over || active.id === over.id) return
@@ -856,11 +953,71 @@ export default function PlanificacionPage() {
   const reloadRef = useRef(reload)
   reloadRef.current = reload
 
+  const dataRef = useRef<SemanaResponse | null>(null)
+  dataRef.current = data
+
   const handleDragStart = useCallback(
     (info: Omit<DragStateExtending, 'type' | 'direction' | 'celdasPreview' | 'fechaFin'>) => {
       setDragInfo({ type: 'extending', ...info, fechaFin: info.fechaOrigen })
     },
     [],
+  )
+
+  // ── Selection handlers ───────────────────────────────────────────────────────
+  const handleCeldaMouseDown = useCallback(
+    (userId: string, fecha: string, e: React.MouseEvent) => {
+      if (!seleccionEnabled) return
+      if (dragInfo.type === 'extending') return
+      e.preventDefault()
+
+      // Ctrl/Cmd+click: toggle individual cell
+      if (e.ctrlKey || e.metaKey) {
+        setSeleccionState((prev) => {
+          const key = `${userId}|${fecha}`
+          if (prev.type === 'selected') {
+            const next = new Set(prev.celdas)
+            if (next.has(key)) next.delete(key)
+            else next.add(key)
+            return next.size > 0
+              ? { type: 'selected', celdas: next, anchorUserId: prev.anchorUserId, anchorFecha: prev.anchorFecha }
+              : { type: 'idle' }
+          }
+          return { type: 'selected', celdas: new Set([key]), anchorUserId: userId, anchorFecha: fecha }
+        })
+        return
+      }
+
+      // Shift+click: extend from anchor to this cell
+      if (e.shiftKey && seleccionState.type === 'selected') {
+        const extendedKeys = computeSeleccionRectangulo(
+          seleccionState.anchorUserId,
+          seleccionState.anchorFecha,
+          userId,
+          fecha,
+          orderedUserIdsRef.current,
+          fechasOrdenadasRef.current,
+          (uid, f) => data?.personas.find((p) => p.userId === uid)?.dias[f] ?? [],
+        )
+        if (extendedKeys.size > 0) {
+          setSeleccionState((prev) =>
+            prev.type === 'selected'
+              ? { ...prev, celdas: extendedKeys }
+              : { type: 'selected', celdas: extendedKeys, anchorUserId: userId, anchorFecha: fecha },
+          )
+        }
+        return
+      }
+
+      // Plain mousedown: start rectangular drag-select
+      setSeleccionState({
+        type: 'selecting',
+        origenUserId: userId,
+        origenFecha: fecha,
+        actualUserId: userId,
+        actualFecha: fecha,
+      })
+    },
+    [seleccionEnabled, dragInfo.type, seleccionState, data],
   )
 
   useEffect(() => {
@@ -975,6 +1132,116 @@ export default function PlanificacionPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dragInfo.type])
 
+  // ── Selection drag effect ────────────────────────────────────────────────────
+  useEffect(() => {
+    if (seleccionState.type !== 'selecting') return
+
+    let rafId: number | null = null
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (rafId !== null) return
+      rafId = requestAnimationFrame(() => {
+        rafId = null
+        const el = document.elementFromPoint(e.clientX, e.clientY)
+        const cellEl = el?.closest('[data-celda-userid]') as HTMLElement | null
+        const fecha = cellEl?.dataset.celdaFecha
+        const userId = cellEl?.dataset.celdaUserid
+        if (fecha && userId) {
+          setSeleccionState((prev) =>
+            prev.type === 'selecting' &&
+            (prev.actualUserId !== userId || prev.actualFecha !== fecha)
+              ? { ...prev, actualUserId: userId, actualFecha: fecha }
+              : prev,
+          )
+        }
+      })
+    }
+
+    const handleMouseUp = () => {
+      const state = seleccionRef.current
+      if (state.type !== 'selecting') return
+
+      const finalKeys = computeSeleccionRectangulo(
+        state.origenUserId,
+        state.origenFecha,
+        state.actualUserId,
+        state.actualFecha,
+        orderedUserIdsRef.current,
+        fechasOrdenadasRef.current,
+        (uid, f) => dataRef.current?.personas.find((p) => p.userId === uid)?.dias[f] ?? [],
+      )
+
+      if (finalKeys.size === 0) {
+        setSeleccionState({ type: 'idle' })
+      } else {
+        setSeleccionState({
+          type: 'selected',
+          celdas: finalKeys,
+          anchorUserId: state.origenUserId,
+          anchorFecha: state.origenFecha,
+        })
+      }
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      if (rafId !== null) cancelAnimationFrame(rafId)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seleccionState.type])
+
+  // ── Selection keyboard effect ─────────────────────────────────────────────────
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const state = seleccionRef.current
+
+      if (e.key === 'Escape' && state.type !== 'idle') {
+        e.preventDefault()
+        setSeleccionState({ type: 'idle' })
+        return
+      }
+
+      if (e.key === 'Enter' && state.type === 'selected' && state.celdas.size > 0) {
+        e.preventDefault()
+        setModalMasivo(true)
+        return
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key === 'a' && !e.shiftKey) {
+        // Only activate Ctrl+A if no input/textarea is focused
+        const tag = (document.activeElement as HTMLElement)?.tagName
+        if (tag === 'INPUT' || tag === 'TEXTAREA') return
+        e.preventDefault()
+        if (!seleccionEnabled) return
+
+        const allEmpty = new Set<string>()
+        for (const p of dataRef.current?.personas ?? []) {
+          for (const f of fechasOrdenadasRef.current) {
+            if ((p.dias[f] ?? []).length === 0) allEmpty.add(`${p.userId}|${f}`)
+          }
+        }
+        if (allEmpty.size === 0) return
+
+        if (allEmpty.size > 30) {
+          if (!window.confirm(`Seleccionar ${allEmpty.size} celdas vacías?`)) return
+        }
+        setSeleccionState({
+          type: 'selected',
+          celdas: allEmpty,
+          anchorUserId: orderedUserIdsRef.current[0] ?? '',
+          anchorFecha: fechasOrdenadasRef.current[0] ?? '',
+        })
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seleccionEnabled])
+
   if (role && !ROLES_PERMITIDOS.includes(role)) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -985,7 +1252,11 @@ export default function PlanificacionPage() {
 
   return (
     <TooltipProvider delayDuration={250}>
-      <div className={cn('container mx-auto p-4 sm:p-6', dragState.type === 'extending' && 'cursor-col-resize select-none')}>
+      <div className={cn(
+        'container mx-auto p-4 sm:p-6',
+        dragState.type === 'extending' && 'cursor-col-resize select-none',
+        seleccionState.type === 'selecting' && 'cursor-crosshair select-none',
+      )}>
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold">Planificación de personal</h1>
@@ -1276,11 +1547,20 @@ export default function PlanificacionPage() {
                           gridCols={gridCols}
                           dragState={dragState}
                           dragHandleEnabled={dragHandleEnabled}
+                          seleccionKeys={seleccionKeys}
+                          seleccionRectKeys={seleccionRectKeys}
+                          seleccionEnabled={seleccionEnabled}
+                          onCeldaMouseDown={handleCeldaMouseDown}
                           onClickEmpty={(fecha) => {
                             if (isReadOnly) return
+                            if (seleccionState.type !== 'idle') {
+                              setSeleccionState({ type: 'idle' })
+                              return
+                            }
                             setModalCelda({ userId: persona.userId, nombre: persona.nombre, fecha })
                           }}
                           onClickProyecto={(fecha, celda) => {
+                            setSeleccionState({ type: 'idle' })
                             if (isReadOnly) {
                               setModalDetalle({ nombrePersona: persona.nombre, fecha, celda })
                             } else {
@@ -1288,6 +1568,7 @@ export default function PlanificacionPage() {
                             }
                           }}
                           onClickAusencia={(fecha, celda) => {
+                            setSeleccionState({ type: 'idle' })
                             if (isReadOnly) {
                               setModalDetalle({ nombrePersona: persona.nombre, fecha, celda })
                             } else {
@@ -1364,7 +1645,58 @@ export default function PlanificacionPage() {
           semanaActual={semanaInicio}
           departamentoId={departamentosSeleccionados[0]}
         />
+
+        <AsignacionMasivaModal
+          open={modalMasivo}
+          onClose={() => setModalMasivo(false)}
+          onDone={() => {
+            setSeleccionState({ type: 'idle' })
+            reload()
+          }}
+          celdas={
+            seleccionState.type === 'selected'
+              ? Array.from(seleccionState.celdas).slice(0, 50).map((key) => {
+                  const [userId, fecha] = key.split('|')
+                  return { userId, fecha }
+                })
+              : []
+          }
+          proyectos={data?.proyectos ?? []}
+        />
       </div>
+
+      {/* ── Floating selection action bar ──────────────────────────────────────── */}
+      {seleccionState.type === 'selected' && seleccionState.celdas.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-background border shadow-lg rounded-full px-5 py-2.5 select-none">
+          <span className="text-sm font-medium text-foreground">
+            {Math.min(seleccionState.celdas.size, 50)} celda{seleccionState.celdas.size !== 1 ? 's' : ''} seleccionada{seleccionState.celdas.size !== 1 ? 's' : ''}
+            {seleccionState.celdas.size > 50 && (
+              <span className="ml-1.5 text-xs text-amber-600 font-normal">(máximo 50)</span>
+            )}
+          </span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="sm"
+                onClick={() => setModalMasivo(true)}
+                disabled={seleccionState.celdas.size > 50}
+              >
+                Asignar a proyecto...
+              </Button>
+            </TooltipTrigger>
+            {seleccionState.celdas.size > 50 && (
+              <TooltipContent>Máximo 50 celdas por asignación</TooltipContent>
+            )}
+          </Tooltip>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setSeleccionState({ type: 'idle' })}
+          >
+            Limpiar
+          </Button>
+        </div>
+      )}
     </TooltipProvider>
   )
 }
