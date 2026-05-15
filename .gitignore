@@ -48,3 +48,8 @@ scripts/test-ssoma.ts
 scripts/migration-snapshot-*.json
 docs/
 .claude/settings.local.json
+
+# Archivos temporales locales
+CONTEXT_DUMP.md
+*.log
+dev-server.log
