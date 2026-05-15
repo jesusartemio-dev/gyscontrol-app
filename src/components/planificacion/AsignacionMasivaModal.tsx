@@ -72,14 +72,18 @@ export default function AsignacionMasivaModal({ open, onClose, onDone, celdas }:
     if (!proyectoId) return
     setSaving(true)
     try {
-      const asignaciones = celdas.map(({ userId, fecha }) => ({
-        userId,
-        fecha,
-        turno: 'dia_completo' as const,
-        proyectoId,
-        esExcepcional: tieneFinDeSemana ? esExcepcional : false,
-        notas: notas.trim() || null,
-      }))
+      const asignaciones = celdas.map(({ userId, fecha }) => {
+        const dow = new Date(fecha + 'T00:00:00.000Z').getUTCDay()
+        const isWeekend = dow === 0 || dow === 6
+        return {
+          userId,
+          fecha,
+          turno: 'dia_completo' as const,
+          proyectoId,
+          esExcepcional: isWeekend ? esExcepcional : false,
+          notas: notas.trim() || null,
+        }
+      })
 
       const res = await fetch('/api/planificacion/dia/batch', {
         method: 'POST',
