@@ -37,6 +37,8 @@ interface PersonaEntry {
   nombre: string
   iniciales: string
   cargo: string | null
+  departamentoId: string
+  departamentoNombre: string
   utilizacion: string
   dias: Record<string, CeldaEntry[]>
 }
@@ -182,6 +184,17 @@ export default function PlanificacionPage() {
     )
   }, [data?.personas, busqueda])
 
+  const gruposPorDepartamento = useMemo(() => {
+    const map = new Map<string, { id: string; nombre: string; personas: PersonaEntry[] }>()
+    for (const p of personasFiltradas) {
+      if (!map.has(p.departamentoId)) {
+        map.set(p.departamentoId, { id: p.departamentoId, nombre: p.departamentoNombre, personas: [] })
+      }
+      map.get(p.departamentoId)!.personas.push(p)
+    }
+    return Array.from(map.values())
+  }, [personasFiltradas])
+
   const diasHeader = useMemo(() => {
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(semanaInicio + 'T00:00:00.000Z')
@@ -296,55 +309,66 @@ export default function PlanificacionPage() {
               </div>
             )}
 
-            {personasFiltradas.map((persona) => (
-              <div
-                key={persona.userId}
-                className="grid grid-cols-[200px_repeat(7,1fr)_70px] h-10 border-b hover:bg-muted/20 items-center"
-              >
-                <div className="flex items-center gap-2 px-3 overflow-hidden">
-                  <div className="shrink-0 h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-[11px] font-semibold text-primary">
-                    {persona.iniciales}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate leading-none">{persona.nombre}</p>
-                    {persona.cargo && (
-                      <p className="text-xs text-muted-foreground truncate">{persona.cargo}</p>
-                    )}
+            {gruposPorDepartamento.map((grupo) => (
+              <div key={grupo.id}>
+                {/* Fila de cabecera del departamento */}
+                <div className="grid grid-cols-[200px_repeat(7,1fr)_70px] h-7 bg-muted/50 border-b border-t items-center">
+                  <div className="px-3 col-span-9 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">
+                    {grupo.nombre}
                   </div>
                 </div>
 
-                {diasHeader.map(({ dateKey, d }) => {
-                  const celdasDia = persona.dias[dateKey] ?? []
-                  const isWeekend = d.getUTCDay() === 0 || d.getUTCDay() === 6
-                  const dimmed =
-                    proyectoFiltro !== '__all__' &&
-                    celdasDia.length > 0 &&
-                    !celdasDia.some((c) => c.proyecto?.id === proyectoFiltro)
-                  return (
-                    <div key={dateKey} className={cn('h-full px-0.5 py-1', isWeekend && 'bg-muted/30')}>
-                      <CeldaDia
-                        celda={celdasDia}
-                        dimmed={dimmed}
-                        onClickEmpty={() =>
-                          setModalCelda({ userId: persona.userId, nombre: persona.nombre, fecha: dateKey })
-                        }
-                        onClickProyecto={() =>
-                          setModalCelda({
-                            userId: persona.userId,
-                            nombre: persona.nombre,
-                            fecha: dateKey,
-                            celda: celdasDia[0],
-                          })
-                        }
-                        onClickAusencia={() => setModalAusencia(celdasDia[0])}
-                      />
+                {grupo.personas.map((persona) => (
+                  <div
+                    key={persona.userId}
+                    className="grid grid-cols-[200px_repeat(7,1fr)_70px] h-10 border-b hover:bg-muted/20 items-center"
+                  >
+                    <div className="flex items-center gap-2 px-3 overflow-hidden">
+                      <div className="shrink-0 h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-[11px] font-semibold text-primary">
+                        {persona.iniciales}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate leading-none">{persona.nombre}</p>
+                        {persona.cargo && (
+                          <p className="text-xs text-muted-foreground truncate">{persona.cargo}</p>
+                        )}
+                      </div>
                     </div>
-                  )
-                })}
 
-                <div className="flex items-center justify-center">
-                  <UtilBadge util={persona.utilizacion} />
-                </div>
+                    {diasHeader.map(({ dateKey, d }) => {
+                      const celdasDia = persona.dias[dateKey] ?? []
+                      const isWeekend = d.getUTCDay() === 0 || d.getUTCDay() === 6
+                      const dimmed =
+                        proyectoFiltro !== '__all__' &&
+                        celdasDia.length > 0 &&
+                        !celdasDia.some((c) => c.proyecto?.id === proyectoFiltro)
+                      return (
+                        <div key={dateKey} className={cn('h-full px-0.5 py-1', isWeekend && 'bg-muted/30')}>
+                          <CeldaDia
+                            celda={celdasDia}
+                            dimmed={dimmed}
+                            onClickEmpty={() =>
+                              setModalCelda({ userId: persona.userId, nombre: persona.nombre, fecha: dateKey })
+                            }
+                            onClickProyecto={() =>
+                              setModalCelda({
+                                userId: persona.userId,
+                                nombre: persona.nombre,
+                                fecha: dateKey,
+                                celda: celdasDia[0],
+                              })
+                            }
+                            onClickAusencia={() => setModalAusencia(celdasDia[0])}
+                          />
+                        </div>
+                      )
+                    })}
+
+                    <div className="flex items-center justify-center">
+                      <UtilBadge util={persona.utilizacion} />
+                    </div>
+                  </div>
+                ))}
               </div>
             ))}
           </div>

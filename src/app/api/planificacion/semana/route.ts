@@ -57,17 +57,29 @@ export async function GET(request: NextRequest) {
         })
       : null
 
-    // Empleados activos del departamento (o todos si no se especifica)
+    // Departamentos por defecto cuando no se filtra por uno específico
+    const DEPARTAMENTOS_DEFAULT = ['PROYECTOS', 'INGENIERIA', 'CONSTRUCCION', 'GESTION']
+
+    // Empleados activos: filtrar por departamento específico o por los 4 por defecto
     const empleados = await prisma.empleado.findMany({
       where: {
         activo: true,
-        ...(departamentoId ? { departamentoId } : {}),
+        ...(departamentoId
+          ? { departamentoId }
+          : {
+              departamento: {
+                OR: DEPARTAMENTOS_DEFAULT.map((n) => ({
+                  nombre: { equals: n, mode: 'insensitive' as const },
+                })),
+              },
+            }),
       },
       include: {
         user: { select: { id: true, name: true, image: true } },
         cargo: { select: { nombre: true } },
+        departamento: { select: { id: true, nombre: true } },
       },
-      orderBy: { user: { name: 'asc' } },
+      orderBy: [{ departamento: { nombre: 'asc' } }, { user: { name: 'asc' } }],
     })
 
     if (empleados.length === 0) {
@@ -169,6 +181,8 @@ export async function GET(request: NextRequest) {
         nombre: emp.user.name ?? emp.userId,
         iniciales: iniciales(emp.user.name ?? emp.userId),
         cargo: emp.cargo?.nombre ?? null,
+        departamentoId: emp.departamentoId ?? '',
+        departamentoNombre: emp.departamento?.nombre ?? 'Sin departamento',
         utilizacion: `${diasConProyecto}/${diasLaborables}`,
         dias: diasObj,
       }
