@@ -41,6 +41,7 @@ export async function GET() {
     const esAdminOrGerente = ['admin', 'gerente'].includes(role)
     const esLogistico = ['logistico', 'coordinador_logistico', 'admin', 'gerente'].includes(role)
     const esAprobadorTimesheet = ['admin', 'gerente', 'gestor', 'coordinador'].includes(role)
+    const esAprobadorAusencias = ['admin', 'gerente', 'gestor', 'coordinador', 'administracion'].includes(role)
 
     const ahora = new Date()
     const inicioHoy = new Date(ahora); inicioHoy.setHours(0, 0, 0, 0)
@@ -88,6 +89,7 @@ export async function GET() {
       timesheetSemanaActual,
       timesheetRechazado,
       timesheetPendientesAprobacion,
+      ausenciasPendientes,
     ] = await Promise.all([
       prisma.cotizacion.count({ where: cotizacionesWhere }),
       prisma.proyecto.count({ where: proyectosWhere }),
@@ -135,6 +137,17 @@ export async function GET() {
       esAprobadorTimesheet
         ? prisma.timesheetAprobacion.count({ where: { estado: 'enviado' } })
         : Promise.resolve(0),
+      esAprobadorAusencias
+        ? prisma.solicitudAusencia.count({
+            where: {
+              estado: 'pendiente',
+              OR: [
+                { aprobador1Id: userId, fechaAprobacion1: null },
+                { aprobador2Id: userId, fechaAprobacion1: { not: null } },
+              ],
+            },
+          })
+        : Promise.resolve(0),
     ])
 
     // Asistencia abierta: hay ingreso hoy y aún no marcó salida
@@ -158,6 +171,7 @@ export async function GET() {
       'timesheet-no-enviado': timesheetNoEnviado,
       'timesheet-rechazado': timesheetRechazado,
       'timesheet-pendientes-aprobacion': timesheetPendientesAprobacion,
+      'ausencias-pendientes': ausenciasPendientes,
     })
   } catch (error) {
     console.error('Error fetching notification counts:', error)

@@ -186,6 +186,7 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
     'iperc': 'IPERC',
     'mpp': 'MPP',
     'pets': 'PETS',
+    'personal-planificado': 'Personal Planificado',
   }
 
   // Build breadcrumb trail from path segments (e.g. listas/[id] → Listas > Detalle)

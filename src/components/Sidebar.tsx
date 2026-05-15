@@ -63,6 +63,8 @@ import {
   ClipboardCheck,
   FileBarChart,
   Sparkles,
+  CalendarOff,
+  CalendarDays,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -229,6 +231,7 @@ export default function Sidebar() {
             { href: '/mi-trabajo/solicitudes-remoto', label: 'Solicitudes Remoto', icon: Home },
           ],
         },
+        { href: '/mi-trabajo/ausencias', label: 'Mis Ausencias', icon: CalendarOff },
         { href: '/mi-trabajo/timesheet', label: 'Mi Timesheet', icon: Calendar, badge: 'timesheet-no-enviado' as NotificationBadgeType },
         { href: '/mi-trabajo/mi-jornada', label: 'Mi Jornada', icon: HardHat },
         { href: '/mi-trabajo/tareas', label: 'Mis Tareas', icon: CheckSquare, badge: 'tareas-vencidas' as NotificationBadgeType },
@@ -255,12 +258,14 @@ export default function Sidebar() {
             { href: '/supervision/solicitudes-remoto', label: 'Solicitudes Remoto', icon: Home, badge: 'solicitudes-remoto-pendientes' as NotificationBadgeType },
           ],
         },
+        { href: '/supervision/ausencias', label: 'Aprobar Ausencias', icon: CalendarOff, badge: 'ausencias-pendientes' as NotificationBadgeType },
         { href: '/supervision/timesheet', label: 'Timesheet', icon: ClipboardList, badge: 'timesheet-pendientes-aprobacion' as NotificationBadgeType },
         { href: '/supervision/jornada-campo', label: 'Jornada Campo', icon: MapPin },
         { href: '/supervision/bloqueos-campo', label: 'Bloqueos Campo', icon: ShieldAlert },
         { href: '/supervision/tareas', label: 'Gestión de Tareas', icon: CheckSquare },
         { href: '/supervision/equipo', label: 'Vista de Equipo', icon: Users },
         { href: '/supervision/edts', label: 'Gestión de EDTs', icon: GitBranch },
+        { href: '/supervision/planificacion', label: 'Planificación', icon: CalendarDays },
         { href: '/supervision/listas-equipo', label: 'Listas Equipo', icon: ClipboardList },
         { href: '/supervision/resumen', label: 'Resumen Proyectos', icon: BarChart3 },
         { href: '/supervision/analisis-edt', label: 'Análisis EDT', icon: Target },
@@ -361,6 +366,7 @@ export default function Sidebar() {
         { href: '/administracion/cuentas-pagar', label: 'Cuentas por Pagar', icon: ArrowUpCircle },
         { href: '/administracion/cuentas-bancarias', label: 'Cuentas Bancarias', icon: Landmark },
         { href: '/administracion/proyectos-internos', label: 'Proyectos Internos', icon: Building2 },
+        { href: '/administracion/saldos-ausencia', label: 'Saldos de Ausencia', icon: CalendarOff },
       ],
     },
     // 5. Gestión - Análisis y control
@@ -443,6 +449,8 @@ export default function Sidebar() {
         { href: '/configuracion/centros-costo', label: 'Centros de Costo', icon: CreditCard },
         // 👁️ Vistas del catálogo
         { href: '/configuracion/catalogo-columnas', label: 'Vistas Catálogo', icon: Wrench },
+        // 📅 Ausencias
+        { href: '/configuracion/tipos-ausencia', label: 'Tipos de Ausencia', icon: CalendarOff },
         // 🤖 IA — monitoreo de uso y costos
         { href: '/admin/uso-ia', label: 'Uso IA', icon: Sparkles },
       ],

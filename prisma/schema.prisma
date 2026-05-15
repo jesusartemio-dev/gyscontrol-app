@@ -1130,6 +1130,7 @@ model Proyecto {
   iperc                      Iperc?
   mpp                        Mpp?
   pets                       Pets?
+  planificacionesDia         PlanificacionDia[]
 
   @@index([clienteId, estado, createdAt(sort: Desc)], map: "idx_proyecto_cliente_estado_fecha")
   @@index([comercialId, estado, fechaInicio], map: "idx_proyecto_comercial_estado_inicio")
@@ -1805,6 +1806,17 @@ model User {
   reportesSeguridadAprobados               ReporteSemanalSeguridad[]   @relation("ReportesSeguridadAprobador")
   orgNodos                                 ProyectoOrgNodo[]
   planTrabajoGeneraciones                  PlanTrabajoGeneracion[]
+  // Módulo Ausencias
+  solicitudesAusencia                      SolicitudAusencia[]      @relation("AusenciaSolicitante")
+  ausenciasComoAprobador1                  SolicitudAusencia[]      @relation("AusenciaAprobador1")
+  ausenciasComoAprobador2                  SolicitudAusencia[]      @relation("AusenciaAprobador2")
+  ausenciasComoRechazador                  SolicitudAusencia[]      @relation("AusenciaRechazador")
+  saldosAusencia                           SaldoAusencia[]          @relation("SaldosAusencia")
+  movimientosSaldoAusencia                 MovimientoSaldoAusencia[] @relation("MovimientoSaldoCreador")
+  // Módulo Planificación
+  planificacionesDia                       PlanificacionDia[]       @relation("PlanificacionPersona")
+  planificacionesDiaCreadas                PlanificacionDia[]       @relation("PlanificacionCreador")
+  planificacionesDiaActualizadas           PlanificacionDia[]       @relation("PlanificacionActualizador")
 
   @@map("user")
 }
@@ -5414,4 +5426,196 @@ model Pets {
 
   @@map("pets")
   @@index([proyectoId])
+}
+
+// ============================================================
+// 🏖️ Módulo de Ausencias (Time Off)
+// ============================================================
+
+enum TipoCicloSaldo {
+  anio_calendario // resetea el 1 de enero
+  anio_servicio   // resetea en aniversario de Empleado.fechaIngreso
+  sin_ciclo       // no resetea (tipos sin saldo o acumulativos)
+}
+
+enum EstadoSolicitudAusencia {
+  borrador
+  pendiente
+  aprobada
+  rechazada
+  cancelada
+  en_curso   // activado por cron al llegar fechaInicio
+  finalizada // activado por cron al pasar fechaFin
+}
+
+// Turno del día — compartido por SolicitudAusencia y PlanificacionDia
+enum TurnoDia {
+  dia_completo
+  am
+  pm
+}
+
+model TipoAusencia {
+  id                    String         @id @default(cuid())
+  codigo                String         @unique // "VAC", "PERM_GOCE", "LIC_MED"...
+  nombre                String
+  color                 String         @default("#6366f1") // hex para el calendario
+  descuentaSaldo        Boolean        @default(true)
+  diasPorDefecto        Float? // null = sin saldo / ilimitado
+  tipoCicloSaldo        TipoCicloSaldo @default(sin_ciclo)
+  requiereDocumento     Boolean        @default(false)
+  requiereAprobacion    Boolean        @default(true)
+  requiereAprobacion2   Boolean        @default(false)
+  diasUmbralAprobacion2 Int? // dispara nivel 2 si diasHabiles > umbral
+  aplicaFinDeSemana     Boolean        @default(false)
+  activo                Boolean        @default(true)
+  orden                 Int            @default(0)
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  solicitudes     SolicitudAusencia[]
+  saldos          SaldoAusencia[]
+  planificaciones PlanificacionDia[]
+
+  @@index([activo, orden])
+  @@map("tipo_ausencia")
+}
+
+model SolicitudAusencia {
+  id             String @id @default(cuid())
+  tipoAusenciaId String
+  solicitanteId  String
+  empleadoId     String? // Empleado.id — guardado para queries RRHH sin JOIN extra
+
+  fechaInicio DateTime @db.Date
+  fechaFin    DateTime @db.Date
+  turnoInicio TurnoDia @default(dia_completo)
+  turnoFin    TurnoDia @default(dia_completo)
+
+  diasHabiles                 Float? // calculado al aprobar, descontando feriados
+  motivo                      String?
+  estado                      EstadoSolicitudAusencia @default(borrador)
+  requiereAsignacionAprobador Boolean                 @default(false) // true cuando la cadena de fallback no resuelve aprobador
+
+  // Nivel 1: Departamento.responsable → Proyecto.lider → Role.administracion
+  aprobador1Id     String?
+  fechaAprobacion1 DateTime?
+  // Nivel 2: RRHH / gerencia (condicionado por TipoAusencia)
+  aprobador2Id     String?
+  fechaAprobacion2 DateTime?
+
+  motivoRechazo  String?
+  rechazadoPorId String?
+  fechaRechazo   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tipoAusencia    TipoAusencia               @relation(fields: [tipoAusenciaId], references: [id])
+  solicitante     User                       @relation("AusenciaSolicitante", fields: [solicitanteId], references: [id])
+  aprobador1      User?                      @relation("AusenciaAprobador1", fields: [aprobador1Id], references: [id])
+  aprobador2      User?                      @relation("AusenciaAprobador2", fields: [aprobador2Id], references: [id])
+  rechazadoPor    User?                      @relation("AusenciaRechazador", fields: [rechazadoPorId], references: [id])
+  adjuntos        SolicitudAusenciaAdjunto[]
+  planificaciones PlanificacionDia[]
+
+  @@index([solicitanteId, estado])
+  @@index([estado, fechaInicio])
+  @@index([fechaInicio, fechaFin])
+  @@map("solicitud_ausencia")
+}
+
+model SolicitudAusenciaAdjunto {
+  id                  String   @id @default(cuid())
+  solicitudAusenciaId String
+  nombreArchivo       String
+  urlArchivo          String
+  driveFileId         String?
+  tipoArchivo         String?
+  tamano              Int?
+  createdAt           DateTime @default(now())
+
+  solicitudAusencia SolicitudAusencia @relation(fields: [solicitudAusenciaId], references: [id], onDelete: Cascade)
+
+  @@index([solicitudAusenciaId])
+  @@map("solicitud_ausencia_adjunto")
+}
+
+model SaldoAusencia {
+  id             String @id @default(cuid())
+  userId         String
+  tipoAusenciaId String
+  anio           Int // año calendario de referencia (aun cuando el ciclo es por servicio)
+  diasAsignados  Float @default(0)
+  diasGozados    Float @default(0) // aprobadas + finalizadas acumuladas en el año
+  diasPendientes Float @default(0) // en flujo (pendiente o aprobada, aún no finalizadas)
+  /// = diasAsignados - diasGozados - diasPendientes. Recalculado por service en cada movimiento.
+  diasDisponibles Float    @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user         User         @relation("SaldosAusencia", fields: [userId], references: [id])
+  tipoAusencia TipoAusencia @relation(fields: [tipoAusenciaId], references: [id])
+  movimientos  MovimientoSaldoAusencia[]
+
+  @@unique([userId, tipoAusenciaId, anio])
+  @@index([userId, anio])
+  @@map("saldo_ausencia")
+}
+
+// Auditoría de todos los cambios al saldo (asignación inicial, ajustes, consumos, devoluciones)
+model MovimientoSaldoAusencia {
+  id           String   @id @default(cuid())
+  saldoId      String
+  tipo         String // "asignacion_anual" | "ajuste_manual" | "consumo" | "devolucion"
+  dias         Float // positivo = acredita, negativo = debita
+  motivo       String?
+  referenciaId String? // solicitudAusenciaId cuando el movimiento viene de una solicitud
+  creadoPorId  String
+  createdAt    DateTime @default(now())
+
+  saldo     SaldoAusencia @relation(fields: [saldoId], references: [id], onDelete: Cascade)
+  creadoPor User          @relation("MovimientoSaldoCreador", fields: [creadoPorId], references: [id])
+
+  @@index([saldoId, createdAt(sort: Desc)])
+  @@map("movimiento_saldo_ausencia")
+}
+
+// ============================================================
+// 📅 Módulo de Planificación de Personal (Resource Planning)
+// ============================================================
+
+/// CHECK constraint: proyectoId XOR solicitudAusenciaId — ver migración.
+/// proyectoId y solicitudAusenciaId son mutuamente excluyentes:
+/// exactamente uno debe estar presente (también validado en API).
+model PlanificacionDia {
+  id                  String   @id @default(cuid())
+  userId              String
+  fecha               DateTime @db.Date
+  turno               TurnoDia @default(dia_completo)
+
+  proyectoId          String? // asignación productiva a proyecto
+  solicitudAusenciaId String? // ausencia materializada al aprobar SolicitudAusencia
+  tipoAusenciaId      String? // snapshot de display (evita JOIN en vistas de planificación)
+
+  esExcepcional Boolean  @default(false) // fin de semana extra o feriado trabajado
+  notas         String?
+  createdById   String
+  updatedById   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user              User               @relation("PlanificacionPersona", fields: [userId], references: [id])
+  proyecto          Proyecto?          @relation(fields: [proyectoId], references: [id], onDelete: SetNull)
+  solicitudAusencia SolicitudAusencia? @relation(fields: [solicitudAusenciaId], references: [id], onDelete: Cascade)
+  tipoAusencia      TipoAusencia?      @relation(fields: [tipoAusenciaId], references: [id], onDelete: SetNull)
+  createdBy         User               @relation("PlanificacionCreador", fields: [createdById], references: [id])
+  updatedBy         User?              @relation("PlanificacionActualizador", fields: [updatedById], references: [id])
+
+  @@unique([userId, fecha, turno])
+  @@index([fecha, userId])
+  @@index([userId, fecha])
+  @@index([proyectoId, fecha])
+  @@index([fecha])
+  @@map("planificacion_dia")
 }

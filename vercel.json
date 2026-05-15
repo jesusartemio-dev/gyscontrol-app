@@ -1,9 +1,11 @@
 {
   "crons": [
-    { "path": "/api/cron/actualizar-vencimiento", "schedule": "0 13 * * *" },
-    { "path": "/api/cron/cartas-fianza",          "schedule": "0 13 * * *" },
-    { "path": "/api/cron/asistencia-reporte",     "schedule": "0 19 * * *" },
-    { "path": "/api/cron/cerrar-asistencia",      "schedule": "59 4 * * *" }
+    { "path": "/api/cron/actualizar-vencimiento",        "schedule": "0 13 * * *"  },
+    { "path": "/api/cron/cartas-fianza",                 "schedule": "0 13 * * *"  },
+    { "path": "/api/cron/asistencia-reporte",            "schedule": "0 19 * * *"  },
+    { "path": "/api/cron/cerrar-asistencia",             "schedule": "59 4 * * *"  },
+    { "path": "/api/cron/ausencias/sync?job=activar",   "schedule": "5 0 * * *"   },
+    { "path": "/api/cron/ausencias/sync?job=finalizar", "schedule": "55 23 * * *" }
   ],
   "functions": {
     "api/iperc/render-xlsx.py": {

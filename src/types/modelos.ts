@@ -50,6 +50,8 @@ export type NotificationBadgeType =
   | 'timesheet-no-enviado'
   | 'timesheet-rechazado'
   | 'timesheet-pendientes-aprobacion'
+  // Ausencias
+  | 'ausencias-pendientes'
 
 
 // ✅ Tipo para enlaces del sidebar con notificaciones

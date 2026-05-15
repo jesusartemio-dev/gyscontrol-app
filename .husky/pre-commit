@@ -1,3 +1,4 @@
+#!/bin/sh
 # 🔍 Auditoría de Consistencia BD-API-Componentes
 echo "🔍 Ejecutando auditoría de consistencia..."
 npm run audit:consistency

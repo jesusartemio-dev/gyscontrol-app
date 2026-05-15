@@ -68,6 +68,10 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
     "db:seed:organigrama": "tsx prisma/seeds/organigrama.ts",
+    "db:seed:ausencias": "tsx prisma/seeds/tipos-ausencia.ts",
+    "db:seed:saldos-iniciales": "tsx prisma/seeds/saldos-ausencia-inicial.ts",
+    "db:prod:seed:ausencias": "dotenv -e .env.production -- tsx prisma/seeds/tipos-ausencia.ts",
+    "db:prod:seed:saldos-iniciales": "dotenv -e .env.production -- tsx prisma/seeds/saldos-ausencia-inicial.ts",
     "db:studio": "prisma studio",
     "db:validate": "prisma validate",
     "db:local:studio": "prisma studio",
@@ -75,7 +79,8 @@
     "db:prod:migrate": "dotenv -e .env.production -- prisma migrate deploy",
     "db:prod:push": "dotenv -e .env.production -- prisma db push",
     "postinstall": "prisma generate && prisma migrate deploy",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "validate:ausencias": "tsx scripts/validar-ausencias-e2e.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.74.0",

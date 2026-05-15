@@ -45,6 +45,7 @@ const DEFAULT_COUNTS: NotificationCounts = {
   'timesheet-no-enviado': 0,
   'timesheet-rechazado': 0,
   'timesheet-pendientes-aprobacion': 0,
+  'ausencias-pendientes': 0,
 }
 
 const DEFAULT_PREFERENCES: UserPreferences = {
@@ -161,6 +162,7 @@ export function useNotifications(): UseNotificationsReturn {
         'timesheet-no-enviado': data['timesheet-no-enviado'] || 0,
         'timesheet-rechazado': data['timesheet-rechazado'] || 0,
         'timesheet-pendientes-aprobacion': data['timesheet-pendientes-aprobacion'] || 0,
+        'ausencias-pendientes': data['ausencias-pendientes'] || 0,
       }
 
       setCounts(newCounts)
