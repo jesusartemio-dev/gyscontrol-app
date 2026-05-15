@@ -46,7 +46,48 @@ import { abreviarCargo, abreviarNombre } from '@/lib/planificacion/format'
 
 const DEPT_ORDER = ['INGENIERIA', 'CONSTRUCCION', 'GESTION', 'PROYECTOS']
 const ROLES_PERMITIDOS = ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos']
-const GRID_COLS = 'grid-cols-[260px_repeat(7,1fr)_70px]'
+
+type Rango = '1' | '2' | '4' | 'mes'
+type TextMode = 'full' | 'short' | 'mini' | 'none'
+
+function rangoToSemanas(rango: Rango, mesBase: { anio: number; mes: number } | null): number {
+  if (rango === 'mes' && mesBase) return weeksForMonth(mesBase.anio, mesBase.mes)
+  return parseInt(rango) || 1
+}
+
+function firstMondayOnOrBefore(anio: number, mes: number): string {
+  const firstDay = new Date(Date.UTC(anio, mes - 1, 1))
+  const dow = firstDay.getUTCDay()
+  const daysBack = dow === 0 ? 6 : dow === 1 ? 0 : dow - 1
+  return new Date(firstDay.getTime() - daysBack * 86400000).toISOString().slice(0, 10)
+}
+
+function weeksForMonth(anio: number, mes: number): number {
+  const inicio = new Date(firstMondayOnOrBefore(anio, mes) + 'T00:00:00.000Z')
+  const lastDay = new Date(Date.UTC(anio, mes, 0))
+  const dow = lastDay.getUTCDay()
+  const daysForward = dow === 0 ? 0 : 7 - dow
+  const lastSunday = new Date(lastDay.getTime() + daysForward * 86400000)
+  return Math.round(((lastSunday.getTime() - inicio.getTime()) / 86400000 + 1) / 7)
+}
+
+function textModeForSemanas(n: number): TextMode {
+  if (n <= 1) return 'full'
+  if (n <= 2) return 'short'
+  if (n <= 4) return 'mini'
+  return 'none'
+}
+
+function colWidthForSemanas(n: number): string {
+  if (n <= 1) return 'minmax(52px, 1fr)'
+  if (n <= 2) return 'minmax(44px, 1fr)'
+  if (n <= 4) return 'minmax(36px, 1fr)'
+  return 'minmax(28px, 1fr)'
+}
+
+function gridTemplate(numDias: number, n: number): string {
+  return `260px repeat(${numDias}, ${colWidthForSemanas(n)}) 60px`
+}
 
 interface CeldaEntry {
   id: string
@@ -70,7 +111,7 @@ interface PersonaEntry {
 }
 
 interface SemanaResponse {
-  semana: { inicio: string; fin: string; isoWeek: string }
+  semana: { inicio: string; fin: string; isoWeek: string; numSemanas: number }
   departamento: { id: string; nombre: string } | null
   personas: PersonaEntry[]
   proyectos: Array<{ id: string; codigo: string; nombre: string; color: string }>
@@ -108,10 +149,21 @@ function formatDateRange(inicio: string): string {
   return `${format(d1, 'd MMM', { locale: es })} – ${format(d2, 'd MMM yyyy', { locale: es })}`
 }
 
+function celdaLabel(codigo: string | undefined, textMode: TextMode): string | null {
+  if (!codigo) return null
+  if (textMode === 'full' || textMode === 'short') return codigo
+  if (textMode === 'mini') {
+    // first char + last 2 chars, e.g. "CJM46" → "C46"
+    return codigo.length <= 3 ? codigo : codigo[0] + codigo.slice(-2)
+  }
+  return null
+}
+
 function CeldaDia({
   celda,
   dimmed,
   isWeekend,
+  textMode,
   onClickEmpty,
   onClickProyecto,
   onClickAusencia,
@@ -119,6 +171,7 @@ function CeldaDia({
   celda: CeldaEntry[]
   dimmed: boolean
   isWeekend: boolean
+  textMode: TextMode
   onClickEmpty: () => void
   onClickProyecto: () => void
   onClickAusencia: () => void
@@ -129,7 +182,9 @@ function CeldaDia({
         className="group relative flex items-center justify-center h-full border border-dashed border-transparent hover:border-border cursor-pointer rounded"
         onClick={onClickEmpty}
       >
-        <span className="text-muted-foreground/30 group-hover:text-muted-foreground text-lg font-light">+</span>
+        {textMode !== 'none' && (
+          <span className="text-muted-foreground/30 group-hover:text-muted-foreground text-lg font-light">+</span>
+        )}
       </div>
     )
   }
@@ -137,6 +192,7 @@ function CeldaDia({
   const c = celda[0]
 
   if (c.tipo === 'ausencia') {
+    const label = textMode === 'none' ? null : (c.ausencia?.codigo ?? 'AUS')
     return (
       <Tooltip>
         <TooltipTrigger asChild>
@@ -149,7 +205,7 @@ function CeldaDia({
             style={{ background: 'repeating-linear-gradient(45deg, #f3f4f6, #f3f4f6 4px, #e5e7eb 4px, #e5e7eb 8px)' }}
             onClick={onClickAusencia}
           >
-            <span className="bg-white/80 rounded px-1">{c.ausencia?.codigo ?? 'AUS'}</span>
+            {label && <span className="bg-white/80 rounded px-1">{label}</span>}
             {c.esExcepcional && (
               <span className="absolute top-0.5 right-0.5 text-[9px]">⏰</span>
             )}
@@ -167,12 +223,13 @@ function CeldaDia({
   }
 
   const color = c.proyecto?.color ?? '#6b7280'
+  const label = celdaLabel(c.proyecto?.codigo, textMode)
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <div
           className={cn(
-            'relative flex items-center justify-center h-full rounded cursor-pointer text-xs font-semibold px-1',
+            'relative flex items-center justify-center h-full rounded cursor-pointer text-xs font-semibold px-0.5',
             dimmed && 'opacity-30',
             isWeekend && c.esExcepcional && 'border-dashed',
           )}
@@ -185,7 +242,7 @@ function CeldaDia({
           }}
           onClick={onClickProyecto}
         >
-          <span className="truncate">{c.proyecto?.codigo}</span>
+          {label && <span className="truncate">{label}</span>}
           {c.esExcepcional && <span className="absolute top-0.5 right-0.5 text-[9px]">⏰</span>}
         </div>
       </TooltipTrigger>
@@ -240,6 +297,8 @@ function SortablePersonaRow({
   proyectoFiltro,
   semanaInicio,
   hoyKey,
+  textMode,
+  gridCols,
   onClickEmpty,
   onClickProyecto,
   onClickAusencia,
@@ -249,6 +308,8 @@ function SortablePersonaRow({
   proyectoFiltro: string
   semanaInicio: string
   hoyKey: string
+  textMode: TextMode
+  gridCols: string
   onClickEmpty: (fecha: string) => void
   onClickProyecto: (fecha: string, celda: CeldaEntry) => void
   onClickAusencia: (celda: CeldaEntry) => void
@@ -258,6 +319,8 @@ function SortablePersonaRow({
   })
 
   const style = {
+    display: 'grid',
+    gridTemplateColumns: gridCols,
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
@@ -269,7 +332,7 @@ function SortablePersonaRow({
     <div
       ref={setNodeRef}
       style={style}
-      className={cn('grid h-10 border-b hover:bg-muted/20 items-center', GRID_COLS)}
+      className="h-10 border-b hover:bg-muted/20 items-center"
     >
       <div className="flex items-center gap-1 px-2 overflow-hidden">
         <button
@@ -310,6 +373,7 @@ function SortablePersonaRow({
               celda={celdasDia}
               dimmed={dimmed}
               isWeekend={isWeekend}
+              textMode={textMode}
               onClickEmpty={() => onClickEmpty(dateKey)}
               onClickProyecto={() => onClickProyecto(dateKey, celdasDia[0])}
               onClickAusencia={() => onClickAusencia(celdasDia[0])}
@@ -330,6 +394,8 @@ export default function PlanificacionPage() {
   const role = (session?.user as any)?.role as string | undefined
 
   const [semanaInicio, setSemanaInicio] = useState<string>(currentMondayUTC)
+  const [rango, setRango] = useState<Rango>('1')
+  const [mesBase, setMesBase] = useState<{ anio: number; mes: number } | null>(null)
   const [departamentosSeleccionados, setDepartamentosSeleccionados] = useState<string[]>([])
   const [proyectoFiltro, setProyectoFiltro] = useState<string>('__all__')
   const [busqueda, setBusqueda] = useState('')
@@ -368,10 +434,14 @@ export default function PlanificacionPage() {
     )
   }, [departamentos])
 
+  const numSemanas = useMemo(() => rangoToSemanas(rango, mesBase), [rango, mesBase])
+  const textMode = useMemo(() => textModeForSemanas(numSemanas), [numSemanas])
+  const gridCols = useMemo(() => gridTemplate(numSemanas * 7, numSemanas), [numSemanas])
+
   useEffect(() => {
     if (!semanaInicio) return
     setLoading(true)
-    const params = new URLSearchParams({ inicio: semanaInicio })
+    const params = new URLSearchParams({ inicio: semanaInicio, semanas: String(numSemanas) })
     if (departamentosSeleccionados.length > 0) {
       params.set('departamentos', departamentosSeleccionados.join(','))
     }
@@ -380,7 +450,7 @@ export default function PlanificacionPage() {
       .then(setData)
       .catch(() => toast.error('Error al cargar planificación'))
       .finally(() => setLoading(false))
-  }, [semanaInicio, departamentosSeleccionados])
+  }, [semanaInicio, departamentosSeleccionados, numSemanas])
 
   useEffect(() => {
     if (!data?.personas) return
@@ -440,7 +510,7 @@ export default function PlanificacionPage() {
   }, [personasFiltradas, personOrder])
 
   const diasHeader = useMemo((): DiaHeader[] => {
-    return Array.from({ length: 7 }, (_, i) => {
+    return Array.from({ length: numSemanas * 7 }, (_, i) => {
       const d = new Date(semanaInicio + 'T00:00:00.000Z')
       d.setUTCDate(d.getUTCDate() + i)
       const dateKey = d.toISOString().slice(0, 10)
@@ -452,7 +522,7 @@ export default function PlanificacionPage() {
         isWeekend: utcDay === 0 || utcDay === 6,
       }
     })
-  }, [semanaInicio, hoyKey])
+  }, [semanaInicio, hoyKey, numSemanas])
 
   const handleDragEnd = useCallback((deptId: string, event: DragEndEvent) => {
     const { active, over } = event
@@ -468,7 +538,7 @@ export default function PlanificacionPage() {
 
   const reload = useCallback(() => {
     setLoading(true)
-    const params = new URLSearchParams({ inicio: semanaInicio })
+    const params = new URLSearchParams({ inicio: semanaInicio, semanas: String(numSemanas) })
     if (departamentosSeleccionados.length > 0) {
       params.set('departamentos', departamentosSeleccionados.join(','))
     }
@@ -477,7 +547,7 @@ export default function PlanificacionPage() {
       .then(setData)
       .catch(() => toast.error('Error al cargar planificación'))
       .finally(() => setLoading(false))
-  }, [semanaInicio, departamentosSeleccionados])
+  }, [semanaInicio, departamentosSeleccionados, numSemanas])
 
   if (role && !ROLES_PERMITIDOS.includes(role)) {
     return (
@@ -494,7 +564,11 @@ export default function PlanificacionPage() {
           <div>
             <h1 className="text-2xl font-bold">Planificación de personal</h1>
             <p className="text-sm text-muted-foreground">
-              Semana {data?.semana.isoWeek ?? '…'} · {formatDateRange(semanaInicio)}
+              {rango === '1'
+                ? `Semana ${data?.semana.isoWeek ?? '…'} · ${formatDateRange(semanaInicio)}`
+                : rango === 'mes' && mesBase
+                  ? `${new Date(Date.UTC(mesBase.anio, mesBase.mes - 1, 1)).toLocaleDateString('es', { month: 'long', year: 'numeric', timeZone: 'UTC' })}`
+                  : `${numSemanas} semanas · ${formatDateRange(semanaInicio)}`}
             </p>
           </div>
           <Button variant="outline" onClick={() => setShowCopiarModal(true)}>
@@ -504,16 +578,76 @@ export default function PlanificacionPage() {
 
         <div className="flex flex-wrap gap-3 mb-4">
           <div className="flex gap-1">
-            <Button variant="outline" size="sm" onClick={() => setSemanaInicio(addWeeks(semanaInicio, -1))}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (rango === 'mes' && mesBase) {
+                  const prev = mesBase.mes === 1 ? { anio: mesBase.anio - 1, mes: 12 } : { anio: mesBase.anio, mes: mesBase.mes - 1 }
+                  setMesBase(prev)
+                  setSemanaInicio(firstMondayOnOrBefore(prev.anio, prev.mes))
+                } else {
+                  setSemanaInicio(addWeeks(semanaInicio, -numSemanas))
+                }
+              }}
+            >
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setSemanaInicio(hoy)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const todayMonday = hoy
+                setSemanaInicio(todayMonday)
+                if (rango === 'mes') {
+                  const now = new Date()
+                  setMesBase({ anio: now.getUTCFullYear(), mes: now.getUTCMonth() + 1 })
+                  setSemanaInicio(firstMondayOnOrBefore(now.getUTCFullYear(), now.getUTCMonth() + 1))
+                }
+              }}
+            >
               Hoy
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setSemanaInicio(addWeeks(semanaInicio, 1))}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (rango === 'mes' && mesBase) {
+                  const next = mesBase.mes === 12 ? { anio: mesBase.anio + 1, mes: 1 } : { anio: mesBase.anio, mes: mesBase.mes + 1 }
+                  setMesBase(next)
+                  setSemanaInicio(firstMondayOnOrBefore(next.anio, next.mes))
+                } else {
+                  setSemanaInicio(addWeeks(semanaInicio, numSemanas))
+                }
+              }}
+            >
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
+
+          <Select
+            value={rango}
+            onValueChange={(v) => {
+              const r = v as Rango
+              setRango(r)
+              if (r === 'mes') {
+                const d = new Date(semanaInicio + 'T00:00:00.000Z')
+                const mb = { anio: d.getUTCFullYear(), mes: d.getUTCMonth() + 1 }
+                setMesBase(mb)
+                setSemanaInicio(firstMondayOnOrBefore(mb.anio, mb.mes))
+              }
+            }}
+          >
+            <SelectTrigger className="w-36 h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1">1 semana</SelectItem>
+              <SelectItem value="2">2 semanas</SelectItem>
+              <SelectItem value="4">4 semanas</SelectItem>
+              <SelectItem value="mes">Mes calendario</SelectItem>
+            </SelectContent>
+          </Select>
 
           <Input
             placeholder="Buscar persona..."
@@ -579,24 +713,45 @@ export default function PlanificacionPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <div className="min-w-[860px]">
+            <div style={{ minWidth: `${260 + numSemanas * 7 * 36 + 60}px` }}>
+              {/* Week group sub-headers for multi-week view */}
+              {numSemanas > 1 && (
+                <div style={{ display: 'grid', gridTemplateColumns: gridCols }} className="text-[10px] font-semibold text-muted-foreground border-b bg-muted/20">
+                  <div />
+                  {Array.from({ length: numSemanas }, (_, wi) => {
+                    const monday = new Date(semanaInicio + 'T00:00:00.000Z')
+                    monday.setUTCDate(monday.getUTCDate() + wi * 7)
+                    const sunday = new Date(monday.getTime() + 6 * 86400000)
+                    const label = `${monday.getUTCDate()} – ${sunday.getUTCDate()} ${sunday.toLocaleDateString('es', { month: 'short', timeZone: 'UTC' })}`
+                    return (
+                      <div key={wi} className="col-span-7 text-center py-0.5 border-r last:border-r-0 leading-tight">
+                        {label}
+                      </div>
+                    )
+                  })}
+                  <div />
+                </div>
+              )}
+
               {/* Header de días */}
-              <div className={cn('grid text-xs font-medium text-muted-foreground border-b mb-0.5 pb-1', GRID_COLS)}>
+              <div style={{ display: 'grid', gridTemplateColumns: gridCols }} className="text-xs font-medium text-muted-foreground border-b mb-0.5 pb-1">
                 <div className="px-3">Persona</div>
                 {diasHeader.map(({ dateKey, d, isHoy, isWeekend }) => {
-                  const dayName = d.toLocaleDateString('es', { weekday: 'short', timeZone: 'UTC' })
+                  const dayName = textMode === 'full'
+                    ? d.toLocaleDateString('es', { weekday: 'short', timeZone: 'UTC' })
+                    : d.toLocaleDateString('es', { weekday: 'narrow', timeZone: 'UTC' })
                   const dayNum = d.getUTCDate()
                   return (
                     <div
                       key={dateKey}
                       className={cn(
                         'text-center px-0.5 rounded',
-                        isWeekend && 'text-muted-foreground',
+                        isWeekend && 'text-muted-foreground/60',
                         isHoy && 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-l-2 border-blue-500',
                       )}
                     >
-                      {dayName} {dayNum}
-                      {isHoy && (
+                      {textMode === 'full' ? `${dayName} ${dayNum}` : dayNum}
+                      {isHoy && textMode === 'full' && (
                         <span className="ml-1 text-[9px] bg-blue-500 text-white rounded px-1 py-px leading-none">
                           Hoy
                         </span>
@@ -615,8 +770,14 @@ export default function PlanificacionPage() {
 
               {gruposPorDepartamento.map((grupo) => (
                 <div key={grupo.id}>
-                  <div className={cn('grid h-7 bg-muted/50 border-b border-t items-center', GRID_COLS)}>
-                    <div className="px-3 col-span-9 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">
+                  <div
+                    style={{ display: 'grid', gridTemplateColumns: gridCols }}
+                    className="h-7 bg-muted/50 border-b border-t items-center"
+                  >
+                    <div
+                      className="px-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest"
+                      style={{ gridColumn: `1 / -1` }}
+                    >
                       {grupo.nombre}
                     </div>
                   </div>
@@ -637,6 +798,8 @@ export default function PlanificacionPage() {
                           proyectoFiltro={proyectoFiltro}
                           semanaInicio={semanaInicio}
                           hoyKey={hoyKey}
+                          textMode={textMode}
+                          gridCols={gridCols}
                           onClickEmpty={(fecha) =>
                             setModalCelda({ userId: persona.userId, nombre: persona.nombre, fecha })
                           }

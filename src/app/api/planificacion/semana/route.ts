@@ -39,6 +39,9 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    const semanasStr = searchParams.get('semanas')
+    const numSemanas = Math.min(6, Math.max(1, parseInt(semanasStr ?? '1') || 1))
+
     const inicio = new Date(inicioStr + 'T00:00:00.000Z')
     if (isNaN(inicio.getTime())) {
       return NextResponse.json({ error: 'Fecha inicio inválida' }, { status: 400 })
@@ -47,8 +50,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'La fecha inicio debe ser un lunes' }, { status: 400 })
     }
 
-    const dias = Array.from({ length: 7 }, (_, i) => addDays(inicio, i))
-    const fin = dias[6]
+    const dias = Array.from({ length: numSemanas * 7 }, (_, i) => addDays(inicio, i))
+    const fin = dias[dias.length - 1]
 
     // Departamento único para compatibilidad backward (respuesta)
     const departamento = departamentoId
@@ -94,6 +97,7 @@ export async function GET(request: NextRequest) {
           inicio: toDateKey(inicio),
           fin: toDateKey(fin),
           isoWeek: dateToISOWeek(inicio),
+          numSemanas,
         },
         departamento,
         personas: [],
@@ -164,7 +168,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const diasLaborables = 5 // Lun–Vie
+    const diasLaborables = numSemanas * 5
 
     const personas = empleados.map((emp) => {
       const personaDias = mapaPersonaDia.get(emp.userId)!
@@ -199,6 +203,7 @@ export async function GET(request: NextRequest) {
         inicio: toDateKey(inicio),
         fin: toDateKey(fin),
         isoWeek: dateToISOWeek(inicio),
+        numSemanas,
       },
       departamento,
       personas,
