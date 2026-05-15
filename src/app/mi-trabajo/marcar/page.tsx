@@ -218,8 +218,13 @@ export default function MarcarPage() {
       await enviarMarcaje(tipo)
       return
     }
-    // Modo remoto declarado: marca sin GPS ni QR (validación remota se hace server-side)
+    // Modo remoto declarado: intentar GPS primero. Si el GPS detecta que están dentro de una
+    // sede oficial (planta/oficina/campo), el servidor anula la modalidad remota y el marcaje
+    // queda como presencial en esa sede. Si no hay GPS o no están en sede, marca como remoto.
     if (modoHoy?.esRemoto) {
+      if (!geo.coords && permisoGps !== 'denied') {
+        await geo.solicitar()
+      }
       await enviarMarcaje(tipo)
       return
     }
@@ -301,6 +306,7 @@ export default function MarcarPage() {
           <span>
             <strong className="text-purple-900">Modalidad remota hoy:</strong>{' '}
             {modoHoy.razon || 'autorizado'}.
+            {' '}Si estás en planta u oficina, tu marcaje quedará como presencial automáticamente.
           </span>
         </div>
       )}
@@ -452,10 +458,17 @@ export default function MarcarPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               {modoHoy?.esRemoto ? (
-                <>
-                  <Home className="h-4 w-4" />
-                  Marcaje remoto (sin GPS)
-                </>
+                cercanas?.sedeEnZona ? (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                    <span>Presencial en <strong>{cercanas.sedeEnZona.nombre}</strong></span>
+                  </>
+                ) : (
+                  <>
+                    <Home className="h-4 w-4" />
+                    Marcaje remoto
+                  </>
+                )
               ) : (
                 <>
                   <MapPin className="h-4 w-4" />
