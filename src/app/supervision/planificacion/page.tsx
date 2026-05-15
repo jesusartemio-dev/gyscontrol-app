@@ -143,8 +143,8 @@ export default function PlanificacionPage() {
   const role = (session?.user as any)?.role as string | undefined
 
   const [semanaInicio, setSemanaInicio] = useState<string>(currentMondayUTC)
-  const [departamentoId, setDepartamentoId] = useState<string>('')
-  const [proyectoFiltro, setProyectoFiltro] = useState<string>('')
+  const [departamentoId, setDepartamentoId] = useState<string>('__all__')
+  const [proyectoFiltro, setProyectoFiltro] = useState<string>('__all__')
   const [busqueda, setBusqueda] = useState('')
   const [data, setData] = useState<SemanaResponse | null>(null)
   const [departamentos, setDepartamentos] = useState<Departamento[]>([])
@@ -167,7 +167,7 @@ export default function PlanificacionPage() {
     if (!semanaInicio) return
     setLoading(true)
     const params = new URLSearchParams({ inicio: semanaInicio })
-    if (departamentoId) params.set('departamentoId', departamentoId)
+    if (departamentoId && departamentoId !== '__all__') params.set('departamentoId', departamentoId)
     fetch(`/api/planificacion/semana?${params}`)
       .then((r) => r.json())
       .then(setData)
@@ -193,7 +193,7 @@ export default function PlanificacionPage() {
   const reload = () => {
     setLoading(true)
     const params = new URLSearchParams({ inicio: semanaInicio })
-    if (departamentoId) params.set('departamentoId', departamentoId)
+    if (departamentoId && departamentoId !== '__all__') params.set('departamentoId', departamentoId)
     fetch(`/api/planificacion/semana?${params}`)
       .then((r) => r.json())
       .then(setData)
@@ -248,7 +248,7 @@ export default function PlanificacionPage() {
             <SelectValue placeholder="Departamento" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Todos</SelectItem>
+            <SelectItem value="__all__">Todos</SelectItem>
             {departamentos.map((d) => (
               <SelectItem key={d.id} value={d.id}>{d.nombre}</SelectItem>
             ))}
@@ -260,7 +260,7 @@ export default function PlanificacionPage() {
             <SelectValue placeholder="Filtrar proyecto" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Todos los proyectos</SelectItem>
+            <SelectItem value="__all__">Todos los proyectos</SelectItem>
             {data?.proyectos.map((p) => (
               <SelectItem key={p.id} value={p.id}>[{p.codigo}] {p.nombre}</SelectItem>
             ))}
@@ -317,7 +317,7 @@ export default function PlanificacionPage() {
                   const celdasDia = persona.dias[dateKey] ?? []
                   const isWeekend = d.getUTCDay() === 0 || d.getUTCDay() === 6
                   const dimmed =
-                    !!proyectoFiltro &&
+                    proyectoFiltro !== '__all__' &&
                     celdasDia.length > 0 &&
                     !celdasDia.some((c) => c.proyecto?.id === proyectoFiltro)
                   return (
@@ -392,7 +392,7 @@ export default function PlanificacionPage() {
         open={showCopiarModal}
         onClose={() => { setShowCopiarModal(false); reload() }}
         semanaActual={semanaInicio}
-        departamentoId={departamentoId || undefined}
+        departamentoId={departamentoId !== '__all__' ? departamentoId : undefined}
       />
     </div>
   )
