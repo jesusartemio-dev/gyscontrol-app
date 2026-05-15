@@ -20,6 +20,12 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import {
   DndContext,
   DragEndEvent,
   PointerSensor,
@@ -36,9 +42,11 @@ import { CSS } from '@dnd-kit/utilities'
 import AsignacionCeldaModal from '@/components/planificacion/AsignacionCeldaModal'
 import AusenciaDetailModal from '@/components/planificacion/AusenciaDetailModal'
 import CopiarSemanaModal from '@/components/planificacion/CopiarSemanaModal'
+import { abreviarCargo, abreviarNombre } from '@/lib/planificacion/format'
 
 const DEPT_ORDER = ['INGENIERIA', 'CONSTRUCCION', 'GESTION', 'PROYECTOS']
 const ROLES_PERMITIDOS = ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos']
+const GRID_COLS = 'grid-cols-[260px_repeat(7,1fr)_70px]'
 
 interface CeldaEntry {
   id: string
@@ -73,11 +81,20 @@ interface Departamento {
   nombre: string
 }
 
+type DiaHeader = { dateKey: string; d: Date; isHoy: boolean; isWeekend: boolean }
+
 function currentMondayUTC(): string {
   const now = new Date()
   const day = now.getUTCDay() || 7
   const ms = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) - (day - 1) * 86400000
   return new Date(ms).toISOString().slice(0, 10)
+}
+
+function todayUTC(): string {
+  const now = new Date()
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+    .toISOString()
+    .slice(0, 10)
 }
 
 function addWeeks(dateStr: string, n: number): string {
@@ -94,12 +111,14 @@ function formatDateRange(inicio: string): string {
 function CeldaDia({
   celda,
   dimmed,
+  isWeekend,
   onClickEmpty,
   onClickProyecto,
   onClickAusencia,
 }: {
   celda: CeldaEntry[]
   dimmed: boolean
+  isWeekend: boolean
   onClickEmpty: () => void
   onClickProyecto: () => void
   onClickAusencia: () => void
@@ -119,34 +138,99 @@ function CeldaDia({
 
   if (c.tipo === 'ausencia') {
     return (
-      <div
-        className={cn('relative flex items-center justify-center h-full rounded cursor-pointer text-xs font-medium', dimmed && 'opacity-30')}
-        style={{ background: 'repeating-linear-gradient(45deg, #f3f4f6, #f3f4f6 4px, #e5e7eb 4px, #e5e7eb 8px)' }}
-        onClick={onClickAusencia}
-      >
-        <span className="bg-white/80 rounded px-1">{c.ausencia?.codigo ?? 'AUS'}</span>
-      </div>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div
+            className={cn(
+              'relative flex items-center justify-center h-full rounded cursor-pointer text-xs font-medium',
+              dimmed && 'opacity-30',
+              isWeekend && c.esExcepcional && 'border border-dashed border-gray-400',
+            )}
+            style={{ background: 'repeating-linear-gradient(45deg, #f3f4f6, #f3f4f6 4px, #e5e7eb 4px, #e5e7eb 8px)' }}
+            onClick={onClickAusencia}
+          >
+            <span className="bg-white/80 rounded px-1">{c.ausencia?.codigo ?? 'AUS'}</span>
+            {c.esExcepcional && (
+              <span className="absolute top-0.5 right-0.5 text-[9px]">⏰</span>
+            )}
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-[200px]">
+          <p className="font-medium text-xs">
+            {c.ausencia?.tipo ?? 'Ausencia'}
+            {c.ausencia?.codigo ? ` (${c.ausencia.codigo})` : ''}
+          </p>
+          {c.notas && <p className="text-xs text-muted-foreground mt-0.5">{c.notas}</p>}
+        </TooltipContent>
+      </Tooltip>
     )
   }
 
   const color = c.proyecto?.color ?? '#6b7280'
   return (
-    <div
-      className={cn('relative flex items-center justify-center h-full rounded cursor-pointer text-xs font-semibold px-1', dimmed && 'opacity-30')}
-      style={{ backgroundColor: color + '33', border: `1px solid ${color}66`, color }}
-      onClick={onClickProyecto}
-    >
-      <span className="truncate">{c.proyecto?.codigo}</span>
-      {c.esExcepcional && <span className="absolute top-0.5 right-0.5 text-[9px]">⏰</span>}
-    </div>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div
+          className={cn(
+            'relative flex items-center justify-center h-full rounded cursor-pointer text-xs font-semibold px-1',
+            dimmed && 'opacity-30',
+            isWeekend && c.esExcepcional && 'border-dashed',
+          )}
+          style={{
+            backgroundColor: color + '33',
+            border: isWeekend && c.esExcepcional
+              ? `1px dashed ${color}88`
+              : `1px solid ${color}66`,
+            color,
+          }}
+          onClick={onClickProyecto}
+        >
+          <span className="truncate">{c.proyecto?.codigo}</span>
+          {c.esExcepcional && <span className="absolute top-0.5 right-0.5 text-[9px]">⏰</span>}
+        </div>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-[220px]">
+        <p className="font-medium text-xs">
+          [{c.proyecto?.codigo}] {c.proyecto?.nombre}
+        </p>
+        {c.notas && <p className="text-xs text-muted-foreground mt-0.5">{c.notas}</p>}
+      </TooltipContent>
+    </Tooltip>
   )
 }
 
-function UtilBadge({ util }: { util: string }) {
-  const [dias, total] = util.split('/').map(Number)
-  if (dias > total) return <span className="text-xs font-medium text-yellow-600">{util}</span>
-  if (dias === total) return <span className="text-xs font-medium text-green-600">{util}</span>
-  if (dias <= Math.floor(total / 2)) return <span className="text-xs font-medium text-red-500">{util}</span>
+function UtilBadge({
+  util,
+  semanaInicio,
+  hoyKey,
+}: {
+  util: string
+  semanaInicio: string
+  hoyKey: string
+}) {
+  const [asignados, total] = util.split('/').map(Number)
+
+  const lunesMs = new Date(semanaInicio + 'T00:00:00.000Z').getTime()
+  const hoyMs = new Date(hoyKey + 'T00:00:00.000Z').getTime()
+  let diasTranscurridos = 0
+  let d = lunesMs
+  while (d <= hoyMs && diasTranscurridos < 5) {
+    if (new Date(d).getUTCDay() !== 0 && new Date(d).getUTCDay() !== 6) diasTranscurridos++
+    d += 86400000
+  }
+
+  if (asignados === 0 && diasTranscurridos === 0) {
+    return <span className="text-xs font-medium text-muted-foreground">—</span>
+  }
+  if (asignados > total) {
+    return <span className="text-xs font-medium text-amber-600">{util}</span>
+  }
+  if (asignados === total) {
+    return <span className="text-xs font-medium text-green-600">{util}</span>
+  }
+  if (asignados < diasTranscurridos) {
+    return <span className="text-xs font-medium text-red-500">{util}</span>
+  }
   return <span className="text-xs font-medium text-muted-foreground">{util}</span>
 }
 
@@ -154,13 +238,17 @@ function SortablePersonaRow({
   persona,
   diasHeader,
   proyectoFiltro,
+  semanaInicio,
+  hoyKey,
   onClickEmpty,
   onClickProyecto,
   onClickAusencia,
 }: {
   persona: PersonaEntry
-  diasHeader: Array<{ dateKey: string; d: Date }>
+  diasHeader: DiaHeader[]
   proyectoFiltro: string
+  semanaInicio: string
+  hoyKey: string
   onClickEmpty: (fecha: string) => void
   onClickProyecto: (fecha: string, celda: CeldaEntry) => void
   onClickAusencia: (celda: CeldaEntry) => void
@@ -181,7 +269,7 @@ function SortablePersonaRow({
     <div
       ref={setNodeRef}
       style={style}
-      className="grid grid-cols-[200px_repeat(7,1fr)_70px] h-10 border-b hover:bg-muted/20 items-center"
+      className={cn('grid h-10 border-b hover:bg-muted/20 items-center', GRID_COLS)}
     >
       <div className="flex items-center gap-1 px-2 overflow-hidden">
         <button
@@ -192,29 +280,36 @@ function SortablePersonaRow({
         >
           <GripVertical className="h-3.5 w-3.5" />
         </button>
-        <div className="shrink-0 h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-[11px] font-semibold text-primary">
+        <div className="shrink-0 h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-semibold text-primary">
           {persona.iniciales}
         </div>
         <div className="min-w-0 ml-1">
-          <p className="text-sm font-medium truncate leading-none">{persona.nombre}</p>
+          <p className="text-sm font-medium truncate leading-none">{abreviarNombre(persona.nombre)}</p>
           {persona.cargo && (
-            <p className="text-xs text-muted-foreground truncate">{persona.cargo}</p>
+            <p className="text-xs text-muted-foreground truncate">{abreviarCargo(persona.cargo)}</p>
           )}
         </div>
       </div>
 
-      {diasHeader.map(({ dateKey, d }) => {
+      {diasHeader.map(({ dateKey, d, isHoy, isWeekend }) => {
         const celdasDia = persona.dias[dateKey] ?? []
-        const isWeekend = d.getUTCDay() === 0 || d.getUTCDay() === 6
         const dimmed =
           proyectoFiltro !== '__all__' &&
           celdasDia.length > 0 &&
           !celdasDia.some((c) => c.proyecto?.id === proyectoFiltro)
         return (
-          <div key={dateKey} className={cn('h-full px-0.5 py-1', isWeekend && 'bg-muted/30')}>
+          <div
+            key={dateKey}
+            className={cn(
+              'h-full px-0.5 py-1',
+              isWeekend && 'bg-muted/40',
+              isHoy && 'border-l-2 border-blue-500',
+            )}
+          >
             <CeldaDia
               celda={celdasDia}
               dimmed={dimmed}
+              isWeekend={isWeekend}
               onClickEmpty={() => onClickEmpty(dateKey)}
               onClickProyecto={() => onClickProyecto(dateKey, celdasDia[0])}
               onClickAusencia={() => onClickAusencia(celdasDia[0])}
@@ -224,7 +319,7 @@ function SortablePersonaRow({
       })}
 
       <div className="flex items-center justify-center">
-        <UtilBadge util={persona.utilizacion} />
+        <UtilBadge util={persona.utilizacion} semanaInicio={semanaInicio} hoyKey={hoyKey} />
       </div>
     </div>
   )
@@ -253,6 +348,7 @@ export default function PlanificacionPage() {
   const [showCopiarModal, setShowCopiarModal] = useState(false)
 
   const hoy = useMemo(() => currentMondayUTC(), [])
+  const hoyKey = useMemo(() => todayUTC(), [])
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
   useEffect(() => {
@@ -262,7 +358,6 @@ export default function PlanificacionPage() {
       .catch(() => {})
   }, [])
 
-  // Pre-select the 4 default departments once the list loads
   useEffect(() => {
     if (departamentos.length === 0 || departamentosSeleccionados.length > 0) return
     const defaults = departamentos
@@ -287,7 +382,6 @@ export default function PlanificacionPage() {
       .finally(() => setLoading(false))
   }, [semanaInicio, departamentosSeleccionados])
 
-  // Keep personOrder in sync with data: preserve existing custom order, append new users
   useEffect(() => {
     if (!data?.personas) return
     setPersonOrder((prev) => {
@@ -345,13 +439,20 @@ export default function PlanificacionPage() {
       })
   }, [personasFiltradas, personOrder])
 
-  const diasHeader = useMemo(() => {
+  const diasHeader = useMemo((): DiaHeader[] => {
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(semanaInicio + 'T00:00:00.000Z')
       d.setUTCDate(d.getUTCDate() + i)
-      return { dateKey: d.toISOString().slice(0, 10), d }
+      const dateKey = d.toISOString().slice(0, 10)
+      const utcDay = d.getUTCDay()
+      return {
+        dateKey,
+        d,
+        isHoy: dateKey === hoyKey,
+        isWeekend: utcDay === 0 || utcDay === 6,
+      }
     })
-  }, [semanaInicio])
+  }, [semanaInicio, hoyKey])
 
   const handleDragEnd = useCallback((deptId: string, event: DragEndEvent) => {
     const { active, over } = event
@@ -387,210 +488,226 @@ export default function PlanificacionPage() {
   }
 
   return (
-    <div className="container mx-auto p-4 sm:p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">Planificación de personal</h1>
-          <p className="text-sm text-muted-foreground">
-            Semana {data?.semana.isoWeek ?? '…'} · {formatDateRange(semanaInicio)}
-          </p>
-        </div>
-        <Button variant="outline" onClick={() => setShowCopiarModal(true)}>
-          <Copy className="mr-2 h-4 w-4" /> Copiar semana
-        </Button>
-      </div>
-
-      <div className="flex flex-wrap gap-3 mb-4">
-        <div className="flex gap-1">
-          <Button variant="outline" size="sm" onClick={() => setSemanaInicio(addWeeks(semanaInicio, -1))}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setSemanaInicio(hoy)}>
-            Hoy
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setSemanaInicio(addWeeks(semanaInicio, 1))}>
-            <ChevronRight className="h-4 w-4" />
+    <TooltipProvider delayDuration={250}>
+      <div className="container mx-auto p-4 sm:p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-bold">Planificación de personal</h1>
+            <p className="text-sm text-muted-foreground">
+              Semana {data?.semana.isoWeek ?? '…'} · {formatDateRange(semanaInicio)}
+            </p>
+          </div>
+          <Button variant="outline" onClick={() => setShowCopiarModal(true)}>
+            <Copy className="mr-2 h-4 w-4" /> Copiar semana
           </Button>
         </div>
 
-        <Input
-          placeholder="Buscar persona..."
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          className="w-48 h-9"
-        />
-
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="h-9 gap-2">
-              <SlidersHorizontal className="h-4 w-4" />
-              Áreas
-              {departamentosSeleccionados.length > 0 && (
-                <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-xs leading-4">
-                  {departamentosSeleccionados.length}
-                </Badge>
-              )}
+        <div className="flex flex-wrap gap-3 mb-4">
+          <div className="flex gap-1">
+            <Button variant="outline" size="sm" onClick={() => setSemanaInicio(addWeeks(semanaInicio, -1))}>
+              <ChevronLeft className="h-4 w-4" />
             </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-56 p-2" align="start">
-            <p className="text-xs font-medium text-muted-foreground mb-2 px-1">Filtrar por área</p>
-            {departamentos.map((dept) => {
-              const checked = departamentosSeleccionados.includes(dept.id)
-              return (
-                <label
-                  key={dept.id}
-                  className="flex items-center gap-2 px-1 py-1.5 rounded hover:bg-muted/50 cursor-pointer text-sm"
-                >
-                  <Checkbox
-                    checked={checked}
-                    onCheckedChange={(v) =>
-                      setDepartamentosSeleccionados((prev) =>
-                        v ? [...prev, dept.id] : prev.filter((id) => id !== dept.id),
-                      )
-                    }
-                  />
-                  {dept.nombre}
-                </label>
-              )
-            })}
-          </PopoverContent>
-        </Popover>
+            <Button variant="outline" size="sm" onClick={() => setSemanaInicio(hoy)}>
+              Hoy
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setSemanaInicio(addWeeks(semanaInicio, 1))}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
 
-        <Select value={proyectoFiltro} onValueChange={setProyectoFiltro}>
-          <SelectTrigger className="w-52 h-9">
-            <SelectValue placeholder="Filtrar proyecto" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__all__">Todos los proyectos</SelectItem>
-            {data?.proyectos.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                [{p.codigo}] {p.nombre}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+          <Input
+            placeholder="Buscar persona..."
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            className="w-48 h-9"
+          />
 
-      {loading ? (
-        <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
-          Cargando planificación...
-        </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <div className="min-w-[800px]">
-            <div className="grid grid-cols-[200px_repeat(7,1fr)_70px] text-xs font-medium text-muted-foreground border-b mb-0.5 pb-1">
-              <div className="px-3">Persona</div>
-              {diasHeader.map(({ dateKey, d }) => {
-                const isWeekend = d.getUTCDay() === 0 || d.getUTCDay() === 6
-                const dayName = d.toLocaleDateString('es', { weekday: 'short', timeZone: 'UTC' })
-                const dayNum = d.getUTCDate()
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9 gap-2">
+                <SlidersHorizontal className="h-4 w-4" />
+                Áreas
+                {departamentosSeleccionados.length > 0 && (
+                  <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-xs leading-4">
+                    {departamentosSeleccionados.length}
+                  </Badge>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-56 p-2" align="start">
+              <p className="text-xs font-medium text-muted-foreground mb-2 px-1">Filtrar por área</p>
+              {departamentos.map((dept) => {
+                const checked = departamentosSeleccionados.includes(dept.id)
                 return (
-                  <div key={dateKey} className={cn('text-center', isWeekend && 'text-muted-foreground/50')}>
-                    {dayName} {dayNum}
-                  </div>
+                  <label
+                    key={dept.id}
+                    className="flex items-center gap-2 px-1 py-1.5 rounded hover:bg-muted/50 cursor-pointer text-sm"
+                  >
+                    <Checkbox
+                      checked={checked}
+                      onCheckedChange={(v) =>
+                        setDepartamentosSeleccionados((prev) =>
+                          v ? [...prev, dept.id] : prev.filter((id) => id !== dept.id),
+                        )
+                      }
+                    />
+                    {dept.nombre}
+                  </label>
                 )
               })}
-              <div className="text-center">Util.</div>
-            </div>
+            </PopoverContent>
+          </Popover>
 
-            {personasFiltradas.length === 0 && (
-              <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
-                No hay personal en esta semana
-              </div>
-            )}
-
-            {gruposPorDepartamento.map((grupo) => (
-              <div key={grupo.id}>
-                <div className="grid grid-cols-[200px_repeat(7,1fr)_70px] h-7 bg-muted/50 border-b border-t items-center">
-                  <div className="px-3 col-span-9 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">
-                    {grupo.nombre}
-                  </div>
-                </div>
-
-                <DndContext
-                  sensors={sensors}
-                  onDragEnd={(event) => handleDragEnd(grupo.id, event)}
-                >
-                  <SortableContext
-                    items={grupo.personas.map((p) => p.userId)}
-                    strategy={verticalListSortingStrategy}
-                  >
-                    {grupo.personas.map((persona) => (
-                      <SortablePersonaRow
-                        key={persona.userId}
-                        persona={persona}
-                        diasHeader={diasHeader}
-                        proyectoFiltro={proyectoFiltro}
-                        onClickEmpty={(fecha) =>
-                          setModalCelda({ userId: persona.userId, nombre: persona.nombre, fecha })
-                        }
-                        onClickProyecto={(fecha, celda) =>
-                          setModalCelda({ userId: persona.userId, nombre: persona.nombre, fecha, celda })
-                        }
-                        onClickAusencia={(celda) => setModalAusencia(celda)}
-                      />
-                    ))}
-                  </SortableContext>
-                </DndContext>
-              </div>
-            ))}
-          </div>
+          <Select value={proyectoFiltro} onValueChange={setProyectoFiltro}>
+            <SelectTrigger className="w-52 h-9">
+              <SelectValue placeholder="Filtrar proyecto" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">Todos los proyectos</SelectItem>
+              {data?.proyectos.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  [{p.codigo}] {p.nombre}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-      )}
 
-      <div className="mt-4 flex flex-wrap gap-4 text-xs text-muted-foreground">
-        <span className="flex items-center gap-1">
-          <span className="inline-block w-3 h-3 rounded" style={{ backgroundColor: '#3B82F666' }} /> Proyecto
-        </span>
-        <span className="flex items-center gap-1">
-          <span
-            className="inline-block w-3 h-3 rounded"
-            style={{
-              background:
-                'repeating-linear-gradient(45deg, #f3f4f6, #f3f4f6 3px, #e5e7eb 3px, #e5e7eb 6px)',
-            }}
-          />{' '}
-          Ausencia
-        </span>
-        <span className="flex items-center gap-1">⏰ Excepcional</span>
-        {data?.proyectos.map((p) => (
-          <span key={p.id} className="flex items-center gap-1">
-            <span className="inline-block w-3 h-3 rounded" style={{ backgroundColor: p.color + '88' }} />
-            [{p.codigo}] {p.nombre}
+        {loading ? (
+          <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
+            Cargando planificación...
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <div className="min-w-[860px]">
+              {/* Header de días */}
+              <div className={cn('grid text-xs font-medium text-muted-foreground border-b mb-0.5 pb-1', GRID_COLS)}>
+                <div className="px-3">Persona</div>
+                {diasHeader.map(({ dateKey, d, isHoy, isWeekend }) => {
+                  const dayName = d.toLocaleDateString('es', { weekday: 'short', timeZone: 'UTC' })
+                  const dayNum = d.getUTCDate()
+                  return (
+                    <div
+                      key={dateKey}
+                      className={cn(
+                        'text-center px-0.5 rounded',
+                        isWeekend && 'text-muted-foreground',
+                        isHoy && 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-l-2 border-blue-500',
+                      )}
+                    >
+                      {dayName} {dayNum}
+                      {isHoy && (
+                        <span className="ml-1 text-[9px] bg-blue-500 text-white rounded px-1 py-px leading-none">
+                          Hoy
+                        </span>
+                      )}
+                    </div>
+                  )
+                })}
+                <div className="text-center">Util.</div>
+              </div>
+
+              {personasFiltradas.length === 0 && (
+                <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
+                  No hay personal en esta semana
+                </div>
+              )}
+
+              {gruposPorDepartamento.map((grupo) => (
+                <div key={grupo.id}>
+                  <div className={cn('grid h-7 bg-muted/50 border-b border-t items-center', GRID_COLS)}>
+                    <div className="px-3 col-span-9 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">
+                      {grupo.nombre}
+                    </div>
+                  </div>
+
+                  <DndContext
+                    sensors={sensors}
+                    onDragEnd={(event) => handleDragEnd(grupo.id, event)}
+                  >
+                    <SortableContext
+                      items={grupo.personas.map((p) => p.userId)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      {grupo.personas.map((persona) => (
+                        <SortablePersonaRow
+                          key={persona.userId}
+                          persona={persona}
+                          diasHeader={diasHeader}
+                          proyectoFiltro={proyectoFiltro}
+                          semanaInicio={semanaInicio}
+                          hoyKey={hoyKey}
+                          onClickEmpty={(fecha) =>
+                            setModalCelda({ userId: persona.userId, nombre: persona.nombre, fecha })
+                          }
+                          onClickProyecto={(fecha, celda) =>
+                            setModalCelda({ userId: persona.userId, nombre: persona.nombre, fecha, celda })
+                          }
+                          onClickAusencia={(celda) => setModalAusencia(celda)}
+                        />
+                      ))}
+                    </SortableContext>
+                  </DndContext>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="mt-4 flex flex-wrap gap-4 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <span className="inline-block w-3 h-3 rounded" style={{ backgroundColor: '#3B82F666' }} /> Proyecto
           </span>
-        ))}
-      </div>
+          <span className="flex items-center gap-1">
+            <span
+              className="inline-block w-3 h-3 rounded"
+              style={{
+                background:
+                  'repeating-linear-gradient(45deg, #f3f4f6, #f3f4f6 3px, #e5e7eb 3px, #e5e7eb 6px)',
+              }}
+            />{' '}
+            Ausencia
+          </span>
+          <span className="flex items-center gap-1">⏰ Excepcional</span>
+          {data?.proyectos.map((p) => (
+            <span key={p.id} className="flex items-center gap-1">
+              <span className="inline-block w-3 h-3 rounded" style={{ backgroundColor: p.color + '88' }} />
+              [{p.codigo}] {p.nombre}
+            </span>
+          ))}
+        </div>
 
-      {modalCelda && (
-        <AsignacionCeldaModal
-          open={true}
-          onClose={() => setModalCelda(null)}
-          onSaved={() => {
-            setModalCelda(null)
+        {modalCelda && (
+          <AsignacionCeldaModal
+            open={true}
+            onClose={() => setModalCelda(null)}
+            onSaved={() => {
+              setModalCelda(null)
+              reload()
+            }}
+            userId={modalCelda.userId}
+            userName={modalCelda.nombre}
+            fecha={modalCelda.fecha}
+            celdaExistente={modalCelda.celda}
+          />
+        )}
+
+        <AusenciaDetailModal
+          open={!!modalAusencia}
+          onClose={() => setModalAusencia(null)}
+          celda={modalAusencia}
+        />
+
+        <CopiarSemanaModal
+          open={showCopiarModal}
+          onClose={() => {
+            setShowCopiarModal(false)
             reload()
           }}
-          userId={modalCelda.userId}
-          userName={modalCelda.nombre}
-          fecha={modalCelda.fecha}
-          celdaExistente={modalCelda.celda}
+          semanaActual={semanaInicio}
+          departamentoId={departamentosSeleccionados[0]}
         />
-      )}
-
-      <AusenciaDetailModal
-        open={!!modalAusencia}
-        onClose={() => setModalAusencia(null)}
-        celda={modalAusencia}
-      />
-
-      <CopiarSemanaModal
-        open={showCopiarModal}
-        onClose={() => {
-          setShowCopiarModal(false)
-          reload()
-        }}
-        semanaActual={semanaInicio}
-        departamentoId={departamentosSeleccionados[0]}
-      />
-    </div>
+      </div>
+    </TooltipProvider>
   )
 }
