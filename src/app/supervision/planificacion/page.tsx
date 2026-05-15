@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
@@ -124,6 +124,94 @@ interface Departamento {
 
 type DiaHeader = { dateKey: string; d: Date; isHoy: boolean; isWeekend: boolean }
 
+// ── Drag-extend types ─────────────────────────────────────────────────────────
+type TurnoDia = 'dia_completo' | 'turno_a' | 'turno_b' | 'turno_c' | 'turno_noche'
+type CeldaPreviewEstado =
+  | 'libre'
+  | 'ya_asignada_mismo'
+  | 'ya_asignada_otro'
+  | 'ausencia'
+  | 'fin_semana_bloqueado'
+
+type DragInfo =
+  | { type: 'idle' }
+  | {
+      type: 'extending'
+      userId: string
+      turno: TurnoDia
+      proyectoId: string
+      color: string
+      esExcepcional: boolean
+      fechaOrigen: string
+      fechaFin: string
+    }
+
+interface DragPreviewCell {
+  fecha: string
+  estado: CeldaPreviewEstado
+  id?: string
+}
+
+interface DragStateExtending {
+  type: 'extending'
+  userId: string
+  turno: TurnoDia
+  proyectoId: string
+  color: string
+  esExcepcional: boolean
+  fechaOrigen: string
+  fechaFin: string
+  direction: 'extend' | 'reduce'
+  celdasPreview: DragPreviewCell[]
+}
+
+type DragState = { type: 'idle' } | DragStateExtending
+
+function computeDragPreview(
+  fechaOrigen: string,
+  fechaFin: string,
+  proyectoId: string,
+  personaDias: Record<string, CeldaEntry[]>,
+): { direction: 'extend' | 'reduce'; celdasPreview: DragPreviewCell[] } {
+  const origenMs = new Date(fechaOrigen + 'T00:00:00.000Z').getTime()
+  const finMs = new Date(fechaFin + 'T00:00:00.000Z').getTime()
+  const direction: 'extend' | 'reduce' = finMs >= origenMs ? 'extend' : 'reduce'
+
+  // extend: cells from origen+1 to fin
+  // reduce: cells from fin+1 to origen (the ones to delete)
+  const [startMs, endMs] =
+    direction === 'extend'
+      ? [origenMs + 86400000, finMs]
+      : [finMs + 86400000, origenMs]
+
+  const celdasPreview: DragPreviewCell[] = []
+  let ms = startMs
+  while (ms <= endMs) {
+    const fecha = new Date(ms).toISOString().slice(0, 10)
+    const dow = new Date(ms).getUTCDay()
+    const celdasDia = personaDias[fecha] ?? []
+
+    let estado: CeldaPreviewEstado
+    if (dow === 0 || dow === 6) {
+      estado = 'fin_semana_bloqueado'
+    } else if (celdasDia.some((c) => c.tipo === 'ausencia')) {
+      estado = 'ausencia'
+    } else if (celdasDia.some((c) => c.proyecto?.id === proyectoId)) {
+      estado = 'ya_asignada_mismo'
+    } else if (celdasDia.length > 0) {
+      estado = 'ya_asignada_otro'
+    } else {
+      estado = 'libre'
+    }
+
+    const cell = celdasDia.find((c) => c.proyecto?.id === proyectoId)
+    celdasPreview.push({ fecha, estado, id: cell?.id })
+    ms += 86400000
+  }
+
+  return { direction, celdasPreview }
+}
+
 function currentMondayUTC(): string {
   const now = new Date()
   const day = now.getUTCDay() || 7
@@ -164,17 +252,21 @@ function CeldaDia({
   dimmed,
   isWeekend,
   textMode,
+  dragHandleEnabled,
   onClickEmpty,
   onClickProyecto,
   onClickAusencia,
+  onDragHandleMouseDown,
 }: {
   celda: CeldaEntry[]
   dimmed: boolean
   isWeekend: boolean
   textMode: TextMode
+  dragHandleEnabled: boolean
   onClickEmpty: () => void
   onClickProyecto: () => void
   onClickAusencia: () => void
+  onDragHandleMouseDown?: (e: React.MouseEvent) => void
 }) {
   if (!celda || celda.length === 0) {
     return (
@@ -229,7 +321,7 @@ function CeldaDia({
       <TooltipTrigger asChild>
         <div
           className={cn(
-            'relative flex items-center justify-center h-full rounded cursor-pointer text-xs font-semibold px-0.5',
+            'group relative flex items-center justify-center h-full rounded cursor-pointer text-xs font-semibold px-0.5',
             dimmed && 'opacity-30',
             isWeekend && c.esExcepcional && 'border-dashed',
           )}
@@ -244,6 +336,18 @@ function CeldaDia({
         >
           {label && <span className="truncate">{label}</span>}
           {c.esExcepcional && <span className="absolute top-0.5 right-0.5 text-[9px]">⏰</span>}
+          {dragHandleEnabled && onDragHandleMouseDown && (
+            <div
+              className="absolute right-0 top-[15%] bottom-[15%] w-1.5 rounded-r opacity-0 group-hover:opacity-50 cursor-col-resize transition-opacity"
+              style={{ backgroundColor: color }}
+              onMouseDown={(e) => {
+                e.stopPropagation()
+                e.preventDefault()
+                onDragHandleMouseDown(e)
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+            />
+          )}
         </div>
       </TooltipTrigger>
       <TooltipContent side="top" className="max-w-[220px]">
@@ -291,6 +395,50 @@ function UtilBadge({
   return <span className="text-xs font-medium text-muted-foreground">{util}</span>
 }
 
+function DragPreviewOverlay({
+  estado,
+  direction,
+  color,
+}: {
+  estado: CeldaPreviewEstado
+  direction: 'extend' | 'reduce'
+  color: string
+}) {
+  if (estado === 'ya_asignada_mismo') {
+    // reduce direction: mark for deletion
+    if (direction === 'reduce') {
+      return (
+        <div className="absolute inset-0 rounded border-2 border-red-500 bg-red-400/25 pointer-events-none" />
+      )
+    }
+    return null // extend: already assigned, no overlay
+  }
+  if (estado === 'libre') {
+    return (
+      <div
+        className="absolute inset-0.5 rounded animate-pulse pointer-events-none"
+        style={{ backgroundColor: color + '55', border: `1px solid ${color}88` }}
+      />
+    )
+  }
+  if (estado === 'ausencia') {
+    return (
+      <div className="absolute inset-0 rounded border-2 border-red-400 bg-red-100/40 pointer-events-none" />
+    )
+  }
+  if (estado === 'ya_asignada_otro') {
+    return (
+      <div className="absolute inset-0 rounded border-2 border-amber-400 bg-amber-100/40 pointer-events-none" />
+    )
+  }
+  // fin_semana_bloqueado
+  return (
+    <div className="absolute inset-0 rounded bg-gray-300/50 flex items-center justify-center text-[9px] pointer-events-none">
+      🔒
+    </div>
+  )
+}
+
 function SortablePersonaRow({
   persona,
   diasHeader,
@@ -299,9 +447,12 @@ function SortablePersonaRow({
   hoyKey,
   textMode,
   gridCols,
+  dragState,
+  dragHandleEnabled,
   onClickEmpty,
   onClickProyecto,
   onClickAusencia,
+  onDragStart,
 }: {
   persona: PersonaEntry
   diasHeader: DiaHeader[]
@@ -310,9 +461,12 @@ function SortablePersonaRow({
   hoyKey: string
   textMode: TextMode
   gridCols: string
+  dragState: DragState
+  dragHandleEnabled: boolean
   onClickEmpty: (fecha: string) => void
   onClickProyecto: (fecha: string, celda: CeldaEntry) => void
   onClickAusencia: (celda: CeldaEntry) => void
+  onDragStart: (info: Omit<DragStateExtending, 'type' | 'direction' | 'celdasPreview' | 'fechaFin'>) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: persona.userId,
@@ -360,11 +514,35 @@ function SortablePersonaRow({
           proyectoFiltro !== '__all__' &&
           celdasDia.length > 0 &&
           !celdasDia.some((c) => c.proyecto?.id === proyectoFiltro)
+
+        const isDragActive = dragState.type === 'extending'
+        const isThisUserDragging = isDragActive && dragState.userId === persona.userId
+        const previewCell = isThisUserDragging
+          ? dragState.celdasPreview.find((p) => p.fecha === dateKey)
+          : undefined
+
+        const c0 = celdasDia[0]
+        const handleDragMouseDown =
+          dragHandleEnabled && c0?.tipo === 'proyecto'
+            ? (e: React.MouseEvent) => {
+                onDragStart({
+                  userId: persona.userId,
+                  turno: c0.turno as TurnoDia,
+                  proyectoId: c0.proyecto?.id ?? '',
+                  color: c0.proyecto?.color ?? '#6b7280',
+                  esExcepcional: c0.esExcepcional,
+                  fechaOrigen: dateKey,
+                })
+              }
+            : undefined
+
         return (
           <div
             key={dateKey}
+            data-celda-userid={persona.userId}
+            data-celda-fecha={dateKey}
             className={cn(
-              'h-full px-0.5 py-1',
+              'relative h-full px-0.5 py-1',
               isWeekend && 'bg-muted/40',
               isHoy && 'border-l-2 border-blue-500',
             )}
@@ -374,10 +552,19 @@ function SortablePersonaRow({
               dimmed={dimmed}
               isWeekend={isWeekend}
               textMode={textMode}
-              onClickEmpty={() => onClickEmpty(dateKey)}
-              onClickProyecto={() => onClickProyecto(dateKey, celdasDia[0])}
-              onClickAusencia={() => onClickAusencia(celdasDia[0])}
+              dragHandleEnabled={dragHandleEnabled}
+              onClickEmpty={isDragActive ? () => {} : () => onClickEmpty(dateKey)}
+              onClickProyecto={isDragActive ? () => {} : () => onClickProyecto(dateKey, celdasDia[0])}
+              onClickAusencia={isDragActive ? () => {} : () => onClickAusencia(celdasDia[0])}
+              onDragHandleMouseDown={handleDragMouseDown}
             />
+            {previewCell && dragState.type === 'extending' && (
+              <DragPreviewOverlay
+                estado={previewCell.estado}
+                direction={dragState.direction}
+                color={dragState.color}
+              />
+            )}
           </div>
         )
       })}
@@ -413,6 +600,8 @@ export default function PlanificacionPage() {
   const [modalAusencia, setModalAusencia] = useState<CeldaEntry | null>(null)
   const [showCopiarModal, setShowCopiarModal] = useState(false)
 
+  const [dragInfo, setDragInfo] = useState<DragInfo>({ type: 'idle' })
+
   const hoy = useMemo(() => currentMondayUTC(), [])
   const hoyKey = useMemo(() => todayUTC(), [])
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
@@ -437,6 +626,25 @@ export default function PlanificacionPage() {
   const numSemanas = useMemo(() => rangoToSemanas(rango, mesBase), [rango, mesBase])
   const textMode = useMemo(() => textModeForSemanas(numSemanas), [numSemanas])
   const gridCols = useMemo(() => gridTemplate(numSemanas * 7, numSemanas), [numSemanas])
+
+  // Drag-extend: only available in 1- and 2-week views (cells are wide enough)
+  const dragHandleEnabled = numSemanas <= 2
+
+  const dragState = useMemo((): DragState => {
+    if (dragInfo.type !== 'extending') return { type: 'idle' }
+    const persona = data?.personas.find((p) => p.userId === dragInfo.userId)
+    if (!persona) return { type: 'idle' }
+    const { direction, celdasPreview } = computeDragPreview(
+      dragInfo.fechaOrigen,
+      dragInfo.fechaFin,
+      dragInfo.proyectoId,
+      persona.dias,
+    )
+    return { ...dragInfo, direction, celdasPreview }
+  }, [dragInfo, data])
+
+  const dragStateRef = useRef<DragState>(dragState)
+  dragStateRef.current = dragState
 
   useEffect(() => {
     if (!semanaInicio) return
@@ -549,6 +757,123 @@ export default function PlanificacionPage() {
       .finally(() => setLoading(false))
   }, [semanaInicio, departamentosSeleccionados, numSemanas])
 
+  const reloadRef = useRef(reload)
+  reloadRef.current = reload
+
+  const handleDragStart = useCallback(
+    (info: Omit<DragStateExtending, 'type' | 'direction' | 'celdasPreview' | 'fechaFin'>) => {
+      setDragInfo({ type: 'extending', ...info, fechaFin: info.fechaOrigen })
+    },
+    [],
+  )
+
+  useEffect(() => {
+    if (dragInfo.type !== 'extending') return
+
+    let rafId: number | null = null
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (rafId !== null) return
+      rafId = requestAnimationFrame(() => {
+        rafId = null
+        const el = document.elementFromPoint(e.clientX, e.clientY)
+        const cellEl = el?.closest('[data-celda-fecha]') as HTMLElement | null
+        const fecha = cellEl?.dataset.celdaFecha
+        const userId = cellEl?.dataset.celdaUserid
+        if (fecha && userId === dragInfo.userId) {
+          setDragInfo((prev) =>
+            prev.type === 'extending' && prev.fechaFin !== fecha
+              ? { ...prev, fechaFin: fecha }
+              : prev,
+          )
+        }
+      })
+    }
+
+    const handleMouseUp = async () => {
+      const state = dragStateRef.current
+      setDragInfo({ type: 'idle' })
+
+      if (state.type !== 'extending' || state.celdasPreview.length === 0) return
+
+      if (state.direction === 'extend') {
+        const libres = state.celdasPreview.filter((c) => c.estado === 'libre')
+        if (libres.length === 0) return
+
+        try {
+          const res = await fetch('/api/planificacion/dia/batch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              asignaciones: libres.map((c) => ({
+                userId: state.userId,
+                fecha: c.fecha,
+                turno: state.turno,
+                proyectoId: state.proyectoId,
+                esExcepcional: state.esExcepcional,
+                notas: null,
+              })),
+            }),
+          })
+          const result = await res.json()
+          if (!res.ok && res.status !== 207) {
+            toast.error('Error al asignar celdas')
+            return
+          }
+          const msgs: string[] = []
+          if (result.creadas > 0)
+            msgs.push(`✓ ${result.creadas} celda${result.creadas > 1 ? 's' : ''} asignada${result.creadas > 1 ? 's' : ''}`)
+          const aus = result.omitidas?.filter((o: { razon: string }) => o.razon === 'conflicto_ausencia').length ?? 0
+          const fin = result.omitidas?.filter((o: { razon: string }) => o.razon === 'fin_de_semana_no_excepcional').length ?? 0
+          const otro = (result.omitidas?.length ?? 0) - aus - fin
+          if (aus) msgs.push(`⚠ ${aus} omitida${aus > 1 ? 's' : ''} (ausencia)`)
+          if (fin) msgs.push(`⚠ ${fin} omitida${fin > 1 ? 's' : ''} (fin de semana)`)
+          if (otro) msgs.push(`⚠ ${otro} omitida${otro > 1 ? 's' : ''} (otro)`)
+          toast.success(msgs.join(' · ') || 'Sin cambios')
+          reloadRef.current()
+        } catch {
+          toast.error('Error al asignar celdas')
+        }
+      } else {
+        // Reduce: delete existing cells in preview range
+        const toDelete = state.celdasPreview.filter(
+          (c) => c.estado === 'ya_asignada_mismo' && c.id,
+        )
+        if (toDelete.length === 0) return
+        try {
+          await Promise.all(
+            toDelete.map((c) =>
+              fetch(`/api/planificacion/dia/${c.id}`, { method: 'DELETE' }),
+            ),
+          )
+          toast.success(
+            `✓ ${toDelete.length} celda${toDelete.length > 1 ? 's' : ''} eliminada${toDelete.length > 1 ? 's' : ''}`,
+          )
+          reloadRef.current()
+        } catch {
+          toast.error('Error al eliminar celdas')
+        }
+      }
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setDragInfo({ type: 'idle' })
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+    document.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      document.removeEventListener('keydown', handleKeyDown)
+      if (rafId !== null) cancelAnimationFrame(rafId)
+    }
+    // Only re-attach when drag starts/stops, not on every fechaFin change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dragInfo.type])
+
   if (role && !ROLES_PERMITIDOS.includes(role)) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -559,7 +884,7 @@ export default function PlanificacionPage() {
 
   return (
     <TooltipProvider delayDuration={250}>
-      <div className="container mx-auto p-4 sm:p-6">
+      <div className={cn('container mx-auto p-4 sm:p-6', dragState.type === 'extending' && 'cursor-col-resize select-none')}>
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold">Planificación de personal</h1>
@@ -800,6 +1125,8 @@ export default function PlanificacionPage() {
                           hoyKey={hoyKey}
                           textMode={textMode}
                           gridCols={gridCols}
+                          dragState={dragState}
+                          dragHandleEnabled={dragHandleEnabled}
                           onClickEmpty={(fecha) =>
                             setModalCelda({ userId: persona.userId, nombre: persona.nombre, fecha })
                           }
@@ -807,6 +1134,7 @@ export default function PlanificacionPage() {
                             setModalCelda({ userId: persona.userId, nombre: persona.nombre, fecha, celda })
                           }
                           onClickAusencia={(celda) => setModalAusencia(celda)}
+                          onDragStart={handleDragStart}
                         />
                       ))}
                     </SortableContext>
