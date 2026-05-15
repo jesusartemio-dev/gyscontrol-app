@@ -29,7 +29,8 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = request.nextUrl
     const inicioStr = searchParams.get('inicio')
-    const departamentoId = searchParams.get('departamentoId')
+    const departamentosParam = searchParams.get('departamentos') // comma-separated IDs (new)
+    const departamentoId = searchParams.get('departamentoId')   // single ID (backward compat)
 
     if (!inicioStr) {
       return NextResponse.json(
@@ -49,7 +50,7 @@ export async function GET(request: NextRequest) {
     const dias = Array.from({ length: 7 }, (_, i) => addDays(inicio, i))
     const fin = dias[6]
 
-    // Departamento (opcional)
+    // Departamento único para compatibilidad backward (respuesta)
     const departamento = departamentoId
       ? await prisma.departamento.findUnique({
           where: { id: departamentoId },
@@ -57,22 +58,27 @@ export async function GET(request: NextRequest) {
         })
       : null
 
-    // Departamentos por defecto cuando no se filtra por uno específico
-    const DEPARTAMENTOS_DEFAULT = ['PROYECTOS', 'INGENIERIA', 'CONSTRUCCION', 'GESTION']
+    // Nombres de los 4 departamentos por defecto
+    const DEPARTAMENTOS_DEFAULT = ['INGENIERIA', 'CONSTRUCCION', 'GESTION', 'PROYECTOS']
 
-    // Empleados activos: filtrar por departamento específico o por los 4 por defecto
+    // Empleados activos:
+    //   - departamentosParam (multi-ID): filtra por esos IDs
+    //   - departamentoId (single): filtra por ese ID
+    //   - ninguno: filtra por los 4 departamentos por defecto
     const empleados = await prisma.empleado.findMany({
       where: {
         activo: true,
-        ...(departamentoId
-          ? { departamentoId }
-          : {
-              departamento: {
-                OR: DEPARTAMENTOS_DEFAULT.map((n) => ({
-                  nombre: { equals: n, mode: 'insensitive' as const },
-                })),
-              },
-            }),
+        ...(departamentosParam
+          ? { departamentoId: { in: departamentosParam.split(',').filter(Boolean) } }
+          : departamentoId
+            ? { departamentoId }
+            : {
+                departamento: {
+                  OR: DEPARTAMENTOS_DEFAULT.map((n) => ({
+                    nombre: { equals: n, mode: 'insensitive' as const },
+                  })),
+                },
+              }),
       },
       include: {
         user: { select: { id: true, name: true, image: true } },

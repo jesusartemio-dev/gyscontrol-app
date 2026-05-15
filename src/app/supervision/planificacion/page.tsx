@@ -1,14 +1,17 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, Copy } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Copy, GripVertical, SlidersHorizontal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   Select,
   SelectContent,
@@ -16,10 +19,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  DndContext,
+  DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import AsignacionCeldaModal from '@/components/planificacion/AsignacionCeldaModal'
 import AusenciaDetailModal from '@/components/planificacion/AusenciaDetailModal'
 import CopiarSemanaModal from '@/components/planificacion/CopiarSemanaModal'
 
+const DEPT_ORDER = ['INGENIERIA', 'CONSTRUCCION', 'GESTION', 'PROYECTOS']
 const ROLES_PERMITIDOS = ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos']
 
 interface CeldaEntry {
@@ -53,14 +71,6 @@ interface SemanaResponse {
 interface Departamento {
   id: string
   nombre: string
-}
-
-interface ProyectoActivo {
-  id: string
-  codigo: string
-  nombre: string
-  color: string
-  estado: string
 }
 
 function currentMondayUTC(): string {
@@ -140,23 +150,110 @@ function UtilBadge({ util }: { util: string }) {
   return <span className="text-xs font-medium text-muted-foreground">{util}</span>
 }
 
+function SortablePersonaRow({
+  persona,
+  diasHeader,
+  proyectoFiltro,
+  onClickEmpty,
+  onClickProyecto,
+  onClickAusencia,
+}: {
+  persona: PersonaEntry
+  diasHeader: Array<{ dateKey: string; d: Date }>
+  proyectoFiltro: string
+  onClickEmpty: (fecha: string) => void
+  onClickProyecto: (fecha: string, celda: CeldaEntry) => void
+  onClickAusencia: (celda: CeldaEntry) => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: persona.userId,
+  })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : undefined,
+    position: isDragging ? ('relative' as const) : undefined,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="grid grid-cols-[200px_repeat(7,1fr)_70px] h-10 border-b hover:bg-muted/20 items-center"
+    >
+      <div className="flex items-center gap-1 px-2 overflow-hidden">
+        <button
+          {...attributes}
+          {...listeners}
+          tabIndex={-1}
+          className="shrink-0 text-muted-foreground/30 hover:text-muted-foreground cursor-grab active:cursor-grabbing p-0.5"
+        >
+          <GripVertical className="h-3.5 w-3.5" />
+        </button>
+        <div className="shrink-0 h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-[11px] font-semibold text-primary">
+          {persona.iniciales}
+        </div>
+        <div className="min-w-0 ml-1">
+          <p className="text-sm font-medium truncate leading-none">{persona.nombre}</p>
+          {persona.cargo && (
+            <p className="text-xs text-muted-foreground truncate">{persona.cargo}</p>
+          )}
+        </div>
+      </div>
+
+      {diasHeader.map(({ dateKey, d }) => {
+        const celdasDia = persona.dias[dateKey] ?? []
+        const isWeekend = d.getUTCDay() === 0 || d.getUTCDay() === 6
+        const dimmed =
+          proyectoFiltro !== '__all__' &&
+          celdasDia.length > 0 &&
+          !celdasDia.some((c) => c.proyecto?.id === proyectoFiltro)
+        return (
+          <div key={dateKey} className={cn('h-full px-0.5 py-1', isWeekend && 'bg-muted/30')}>
+            <CeldaDia
+              celda={celdasDia}
+              dimmed={dimmed}
+              onClickEmpty={() => onClickEmpty(dateKey)}
+              onClickProyecto={() => onClickProyecto(dateKey, celdasDia[0])}
+              onClickAusencia={() => onClickAusencia(celdasDia[0])}
+            />
+          </div>
+        )
+      })}
+
+      <div className="flex items-center justify-center">
+        <UtilBadge util={persona.utilizacion} />
+      </div>
+    </div>
+  )
+}
+
 export default function PlanificacionPage() {
   const { data: session } = useSession()
   const role = (session?.user as any)?.role as string | undefined
 
   const [semanaInicio, setSemanaInicio] = useState<string>(currentMondayUTC)
-  const [departamentoId, setDepartamentoId] = useState<string>('__all__')
+  const [departamentosSeleccionados, setDepartamentosSeleccionados] = useState<string[]>([])
   const [proyectoFiltro, setProyectoFiltro] = useState<string>('__all__')
   const [busqueda, setBusqueda] = useState('')
   const [data, setData] = useState<SemanaResponse | null>(null)
   const [departamentos, setDepartamentos] = useState<Departamento[]>([])
+  const [personOrder, setPersonOrder] = useState<Record<string, string[]>>({})
   const [loading, setLoading] = useState(true)
 
-  const [modalCelda, setModalCelda] = useState<{ userId: string; nombre: string; fecha: string; celda?: CeldaEntry } | null>(null)
+  const [modalCelda, setModalCelda] = useState<{
+    userId: string
+    nombre: string
+    fecha: string
+    celda?: CeldaEntry
+  } | null>(null)
   const [modalAusencia, setModalAusencia] = useState<CeldaEntry | null>(null)
   const [showCopiarModal, setShowCopiarModal] = useState(false)
 
   const hoy = useMemo(() => currentMondayUTC(), [])
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
   useEffect(() => {
     fetch('/api/planificacion/departamentos')
@@ -165,22 +262,59 @@ export default function PlanificacionPage() {
       .catch(() => {})
   }, [])
 
+  // Pre-select the 4 default departments once the list loads
+  useEffect(() => {
+    if (departamentos.length === 0 || departamentosSeleccionados.length > 0) return
+    const defaults = departamentos
+      .filter((d) => DEPT_ORDER.some((n) => d.nombre.toUpperCase().includes(n)))
+      .map((d) => d.id)
+    setDepartamentosSeleccionados(
+      defaults.length > 0 ? defaults : departamentos.slice(0, 4).map((d) => d.id),
+    )
+  }, [departamentos])
+
   useEffect(() => {
     if (!semanaInicio) return
     setLoading(true)
     const params = new URLSearchParams({ inicio: semanaInicio })
-    if (departamentoId && departamentoId !== '__all__') params.set('departamentoId', departamentoId)
+    if (departamentosSeleccionados.length > 0) {
+      params.set('departamentos', departamentosSeleccionados.join(','))
+    }
     fetch(`/api/planificacion/semana?${params}`)
       .then((r) => r.json())
       .then(setData)
       .catch(() => toast.error('Error al cargar planificación'))
       .finally(() => setLoading(false))
-  }, [semanaInicio, departamentoId])
+  }, [semanaInicio, departamentosSeleccionados])
+
+  // Keep personOrder in sync with data: preserve existing custom order, append new users
+  useEffect(() => {
+    if (!data?.personas) return
+    setPersonOrder((prev) => {
+      const deptMap = new Map<string, string[]>()
+      for (const p of data.personas) {
+        if (!deptMap.has(p.departamentoId)) deptMap.set(p.departamentoId, [])
+        deptMap.get(p.departamentoId)!.push(p.userId)
+      }
+      const next: Record<string, string[]> = {}
+      for (const [deptId, userIds] of deptMap.entries()) {
+        const existing = prev[deptId]
+        if (existing) {
+          const filtered = existing.filter((id) => userIds.includes(id))
+          const newOnes = userIds.filter((id) => !existing.includes(id))
+          next[deptId] = [...filtered, ...newOnes]
+        } else {
+          next[deptId] = userIds
+        }
+      }
+      return next
+    })
+  }, [data])
 
   const personasFiltradas = useMemo(() => {
     if (!data?.personas) return []
     return data.personas.filter(
-      (p) => !busqueda || p.nombre.toLowerCase().includes(busqueda.toLowerCase())
+      (p) => !busqueda || p.nombre.toLowerCase().includes(busqueda.toLowerCase()),
     )
   }, [data?.personas, busqueda])
 
@@ -193,7 +327,23 @@ export default function PlanificacionPage() {
       map.get(p.departamentoId)!.personas.push(p)
     }
     return Array.from(map.values())
-  }, [personasFiltradas])
+      .map((grupo) => {
+        const order = personOrder[grupo.id] ?? []
+        const ordered = order
+          .map((uid) => grupo.personas.find((p) => p.userId === uid))
+          .filter((p): p is PersonaEntry => !!p)
+        const unordered = grupo.personas.filter((p) => !order.includes(p.userId))
+        return { ...grupo, personas: [...ordered, ...unordered] }
+      })
+      .sort((a, b) => {
+        const ai = DEPT_ORDER.findIndex((n) => a.nombre.toUpperCase().includes(n))
+        const bi = DEPT_ORDER.findIndex((n) => b.nombre.toUpperCase().includes(n))
+        if (ai === -1 && bi === -1) return a.nombre.localeCompare(b.nombre)
+        if (ai === -1) return 1
+        if (bi === -1) return -1
+        return ai - bi
+      })
+  }, [personasFiltradas, personOrder])
 
   const diasHeader = useMemo(() => {
     return Array.from({ length: 7 }, (_, i) => {
@@ -203,16 +353,30 @@ export default function PlanificacionPage() {
     })
   }, [semanaInicio])
 
-  const reload = () => {
+  const handleDragEnd = useCallback((deptId: string, event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    setPersonOrder((prev) => {
+      const current = prev[deptId] ?? []
+      const oldIndex = current.indexOf(active.id as string)
+      const newIndex = current.indexOf(over.id as string)
+      if (oldIndex === -1 || newIndex === -1) return prev
+      return { ...prev, [deptId]: arrayMove(current, oldIndex, newIndex) }
+    })
+  }, [])
+
+  const reload = useCallback(() => {
     setLoading(true)
     const params = new URLSearchParams({ inicio: semanaInicio })
-    if (departamentoId && departamentoId !== '__all__') params.set('departamentoId', departamentoId)
+    if (departamentosSeleccionados.length > 0) {
+      params.set('departamentos', departamentosSeleccionados.join(','))
+    }
     fetch(`/api/planificacion/semana?${params}`)
       .then((r) => r.json())
       .then(setData)
       .catch(() => toast.error('Error al cargar planificación'))
       .finally(() => setLoading(false))
-  }
+  }, [semanaInicio, departamentosSeleccionados])
 
   if (role && !ROLES_PERMITIDOS.includes(role)) {
     return (
@@ -256,17 +420,41 @@ export default function PlanificacionPage() {
           className="w-48 h-9"
         />
 
-        <Select value={departamentoId} onValueChange={setDepartamentoId}>
-          <SelectTrigger className="w-44 h-9">
-            <SelectValue placeholder="Departamento" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__all__">Todos</SelectItem>
-            {departamentos.map((d) => (
-              <SelectItem key={d.id} value={d.id}>{d.nombre}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="h-9 gap-2">
+              <SlidersHorizontal className="h-4 w-4" />
+              Áreas
+              {departamentosSeleccionados.length > 0 && (
+                <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-xs leading-4">
+                  {departamentosSeleccionados.length}
+                </Badge>
+              )}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-56 p-2" align="start">
+            <p className="text-xs font-medium text-muted-foreground mb-2 px-1">Filtrar por área</p>
+            {departamentos.map((dept) => {
+              const checked = departamentosSeleccionados.includes(dept.id)
+              return (
+                <label
+                  key={dept.id}
+                  className="flex items-center gap-2 px-1 py-1.5 rounded hover:bg-muted/50 cursor-pointer text-sm"
+                >
+                  <Checkbox
+                    checked={checked}
+                    onCheckedChange={(v) =>
+                      setDepartamentosSeleccionados((prev) =>
+                        v ? [...prev, dept.id] : prev.filter((id) => id !== dept.id),
+                      )
+                    }
+                  />
+                  {dept.nombre}
+                </label>
+              )
+            })}
+          </PopoverContent>
+        </Popover>
 
         <Select value={proyectoFiltro} onValueChange={setProyectoFiltro}>
           <SelectTrigger className="w-52 h-9">
@@ -275,7 +463,9 @@ export default function PlanificacionPage() {
           <SelectContent>
             <SelectItem value="__all__">Todos los proyectos</SelectItem>
             {data?.proyectos.map((p) => (
-              <SelectItem key={p.id} value={p.id}>[{p.codigo}] {p.nombre}</SelectItem>
+              <SelectItem key={p.id} value={p.id}>
+                [{p.codigo}] {p.nombre}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -303,7 +493,7 @@ export default function PlanificacionPage() {
               <div className="text-center">Util.</div>
             </div>
 
-            {personasFiltradas.length === 0 && !loading && (
+            {personasFiltradas.length === 0 && (
               <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
                 No hay personal en esta semana
               </div>
@@ -311,64 +501,37 @@ export default function PlanificacionPage() {
 
             {gruposPorDepartamento.map((grupo) => (
               <div key={grupo.id}>
-                {/* Fila de cabecera del departamento */}
                 <div className="grid grid-cols-[200px_repeat(7,1fr)_70px] h-7 bg-muted/50 border-b border-t items-center">
                   <div className="px-3 col-span-9 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">
                     {grupo.nombre}
                   </div>
                 </div>
 
-                {grupo.personas.map((persona) => (
-                  <div
-                    key={persona.userId}
-                    className="grid grid-cols-[200px_repeat(7,1fr)_70px] h-10 border-b hover:bg-muted/20 items-center"
+                <DndContext
+                  sensors={sensors}
+                  onDragEnd={(event) => handleDragEnd(grupo.id, event)}
+                >
+                  <SortableContext
+                    items={grupo.personas.map((p) => p.userId)}
+                    strategy={verticalListSortingStrategy}
                   >
-                    <div className="flex items-center gap-2 px-3 overflow-hidden">
-                      <div className="shrink-0 h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-[11px] font-semibold text-primary">
-                        {persona.iniciales}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate leading-none">{persona.nombre}</p>
-                        {persona.cargo && (
-                          <p className="text-xs text-muted-foreground truncate">{persona.cargo}</p>
-                        )}
-                      </div>
-                    </div>
-
-                    {diasHeader.map(({ dateKey, d }) => {
-                      const celdasDia = persona.dias[dateKey] ?? []
-                      const isWeekend = d.getUTCDay() === 0 || d.getUTCDay() === 6
-                      const dimmed =
-                        proyectoFiltro !== '__all__' &&
-                        celdasDia.length > 0 &&
-                        !celdasDia.some((c) => c.proyecto?.id === proyectoFiltro)
-                      return (
-                        <div key={dateKey} className={cn('h-full px-0.5 py-1', isWeekend && 'bg-muted/30')}>
-                          <CeldaDia
-                            celda={celdasDia}
-                            dimmed={dimmed}
-                            onClickEmpty={() =>
-                              setModalCelda({ userId: persona.userId, nombre: persona.nombre, fecha: dateKey })
-                            }
-                            onClickProyecto={() =>
-                              setModalCelda({
-                                userId: persona.userId,
-                                nombre: persona.nombre,
-                                fecha: dateKey,
-                                celda: celdasDia[0],
-                              })
-                            }
-                            onClickAusencia={() => setModalAusencia(celdasDia[0])}
-                          />
-                        </div>
-                      )
-                    })}
-
-                    <div className="flex items-center justify-center">
-                      <UtilBadge util={persona.utilizacion} />
-                    </div>
-                  </div>
-                ))}
+                    {grupo.personas.map((persona) => (
+                      <SortablePersonaRow
+                        key={persona.userId}
+                        persona={persona}
+                        diasHeader={diasHeader}
+                        proyectoFiltro={proyectoFiltro}
+                        onClickEmpty={(fecha) =>
+                          setModalCelda({ userId: persona.userId, nombre: persona.nombre, fecha })
+                        }
+                        onClickProyecto={(fecha, celda) =>
+                          setModalCelda({ userId: persona.userId, nombre: persona.nombre, fecha, celda })
+                        }
+                        onClickAusencia={(celda) => setModalAusencia(celda)}
+                      />
+                    ))}
+                  </SortableContext>
+                </DndContext>
               </div>
             ))}
           </div>
@@ -382,8 +545,12 @@ export default function PlanificacionPage() {
         <span className="flex items-center gap-1">
           <span
             className="inline-block w-3 h-3 rounded"
-            style={{ background: 'repeating-linear-gradient(45deg, #f3f4f6, #f3f4f6 3px, #e5e7eb 3px, #e5e7eb 6px)' }}
-          /> Ausencia
+            style={{
+              background:
+                'repeating-linear-gradient(45deg, #f3f4f6, #f3f4f6 3px, #e5e7eb 3px, #e5e7eb 6px)',
+            }}
+          />{' '}
+          Ausencia
         </span>
         <span className="flex items-center gap-1">⏰ Excepcional</span>
         {data?.proyectos.map((p) => (
@@ -398,7 +565,10 @@ export default function PlanificacionPage() {
         <AsignacionCeldaModal
           open={true}
           onClose={() => setModalCelda(null)}
-          onSaved={() => { setModalCelda(null); reload() }}
+          onSaved={() => {
+            setModalCelda(null)
+            reload()
+          }}
           userId={modalCelda.userId}
           userName={modalCelda.nombre}
           fecha={modalCelda.fecha}
@@ -414,9 +584,12 @@ export default function PlanificacionPage() {
 
       <CopiarSemanaModal
         open={showCopiarModal}
-        onClose={() => { setShowCopiarModal(false); reload() }}
+        onClose={() => {
+          setShowCopiarModal(false)
+          reload()
+        }}
         semanaActual={semanaInicio}
-        departamentoId={departamentoId !== '__all__' ? departamentoId : undefined}
+        departamentoId={departamentosSeleccionados[0]}
       />
     </div>
   )
