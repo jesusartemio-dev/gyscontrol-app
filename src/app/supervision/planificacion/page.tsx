@@ -43,6 +43,11 @@ import AsignacionCeldaModal from '@/components/planificacion/AsignacionCeldaModa
 import AusenciaDetailModal from '@/components/planificacion/AusenciaDetailModal'
 import CopiarSemanaModal from '@/components/planificacion/CopiarSemanaModal'
 import { abreviarCargo, abreviarNombre } from '@/lib/planificacion/format'
+import { CeldaPlanificacionCompacta } from '@/components/planificacion/CeldaPlanificacionCompacta'
+import {
+  CeldaDetalleModal,
+  type CeldaDetalleData,
+} from '@/components/planificacion/CeldaDetalleModal'
 
 const DEPT_ORDER = ['INGENIERIA', 'CONSTRUCCION', 'GESTION', 'PROYECTOS']
 const ROLES_PERMITIDOS = ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos']
@@ -465,7 +470,7 @@ function SortablePersonaRow({
   dragHandleEnabled: boolean
   onClickEmpty: (fecha: string) => void
   onClickProyecto: (fecha: string, celda: CeldaEntry) => void
-  onClickAusencia: (celda: CeldaEntry) => void
+  onClickAusencia: (fecha: string, celda: CeldaEntry) => void
   onDragStart: (info: Omit<DragStateExtending, 'type' | 'direction' | 'celdasPreview' | 'fechaFin'>) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -555,7 +560,7 @@ function SortablePersonaRow({
               dragHandleEnabled={dragHandleEnabled}
               onClickEmpty={isDragActive ? () => {} : () => onClickEmpty(dateKey)}
               onClickProyecto={isDragActive ? () => {} : () => onClickProyecto(dateKey, celdasDia[0])}
-              onClickAusencia={isDragActive ? () => {} : () => onClickAusencia(celdasDia[0])}
+              onClickAusencia={isDragActive ? () => {} : () => onClickAusencia(dateKey, celdasDia[0])}
               onDragHandleMouseDown={handleDragMouseDown}
             />
             {previewCell && dragState.type === 'extending' && (
@@ -571,6 +576,93 @@ function SortablePersonaRow({
 
       <div className="flex items-center justify-center">
         <UtilBadge util={persona.utilizacion} semanaInicio={semanaInicio} hoyKey={hoyKey} />
+      </div>
+    </div>
+  )
+}
+
+// ── Viewport detection ────────────────────────────────────────────────────────
+function useViewport(): 'mobile' | 'tablet' | 'desktop' {
+  const [vp, setVp] = useState<'mobile' | 'tablet' | 'desktop'>('desktop')
+  useEffect(() => {
+    function check() {
+      const w = window.innerWidth
+      setVp(w < 768 ? 'mobile' : w < 1024 ? 'tablet' : 'desktop')
+    }
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
+  return vp
+}
+
+// ── Mobile card view ─────────────────────────────────────────────────────────
+function PersonaMobileCard({
+  persona,
+  diasHeader,
+  hoyKey,
+  onTapCelda,
+}: {
+  persona: PersonaEntry
+  diasHeader: DiaHeader[]
+  hoyKey: string
+  onTapCelda: (fecha: string) => void
+}) {
+  return (
+    <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
+      {/* Card header */}
+      <div className="flex items-center gap-2.5 px-3 py-2.5 border-b bg-muted/20">
+        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-[11px] font-semibold text-primary flex-shrink-0">
+          {persona.iniciales}
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold truncate">{persona.nombre}</p>
+          {persona.cargo && (
+            <p className="text-xs text-muted-foreground truncate">{abreviarCargo(persona.cargo)}</p>
+          )}
+        </div>
+        <UtilBadge util={persona.utilizacion} semanaInicio={diasHeader[0]?.dateKey ?? ''} hoyKey={hoyKey} />
+      </div>
+
+      {/* Day rows */}
+      <div>
+        {diasHeader.map(({ dateKey, d, isHoy, isWeekend }) => {
+          const celdasDia = persona.dias[dateKey] ?? []
+          const dow = d.toLocaleDateString('es', { weekday: 'short', timeZone: 'UTC' })
+          const num = d.getUTCDate()
+          return (
+            <button
+              key={dateKey}
+              type="button"
+              onClick={() => onTapCelda(dateKey)}
+              className={cn(
+                'w-full flex items-center gap-3 px-3 py-2 border-b last:border-b-0 text-left',
+                isHoy && 'bg-blue-50 dark:bg-blue-950/20',
+                isWeekend && !isHoy && 'bg-muted/20',
+                'hover:bg-muted/30 transition-colors',
+              )}
+            >
+              <div className="w-14 flex-shrink-0">
+                <span
+                  className={cn(
+                    'text-xs capitalize',
+                    isHoy ? 'font-semibold text-blue-600' : 'text-muted-foreground',
+                    isWeekend && !isHoy && 'text-muted-foreground/60',
+                  )}
+                >
+                  {dow} {num}
+                </span>
+              </div>
+              <div className="flex-1 min-w-0">
+                {celdasDia.length === 0 ? (
+                  <span className="text-xs text-muted-foreground/50">—</span>
+                ) : (
+                  <CeldaPlanificacionCompacta celda={celdasDia[0]} />
+                )}
+              </div>
+            </button>
+          )
+        })}
       </div>
     </div>
   )
@@ -601,6 +693,10 @@ export default function PlanificacionPage() {
   const [showCopiarModal, setShowCopiarModal] = useState(false)
 
   const [dragInfo, setDragInfo] = useState<DragInfo>({ type: 'idle' })
+  const [modalDetalle, setModalDetalle] = useState<CeldaDetalleData | null>(null)
+  const viewport = useViewport()
+  const isDesktop = viewport === 'desktop'
+  const isReadOnly = !isDesktop
 
   const hoy = useMemo(() => currentMondayUTC(), [])
   const hoyKey = useMemo(() => todayUTC(), [])
@@ -627,8 +723,8 @@ export default function PlanificacionPage() {
   const textMode = useMemo(() => textModeForSemanas(numSemanas), [numSemanas])
   const gridCols = useMemo(() => gridTemplate(numSemanas * 7, numSemanas), [numSemanas])
 
-  // Drag-extend: only available in 1- and 2-week views (cells are wide enough)
-  const dragHandleEnabled = numSemanas <= 2
+  // Drag-extend: desktop only, and only in 1- or 2-week views
+  const dragHandleEnabled = numSemanas <= 2 && isDesktop
 
   const dragState = useMemo((): DragState => {
     if (dragInfo.type !== 'extending') return { type: 'idle' }
@@ -769,6 +865,11 @@ export default function PlanificacionPage() {
 
   useEffect(() => {
     if (dragInfo.type !== 'extending') return
+    // Safety guard: do not attach drag listeners on touch/tablet devices
+    if (!window.matchMedia('(min-width: 1024px)').matches) {
+      setDragInfo({ type: 'idle' })
+      return
+    }
 
     let rafId: number | null = null
 
@@ -896,7 +997,7 @@ export default function PlanificacionPage() {
                   : `${numSemanas} semanas · ${formatDateRange(semanaInicio)}`}
             </p>
           </div>
-          <Button variant="outline" onClick={() => setShowCopiarModal(true)}>
+          <Button variant="outline" onClick={() => setShowCopiarModal(true)} className="hidden lg:flex">
             <Copy className="mr-2 h-4 w-4" /> Copiar semana
           </Button>
         </div>
@@ -962,8 +1063,9 @@ export default function PlanificacionPage() {
                 setSemanaInicio(firstMondayOnOrBefore(mb.anio, mb.mes))
               }
             }}
+            // Only show range selector on desktop/tablet (on mobile we always use 1 week)
           >
-            <SelectTrigger className="w-36 h-9">
+            <SelectTrigger className="hidden md:flex w-36 h-9">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -978,7 +1080,7 @@ export default function PlanificacionPage() {
             placeholder="Buscar persona..."
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
-            className="w-48 h-9"
+            className="w-40 h-9"
           />
 
           <Popover>
@@ -1032,12 +1134,59 @@ export default function PlanificacionPage() {
           </Select>
         </div>
 
+        {/* ── Mobile card view (<768px) ──────────────────────────────────────── */}
+        <div className="md:hidden">
+          {viewport === 'mobile' && rango !== '1' && (
+            <p className="text-xs text-muted-foreground text-center mb-2 bg-muted/30 rounded px-3 py-1.5">
+              Vista semanal en móvil. Para ver más, abre desde PC.
+            </p>
+          )}
+          {loading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-48 rounded-lg border bg-muted/30 animate-pulse" />
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {gruposPorDepartamento.map((grupo) => (
+                <div key={grupo.id}>
+                  <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest px-1 mb-2">
+                    {grupo.nombre} ({grupo.personas.length})
+                  </p>
+                  <div className="space-y-3">
+                    {grupo.personas.map((persona) => (
+                      <PersonaMobileCard
+                        key={persona.userId}
+                        persona={persona}
+                        diasHeader={diasHeader.slice(0, 7)}
+                        hoyKey={hoyKey}
+                        onTapCelda={(fecha) => {
+                          const celdas = persona.dias[fecha] ?? []
+                          const celda = celdas[0] ?? null
+                          setModalDetalle({ nombrePersona: persona.nombre, fecha, celda })
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+              {personasFiltradas.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  No hay personal en esta semana
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ── Desktop/Tablet matrix (≥768px) ─────────────────────────────────── */}
         {loading ? (
-          <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
+          <div className="hidden md:flex items-center justify-center h-48 text-muted-foreground text-sm">
             Cargando planificación...
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="hidden md:block overflow-x-auto">
             <div style={{ minWidth: `${260 + numSemanas * 7 * 36 + 60}px` }}>
               {/* Week group sub-headers for multi-week view */}
               {numSemanas > 1 && (
@@ -1127,13 +1276,24 @@ export default function PlanificacionPage() {
                           gridCols={gridCols}
                           dragState={dragState}
                           dragHandleEnabled={dragHandleEnabled}
-                          onClickEmpty={(fecha) =>
+                          onClickEmpty={(fecha) => {
+                            if (isReadOnly) return
                             setModalCelda({ userId: persona.userId, nombre: persona.nombre, fecha })
-                          }
-                          onClickProyecto={(fecha, celda) =>
-                            setModalCelda({ userId: persona.userId, nombre: persona.nombre, fecha, celda })
-                          }
-                          onClickAusencia={(celda) => setModalAusencia(celda)}
+                          }}
+                          onClickProyecto={(fecha, celda) => {
+                            if (isReadOnly) {
+                              setModalDetalle({ nombrePersona: persona.nombre, fecha, celda })
+                            } else {
+                              setModalCelda({ userId: persona.userId, nombre: persona.nombre, fecha, celda })
+                            }
+                          }}
+                          onClickAusencia={(fecha, celda) => {
+                            if (isReadOnly) {
+                              setModalDetalle({ nombrePersona: persona.nombre, fecha, celda })
+                            } else {
+                              setModalAusencia(celda)
+                            }
+                          }}
                           onDragStart={handleDragStart}
                         />
                       ))}
@@ -1145,7 +1305,7 @@ export default function PlanificacionPage() {
           </div>
         )}
 
-        <div className="mt-4 flex flex-wrap gap-4 text-xs text-muted-foreground">
+        <div className="mt-4 hidden md:flex flex-wrap gap-4 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
             <span className="inline-block w-3 h-3 rounded" style={{ backgroundColor: '#3B82F666' }} /> Proyecto
           </span>
@@ -1187,6 +1347,12 @@ export default function PlanificacionPage() {
           open={!!modalAusencia}
           onClose={() => setModalAusencia(null)}
           celda={modalAusencia}
+        />
+
+        <CeldaDetalleModal
+          open={!!modalDetalle}
+          onClose={() => setModalDetalle(null)}
+          data={modalDetalle}
         />
 
         <CopiarSemanaModal

@@ -65,6 +65,7 @@ import {
   Sparkles,
   CalendarOff,
   CalendarDays,
+  CalendarRange,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -232,6 +233,7 @@ export default function Sidebar() {
           ],
         },
         { href: '/mi-trabajo/ausencias', label: 'Mis Ausencias', icon: CalendarOff },
+        { href: '/mi-trabajo/mi-planificacion', label: 'Mi planificación', icon: CalendarRange },
         { href: '/mi-trabajo/timesheet', label: 'Mi Timesheet', icon: Calendar, badge: 'timesheet-no-enviado' as NotificationBadgeType },
         { href: '/mi-trabajo/mi-jornada', label: 'Mi Jornada', icon: HardHat },
         { href: '/mi-trabajo/tareas', label: 'Mis Tareas', icon: CheckSquare, badge: 'tareas-vencidas' as NotificationBadgeType },
