@@ -1,4 +1,4 @@
-import { computeSeleccionRectangulo } from '@/lib/planificacion/seleccion'
+import { computeSeleccionRectangulo, toggleCeldaEnSeleccion } from '@/lib/planificacion/seleccion'
 
 const userIds = ['u1', 'u2', 'u3']
 const fechas = ['2026-05-25', '2026-05-26', '2026-05-27', '2026-05-28', '2026-05-29']
@@ -65,5 +65,72 @@ describe('computeSeleccionRectangulo', () => {
     const result = computeSeleccionRectangulo('u2', '2026-05-25', 'u2', '2026-05-29', userIds, fechas, vacio)
     expect(result.size).toBe(5)
     for (const f of fechas) expect(result.has(`u2|${f}`)).toBe(true)
+  })
+})
+
+describe('toggleCeldaEnSeleccion', () => {
+  it('Ctrl+click desde idle → selección de 1 celda', () => {
+    const result = toggleCeldaEnSeleccion({ type: 'idle' }, 'u1', '2026-05-25')
+    expect(result.type).toBe('selected')
+    if (result.type === 'selected') {
+      expect(result.celdas.size).toBe(1)
+      expect(result.celdas.has('u1|2026-05-25')).toBe(true)
+      expect(result.anchorUserId).toBe('u1')
+      expect(result.anchorFecha).toBe('2026-05-25')
+    }
+  })
+
+  it('Ctrl+click acumulativo: 3 celdas distintas → set con 3 elementos', () => {
+    let state = toggleCeldaEnSeleccion({ type: 'idle' }, 'u1', '2026-05-25')
+    state = toggleCeldaEnSeleccion(state, 'u1', '2026-05-26')
+    state = toggleCeldaEnSeleccion(state, 'u2', '2026-05-25')
+    expect(state.type).toBe('selected')
+    if (state.type === 'selected') {
+      expect(state.celdas.size).toBe(3)
+      expect(state.celdas.has('u1|2026-05-25')).toBe(true)
+      expect(state.celdas.has('u1|2026-05-26')).toBe(true)
+      expect(state.celdas.has('u2|2026-05-25')).toBe(true)
+    }
+  })
+
+  it('Ctrl+click sobre celda ya seleccionada → toggle (quita la celda)', () => {
+    let state = toggleCeldaEnSeleccion({ type: 'idle' }, 'u1', '2026-05-25')
+    state = toggleCeldaEnSeleccion(state, 'u1', '2026-05-26')
+    state = toggleCeldaEnSeleccion(state, 'u1', '2026-05-25') // quitar primera
+    expect(state.type).toBe('selected')
+    if (state.type === 'selected') {
+      expect(state.celdas.size).toBe(1)
+      expect(state.celdas.has('u1|2026-05-25')).toBe(false)
+      expect(state.celdas.has('u1|2026-05-26')).toBe(true)
+    }
+  })
+
+  it('Ctrl+click quita la única celda → state vuelve a idle', () => {
+    let state = toggleCeldaEnSeleccion({ type: 'idle' }, 'u1', '2026-05-25')
+    state = toggleCeldaEnSeleccion(state, 'u1', '2026-05-25')
+    expect(state.type).toBe('idle')
+  })
+
+  it('Cmd+click (metaKey) — la lógica de toggle es idéntica al Ctrl+click', () => {
+    // metaKey vs ctrlKey distinción vive en el caller (page.tsx); toggleCeldaEnSeleccion es agnóstico
+    // Verificamos que el mismo resultado se produce independientemente del modificador de teclado
+    const fromIdle = toggleCeldaEnSeleccion({ type: 'idle' }, 'u-mac', '2026-05-27')
+    expect(fromIdle.type).toBe('selected')
+    if (fromIdle.type === 'selected') {
+      expect(fromIdle.celdas.has('u-mac|2026-05-27')).toBe(true)
+    }
+    // Toggle off (simula segundo Cmd+click sobre la misma celda)
+    const toggled = toggleCeldaEnSeleccion(fromIdle, 'u-mac', '2026-05-27')
+    expect(toggled.type).toBe('idle')
+  })
+
+  it('Ctrl+click desde estado selecting (drag en curso) → crea nueva selección de 1 celda', () => {
+    const selecting = { type: 'selecting', origenUserId: 'u1', origenFecha: '2026-05-25', actualUserId: 'u2', actualFecha: '2026-05-26' }
+    const result = toggleCeldaEnSeleccion(selecting, 'u3', '2026-05-27')
+    expect(result.type).toBe('selected')
+    if (result.type === 'selected') {
+      expect(result.celdas.size).toBe(1)
+      expect(result.celdas.has('u3|2026-05-27')).toBe(true)
+    }
   })
 })

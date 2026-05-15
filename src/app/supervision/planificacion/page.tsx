@@ -49,7 +49,7 @@ import {
   CeldaDetalleModal,
   type CeldaDetalleData,
 } from '@/components/planificacion/CeldaDetalleModal'
-import { computeSeleccionRectangulo } from '@/lib/planificacion/seleccion'
+import { computeSeleccionRectangulo, toggleCeldaEnSeleccion } from '@/lib/planificacion/seleccion'
 
 const DEPT_ORDER = ['INGENIERIA', 'CONSTRUCCION', 'GESTION', 'PROYECTOS']
 const ROLES_PERMITIDOS = ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos']
@@ -807,6 +807,8 @@ export default function PlanificacionPage() {
   seleccionRef.current = seleccionState
   const orderedUserIdsRef = useRef<string[]>([])
   const fechasOrdenadasRef = useRef<string[]>([])
+  // Suppresses the onClick that fires after a Ctrl/Cmd+mousedown on an empty cell
+  const ctrlClickSuppressRef = useRef(false)
 
   useEffect(() => {
     if (!semanaInicio) return
@@ -972,18 +974,8 @@ export default function PlanificacionPage() {
 
       // Ctrl/Cmd+click: toggle individual cell
       if (e.ctrlKey || e.metaKey) {
-        setSeleccionState((prev) => {
-          const key = `${userId}|${fecha}`
-          if (prev.type === 'selected') {
-            const next = new Set(prev.celdas)
-            if (next.has(key)) next.delete(key)
-            else next.add(key)
-            return next.size > 0
-              ? { type: 'selected', celdas: next, anchorUserId: prev.anchorUserId, anchorFecha: prev.anchorFecha }
-              : { type: 'idle' }
-          }
-          return { type: 'selected', celdas: new Set([key]), anchorUserId: userId, anchorFecha: fecha }
-        })
+        ctrlClickSuppressRef.current = true
+        setSeleccionState((prev) => toggleCeldaEnSeleccion(prev, userId, fecha) as SeleccionState)
         return
       }
 
@@ -1552,6 +1544,10 @@ export default function PlanificacionPage() {
                           seleccionEnabled={seleccionEnabled}
                           onCeldaMouseDown={handleCeldaMouseDown}
                           onClickEmpty={(fecha) => {
+                            if (ctrlClickSuppressRef.current) {
+                              ctrlClickSuppressRef.current = false
+                              return
+                            }
                             if (isReadOnly) return
                             if (seleccionState.type !== 'idle') {
                               setSeleccionState({ type: 'idle' })
@@ -1661,7 +1657,6 @@ export default function PlanificacionPage() {
                 })
               : []
           }
-          proyectos={data?.proyectos ?? []}
         />
       </div>
 

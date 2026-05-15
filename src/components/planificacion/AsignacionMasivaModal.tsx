@@ -32,14 +32,15 @@ interface Props {
   onClose: () => void
   onDone: () => void
   celdas: CeldaMasiva[]
-  proyectos: ProyectoActivo[]
 }
 
-export default function AsignacionMasivaModal({ open, onClose, onDone, celdas, proyectos }: Props) {
+export default function AsignacionMasivaModal({ open, onClose, onDone, celdas }: Props) {
   const [proyectoId, setProyectoId] = useState('')
   const [notas, setNotas] = useState('')
   const [esExcepcional, setEsExcepcional] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [proyectos, setProyectos] = useState<ProyectoActivo[]>([])
+  const [cargandoProyectos, setCargandoProyectos] = useState(false)
 
   const tieneFinDeSemana = celdas.some(({ fecha }) => {
     const dow = new Date(fecha + 'T00:00:00.000Z').getUTCDay()
@@ -54,7 +55,14 @@ export default function AsignacionMasivaModal({ open, onClose, onDone, celdas, p
       setProyectoId('')
       setNotas('')
       setEsExcepcional(false)
+      return
     }
+    setCargandoProyectos(true)
+    fetch('/api/planificacion/proyectos-activos')
+      .then((r) => r.json())
+      .then(setProyectos)
+      .catch(() => {})
+      .finally(() => setCargandoProyectos(false))
   }, [open])
 
   const handleConfirm = async () => {
@@ -135,9 +143,9 @@ export default function AsignacionMasivaModal({ open, onClose, onDone, celdas, p
             <Label>
               Proyecto <span className="text-destructive">*</span>
             </Label>
-            <Select value={proyectoId} onValueChange={setProyectoId}>
+            <Select value={proyectoId} onValueChange={setProyectoId} disabled={cargandoProyectos}>
               <SelectTrigger>
-                <SelectValue placeholder="Seleccionar proyecto..." />
+                <SelectValue placeholder={cargandoProyectos ? 'Cargando proyectos...' : 'Seleccionar proyecto...'} />
               </SelectTrigger>
               <SelectContent>
                 {proyectos.map((p) => (

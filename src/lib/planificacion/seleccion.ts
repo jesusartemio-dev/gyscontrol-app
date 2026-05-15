@@ -2,6 +2,32 @@ export interface CeldaSimple {
   tipo: 'proyecto' | 'ausencia'
 }
 
+export type SeleccionToggleResult =
+  | { type: 'idle' }
+  | { type: 'selected'; celdas: Set<string>; anchorUserId: string; anchorFecha: string }
+
+/**
+ * Pure toggle for Ctrl/Cmd+click multi-select.
+ * Adds the key "userId|fecha" if absent; removes it if present.
+ * Returns { type: 'idle' } when removing the last key empties the set.
+ */
+export function toggleCeldaEnSeleccion(
+  prev: { type: string; celdas?: Set<string>; anchorUserId?: string; anchorFecha?: string },
+  userId: string,
+  fecha: string,
+): SeleccionToggleResult {
+  const key = `${userId}|${fecha}`
+  if (prev.type === 'selected' && prev.celdas) {
+    const next = new Set(prev.celdas)
+    if (next.has(key)) next.delete(key)
+    else next.add(key)
+    return next.size > 0
+      ? { type: 'selected', celdas: next, anchorUserId: prev.anchorUserId ?? userId, anchorFecha: prev.anchorFecha ?? fecha }
+      : { type: 'idle' }
+  }
+  return { type: 'selected', celdas: new Set([key]), anchorUserId: userId, anchorFecha: fecha }
+}
+
 /**
  * Computes the set of selectable (empty) cell keys within a rectangular drag selection.
  * Keys are "userId|fecha". Only cells where getCeldasDia returns [] are included.
