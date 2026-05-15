@@ -5453,6 +5453,10 @@ enum TurnoDia {
   dia_completo
   am
   pm
+  turno_a
+  turno_b
+  turno_c
+  turno_noche
 }
 
 model TipoAusencia {

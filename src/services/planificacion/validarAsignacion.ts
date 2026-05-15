@@ -4,7 +4,7 @@ export type PrismaTx = Omit<
   PrismaClient,
   '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
 >
-export type TurnoDia = 'dia_completo' | 'am' | 'pm'
+export type TurnoDia = 'dia_completo' | 'turno_a' | 'turno_b' | 'turno_c' | 'turno_noche'
 
 export interface ValidacionError {
   codigo: string
@@ -26,10 +26,10 @@ const ESTADOS_INACTIVOS = ['cerrado', 'pausado', 'cancelado']
 /**
  * Devuelve los valores de turno que entran en conflicto con la asignación dada.
  * - dia_completo → conflicta con cualquier turno
- * - am / pm → conflicta con dia_completo y consigo mismo
+ * - turno_a/b/c/noche → conflicta con dia_completo y consigo mismo
  */
 function turnosConflicto(turno: TurnoDia): TurnoDia[] {
-  if (turno === 'dia_completo') return ['dia_completo', 'am', 'pm']
+  if (turno === 'dia_completo') return ['dia_completo', 'turno_a', 'turno_b', 'turno_c', 'turno_noche']
   return ['dia_completo', turno]
 }
 

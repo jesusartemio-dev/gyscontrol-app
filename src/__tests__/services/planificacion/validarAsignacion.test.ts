@@ -299,7 +299,7 @@ describe('validarAsignacion', () => {
 
       const tx = makeTx({
         planificacionDia: {
-          // se llama con turno: { in: ['dia_completo', 'am'] }
+          // se llama con turno: { in: ['dia_completo', 'turno_a'] }
           findFirst: jest.fn().mockResolvedValue(ausenciaCell),
         },
       })
@@ -307,7 +307,7 @@ describe('validarAsignacion', () => {
       const result = await validarAsignacion(
         USER_ID,
         FECHA_LUNES,
-        'am',
+        'turno_a',
         PROYECTO_ID,
         false,
         tx,
@@ -317,7 +317,7 @@ describe('validarAsignacion', () => {
       expect(result.errores[0].codigo).toBe('conflicto_ausencia')
     })
 
-    it('turno pm sin ausencia pm → válido', async () => {
+    it('turno_b sin ausencia turno_b → válido', async () => {
       const tx = makeTx({
         planificacionDia: {
           findFirst: jest.fn().mockResolvedValue(null),
@@ -327,7 +327,7 @@ describe('validarAsignacion', () => {
       const result = await validarAsignacion(
         USER_ID,
         FECHA_LUNES,
-        'pm',
+        'turno_b',
         PROYECTO_ID,
         false,
         tx,

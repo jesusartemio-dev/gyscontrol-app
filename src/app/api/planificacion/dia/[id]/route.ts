@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { authOptions } from '@/lib/auth'
 import { validarAsignacion } from '@/services/planificacion/validarAsignacion'
-import type { PrismaTx } from '@/services/planificacion/validarAsignacion'
+import type { PrismaTx, TurnoDia } from '@/services/planificacion/validarAsignacion'
 
 const ROLES_PLANIFICADOR = ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos']
 
@@ -48,7 +48,7 @@ export async function PUT(request: NextRequest, context: Ctx) {
       const validacion = await validarAsignacion(
         celda.userId,
         celda.fecha,
-        celda.turno as 'dia_completo' | 'am' | 'pm',
+        celda.turno as TurnoDia,
         data.proyectoId,
         data.esExcepcional,
         tx as unknown as PrismaTx,

@@ -11,7 +11,7 @@ const ROLES_PLANIFICADOR = ['admin', 'gerente', 'gestor', 'coordinador', 'proyec
 const DiaSchema = z.object({
   userId: z.string().min(1),
   fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato YYYY-MM-DD requerido'),
-  turno: z.enum(['dia_completo', 'am', 'pm']),
+  turno: z.enum(['dia_completo', 'turno_a', 'turno_b', 'turno_c', 'turno_noche']),
   proyectoId: z.string().min(1),
   esExcepcional: z.boolean().default(false),
   notas: z.string().optional(),

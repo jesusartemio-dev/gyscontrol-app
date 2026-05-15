@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import type { PrismaTx } from './validarAsignacion'
+import type { PrismaTx, TurnoDia } from './validarAsignacion'
 import { validarAsignacion } from './validarAsignacion'
 import { parseISOWeek, addDays, toDateKey } from '@/lib/utils/planificacion'
 
@@ -82,7 +82,7 @@ export async function copiarSemana(
       const validacion = await validarAsignacion(
         celda.userId,
         fechaDestino,
-        celda.turno as 'dia_completo' | 'am' | 'pm',
+        celda.turno as TurnoDia,
         celda.proyectoId!,
         celda.esExcepcional,
         tx as unknown as PrismaTx,

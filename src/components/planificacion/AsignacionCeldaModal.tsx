@@ -48,7 +48,7 @@ interface Props {
 
 const FormSchema = z.object({
   proyectoId: z.string().min(1, 'Seleccione un proyecto'),
-  turno: z.enum(['dia_completo', 'am', 'pm']),
+  turno: z.enum(['dia_completo', 'turno_a', 'turno_b', 'turno_c', 'turno_noche']),
   esExcepcional: z.boolean(),
   notas: z.string().max(200).optional(),
 })
@@ -57,8 +57,10 @@ type FormValues = z.infer<typeof FormSchema>
 
 const TURNO_LABELS: Record<string, string> = {
   dia_completo: 'Día completo',
-  am: 'Solo mañana (AM)',
-  pm: 'Solo tarde (PM)',
+  turno_a: 'Turno A',
+  turno_b: 'Turno B',
+  turno_c: 'Turno C',
+  turno_noche: 'Turno Noche',
 }
 
 export default function AsignacionCeldaModal({ open, onClose, onSaved, userId, userName, fecha, celdaExistente }: Props) {
@@ -90,7 +92,7 @@ export default function AsignacionCeldaModal({ open, onClose, onSaved, userId, u
     ),
     defaultValues: {
       proyectoId: celdaExistente?.proyecto?.id ?? '',
-      turno: (celdaExistente?.turno as 'dia_completo' | 'am' | 'pm') ?? 'dia_completo',
+      turno: (celdaExistente?.turno as FormValues['turno']) ?? 'dia_completo',
       esExcepcional: celdaExistente?.esExcepcional ?? isWeekend,
       notas: celdaExistente?.notas ?? '',
     },
@@ -111,7 +113,7 @@ export default function AsignacionCeldaModal({ open, onClose, onSaved, userId, u
     if (!open) return
     reset({
       proyectoId: celdaExistente?.proyecto?.id ?? '',
-      turno: (celdaExistente?.turno as 'dia_completo' | 'am' | 'pm') ?? 'dia_completo',
+      turno: (celdaExistente?.turno as FormValues['turno']) ?? 'dia_completo',
       esExcepcional: celdaExistente?.esExcepcional ?? isWeekend,
       notas: celdaExistente?.notas ?? '',
     })
@@ -221,7 +223,7 @@ export default function AsignacionCeldaModal({ open, onClose, onSaved, userId, u
 
             <div className="space-y-1.5">
               <Label>Turno</Label>
-              <Select value={watch('turno')} onValueChange={(v) => setValue('turno', v as 'dia_completo' | 'am' | 'pm')}>
+              <Select value={watch('turno')} onValueChange={(v) => setValue('turno', v as FormValues['turno'])}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
