@@ -5451,12 +5451,12 @@ enum EstadoSolicitudAusencia {
 // Turno del día — compartido por SolicitudAusencia y PlanificacionDia
 enum TurnoDia {
   dia_completo
-  am
-  pm
-  turno_a
-  turno_b
-  turno_c
-  turno_noche
+  am          // deprecated — no usar; existe por compatibilidad histórica
+  pm          // deprecated — no usar
+  turno_a     // pendiente — requiere definir horarios reales y reglas antes de habilitar
+  turno_b     // pendiente
+  turno_c     // pendiente
+  turno_noche // pendiente — probablemente redundante con turno_c
 }
 
 model TipoAusencia {

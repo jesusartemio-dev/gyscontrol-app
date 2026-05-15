@@ -25,10 +25,7 @@ interface Props {
 
 const TURNO_LABELS: Record<string, string> = {
   dia_completo: 'Día completo',
-  turno_a: 'Turno A',
-  turno_b: 'Turno B',
-  turno_c: 'Turno C',
-  turno_noche: 'Turno Noche',
+  // turno_a/b/c/noche: pendientes de definición de horarios
 }
 
 export function CeldaDetalleModal({ open, onClose, data }: Props) {

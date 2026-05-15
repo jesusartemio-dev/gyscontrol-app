@@ -285,55 +285,33 @@ describe('validarAsignacion', () => {
     expect(result.warnings[0].codigo).toBe('persona_no_en_proyecto')
   })
 
-  describe('conflictos de turno', () => {
-    it('turno am con ausencia dia_completo → conflicto', async () => {
-      const ausenciaCell = {
-        id: 'planif-2',
-        solicitudAusenciaId: 'sol-2',
-        solicitudAusencia: {
-          id: 'sol-2',
-          estado: 'aprobada',
-          tipoAusencia: { nombre: 'Permiso' },
-        },
-      }
+  it('dia_completo con ausencia dia_completo → conflicto', async () => {
+    const ausenciaCell = {
+      id: 'planif-2',
+      solicitudAusenciaId: 'sol-2',
+      solicitudAusencia: {
+        id: 'sol-2',
+        estado: 'aprobada',
+        tipoAusencia: { nombre: 'Permiso' },
+      },
+    }
 
-      const tx = makeTx({
-        planificacionDia: {
-          // se llama con turno: { in: ['dia_completo', 'turno_a'] }
-          findFirst: jest.fn().mockResolvedValue(ausenciaCell),
-        },
-      })
-
-      const result = await validarAsignacion(
-        USER_ID,
-        FECHA_LUNES,
-        'turno_a',
-        PROYECTO_ID,
-        false,
-        tx,
-      )
-
-      expect(result.valido).toBe(false)
-      expect(result.errores[0].codigo).toBe('conflicto_ausencia')
+    const tx = makeTx({
+      planificacionDia: {
+        findFirst: jest.fn().mockResolvedValue(ausenciaCell),
+      },
     })
 
-    it('turno_b sin ausencia turno_b → válido', async () => {
-      const tx = makeTx({
-        planificacionDia: {
-          findFirst: jest.fn().mockResolvedValue(null),
-        },
-      })
+    const result = await validarAsignacion(
+      USER_ID,
+      FECHA_LUNES,
+      'dia_completo',
+      PROYECTO_ID,
+      false,
+      tx,
+    )
 
-      const result = await validarAsignacion(
-        USER_ID,
-        FECHA_LUNES,
-        'turno_b',
-        PROYECTO_ID,
-        false,
-        tx,
-      )
-
-      expect(result.valido).toBe(true)
-    })
+    expect(result.valido).toBe(false)
+    expect(result.errores[0].codigo).toBe('conflicto_ausencia')
   })
 })

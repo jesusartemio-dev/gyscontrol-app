@@ -48,7 +48,7 @@ interface Props {
 
 const FormSchema = z.object({
   proyectoId: z.string().min(1, 'Seleccione un proyecto'),
-  turno: z.enum(['dia_completo', 'turno_a', 'turno_b', 'turno_c', 'turno_noche']),
+  turno: z.enum(['dia_completo']),
   esExcepcional: z.boolean(),
   notas: z.string().max(200).optional(),
 })
@@ -57,10 +57,6 @@ type FormValues = z.infer<typeof FormSchema>
 
 const TURNO_LABELS: Record<string, string> = {
   dia_completo: 'Día completo',
-  turno_a: 'Turno A',
-  turno_b: 'Turno B',
-  turno_c: 'Turno C',
-  turno_noche: 'Turno Noche',
 }
 
 export default function AsignacionCeldaModal({ open, onClose, onSaved, userId, userName, fecha, celdaExistente }: Props) {

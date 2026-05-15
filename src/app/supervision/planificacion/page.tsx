@@ -130,7 +130,7 @@ interface Departamento {
 type DiaHeader = { dateKey: string; d: Date; isHoy: boolean; isWeekend: boolean }
 
 // ── Drag-extend types ─────────────────────────────────────────────────────────
-type TurnoDia = 'dia_completo' | 'turno_a' | 'turno_b' | 'turno_c' | 'turno_noche'
+type TurnoDia = 'dia_completo'
 type CeldaPreviewEstado =
   | 'libre'
   | 'ya_asignada_mismo'
