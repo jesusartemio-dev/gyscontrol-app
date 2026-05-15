@@ -979,7 +979,7 @@ export default function PersonalClient() {
                     onValueChange={(v) => setForm({ ...form, userId: v })}
                     disabled={!!editingEmpleado}
                   >
-                    <SelectTrigger className={cn("h-9", errors.userId && 'border-red-500')}>
+                    <SelectTrigger className={cn("h-9 w-full truncate", errors.userId && 'border-red-500')}>
                       <SelectValue placeholder="Selecciona un usuario" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1005,10 +1005,10 @@ export default function PersonalClient() {
 
               {/* Cargo y Departamento */}
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
+                  <div className="space-y-1">
                   <Label htmlFor="cargoId" className="text-xs">Cargo</Label>
                   <Select value={form.cargoId} onValueChange={(v) => setForm({ ...form, cargoId: v })}>
-                    <SelectTrigger className="h-9">
+                    <SelectTrigger className="h-9 w-full truncate">
                       <SelectValue placeholder="Seleccionar" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1021,7 +1021,7 @@ export default function PersonalClient() {
                 <div className="space-y-1">
                   <Label htmlFor="departamentoId" className="text-xs">Departamento</Label>
                   <Select value={form.departamentoId} onValueChange={(v) => setForm({ ...form, departamentoId: v })}>
-                    <SelectTrigger className="h-9">
+                    <SelectTrigger className="h-9 w-full truncate">
                       <SelectValue placeholder="Seleccionar" />
                     </SelectTrigger>
                     <SelectContent>
