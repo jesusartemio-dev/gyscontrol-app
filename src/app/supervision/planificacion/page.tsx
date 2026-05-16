@@ -144,7 +144,7 @@ interface Departamento {
   nombre: string
 }
 
-type DiaHeader = { dateKey: string; d: Date; isHoy: boolean; isWeekend: boolean }
+type DiaHeader = { dateKey: string; d: Date; isHoy: boolean; isWeekend: boolean; isSaturday: boolean; isSunday: boolean }
 
 // ── Drag-extend types ─────────────────────────────────────────────────────────
 type TurnoDia = 'dia_completo'
@@ -290,6 +290,8 @@ function CeldaDia({
   celda,
   dimmed,
   isWeekend,
+  isSaturday,
+  isSunday,
   textMode,
   dragHandleEnabled,
   isSelected,
@@ -303,6 +305,8 @@ function CeldaDia({
   celda: CeldaEntry[]
   dimmed: boolean
   isWeekend: boolean
+  isSaturday: boolean
+  isSunday: boolean
   textMode: TextMode
   dragHandleEnabled: boolean
   isSelected?: boolean
@@ -313,11 +317,14 @@ function CeldaDia({
   onDragHandleMouseDown?: (e: React.MouseEvent) => void
   onMouseDownEmpty?: (e: React.MouseEvent) => void
 }) {
+  const weekendBg = isSaturday ? 'bg-orange-100/40' : isSunday ? 'bg-red-100/40' : ''
+
   if (!celda || celda.length === 0) {
     return (
       <div
         className={cn(
           'group relative flex items-center justify-center h-full border border-dashed cursor-pointer rounded transition-colors',
+          weekendBg,
           isSelected
             ? 'border-blue-500 border-solid bg-blue-100/50 dark:bg-blue-900/30'
             : isInSelectionRect
@@ -348,14 +355,13 @@ function CeldaDia({
             className={cn(
               'relative flex items-center justify-center h-full rounded cursor-pointer text-xs font-medium',
               dimmed && 'opacity-30',
-              isWeekend && c.esExcepcional && 'border border-dashed border-gray-400',
             )}
             style={{ background: 'repeating-linear-gradient(45deg, #f3f4f6, #f3f4f6 4px, #e5e7eb 4px, #e5e7eb 8px)' }}
             onClick={onClickAusencia}
           >
             {label && <span className="bg-white/80 rounded px-1">{label}</span>}
             {c.esExcepcional && (
-              <span className="absolute top-0.5 right-0.5 text-[9px]">⏰</span>
+              <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-amber-400 border border-white" />
             )}
           </div>
         </TooltipTrigger>
@@ -380,15 +386,13 @@ function CeldaDia({
             'group relative flex items-center justify-center h-full rounded cursor-pointer text-[10px] font-bold px-0.5 shadow-sm',
             dimmed && 'opacity-40',
           )}
-          style={{
-            backgroundColor: color,
-            border: c.esExcepcional ? `2px dashed rgba(255,255,255,0.55)` : 'none',
-            color: 'white',
-          }}
+          style={{ backgroundColor: color, color: 'white' }}
           onClick={onClickProyecto}
         >
           {label && <span className="truncate drop-shadow-sm">{label}</span>}
-          {c.esExcepcional && <span className="absolute top-0 right-0.5 text-[9px] leading-none pt-px">⏰</span>}
+          {c.esExcepcional && (
+            <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-amber-300 border border-white/60" />
+          )}
           {dragHandleEnabled && onDragHandleMouseDown && (
             <div
               className="absolute right-0 top-[15%] bottom-[15%] w-1.5 rounded-r opacity-0 group-hover:opacity-40 cursor-col-resize transition-opacity"
@@ -585,7 +589,7 @@ function SortablePersonaRow({
         </div>
       </div>
 
-      {diasHeader.map(({ dateKey, d, isHoy, isWeekend }) => {
+      {diasHeader.map(({ dateKey, d, isHoy, isWeekend, isSaturday, isSunday }) => {
         const celdasDia = (persona.dias[dateKey] ?? []).map((c) =>
           c.tipo === 'proyecto' && c.proyecto && colorOverrides[c.proyecto.id]
             ? { ...c, proyecto: { ...c.proyecto, color: colorOverrides[c.proyecto.id] } }
@@ -632,7 +636,8 @@ function SortablePersonaRow({
             data-celda-fecha={dateKey}
             className={cn(
               'relative h-full px-0.5 py-0.5',
-              isWeekend && 'bg-muted/40',
+              isSaturday && 'bg-orange-100/30',
+              isSunday && 'bg-red-100/30',
               isHoy && 'border-l-2 border-blue-500',
             )}
           >
@@ -640,6 +645,8 @@ function SortablePersonaRow({
               celda={celdasDia}
               dimmed={dimmed}
               isWeekend={isWeekend}
+              isSaturday={isSaturday}
+              isSunday={isSunday}
               textMode={textMode}
               dragHandleEnabled={dragHandleEnabled}
               isSelected={isSelected}
@@ -929,6 +936,8 @@ export default function PlanificacionPage() {
         d,
         isHoy: dateKey === hoyKey,
         isWeekend: utcDay === 0 || utcDay === 6,
+        isSaturday: utcDay === 6,
+        isSunday: utcDay === 0,
       }
     })
   }, [semanaInicio, hoyKey, numSemanas])
@@ -1535,7 +1544,7 @@ export default function PlanificacionPage() {
               <div style={{ display: 'grid', gridTemplateColumns: gridCols }} className="text-xs font-medium text-muted-foreground border-b mb-0.5 pb-1">
                 <div />{/* dept stripe col */}
                 <div className="px-3">Persona</div>
-                {diasHeader.map(({ dateKey, d, isHoy, isWeekend }) => {
+                {diasHeader.map(({ dateKey, d, isHoy, isSaturday, isSunday }) => {
                   const dayName = (textMode === 'full' || textMode === 'short')
                     ? d.toLocaleDateString('es', { weekday: 'short', timeZone: 'UTC' })
                     : d.toLocaleDateString('es', { weekday: 'narrow', timeZone: 'UTC' })
@@ -1545,8 +1554,9 @@ export default function PlanificacionPage() {
                     <div
                       key={dateKey}
                       className={cn(
-                        'text-center px-0.5 rounded truncate',
-                        isWeekend && 'text-muted-foreground/60',
+                        'text-center px-0.5 rounded truncate font-semibold',
+                        isSaturday && 'text-orange-500 bg-orange-50/60',
+                        isSunday && 'text-red-500 bg-red-50/60',
                         isHoy && 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-l-2 border-blue-500',
                       )}
                     >
@@ -1663,7 +1673,10 @@ export default function PlanificacionPage() {
             />{' '}
             Ausencia
           </span>
-          <span className="flex items-center gap-1">⏰ Excepcional</span>
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-400 border border-white ring-1 ring-amber-300" />
+            Excepcional
+          </span>
           {data?.proyectos.map((p) => {
             const displayColor = colorOverrides[p.id] ?? p.color
             return (
