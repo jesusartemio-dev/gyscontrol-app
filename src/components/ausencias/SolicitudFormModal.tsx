@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { toast } from 'sonner'
-import { X, Save, Send, Loader2, AlertCircle } from 'lucide-react'
+import { X, Save, Send, Loader2, AlertCircle, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -51,6 +51,8 @@ interface SaldoInfo {
   diasDisponibles: number
   tipoAusencia: { id: string; nombre: string }
 }
+
+const HORAS_POR_DIA_COMP_HE = 9.5
 
 interface SolicitudAusencia {
   id: string
@@ -107,6 +109,7 @@ export default function SolicitudFormModal({ open, onClose, onSaved, solicitudEx
   const tipoSeleccionado = watch('tipoAusenciaId')
   const saldoActual = saldos.find((s) => s.tipoAusencia.id === tipoSeleccionado)
   const tipoInfo = tipos.find((t) => t.id === tipoSeleccionado)
+  const esCompHe = tipoInfo?.codigo === 'COMP_HE'
   // Tipos con requiereDocumento solo pueden enviarse desde el detalle tras adjuntar
   const bloqueadoPorDocumento = Boolean(tipoInfo?.requiereDocumento) && !isEditing
 
@@ -143,6 +146,14 @@ export default function SolicitudFormModal({ open, onClose, onSaved, solicitudEx
       setDateRange(undefined)
     }
   }, [open, solicitudExistente, reset])
+
+  // COMP_HE solo permite día completo
+  useEffect(() => {
+    if (esCompHe) {
+      setValue('turnoInicio', 'dia_completo')
+      setValue('turnoFin', 'dia_completo')
+    }
+  }, [esCompHe, setValue])
 
   const buildPayload = (values: FormValues) => {
     if (!dateRange?.from) return null
@@ -268,11 +279,36 @@ export default function SolicitudFormModal({ open, onClose, onSaved, solicitudEx
           {saldoActual && (
             <div className="rounded-lg border bg-muted/40 px-4 py-3 text-sm">
               <p className="font-medium text-foreground">{saldoActual.tipoAusencia.nombre}</p>
-              <div className="mt-1 flex gap-4 text-muted-foreground">
-                <span>Asignados: <strong className="text-foreground">{saldoActual.diasAsignados}d</strong></span>
-                <span>Gozados: <strong className="text-foreground">{saldoActual.diasGozados}d</strong></span>
-                <span>Disponibles: <strong className="text-foreground">{saldoActual.diasDisponibles}d</strong></span>
-              </div>
+              {esCompHe ? (
+                <div className="mt-1 space-y-1">
+                  <div className="flex gap-4 text-muted-foreground">
+                    <span>Acumuladas: <strong className="text-foreground">{saldoActual.diasAsignados}h</strong></span>
+                    <span>Gozadas: <strong className="text-foreground">{saldoActual.diasGozados}h</strong></span>
+                    <span>
+                      Disponibles:{' '}
+                      <strong className={saldoActual.diasDisponibles <= 0 ? 'text-destructive' : 'text-emerald-600'}>
+                        {saldoActual.diasDisponibles}h
+                      </strong>
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                    <Clock className="h-3.5 w-3.5" />
+                    <span>
+                      ~<strong className="text-foreground">
+                        {Math.floor(saldoActual.diasDisponibles / HORAS_POR_DIA_COMP_HE)}
+                      </strong>{' '}
+                      día{Math.floor(saldoActual.diasDisponibles / HORAS_POR_DIA_COMP_HE) !== 1 ? 's' : ''} compensable{Math.floor(saldoActual.diasDisponibles / HORAS_POR_DIA_COMP_HE) !== 1 ? 's' : ''}
+                      {' '}(1 día = {HORAS_POR_DIA_COMP_HE}h)
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-1 flex gap-4 text-muted-foreground">
+                  <span>Asignados: <strong className="text-foreground">{saldoActual.diasAsignados}d</strong></span>
+                  <span>Gozados: <strong className="text-foreground">{saldoActual.diasGozados}d</strong></span>
+                  <span>Disponibles: <strong className="text-foreground">{saldoActual.diasDisponibles}d</strong></span>
+                </div>
+              )}
             </div>
           )}
 
@@ -282,41 +318,43 @@ export default function SolicitudFormModal({ open, onClose, onSaved, solicitudEx
             <DatePickerWithRange date={dateRange} onDateChange={setDateRange} placeholder="Seleccionar fechas" />
           </div>
 
-          {/* Turnos */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label>Turno inicio</Label>
-              <Select
-                value={watch('turnoInicio')}
-                onValueChange={(v) => setValue('turnoInicio', v as any)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(TURNO_LABELS).map(([val, label]) => (
-                    <SelectItem key={val} value={val}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          {/* Turnos — COMP_HE solo permite día completo */}
+          {!esCompHe && (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Turno inicio</Label>
+                <Select
+                  value={watch('turnoInicio')}
+                  onValueChange={(v) => setValue('turnoInicio', v as any)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(TURNO_LABELS).map(([val, label]) => (
+                      <SelectItem key={val} value={val}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Turno fin</Label>
+                <Select
+                  value={watch('turnoFin')}
+                  onValueChange={(v) => setValue('turnoFin', v as any)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(TURNO_LABELS).map(([val, label]) => (
+                      <SelectItem key={val} value={val}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label>Turno fin</Label>
-              <Select
-                value={watch('turnoFin')}
-                onValueChange={(v) => setValue('turnoFin', v as any)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(TURNO_LABELS).map(([val, label]) => (
-                    <SelectItem key={val} value={val}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+          )}
 
           {/* Aviso documento requerido */}
           {bloqueadoPorDocumento && (

@@ -34,6 +34,24 @@ interface TipoAusencia {
   nombre: string
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function formatSaldo(valor: number, codigo: string): string {
+  return codigo === 'COMP_HE' ? `${valor}h` : `${valor}d`
+}
+
+function colorDisponibles(valor: number, codigo: string): string {
+  if (codigo === 'COMP_HE') {
+    // umbral en horas: ≤0 rojo, ≤9.5 (1 día) ámbar, resto verde
+    if (valor <= 0) return 'text-destructive'
+    if (valor <= 9.5) return 'text-amber-600'
+    return 'text-emerald-600'
+  }
+  if (valor <= 0) return 'text-destructive'
+  if (valor <= 3) return 'text-amber-600'
+  return 'text-emerald-600'
+}
+
 // ── Ajuste Modal ───────────────────────────────────────────────────────────────
 
 function AjusteModal({
@@ -57,13 +75,19 @@ function AjusteModal({
   const [motivo, setMotivo] = useState('')
   const [saving, setSaving] = useState(false)
 
+  const tipoSeleccionado = tipos.find((t) => t.id === tipoAusenciaId)
+  const esCompHe = tipoSeleccionado?.codigo === 'COMP_HE'
+
   const handleSave = async () => {
     if (!userId || !tipoAusenciaId || !dias || !motivo.trim()) {
       toast.error('Complete todos los campos requeridos')
       return
     }
     const parsedDias = parseFloat(dias)
-    if (isNaN(parsedDias)) { toast.error('Los días deben ser un número'); return }
+    if (isNaN(parsedDias)) {
+      toast.error(esCompHe ? 'Las horas deben ser un número' : 'Los días deben ser un número')
+      return
+    }
 
     setSaving(true)
     try {
@@ -130,17 +154,28 @@ function AjusteModal({
             </Select>
           </div>
 
-          {/* Días */}
+          {/* Días / Horas */}
           <div className="space-y-1.5">
-            <Label>Días a ajustar <span className="text-destructive">*</span></Label>
+            <Label>
+              {esCompHe ? 'Horas a ajustar' : 'Días a ajustar'}{' '}
+              <span className="text-destructive">*</span>
+            </Label>
             <Input
               type="number"
               step="0.5"
-              placeholder="Ej: 5 (suma) o -3 (resta)"
+              placeholder={
+                esCompHe
+                  ? 'Ej: 9.5 (suma) o -9.5 (resta)'
+                  : 'Ej: 5 (suma) o -3 (resta)'
+              }
               value={dias}
               onChange={(e) => setDias(e.target.value)}
             />
-            <p className="text-xs text-muted-foreground">Positivo para agregar días, negativo para reducir.</p>
+            <p className="text-xs text-muted-foreground">
+              {esCompHe
+                ? 'Positivo para agregar horas, negativo para reducir. 1 día = 9.5h'
+                : 'Positivo para agregar días, negativo para reducir.'}
+            </p>
           </div>
 
           {/* Motivo */}
@@ -239,7 +274,7 @@ export default function SaldosAusenciaPage() {
         </Select>
 
         <Select value={filtroTipo} onValueChange={setFiltroTipo}>
-          <SelectTrigger className="w-52">
+          <SelectTrigger className="w-56">
             <SelectValue placeholder="Todos los tipos" />
           </SelectTrigger>
           <SelectContent>
@@ -285,34 +320,37 @@ export default function SaldosAusenciaPage() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {saldos.map((s) => (
-                <tr key={s.id} className="hover:bg-muted/20">
-                  <td className="px-4 py-3 font-medium">{s.user.name}</td>
-                  <td className="px-4 py-3">
-                    <span className="flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full" style={{ background: s.tipoAusencia.color }} />
-                      {s.tipoAusencia.nombre}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-center">{s.diasAsignados}d</td>
-                  <td className="px-4 py-3 text-center">{s.diasGozados}d</td>
-                  <td className="px-4 py-3 text-center">{s.diasPendientes}d</td>
-                  <td className="px-4 py-3 text-center">
-                    <span className={`font-semibold ${s.diasDisponibles <= 0 ? 'text-destructive' : s.diasDisponibles <= 3 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                      {s.diasDisponibles}d
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setAjusteModal({ open: true, saldo: s })}
-                    >
-                      Ajustar
-                    </Button>
-                  </td>
-                </tr>
-              ))}
+              {saldos.map((s) => {
+                const codigo = s.tipoAusencia.codigo
+                return (
+                  <tr key={s.id} className="hover:bg-muted/20">
+                    <td className="px-4 py-3 font-medium">{s.user.name}</td>
+                    <td className="px-4 py-3">
+                      <span className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full" style={{ background: s.tipoAusencia.color }} />
+                        {s.tipoAusencia.nombre}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-center">{formatSaldo(s.diasAsignados, codigo)}</td>
+                    <td className="px-4 py-3 text-center">{formatSaldo(s.diasGozados, codigo)}</td>
+                    <td className="px-4 py-3 text-center">{formatSaldo(s.diasPendientes, codigo)}</td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`font-semibold ${colorDisponibles(s.diasDisponibles, codigo)}`}>
+                        {formatSaldo(s.diasDisponibles, codigo)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setAjusteModal({ open: true, saldo: s })}
+                      >
+                        Ajustar
+                      </Button>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth'
 import { calcularDiasHabiles } from '@/services/ausencias/calcularDiasHabiles'
 import { resolverAprobador1 } from '@/services/ausencias/resolverAprobador'
 import { obtenerCalendarioLaboral } from '@/lib/utils/calendarioLaboral'
+import { calcularHorasRequeridas } from '@/services/ausencias/compHeValidacion'
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -91,6 +92,9 @@ export async function PATCH(_: NextRequest, context: Ctx) {
 
     // ── 6. Validar saldo si descuentaSaldo ────────────────────────────────────
     const anio = solicitud.fechaInicio.getFullYear()
+    const esCompHe = solicitud.tipoAusencia.codigo === 'COMP_HE'
+    // Para COMP_HE las unidades son HORAS; para el resto son DÍAS
+    const unidadesRequeridas = esCompHe ? calcularHorasRequeridas(diasHabiles) : diasHabiles
 
     if (solicitud.tipoAusencia.descuentaSaldo) {
       let saldo = await prisma.saldoAusencia.findUnique({
@@ -129,10 +133,13 @@ export async function PATCH(_: NextRequest, context: Ctx) {
         })
       }
 
-      if (saldo.diasDisponibles < diasHabiles) {
+      if (saldo.diasDisponibles < unidadesRequeridas) {
+        const unidad = esCompHe ? 'h' : ' días'
         return NextResponse.json(
           {
-            error: `Saldo insuficiente. Disponibles: ${saldo.diasDisponibles} días, requeridos: ${diasHabiles} días`,
+            error: esCompHe
+              ? `Saldo insuficiente: tienes ${saldo.diasDisponibles}h, necesitas ${unidadesRequeridas}h (${diasHabiles} día${diasHabiles !== 1 ? 's' : ''})`
+              : `Saldo insuficiente. Disponibles: ${saldo.diasDisponibles}${unidad}, requeridos: ${unidadesRequeridas}${unidad}`,
             saldo: {
               diasAsignados: saldo.diasAsignados,
               diasGozados: saldo.diasGozados,
@@ -174,7 +181,7 @@ export async function PATCH(_: NextRequest, context: Ctx) {
         })
 
         if (saldo) {
-          const nuevosPendientes = saldo.diasPendientes + diasHabiles
+          const nuevosPendientes = saldo.diasPendientes + unidadesRequeridas
           const nuevosDisponibles =
             saldo.diasAsignados - saldo.diasGozados - nuevosPendientes
 
@@ -191,7 +198,7 @@ export async function PATCH(_: NextRequest, context: Ctx) {
             data: {
               saldoId: saldo.id,
               tipo: 'consumo',
-              dias: diasHabiles,
+              dias: unidadesRequeridas,
               motivo: `Solicitud de ${solicitud.tipoAusencia.nombre} enviada a aprobación`,
               referenciaId: id,
               creadoPorId: session.user.id,

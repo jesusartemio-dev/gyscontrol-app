@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { toast } from 'sonner'
-import { Plus, Eye, Send, XCircle, Pencil, CalendarOff } from 'lucide-react'
+import { Plus, Eye, Send, XCircle, Pencil, CalendarOff, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -72,8 +72,48 @@ const ESTADO_VARIANTS: Record<string, 'default' | 'secondary' | 'destructive' | 
   finalizada: 'secondary',
 }
 
+const HORAS_POR_DIA = 9.5
+
 function formatFecha(iso: string) {
   return format(new Date(iso), 'dd/MM/yyyy', { locale: es })
+}
+
+function SaldoCard({ s }: { s: SaldoAusencia }) {
+  const esCompHe = s.tipoAusencia.codigo === 'COMP_HE'
+
+  if (esCompHe) {
+    const diasComp = Math.floor(s.diasDisponibles / HORAS_POR_DIA)
+    const negativo = s.diasDisponibles < 0
+    return (
+      <div className="rounded-lg border bg-card px-4 py-3">
+        <div className="mb-1 flex items-center gap-2">
+          <Clock className="h-2.5 w-2.5 text-muted-foreground" />
+          <p className="text-xs font-medium text-muted-foreground">Compensación de horas</p>
+        </div>
+        <p className={`text-2xl font-bold ${negativo ? 'text-destructive' : ''}`}>
+          {s.diasDisponibles >= 0 ? '+' : ''}{s.diasDisponibles}h
+        </p>
+        <p className="text-xs text-muted-foreground">
+          {negativo
+            ? 'Horas por compensar'
+            : `≈ ${diasComp} día${diasComp !== 1 ? 's' : ''} compensable${diasComp !== 1 ? 's' : ''}`}
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-lg border bg-card px-4 py-3">
+      <div className="mb-1 flex items-center gap-2">
+        <span className="h-2.5 w-2.5 rounded-full" style={{ background: s.tipoAusencia.color }} />
+        <p className="text-xs font-medium text-muted-foreground">{s.tipoAusencia.nombre}</p>
+      </div>
+      <p className="text-2xl font-bold">{s.diasDisponibles}d</p>
+      <p className="text-xs text-muted-foreground">
+        de {s.diasAsignados}d asignados · {s.diasGozados}d gozados
+      </p>
+    </div>
+  )
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -160,21 +200,7 @@ export default function MisAusenciasPage() {
       {/* Saldo cards */}
       {saldos.length > 0 && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {saldos.map((s) => (
-            <div key={s.tipoAusencia.id} className="rounded-lg border bg-card px-4 py-3">
-              <div className="mb-1 flex items-center gap-2">
-                <span
-                  className="h-2.5 w-2.5 rounded-full"
-                  style={{ background: s.tipoAusencia.color }}
-                />
-                <p className="text-xs font-medium text-muted-foreground">{s.tipoAusencia.nombre}</p>
-              </div>
-              <p className="text-2xl font-bold">{s.diasDisponibles}d</p>
-              <p className="text-xs text-muted-foreground">
-                de {s.diasAsignados}d asignados · {s.diasGozados}d gozados
-              </p>
-            </div>
-          ))}
+          {saldos.map((s) => <SaldoCard key={s.tipoAusencia.id} s={s} />)}
         </div>
       )}
 
