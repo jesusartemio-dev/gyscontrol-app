@@ -100,8 +100,16 @@ function colWidthForSemanas(n: number): string {
 }
 
 function gridTemplate(numDias: number, n: number): string {
-  return `260px repeat(${numDias}, ${colWidthForSemanas(n)}) 60px`
+  return `12px 260px repeat(${numDias}, ${colWidthForSemanas(n)}) 60px`
 }
+
+const DEPT_STYLES = [
+  { stripe: '#3b82f6', rowEven: 'bg-blue-50/20', rowOdd: 'bg-blue-50/50' },
+  { stripe: '#10b981', rowEven: 'bg-emerald-50/20', rowOdd: 'bg-emerald-50/50' },
+  { stripe: '#f59e0b', rowEven: 'bg-amber-50/20', rowOdd: 'bg-amber-50/50' },
+  { stripe: '#8b5cf6', rowEven: 'bg-violet-50/20', rowOdd: 'bg-violet-50/50' },
+  { stripe: '#ef4444', rowEven: 'bg-rose-50/20', rowOdd: 'bg-rose-50/50' },
+]
 
 interface CeldaEntry {
   id: string
@@ -503,6 +511,8 @@ function SortablePersonaRow({
   onClickAusencia,
   onDragStart,
   onCeldaMouseDown,
+  deptStripeColor,
+  rowBgClass,
 }: {
   persona: PersonaEntry
   diasHeader: DiaHeader[]
@@ -522,6 +532,8 @@ function SortablePersonaRow({
   onClickAusencia: (fecha: string, celda: CeldaEntry) => void
   onDragStart: (info: Omit<DragStateExtending, 'type' | 'direction' | 'celdasPreview' | 'fechaFin'>) => void
   onCeldaMouseDown: (userId: string, fecha: string, e: React.MouseEvent) => void
+  deptStripeColor: string
+  rowBgClass: string
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: persona.userId,
@@ -541,8 +553,10 @@ function SortablePersonaRow({
     <div
       ref={setNodeRef}
       style={style}
-      className="h-6 border-b hover:bg-muted/20 items-center"
+      className={cn("h-6 border-b items-center hover:brightness-95", rowBgClass)}
     >
+      {/* Dept stripe — 12px first column, overlaid by parent absolute label */}
+      <div className="self-stretch" style={{ backgroundColor: deptStripeColor, opacity: 0.15 }} />
       <div className="flex items-center gap-1 px-2 overflow-hidden">
         <button
           {...attributes}
@@ -1500,6 +1514,7 @@ export default function PlanificacionPage() {
               {/* Week group sub-headers for multi-week view */}
               {numSemanas > 1 && (
                 <div style={{ display: 'grid', gridTemplateColumns: gridCols }} className="text-[10px] font-semibold text-muted-foreground border-b bg-muted/20">
+                  <div />{/* dept stripe col */}
                   <div />
                   {Array.from({ length: numSemanas }, (_, wi) => {
                     const monday = new Date(semanaInicio + 'T00:00:00.000Z')
@@ -1518,6 +1533,7 @@ export default function PlanificacionPage() {
 
               {/* Header de días */}
               <div style={{ display: 'grid', gridTemplateColumns: gridCols }} className="text-xs font-medium text-muted-foreground border-b mb-0.5 pb-1">
+                <div />{/* dept stripe col */}
                 <div className="px-3">Persona</div>
                 {diasHeader.map(({ dateKey, d, isHoy, isWeekend }) => {
                   const dayName = (textMode === 'full' || textMode === 'short')
@@ -1552,18 +1568,18 @@ export default function PlanificacionPage() {
                 </div>
               )}
 
-              {gruposPorDepartamento.map((grupo) => (
-                <div key={grupo.id}>
+              {gruposPorDepartamento.map((grupo, grupoIdx) => {
+                const deptStyle = DEPT_STYLES[grupoIdx % DEPT_STYLES.length]
+                return (
+                <div key={grupo.id} className="relative">
+                  {/* Vertical dept label spanning the full group height */}
                   <div
-                    style={{ display: 'grid', gridTemplateColumns: gridCols }}
-                    className="h-7 bg-muted/50 border-b border-t items-center"
+                    className="absolute left-0 top-0 bottom-0 flex items-center justify-center overflow-hidden pointer-events-none"
+                    style={{ width: 12, backgroundColor: deptStyle.stripe, writingMode: 'vertical-lr', transform: 'rotate(180deg)' }}
                   >
-                    <div
-                      className="px-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest"
-                      style={{ gridColumn: `1 / -1` }}
-                    >
+                    <span className="text-[7px] font-bold uppercase tracking-widest text-white select-none whitespace-nowrap px-0.5">
                       {grupo.nombre}
-                    </div>
+                    </span>
                   </div>
 
                   <DndContext
@@ -1574,10 +1590,12 @@ export default function PlanificacionPage() {
                       items={grupo.personas.map((p) => p.userId)}
                       strategy={verticalListSortingStrategy}
                     >
-                      {grupo.personas.map((persona) => (
+                      {grupo.personas.map((persona, personaIdx) => (
                         <SortablePersonaRow
                           key={persona.userId}
                           persona={persona}
+                          deptStripeColor={deptStyle.stripe}
+                          rowBgClass={personaIdx % 2 === 0 ? deptStyle.rowEven : deptStyle.rowOdd}
                           diasHeader={diasHeader}
                           proyectoFiltro={proyectoFiltro}
                           semanaInicio={semanaInicio}
@@ -1625,7 +1643,8 @@ export default function PlanificacionPage() {
                     </SortableContext>
                   </DndContext>
                 </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}
