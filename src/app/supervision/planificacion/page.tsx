@@ -368,25 +368,22 @@ function CeldaDia({
       <TooltipTrigger asChild>
         <div
           className={cn(
-            'group relative flex items-center justify-center h-full rounded cursor-pointer text-xs font-semibold px-0.5',
-            dimmed && 'opacity-30',
-            isWeekend && c.esExcepcional && 'border-dashed',
+            'group relative flex items-center justify-center h-full rounded cursor-pointer text-xs font-bold px-0.5 shadow-sm',
+            dimmed && 'opacity-40',
           )}
           style={{
-            backgroundColor: color + '33',
-            border: isWeekend && c.esExcepcional
-              ? `1px dashed ${color}88`
-              : `1px solid ${color}66`,
-            color,
+            backgroundColor: color,
+            border: c.esExcepcional ? `2px dashed rgba(255,255,255,0.55)` : 'none',
+            color: 'white',
           }}
           onClick={onClickProyecto}
         >
-          {label && <span className="truncate">{label}</span>}
-          {c.esExcepcional && <span className="absolute top-0.5 right-0.5 text-[9px]">⏰</span>}
+          {label && <span className="truncate drop-shadow-sm">{label}</span>}
+          {c.esExcepcional && <span className="absolute top-0 right-0.5 text-[9px] leading-none pt-px">⏰</span>}
           {dragHandleEnabled && onDragHandleMouseDown && (
             <div
-              className="absolute right-0 top-[15%] bottom-[15%] w-1.5 rounded-r opacity-0 group-hover:opacity-50 cursor-col-resize transition-opacity"
-              style={{ backgroundColor: color }}
+              className="absolute right-0 top-[15%] bottom-[15%] w-1.5 rounded-r opacity-0 group-hover:opacity-40 cursor-col-resize transition-opacity"
+              style={{ backgroundColor: 'rgba(255,255,255,0.6)' }}
               onMouseDown={(e) => {
                 e.stopPropagation()
                 e.preventDefault()
@@ -1595,7 +1592,7 @@ export default function PlanificacionPage() {
 
         <div className="mt-4 hidden md:flex flex-wrap gap-4 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
-            <span className="inline-block w-3 h-3 rounded" style={{ backgroundColor: '#3B82F666' }} /> Proyecto
+            <span className="inline-block w-3 h-3 rounded shadow-sm" style={{ backgroundColor: '#3B82F6' }} /> Proyecto
           </span>
           <span className="flex items-center gap-1">
             <span
@@ -1610,7 +1607,7 @@ export default function PlanificacionPage() {
           <span className="flex items-center gap-1">⏰ Excepcional</span>
           {data?.proyectos.map((p) => (
             <span key={p.id} className="flex items-center gap-1">
-              <span className="inline-block w-3 h-3 rounded" style={{ backgroundColor: p.color + '88' }} />
+              <span className="inline-block w-3 h-3 rounded shadow-sm" style={{ backgroundColor: p.color }} />
               [{p.codigo}] {p.nombre}
             </span>
           ))}
