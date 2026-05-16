@@ -218,7 +218,7 @@ export default function SupervisionTimesheetPage() {
         params.set('semanaHasta', semanaMatriz)
         if (filtroUsuarioId) params.set('usuarioId', filtroUsuarioId)
       } else {
-        params.set('estado', tab)
+        params.set('estado', 'todos')
         if (filtroUsuarioId) params.set('usuarioId', filtroUsuarioId)
         if (filtroSemanaDesde) params.set('semanaDesde', filtroSemanaDesde)
         if (filtroSemanaHasta) params.set('semanaHasta', filtroSemanaHasta)
@@ -236,7 +236,7 @@ export default function SupervisionTimesheetPage() {
     } finally {
       setLoading(false)
     }
-  }, [vista, semanaMatriz, tab, filtroUsuarioId, filtroSemanaDesde, filtroSemanaHasta, toast])
+  }, [vista, semanaMatriz, filtroUsuarioId, filtroSemanaDesde, filtroSemanaHasta, toast])
 
   useEffect(() => {
     cargarUsuarios()
@@ -263,6 +263,17 @@ export default function SupervisionTimesheetPage() {
         )
       })
     : aprobaciones
+
+  const conteosPorEstado = {
+    sin_enviar: aprobacionesFiltradas.filter(a => a.estado === 'sin_enviar').length,
+    enviado: aprobacionesFiltradas.filter(a => a.estado === 'enviado').length,
+    aprobado: aprobacionesFiltradas.filter(a => a.estado === 'aprobado').length,
+    rechazado: aprobacionesFiltradas.filter(a => a.estado === 'rechazado').length,
+  }
+
+  const aprobacionesTabActual = tab === 'todos'
+    ? aprobacionesFiltradas
+    : aprobacionesFiltradas.filter(a => a.estado === tab)
 
   const tieneFiltros = busqueda || filtroUsuarioId || filtroSemanaDesde || filtroSemanaHasta
 
@@ -469,115 +480,6 @@ export default function SupervisionTimesheetPage() {
         </div>
       </div>
 
-      {/* Resumen semana actual */}
-      {resumen?.semanaActual && (
-        <div className="space-y-3">
-          {/* KPI Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Card>
-              <CardContent className="p-3">
-                <div className="flex items-center gap-2">
-                  <Users className="h-5 w-5 text-blue-500" />
-                  <div>
-                    <p className="text-lg font-bold">{resumen.semanaActual.totalUsuarios}</p>
-                    <p className="text-xs text-muted-foreground">Con horas esta semana</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className={resumen.semanaActual.sinEnviar.length > 0 ? 'border-amber-300' : ''}>
-              <CardContent className="p-3">
-                <div className="flex items-center gap-2">
-                  <Clock className="h-5 w-5 text-amber-500" />
-                  <div>
-                    <p className="text-lg font-bold">{resumen.semanaActual.sinEnviar.length}</p>
-                    <p className="text-xs text-muted-foreground">Sin enviar</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className={resumen.semanaActual.pendientes.length > 0 ? 'border-yellow-300' : ''}>
-              <CardContent className="p-3">
-                <div className="flex items-center gap-2">
-                  <Send className="h-5 w-5 text-yellow-500" />
-                  <div>
-                    <p className="text-lg font-bold">{resumen.semanaActual.pendientes.length}</p>
-                    <p className="text-xs text-muted-foreground">Por aprobar</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-3">
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5 text-green-500" />
-                  <div>
-                    <p className="text-lg font-bold">{resumen.semanaActual.aprobados}</p>
-                    <p className="text-xs text-muted-foreground">Aprobados</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Alert: employees who haven't submitted */}
-          {resumen.semanaActual.sinEnviar.length > 0 && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <AlertCircle className="h-4 w-4 text-amber-600" />
-                <span className="text-sm font-semibold text-amber-800">
-                  {resumen.semanaActual.sinEnviar.length} empleado{resumen.semanaActual.sinEnviar.length !== 1 ? 's' : ''} no ha{resumen.semanaActual.sinEnviar.length !== 1 ? 'n' : ''} enviado la semana {resumen.semana}
-                </span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {resumen.semanaActual.sinEnviar.map((u: any) => (
-                  <div
-                    key={u.id}
-                    className="flex items-center gap-1.5 bg-white border border-amber-200 px-3 py-1 rounded-full text-sm cursor-pointer hover:bg-amber-100 transition-colors"
-                    onClick={() => {
-                      setFiltroUsuarioId(u.id)
-                      setTab('sin_enviar')
-                    }}
-                  >
-                    <User className="h-3 w-3 text-amber-600" />
-                    <span className="text-amber-900">{u.nombre}</span>
-                    <Badge variant="secondary" className="text-xs px-1.5 py-0">{u.horas}h</Badge>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Alert: pending approval */}
-          {resumen.semanaActual.pendientes.length > 0 && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Send className="h-4 w-4 text-yellow-600" />
-                <span className="text-sm font-semibold text-yellow-800">
-                  {resumen.semanaActual.pendientes.length} timesheet{resumen.semanaActual.pendientes.length !== 1 ? 's' : ''} esperando tu aprobación esta semana
-                </span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {resumen.semanaActual.pendientes.map((u: any) => (
-                  <div
-                    key={u.id}
-                    className="flex items-center gap-1.5 bg-white border border-yellow-200 px-3 py-1 rounded-full text-sm cursor-pointer hover:bg-yellow-100 transition-colors"
-                    onClick={() => {
-                      setFiltroUsuarioId(u.id)
-                      setTab('enviado')
-                    }}
-                  >
-                    <User className="h-3 w-3 text-yellow-600" />
-                    <span className="text-yellow-900">{u.nombre}</span>
-                    <Badge variant="secondary" className="text-xs px-1.5 py-0">{u.horas}h</Badge>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-[200px]">
@@ -709,31 +611,46 @@ export default function SupervisionTimesheetPage() {
       {vista === 'lista' && (
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
-          <TabsTrigger value="todos">
+          <TabsTrigger value="todos" className="flex items-center gap-1.5">
             Todos
+            <span className="bg-gray-200 text-gray-700 text-xs px-1.5 py-0.5 rounded-full font-medium">
+              {aprobacionesFiltradas.length}
+            </span>
           </TabsTrigger>
-          <TabsTrigger value="sin_enviar" className="flex items-center gap-1">
-            <Clock className="h-4 w-4" />
+          <TabsTrigger value="sin_enviar" className="flex items-center gap-1.5">
+            <Clock className="h-3.5 w-3.5" />
             Sin enviar
+            <span className={cn('text-xs px-1.5 py-0.5 rounded-full font-medium', conteosPorEstado.sin_enviar > 0 ? 'bg-amber-100 text-amber-700' : 'bg-gray-200 text-gray-600')}>
+              {conteosPorEstado.sin_enviar}
+            </span>
           </TabsTrigger>
-          <TabsTrigger value="enviado" className="flex items-center gap-1">
-            <AlertCircle className="h-4 w-4" />
+          <TabsTrigger value="enviado" className="flex items-center gap-1.5">
+            <AlertCircle className="h-3.5 w-3.5" />
             Pendientes
+            <span className={cn('text-xs px-1.5 py-0.5 rounded-full font-medium', conteosPorEstado.enviado > 0 ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-200 text-gray-600')}>
+              {conteosPorEstado.enviado}
+            </span>
           </TabsTrigger>
-          <TabsTrigger value="aprobado" className="flex items-center gap-1">
-            <CheckCircle className="h-4 w-4" />
+          <TabsTrigger value="aprobado" className="flex items-center gap-1.5">
+            <CheckCircle className="h-3.5 w-3.5" />
             Aprobados
+            <span className={cn('text-xs px-1.5 py-0.5 rounded-full font-medium', conteosPorEstado.aprobado > 0 ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600')}>
+              {conteosPorEstado.aprobado}
+            </span>
           </TabsTrigger>
-          <TabsTrigger value="rechazado" className="flex items-center gap-1">
-            <XCircle className="h-4 w-4" />
+          <TabsTrigger value="rechazado" className="flex items-center gap-1.5">
+            <XCircle className="h-3.5 w-3.5" />
             Rechazados
+            <span className={cn('text-xs px-1.5 py-0.5 rounded-full font-medium', conteosPorEstado.rechazado > 0 ? 'bg-red-100 text-red-700' : 'bg-gray-200 text-gray-600')}>
+              {conteosPorEstado.rechazado}
+            </span>
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value={tab} className="mt-4">
           {loading ? (
             <div className="text-center py-8 text-muted-foreground">Cargando...</div>
-          ) : aprobacionesFiltradas.length === 0 ? (
+          ) : aprobacionesTabActual.length === 0 ? (
             <div className="text-center py-8">
               <ClipboardCheck className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
               <p className="text-sm text-muted-foreground">
@@ -748,7 +665,7 @@ export default function SupervisionTimesheetPage() {
           ) : (
             <>
               <p className="text-xs text-muted-foreground mb-3">
-                {aprobacionesFiltradas.length} timesheet{aprobacionesFiltradas.length !== 1 ? 's' : ''}
+                {aprobacionesTabActual.length} timesheet{aprobacionesTabActual.length !== 1 ? 's' : ''}
               </p>
 
               {/* PC: tabla con filas expandibles */}
@@ -761,16 +678,22 @@ export default function SupervisionTimesheetPage() {
                       <TableHead className="text-right w-[70px]">Horas</TableHead>
                       <TableHead>Proyectos</TableHead>
                       <TableHead className="w-[115px]">Estado</TableHead>
-                      <TableHead className="w-[280px] text-right">Acciones</TableHead>
+                      <TableHead className="w-[260px] text-right">Acciones</TableHead>
+                      <TableHead className="w-[36px]" />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {aprobacionesFiltradas.map(a => {
+                    {aprobacionesTabActual.map(a => {
                       const expanded = expandedIds.has(a.id)
                       return (
                         <React.Fragment key={a.id}>
                           <TableRow
-                            className={cn('cursor-pointer hover:bg-muted/40 transition-colors', expanded && 'bg-muted/20')}
+                            className={cn(
+                              'cursor-pointer transition-colors border-l-2',
+                              expanded
+                                ? 'bg-blue-50/70 border-l-blue-400 hover:bg-blue-50/80'
+                                : 'border-l-transparent hover:bg-slate-50'
+                            )}
                             onClick={() => toggleExpand(a.id)}
                           >
                             <TableCell>
@@ -795,8 +718,11 @@ export default function SupervisionTimesheetPage() {
                               </div>
                             </TableCell>
                             <TableCell>{estadoBadge(a.estado)}</TableCell>
-                            <TableCell onClick={e => e.stopPropagation()}>
-                              <div className="flex items-center justify-end gap-1.5">
+                            <TableCell>
+                              <div
+                                className="flex items-center justify-end gap-1.5"
+                                onClick={e => e.stopPropagation()}
+                              >
                                 {a.estado === 'enviado' && (
                                   <>
                                     <Button
@@ -839,17 +765,24 @@ export default function SupervisionTimesheetPage() {
                                     ← Borrador
                                   </Button>
                                 )}
-                                {expanded
-                                  ? <ChevronUp className="h-4 w-4 text-muted-foreground ml-1 shrink-0" />
-                                  : <ChevronDown className="h-4 w-4 text-muted-foreground ml-1 shrink-0" />
-                                }
                               </div>
+                            </TableCell>
+                            <TableCell className="pr-3">
+                              <button
+                                className="flex items-center justify-center h-6 w-6 rounded hover:bg-muted"
+                                onClick={e => { e.stopPropagation(); toggleExpand(a.id) }}
+                              >
+                                {expanded
+                                  ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                                  : <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                }
+                              </button>
                             </TableCell>
                           </TableRow>
                           {expanded && (
                             <TableRow className="hover:bg-transparent">
-                              <TableCell colSpan={6} className="p-0 bg-muted/10">
-                                <div className="px-6 py-4 border-t">
+                              <TableCell colSpan={7} className="p-0 bg-blue-50/30">
+                                <div className="mx-4 my-3 rounded-lg border border-blue-100 bg-white shadow-sm p-4">
                                   {renderDetailContent(a)}
                                 </div>
                               </TableCell>
@@ -864,7 +797,7 @@ export default function SupervisionTimesheetPage() {
 
               {/* Mobile: cards compactas */}
               <div className="md:hidden space-y-2">
-                {aprobacionesFiltradas.map(a => {
+                {aprobacionesTabActual.map(a => {
                   const expanded = expandedIds.has(a.id)
                   return (
                     <Card key={a.id} className="border overflow-hidden">
