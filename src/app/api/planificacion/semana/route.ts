@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { prisma } from '@/lib/prisma'
 import { authOptions } from '@/lib/auth'
 import {
-  colorParaProyecto,
+  resolverColorProyecto,
   iniciales,
   toDateKey,
   addDays,
@@ -111,7 +111,7 @@ export async function GET(request: NextRequest) {
     const celdas = await prisma.planificacionDia.findMany({
       where: { userId: { in: userIds }, fecha: { gte: inicio, lte: fin } },
       include: {
-        proyecto: { select: { id: true, codigo: true, nombre: true } },
+        proyecto: { select: { id: true, codigo: true, nombre: true, colorPlanificacion: true } },
         solicitudAusencia: {
           select: {
             tipoAusencia: { select: { nombre: true, codigo: true, color: true } },
@@ -136,7 +136,7 @@ export async function GET(request: NextRequest) {
       if (!personaDias.has(dKey)) personaDias.set(dKey, [])
 
       if (celda.proyectoId && celda.proyecto) {
-        const color = colorParaProyecto(celda.proyectoId)
+        const color = resolverColorProyecto(celda.proyectoId, celda.proyecto.colorPlanificacion)
         proyectosSet.set(celda.proyectoId, {
           id: celda.proyectoId,
           codigo: celda.proyecto.codigo,
@@ -147,7 +147,7 @@ export async function GET(request: NextRequest) {
           id: celda.id,
           turno: celda.turno,
           tipo: 'proyecto',
-          proyecto: { ...celda.proyecto, color },
+          proyecto: { id: celda.proyecto.id, codigo: celda.proyecto.codigo, nombre: celda.proyecto.nombre, color },
           esExcepcional: celda.esExcepcional,
           notas: celda.notas,
         })

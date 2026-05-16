@@ -4,15 +4,18 @@
  */
 
 export const COLORES_PROYECTO = [
-  '#3B82F6',
-  '#10B981',
-  '#F59E0B',
-  '#EF4444',
-  '#8B5CF6',
-  '#EC4899',
-  '#06B6D4',
-  '#84CC16',
-  '#F97316',
+  '#3B82F6', // blue
+  '#10B981', // emerald
+  '#F59E0B', // amber
+  '#EF4444', // red
+  '#8B5CF6', // violet
+  '#EC4899', // pink
+  '#06B6D4', // cyan
+  '#84CC16', // lime
+  '#F97316', // orange
+  '#14B8A6', // teal
+  '#6366F1', // indigo
+  '#F43F5E', // rose
 ]
 
 /**
@@ -23,6 +26,14 @@ export function colorParaProyecto(id: string): string {
   let h = 0
   for (let i = 0; i < id.length; i++) h = ((h << 5) - h + id.charCodeAt(i)) | 0
   return COLORES_PROYECTO[Math.abs(h) % COLORES_PROYECTO.length]
+}
+
+/**
+ * Resuelve el color final de un proyecto:
+ * usa el guardado en DB si existe, si no el determinístico por ID.
+ */
+export function resolverColorProyecto(id: string, colorGuardado?: string | null): string {
+  return colorGuardado || colorParaProyecto(id)
 }
 
 /**

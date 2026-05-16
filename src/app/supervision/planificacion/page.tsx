@@ -50,6 +50,7 @@ import {
   type CeldaDetalleData,
 } from '@/components/planificacion/CeldaDetalleModal'
 import { computeSeleccionRectangulo, toggleCeldaEnSeleccion } from '@/lib/planificacion/seleccion'
+import { COLORES_PROYECTO } from '@/lib/utils/planificacion'
 
 const DEPT_ORDER = ['INGENIERIA', 'CONSTRUCCION', 'GESTION', 'PROYECTOS']
 const ROLES_PERMITIDOS = ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos']
@@ -368,7 +369,7 @@ function CeldaDia({
       <TooltipTrigger asChild>
         <div
           className={cn(
-            'group relative flex items-center justify-center h-full rounded cursor-pointer text-xs font-bold px-0.5 shadow-sm',
+            'group relative flex items-center justify-center h-full rounded cursor-pointer text-[10px] font-bold px-0.5 shadow-sm',
             dimmed && 'opacity-40',
           )}
           style={{
@@ -496,6 +497,7 @@ function SortablePersonaRow({
   seleccionKeys,
   seleccionRectKeys,
   seleccionEnabled,
+  colorOverrides,
   onClickEmpty,
   onClickProyecto,
   onClickAusencia,
@@ -514,6 +516,7 @@ function SortablePersonaRow({
   seleccionKeys: Set<string>
   seleccionRectKeys: Set<string>
   seleccionEnabled: boolean
+  colorOverrides: Record<string, string>
   onClickEmpty: (fecha: string) => void
   onClickProyecto: (fecha: string, celda: CeldaEntry) => void
   onClickAusencia: (fecha: string, celda: CeldaEntry) => void
@@ -561,7 +564,11 @@ function SortablePersonaRow({
       </div>
 
       {diasHeader.map(({ dateKey, d, isHoy, isWeekend }) => {
-        const celdasDia = persona.dias[dateKey] ?? []
+        const celdasDia = (persona.dias[dateKey] ?? []).map((c) =>
+          c.tipo === 'proyecto' && c.proyecto && colorOverrides[c.proyecto.id]
+            ? { ...c, proyecto: { ...c.proyecto, color: colorOverrides[c.proyecto.id] } }
+            : c,
+        )
         const dimmed =
           proyectoFiltro !== '__all__' &&
           celdasDia.length > 0 &&
@@ -754,6 +761,7 @@ export default function PlanificacionPage() {
   const [modalDetalle, setModalDetalle] = useState<CeldaDetalleData | null>(null)
   const [seleccionState, setSeleccionState] = useState<SeleccionState>({ type: 'idle' })
   const [modalMasivo, setModalMasivo] = useState(false)
+  const [colorOverrides, setColorOverrides] = useState<Record<string, string>>({})
   const viewport = useViewport()
   const isDesktop = viewport === 'desktop'
   const isReadOnly = !isDesktop
@@ -971,6 +979,29 @@ export default function PlanificacionPage() {
     },
     [],
   )
+
+  const handleColorChange = useCallback(async (proyectoId: string, color: string | null) => {
+    setColorOverrides((prev) =>
+      color === null
+        ? Object.fromEntries(Object.entries(prev).filter(([k]) => k !== proyectoId))
+        : { ...prev, [proyectoId]: color },
+    )
+    try {
+      await fetch(`/api/planificacion/proyectos/${proyectoId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ colorPlanificacion: color }),
+      })
+      reloadRef.current()
+    } catch {
+      toast.error('Error al guardar el color')
+      setColorOverrides((prev) => {
+        const next = { ...prev }
+        delete next[proyectoId]
+        return next
+      })
+    }
+  }, [])
 
   // ── Selection handlers ───────────────────────────────────────────────────────
   const handleCeldaMouseDown = useCallback(
@@ -1550,6 +1581,7 @@ export default function PlanificacionPage() {
                           seleccionKeys={seleccionKeys}
                           seleccionRectKeys={seleccionRectKeys}
                           seleccionEnabled={seleccionEnabled}
+                          colorOverrides={colorOverrides}
                           onCeldaMouseDown={handleCeldaMouseDown}
                           onClickEmpty={(fecha) => {
                             if (ctrlClickSuppressRef.current) {
@@ -1605,12 +1637,47 @@ export default function PlanificacionPage() {
             Ausencia
           </span>
           <span className="flex items-center gap-1">⏰ Excepcional</span>
-          {data?.proyectos.map((p) => (
-            <span key={p.id} className="flex items-center gap-1">
-              <span className="inline-block w-3 h-3 rounded shadow-sm" style={{ backgroundColor: p.color }} />
-              [{p.codigo}] {p.nombre}
-            </span>
-          ))}
+          {data?.proyectos.map((p) => {
+            const displayColor = colorOverrides[p.id] ?? p.color
+            return (
+              <Popover key={p.id}>
+                <PopoverTrigger asChild>
+                  <button className="flex items-center gap-1.5 hover:text-foreground transition-colors">
+                    <span
+                      className="inline-block w-3.5 h-3.5 rounded shadow-sm ring-offset-background hover:ring-2 hover:ring-ring hover:ring-offset-1 transition-all cursor-pointer"
+                      style={{ backgroundColor: displayColor }}
+                    />
+                    [{p.codigo}] {p.nombre}
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-3" align="start">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Color del proyecto</p>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {COLORES_PROYECTO.map((c) => (
+                      <button
+                        key={c}
+                        title={c}
+                        className={cn(
+                          'w-6 h-6 rounded-md cursor-pointer transition-transform hover:scale-110 shadow-sm',
+                          displayColor === c && 'ring-2 ring-offset-1 ring-foreground scale-110',
+                        )}
+                        style={{ backgroundColor: c }}
+                        onClick={() => handleColorChange(p.id, c)}
+                      />
+                    ))}
+                  </div>
+                  {colorOverrides[p.id] && (
+                    <button
+                      className="mt-2 text-[10px] text-muted-foreground hover:text-foreground w-full text-center underline underline-offset-2"
+                      onClick={() => handleColorChange(p.id, null)}
+                    >
+                      Restaurar automático
+                    </button>
+                  )}
+                </PopoverContent>
+              </Popover>
+            )
+          })}
         </div>
 
         {modalCelda && (

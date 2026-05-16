@@ -2,10 +2,11 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { prisma } from '@/lib/prisma'
 import { authOptions } from '@/lib/auth'
+import { resolverColorProyecto } from '@/lib/utils/planificacion'
 
 const ESTADOS_INACTIVOS = ['cerrado', 'pausado', 'cancelado']
 
-// GET /api/planificacion/proyectos-activos — lista proyectos no inactivos
+// GET /api/planificacion/proyectos-activos — lista proyectos no inactivos con color resuelto
 export async function GET() {
   try {
     const session = await getServerSession(authOptions)
@@ -25,12 +26,18 @@ export async function GET() {
         estado: true,
         fechaInicio: true,
         fechaFin: true,
+        colorPlanificacion: true,
         lider: { select: { id: true, name: true } },
       },
       orderBy: { codigo: 'asc' },
     })
 
-    return NextResponse.json(proyectos)
+    return NextResponse.json(
+      proyectos.map((p) => ({
+        ...p,
+        color: resolverColorProyecto(p.id, p.colorPlanificacion),
+      })),
+    )
   } catch (error) {
     console.error('[GET /api/planificacion/proyectos-activos]', error)
     return NextResponse.json({ error: 'Error del servidor' }, { status: 500 })
