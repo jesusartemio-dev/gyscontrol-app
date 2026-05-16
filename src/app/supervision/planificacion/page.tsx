@@ -541,7 +541,7 @@ function SortablePersonaRow({
     <div
       ref={setNodeRef}
       style={style}
-      className="h-8 border-b hover:bg-muted/20 items-center"
+      className="h-6 border-b hover:bg-muted/20 items-center"
     >
       <div className="flex items-center gap-1 px-2 overflow-hidden">
         <button
@@ -556,9 +556,17 @@ function SortablePersonaRow({
           {persona.iniciales}
         </div>
         <div className="min-w-0 ml-1">
-          <p className="text-xs font-medium truncate leading-none">{abreviarNombre(persona.nombre)}</p>
-          {persona.cargo && (
-            <p className="text-[10px] text-muted-foreground truncate leading-none">{abreviarCargo(persona.cargo)}</p>
+          {persona.cargo ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <p className="text-xs font-medium truncate leading-none cursor-default">{abreviarNombre(persona.nombre)}</p>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="text-xs">
+                {abreviarCargo(persona.cargo)}
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            <p className="text-xs font-medium truncate leading-none">{abreviarNombre(persona.nombre)}</p>
           )}
         </div>
       </div>
