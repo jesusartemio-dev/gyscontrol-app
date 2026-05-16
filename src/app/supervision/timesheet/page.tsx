@@ -49,6 +49,7 @@ import {
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { useToast } from '@/components/ui/use-toast'
+import { cn } from '@/lib/utils'
 
 interface Registro {
   id: string
@@ -349,6 +350,69 @@ export default function SupervisionTimesheetPage() {
     }
   }
 
+  const renderDetailContent = (a: Aprobacion) => (
+    <>
+      <div className="flex flex-wrap gap-2 py-3">
+        {a.proyectos.map((p, i) => (
+          <div key={i} className="flex items-center gap-1.5 bg-gray-50 px-3 py-1 rounded-full text-sm">
+            <span className="font-medium">{p.codigo}</span>
+            <span className="text-muted-foreground">-</span>
+            <span className="text-muted-foreground truncate max-w-[150px]">{p.nombre}</span>
+            <Badge variant="secondary" className="text-xs ml-1">{p.horas}h</Badge>
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center gap-4 text-xs text-muted-foreground pb-3 flex-wrap">
+        <span>{a.diasTrabajados} días trabajados</span>
+        <span>{a.registros.length} registros</span>
+        {a.fechaEnvio && <span>Enviado: {format(new Date(a.fechaEnvio), 'dd/MM/yyyy HH:mm')}</span>}
+        {a.fechaResolucion && <span>Resuelto: {format(new Date(a.fechaResolucion), 'dd/MM/yyyy HH:mm')}</span>}
+        {a.aprobadoPor && <span>Por: {a.aprobadoPor}</span>}
+        {a.motivoRechazo && <span className="text-red-600">Motivo: {a.motivoRechazo}</span>}
+      </div>
+      <div className="overflow-x-auto rounded border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Fecha</TableHead>
+              <TableHead>Origen</TableHead>
+              <TableHead>Proyecto</TableHead>
+              <TableHead>EDT</TableHead>
+              <TableHead>Tarea</TableHead>
+              <TableHead className="text-right">Horas</TableHead>
+              <TableHead>Descripción</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {a.registros.map(r => (
+              <TableRow key={r.id}>
+                <TableCell className="text-sm whitespace-nowrap">
+                  {format(new Date(r.fechaTrabajo), 'dd MMM', { locale: es })}
+                </TableCell>
+                <TableCell>
+                  {r.origen === 'campo' ? (
+                    <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700 border-orange-300">
+                      <MapPin className="h-3 w-3 mr-0.5" />Campo
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-xs bg-indigo-50 text-indigo-700 border-indigo-300">
+                      <Monitor className="h-3 w-3 mr-0.5" />Oficina
+                    </Badge>
+                  )}
+                </TableCell>
+                <TableCell className="text-sm font-medium">{r.proyecto.codigo}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">{r.proyectoEdt?.nombre || '-'}</TableCell>
+                <TableCell className="text-sm">{r.proyectoTarea?.nombre || '-'}</TableCell>
+                <TableCell className="text-sm text-right font-medium">{r.horasTrabajadas}h</TableCell>
+                <TableCell className="text-sm text-muted-foreground max-w-[250px] truncate">{r.descripcion || '-'}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </>
+  )
+
   const estadoBadge = (estado: string) => {
     switch (estado) {
       case 'sin_enviar':
@@ -536,22 +600,20 @@ export default function SupervisionTimesheetPage() {
           ))}
         </select>
         {vista === 'lista' && (
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground whitespace-nowrap">Semana:</span>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-xs text-muted-foreground whitespace-nowrap">Desde:</span>
             <Input
               type="week"
               value={filtroSemanaDesde}
               onChange={e => setFiltroSemanaDesde(e.target.value)}
-              className="h-9 w-[155px] text-sm"
-              title="Desde"
+              className="h-9 w-[150px] text-sm"
             />
-            <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <span className="text-xs text-muted-foreground whitespace-nowrap">Hasta:</span>
             <Input
               type="week"
               value={filtroSemanaHasta}
               onChange={e => setFiltroSemanaHasta(e.target.value)}
-              className="h-9 w-[155px] text-sm"
-              title="Hasta"
+              className="h-9 w-[150px] text-sm"
             />
           </div>
         )}
@@ -598,6 +660,51 @@ export default function SupervisionTimesheetPage() {
         )}
       </div>
 
+      {/* Active filter pills */}
+      {vista === 'lista' && tieneFiltros && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-muted-foreground">Filtros:</span>
+          {busqueda && (
+            <button
+              onClick={() => setBusqueda('')}
+              className="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2 py-1 rounded-full hover:bg-blue-100"
+            >
+              <Search className="h-3 w-3" />
+              {busqueda}
+              <X className="h-3 w-3 ml-0.5" />
+            </button>
+          )}
+          {filtroUsuarioId && (
+            <button
+              onClick={() => setFiltroUsuarioId('')}
+              className="inline-flex items-center gap-1 text-xs bg-purple-50 text-purple-700 border border-purple-200 px-2 py-1 rounded-full hover:bg-purple-100"
+            >
+              <User className="h-3 w-3" />
+              {usuarios.find(u => u.id === filtroUsuarioId)?.name || 'Usuario'}
+              <X className="h-3 w-3 ml-0.5" />
+            </button>
+          )}
+          {filtroSemanaDesde && (
+            <button
+              onClick={() => setFiltroSemanaDesde('')}
+              className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-700 border border-gray-200 px-2 py-1 rounded-full hover:bg-gray-200"
+            >
+              Desde: {parseSemanaLabel(filtroSemanaDesde)}
+              <X className="h-3 w-3 ml-0.5" />
+            </button>
+          )}
+          {filtroSemanaHasta && (
+            <button
+              onClick={() => setFiltroSemanaHasta('')}
+              className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-700 border border-gray-200 px-2 py-1 rounded-full hover:bg-gray-200"
+            >
+              Hasta: {parseSemanaLabel(filtroSemanaHasta)}
+              <X className="h-3 w-3 ml-0.5" />
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Tabs (solo en modo lista) */}
       {vista === 'lista' && (
       <Tabs value={tab} onValueChange={setTab}>
@@ -643,169 +750,202 @@ export default function SupervisionTimesheetPage() {
               <p className="text-xs text-muted-foreground mb-3">
                 {aprobacionesFiltradas.length} timesheet{aprobacionesFiltradas.length !== 1 ? 's' : ''}
               </p>
-              <div className="space-y-3">
+
+              {/* PC: tabla con filas expandibles */}
+              <div className="hidden md:block border rounded-lg overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/30">
+                      <TableHead className="w-[190px]">Empleado</TableHead>
+                      <TableHead className="w-[220px]">Semana</TableHead>
+                      <TableHead className="text-right w-[70px]">Horas</TableHead>
+                      <TableHead>Proyectos</TableHead>
+                      <TableHead className="w-[115px]">Estado</TableHead>
+                      <TableHead className="w-[280px] text-right">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {aprobacionesFiltradas.map(a => {
+                      const expanded = expandedIds.has(a.id)
+                      return (
+                        <React.Fragment key={a.id}>
+                          <TableRow
+                            className={cn('cursor-pointer hover:bg-muted/40 transition-colors', expanded && 'bg-muted/20')}
+                            onClick={() => toggleExpand(a.id)}
+                          >
+                            <TableCell>
+                              <div className="flex items-center gap-1.5">
+                                <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                <span className="font-medium text-sm truncate max-w-[150px]">{a.usuario.name}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-sm font-medium leading-tight">{parseSemanaLabel(a.semana)}</div>
+                              <div className="text-xs text-muted-foreground">{formatSemanaRango(a.semana)}</div>
+                            </TableCell>
+                            <TableCell className="text-right font-semibold text-sm">{a.totalHoras}h</TableCell>
+                            <TableCell>
+                              <div className="flex flex-wrap gap-1 items-center">
+                                {a.proyectos.slice(0, 2).map((p, i) => (
+                                  <span key={i} className="text-xs bg-gray-100 px-1.5 py-0.5 rounded font-mono">{p.codigo}</span>
+                                ))}
+                                {a.proyectos.length > 2 && (
+                                  <span className="text-xs text-muted-foreground">+{a.proyectos.length - 2}</span>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>{estadoBadge(a.estado)}</TableCell>
+                            <TableCell onClick={e => e.stopPropagation()}>
+                              <div className="flex items-center justify-end gap-1.5">
+                                {a.estado === 'enviado' && (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 text-xs text-green-700 border-green-300 hover:bg-green-50"
+                                      onClick={() => handleAprobar(a.id)}
+                                      disabled={processing}
+                                    >
+                                      <CheckCircle className="h-3.5 w-3.5 mr-1" />Aprobar
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 text-xs text-red-700 border-red-300 hover:bg-red-50"
+                                      onClick={() => { setRejectId(a.id); setMotivoRechazo('') }}
+                                      disabled={processing}
+                                    >
+                                      <XCircle className="h-3.5 w-3.5 mr-1" />Rechazar
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-7 text-xs text-gray-600"
+                                      onClick={() => handleVolverBorrador(a.id)}
+                                      disabled={processing}
+                                    >
+                                      ← Borrador
+                                    </Button>
+                                  </>
+                                )}
+                                {a.estado === 'aprobado' && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-7 text-xs text-gray-600"
+                                    onClick={() => handleVolverBorrador(a.id)}
+                                    disabled={processing}
+                                  >
+                                    ← Borrador
+                                  </Button>
+                                )}
+                                {expanded
+                                  ? <ChevronUp className="h-4 w-4 text-muted-foreground ml-1 shrink-0" />
+                                  : <ChevronDown className="h-4 w-4 text-muted-foreground ml-1 shrink-0" />
+                                }
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                          {expanded && (
+                            <TableRow className="hover:bg-transparent">
+                              <TableCell colSpan={6} className="p-0 bg-muted/10">
+                                <div className="px-6 py-4 border-t">
+                                  {renderDetailContent(a)}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </React.Fragment>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Mobile: cards compactas */}
+              <div className="md:hidden space-y-2">
                 {aprobacionesFiltradas.map(a => {
                   const expanded = expandedIds.has(a.id)
                   return (
-                    <Card key={a.id} className="border">
+                    <Card key={a.id} className="border overflow-hidden">
                       <div
-                        className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50"
+                        className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-muted/40"
                         onClick={() => toggleExpand(a.id)}
                       >
-                        <div className="flex items-center gap-4 flex-1 min-w-0 flex-wrap">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <User className="h-4 w-4 text-muted-foreground shrink-0" />
-                            <span className="font-medium truncate">{a.usuario.name}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium text-sm truncate">{a.usuario.name}</span>
+                            {estadoBadge(a.estado)}
+                            <Badge variant="secondary" className="text-xs shrink-0">{a.totalHoras}h</Badge>
                           </div>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Calendar className="h-4 w-4 shrink-0" />
-                            <span className="whitespace-nowrap">
-                              {parseSemanaLabel(a.semana)}
-                              <span className="text-muted-foreground/70"> · {formatSemanaRango(a.semana)}</span>
-                            </span>
+                          <div className="flex items-center gap-1 mt-0.5 text-xs text-muted-foreground flex-wrap">
+                            <span>{parseSemanaLabel(a.semana)}</span>
+                            <span>·</span>
+                            <span>{formatSemanaRango(a.semana)}</span>
+                            {a.proyectos.length > 0 && (
+                              <>
+                                <span>·</span>
+                                <span>
+                                  {a.proyectos.slice(0, 2).map(p => p.codigo).join(', ')}
+                                  {a.proyectos.length > 2 ? ` +${a.proyectos.length - 2}` : ''}
+                                </span>
+                              </>
+                            )}
                           </div>
-                          <Badge variant="secondary" className="shrink-0">
-                            {a.totalHoras}h
-                          </Badge>
-                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                            <Briefcase className="h-3.5 w-3.5" />
-                            <span>{a.proyectos.length} proyecto{a.proyectos.length !== 1 ? 's' : ''}</span>
-                          </div>
-                          {estadoBadge(a.estado)}
                         </div>
-                        <div className="flex items-center gap-2 ml-4 shrink-0">
+                        {expanded
+                          ? <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          : <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        }
+                      </div>
+                      {expanded && (
+                        <div className="border-t">
                           {a.estado === 'enviado' && (
-                            <>
+                            <div className="flex gap-2 px-3 pt-3 flex-wrap">
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="text-green-700 border-green-300 hover:bg-green-50"
-                                onClick={(e) => { e.stopPropagation(); handleAprobar(a.id) }}
+                                className="flex-1 text-green-700 border-green-300 hover:bg-green-50"
+                                onClick={() => handleAprobar(a.id)}
                                 disabled={processing}
                               >
-                                <CheckCircle className="h-4 w-4 mr-1" />
-                                Aprobar
+                                <CheckCircle className="h-4 w-4 mr-1" />Aprobar
                               </Button>
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="text-red-700 border-red-300 hover:bg-red-50"
-                                onClick={(e) => { e.stopPropagation(); setRejectId(a.id); setMotivoRechazo('') }}
+                                className="flex-1 text-red-700 border-red-300 hover:bg-red-50"
+                                onClick={() => { setRejectId(a.id); setMotivoRechazo('') }}
                                 disabled={processing}
                               >
-                                <XCircle className="h-4 w-4 mr-1" />
-                                Rechazar
+                                <XCircle className="h-4 w-4 mr-1" />Rechazar
                               </Button>
                               <Button
                                 size="sm"
                                 variant="outline"
                                 className="text-gray-600 border-gray-300 hover:bg-gray-50"
-                                onClick={(e) => { e.stopPropagation(); handleVolverBorrador(a.id) }}
+                                onClick={() => handleVolverBorrador(a.id)}
                                 disabled={processing}
                               >
-                                Volver a Borrador
+                                ← Borrador
                               </Button>
-                            </>
+                            </div>
                           )}
                           {a.estado === 'aprobado' && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-gray-600 border-gray-300 hover:bg-gray-50"
-                              onClick={(e) => { e.stopPropagation(); handleVolverBorrador(a.id) }}
-                              disabled={processing}
-                            >
-                              Volver a Borrador
-                            </Button>
+                            <div className="px-3 pt-3">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-gray-600 border-gray-300 hover:bg-gray-50"
+                                onClick={() => handleVolverBorrador(a.id)}
+                                disabled={processing}
+                              >
+                                ← Borrador
+                              </Button>
+                            </div>
                           )}
-                          {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                        </div>
-                      </div>
-
-                      {expanded && (
-                        <div className="border-t px-4 pb-4">
-                          {/* Project summary */}
-                          <div className="flex flex-wrap gap-2 py-3">
-                            {a.proyectos.map((p, i) => (
-                              <div key={i} className="flex items-center gap-1.5 bg-gray-50 px-3 py-1 rounded-full text-sm">
-                                <span className="font-medium">{p.codigo}</span>
-                                <span className="text-muted-foreground">-</span>
-                                <span className="text-muted-foreground truncate max-w-[150px]">{p.nombre}</span>
-                                <Badge variant="secondary" className="text-xs ml-1">{p.horas}h</Badge>
-                              </div>
-                            ))}
-                          </div>
-
-                          {/* Info row */}
-                          <div className="flex items-center gap-4 text-xs text-muted-foreground pb-3 flex-wrap">
-                            <span>{a.diasTrabajados} días trabajados</span>
-                            <span>{a.registros.length} registros</span>
-                            {a.fechaEnvio && (
-                              <span>Enviado: {format(new Date(a.fechaEnvio), 'dd/MM/yyyy HH:mm')}</span>
-                            )}
-                            {a.fechaResolucion && (
-                              <span>Resuelto: {format(new Date(a.fechaResolucion), 'dd/MM/yyyy HH:mm')}</span>
-                            )}
-                            {a.aprobadoPor && (
-                              <span>Por: {a.aprobadoPor}</span>
-                            )}
-                            {a.motivoRechazo && (
-                              <span className="text-red-600">Motivo: {a.motivoRechazo}</span>
-                            )}
-                          </div>
-
-                          {/* Detail table */}
-                          <div className="overflow-x-auto">
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead>Fecha</TableHead>
-                                  <TableHead>Origen</TableHead>
-                                  <TableHead>Proyecto</TableHead>
-                                  <TableHead>EDT</TableHead>
-                                  <TableHead>Tarea</TableHead>
-                                  <TableHead className="text-right">Horas</TableHead>
-                                  <TableHead>Descripción</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {a.registros.map(r => (
-                                  <TableRow key={r.id}>
-                                    <TableCell className="text-sm whitespace-nowrap">
-                                      {format(new Date(r.fechaTrabajo), 'dd MMM', { locale: es })}
-                                    </TableCell>
-                                    <TableCell>
-                                      {r.origen === 'campo' ? (
-                                        <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700 border-orange-300">
-                                          <MapPin className="h-3 w-3 mr-0.5" />
-                                          Campo
-                                        </Badge>
-                                      ) : (
-                                        <Badge variant="outline" className="text-xs bg-indigo-50 text-indigo-700 border-indigo-300">
-                                          <Monitor className="h-3 w-3 mr-0.5" />
-                                          Oficina
-                                        </Badge>
-                                      )}
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                      <span className="font-medium">{r.proyecto.codigo}</span>
-                                    </TableCell>
-                                    <TableCell className="text-sm text-muted-foreground">
-                                      {r.proyectoEdt?.nombre || '-'}
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                      {r.proyectoTarea?.nombre || '-'}
-                                    </TableCell>
-                                    <TableCell className="text-sm text-right font-medium">
-                                      {r.horasTrabajadas}h
-                                    </TableCell>
-                                    <TableCell className="text-sm text-muted-foreground max-w-[250px] truncate">
-                                      {r.descripcion || '-'}
-                                    </TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
+                          <div className="px-3 pb-3">
+                            {renderDetailContent(a)}
                           </div>
                         </div>
                       )}
