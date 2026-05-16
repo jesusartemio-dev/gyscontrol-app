@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-const ROLES_ADMIN = ['admin', 'administracion']
+const ROLES_ADMIN = ['admin', 'administracion', 'gerente', 'gestor', 'coordinador']
 
 const AjusteSchema = z.object({
   userId: z.string().min(1),

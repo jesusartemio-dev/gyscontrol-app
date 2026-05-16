@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-const ROLES_ADMIN = ['admin', 'administracion', 'gerente']
+const ROLES_ADMIN = ['admin', 'administracion', 'gerente', 'gestor', 'coordinador', 'proyectos']
 
 // GET /api/saldos-ausencia?anio=2026&tipoAusenciaId=...&userId=...
 export async function GET(request: NextRequest) {

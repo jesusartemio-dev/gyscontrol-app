@@ -66,6 +66,7 @@ import {
   CalendarOff,
   CalendarDays,
   CalendarRange,
+  Wallet,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -268,6 +269,7 @@ export default function Sidebar() {
         { href: '/supervision/equipo', label: 'Vista de Equipo', icon: Users },
         { href: '/supervision/edts', label: 'Gestión de EDTs', icon: GitBranch },
         { href: '/supervision/planificacion', label: 'Planificación', icon: CalendarDays },
+        { href: '/supervision/saldos-equipo', label: 'Saldos del equipo', icon: Wallet },
         { href: '/supervision/listas-equipo', label: 'Listas Equipo', icon: ClipboardList },
         { href: '/supervision/resumen', label: 'Resumen Proyectos', icon: BarChart3 },
         { href: '/supervision/analisis-edt', label: 'Análisis EDT', icon: Target },
