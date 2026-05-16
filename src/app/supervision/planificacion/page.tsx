@@ -1642,9 +1642,12 @@ export default function PlanificacionPage() {
             return (
               <Popover key={p.id}>
                 <PopoverTrigger asChild>
-                  <button className="flex items-center gap-1.5 hover:text-foreground transition-colors">
+                  <button
+                    type="button"
+                    className="flex items-center gap-1.5 cursor-pointer hover:text-foreground transition-colors"
+                  >
                     <span
-                      className="inline-block w-3.5 h-3.5 rounded shadow-sm ring-offset-background hover:ring-2 hover:ring-ring hover:ring-offset-1 transition-all cursor-pointer"
+                      className="inline-block w-3.5 h-3.5 rounded shadow-sm ring-offset-background hover:ring-2 hover:ring-ring hover:ring-offset-1 transition-all"
                       style={{ backgroundColor: displayColor }}
                     />
                     [{p.codigo}] {p.nombre}
