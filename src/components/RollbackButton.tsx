@@ -11,7 +11,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
-import { Loader2, RotateCcw, ShieldAlert, AlertTriangle } from 'lucide-react'
+import { Loader2, RotateCcw, ShieldAlert, AlertTriangle, Info } from 'lucide-react'
 import { toast } from 'sonner'
 import type { RollbackBlocker } from '@/lib/utils/rollbackValidation'
 
@@ -20,6 +20,7 @@ interface RollbackCheckResult {
   blockers: RollbackBlocker[]
   message: string
   fieldsToClean: string[]
+  notes?: string[]
 }
 
 type EntityType = 'ordenCompra' | 'listaEquipo' | 'pedidoEquipo'
@@ -172,6 +173,19 @@ export function RollbackButton({
                   <span className="text-muted-foreground">→</span>
                   <span className="rounded bg-orange-100 px-2 py-0.5 font-mono text-xs text-orange-700">{targetEstado}</span>
                 </div>
+                {checkResult?.notes && checkResult.notes.length > 0 && (
+                  <div className="space-y-1">
+                    {checkResult.notes.map((note, i) => (
+                      <div
+                        key={i}
+                        className="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm dark:border-blue-800 dark:bg-blue-950"
+                      >
+                        <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-500 dark:text-blue-400" />
+                        <span className="text-blue-800 dark:text-blue-200">{note}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <Textarea
                   placeholder="Motivo del retroceso (opcional)"
                   value={motivo}

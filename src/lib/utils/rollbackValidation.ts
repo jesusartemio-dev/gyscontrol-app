@@ -19,6 +19,7 @@ export interface RollbackResult {
   blockers: RollbackBlocker[]
   message: string
   fieldsToClean: string[]
+  notes?: string[]
 }
 
 // Transiciones válidas: [estadoActual] → [targetEstado]
@@ -273,22 +274,32 @@ async function checkPedidoEquipoRollback(id: string, targetEstado: string): Prom
     }
   }
 
-  // entregado → parcial: bloquear si tiene entregas activas (con recepción vinculada)
-  // EntregaItems huérfanos (recepcionPendienteId = null) no bloquean — se limpian al retroceder
+  const notes: string[] = []
+
+  // entregado → parcial: no bloquear — las entregas con recepción vinculada se conservan intactas,
+  // solo se limpian las huérfanas (recepcionPendienteId = null). Informar al usuario del impacto.
   if (targetEstado === 'parcial') {
-    const entregaCount = await prisma.entregaItem.count({
-      where: {
-        pedidoEquipoItem: { pedidoId: id },
-        estado: 'entregado',
-        recepcionPendienteId: { not: null },
-      },
-    })
-    if (entregaCount > 0) {
-      blockers.push({
-        entity: 'EntregaItem',
-        count: entregaCount,
-        message: `Tiene ${entregaCount} entrega(s) activa(s) vinculada(s) a recepciones — retrocédelas primero`,
-      })
+    const [linkedCount, orphanCount] = await Promise.all([
+      prisma.entregaItem.count({
+        where: {
+          pedidoEquipoItem: { pedidoId: id },
+          estado: 'entregado',
+          recepcionPendienteId: { not: null },
+        },
+      }),
+      prisma.entregaItem.count({
+        where: {
+          pedidoEquipoItem: { pedidoId: id },
+          estado: 'entregado',
+          recepcionPendienteId: null,
+        },
+      }),
+    ])
+    if (linkedCount > 0) {
+      notes.push(`${linkedCount} entrega(s) ya vinculada(s) a recepciones se conservan intactas — no se pierden.`)
+    }
+    if (orphanCount > 0) {
+      notes.push(`${orphanCount} entrega(s) sin recepción vinculada serán eliminadas al retroceder.`)
     }
   }
 
@@ -304,10 +315,12 @@ async function checkPedidoEquipoRollback(id: string, targetEstado: string): Prom
   }
 
   const message = allowed
-    ? `El pedido volverá a ${targetLabels[targetEstado] || targetEstado}.`
+    ? targetEstado === 'parcial'
+      ? 'El pedido volverá a Parcial. Podrás continuar registrando entregas en los ítems pendientes.'
+      : `El pedido volverá a ${targetLabels[targetEstado] || targetEstado}.`
     : `No se puede retroceder:\n${blockers.map(b => `· ${b.message}`).join('\n')}`
 
-  return { allowed, blockers, message, fieldsToClean }
+  return { allowed, blockers, message, fieldsToClean, notes: notes.length > 0 ? notes : undefined }
 }
 
 async function checkRecepcionPendienteRollback(id: string, targetEstado: string): Promise<RollbackResult> {
