@@ -6,13 +6,7 @@ export interface DeviceInfo {
   resolucion: string
 }
 
-async function sha256(input: string): Promise<string> {
-  const buf = new TextEncoder().encode(input)
-  const hash = await crypto.subtle.digest('SHA-256', buf)
-  return Array.from(new Uint8Array(hash))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('')
-}
+const STORAGE_KEY = 'gys_device_id'
 
 function detectarPlataforma(ua: string): string {
   if (/android/i.test(ua)) return 'Android'
@@ -29,11 +23,10 @@ function detectarModelo(ua: string, plataforma: string): string | null {
   if (android) {
     const m = android[1].trim()
     if (m && m !== 'K') return m
-    return null // se mostrará solo la plataforma
+    return null
   }
   if (/iphone/i.test(ua)) return 'iPhone'
   if (/ipad/i.test(ua)) return 'iPad'
-  // Desktop: mostrar navegador + versión
   const edge = ua.match(/Edg\/([\d]+)/i)
   if (edge) return `Edge ${edge[1]}`
   const firefox = ua.match(/Firefox\/([\d]+)/i)
@@ -64,18 +57,14 @@ export async function getDeviceInfo(): Promise<DeviceInfo> {
   const modelo = modeloUaCh || detectarModelo(ua, plataforma)
   const resolucion = `${screen.width}x${screen.height}`
 
-  const raw = [
-    ua,
-    plataforma,
-    resolucion,
-    String(screen.colorDepth),
-    String(screen.pixelDepth),
-    String(navigator.hardwareConcurrency || 0),
-    Intl.DateTimeFormat().resolvedOptions().timeZone,
-    navigator.language,
-  ].join('|')
-
-  const fingerprint = await sha256(raw)
+  // ID estable generado una vez y persistido en localStorage.
+  // A diferencia del fingerprint basado en UA/resolución, sobrevive actualizaciones
+  // del browser y rotaciones de pantalla. Solo cambia si el usuario borra datos del browser.
+  let fingerprint = localStorage.getItem(STORAGE_KEY)
+  if (!fingerprint) {
+    fingerprint = crypto.randomUUID()
+    localStorage.setItem(STORAGE_KEY, fingerprint)
+  }
 
   return { fingerprint, userAgent: ua, plataforma, modelo, resolucion }
 }
