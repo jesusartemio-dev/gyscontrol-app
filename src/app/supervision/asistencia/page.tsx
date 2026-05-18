@@ -118,6 +118,7 @@ function estadoColor(e: string) {
 }
 
 const ROLES_SUPERVISION_DISPOSITIVOS = ['admin', 'gerente', 'coordinador', 'gestor']
+const STORAGE_KEY = 'gys_asistencia_filtros'
 
 export default function SupervisionAsistencia() {
   const { data: session } = useSession()
@@ -156,27 +157,49 @@ export default function SupervisionAsistencia() {
   } | null>(null)
   const [dialogVisitas, setDialogVisitas] = useState(false)
 
-  async function cargar(overrideDesde?: string, overrideHasta?: string) {
+  async function cargar(ov: { desde?: string; hasta?: string; estado?: string; metodo?: string } = {}) {
     setLoading(true)
-    const d = overrideDesde ?? desde
-    const h = overrideHasta ?? hasta
+    const d = ov.desde ?? desde
+    const h = ov.hasta ?? hasta
+    const e = ov.estado ?? estado
+    const m = ov.metodo ?? metodo
     const params = new URLSearchParams({ desde: d, hasta: h })
-    if (estado !== 'todos') params.set('estado', estado)
-    if (metodo !== 'todos') params.set('metodoMarcaje', metodo)
+    if (e !== 'todos') params.set('estado', e)
+    if (m !== 'todos') params.set('metodoMarcaje', m)
     const r = await fetch(`/api/asistencia/reporte?${params}`)
     const j = await r.json()
     setData(Array.isArray(j) ? j : [])
     setLoading(false)
   }
 
+  // Inicializar desde localStorage y cargar datos con los filtros guardados
   useEffect(() => {
-    cargar()
+    let ov: { desde?: string; hasta?: string; estado?: string; metodo?: string } = {}
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')
+      if (saved.desde)   { setDesde(saved.desde);       ov.desde   = saved.desde   }
+      if (saved.hasta)   { setHasta(saved.hasta);       ov.hasta   = saved.hasta   }
+      if (saved.estado)  { setEstado(saved.estado);     ov.estado  = saved.estado  }
+      if (saved.metodo)  { setMetodo(saved.metodo);     ov.metodo  = saved.metodo  }
+      if (saved.busqueda)  setBusqueda(saved.busqueda)
+      if (saved.sortKey)   setSortKey(saved.sortKey)
+      if (saved.sortDir)   setSortDir(saved.sortDir)
+      if (saved.vista)     setVista(saved.vista)
+    } catch {}
+    cargar(ov)
     fetch('/api/asistencia/visitas-externas-mes')
       .then(r => (r.ok ? r.json() : null))
       .then(d => setVisitasMes(d))
       .catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Persistir filtros en localStorage cada vez que cambian
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ desde, hasta, estado, metodo, busqueda, sortKey, sortDir, vista }))
+    } catch {}
+  }, [desde, hasta, estado, metodo, busqueda, sortKey, sortDir, vista])
 
   const usuariosExcedenUmbral = useMemo(
     () => new Set((visitasMes?.resumen || []).filter(r => r.excedeUmbral).map(r => r.email)),
@@ -188,7 +211,7 @@ export default function SupervisionAsistencia() {
     const h = p.hasta()
     setDesde(d)
     setHasta(h)
-    cargar(d, h)
+    cargar({ desde: d, hasta: h })
   }
 
   function toggleSort(key: SortKey) {
