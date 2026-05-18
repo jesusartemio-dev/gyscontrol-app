@@ -136,6 +136,8 @@ export default function SupervisionAsistencia() {
   const [sortKey, setSortKey] = useState<SortKey>('fechaHora')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
 
+  const [vista, setVista] = useState<'detalle' | 'resumen'>('detalle')
+
   const [filaAEliminar, setFilaAEliminar] = useState<Fila | null>(null)
   const [eliminando, setEliminando] = useState(false)
 
@@ -243,6 +245,67 @@ export default function SupervisionAsistencia() {
     return c
   }, [dataFiltrada])
 
+  const resumenPorPersona = useMemo(() => {
+    type Grupo = { ingresos: Fila[]; salidas: Fila[] }
+    const grupos = new Map<string, Grupo>()
+
+    for (const f of dataFiltrada) {
+      if (f.tipo !== 'ingreso' && f.tipo !== 'salida') continue
+      const fechaLima = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Lima',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+      }).format(new Date(f.fechaHora))
+      const key = `${f.user.email}|${fechaLima}`
+      if (!grupos.has(key)) grupos.set(key, { ingresos: [], salidas: [] })
+      const g = grupos.get(key)!
+      if (f.tipo === 'ingreso') g.ingresos.push(f)
+      else g.salidas.push(f)
+    }
+
+    return Array.from(grupos.entries())
+      .map(([key, { ingresos, salidas }]) => {
+        const fecha = key.split('|')[1]
+        const sortAsc = (a: Fila, b: Fila) => new Date(a.fechaHora).getTime() - new Date(b.fechaHora).getTime()
+        const primerIngreso = [...ingresos].sort(sortAsc)[0] ?? null
+        const ultimaSalida = [...salidas].sort(sortAsc).at(-1) ?? null
+        const ref = primerIngreso ?? ultimaSalida!
+
+        const horasTrabajadas = primerIngreso && ultimaSalida
+          ? (new Date(ultimaSalida.fechaHora).getTime() - new Date(primerIngreso.fechaHora).getTime()) / 3600000
+          : null
+
+        const alertas: string[] = []
+        if (ingresos.length > 1) alertas.push('multi_ingreso')
+        if (salidas.length > 1) alertas.push('multi_salida')
+
+        return {
+          key,
+          fecha,
+          nombre: ref.user.name || ref.user.email,
+          email: ref.user.email,
+          dpto: ref.empleado?.departamento?.nombre ?? null,
+          ubicacion: (primerIngreso ?? ultimaSalida)?.ubicacion?.nombre ?? null,
+          ingreso: primerIngreso ? {
+            hora: new Date(primerIngreso.fechaHora),
+            estado: primerIngreso.estado,
+            minutosTarde: primerIngreso.minutosTarde,
+            count: ingresos.length,
+          } : null,
+          salida: ultimaSalida ? {
+            hora: new Date(ultimaSalida.fechaHora),
+            esAutoCierre: ultimaSalida.banderas?.includes('auto_cierre') ?? false,
+            count: salidas.length,
+          } : null,
+          horasTrabajadas,
+          alertas,
+        }
+      })
+      .sort((a, b) => {
+        const fd = b.fecha.localeCompare(a.fecha)
+        return fd !== 0 ? fd : a.nombre.localeCompare(b.nombre)
+      })
+  }, [dataFiltrada])
+
   async function confirmarEliminar() {
     if (!filaAEliminar) return
     setEliminando(true)
@@ -287,6 +350,32 @@ export default function SupervisionAsistencia() {
   function formatDistancia(m: number | null) {
     if (m == null) return '—'
     return m < 1000 ? `${Math.round(m)}m` : `${(m / 1000).toFixed(2)}km`
+  }
+
+  function fmtHoras(h: number) {
+    const horas = Math.floor(h)
+    const mins = Math.round((h - horas) * 60)
+    return mins === 0 ? `${horas}h` : `${horas}h ${mins}m`
+  }
+
+  function exportarResumen() {
+    const rows = resumenPorPersona.map(r => ({
+      Fecha: r.fecha,
+      Trabajador: r.nombre,
+      Departamento: r.dpto || '',
+      Ubicación: r.ubicacion || '',
+      'H. Ingreso': r.ingreso ? r.ingreso.hora.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima' }) : '',
+      'Min. tarde': r.ingreso?.minutosTarde ?? 0,
+      'Estado ingreso': r.ingreso?.estado ?? '',
+      'H. Salida': r.salida ? r.salida.hora.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima' }) : '',
+      'Salida auto': r.salida?.esAutoCierre ? 'Sí' : 'No',
+      'Horas trabajadas': r.horasTrabajadas != null ? fmtHoras(r.horasTrabajadas) : '',
+      Alertas: r.alertas.join(', '),
+    }))
+    const ws = XLSX.utils.json_to_sheet(rows)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Resumen')
+    XLSX.writeFile(wb, `resumen_asistencia_${desde}_a_${hasta}.xlsx`)
   }
 
   return (
@@ -379,7 +468,11 @@ export default function SupervisionAsistencia() {
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             Filtrar
           </Button>
-          <Button variant="outline" onClick={exportarExcel} disabled={dataFiltrada.length === 0}>
+          <Button
+            variant="outline"
+            onClick={vista === 'detalle' ? exportarExcel : exportarResumen}
+            disabled={dataFiltrada.length === 0}
+          >
             <FileSpreadsheet className="mr-2 h-4 w-4" /> Exportar Excel
           </Button>
         </CardContent>
@@ -449,7 +542,153 @@ export default function SupervisionAsistencia() {
         </CardContent></Card>
       </div>
 
-      {/* Tabla */}
+      {/* Toggle de vista */}
+      <div className="mb-3 flex items-center gap-2">
+        <div className="flex overflow-hidden rounded-lg border text-sm">
+          <button
+            onClick={() => setVista('detalle')}
+            className={`px-3 py-1.5 transition-colors ${vista === 'detalle' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+          >
+            Detalle
+          </button>
+          <button
+            onClick={() => setVista('resumen')}
+            className={`px-3 py-1.5 transition-colors ${vista === 'resumen' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+          >
+            Resumen por persona
+          </button>
+        </div>
+        {vista === 'resumen' && (
+          <span className="text-xs text-muted-foreground">
+            {resumenPorPersona.length} jornada(s) · primer ingreso y última salida por día
+          </span>
+        )}
+      </div>
+
+      {/* Tabla detalle */}
+      {vista === 'resumen' ? (
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Fecha</TableHead>
+                  <TableHead>Trabajador</TableHead>
+                  <TableHead>Dpto.</TableHead>
+                  <TableHead>Ingreso</TableHead>
+                  <TableHead>Salida</TableHead>
+                  <TableHead>Horas</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead>Alertas</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {resumenPorPersona.map(r => (
+                  <TableRow key={r.key} className={!r.ingreso || !r.salida ? 'bg-amber-50/50 dark:bg-amber-950/20' : ''}>
+                    <TableCell className="font-mono text-xs whitespace-nowrap">
+                      {new Date(r.fecha + 'T12:00:00').toLocaleDateString('es-PE', {
+                        weekday: 'short', day: '2-digit', month: 'short',
+                      })}
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium">{r.nombre}</div>
+                      {r.ubicacion && <div className="text-xs text-muted-foreground">{r.ubicacion}</div>}
+                    </TableCell>
+                    <TableCell className="text-xs">{r.dpto || '—'}</TableCell>
+                    <TableCell>
+                      {r.ingreso ? (
+                        <div>
+                          <div className="font-mono text-sm">
+                            {r.ingreso.hora.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima' })}
+                          </div>
+                          {r.ingreso.minutosTarde > 0 && (
+                            <div className="text-xs text-amber-700">+{formatearTardanza(r.ingreso.minutosTarde)}</div>
+                          )}
+                          {r.ingreso.count > 1 && (
+                            <div className="text-[10px] text-blue-600 font-medium">{r.ingreso.count} marcajes</div>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {r.salida ? (
+                        <div>
+                          <div className="font-mono text-sm">
+                            {r.salida.hora.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima' })}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            {r.salida.esAutoCierre && (
+                              <span className="inline-flex items-center gap-0.5 text-[10px] text-slate-500">
+                                <Moon className="h-3 w-3" /> auto
+                              </span>
+                            )}
+                            {r.salida.count > 1 && (
+                              <span className="text-[10px] text-blue-600 font-medium">{r.salida.count} marcajes</span>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-xs font-medium text-amber-600">Sin salida</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {r.horasTrabajadas != null ? (
+                        <span className={`font-mono text-sm font-semibold ${
+                          r.horasTrabajadas < 4 ? 'text-red-600'
+                          : r.horasTrabajadas >= 8 ? 'text-emerald-700'
+                          : 'text-amber-700'
+                        }`}>
+                          {fmtHoras(r.horasTrabajadas)}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {r.ingreso ? (
+                        <Badge className={estadoColor(r.ingreso.estado)} variant="outline">
+                          {r.ingreso.estado.replace('_', ' ')}
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {r.alertas.includes('multi_ingreso') && (
+                          <span
+                            title={`Marcó ingreso ${r.ingreso?.count} veces — se muestra el primero`}
+                            className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] text-blue-700"
+                          >
+                            {r.ingreso?.count}× ingreso
+                          </span>
+                        )}
+                        {r.alertas.includes('multi_salida') && (
+                          <span
+                            title={`Marcó salida ${r.salida?.count} veces — se muestra la última`}
+                            className="rounded bg-purple-100 px-1.5 py-0.5 text-[10px] text-purple-700"
+                          >
+                            {r.salida?.count}× salida
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {resumenPorPersona.length === 0 && !loading && (
+                  <TableRow>
+                    <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
+                      Sin registros en el rango seleccionado.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      ) : (
       <Card>
         <CardContent className="p-0">
           <Table>
@@ -647,6 +886,7 @@ export default function SupervisionAsistencia() {
           </Table>
         </CardContent>
       </Card>
+      )}
 
       {/* Dialog detalle de visitas externas del mes */}
       <Dialog open={dialogVisitas} onOpenChange={setDialogVisitas}>
