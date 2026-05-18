@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
               horaSalidaOverride: ingreso.jornadaAsistencia.horaSalidaOverride,
             }
           : null
-        const fechaEsperada = await calcularFechaEsperada(
+        let fechaEsperada = await calcularFechaEsperada(
           ahora,
           'salida',
           ingreso.ubicacion,
@@ -76,6 +76,17 @@ export async function GET(request: NextRequest) {
           'default',
           jornadaOverride,
         )
+
+        // Turno nocturno: si la salida esperada cae antes del ingreso real, es del día siguiente
+        // (ej. ingreso 19:00 lunes → salida override 07:00 → calcularFechaEsperada devuelve 07:00 lunes)
+        if (fechaEsperada <= ingreso.fechaHora) {
+          fechaEsperada = new Date(fechaEsperada.getTime() + 24 * 60 * 60 * 1000)
+        }
+
+        // El trabajador aún está en turno — no auto-cerrar
+        if (fechaEsperada > ahora) {
+          continue
+        }
 
         await prisma.asistencia.create({
           data: {
