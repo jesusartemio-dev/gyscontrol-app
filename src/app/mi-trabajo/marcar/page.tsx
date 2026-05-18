@@ -19,6 +19,7 @@ import {
   X,
   Home,
   Briefcase,
+  Info,
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -56,6 +57,15 @@ interface ModoHoy {
   razon?: string
 }
 
+interface JornadaCampo {
+  id: string
+  iniciadaEn: string
+  horaIngresoOverride: string | null
+  horaSalidaOverride: string | null
+  ubicacion: { id: string; nombre: string }
+  supervisor: { name: string | null }
+}
+
 export default function MarcarPage() {
   const { status } = useSession()
   const geo = useGeolocation()
@@ -63,6 +73,7 @@ export default function MarcarPage() {
   const [scannerOpen, setScannerOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [modoHoy, setModoHoy] = useState<ModoHoy | null>(null)
+  const [jornadasCampo, setJornadasCampo] = useState<JornadaCampo[]>([])
   const [permisoGps, setPermisoGps] = useState<'prompt' | 'granted' | 'denied' | 'unknown'>('unknown')
   const [dialogGpsBloqueado, setDialogGpsBloqueado] = useState(false)
   const [cercanas, setCercanas] = useState<null | {
@@ -98,6 +109,11 @@ export default function MarcarPage() {
       .then(r => r.json())
       .then(setModoHoy)
       .catch(() => setModoHoy({ esRemoto: false }))
+
+    fetch('/api/asistencia/jornada/activas')
+      .then(r => r.ok ? r.json() : [])
+      .then(setJornadasCampo)
+      .catch(() => {})
 
     // Consultar el estado del permiso de geolocalización para detectar de antemano
     // si el navegador lo tiene bloqueado y poder mostrar instrucciones de recuperación.
@@ -308,6 +324,33 @@ export default function MarcarPage() {
             {modoHoy.razon || 'autorizado'}.
             {' '}Si estás en planta u oficina, tu marcaje quedará como presencial automáticamente.
           </span>
+        </div>
+      )}
+
+      {jornadasCampo.length > 0 && (
+        <div className="mb-3 space-y-2">
+          {jornadasCampo.map(j => (
+            <div
+              key={j.id}
+              className="flex items-start gap-2 rounded-md border border-blue-300 bg-blue-50 px-3 py-2 text-xs text-blue-800"
+            >
+              <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
+              <div>
+                <p className="font-semibold text-blue-900">
+                  Asistencia de campo activa en {j.ubicacion.nombre}
+                </p>
+                <p className="mt-0.5">
+                  {j.supervisor.name
+                    ? `Supervisor: ${j.supervisor.name} — `
+                    : ''}
+                  Pide el QR a tu supervisor o encargado para registrar tu ingreso/salida.
+                  {j.horaSalidaOverride
+                    ? ` Turno hasta las ${j.horaSalidaOverride}.`
+                    : ''}
+                </p>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
