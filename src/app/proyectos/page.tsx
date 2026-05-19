@@ -88,6 +88,8 @@ export default function ProyectosPage() {
   const [filterClienteId, setFilterClienteId] = useState<string>(savedFilters.filterClienteId ?? 'all')
   const [filterGestorId, setFilterGestorId] = useState<string>(savedFilters.filterGestorId ?? 'all')
   const [filterMoneda, setFilterMoneda] = useState<string>(savedFilters.filterMoneda ?? 'all')
+  const [filterAnio, setFilterAnio] = useState<string>(savedFilters.filterAnio ?? 'all')
+  const [filterMes, setFilterMes] = useState<string>(savedFilters.filterMes ?? 'all')
   const [includeInternos, setIncludeInternos] = useState<boolean>(savedFilters.includeInternos === 'true')
   const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; proyecto?: Proyecto }>({ show: false })
   const { page, limit, handlePageChange, handleLimitChange, reset: resetPagination } = usePagination(1, 12)
@@ -139,10 +141,11 @@ export default function ProyectosPage() {
       localStorage.setItem('gyscontrol:proyectos:filtros', JSON.stringify({
         viewMode, searchTerm, filterStatus, sortOption,
         filterClienteId, filterGestorId, filterMoneda,
+        filterAnio, filterMes,
         includeInternos: String(includeInternos),
       }))
     } catch {}
-  }, [viewMode, searchTerm, filterStatus, sortOption, filterClienteId, filterGestorId, filterMoneda, includeInternos])
+  }, [viewMode, searchTerm, filterStatus, sortOption, filterClienteId, filterGestorId, filterMoneda, filterAnio, filterMes, includeInternos])
 
   const clienteOptions = useMemo(() => {
     const map = new Map<string, string>()
@@ -171,6 +174,14 @@ export default function ProyectosPage() {
     return byMoneda
   }, [filteredProyectos])
 
+  const anioOptions = useMemo(() => {
+    const years = new Set<number>()
+    for (const p of proyectos) if (p.fechaInicio) years.add(new Date(p.fechaInicio).getFullYear())
+    return Array.from(years).sort((a, b) => b - a)
+  }, [proyectos])
+
+  const hasActiveFilters = !!(searchTerm || filterStatus !== 'all' || filterClienteId !== 'all' || filterGestorId !== 'all' || filterMoneda !== 'all' || filterAnio !== 'all' || filterMes !== 'all')
+
   useEffect(() => {
     let filtered = [...proyectos]
     if (searchTerm) {
@@ -184,6 +195,8 @@ export default function ProyectosPage() {
     if (filterClienteId !== 'all') filtered = filtered.filter(p => p.cliente?.id === filterClienteId)
     if (filterGestorId !== 'all') filtered = filtered.filter(p => p.gestor?.id === filterGestorId)
     if (filterMoneda !== 'all') filtered = filtered.filter(p => (p.moneda || 'USD') === filterMoneda)
+    if (filterAnio !== 'all') filtered = filtered.filter(p => p.fechaInicio && new Date(p.fechaInicio).getFullYear() === Number(filterAnio))
+    if (filterMes !== 'all') filtered = filtered.filter(p => p.fechaInicio && new Date(p.fechaInicio).getMonth() + 1 === Number(filterMes))
 
     filtered.sort((a, b) => {
       switch (sortOption) {
@@ -206,7 +219,7 @@ export default function ProyectosPage() {
 
     setFilteredProyectos(filtered)
     resetPagination()
-  }, [proyectos, searchTerm, filterStatus, sortOption, filterClienteId, filterGestorId, filterMoneda, resetPagination])
+  }, [proyectos, searchTerm, filterStatus, sortOption, filterClienteId, filterGestorId, filterMoneda, filterAnio, filterMes, resetPagination])
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -540,6 +553,31 @@ export default function ProyectosPage() {
           </SelectContent>
         </Select>
 
+        <Select value={filterAnio} onValueChange={v => { setFilterAnio(v); if (v === 'all') setFilterMes('all') }}>
+          <SelectTrigger className="w-[100px] h-8 text-xs">
+            <Calendar className="h-3 w-3 mr-1 text-gray-400 shrink-0" />
+            <SelectValue placeholder="Año" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos</SelectItem>
+            {anioOptions.map(y => (
+              <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={filterMes} onValueChange={setFilterMes}>
+          <SelectTrigger className="w-[120px] h-8 text-xs">
+            <SelectValue placeholder="Mes" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos los meses</SelectItem>
+            {['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'].map((m, i) => (
+              <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
         <Button
           variant={includeInternos ? 'default' : 'outline'}
           size="sm"
@@ -590,7 +628,7 @@ export default function ProyectosPage() {
       </div>
 
       {/* Totales filtrados */}
-      {filteredProyectos.length > 0 && (searchTerm || filterStatus !== 'all' || filterClienteId !== 'all' || filterGestorId !== 'all' || filterMoneda !== 'all') && (
+      {filteredProyectos.length > 0 && hasActiveFilters && (
         <div className="flex items-center gap-3 text-xs border rounded-md px-3 py-1.5 bg-muted/30 text-muted-foreground">
           <span className="font-medium text-foreground">{filteredProyectos.length} proyecto{filteredProyectos.length !== 1 ? 's' : ''}</span>
           {Object.entries(totalsFiltrados).map(([m, total]) => (
@@ -608,15 +646,12 @@ export default function ProyectosPage() {
                 <CardContent className="py-12 text-center">
                   <FolderOpen className="h-12 w-12 mx-auto text-gray-300 mb-4" />
                   <h3 className="text-lg font-medium text-gray-600 mb-2">
-                    {searchTerm || filterStatus !== 'all' || filterClienteId !== 'all' || filterGestorId !== 'all' || filterMoneda !== 'all' ? 'No se encontraron proyectos' : 'No hay proyectos'}
+                    {hasActiveFilters ? 'No se encontraron proyectos' : 'No hay proyectos'}
                   </h3>
                   <p className="text-sm text-gray-500 mb-4">
-                    {searchTerm || filterStatus !== 'all' || filterClienteId !== 'all' || filterGestorId !== 'all' || filterMoneda !== 'all'
-                      ? 'Ajusta los filtros de búsqueda'
-                      : 'Comienza creando tu primer proyecto'
-                    }
+                    {hasActiveFilters ? 'Ajusta los filtros de búsqueda' : 'Comienza creando tu primer proyecto'}
                   </p>
-                  {!searchTerm && filterStatus === 'all' && filterClienteId === 'all' && filterGestorId === 'all' && filterMoneda === 'all' && (
+                  {!hasActiveFilters && (
                     <Button onClick={() => setShowCreateDialog(true)} size="sm">
                       <Plus className="h-4 w-4 mr-2" />
                       Crear Proyecto
