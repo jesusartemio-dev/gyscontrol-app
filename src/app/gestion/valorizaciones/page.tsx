@@ -9,8 +9,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, FileSpreadsheet, Loader2, Search, Eye, Send, CheckCircle, Edit, Ban, Upload, Download, AlertTriangle, RefreshCw, Trash2, Clock, Undo2, Info } from 'lucide-react'
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Plus, FileSpreadsheet, Loader2, Search, Eye, Send, CheckCircle, Edit, Ban, Upload, Download, AlertTriangle, RefreshCw, Trash2, Clock, Undo2, Info, CalendarDays } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 import toast from 'react-hot-toast'
 import ValorizacionImportExcelModal from '@/components/gestion/ValorizacionImportExcelModal'
@@ -96,6 +96,16 @@ const formatDate = (date: string) =>
 const formatPeriod = (start: string, end: string) =>
   `${formatDate(start)} — ${formatDate(end)}`
 
+function getRangoFechas(preset: string, desde: string, hasta: string): { desde: Date | null; hasta: Date | null } {
+  const now = new Date()
+  if (preset === 'this_month') return { desde: new Date(now.getFullYear(), now.getMonth(), 1), hasta: new Date(now.getFullYear(), now.getMonth() + 1, 0) }
+  if (preset === 'last_month') return { desde: new Date(now.getFullYear(), now.getMonth() - 1, 1), hasta: new Date(now.getFullYear(), now.getMonth(), 0) }
+  if (preset === 'this_quarter') { const q = Math.floor(now.getMonth() / 3); return { desde: new Date(now.getFullYear(), q * 3, 1), hasta: new Date(now.getFullYear(), (q + 1) * 3, 0) } }
+  if (preset === 'this_year') return { desde: new Date(now.getFullYear(), 0, 1), hasta: new Date(now.getFullYear(), 11, 31) }
+  if (preset === 'custom') return { desde: desde ? new Date(desde) : null, hasta: hasta ? new Date(hasta) : null }
+  return { desde: null, hasta: null }
+}
+
 export default function ValorizacionesPage() {
   const router = useRouter()
   const [items, setItems] = useState<Valorizacion[]>([])
@@ -103,10 +113,16 @@ export default function ValorizacionesPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [showForm, setShowForm] = useState(false)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [filterProyecto, setFilterProyecto] = useState<string>('all')
-  const [filterEstado, setFilterEstado] = useState<string>('all')
-  const [filterCondicionPago, setFilterCondicionPago] = useState<string>('all')
+  const [savedFilters] = useState<Record<string, string>>(() => {
+    try { const s = localStorage.getItem('gyscontrol:valorizaciones:filtros'); return s ? JSON.parse(s) : {} } catch { return {} }
+  })
+  const [searchTerm, setSearchTerm] = useState<string>(savedFilters.searchTerm ?? '')
+  const [filterProyecto, setFilterProyecto] = useState<string>(savedFilters.filterProyecto ?? 'all')
+  const [filterEstado, setFilterEstado] = useState<string>(savedFilters.filterEstado ?? 'all')
+  const [filterCondicionPago, setFilterCondicionPago] = useState<string>(savedFilters.filterCondicionPago ?? 'all')
+  const [filterPeriodPreset, setFilterPeriodPreset] = useState<string>(savedFilters.filterPeriodPreset ?? 'all')
+  const [filterPeriodDesde, setFilterPeriodDesde] = useState<string>(savedFilters.filterPeriodDesde ?? '')
+  const [filterPeriodHasta, setFilterPeriodHasta] = useState<string>(savedFilters.filterPeriodHasta ?? '')
 
   // Form fields (create only)
   const [formProyectoId, setFormProyectoId] = useState('')
@@ -137,6 +153,15 @@ export default function ValorizacionesPage() {
   const [deleteTarget, setDeleteTarget] = useState<Valorizacion | null>(null)
 
   useEffect(() => { loadData() }, [])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('gyscontrol:valorizaciones:filtros', JSON.stringify({
+        searchTerm, filterProyecto, filterEstado, filterCondicionPago,
+        filterPeriodPreset, filterPeriodDesde, filterPeriodHasta,
+      }))
+    } catch {}
+  }, [searchTerm, filterProyecto, filterEstado, filterCondicionPago, filterPeriodPreset, filterPeriodDesde, filterPeriodHasta])
 
   const loadData = async () => {
     try {
@@ -196,8 +221,36 @@ export default function ValorizacionesPage() {
         i.proyecto?.codigo.toLowerCase().includes(term)
       )
     }
+    if (filterPeriodPreset !== 'all') {
+      const { desde, hasta } = getRangoFechas(filterPeriodPreset, filterPeriodDesde, filterPeriodHasta)
+      if (desde || hasta) {
+        result = result.filter(i => {
+          const fin = new Date(i.periodoFin)
+          const inicio = new Date(i.periodoInicio)
+          return (!desde || fin >= desde) && (!hasta || inicio <= hasta)
+        })
+      }
+    }
     return result
-  }, [items, filterProyecto, filterEstado, filterCondicionPago, searchTerm])
+  }, [items, filterProyecto, filterEstado, filterCondicionPago, searchTerm, filterPeriodPreset, filterPeriodDesde, filterPeriodHasta])
+
+  const estadoCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const i of items) counts[i.estado] = (counts[i.estado] || 0) + 1
+    return counts
+  }, [items])
+
+  const totals = useMemo(() => {
+    const activas = filtered.filter(i => i.estado !== 'anulada')
+    const byMoneda: Record<string, { montoVal: number; neto: number }> = {}
+    for (const i of activas) {
+      const m = i.moneda || 'PEN'
+      if (!byMoneda[m]) byMoneda[m] = { montoVal: 0, neto: 0 }
+      byMoneda[m].montoVal += i.montoValorizacion
+      byMoneda[m].neto += i.netoARecibir
+    }
+    return { byMoneda, total: filtered.length, activas: activas.length }
+  }, [filtered])
 
   // Preview info: qué número de valorización se creará y si hay partidas anteriores
   const formPreview = useMemo(() => {
@@ -410,45 +463,74 @@ export default function ValorizacionesPage() {
       </div>
 
       {/* Filtros */}
-      <div className="flex gap-3 items-center flex-wrap">
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Buscar código, proyecto..." className="pl-9" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+      <div className="space-y-2">
+        <div className="flex gap-3 items-center flex-wrap">
+          <div className="relative flex-1 min-w-[200px] max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input placeholder="Buscar código, proyecto..." className="pl-9" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+          </div>
+          <Select value={filterProyecto} onValueChange={setFilterProyecto}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Proyecto" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los proyectos</SelectItem>
+              {proyectos.map(p => (
+                <SelectItem key={p.id} value={p.id}>{p.codigo} - {p.nombre}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={filterEstado} onValueChange={setFilterEstado}>
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="Estado" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos ({items.length})</SelectItem>
+              {ESTADOS.map(e => {
+                const cnt = estadoCounts[e.value] ?? 0
+                return (
+                  <SelectItem key={e.value} value={e.value}>
+                    {e.label}{cnt > 0 ? ` (${cnt})` : ''}
+                  </SelectItem>
+                )
+              })}
+            </SelectContent>
+          </Select>
+          <Select value={filterCondicionPago} onValueChange={setFilterCondicionPago}>
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="Condición de pago" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas las condiciones</SelectItem>
+              <SelectItem value="contado">Contado</SelectItem>
+              <SelectItem value="credito">Crédito</SelectItem>
+              <SelectItem value="adelanto">Adelanto</SelectItem>
+              <SelectItem value="__none__">Sin definir</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={filterPeriodPreset} onValueChange={v => { setFilterPeriodPreset(v); if (v !== 'custom') { setFilterPeriodDesde(''); setFilterPeriodHasta('') } }}>
+            <SelectTrigger className="w-44">
+              <CalendarDays className="h-4 w-4 mr-1 text-muted-foreground shrink-0" />
+              <SelectValue placeholder="Período" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todo el tiempo</SelectItem>
+              <SelectItem value="this_month">Este mes</SelectItem>
+              <SelectItem value="last_month">Mes pasado</SelectItem>
+              <SelectItem value="this_quarter">Este trimestre</SelectItem>
+              <SelectItem value="this_year">Este año</SelectItem>
+              <SelectItem value="custom">Rango personalizado</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        <Select value={filterProyecto} onValueChange={setFilterProyecto}>
-          <SelectTrigger className="w-48">
-            <SelectValue placeholder="Proyecto" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos los proyectos</SelectItem>
-            {proyectos.map(p => (
-              <SelectItem key={p.id} value={p.id}>{p.codigo} - {p.nombre}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={filterEstado} onValueChange={setFilterEstado}>
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="Estado" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            {ESTADOS.map(e => (
-              <SelectItem key={e.value} value={e.value}>{e.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={filterCondicionPago} onValueChange={setFilterCondicionPago}>
-          <SelectTrigger className="w-44">
-            <SelectValue placeholder="Condición de pago" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas las condiciones</SelectItem>
-            <SelectItem value="contado">Contado</SelectItem>
-            <SelectItem value="credito">Crédito</SelectItem>
-            <SelectItem value="adelanto">Adelanto</SelectItem>
-            <SelectItem value="__none__">Sin definir</SelectItem>
-          </SelectContent>
-        </Select>
+        {filterPeriodPreset === 'custom' && (
+          <div className="flex gap-2 items-center">
+            <span className="text-sm text-muted-foreground">Desde</span>
+            <Input type="date" className="w-40" value={filterPeriodDesde} onChange={e => setFilterPeriodDesde(e.target.value)} />
+            <span className="text-sm text-muted-foreground">Hasta</span>
+            <Input type="date" className="w-40" value={filterPeriodHasta} onChange={e => setFilterPeriodHasta(e.target.value)} />
+          </div>
+        )}
       </div>
 
       {/* Tabla */}
@@ -569,6 +651,30 @@ export default function ValorizacionesPage() {
                 ))
               )}
             </TableBody>
+            {filtered.length > 0 && (
+              <TableFooter>
+                <TableRow>
+                  <TableCell colSpan={3} className="py-2 text-sm text-muted-foreground">
+                    {totals.activas} valorización{totals.activas !== 1 ? 'es' : ''} activa{totals.activas !== 1 ? 's' : ''}
+                    {totals.total !== totals.activas && ` · ${totals.total - totals.activas} anulada${totals.total - totals.activas !== 1 ? 's' : ''}`}
+                  </TableCell>
+                  <TableCell className="py-2 text-right font-mono text-sm">
+                    {Object.entries(totals.byMoneda).map(([m, t]) => (
+                      <div key={m}>{formatCurrency(t.montoVal, m)}</div>
+                    ))}
+                  </TableCell>
+                  <TableCell className="py-2" />
+                  <TableCell className="py-2" />
+                  <TableCell className="py-2" />
+                  <TableCell className="py-2 text-right font-mono text-sm font-semibold">
+                    {Object.entries(totals.byMoneda).map(([m, t]) => (
+                      <div key={m}>{formatCurrency(t.neto, m)}</div>
+                    ))}
+                  </TableCell>
+                  <TableCell className="py-2" />
+                </TableRow>
+              </TableFooter>
+            )}
           </Table>
         </CardContent>
       </Card>
