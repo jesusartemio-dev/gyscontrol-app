@@ -627,11 +627,17 @@ export default function ValorizacionEditPage() {
           {val.estado === 'hes_pendiente' && (() => {
             const hasHES = val.adjuntos?.some(a => ['hes', 'guia_almacen'].includes(a.categoria ?? '')) ?? false
             return (
-              <Button size="sm" onClick={() => handleTransicion('facturada')} disabled={!hasHES || transitioning}
-                title={!hasHES ? 'Adjuntar HES o Guía de Almacén primero' : undefined}>
-                {transitioning ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FileText className="h-4 w-4 mr-1" />}
-                Facturar{!hasHES && <span className="ml-1 text-[10px] opacity-60">(falta HES)</span>}
-              </Button>
+              <>
+                <Button size="sm" variant="ghost" onClick={() => handleTransicion('aprobada_cliente')} disabled={transitioning}
+                  title="Retroceder a Aprobada (sin HES)">
+                  {transitioning ? <Loader2 className="h-4 w-4 animate-spin" /> : '← Retroceder'}
+                </Button>
+                <Button size="sm" onClick={() => handleTransicion('facturada')} disabled={!hasHES || transitioning}
+                  title={!hasHES ? 'Adjuntar HES o Guía de Almacén primero' : undefined}>
+                  {transitioning ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FileText className="h-4 w-4 mr-1" />}
+                  Facturar{!hasHES && <span className="ml-1 text-[10px] opacity-60">(falta HES)</span>}
+                </Button>
+              </>
             )
           })()}
           {val.estado === 'facturada' && (
