@@ -8,8 +8,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Loader2, Search, Eye, Receipt, DollarSign, FileSpreadsheet, Check, Ban, Undo2 } from 'lucide-react'
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Loader2, Search, Eye, Receipt, DollarSign, FileSpreadsheet, Check, Ban, Undo2, CalendarDays } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface Proyecto {
@@ -60,10 +60,22 @@ const ESTADOS = [
   { value: 'observada', label: 'Observada', color: 'bg-orange-100 text-orange-700' },
   { value: 'corregida', label: 'Corregida', color: 'bg-violet-100 text-violet-700' },
   { value: 'aprobada_cliente', label: 'Aprobada', color: 'bg-emerald-100 text-emerald-700' },
+  { value: 'hes_pendiente', label: 'HES', color: 'bg-amber-100 text-amber-800' },
   { value: 'facturada', label: 'Facturada', color: 'bg-purple-100 text-purple-700' },
+  { value: 'en_cobro', label: 'En Cobro', color: 'bg-cyan-100 text-cyan-800' },
   { value: 'pagada', label: 'Pagada', color: 'bg-green-100 text-green-800' },
   { value: 'anulada', label: 'Anulada', color: 'bg-red-100 text-red-700' },
 ]
+
+function getRangoFechas(preset: string, desde: string, hasta: string): { desde: Date | null; hasta: Date | null } {
+  const now = new Date()
+  if (preset === 'this_month') return { desde: new Date(now.getFullYear(), now.getMonth(), 1), hasta: new Date(now.getFullYear(), now.getMonth() + 1, 0) }
+  if (preset === 'last_month') return { desde: new Date(now.getFullYear(), now.getMonth() - 1, 1), hasta: new Date(now.getFullYear(), now.getMonth(), 0) }
+  if (preset === 'this_quarter') { const q = Math.floor(now.getMonth() / 3); return { desde: new Date(now.getFullYear(), q * 3, 1), hasta: new Date(now.getFullYear(), (q + 1) * 3, 0) } }
+  if (preset === 'this_year') return { desde: new Date(now.getFullYear(), 0, 1), hasta: new Date(now.getFullYear(), 11, 31) }
+  if (preset === 'custom') return { desde: desde ? new Date(desde) : null, hasta: hasta ? new Date(hasta) : null }
+  return { desde: null, hasta: null }
+}
 
 const getEstadoColor = (estado: string) =>
   ESTADOS.find(e => e.value === estado)?.color || 'bg-gray-100 text-gray-700'
@@ -138,8 +150,16 @@ export default function FacturacionPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [showDetail, setShowDetail] = useState<Valorizacion | null>(null)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [tabFilter, setTabFilter] = useState<TabFilter>('pendientes')
+
+  const [savedFilters] = useState<Record<string, string>>(() => {
+    try { const s = localStorage.getItem('gyscontrol:facturacion:filtros'); return s ? JSON.parse(s) : {} } catch { return {} }
+  })
+  const [searchTerm, setSearchTerm] = useState<string>(savedFilters.searchTerm ?? '')
+  const [tabFilter, setTabFilter] = useState<TabFilter>((savedFilters.tabFilter as TabFilter) ?? 'pendientes')
+  const [filterPeriodPreset, setFilterPeriodPreset] = useState<string>(savedFilters.filterPeriodPreset ?? 'all')
+  const [filterPeriodDesde, setFilterPeriodDesde] = useState<string>(savedFilters.filterPeriodDesde ?? '')
+  const [filterPeriodHasta, setFilterPeriodHasta] = useState<string>(savedFilters.filterPeriodHasta ?? '')
+  const [filterMoneda, setFilterMoneda] = useState<string>(savedFilters.filterMoneda ?? 'all')
 
   // Facturar dialog
   const [showFacturarDialog, setShowFacturarDialog] = useState(false)
@@ -160,14 +180,23 @@ export default function FacturacionPage() {
 
   useEffect(() => { loadData() }, [])
 
+  useEffect(() => {
+    try {
+      localStorage.setItem('gyscontrol:facturacion:filtros', JSON.stringify({
+        searchTerm, tabFilter, filterPeriodPreset, filterPeriodDesde, filterPeriodHasta, filterMoneda,
+      }))
+    } catch {}
+  }, [searchTerm, tabFilter, filterPeriodPreset, filterPeriodDesde, filterPeriodHasta, filterMoneda])
+
   const loadData = async () => {
     try {
       setLoading(true)
       const res = await fetch('/api/gestion/valorizaciones')
       if (res.ok) {
         const data = await res.json()
-        // Only show valorizaciones that are relevant to admin: aprobada_cliente, facturada, pagada
-        setItems(data.filter((v: Valorizacion) => ['aprobada_cliente', 'facturada', 'pagada', 'anulada'].includes(v.estado)))
+        setItems(data.filter((v: Valorizacion) =>
+          ['aprobada_cliente', 'hes_pendiente', 'facturada', 'en_cobro', 'pagada', 'anulada'].includes(v.estado)
+        ))
       }
     } catch {
       toast.error('Error al cargar datos')
@@ -178,10 +207,11 @@ export default function FacturacionPage() {
 
   const filtered = useMemo(() => {
     let result = items
-    if (tabFilter === 'pendientes') result = result.filter(i => i.estado === 'aprobada_cliente')
-    else if (tabFilter === 'facturadas') result = result.filter(i => i.estado === 'facturada')
+    if (tabFilter === 'pendientes') result = result.filter(i => ['aprobada_cliente', 'hes_pendiente'].includes(i.estado))
+    else if (tabFilter === 'facturadas') result = result.filter(i => ['facturada', 'en_cobro'].includes(i.estado))
     else if (tabFilter === 'pagadas') result = result.filter(i => i.estado === 'pagada')
     else if (tabFilter === 'anuladas') result = result.filter(i => i.estado === 'anulada')
+    if (filterMoneda !== 'all') result = result.filter(i => i.moneda === filterMoneda)
     if (searchTerm) {
       const term = searchTerm.toLowerCase()
       result = result.filter(i =>
@@ -190,16 +220,38 @@ export default function FacturacionPage() {
         i.proyecto?.codigo.toLowerCase().includes(term)
       )
     }
+    if (filterPeriodPreset !== 'all') {
+      const { desde, hasta } = getRangoFechas(filterPeriodPreset, filterPeriodDesde, filterPeriodHasta)
+      if (desde || hasta) {
+        result = result.filter(i => {
+          const fin = new Date(i.periodoFin)
+          const inicio = new Date(i.periodoInicio)
+          return (!desde || fin >= desde) && (!hasta || inicio <= hasta)
+        })
+      }
+    }
     return result
-  }, [items, tabFilter, searchTerm])
+  }, [items, tabFilter, searchTerm, filterPeriodPreset, filterPeriodDesde, filterPeriodHasta, filterMoneda])
 
   const counts = useMemo(() => ({
-    pendientes: items.filter(i => i.estado === 'aprobada_cliente').length,
-    facturadas: items.filter(i => i.estado === 'facturada').length,
+    pendientes: items.filter(i => ['aprobada_cliente', 'hes_pendiente'].includes(i.estado)).length,
+    facturadas: items.filter(i => ['facturada', 'en_cobro'].includes(i.estado)).length,
     pagadas: items.filter(i => i.estado === 'pagada').length,
     anuladas: items.filter(i => i.estado === 'anulada').length,
     todas: items.length,
   }), [items])
+
+  const totals = useMemo(() => {
+    const activas = filtered.filter(i => i.estado !== 'anulada')
+    const byMoneda: Record<string, { montoVal: number; neto: number }> = {}
+    for (const i of activas) {
+      const m = i.moneda || 'PEN'
+      if (!byMoneda[m]) byMoneda[m] = { montoVal: 0, neto: 0 }
+      byMoneda[m].montoVal += i.montoValorizacion
+      byMoneda[m].neto += i.netoARecibir
+    }
+    return { byMoneda, total: filtered.length, activas: activas.length }
+  }, [filtered])
 
   // Open facturar dialog
   const openFacturar = (val: Valorizacion) => {
@@ -354,29 +406,63 @@ export default function FacturacionPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-3 items-center flex-wrap">
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Buscar código, proyecto..." className="pl-9" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+      <div className="space-y-2">
+        <div className="flex gap-3 items-center flex-wrap">
+          <div className="relative flex-1 min-w-[200px] max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input placeholder="Buscar código, proyecto..." className="pl-9" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+          </div>
+          <Select value={filterMoneda} onValueChange={setFilterMoneda}>
+            <SelectTrigger className="w-36">
+              <SelectValue placeholder="Moneda" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas las monedas</SelectItem>
+              <SelectItem value="USD">USD</SelectItem>
+              <SelectItem value="PEN">PEN</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={filterPeriodPreset} onValueChange={v => { setFilterPeriodPreset(v); if (v !== 'custom') { setFilterPeriodDesde(''); setFilterPeriodHasta('') } }}>
+            <SelectTrigger className="w-44">
+              <CalendarDays className="h-4 w-4 mr-1 text-muted-foreground shrink-0" />
+              <SelectValue placeholder="Período" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todo el tiempo</SelectItem>
+              <SelectItem value="this_month">Este mes</SelectItem>
+              <SelectItem value="last_month">Mes pasado</SelectItem>
+              <SelectItem value="this_quarter">Este trimestre</SelectItem>
+              <SelectItem value="this_year">Este año</SelectItem>
+              <SelectItem value="custom">Rango personalizado</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="flex gap-1 flex-wrap">
+            {([
+              { key: 'pendientes', label: 'Por Facturar' },
+              { key: 'facturadas', label: 'Facturadas' },
+              { key: 'pagadas', label: 'Pagadas' },
+              { key: 'anuladas', label: 'Anuladas' },
+              { key: 'todas', label: 'Todas' },
+            ] as { key: TabFilter; label: string }[]).map(tab => (
+              <Button
+                key={tab.key}
+                variant={tabFilter === tab.key ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setTabFilter(tab.key)}
+              >
+                {tab.label} ({counts[tab.key]})
+              </Button>
+            ))}
+          </div>
         </div>
-        <div className="flex gap-1">
-          {([
-            { key: 'pendientes', label: 'Por Facturar' },
-            { key: 'facturadas', label: 'Facturadas' },
-            { key: 'pagadas', label: 'Pagadas' },
-            { key: 'anuladas', label: 'Anuladas' },
-            { key: 'todas', label: 'Todas' },
-          ] as { key: TabFilter; label: string }[]).map(tab => (
-            <Button
-              key={tab.key}
-              variant={tabFilter === tab.key ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setTabFilter(tab.key)}
-            >
-              {tab.label} ({counts[tab.key]})
-            </Button>
-          ))}
-        </div>
+        {filterPeriodPreset === 'custom' && (
+          <div className="flex gap-2 items-center">
+            <span className="text-sm text-muted-foreground">Desde</span>
+            <Input type="date" className="w-40" value={filterPeriodDesde} onChange={e => setFilterPeriodDesde(e.target.value)} />
+            <span className="text-sm text-muted-foreground">Hasta</span>
+            <Input type="date" className="w-40" value={filterPeriodHasta} onChange={e => setFilterPeriodHasta(e.target.value)} />
+          </div>
+        )}
       </div>
 
       {/* Table */}
@@ -427,12 +513,12 @@ export default function FacturacionPage() {
                         <Button variant="ghost" size="icon" onClick={() => setShowDetail(item)} title="Ver detalle">
                           <Eye className="h-4 w-4" />
                         </Button>
-                        {item.estado === 'aprobada_cliente' && (
+                        {['aprobada_cliente', 'hes_pendiente'].includes(item.estado) && (
                           <Button variant="ghost" size="icon" onClick={() => openFacturar(item)} title="Facturar">
                             <Receipt className="h-4 w-4 text-purple-600" />
                           </Button>
                         )}
-                        {item.estado === 'facturada' && (
+                        {['facturada', 'en_cobro'].includes(item.estado) && (
                           <Button variant="ghost" size="icon" onClick={() => openEstadoTransition(item, 'pagada')} title="Marcar pagada">
                             <DollarSign className="h-4 w-4 text-green-600" />
                           </Button>
@@ -447,7 +533,7 @@ export default function FacturacionPage() {
                             <Undo2 className="h-4 w-4 text-amber-600" />
                           </Button>
                         )}
-                        {(item.estado === 'facturada' || item.estado === 'pagada') && (
+                        {(['facturada', 'en_cobro', 'pagada'].includes(item.estado)) && (
                           <Button variant="ghost" size="icon" onClick={() => handleAnular(item)} title="Anular">
                             <Ban className="h-4 w-4 text-red-500" />
                           </Button>
@@ -458,6 +544,28 @@ export default function FacturacionPage() {
                 ))
               )}
             </TableBody>
+            {filtered.length > 0 && (
+              <TableFooter>
+                <TableRow>
+                  <TableCell colSpan={3} className="py-2 text-sm text-muted-foreground">
+                    {totals.activas} valorización{totals.activas !== 1 ? 'es' : ''}
+                    {totals.total !== totals.activas && ` · ${totals.total - totals.activas} anulada${totals.total - totals.activas !== 1 ? 's' : ''}`}
+                  </TableCell>
+                  <TableCell className="py-2 text-right font-mono text-sm">
+                    {Object.entries(totals.byMoneda).map(([m, t]) => (
+                      <div key={m}>{formatCurrency(t.montoVal, m)}</div>
+                    ))}
+                  </TableCell>
+                  <TableCell className="py-2 text-right font-mono text-sm font-semibold">
+                    {Object.entries(totals.byMoneda).map(([m, t]) => (
+                      <div key={m}>{formatCurrency(t.neto, m)}</div>
+                    ))}
+                  </TableCell>
+                  <TableCell className="py-2" />
+                  <TableCell className="py-2" />
+                </TableRow>
+              </TableFooter>
+            )}
           </Table>
         </CardContent>
       </Card>
@@ -528,13 +636,13 @@ export default function FacturacionPage() {
             </div>
           )}
           <DialogFooter className="gap-2">
-            {showDetail?.estado === 'aprobada_cliente' && (
+            {showDetail && ['aprobada_cliente', 'hes_pendiente'].includes(showDetail.estado) && (
               <Button onClick={() => { setShowDetail(null); openFacturar(showDetail!) }} className="bg-purple-600 hover:bg-purple-700">
                 <Receipt className="h-4 w-4 mr-2" />
                 Facturar
               </Button>
             )}
-            {showDetail?.estado === 'facturada' && (
+            {showDetail && ['facturada', 'en_cobro'].includes(showDetail.estado) && (
               <Button onClick={() => { setShowDetail(null); openEstadoTransition(showDetail!, 'pagada') }} className="bg-emerald-600 hover:bg-emerald-700">
                 <DollarSign className="h-4 w-4 mr-2" />
                 Marcar Pagada
@@ -552,7 +660,7 @@ export default function FacturacionPage() {
                 Revertir Factura
               </Button>
             )}
-            {(showDetail?.estado === 'facturada' || showDetail?.estado === 'pagada') && (
+            {showDetail && ['facturada', 'en_cobro', 'pagada'].includes(showDetail.estado) && (
               <Button variant="destructive" onClick={() => { setShowDetail(null); handleAnular(showDetail!) }}>
                 <Ban className="h-4 w-4 mr-2" />
                 Anular
@@ -749,7 +857,7 @@ export default function FacturacionPage() {
                 <ul className="list-disc pl-5 text-red-600 space-y-0.5">
                   <li>La valorización pasará a estado <strong>Anulada</strong> de forma irreversible</li>
                   <li>Se revertirá la amortización de adelanto asociada</li>
-                  {(confirmAnular.estado === 'facturada' || confirmAnular.estado === 'pagada') && (
+                  {(['facturada', 'en_cobro', 'pagada'].includes(confirmAnular.estado)) && (
                     <li>Las Cuentas por Cobrar (CxC) asociadas también serán <strong>anuladas</strong></li>
                   )}
                 </ul>
