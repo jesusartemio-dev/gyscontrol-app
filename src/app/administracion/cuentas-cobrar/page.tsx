@@ -9,9 +9,9 @@ import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { Loader2, Search, ArrowDownCircle, AlertTriangle, DollarSign, Clock, CheckCircle, Plus, Ban, Download, Upload, Trash2, ChevronDown, Pencil } from 'lucide-react'
+import { Loader2, Search, ArrowDownCircle, AlertTriangle, DollarSign, Clock, CheckCircle, Plus, Ban, Download, Upload, Trash2, ChevronDown, Pencil, CalendarDays, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import CxCImportExcelModal from '@/components/administracion/CxCImportExcelModal'
 import { exportarCxCAExcel, exportarCxCFormatoAdmin } from '@/lib/utils/cuentasCobrarExcel'
@@ -117,6 +117,16 @@ const formatCurrency = (amount: number, moneda = 'PEN') =>
 const formatDate = (date: string) =>
   new Date(date).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })
 
+function getRangoFechas(preset: string, desde: string, hasta: string): { desde: Date | null; hasta: Date | null } {
+  const now = new Date()
+  if (preset === 'this_month') return { desde: new Date(now.getFullYear(), now.getMonth(), 1), hasta: new Date(now.getFullYear(), now.getMonth() + 1, 0) }
+  if (preset === 'last_month') return { desde: new Date(now.getFullYear(), now.getMonth() - 1, 1), hasta: new Date(now.getFullYear(), now.getMonth(), 0) }
+  if (preset === 'this_quarter') { const q = Math.floor(now.getMonth() / 3); return { desde: new Date(now.getFullYear(), q * 3, 1), hasta: new Date(now.getFullYear(), (q + 1) * 3, 0) } }
+  if (preset === 'this_year') return { desde: new Date(now.getFullYear(), 0, 1), hasta: new Date(now.getFullYear(), 11, 31) }
+  if (preset === 'custom') return { desde: desde ? new Date(desde) : null, hasta: hasta ? new Date(hasta) : null }
+  return { desde: null, hasta: null }
+}
+
 const isVencida = (fecha: string, estado: string) => {
   if (estado === 'vencida') return true
   if (estado === 'pagada' || estado === 'anulada') return false
@@ -140,8 +150,18 @@ export default function CuentasCobrarPage() {
   const [proyectos, setProyectos] = useState<Proyecto[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [filterEstado, setFilterEstado] = useState<string>('all')
+
+  const [savedFilters] = useState<Record<string, string>>(() => {
+    try { const s = localStorage.getItem('gyscontrol:cuentas-cobrar:filtros'); return s ? JSON.parse(s) : {} } catch { return {} }
+  })
+  const [searchTerm, setSearchTerm] = useState<string>(savedFilters.searchTerm ?? '')
+  const [filterEstado, setFilterEstado] = useState<string>(savedFilters.filterEstado ?? 'all')
+  const [filterCliente, setFilterCliente] = useState<string>(savedFilters.filterCliente ?? 'all')
+  const [filterProyecto, setFilterProyecto] = useState<string>(savedFilters.filterProyecto ?? 'all')
+  const [filterMoneda, setFilterMoneda] = useState<string>(savedFilters.filterMoneda ?? 'all')
+  const [filterPeriodPreset, setFilterPeriodPreset] = useState<string>(savedFilters.filterPeriodPreset ?? 'all')
+  const [filterPeriodDesde, setFilterPeriodDesde] = useState<string>(savedFilters.filterPeriodDesde ?? '')
+  const [filterPeriodHasta, setFilterPeriodHasta] = useState<string>(savedFilters.filterPeriodHasta ?? '')
 
   // Create dialog
   const [showCreateDialog, setShowCreateDialog] = useState(false)
@@ -220,6 +240,15 @@ export default function CuentasCobrarPage() {
 
   useEffect(() => { loadData() }, [])
 
+  useEffect(() => {
+    try {
+      localStorage.setItem('gyscontrol:cuentas-cobrar:filtros', JSON.stringify({
+        searchTerm, filterEstado, filterCliente, filterProyecto, filterMoneda,
+        filterPeriodPreset, filterPeriodDesde, filterPeriodHasta,
+      }))
+    } catch {}
+  }, [searchTerm, filterEstado, filterCliente, filterProyecto, filterMoneda, filterPeriodPreset, filterPeriodDesde, filterPeriodHasta])
+
   const loadData = async () => {
     try {
       setLoading(true)
@@ -271,9 +300,19 @@ export default function CuentasCobrarPage() {
     }
   }, [items])
 
+  const proyectosFiltrados = useMemo(() =>
+    filterCliente !== 'all' ? proyectos.filter(p => p.clienteId === filterCliente) : proyectos
+  , [proyectos, filterCliente])
+
   const filtered = useMemo(() => {
     let result = items
-    if (filterEstado !== 'all') result = result.filter(i => i.estado === filterEstado)
+    if (filterEstado !== 'all') {
+      if (filterEstado === 'vencida') result = result.filter(i => isVencida(i.fechaVencimiento, i.estado))
+      else result = result.filter(i => i.estado === filterEstado)
+    }
+    if (filterCliente !== 'all') result = result.filter(i => i.clienteId === filterCliente)
+    if (filterProyecto !== 'all') result = result.filter(i => i.proyectoId === filterProyecto)
+    if (filterMoneda !== 'all') result = result.filter(i => i.moneda === filterMoneda)
     if (searchTerm) {
       const term = searchTerm.toLowerCase()
       result = result.filter(i =>
@@ -284,8 +323,43 @@ export default function CuentasCobrarPage() {
         i.descripcion?.toLowerCase().includes(term)
       )
     }
+    if (filterPeriodPreset !== 'all') {
+      const { desde, hasta } = getRangoFechas(filterPeriodPreset, filterPeriodDesde, filterPeriodHasta)
+      if (desde || hasta) {
+        result = result.filter(i => {
+          const emision = new Date(i.fechaEmision)
+          return (!desde || emision >= desde) && (!hasta || emision <= hasta)
+        })
+      }
+    }
     return result
-  }, [items, filterEstado, searchTerm])
+  }, [items, filterEstado, filterCliente, filterProyecto, filterMoneda, searchTerm, filterPeriodPreset, filterPeriodDesde, filterPeriodHasta])
+
+  const totals = useMemo(() => {
+    const activas = filtered.filter(i => i.estado !== 'anulada')
+    const byMoneda: Record<string, { monto: number; pagado: number; saldo: number }> = {}
+    for (const i of activas) {
+      const m = i.moneda || 'PEN'
+      if (!byMoneda[m]) byMoneda[m] = { monto: 0, pagado: 0, saldo: 0 }
+      byMoneda[m].monto += i.monto
+      byMoneda[m].pagado += i.montoPagado
+      byMoneda[m].saldo += i.saldoPendiente
+    }
+    return { byMoneda, total: filtered.length, activas: activas.length }
+  }, [filtered])
+
+  const hasActiveFilters = filterEstado !== 'all' || filterCliente !== 'all' || filterProyecto !== 'all' || filterMoneda !== 'all' || filterPeriodPreset !== 'all' || !!searchTerm
+
+  const clearFilters = () => {
+    setSearchTerm('')
+    setFilterEstado('all')
+    setFilterCliente('all')
+    setFilterProyecto('all')
+    setFilterMoneda('all')
+    setFilterPeriodPreset('all')
+    setFilterPeriodDesde('')
+    setFilterPeriodHasta('')
+  }
 
   // --- Create ---
   const resetCreateForm = () => {
@@ -744,22 +818,84 @@ export default function CuentasCobrarPage() {
       )}
 
       {/* Filtros */}
-      <div className="flex gap-3 items-center flex-wrap">
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Buscar cliente, proyecto, factura..." className="pl-9" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+      <div className="space-y-2">
+        <div className="flex gap-2 items-center flex-wrap">
+          <div className="relative flex-1 min-w-[180px] max-w-xs">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input placeholder="Buscar cliente, proyecto, factura..." className="pl-9" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+          </div>
+          <Select value={filterCliente} onValueChange={v => { setFilterCliente(v); setFilterProyecto('all') }}>
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="Cliente" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los clientes</SelectItem>
+              {clientes.map(c => (
+                <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={filterProyecto} onValueChange={setFilterProyecto}>
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="Proyecto" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los proyectos</SelectItem>
+              {proyectosFiltrados.map(p => (
+                <SelectItem key={p.id} value={p.id}>{p.codigo} - {p.nombre}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={filterEstado} onValueChange={setFilterEstado}>
+            <SelectTrigger className="w-36">
+              <SelectValue placeholder="Estado" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              {ESTADOS_CXC.map(e => (
+                <SelectItem key={e.value} value={e.value}>{e.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={filterMoneda} onValueChange={setFilterMoneda}>
+            <SelectTrigger className="w-32">
+              <SelectValue placeholder="Moneda" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas</SelectItem>
+              <SelectItem value="USD">USD</SelectItem>
+              <SelectItem value="PEN">PEN</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={filterPeriodPreset} onValueChange={v => { setFilterPeriodPreset(v); if (v !== 'custom') { setFilterPeriodDesde(''); setFilterPeriodHasta('') } }}>
+            <SelectTrigger className="w-44">
+              <CalendarDays className="h-4 w-4 mr-1 text-muted-foreground shrink-0" />
+              <SelectValue placeholder="Período" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todo el tiempo</SelectItem>
+              <SelectItem value="this_month">Este mes</SelectItem>
+              <SelectItem value="last_month">Mes pasado</SelectItem>
+              <SelectItem value="this_quarter">Este trimestre</SelectItem>
+              <SelectItem value="this_year">Este año</SelectItem>
+              <SelectItem value="custom">Rango personalizado</SelectItem>
+            </SelectContent>
+          </Select>
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground hover:text-foreground">
+              <X className="h-3.5 w-3.5 mr-1" />
+              Limpiar
+            </Button>
+          )}
         </div>
-        <Select value={filterEstado} onValueChange={setFilterEstado}>
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="Estado" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            {ESTADOS_CXC.map(e => (
-              <SelectItem key={e.value} value={e.value}>{e.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {filterPeriodPreset === 'custom' && (
+          <div className="flex gap-2 items-center">
+            <span className="text-sm text-muted-foreground">Desde</span>
+            <Input type="date" className="w-40" value={filterPeriodDesde} onChange={e => setFilterPeriodDesde(e.target.value)} />
+            <span className="text-sm text-muted-foreground">Hasta</span>
+            <Input type="date" className="w-40" value={filterPeriodHasta} onChange={e => setFilterPeriodHasta(e.target.value)} />
+          </div>
+        )}
       </div>
 
       {/* Tabla */}
@@ -854,6 +990,32 @@ export default function CuentasCobrarPage() {
                 })
               )}
             </TableBody>
+            {filtered.length > 0 && (
+              <TableFooter>
+                <TableRow>
+                  <TableCell colSpan={4} className="py-2 text-sm text-muted-foreground">
+                    {totals.activas} cuenta{totals.activas !== 1 ? 's' : ''}
+                    {totals.total !== totals.activas && ` · ${totals.total - totals.activas} anulada${totals.total - totals.activas !== 1 ? 's' : ''}`}
+                  </TableCell>
+                  <TableCell className="py-2 text-right font-mono text-sm">
+                    {Object.entries(totals.byMoneda).map(([m, t]) => (
+                      <div key={m}>{formatCurrency(t.monto, m)}</div>
+                    ))}
+                  </TableCell>
+                  <TableCell className="py-2 text-right font-mono text-sm text-green-600">
+                    {Object.entries(totals.byMoneda).map(([m, t]) => (
+                      <div key={m}>{t.pagado > 0 ? formatCurrency(t.pagado, m) : '—'}</div>
+                    ))}
+                  </TableCell>
+                  <TableCell className="py-2 text-right font-mono text-sm font-semibold">
+                    {Object.entries(totals.byMoneda).map(([m, t]) => (
+                      <div key={m}>{formatCurrency(t.saldo, m)}</div>
+                    ))}
+                  </TableCell>
+                  <TableCell colSpan={3} className="py-2" />
+                </TableRow>
+              </TableFooter>
+            )}
           </Table>
         </CardContent>
       </Card>
