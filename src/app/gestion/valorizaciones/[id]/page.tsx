@@ -38,11 +38,25 @@ interface CobroValorizacion {
   tipo: string
   financiera: string | null
   tasaDescuentoPct: number | null
-  montoDescontado: number | null
-  montoNeto: number | null
   fechaDesembolso: string | null
   fechaVencimiento: string | null
   numeroOperacion: string | null
+  numeroDocumentos: number | null
+  diasFinanciamiento: number | null
+  detraccionPct: number | null
+  detraccionMonto: number | null
+  excedentePct: number | null
+  excedenteMonto: number | null
+  valorAFinanciar: number | null
+  interesMonto: number | null
+  comisionEstructuracion: number | null
+  gastosAdicionales: number | null
+  igvGastos: number | null
+  montoADesembolsar: number | null
+  adelantoBanpro: number | null
+  saldoAGirar: number | null
+  montoDescontado: number | null
+  montoNeto: number | null
   confirmacionCliente: string | null
   fechaVencimientoPago: string | null
   observaciones: string | null
@@ -180,14 +194,25 @@ export default function ValorizacionEditPage() {
   const [cobroTipo, setCobroTipo] = useState<'factoring' | 'directo'>('directo')
   const [cobroFinanciera, setCobroFinanciera] = useState('')
   const [cobroTasa, setCobroTasa] = useState('')
-  const [cobroMontoDescontado, setCobroMontoDescontado] = useState('')
-  const [cobroMontoNeto, setCobroMontoNeto] = useState('')
   const [cobroFechaDesembolso, setCobroFechaDesembolso] = useState('')
   const [cobroFechaVencimiento, setCobroFechaVencimiento] = useState('')
   const [cobroNumeroOperacion, setCobroNumeroOperacion] = useState('')
   const [cobroConfirmacion, setCobroConfirmacion] = useState('')
   const [cobroFechaVencimientoPago, setCobroFechaVencimientoPago] = useState('')
   const [cobroObservaciones, setCobroObservaciones] = useState('')
+  // Factoring — liquidación detallada
+  const [cobroNumDocumentos, setCobroNumDocumentos] = useState('')
+  const [cobroDias, setCobroDias] = useState('')
+  const [cobroDetraccionPct, setCobroDetraccionPct] = useState('12')
+  const [cobroDetraccionMonto, setCobroDetraccionMonto] = useState('')
+  const [cobroExcedentePct, setCobroExcedentePct] = useState('1')
+  const [cobroExcedenteMonto, setCobroExcedenteMonto] = useState('')
+  const [cobroValorAFinanciar, setCobroValorAFinanciar] = useState('')
+  const [cobroInteres, setCobroInteres] = useState('')
+  const [cobroComision, setCobroComision] = useState('')
+  const [cobroGastos, setCobroGastos] = useState('')
+  const [cobroIgvGastos, setCobroIgvGastos] = useState('')
+  const [cobroAdelantoBanpro, setCobroAdelantoBanpro] = useState('')
   const [savingCobro, setSavingCobro] = useState(false)
   // Abono form
   const [showAbonoForm, setShowAbonoForm] = useState(false)
@@ -230,17 +255,28 @@ export default function ValorizacionEditPage() {
       setFormNumeroGuiaRemision(data.numeroGuiaRemision || '')
       setFormFechaConformidad(data.fechaConformidad ? data.fechaConformidad.split('T')[0] : '')
       if (data.cobro) {
-        setCobroTipo((data.cobro.tipo as 'factoring' | 'directo') || 'directo')
-        setCobroFinanciera(data.cobro.financiera || '')
-        setCobroTasa(data.cobro.tasaDescuentoPct?.toString() || '')
-        setCobroMontoDescontado(data.cobro.montoDescontado?.toString() || '')
-        setCobroMontoNeto(data.cobro.montoNeto?.toString() || '')
-        setCobroFechaDesembolso(data.cobro.fechaDesembolso ? data.cobro.fechaDesembolso.split('T')[0] : '')
-        setCobroFechaVencimiento(data.cobro.fechaVencimiento ? data.cobro.fechaVencimiento.split('T')[0] : '')
-        setCobroNumeroOperacion(data.cobro.numeroOperacion || '')
-        setCobroConfirmacion(data.cobro.confirmacionCliente || '')
-        setCobroFechaVencimientoPago(data.cobro.fechaVencimientoPago ? data.cobro.fechaVencimientoPago.split('T')[0] : '')
-        setCobroObservaciones(data.cobro.observaciones || '')
+        const c = data.cobro
+        setCobroTipo((c.tipo as 'factoring' | 'directo') || 'directo')
+        setCobroFinanciera(c.financiera || '')
+        setCobroTasa(c.tasaDescuentoPct?.toString() || '')
+        setCobroFechaDesembolso(c.fechaDesembolso ? c.fechaDesembolso.split('T')[0] : '')
+        setCobroFechaVencimiento(c.fechaVencimiento ? c.fechaVencimiento.split('T')[0] : '')
+        setCobroNumeroOperacion(c.numeroOperacion || '')
+        setCobroNumDocumentos(c.numeroDocumentos?.toString() || '')
+        setCobroDias(c.diasFinanciamiento?.toString() || '')
+        setCobroDetraccionPct(c.detraccionPct?.toString() || '12')
+        setCobroDetraccionMonto(c.detraccionMonto?.toString() || '')
+        setCobroExcedentePct(c.excedentePct?.toString() || '1')
+        setCobroExcedenteMonto(c.excedenteMonto?.toString() || '')
+        setCobroValorAFinanciar(c.valorAFinanciar?.toString() || '')
+        setCobroInteres(c.interesMonto?.toString() || '')
+        setCobroComision(c.comisionEstructuracion?.toString() || '')
+        setCobroGastos(c.gastosAdicionales?.toString() || '')
+        setCobroIgvGastos(c.igvGastos?.toString() || '')
+        setCobroAdelantoBanpro(c.adelantoBanpro?.toString() || '')
+        setCobroConfirmacion(c.confirmacionCliente || '')
+        setCobroFechaVencimientoPago(c.fechaVencimientoPago ? c.fechaVencimientoPago.split('T')[0] : '')
+        setCobroObservaciones(c.observaciones || '')
       }
     } catch {
       toast.error('Error al cargar valorización')
@@ -400,13 +436,28 @@ export default function ValorizacionEditPage() {
     try {
       const body: Record<string, any> = { tipo: cobroTipo }
       if (cobroTipo === 'factoring') {
+        const liq = liquidacion
         body.financiera = cobroFinanciera || null
         body.tasaDescuentoPct = cobroTasa ? parseFloat(cobroTasa) : null
-        body.montoDescontado = cobroMontoDescontado ? parseFloat(cobroMontoDescontado) : null
-        body.montoNeto = cobroMontoNeto ? parseFloat(cobroMontoNeto) : null
         body.fechaDesembolso = cobroFechaDesembolso || null
         body.fechaVencimiento = cobroFechaVencimiento || null
         body.numeroOperacion = cobroNumeroOperacion || null
+        body.numeroDocumentos = cobroNumDocumentos ? parseInt(cobroNumDocumentos) : null
+        body.diasFinanciamiento = cobroDias ? parseInt(cobroDias) : null
+        body.detraccionPct = cobroDetraccionPct ? parseFloat(cobroDetraccionPct) : null
+        body.detraccionMonto = liq.detMonto
+        body.excedentePct = cobroExcedentePct ? parseFloat(cobroExcedentePct) : null
+        body.excedenteMonto = liq.excMonto
+        body.valorAFinanciar = liq.aFinanciar
+        body.interesMonto = cobroInteres ? parseFloat(cobroInteres) : null
+        body.comisionEstructuracion = cobroComision ? parseFloat(cobroComision) : null
+        body.gastosAdicionales = cobroGastos ? parseFloat(cobroGastos) : null
+        body.igvGastos = cobroIgvGastos ? parseFloat(cobroIgvGastos) : null
+        body.montoADesembolsar = liq.aDesembolsar
+        body.adelantoBanpro = cobroAdelantoBanpro ? parseFloat(cobroAdelantoBanpro) : null
+        body.saldoAGirar = liq.saldo
+        body.montoDescontado = liq.totalCostos
+        body.montoNeto = liq.aDesembolsar
       } else {
         body.confirmacionCliente = cobroConfirmacion || null
         body.fechaVencimientoPago = cobroFechaVencimientoPago || null
@@ -468,6 +519,37 @@ export default function ValorizacionEditPage() {
       toast.error('Error al eliminar abono')
     }
   }
+
+  // Factoring liquidation calculations
+  const liquidacion = useMemo(() => {
+    const base = val?.netoARecibir ?? 0
+    const detPct = parseFloat(cobroDetraccionPct) || 0
+    const detMonto = parseFloat(cobroDetraccionMonto) || (base * detPct / 100)
+    const valorNeto = base - detMonto
+
+    const excPct = parseFloat(cobroExcedentePct) || 0
+    const excMonto = parseFloat(cobroExcedenteMonto) || (valorNeto * excPct / 100)
+    const aFinanciar = parseFloat(cobroValorAFinanciar) || (valorNeto - excMonto)
+
+    const interes = parseFloat(cobroInteres) || 0
+    const comision = parseFloat(cobroComision) || 0
+    const gastos = parseFloat(cobroGastos) || 0
+    const igv = parseFloat(cobroIgvGastos) || 0
+    const totalCostos = interes + comision + gastos + igv
+
+    const aDesembolsar = aFinanciar - totalCostos
+    const adelanto = parseFloat(cobroAdelantoBanpro) || 0
+    const saldo = aDesembolsar - adelanto
+
+    // Reference interest: aFinanciar × (tasa%/30) × días
+    const tasa = parseFloat(cobroTasa) || 0
+    const dias = parseInt(cobroDias) || 0
+    const refInteres = tasa > 0 && dias > 0 ? aFinanciar * (tasa / 100 / 30) * dias : 0
+
+    return { base, detMonto, valorNeto, excMonto, aFinanciar, totalCostos, aDesembolsar, saldo, refInteres }
+  }, [val, cobroDetraccionPct, cobroDetraccionMonto, cobroExcedentePct, cobroExcedenteMonto,
+      cobroValorAFinanciar, cobroInteres, cobroComision, cobroGastos, cobroIgvGastos,
+      cobroAdelantoBanpro, cobroTasa, cobroDias])
 
   // Preview calculation
   const preview = useMemo(() => {
@@ -962,36 +1044,165 @@ export default function ValorizacionEditPage() {
               </div>
             </div>
 
-            {/* Factoring fields */}
+            {/* Factoring — datos de operación + hoja de liquidación */}
             {cobroTipo === 'factoring' && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-xs">Financiera</Label>
-                  <Input placeholder="Banpro, etc." className="mt-1" value={cobroFinanciera} onChange={e => setCobroFinanciera(e.target.value)} />
+              <div className="space-y-3">
+                {/* Datos de operación */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div>
+                    <Label className="text-xs">Financiera</Label>
+                    <Input placeholder="Banpro" className="mt-1 h-8 text-sm" value={cobroFinanciera} onChange={e => setCobroFinanciera(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Tasa mensual %</Label>
+                    <Input type="number" step="0.01" placeholder="1.38" className="mt-1 h-8 text-sm" value={cobroTasa} onChange={e => setCobroTasa(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Días financiamiento</Label>
+                    <Input type="number" placeholder="126" className="mt-1 h-8 text-sm" value={cobroDias} onChange={e => setCobroDias(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label className="text-xs">N° Documentos</Label>
+                    <Input type="number" placeholder="1" className="mt-1 h-8 text-sm" value={cobroNumDocumentos} onChange={e => setCobroNumDocumentos(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Fecha desembolso</Label>
+                    <Input type="date" className="mt-1 h-8 text-sm" value={cobroFechaDesembolso} onChange={e => setCobroFechaDesembolso(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Fecha vencimiento</Label>
+                    <Input type="date" className="mt-1 h-8 text-sm" value={cobroFechaVencimiento} onChange={e => setCobroFechaVencimiento(e.target.value)} />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Label className="text-xs">N° Operación</Label>
+                    <Input placeholder="OP-2025-001" className="mt-1 h-8 text-sm" value={cobroNumeroOperacion} onChange={e => setCobroNumeroOperacion(e.target.value)} />
+                  </div>
                 </div>
-                <div>
-                  <Label className="text-xs">Tasa de descuento %</Label>
-                  <Input type="number" step="0.01" className="mt-1" value={cobroTasa} onChange={e => setCobroTasa(e.target.value)} />
-                </div>
-                <div>
-                  <Label className="text-xs">Monto descontado</Label>
-                  <Input type="number" step="0.01" className="mt-1" value={cobroMontoDescontado} onChange={e => setCobroMontoDescontado(e.target.value)} />
-                </div>
-                <div>
-                  <Label className="text-xs">Monto neto recibido</Label>
-                  <Input type="number" step="0.01" className="mt-1" value={cobroMontoNeto} onChange={e => setCobroMontoNeto(e.target.value)} />
-                </div>
-                <div>
-                  <Label className="text-xs">Fecha desembolso</Label>
-                  <Input type="date" className="mt-1" value={cobroFechaDesembolso} onChange={e => setCobroFechaDesembolso(e.target.value)} />
-                </div>
-                <div>
-                  <Label className="text-xs">Fecha vencimiento factoring</Label>
-                  <Input type="date" className="mt-1" value={cobroFechaVencimiento} onChange={e => setCobroFechaVencimiento(e.target.value)} />
-                </div>
-                <div className="sm:col-span-2">
-                  <Label className="text-xs">N° Operación</Label>
-                  <Input placeholder="OP-2025-001" className="mt-1" value={cobroNumeroOperacion} onChange={e => setCobroNumeroOperacion(e.target.value)} />
+
+                {/* Hoja de liquidación */}
+                <div className="border rounded-lg overflow-hidden text-sm">
+                  <div className="bg-slate-700 text-white px-4 py-2 text-xs font-semibold tracking-wider uppercase">
+                    Hoja de Liquidación
+                  </div>
+                  <table className="w-full">
+                    <tbody className="divide-y">
+                      {/* Base */}
+                      <tr className="bg-muted/30">
+                        <td className="px-4 py-2 text-muted-foreground">Monto total de facturas</td>
+                        <td className="px-4 py-2 text-right font-mono font-medium">{formatCurrency(liquidacion.base, val.moneda)}</td>
+                      </tr>
+                      {/* Detracción */}
+                      <tr>
+                        <td className="px-4 py-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-muted-foreground">(-) Detracción</span>
+                            <Input type="number" step="0.5" className="h-6 w-14 text-xs px-1.5"
+                              value={cobroDetraccionPct}
+                              onChange={e => { setCobroDetraccionPct(e.target.value); setCobroDetraccionMonto('') }} />
+                            <span className="text-muted-foreground text-xs">%</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-2 text-right font-mono text-red-600">
+                          -{formatCurrency(liquidacion.detMonto, val.moneda)}
+                        </td>
+                      </tr>
+                      {/* Valor Neto */}
+                      <tr className="bg-muted/20 font-medium">
+                        <td className="px-4 py-2">Valor Neto</td>
+                        <td className="px-4 py-2 text-right font-mono">{formatCurrency(liquidacion.valorNeto, val.moneda)}</td>
+                      </tr>
+                      {/* Excedente */}
+                      <tr>
+                        <td className="px-4 py-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-muted-foreground">(-) Excedente (retiene financiera)</span>
+                            <Input type="number" step="0.5" className="h-6 w-14 text-xs px-1.5"
+                              value={cobroExcedentePct}
+                              onChange={e => { setCobroExcedentePct(e.target.value); setCobroExcedenteMonto('') }} />
+                            <span className="text-muted-foreground text-xs">%</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-2 text-right font-mono text-orange-600">
+                          -{formatCurrency(liquidacion.excMonto, val.moneda)}
+                        </td>
+                      </tr>
+                      {/* Valor a Financiar */}
+                      <tr className="bg-muted/20 font-semibold">
+                        <td className="px-4 py-2">
+                          Valor a Financiar ({(100 - (parseFloat(cobroExcedentePct) || 1)).toFixed(0)}%)
+                        </td>
+                        <td className="px-4 py-2 text-right font-mono">{formatCurrency(liquidacion.aFinanciar, val.moneda)}</td>
+                      </tr>
+                      {/* Interés */}
+                      <tr>
+                        <td className="px-4 py-2 text-muted-foreground">
+                          (-) Interés{cobroDias ? ` × ${cobroDias} días` : ''}
+                          {liquidacion.refInteres > 0 && (
+                            <span className="ml-2 text-[10px] text-muted-foreground/60">
+                              ref: {formatCurrency(liquidacion.refInteres, val.moneda)}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2 text-right">
+                          <Input type="number" step="0.01" placeholder="0.00"
+                            className="h-7 w-36 text-xs text-right ml-auto font-mono"
+                            value={cobroInteres} onChange={e => setCobroInteres(e.target.value)} />
+                        </td>
+                      </tr>
+                      {/* Comisión */}
+                      <tr>
+                        <td className="px-4 py-2 text-muted-foreground">(-) Comisión de Estructuración</td>
+                        <td className="px-4 py-2 text-right">
+                          <Input type="number" step="0.01" placeholder="0.00"
+                            className="h-7 w-36 text-xs text-right ml-auto font-mono"
+                            value={cobroComision} onChange={e => setCobroComision(e.target.value)} />
+                        </td>
+                      </tr>
+                      {/* Gastos */}
+                      <tr>
+                        <td className="px-4 py-2 text-muted-foreground">(-) Total Gastos</td>
+                        <td className="px-4 py-2 text-right">
+                          <Input type="number" step="0.01" placeholder="0.00"
+                            className="h-7 w-36 text-xs text-right ml-auto font-mono"
+                            value={cobroGastos} onChange={e => setCobroGastos(e.target.value)} />
+                        </td>
+                      </tr>
+                      {/* IGV */}
+                      <tr>
+                        <td className="px-4 py-2 text-muted-foreground">(-) IGV sobre gastos</td>
+                        <td className="px-4 py-2 text-right">
+                          <Input type="number" step="0.01" placeholder="0.00"
+                            className="h-7 w-36 text-xs text-right ml-auto font-mono"
+                            value={cobroIgvGastos} onChange={e => setCobroIgvGastos(e.target.value)} />
+                        </td>
+                      </tr>
+                      {/* Monto a Desembolsar */}
+                      <tr className="bg-emerald-50 font-bold">
+                        <td className="px-4 py-2.5 text-emerald-900">MONTO A DESEMBOLSAR</td>
+                        <td className="px-4 py-2.5 text-right font-mono text-emerald-700 text-base">
+                          {formatCurrency(liquidacion.aDesembolsar, val.moneda)}
+                        </td>
+                      </tr>
+                      {/* Adelanto */}
+                      <tr>
+                        <td className="px-4 py-2 text-muted-foreground">(-) Adelanto</td>
+                        <td className="px-4 py-2 text-right">
+                          <Input type="number" step="0.01" placeholder="0.00"
+                            className="h-7 w-36 text-xs text-right ml-auto font-mono"
+                            value={cobroAdelantoBanpro} onChange={e => setCobroAdelantoBanpro(e.target.value)} />
+                        </td>
+                      </tr>
+                      {/* Saldo a Girar */}
+                      <tr className={`font-bold ${liquidacion.saldo >= 0 ? 'bg-blue-50' : 'bg-red-50'}`}>
+                        <td className={`px-4 py-2.5 ${liquidacion.saldo >= 0 ? 'text-blue-900' : 'text-red-900'}`}>
+                          SALDO A GIRAR
+                        </td>
+                        <td className={`px-4 py-2.5 text-right font-mono text-base ${liquidacion.saldo >= 0 ? 'text-blue-700' : 'text-red-700'}`}>
+                          {formatCurrency(liquidacion.saldo, val.moneda)}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}

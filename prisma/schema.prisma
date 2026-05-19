@@ -1997,14 +1997,30 @@ model CobroValorizacion {
   id                   String    @id @default(cuid())
   valorizacionId       String    @unique
   tipo                 String    // 'factoring' | 'directo'
-  // Factoring
-  financiera           String?   // "Banpro", "BCP", nombre libre
-  tasaDescuentoPct     Float?
-  montoDescontado      Float?
-  montoNeto            Float?
-  fechaDesembolso      DateTime?
-  fechaVencimiento     DateTime?
-  numeroOperacion      String?
+  // Factoring — datos de operación
+  financiera             String?   // "Banpro", "BCP", nombre libre
+  tasaDescuentoPct       Float?    // tasa mensual (ej. 1.38%)
+  fechaDesembolso        DateTime?
+  fechaVencimiento       DateTime? // fecha fin del periodo
+  numeroOperacion        String?
+  numeroDocumentos       Int?      // N° de facturas incluidas
+  diasFinanciamiento     Int?      // ej. 126 días
+  // Factoring — hoja de liquidación
+  detraccionPct          Float?    // ej. 12.0 (Peru)
+  detraccionMonto        Float?
+  excedentePct           Float?    // % que retiene la financiera, ej. 1.0
+  excedenteMonto         Float?
+  valorAFinanciar        Float?    // = valor neto - excedente
+  interesMonto           Float?    // interés calculado por la financiera
+  comisionEstructuracion Float?
+  gastosAdicionales      Float?
+  igvGastos              Float?    // IGV sobre los gastos de la operación
+  montoADesembolsar      Float?    // lo que efectivamente recibe GYS
+  adelantoBanpro         Float?    // si ya se giró un adelanto
+  saldoAGirar            Float?    // = montoADesembolsar - adelantoBanpro
+  // Legacy (mantener para compatibilidad)
+  montoDescontado        Float?    // total costos/descuentos
+  montoNeto              Float?    // = montoADesembolsar (alias)
   // Cobro directo
   confirmacionCliente  String?   // 'pendiente' | 'confirmado' | 'en_disputa'
   fechaVencimientoPago DateTime?

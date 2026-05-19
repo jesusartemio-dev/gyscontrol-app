@@ -10,19 +10,70 @@ const ROLES_ALLOWED = ['admin', 'gerente', 'gestor', 'coordinador', 'administrac
 
 const CobroSchema = z.object({
   tipo: z.enum(['factoring', 'directo']),
-  // Factoring
+  // Factoring — datos de operación
   financiera: z.string().max(200).optional().nullable(),
   tasaDescuentoPct: z.number().min(0).max(100).optional().nullable(),
-  montoDescontado: z.number().min(0).optional().nullable(),
-  montoNeto: z.number().min(0).optional().nullable(),
   fechaDesembolso: z.string().optional().nullable(),
   fechaVencimiento: z.string().optional().nullable(),
   numeroOperacion: z.string().max(100).optional().nullable(),
-  // Directo
+  numeroDocumentos: z.number().int().min(0).optional().nullable(),
+  diasFinanciamiento: z.number().int().min(0).optional().nullable(),
+  // Factoring — liquidación
+  detraccionPct: z.number().min(0).max(100).optional().nullable(),
+  detraccionMonto: z.number().min(0).optional().nullable(),
+  excedentePct: z.number().min(0).max(100).optional().nullable(),
+  excedenteMonto: z.number().min(0).optional().nullable(),
+  valorAFinanciar: z.number().min(0).optional().nullable(),
+  interesMonto: z.number().min(0).optional().nullable(),
+  comisionEstructuracion: z.number().min(0).optional().nullable(),
+  gastosAdicionales: z.number().min(0).optional().nullable(),
+  igvGastos: z.number().min(0).optional().nullable(),
+  montoADesembolsar: z.number().min(0).optional().nullable(),
+  adelantoBanpro: z.number().min(0).optional().nullable(),
+  saldoAGirar: z.number().optional().nullable(),
+  // Legacy aliases
+  montoDescontado: z.number().min(0).optional().nullable(),
+  montoNeto: z.number().min(0).optional().nullable(),
+  // Cobro directo
   confirmacionCliente: z.enum(['pendiente', 'confirmado', 'en_disputa']).optional().nullable(),
   fechaVencimientoPago: z.string().optional().nullable(),
   observaciones: z.string().max(500).optional().nullable(),
 })
+
+type CobroData = z.infer<typeof CobroSchema>
+
+function buildUpsertPayload(data: CobroData) {
+  return {
+    tipo: data.tipo,
+    financiera: data.financiera ?? null,
+    tasaDescuentoPct: data.tasaDescuentoPct ?? null,
+    fechaDesembolso: data.fechaDesembolso ? new Date(data.fechaDesembolso) : null,
+    fechaVencimiento: data.fechaVencimiento ? new Date(data.fechaVencimiento) : null,
+    numeroOperacion: data.numeroOperacion ?? null,
+    numeroDocumentos: data.numeroDocumentos ?? null,
+    diasFinanciamiento: data.diasFinanciamiento ?? null,
+    // Liquidación
+    detraccionPct: data.detraccionPct ?? null,
+    detraccionMonto: data.detraccionMonto ?? null,
+    excedentePct: data.excedentePct ?? null,
+    excedenteMonto: data.excedenteMonto ?? null,
+    valorAFinanciar: data.valorAFinanciar ?? null,
+    interesMonto: data.interesMonto ?? null,
+    comisionEstructuracion: data.comisionEstructuracion ?? null,
+    gastosAdicionales: data.gastosAdicionales ?? null,
+    igvGastos: data.igvGastos ?? null,
+    montoADesembolsar: data.montoADesembolsar ?? null,
+    adelantoBanpro: data.adelantoBanpro ?? null,
+    saldoAGirar: data.saldoAGirar ?? null,
+    // Legacy
+    montoDescontado: data.montoDescontado ?? null,
+    montoNeto: data.montoNeto ?? null,
+    // Directo
+    confirmacionCliente: data.confirmacionCliente ?? null,
+    fechaVencimientoPago: data.fechaVencimientoPago ? new Date(data.fechaVencimientoPago) : null,
+    observaciones: data.observaciones ?? null,
+  }
+}
 
 // GET /api/proyectos/:id/valorizaciones/:valId/cobro
 export async function GET(_: NextRequest, { params }: Ctx) {
@@ -43,7 +94,7 @@ export async function GET(_: NextRequest, { params }: Ctx) {
   }
 }
 
-// POST /api/proyectos/:id/valorizaciones/:valId/cobro — crear cobro
+// POST /api/proyectos/:id/valorizaciones/:valId/cobro — upsert cobro
 export async function POST(request: NextRequest, { params }: Ctx) {
   try {
     const session = await getServerSession(authOptions)
@@ -53,36 +104,12 @@ export async function POST(request: NextRequest, { params }: Ctx) {
     const { valId } = await params
     const body = await request.json()
     const data = CobroSchema.parse(body)
+    const payload = buildUpsertPayload(data)
 
     const cobro = await prisma.cobroValorizacion.upsert({
       where: { valorizacionId: valId },
-      create: {
-        valorizacionId: valId,
-        tipo: data.tipo,
-        financiera: data.financiera ?? null,
-        tasaDescuentoPct: data.tasaDescuentoPct ?? null,
-        montoDescontado: data.montoDescontado ?? null,
-        montoNeto: data.montoNeto ?? null,
-        fechaDesembolso: data.fechaDesembolso ? new Date(data.fechaDesembolso) : null,
-        fechaVencimiento: data.fechaVencimiento ? new Date(data.fechaVencimiento) : null,
-        numeroOperacion: data.numeroOperacion ?? null,
-        confirmacionCliente: data.confirmacionCliente ?? null,
-        fechaVencimientoPago: data.fechaVencimientoPago ? new Date(data.fechaVencimientoPago) : null,
-        observaciones: data.observaciones ?? null,
-      },
-      update: {
-        tipo: data.tipo,
-        financiera: data.financiera ?? null,
-        tasaDescuentoPct: data.tasaDescuentoPct ?? null,
-        montoDescontado: data.montoDescontado ?? null,
-        montoNeto: data.montoNeto ?? null,
-        fechaDesembolso: data.fechaDesembolso ? new Date(data.fechaDesembolso) : null,
-        fechaVencimiento: data.fechaVencimiento ? new Date(data.fechaVencimiento) : null,
-        numeroOperacion: data.numeroOperacion ?? null,
-        confirmacionCliente: data.confirmacionCliente ?? null,
-        fechaVencimientoPago: data.fechaVencimientoPago ? new Date(data.fechaVencimientoPago) : null,
-        observaciones: data.observaciones ?? null,
-      },
+      create: { valorizacionId: valId, ...payload },
+      update: payload,
       include: { abonos: true },
     })
 
