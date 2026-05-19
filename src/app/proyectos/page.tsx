@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { getProyectos, deleteProyecto, createProyecto } from '@/lib/services/proyecto'
@@ -78,10 +78,17 @@ export default function ProyectosPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [clientes, setClientes] = useState<ClienteOption[]>([])
   const [usuarios, setUsuarios] = useState<UsuarioOption[]>([])
-  const [viewMode, setViewMode] = useState<ViewMode>('table')
-  const [searchTerm, setSearchTerm] = useState('')
-  const [filterStatus, setFilterStatus] = useState<FilterStatus>('all')
-  const [sortOption, setSortOption] = useState<SortOption>('status')
+  const [savedFilters] = useState<Record<string, string>>(() => {
+    try { const s = localStorage.getItem('gyscontrol:proyectos:filtros'); return s ? JSON.parse(s) : {} } catch { return {} }
+  })
+  const [viewMode, setViewMode] = useState<ViewMode>((savedFilters.viewMode as ViewMode) ?? 'table')
+  const [searchTerm, setSearchTerm] = useState<string>(savedFilters.searchTerm ?? '')
+  const [filterStatus, setFilterStatus] = useState<FilterStatus>((savedFilters.filterStatus as FilterStatus) ?? 'all')
+  const [sortOption, setSortOption] = useState<SortOption>((savedFilters.sortOption as SortOption) ?? 'status')
+  const [filterClienteId, setFilterClienteId] = useState<string>(savedFilters.filterClienteId ?? 'all')
+  const [filterGestorId, setFilterGestorId] = useState<string>(savedFilters.filterGestorId ?? 'all')
+  const [filterMoneda, setFilterMoneda] = useState<string>(savedFilters.filterMoneda ?? 'all')
+  const [includeInternos, setIncludeInternos] = useState<boolean>(savedFilters.includeInternos === 'true')
   const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; proyecto?: Proyecto }>({ show: false })
   const { page, limit, handlePageChange, handleLimitChange, reset: resetPagination } = usePagination(1, 12)
 
@@ -94,11 +101,14 @@ export default function ProyectosPage() {
   }, [session, status, router])
 
   useEffect(() => {
-    getProyectos()
-      .then(setProyectos)
+    setPageLoading(true)
+    const params = includeInternos ? '?includeInternos=true' : ''
+    fetch(buildApiUrl(`/api/proyectos${params}`))
+      .then(res => res.json())
+      .then(data => setProyectos(Array.isArray(data) ? data : data.proyectos || data.data || []))
       .catch(() => toast.error('Error al cargar proyectos.'))
       .finally(() => setPageLoading(false))
-  }, [])
+  }, [includeInternos])
 
   // Cargar clientes y usuarios cuando se abre el dialog
   useEffect(() => {
@@ -125,6 +135,43 @@ export default function ProyectosPage() {
   }, [showCreateDialog])
 
   useEffect(() => {
+    try {
+      localStorage.setItem('gyscontrol:proyectos:filtros', JSON.stringify({
+        viewMode, searchTerm, filterStatus, sortOption,
+        filterClienteId, filterGestorId, filterMoneda,
+        includeInternos: String(includeInternos),
+      }))
+    } catch {}
+  }, [viewMode, searchTerm, filterStatus, sortOption, filterClienteId, filterGestorId, filterMoneda, includeInternos])
+
+  const clienteOptions = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const p of proyectos) if (p.cliente?.id && p.cliente?.nombre) map.set(p.cliente.id, p.cliente.nombre)
+    return Array.from(map.entries()).map(([id, nombre]) => ({ id, nombre })).sort((a, b) => a.nombre.localeCompare(b.nombre))
+  }, [proyectos])
+
+  const gestorOptions = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const p of proyectos) if (p.gestor?.id && p.gestor?.name) map.set(p.gestor.id, p.gestor.name)
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))
+  }, [proyectos])
+
+  const estadoCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const p of proyectos) counts[p.estado] = (counts[p.estado] || 0) + 1
+    return counts
+  }, [proyectos])
+
+  const totalsFiltrados = useMemo(() => {
+    const byMoneda: Record<string, number> = {}
+    for (const p of filteredProyectos) {
+      const m = p.moneda || 'USD'
+      byMoneda[m] = (byMoneda[m] || 0) + (p.totalCliente || 0)
+    }
+    return byMoneda
+  }, [filteredProyectos])
+
+  useEffect(() => {
     let filtered = [...proyectos]
     if (searchTerm) {
       filtered = filtered.filter(p =>
@@ -133,9 +180,10 @@ export default function ProyectosPage() {
         p.cliente?.nombre?.toLowerCase().includes(searchTerm.toLowerCase())
       )
     }
-    if (filterStatus !== 'all') {
-      filtered = filtered.filter(p => p.estado === filterStatus)
-    }
+    if (filterStatus !== 'all') filtered = filtered.filter(p => p.estado === filterStatus)
+    if (filterClienteId !== 'all') filtered = filtered.filter(p => p.cliente?.id === filterClienteId)
+    if (filterGestorId !== 'all') filtered = filtered.filter(p => p.gestor?.id === filterGestorId)
+    if (filterMoneda !== 'all') filtered = filtered.filter(p => (p.moneda || 'USD') === filterMoneda)
 
     filtered.sort((a, b) => {
       switch (sortOption) {
@@ -158,7 +206,7 @@ export default function ProyectosPage() {
 
     setFilteredProyectos(filtered)
     resetPagination()
-  }, [proyectos, searchTerm, filterStatus, sortOption, resetPagination])
+  }, [proyectos, searchTerm, filterStatus, sortOption, filterClienteId, filterGestorId, filterMoneda, resetPagination])
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -438,21 +486,72 @@ export default function ProyectosPage() {
         </div>
 
         <Select value={filterStatus} onValueChange={(value: string) => setFilterStatus(value as FilterStatus)}>
-          <SelectTrigger className="w-[190px] h-8 text-xs">
+          <SelectTrigger className="w-[160px] h-8 text-xs">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Estado: Todos</SelectItem>
-            {proyectoEstadoList.map(({ key, label }) => (
-              <SelectItem key={key} value={key}>
-                Estado: {label}
-              </SelectItem>
+            <SelectItem value="all">Estado: Todos ({proyectos.length})</SelectItem>
+            {proyectoEstadoList.map(({ key, label }) => {
+              const cnt = estadoCounts[key] ?? 0
+              return (
+                <SelectItem key={key} value={key}>
+                  {label}{cnt > 0 ? ` (${cnt})` : ''}
+                </SelectItem>
+              )
+            })}
+          </SelectContent>
+        </Select>
+
+        <Select value={filterClienteId} onValueChange={setFilterClienteId}>
+          <SelectTrigger className="w-[170px] h-8 text-xs">
+            <Building2 className="h-3 w-3 mr-1 text-gray-400 shrink-0" />
+            <SelectValue placeholder="Cliente" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos los clientes</SelectItem>
+            {clienteOptions.map(c => (
+              <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>
             ))}
           </SelectContent>
         </Select>
 
+        <Select value={filterGestorId} onValueChange={setFilterGestorId}>
+          <SelectTrigger className="w-[160px] h-8 text-xs">
+            <UserCog className="h-3 w-3 mr-1 text-gray-400 shrink-0" />
+            <SelectValue placeholder="Gestor" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos los gestores</SelectItem>
+            {gestorOptions.map(g => (
+              <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={filterMoneda} onValueChange={setFilterMoneda}>
+          <SelectTrigger className="w-[110px] h-8 text-xs">
+            <DollarSign className="h-3 w-3 mr-1 text-gray-400 shrink-0" />
+            <SelectValue placeholder="Moneda" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas</SelectItem>
+            <SelectItem value="USD">USD</SelectItem>
+            <SelectItem value="PEN">PEN (S/)</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Button
+          variant={includeInternos ? 'default' : 'outline'}
+          size="sm"
+          className="h-8 text-xs"
+          onClick={() => setIncludeInternos(v => !v)}
+          title="Incluir proyectos internos"
+        >
+          + Internos
+        </Button>
+
         <Select value={sortOption} onValueChange={(value: string) => setSortOption(value as SortOption)}>
-          <SelectTrigger className="w-[170px] h-8 text-xs">
+          <SelectTrigger className="w-[150px] h-8 text-xs">
             <div className="flex items-center gap-1">
               <ArrowUpDown className="h-3 w-3" />
               <SelectValue />
@@ -490,6 +589,16 @@ export default function ProyectosPage() {
         </span>
       </div>
 
+      {/* Totales filtrados */}
+      {filteredProyectos.length > 0 && (searchTerm || filterStatus !== 'all' || filterClienteId !== 'all' || filterGestorId !== 'all' || filterMoneda !== 'all') && (
+        <div className="flex items-center gap-3 text-xs border rounded-md px-3 py-1.5 bg-muted/30 text-muted-foreground">
+          <span className="font-medium text-foreground">{filteredProyectos.length} proyecto{filteredProyectos.length !== 1 ? 's' : ''}</span>
+          {Object.entries(totalsFiltrados).map(([m, total]) => (
+            <span key={m}>{getMonedaSymbol(m)} {total.toLocaleString()}</span>
+          ))}
+        </div>
+      )}
+
       {/* Projects List */}
       {viewMode === 'cards' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -499,15 +608,15 @@ export default function ProyectosPage() {
                 <CardContent className="py-12 text-center">
                   <FolderOpen className="h-12 w-12 mx-auto text-gray-300 mb-4" />
                   <h3 className="text-lg font-medium text-gray-600 mb-2">
-                    {searchTerm || filterStatus !== 'all' ? 'No se encontraron proyectos' : 'No hay proyectos'}
+                    {searchTerm || filterStatus !== 'all' || filterClienteId !== 'all' || filterGestorId !== 'all' || filterMoneda !== 'all' ? 'No se encontraron proyectos' : 'No hay proyectos'}
                   </h3>
                   <p className="text-sm text-gray-500 mb-4">
-                    {searchTerm || filterStatus !== 'all'
+                    {searchTerm || filterStatus !== 'all' || filterClienteId !== 'all' || filterGestorId !== 'all' || filterMoneda !== 'all'
                       ? 'Ajusta los filtros de búsqueda'
                       : 'Comienza creando tu primer proyecto'
                     }
                   </p>
-                  {!searchTerm && filterStatus === 'all' && (
+                  {!searchTerm && filterStatus === 'all' && filterClienteId === 'all' && filterGestorId === 'all' && filterMoneda === 'all' && (
                     <Button onClick={() => setShowCreateDialog(true)} size="sm">
                       <Plus className="h-4 w-4 mr-2" />
                       Crear Proyecto
