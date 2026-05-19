@@ -1958,6 +1958,7 @@ model Valorizacion {
   numeroHES                    String?            // N° de HES (cuando es servicio)
   numeroGuiaRemision           String?            // N° de Guía de Remisión (cuando es bien)
   fechaConformidad             DateTime?          // Cuándo el cliente firmó/emitió la conformidad
+  fechaSolicitudHES            DateTime?          // Cuándo se solicitó el HES al cliente (inicio de hes_pendiente)
   observaciones                String?
   createdAt                    DateTime           @default(now())
   updatedAt                    DateTime
@@ -1967,6 +1968,7 @@ model Valorizacion {
   cuentasPorCobrar CuentaPorCobrar[]
   partidas         PartidaValorizacion[]
   valorizacionHH   ValorizacionHH?
+  cobro            CobroValorizacion?
 
   @@unique([proyectoId, numero])
   @@index([proyectoId, estado])
@@ -1981,6 +1983,7 @@ model ValorizacionAdjunto {
   urlArchivo     String
   driveFileId    String?
   tipoArchivo    String? // "excel", "pdf"
+  categoria      String? // "hes" | "guia_almacen" | "factura" | "otro"
   tamano         Int?
   createdAt      DateTime @default(now())
 
@@ -1988,6 +1991,45 @@ model ValorizacionAdjunto {
 
   @@index([valorizacionId])
   @@map("valorizacion_adjunto")
+}
+
+model CobroValorizacion {
+  id                   String    @id @default(cuid())
+  valorizacionId       String    @unique
+  tipo                 String    // 'factoring' | 'directo'
+  // Factoring
+  financiera           String?   // "Banpro", "BCP", nombre libre
+  tasaDescuentoPct     Float?
+  montoDescontado      Float?
+  montoNeto            Float?
+  fechaDesembolso      DateTime?
+  fechaVencimiento     DateTime?
+  numeroOperacion      String?
+  // Cobro directo
+  confirmacionCliente  String?   // 'pendiente' | 'confirmado' | 'en_disputa'
+  fechaVencimientoPago DateTime?
+  observaciones        String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  valorizacion Valorizacion       @relation(fields: [valorizacionId], references: [id], onDelete: Cascade)
+  abonos       AbonoValorizacion[]
+
+  @@map("cobro_valorizacion")
+}
+
+model AbonoValorizacion {
+  id            String   @id @default(cuid())
+  cobroId       String
+  monto         Float
+  fecha         DateTime
+  observaciones String?
+  createdAt     DateTime @default(now())
+
+  cobro CobroValorizacion @relation(fields: [cobroId], references: [id], onDelete: Cascade)
+
+  @@index([cobroId])
+  @@map("abono_valorizacion")
 }
 
 model PartidaValorizacion {
@@ -3506,7 +3548,9 @@ enum EstadoValorizacion {
   observada
   corregida
   aprobada_cliente
+  hes_pendiente
   facturada
+  en_cobro
   pagada
   anulada
 }

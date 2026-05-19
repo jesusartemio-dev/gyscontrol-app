@@ -65,9 +65,11 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       enviada:          ['observada', 'aprobada_cliente', 'borrador', 'anulada'],
       observada:        ['corregida', 'enviada', 'anulada'],
       corregida:        ['observada', 'aprobada_cliente', 'enviada', 'anulada'],
-      aprobada_cliente: ['facturada', 'enviada', 'anulada'],
-      facturada:        ['pagada', 'aprobada_cliente', 'anulada'],
-      pagada:           ['facturada', 'anulada'],
+      aprobada_cliente: ['hes_pendiente', 'enviada', 'anulada'],
+      hes_pendiente:    ['facturada', 'aprobada_cliente', 'anulada'],
+      facturada:        ['en_cobro', 'pagada', 'hes_pendiente', 'anulada'],
+      en_cobro:         ['pagada', 'facturada', 'anulada'],
+      pagada:           ['en_cobro', 'anulada'],
       anulada:          [],
     }
 
@@ -101,6 +103,22 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         case 'aprobada_cliente':
           extraCampos = { fechaAprobacion: new Date() }
           break
+        case 'hes_pendiente':
+          if (!existing.fechaSolicitudHES) extraCampos = { fechaSolicitudHES: new Date() }
+          break
+      }
+    }
+
+    // Bloqueo: hes_pendiente → facturada requiere adjunto HES o Guía de Almacén
+    if (body.estado === 'facturada' && existing.estado === 'hes_pendiente') {
+      const adjuntoHES = await prisma.valorizacionAdjunto.findFirst({
+        where: { valorizacionId: valId, categoria: { in: ['hes', 'guia_almacen'] } },
+      })
+      if (!adjuntoHES) {
+        return NextResponse.json(
+          { error: 'Se requiere adjuntar el documento HES o Guía de Almacén antes de facturar' },
+          { status: 400 }
+        )
       }
     }
 
@@ -117,7 +135,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       }
 
       // Revertir amortización al anular desde estado post-aprobación
-      const estadosPostAprobacion = ['aprobada_cliente', 'facturada', 'pagada']
+      const estadosPostAprobacion = ['aprobada_cliente', 'hes_pendiente', 'facturada', 'en_cobro', 'pagada']
       if (body.estado === 'anulada' && estadosPostAprobacion.includes(existing.estado) && existing.adelantoMonto > 0) {
         await prisma.proyecto.update({
           where: { id: proyectoId },
@@ -127,9 +145,17 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         })
       }
 
-      // Al anular desde facturada/pagada: anular CxC asociadas
-      const estadosConCxC = ['facturada', 'pagada']
+      // Al anular desde facturada/en_cobro/pagada: anular CxC asociadas
+      const estadosConCxC = ['facturada', 'en_cobro', 'pagada']
       if (body.estado === 'anulada' && estadosConCxC.includes(existing.estado)) {
+        await prisma.cuentaPorCobrar.updateMany({
+          where: { valorizacionId: valId, estado: { not: 'anulada' } },
+          data: { estado: 'anulada', updatedAt: new Date() },
+        })
+      }
+
+      // Revertir facturación (facturada → hes_pendiente): anular CxC asociadas
+      if (existing.estado === 'facturada' && body.estado === 'hes_pendiente') {
         await prisma.cuentaPorCobrar.updateMany({
           where: { valorizacionId: valId, estado: { not: 'anulada' } },
           data: { estado: 'anulada', updatedAt: new Date() },
@@ -238,7 +264,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
     // Bloqueo: condiciones de pago no editables si la valorización está en estado final
     // (ya facturada, pagada, aprobada_cliente o anulada). Solo editables en borrador/enviada/observada/corregida.
-    const ESTADOS_PAGO_BLOQUEADOS = ['aprobada_cliente', 'facturada', 'pagada', 'anulada']
+    const ESTADOS_PAGO_BLOQUEADOS = ['aprobada_cliente', 'hes_pendiente', 'facturada', 'en_cobro', 'pagada', 'anulada']
     const tocaPago = body.condicionPago !== undefined || body.formaPago !== undefined
                   || body.diasCredito !== undefined || body.notasPago !== undefined
     if (tocaPago && ESTADOS_PAGO_BLOQUEADOS.includes(existing.estado)) {

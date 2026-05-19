@@ -8,12 +8,46 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ArrowLeft, Loader2, Save, Eye, Check } from 'lucide-react'
+import { ArrowLeft, Loader2, Save, Eye, Check, Upload, Trash2, Plus, Clock, DollarSign, FileText } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { CONDICIONES_PAGO, FORMAS_PAGO, DIAS_CREDITO_PRESETS, formatPago } from '@/lib/utils/formaPago'
 import TablaPartidas from '@/components/valorizacion/TablaPartidas'
 import DetalleHH from '@/components/valorizacion/DetalleHH'
 import { calcularAdelantoValorizacion } from '@/lib/utils/adelantoUtils'
+
+interface ValorizacionAdjunto {
+  id: string
+  nombreArchivo: string
+  urlArchivo: string | null
+  driveFileId: string | null
+  categoria: string | null
+  createdAt: string
+}
+
+interface AbonoValorizacion {
+  id: string
+  cobroId: string
+  monto: number
+  fecha: string
+  observaciones: string | null
+}
+
+interface CobroValorizacion {
+  id: string
+  valorizacionId: string
+  tipo: string
+  financiera: string | null
+  tasaDescuentoPct: number | null
+  montoDescontado: number | null
+  montoNeto: number | null
+  fechaDesembolso: string | null
+  fechaVencimiento: string | null
+  numeroOperacion: string | null
+  confirmacionCliente: string | null
+  fechaVencimientoPago: string | null
+  observaciones: string | null
+  abonos: AbonoValorizacion[]
+}
 
 interface Proyecto {
   id: string
@@ -65,9 +99,12 @@ interface Valorizacion {
   numeroHES?: string | null
   numeroGuiaRemision?: string | null
   fechaConformidad?: string | null
+  fechaSolicitudHES?: string | null
   createdAt: string
   updatedAt: string
   proyecto?: Proyecto
+  adjuntos?: ValorizacionAdjunto[]
+  cobro?: CobroValorizacion | null
   valorizacionHH?: {
     id: string
     clienteId: string
@@ -85,7 +122,9 @@ const ESTADOS = [
   { value: 'observada', label: 'Observada', color: 'bg-orange-100 text-orange-700' },
   { value: 'corregida', label: 'Corregida', color: 'bg-violet-100 text-violet-700' },
   { value: 'aprobada_cliente', label: 'Aprobada', color: 'bg-emerald-100 text-emerald-700' },
+  { value: 'hes_pendiente', label: 'HES Pendiente', color: 'bg-amber-100 text-amber-800' },
   { value: 'facturada', label: 'Facturada', color: 'bg-purple-100 text-purple-700' },
+  { value: 'en_cobro', label: 'En Cobro', color: 'bg-cyan-100 text-cyan-800' },
   { value: 'pagada', label: 'Pagada', color: 'bg-green-100 text-green-800' },
   { value: 'anulada', label: 'Anulada', color: 'bg-red-100 text-red-700' },
 ]
@@ -135,6 +174,29 @@ export default function ValorizacionEditPage() {
   const [formNumeroGuiaRemision, setFormNumeroGuiaRemision] = useState('')
   const [formFechaConformidad, setFormFechaConformidad] = useState('')
   const [savingConformidad, setSavingConformidad] = useState(false)
+  // HES upload
+  const [uploadingHES, setUploadingHES] = useState(false)
+  // Cobro form
+  const [cobroTipo, setCobroTipo] = useState<'factoring' | 'directo'>('directo')
+  const [cobroFinanciera, setCobroFinanciera] = useState('')
+  const [cobroTasa, setCobroTasa] = useState('')
+  const [cobroMontoDescontado, setCobroMontoDescontado] = useState('')
+  const [cobroMontoNeto, setCobroMontoNeto] = useState('')
+  const [cobroFechaDesembolso, setCobroFechaDesembolso] = useState('')
+  const [cobroFechaVencimiento, setCobroFechaVencimiento] = useState('')
+  const [cobroNumeroOperacion, setCobroNumeroOperacion] = useState('')
+  const [cobroConfirmacion, setCobroConfirmacion] = useState('')
+  const [cobroFechaVencimientoPago, setCobroFechaVencimientoPago] = useState('')
+  const [cobroObservaciones, setCobroObservaciones] = useState('')
+  const [savingCobro, setSavingCobro] = useState(false)
+  // Abono form
+  const [showAbonoForm, setShowAbonoForm] = useState(false)
+  const [abonoMonto, setAbonoMonto] = useState('')
+  const [abonoFecha, setAbonoFecha] = useState(new Date().toISOString().split('T')[0])
+  const [abonoObs, setAbonoObs] = useState('')
+  const [addingAbono, setAddingAbono] = useState(false)
+  // State transition
+  const [transitioning, setTransitioning] = useState(false)
 
   const loadVal = useCallback(async () => {
     try {
@@ -167,6 +229,19 @@ export default function ValorizacionEditPage() {
       setFormNumeroHES(data.numeroHES || '')
       setFormNumeroGuiaRemision(data.numeroGuiaRemision || '')
       setFormFechaConformidad(data.fechaConformidad ? data.fechaConformidad.split('T')[0] : '')
+      if (data.cobro) {
+        setCobroTipo((data.cobro.tipo as 'factoring' | 'directo') || 'directo')
+        setCobroFinanciera(data.cobro.financiera || '')
+        setCobroTasa(data.cobro.tasaDescuentoPct?.toString() || '')
+        setCobroMontoDescontado(data.cobro.montoDescontado?.toString() || '')
+        setCobroMontoNeto(data.cobro.montoNeto?.toString() || '')
+        setCobroFechaDesembolso(data.cobro.fechaDesembolso ? data.cobro.fechaDesembolso.split('T')[0] : '')
+        setCobroFechaVencimiento(data.cobro.fechaVencimiento ? data.cobro.fechaVencimiento.split('T')[0] : '')
+        setCobroNumeroOperacion(data.cobro.numeroOperacion || '')
+        setCobroConfirmacion(data.cobro.confirmacionCliente || '')
+        setCobroFechaVencimientoPago(data.cobro.fechaVencimientoPago ? data.cobro.fechaVencimientoPago.split('T')[0] : '')
+        setCobroObservaciones(data.cobro.observaciones || '')
+      }
     } catch {
       toast.error('Error al cargar valorización')
       router.push('/gestion/valorizaciones')
@@ -258,6 +333,142 @@ export default function ValorizacionEditPage() {
     }
   }
 
+  const handleTransicion = async (newEstado: string) => {
+    if (!val) return
+    setTransitioning(true)
+    try {
+      const res = await fetch(`/api/proyectos/${val.proyectoId}/valorizaciones/${val.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estado: newEstado }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Error')
+      }
+      toast.success('Estado actualizado')
+      loadVal()
+    } catch (e: any) {
+      toast.error(e.message || 'Error al cambiar estado')
+    } finally {
+      setTransitioning(false)
+    }
+  }
+
+  const handleUploadAdjunto = async (e: React.ChangeEvent<HTMLInputElement>, categoria: string) => {
+    if (!val || !e.target.files?.[0]) return
+    const file = e.target.files[0]
+    setUploadingHES(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('categoria', categoria)
+      const res = await fetch(`/api/proyectos/${val.proyectoId}/valorizaciones/${val.id}/adjuntos`, {
+        method: 'POST',
+        body: fd,
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Error')
+      }
+      toast.success('Documento adjuntado')
+      loadVal()
+    } catch (e: any) {
+      toast.error(e.message || 'Error al subir archivo')
+    } finally {
+      setUploadingHES(false)
+      e.target.value = ''
+    }
+  }
+
+  const handleDeleteAdjunto = async (adjId: string) => {
+    if (!val) return
+    if (!window.confirm('¿Eliminar este adjunto?')) return
+    try {
+      const res = await fetch(`/api/proyectos/${val.proyectoId}/valorizaciones/${val.id}/adjuntos/${adjId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Error')
+      toast.success('Adjunto eliminado')
+      loadVal()
+    } catch {
+      toast.error('Error al eliminar adjunto')
+    }
+  }
+
+  const handleSaveCobro = async () => {
+    if (!val) return
+    setSavingCobro(true)
+    try {
+      const body: Record<string, any> = { tipo: cobroTipo }
+      if (cobroTipo === 'factoring') {
+        body.financiera = cobroFinanciera || null
+        body.tasaDescuentoPct = cobroTasa ? parseFloat(cobroTasa) : null
+        body.montoDescontado = cobroMontoDescontado ? parseFloat(cobroMontoDescontado) : null
+        body.montoNeto = cobroMontoNeto ? parseFloat(cobroMontoNeto) : null
+        body.fechaDesembolso = cobroFechaDesembolso || null
+        body.fechaVencimiento = cobroFechaVencimiento || null
+        body.numeroOperacion = cobroNumeroOperacion || null
+      } else {
+        body.confirmacionCliente = cobroConfirmacion || null
+        body.fechaVencimientoPago = cobroFechaVencimientoPago || null
+        body.observaciones = cobroObservaciones || null
+      }
+      const res = await fetch(`/api/proyectos/${val.proyectoId}/valorizaciones/${val.id}/cobro`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Error')
+      }
+      toast.success('Cobro guardado')
+      loadVal()
+    } catch (e: any) {
+      toast.error(e.message || 'Error al guardar cobro')
+    } finally {
+      setSavingCobro(false)
+    }
+  }
+
+  const handleAddAbono = async () => {
+    if (!val || !abonoMonto || !abonoFecha) return
+    setAddingAbono(true)
+    try {
+      const res = await fetch(`/api/proyectos/${val.proyectoId}/valorizaciones/${val.id}/cobro/abonos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ monto: parseFloat(abonoMonto), fecha: abonoFecha, observaciones: abonoObs || null }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Error')
+      }
+      toast.success('Abono registrado')
+      setAbonoMonto('')
+      setAbonoFecha(new Date().toISOString().split('T')[0])
+      setAbonoObs('')
+      setShowAbonoForm(false)
+      loadVal()
+    } catch (e: any) {
+      toast.error(e.message || 'Error al registrar abono')
+    } finally {
+      setAddingAbono(false)
+    }
+  }
+
+  const handleDeleteAbono = async (abonoId: string) => {
+    if (!val) return
+    if (!window.confirm('¿Eliminar este abono?')) return
+    try {
+      const res = await fetch(`/api/proyectos/${val.proyectoId}/valorizaciones/${val.id}/cobro/abonos?abonoId=${abonoId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Error')
+      toast.success('Abono eliminado')
+      loadVal()
+    } catch {
+      toast.error('Error al eliminar abono')
+    }
+  }
+
   // Preview calculation
   const preview = useMemo(() => {
     const monto = parseFloat(formMontoValorizacion) || 0
@@ -322,6 +533,35 @@ export default function ValorizacionEditPage() {
             <Button onClick={handleSave} disabled={saving}>
               {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
               Guardar cambios
+            </Button>
+          )}
+          {/* Workflow transition buttons */}
+          {val.estado === 'aprobada_cliente' && (
+            <Button size="sm" variant="outline" onClick={() => handleTransicion('hes_pendiente')} disabled={transitioning}>
+              {transitioning ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Clock className="h-4 w-4 mr-1" />}
+              Solicitar HES
+            </Button>
+          )}
+          {val.estado === 'hes_pendiente' && (() => {
+            const hasHES = val.adjuntos?.some(a => ['hes', 'guia_almacen'].includes(a.categoria ?? '')) ?? false
+            return (
+              <Button size="sm" onClick={() => handleTransicion('facturada')} disabled={!hasHES || transitioning}
+                title={!hasHES ? 'Adjuntar HES o Guía de Almacén primero' : undefined}>
+                {transitioning ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FileText className="h-4 w-4 mr-1" />}
+                Facturar{!hasHES && <span className="ml-1 text-[10px] opacity-60">(falta HES)</span>}
+              </Button>
+            )
+          })()}
+          {val.estado === 'facturada' && (
+            <Button size="sm" variant="outline" onClick={() => handleTransicion('en_cobro')} disabled={transitioning}>
+              {transitioning ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <DollarSign className="h-4 w-4 mr-1" />}
+              Iniciar Cobro
+            </Button>
+          )}
+          {val.estado === 'en_cobro' && (
+            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => handleTransicion('pagada')} disabled={transitioning}>
+              {transitioning ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Check className="h-4 w-4 mr-1" />}
+              Marcar Pagada
             </Button>
           )}
         </div>
@@ -550,8 +790,8 @@ export default function ValorizacionEditPage() {
       {/* Conformidad del cliente — visible desde aprobada_cliente en adelante.
           Editable solo cuando la valorización está en aprobada_cliente (antes de facturar).
           Al facturar, los campos se heredan automáticamente a la CxC creada. */}
-      {!viewMode && val && ['aprobada_cliente', 'facturada', 'pagada', 'anulada'].includes(val.estado) && (() => {
-        const editable = val.estado === 'aprobada_cliente'
+      {val && ['aprobada_cliente', 'hes_pendiente', 'facturada', 'en_cobro', 'pagada', 'anulada'].includes(val.estado) && (() => {
+        const editable = val.estado === 'aprobada_cliente' && !viewMode
         const tieneConformidad = !!(val.numeroHES || val.numeroGuiaRemision || val.fechaConformidad)
         return (
           <Card className={editable && !tieneConformidad ? 'border-amber-300 bg-amber-50/30' : ''}>
@@ -643,6 +883,214 @@ export default function ValorizacionEditPage() {
         )
       })()}
 
+      {/* HES Adjuntos card — visible in hes_pendiente state */}
+      {val.estado === 'hes_pendiente' && (
+        <Card className="border-amber-300">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <h3 className="font-semibold text-sm flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-amber-600" />
+                  Documentos HES / Guía de Almacén
+                </h3>
+                {val.fechaSolicitudHES && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Solicitada el {formatDate(val.fechaSolicitudHES)}
+                    {' · '}{Math.floor((Date.now() - new Date(val.fechaSolicitudHES).getTime()) / 86_400_000)} días
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <label className="cursor-pointer">
+                  <input type="file" className="sr-only" accept=".pdf,.jpg,.jpeg,.png,.docx"
+                    onChange={e => handleUploadAdjunto(e, 'hes')} disabled={uploadingHES} />
+                  <Button size="sm" variant="outline" asChild disabled={uploadingHES}>
+                    <span>{uploadingHES ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />}HES</span>
+                  </Button>
+                </label>
+                <label className="cursor-pointer">
+                  <input type="file" className="sr-only" accept=".pdf,.jpg,.jpeg,.png,.docx"
+                    onChange={e => handleUploadAdjunto(e, 'guia_almacen')} disabled={uploadingHES} />
+                  <Button size="sm" variant="outline" asChild disabled={uploadingHES}>
+                    <span><Upload className="h-4 w-4 mr-1" />Guía Almacén</span>
+                  </Button>
+                </label>
+              </div>
+            </div>
+
+            {val.adjuntos && val.adjuntos.filter(a => ['hes', 'guia_almacen'].includes(a.categoria ?? '')).length > 0 ? (
+              <div className="space-y-1.5">
+                {val.adjuntos.filter(a => ['hes', 'guia_almacen'].includes(a.categoria ?? '')).map(adj => (
+                  <div key={adj.id} className="flex items-center gap-2 text-sm bg-emerald-50 border border-emerald-200 rounded px-3 py-1.5">
+                    <FileText className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                    <a href={adj.urlArchivo ?? '#'} target="_blank" rel="noopener noreferrer" className="flex-1 truncate hover:underline">
+                      {adj.nombreArchivo}
+                    </a>
+                    <Badge className="text-[10px] bg-amber-100 text-amber-700 shrink-0">
+                      {adj.categoria === 'hes' ? 'HES' : 'Guía Almacén'}
+                    </Badge>
+                    <button onClick={() => handleDeleteAdjunto(adj.id)} className="text-red-400 hover:text-red-600 ml-1">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+                Sin documentos adjuntos. Se requiere HES o Guía de Almacén para poder facturar.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Cobro card — visible from facturada onwards */}
+      {['facturada', 'en_cobro', 'pagada'].includes(val.estado) && (
+        <Card>
+          <CardContent className="p-4 space-y-4">
+            <h3 className="font-semibold text-sm flex items-center gap-2">
+              <DollarSign className="h-4 w-4 text-primary" />
+              Gestión de Cobro
+            </h3>
+
+            {/* Tipo selector */}
+            <div>
+              <Label className="text-xs text-muted-foreground">Tipo de cobro</Label>
+              <div className="flex gap-2 mt-1">
+                <Button size="sm" variant={cobroTipo === 'directo' ? 'default' : 'outline'} onClick={() => setCobroTipo('directo')}>Cobro directo</Button>
+                <Button size="sm" variant={cobroTipo === 'factoring' ? 'default' : 'outline'} onClick={() => setCobroTipo('factoring')}>Factoring</Button>
+              </div>
+            </div>
+
+            {/* Factoring fields */}
+            {cobroTipo === 'factoring' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">Financiera</Label>
+                  <Input placeholder="Banpro, etc." className="mt-1" value={cobroFinanciera} onChange={e => setCobroFinanciera(e.target.value)} />
+                </div>
+                <div>
+                  <Label className="text-xs">Tasa de descuento %</Label>
+                  <Input type="number" step="0.01" className="mt-1" value={cobroTasa} onChange={e => setCobroTasa(e.target.value)} />
+                </div>
+                <div>
+                  <Label className="text-xs">Monto descontado</Label>
+                  <Input type="number" step="0.01" className="mt-1" value={cobroMontoDescontado} onChange={e => setCobroMontoDescontado(e.target.value)} />
+                </div>
+                <div>
+                  <Label className="text-xs">Monto neto recibido</Label>
+                  <Input type="number" step="0.01" className="mt-1" value={cobroMontoNeto} onChange={e => setCobroMontoNeto(e.target.value)} />
+                </div>
+                <div>
+                  <Label className="text-xs">Fecha desembolso</Label>
+                  <Input type="date" className="mt-1" value={cobroFechaDesembolso} onChange={e => setCobroFechaDesembolso(e.target.value)} />
+                </div>
+                <div>
+                  <Label className="text-xs">Fecha vencimiento factoring</Label>
+                  <Input type="date" className="mt-1" value={cobroFechaVencimiento} onChange={e => setCobroFechaVencimiento(e.target.value)} />
+                </div>
+                <div className="sm:col-span-2">
+                  <Label className="text-xs">N° Operación</Label>
+                  <Input placeholder="OP-2025-001" className="mt-1" value={cobroNumeroOperacion} onChange={e => setCobroNumeroOperacion(e.target.value)} />
+                </div>
+              </div>
+            )}
+
+            {/* Directo fields */}
+            {cobroTipo === 'directo' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">Confirmación cliente</Label>
+                  <Select value={cobroConfirmacion || '__none__'} onValueChange={v => setCobroConfirmacion(v === '__none__' ? '' : v)}>
+                    <SelectTrigger className="mt-1"><SelectValue placeholder="— Seleccionar —" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">— Sin confirmar —</SelectItem>
+                      <SelectItem value="pendiente">Pendiente</SelectItem>
+                      <SelectItem value="confirmado">Confirmado</SelectItem>
+                      <SelectItem value="en_disputa">En disputa</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs">Fecha vencimiento pago</Label>
+                  <Input type="date" className="mt-1" value={cobroFechaVencimientoPago} onChange={e => setCobroFechaVencimientoPago(e.target.value)} />
+                </div>
+                <div className="sm:col-span-2">
+                  <Label className="text-xs">Observaciones</Label>
+                  <Input className="mt-1" value={cobroObservaciones} onChange={e => setCobroObservaciones(e.target.value)} />
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end">
+              <Button size="sm" onClick={handleSaveCobro} disabled={savingCobro}>
+                {savingCobro && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Guardar cobro
+              </Button>
+            </div>
+
+            {/* Abonos section */}
+            <div className="border-t pt-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-medium">Pagos / Abonos</h4>
+                <Button size="sm" variant="outline" onClick={() => setShowAbonoForm(v => !v)}>
+                  <Plus className="h-4 w-4 mr-1" />Agregar abono
+                </Button>
+              </div>
+
+              {showAbonoForm && (
+                <div className="flex flex-wrap gap-2 items-end p-2 bg-muted/30 rounded">
+                  <div>
+                    <Label className="text-xs">Monto</Label>
+                    <Input type="number" step="0.01" className="h-8 w-36 mt-1" value={abonoMonto} onChange={e => setAbonoMonto(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Fecha</Label>
+                    <Input type="date" className="h-8 mt-1" value={abonoFecha} onChange={e => setAbonoFecha(e.target.value)} />
+                  </div>
+                  <div className="flex-1 min-w-32">
+                    <Label className="text-xs">Observaciones</Label>
+                    <Input className="h-8 mt-1" value={abonoObs} onChange={e => setAbonoObs(e.target.value)} />
+                  </div>
+                  <Button size="sm" onClick={handleAddAbono} disabled={addingAbono || !abonoMonto || !abonoFecha}>
+                    {addingAbono ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Agregar'}
+                  </Button>
+                </div>
+              )}
+
+              {val.cobro && val.cobro.abonos.length > 0 ? (
+                <div className="space-y-1">
+                  {val.cobro.abonos.map(abono => (
+                    <div key={abono.id} className="flex items-center gap-3 text-sm py-1 border-b last:border-0">
+                      <span className="text-muted-foreground text-xs w-24 shrink-0">{formatDate(abono.fecha)}</span>
+                      <span className="font-mono font-medium">{formatCurrency(abono.monto, val.moneda)}</span>
+                      {abono.observaciones && <span className="text-xs text-muted-foreground flex-1 truncate">{abono.observaciones}</span>}
+                      <button onClick={() => handleDeleteAbono(abono.id)} className="text-red-400 hover:text-red-600 ml-auto shrink-0">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                  {(() => {
+                    const totalAbonado = val.cobro.abonos.reduce((s, a) => s + a.monto, 0)
+                    const saldo = val.netoARecibir - totalAbonado
+                    return (
+                      <div className="flex justify-between text-sm pt-2 font-medium">
+                        <span>Total abonado: <span className="font-mono">{formatCurrency(totalAbonado, val.moneda)}</span></span>
+                        <span className={saldo > 0 ? 'text-orange-600' : 'text-emerald-600'}>
+                          Saldo: <span className="font-mono">{formatCurrency(saldo, val.moneda)}</span>
+                        </span>
+                      </div>
+                    )
+                  })()}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground italic">Sin pagos registrados.</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* HH detail OR partidas table */}
       {val.valorizacionHH ? (
         <DetalleHH
@@ -724,7 +1172,9 @@ const FLOW_STEPS = [
   { value: 'observada', label: 'Observada' },
   { value: 'corregida', label: 'Corregida' },
   { value: 'aprobada_cliente', label: 'Aprobada' },
+  { value: 'hes_pendiente', label: 'HES' },
   { value: 'facturada', label: 'Facturada' },
+  { value: 'en_cobro', label: 'En Cobro' },
   { value: 'pagada', label: 'Pagada' },
 ]
 

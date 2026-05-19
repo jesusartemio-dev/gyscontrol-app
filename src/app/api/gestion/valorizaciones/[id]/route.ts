@@ -37,7 +37,8 @@ export async function GET(
             adelantoAmortizado: true,
           },
         },
-        adjuntos: true,
+        adjuntos: { orderBy: { createdAt: 'asc' } },
+        cobro: { include: { abonos: { orderBy: { fecha: 'asc' } } } },
         partidas: { orderBy: { orden: 'asc' } },
         valorizacionHH: {
           select: {
