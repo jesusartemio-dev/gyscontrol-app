@@ -621,7 +621,7 @@ export default function ValorizacionEditPage() {
           {val.estado === 'aprobada_cliente' && (
             <Button size="sm" variant="outline" onClick={() => handleTransicion('hes_pendiente')} disabled={transitioning}>
               {transitioning ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Clock className="h-4 w-4 mr-1" />}
-              Solicitar HES
+              Pendiente de HES
             </Button>
           )}
           {val.estado === 'hes_pendiente' && (() => {
