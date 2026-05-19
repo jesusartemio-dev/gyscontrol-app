@@ -74,17 +74,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'proyectoId, clienteId, monto, fechaEmision y fechaVencimiento son requeridos' }, { status: 400 })
     }
 
-    // Si se vincula a una valorización, heredar las condiciones de pago de ella
-    // (a menos que el body las pase explícitamente).
+    // Validar que la valorización exista antes de intentar vincularla
     let condicionPago: string | null = body.condicionPago ?? null
     let formaPago: string | null = body.formaPago ?? null
     let diasCredito: number | null = body.diasCredito ?? null
-    if (valorizacionId && (condicionPago === null && formaPago === null && diasCredito === null)) {
+    if (valorizacionId) {
       const val = await prisma.valorizacion.findUnique({
         where: { id: valorizacionId },
-        select: { condicionPago: true, formaPago: true, diasCredito: true },
+        select: { id: true, condicionPago: true, formaPago: true, diasCredito: true },
       })
-      if (val) {
+      if (!val) {
+        return NextResponse.json({ error: 'La valorización seleccionada no existe' }, { status: 400 })
+      }
+      if (condicionPago === null && formaPago === null && diasCredito === null) {
         condicionPago = val.condicionPago
         formaPago = val.formaPago
         diasCredito = val.diasCredito

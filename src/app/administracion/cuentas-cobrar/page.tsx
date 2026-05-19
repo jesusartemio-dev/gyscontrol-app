@@ -206,6 +206,9 @@ export default function CuentasCobrarPage() {
     observaciones: '',
   })
 
+  // Valorizaciones para el proyecto seleccionado en el form de creación
+  const [createValorizaciones, setCreateValorizaciones] = useState<{ id: string; codigo: string; numero: number; estado: string }[]>([])
+
   // Import dialog
   const [showImportDialog, setShowImportDialog] = useState(false)
 
@@ -307,6 +310,7 @@ export default function CuentasCobrarPage() {
       observaciones: '',
     })
     setCreateErrors(new Set())
+    setCreateValorizaciones([])
   }
 
   const updateCreateField = <K extends keyof typeof createForm>(field: K, value: (typeof createForm)[K]) => {
@@ -888,8 +892,18 @@ export default function CuentasCobrarPage() {
                 value={createForm.proyectoId}
                 onValueChange={v => {
                   const p = proyectos.find(x => x.id === v)
-                  setCreateForm(f => ({ ...f, proyectoId: v, ...(p?.clienteId ? { clienteId: p.clienteId } : {}) }))
+                  setCreateForm(f => ({ ...f, proyectoId: v, valorizacionId: '', ...(p?.clienteId ? { clienteId: p.clienteId } : {}) }))
                   setCreateErrors(prev => { const s = new Set(prev); s.delete('proyectoId'); if (p?.clienteId) s.delete('clienteId'); return s })
+                  if (v) {
+                    fetch(`/api/proyectos/${v}/valorizaciones`)
+                      .then(r => r.ok ? r.json() : [])
+                      .then((data: any[]) => setCreateValorizaciones(
+                        data.map(x => ({ id: x.id, codigo: x.codigo, numero: x.numero, estado: x.estado }))
+                      ))
+                      .catch(() => setCreateValorizaciones([]))
+                  } else {
+                    setCreateValorizaciones([])
+                  }
                 }}
               >
                 <SelectTrigger className={createErrors.has('proyectoId') ? 'border-red-500 ring-1 ring-red-500' : ''}><SelectValue placeholder="Seleccionar proyecto" /></SelectTrigger>
@@ -1006,7 +1020,26 @@ export default function CuentasCobrarPage() {
             </div>
             <div>
               <Label>Valorización (opcional)</Label>
-              <Input placeholder="ID de valorización" value={createForm.valorizacionId} onChange={e => updateCreateField('valorizacionId', e.target.value)} />
+              <Select
+                value={createForm.valorizacionId || '__none__'}
+                onValueChange={v => updateCreateField('valorizacionId', v === '__none__' ? '' : v)}
+                disabled={!createForm.proyectoId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={createForm.proyectoId ? '— Sin vincular —' : 'Selecciona un proyecto primero'} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— Sin vincular —</SelectItem>
+                  {createValorizaciones.map(v => (
+                    <SelectItem key={v.id} value={v.id}>
+                      {v.codigo} — {v.estado.replace('_', ' ')}
+                    </SelectItem>
+                  ))}
+                  {createForm.proyectoId && createValorizaciones.length === 0 && (
+                    <SelectItem value="__empty__" disabled>Sin valorizaciones en este proyecto</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label>Descripción / Servicio</Label>
