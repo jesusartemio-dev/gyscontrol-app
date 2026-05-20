@@ -863,10 +863,9 @@ export default function ValorizacionEditPage() {
       </Card>
 
       {/* Conformidad del cliente — visible desde aprobada_cliente en adelante.
-          Editable en aprobada_cliente y hes_pendiente (cuando el documento ya está en mano).
-          Al facturar, los campos se heredan automáticamente a la CxC creada. */}
+          Editable en aprobada_cliente, hes_pendiente y facturada (por si se completó después de facturar). */}
       {val && ['aprobada_cliente', 'hes_pendiente', 'facturada', 'pagada', 'anulada'].includes(val.estado) && (() => {
-        const editable = ['aprobada_cliente', 'hes_pendiente'].includes(val.estado)
+        const editable = ['aprobada_cliente', 'hes_pendiente', 'facturada'].includes(val.estado)
         const tieneConformidad = !!(val.numeroHES || val.numeroGuiaRemision || val.fechaConformidad)
         return (
           <Card className={editable && !tieneConformidad ? 'border-amber-300 bg-amber-50/30' : ''}>
