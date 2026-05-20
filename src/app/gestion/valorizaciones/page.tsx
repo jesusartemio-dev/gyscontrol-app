@@ -78,7 +78,6 @@ const ESTADOS = [
   { value: 'aprobada_cliente', label: 'Aprobada', color: 'bg-emerald-100 text-emerald-700' },
   { value: 'hes_pendiente', label: 'HES', color: 'bg-amber-100 text-amber-800' },
   { value: 'facturada', label: 'Facturada', color: 'bg-purple-100 text-purple-700' },
-  { value: 'en_cobro', label: 'En Cobro', color: 'bg-cyan-100 text-cyan-800' },
   { value: 'pagada', label: 'Pagada', color: 'bg-green-100 text-green-800' },
   { value: 'anulada', label: 'Anulada', color: 'bg-red-100 text-red-700' },
 ]

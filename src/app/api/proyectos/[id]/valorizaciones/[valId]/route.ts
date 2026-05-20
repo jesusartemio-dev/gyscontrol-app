@@ -67,9 +67,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       corregida:        ['observada', 'aprobada_cliente', 'enviada', 'anulada'],
       aprobada_cliente: ['hes_pendiente', 'enviada', 'anulada'],
       hes_pendiente:    ['facturada', 'aprobada_cliente', 'anulada'],
-      facturada:        ['en_cobro', 'pagada', 'hes_pendiente', 'anulada'],
-      en_cobro:         ['pagada', 'facturada', 'anulada'],
-      pagada:           ['en_cobro', 'anulada'],
+      facturada:        ['pagada', 'hes_pendiente', 'aprobada_cliente', 'anulada'],
+      pagada:           ['facturada', 'anulada'],
       anulada:          [],
     }
 
@@ -135,7 +134,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       }
 
       // Revertir amortización al anular desde estado post-aprobación
-      const estadosPostAprobacion = ['aprobada_cliente', 'hes_pendiente', 'facturada', 'en_cobro', 'pagada']
+      const estadosPostAprobacion = ['aprobada_cliente', 'hes_pendiente', 'facturada', 'pagada']
       if (body.estado === 'anulada' && estadosPostAprobacion.includes(existing.estado) && existing.adelantoMonto > 0) {
         await prisma.proyecto.update({
           where: { id: proyectoId },
@@ -145,8 +144,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         })
       }
 
-      // Al anular desde facturada/en_cobro/pagada: anular CxC asociadas
-      const estadosConCxC = ['facturada', 'en_cobro', 'pagada']
+      // Al anular desde facturada/pagada: anular CxC asociadas
+      const estadosConCxC = ['facturada', 'pagada']
       if (body.estado === 'anulada' && estadosConCxC.includes(existing.estado)) {
         await prisma.cuentaPorCobrar.updateMany({
           where: { valorizacionId: valId, estado: { not: 'anulada' } },
@@ -264,7 +263,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
     // Bloqueo: condiciones de pago no editables si la valorización está en estado final
     // (ya facturada, pagada, aprobada_cliente o anulada). Solo editables en borrador/enviada/observada/corregida.
-    const ESTADOS_PAGO_BLOQUEADOS = ['aprobada_cliente', 'hes_pendiente', 'facturada', 'en_cobro', 'pagada', 'anulada']
+    const ESTADOS_PAGO_BLOQUEADOS = ['aprobada_cliente', 'hes_pendiente', 'facturada', 'pagada', 'anulada']
     const tocaPago = body.condicionPago !== undefined || body.formaPago !== undefined
                   || body.diasCredito !== undefined || body.notasPago !== undefined
     if (tocaPago && ESTADOS_PAGO_BLOQUEADOS.includes(existing.estado)) {

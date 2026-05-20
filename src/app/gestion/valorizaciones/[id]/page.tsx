@@ -138,7 +138,6 @@ const ESTADOS = [
   { value: 'aprobada_cliente', label: 'Aprobada', color: 'bg-emerald-100 text-emerald-700' },
   { value: 'hes_pendiente', label: 'HES', color: 'bg-amber-100 text-amber-800' },
   { value: 'facturada', label: 'Facturada', color: 'bg-purple-100 text-purple-700' },
-  { value: 'en_cobro', label: 'En Cobro', color: 'bg-cyan-100 text-cyan-800' },
   { value: 'pagada', label: 'Pagada', color: 'bg-green-100 text-green-800' },
   { value: 'anulada', label: 'Anulada', color: 'bg-red-100 text-red-700' },
 ]
@@ -640,18 +639,6 @@ export default function ValorizacionEditPage() {
               </>
             )
           })()}
-          {val.estado === 'facturada' && (
-            <Button size="sm" variant="outline" onClick={() => handleTransicion('en_cobro')} disabled={transitioning}>
-              {transitioning ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <DollarSign className="h-4 w-4 mr-1" />}
-              Iniciar Cobro
-            </Button>
-          )}
-          {val.estado === 'en_cobro' && (
-            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => handleTransicion('pagada')} disabled={transitioning}>
-              {transitioning ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Check className="h-4 w-4 mr-1" />}
-              Marcar Pagada
-            </Button>
-          )}
         </div>
       </div>
 
@@ -878,7 +865,7 @@ export default function ValorizacionEditPage() {
       {/* Conformidad del cliente — visible desde aprobada_cliente en adelante.
           Editable en aprobada_cliente y hes_pendiente (cuando el documento ya está en mano).
           Al facturar, los campos se heredan automáticamente a la CxC creada. */}
-      {val && ['aprobada_cliente', 'hes_pendiente', 'facturada', 'en_cobro', 'pagada', 'anulada'].includes(val.estado) && (() => {
+      {val && ['aprobada_cliente', 'hes_pendiente', 'facturada', 'pagada', 'anulada'].includes(val.estado) && (() => {
         const editable = ['aprobada_cliente', 'hes_pendiente'].includes(val.estado)
         const tieneConformidad = !!(val.numeroHES || val.numeroGuiaRemision || val.fechaConformidad)
         return (
@@ -1032,281 +1019,6 @@ export default function ValorizacionEditPage() {
         </Card>
       )}
 
-      {/* Cobro card — visible from facturada onwards */}
-      {['facturada', 'en_cobro', 'pagada'].includes(val.estado) && (
-        <Card>
-          <CardContent className="p-4 space-y-4">
-            <h3 className="font-semibold text-sm flex items-center gap-2">
-              <DollarSign className="h-4 w-4 text-primary" />
-              Gestión de Cobro
-            </h3>
-
-            {/* Tipo selector */}
-            <div>
-              <Label className="text-xs text-muted-foreground">Tipo de cobro</Label>
-              <div className="flex gap-2 mt-1">
-                <Button size="sm" variant={cobroTipo === 'directo' ? 'default' : 'outline'} onClick={() => setCobroTipo('directo')}>Cobro directo</Button>
-                <Button size="sm" variant={cobroTipo === 'factoring' ? 'default' : 'outline'} onClick={() => setCobroTipo('factoring')}>Factoring</Button>
-              </div>
-            </div>
-
-            {/* Factoring — datos de operación + hoja de liquidación */}
-            {cobroTipo === 'factoring' && (
-              <div className="space-y-3">
-                {/* Datos de operación */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div>
-                    <Label className="text-xs">Financiera</Label>
-                    <Input placeholder="Banpro" className="mt-1 h-8 text-sm" value={cobroFinanciera} onChange={e => setCobroFinanciera(e.target.value)} />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Tasa mensual %</Label>
-                    <Input type="number" step="0.01" placeholder="1.38" className="mt-1 h-8 text-sm" value={cobroTasa} onChange={e => setCobroTasa(e.target.value)} />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Días financiamiento</Label>
-                    <Input type="number" placeholder="126" className="mt-1 h-8 text-sm" value={cobroDias} onChange={e => setCobroDias(e.target.value)} />
-                  </div>
-                  <div>
-                    <Label className="text-xs">N° Documentos</Label>
-                    <Input type="number" placeholder="1" className="mt-1 h-8 text-sm" value={cobroNumDocumentos} onChange={e => setCobroNumDocumentos(e.target.value)} />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Fecha desembolso</Label>
-                    <Input type="date" className="mt-1 h-8 text-sm" value={cobroFechaDesembolso} onChange={e => setCobroFechaDesembolso(e.target.value)} />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Fecha vencimiento</Label>
-                    <Input type="date" className="mt-1 h-8 text-sm" value={cobroFechaVencimiento} onChange={e => setCobroFechaVencimiento(e.target.value)} />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <Label className="text-xs">N° Operación</Label>
-                    <Input placeholder="OP-2025-001" className="mt-1 h-8 text-sm" value={cobroNumeroOperacion} onChange={e => setCobroNumeroOperacion(e.target.value)} />
-                  </div>
-                </div>
-
-                {/* Hoja de liquidación */}
-                <div className="border rounded-lg overflow-hidden text-sm">
-                  <div className="bg-slate-700 text-white px-4 py-2 text-xs font-semibold tracking-wider uppercase">
-                    Hoja de Liquidación
-                  </div>
-                  <table className="w-full">
-                    <tbody className="divide-y">
-                      {/* Base */}
-                      <tr className="bg-muted/30">
-                        <td className="px-4 py-2 text-muted-foreground">Monto total de facturas</td>
-                        <td className="px-4 py-2 text-right font-mono font-medium">{formatCurrency(liquidacion.base, val.moneda)}</td>
-                      </tr>
-                      {/* Detracción */}
-                      <tr>
-                        <td className="px-4 py-2">
-                          <div className="flex items-center gap-2">
-                            <span className="text-muted-foreground">(-) Detracción</span>
-                            <Input type="number" step="0.5" className="h-6 w-14 text-xs px-1.5"
-                              value={cobroDetraccionPct}
-                              onChange={e => { setCobroDetraccionPct(e.target.value); setCobroDetraccionMonto('') }} />
-                            <span className="text-muted-foreground text-xs">%</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-2 text-right font-mono text-red-600">
-                          -{formatCurrency(liquidacion.detMonto, val.moneda)}
-                        </td>
-                      </tr>
-                      {/* Valor Neto */}
-                      <tr className="bg-muted/20 font-medium">
-                        <td className="px-4 py-2">Valor Neto</td>
-                        <td className="px-4 py-2 text-right font-mono">{formatCurrency(liquidacion.valorNeto, val.moneda)}</td>
-                      </tr>
-                      {/* Excedente */}
-                      <tr>
-                        <td className="px-4 py-2">
-                          <div className="flex items-center gap-2">
-                            <span className="text-muted-foreground">(-) Excedente (retiene financiera)</span>
-                            <Input type="number" step="0.5" className="h-6 w-14 text-xs px-1.5"
-                              value={cobroExcedentePct}
-                              onChange={e => { setCobroExcedentePct(e.target.value); setCobroExcedenteMonto('') }} />
-                            <span className="text-muted-foreground text-xs">%</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-2 text-right font-mono text-orange-600">
-                          -{formatCurrency(liquidacion.excMonto, val.moneda)}
-                        </td>
-                      </tr>
-                      {/* Valor a Financiar */}
-                      <tr className="bg-muted/20 font-semibold">
-                        <td className="px-4 py-2">
-                          Valor a Financiar ({(100 - (parseFloat(cobroExcedentePct) || 1)).toFixed(0)}%)
-                        </td>
-                        <td className="px-4 py-2 text-right font-mono">{formatCurrency(liquidacion.aFinanciar, val.moneda)}</td>
-                      </tr>
-                      {/* Interés */}
-                      <tr>
-                        <td className="px-4 py-2 text-muted-foreground">
-                          (-) Interés{cobroDias ? ` × ${cobroDias} días` : ''}
-                          {liquidacion.refInteres > 0 && (
-                            <span className="ml-2 text-[10px] text-muted-foreground/60">
-                              ref: {formatCurrency(liquidacion.refInteres, val.moneda)}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-2 text-right">
-                          <Input type="number" step="0.01" placeholder="0.00"
-                            className="h-7 w-36 text-xs text-right ml-auto font-mono"
-                            value={cobroInteres} onChange={e => setCobroInteres(e.target.value)} />
-                        </td>
-                      </tr>
-                      {/* Comisión */}
-                      <tr>
-                        <td className="px-4 py-2 text-muted-foreground">(-) Comisión de Estructuración</td>
-                        <td className="px-4 py-2 text-right">
-                          <Input type="number" step="0.01" placeholder="0.00"
-                            className="h-7 w-36 text-xs text-right ml-auto font-mono"
-                            value={cobroComision} onChange={e => setCobroComision(e.target.value)} />
-                        </td>
-                      </tr>
-                      {/* Gastos */}
-                      <tr>
-                        <td className="px-4 py-2 text-muted-foreground">(-) Total Gastos</td>
-                        <td className="px-4 py-2 text-right">
-                          <Input type="number" step="0.01" placeholder="0.00"
-                            className="h-7 w-36 text-xs text-right ml-auto font-mono"
-                            value={cobroGastos} onChange={e => setCobroGastos(e.target.value)} />
-                        </td>
-                      </tr>
-                      {/* IGV */}
-                      <tr>
-                        <td className="px-4 py-2 text-muted-foreground">(-) IGV sobre gastos</td>
-                        <td className="px-4 py-2 text-right">
-                          <Input type="number" step="0.01" placeholder="0.00"
-                            className="h-7 w-36 text-xs text-right ml-auto font-mono"
-                            value={cobroIgvGastos} onChange={e => setCobroIgvGastos(e.target.value)} />
-                        </td>
-                      </tr>
-                      {/* Monto a Desembolsar */}
-                      <tr className="bg-emerald-50 font-bold">
-                        <td className="px-4 py-2.5 text-emerald-900">MONTO A DESEMBOLSAR</td>
-                        <td className="px-4 py-2.5 text-right font-mono text-emerald-700 text-base">
-                          {formatCurrency(liquidacion.aDesembolsar, val.moneda)}
-                        </td>
-                      </tr>
-                      {/* Adelanto */}
-                      <tr>
-                        <td className="px-4 py-2 text-muted-foreground">(-) Adelanto</td>
-                        <td className="px-4 py-2 text-right">
-                          <Input type="number" step="0.01" placeholder="0.00"
-                            className="h-7 w-36 text-xs text-right ml-auto font-mono"
-                            value={cobroAdelantoBanpro} onChange={e => setCobroAdelantoBanpro(e.target.value)} />
-                        </td>
-                      </tr>
-                      {/* Saldo a Girar */}
-                      <tr className={`font-bold ${liquidacion.saldo >= 0 ? 'bg-blue-50' : 'bg-red-50'}`}>
-                        <td className={`px-4 py-2.5 ${liquidacion.saldo >= 0 ? 'text-blue-900' : 'text-red-900'}`}>
-                          SALDO A GIRAR
-                        </td>
-                        <td className={`px-4 py-2.5 text-right font-mono text-base ${liquidacion.saldo >= 0 ? 'text-blue-700' : 'text-red-700'}`}>
-                          {formatCurrency(liquidacion.saldo, val.moneda)}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {/* Directo fields */}
-            {cobroTipo === 'directo' && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-xs">Confirmación cliente</Label>
-                  <Select value={cobroConfirmacion || '__none__'} onValueChange={v => setCobroConfirmacion(v === '__none__' ? '' : v)}>
-                    <SelectTrigger className="mt-1"><SelectValue placeholder="— Seleccionar —" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">— Sin confirmar —</SelectItem>
-                      <SelectItem value="pendiente">Pendiente</SelectItem>
-                      <SelectItem value="confirmado">Confirmado</SelectItem>
-                      <SelectItem value="en_disputa">En disputa</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label className="text-xs">Fecha vencimiento pago</Label>
-                  <Input type="date" className="mt-1" value={cobroFechaVencimientoPago} onChange={e => setCobroFechaVencimientoPago(e.target.value)} />
-                </div>
-                <div className="sm:col-span-2">
-                  <Label className="text-xs">Observaciones</Label>
-                  <Input className="mt-1" value={cobroObservaciones} onChange={e => setCobroObservaciones(e.target.value)} />
-                </div>
-              </div>
-            )}
-
-            <div className="flex justify-end">
-              <Button size="sm" onClick={handleSaveCobro} disabled={savingCobro}>
-                {savingCobro && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Guardar cobro
-              </Button>
-            </div>
-
-            {/* Abonos section */}
-            <div className="border-t pt-3 space-y-2">
-              <div className="flex items-center justify-between">
-                <h4 className="text-sm font-medium">Pagos / Abonos</h4>
-                <Button size="sm" variant="outline" onClick={() => setShowAbonoForm(v => !v)}>
-                  <Plus className="h-4 w-4 mr-1" />Agregar abono
-                </Button>
-              </div>
-
-              {showAbonoForm && (
-                <div className="flex flex-wrap gap-2 items-end p-2 bg-muted/30 rounded">
-                  <div>
-                    <Label className="text-xs">Monto</Label>
-                    <Input type="number" step="0.01" className="h-8 w-36 mt-1" value={abonoMonto} onChange={e => setAbonoMonto(e.target.value)} />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Fecha</Label>
-                    <Input type="date" className="h-8 mt-1" value={abonoFecha} onChange={e => setAbonoFecha(e.target.value)} />
-                  </div>
-                  <div className="flex-1 min-w-32">
-                    <Label className="text-xs">Observaciones</Label>
-                    <Input className="h-8 mt-1" value={abonoObs} onChange={e => setAbonoObs(e.target.value)} />
-                  </div>
-                  <Button size="sm" onClick={handleAddAbono} disabled={addingAbono || !abonoMonto || !abonoFecha}>
-                    {addingAbono ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Agregar'}
-                  </Button>
-                </div>
-              )}
-
-              {val.cobro && val.cobro.abonos.length > 0 ? (
-                <div className="space-y-1">
-                  {val.cobro.abonos.map(abono => (
-                    <div key={abono.id} className="flex items-center gap-3 text-sm py-1 border-b last:border-0">
-                      <span className="text-muted-foreground text-xs w-24 shrink-0">{formatDate(abono.fecha)}</span>
-                      <span className="font-mono font-medium">{formatCurrency(abono.monto, val.moneda)}</span>
-                      {abono.observaciones && <span className="text-xs text-muted-foreground flex-1 truncate">{abono.observaciones}</span>}
-                      <button onClick={() => handleDeleteAbono(abono.id)} className="text-red-400 hover:text-red-600 ml-auto shrink-0">
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                  {(() => {
-                    const totalAbonado = val.cobro.abonos.reduce((s, a) => s + a.monto, 0)
-                    const saldo = val.netoARecibir - totalAbonado
-                    return (
-                      <div className="flex justify-between text-sm pt-2 font-medium">
-                        <span>Total abonado: <span className="font-mono">{formatCurrency(totalAbonado, val.moneda)}</span></span>
-                        <span className={saldo > 0 ? 'text-orange-600' : 'text-emerald-600'}>
-                          Saldo: <span className="font-mono">{formatCurrency(saldo, val.moneda)}</span>
-                        </span>
-                      </div>
-                    )
-                  })()}
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground italic">Sin pagos registrados.</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* HH detail OR partidas table */}
       {val.valorizacionHH ? (
@@ -1391,7 +1103,6 @@ const FLOW_STEPS = [
   { value: 'aprobada_cliente', label: 'Aprobada' },
   { value: 'hes_pendiente', label: 'HES' },
   { value: 'facturada', label: 'Facturada' },
-  { value: 'en_cobro', label: 'En Cobro' },
   { value: 'pagada', label: 'Pagada' },
 ]
 

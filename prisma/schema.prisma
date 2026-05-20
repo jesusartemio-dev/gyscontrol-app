@@ -3566,7 +3566,6 @@ enum EstadoValorizacion {
   aprobada_cliente
   hes_pendiente
   facturada
-  en_cobro
   pagada
   anulada
 }

@@ -62,7 +62,6 @@ const ESTADOS = [
   { value: 'aprobada_cliente', label: 'Aprobada', color: 'bg-emerald-100 text-emerald-700' },
   { value: 'hes_pendiente', label: 'HES', color: 'bg-amber-100 text-amber-800' },
   { value: 'facturada', label: 'Facturada', color: 'bg-purple-100 text-purple-700' },
-  { value: 'en_cobro', label: 'En Cobro', color: 'bg-cyan-100 text-cyan-800' },
   { value: 'pagada', label: 'Pagada', color: 'bg-green-100 text-green-800' },
   { value: 'anulada', label: 'Anulada', color: 'bg-red-100 text-red-700' },
 ]
@@ -195,7 +194,7 @@ export default function FacturacionPage() {
       if (res.ok) {
         const data = await res.json()
         setItems(data.filter((v: Valorizacion) =>
-          ['aprobada_cliente', 'hes_pendiente', 'facturada', 'en_cobro', 'pagada', 'anulada'].includes(v.estado)
+          ['aprobada_cliente', 'hes_pendiente', 'facturada', 'pagada', 'anulada'].includes(v.estado)
         ))
       }
     } catch {
@@ -208,7 +207,7 @@ export default function FacturacionPage() {
   const filtered = useMemo(() => {
     let result = items
     if (tabFilter === 'pendientes') result = result.filter(i => ['aprobada_cliente', 'hes_pendiente'].includes(i.estado))
-    else if (tabFilter === 'facturadas') result = result.filter(i => ['facturada', 'en_cobro'].includes(i.estado))
+    else if (tabFilter === 'facturadas') result = result.filter(i => i.estado === 'facturada')
     else if (tabFilter === 'pagadas') result = result.filter(i => i.estado === 'pagada')
     else if (tabFilter === 'anuladas') result = result.filter(i => i.estado === 'anulada')
     if (filterMoneda !== 'all') result = result.filter(i => i.moneda === filterMoneda)
@@ -235,7 +234,7 @@ export default function FacturacionPage() {
 
   const counts = useMemo(() => ({
     pendientes: items.filter(i => ['aprobada_cliente', 'hes_pendiente'].includes(i.estado)).length,
-    facturadas: items.filter(i => ['facturada', 'en_cobro'].includes(i.estado)).length,
+    facturadas: items.filter(i => i.estado === 'facturada').length,
     pagadas: items.filter(i => i.estado === 'pagada').length,
     anuladas: items.filter(i => i.estado === 'anulada').length,
     todas: items.length,
@@ -518,7 +517,7 @@ export default function FacturacionPage() {
                             <Receipt className="h-4 w-4 text-purple-600" />
                           </Button>
                         )}
-                        {['facturada', 'en_cobro'].includes(item.estado) && (
+                        {item.estado === 'facturada' && (
                           <Button variant="ghost" size="icon" onClick={() => openEstadoTransition(item, 'pagada')} title="Marcar pagada">
                             <DollarSign className="h-4 w-4 text-green-600" />
                           </Button>
@@ -533,7 +532,7 @@ export default function FacturacionPage() {
                             <Undo2 className="h-4 w-4 text-amber-600" />
                           </Button>
                         )}
-                        {(['facturada', 'en_cobro', 'pagada'].includes(item.estado)) && (
+                        {(['facturada', 'pagada'].includes(item.estado)) && (
                           <Button variant="ghost" size="icon" onClick={() => handleAnular(item)} title="Anular">
                             <Ban className="h-4 w-4 text-red-500" />
                           </Button>
@@ -642,7 +641,7 @@ export default function FacturacionPage() {
                 Facturar
               </Button>
             )}
-            {showDetail && ['facturada', 'en_cobro'].includes(showDetail.estado) && (
+            {showDetail?.estado === 'facturada' && (
               <Button onClick={() => { setShowDetail(null); openEstadoTransition(showDetail!, 'pagada') }} className="bg-emerald-600 hover:bg-emerald-700">
                 <DollarSign className="h-4 w-4 mr-2" />
                 Marcar Pagada
@@ -660,7 +659,7 @@ export default function FacturacionPage() {
                 Revertir Factura
               </Button>
             )}
-            {showDetail && ['facturada', 'en_cobro', 'pagada'].includes(showDetail.estado) && (
+            {showDetail && ['facturada', 'pagada'].includes(showDetail.estado) && (
               <Button variant="destructive" onClick={() => { setShowDetail(null); handleAnular(showDetail!) }}>
                 <Ban className="h-4 w-4 mr-2" />
                 Anular
@@ -857,7 +856,7 @@ export default function FacturacionPage() {
                 <ul className="list-disc pl-5 text-red-600 space-y-0.5">
                   <li>La valorización pasará a estado <strong>Anulada</strong> de forma irreversible</li>
                   <li>Se revertirá la amortización de adelanto asociada</li>
-                  {(['facturada', 'en_cobro', 'pagada'].includes(confirmAnular.estado)) && (
+                  {(['facturada', 'pagada'].includes(confirmAnular.estado)) && (
                     <li>Las Cuentas por Cobrar (CxC) asociadas también serán <strong>anuladas</strong></li>
                   )}
                 </ul>

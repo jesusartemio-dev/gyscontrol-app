@@ -129,7 +129,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       : montoPagado > 0 ? 'parcial'
       : cuenta.estado
 
-    await prisma.cuentaPorCobrar.update({
+    const cuentaActualizada = await prisma.cuentaPorCobrar.update({
       where: { id: cuentaPorCobrarId },
       data: {
         montoPagado: round2(montoPagado),
@@ -138,6 +138,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         updatedAt: new Date(),
       },
     })
+
+    // Auto-sync: si CxC queda pagada y tiene valorización vinculada, marcarla como pagada también
+    if (nuevoEstado === 'pagada' && cuentaActualizada.valorizacionId) {
+      const val = await prisma.valorizacion.findUnique({
+        where: { id: cuentaActualizada.valorizacionId },
+        select: { id: true, estado: true, proyectoId: true },
+      })
+      if (val && val.estado === 'facturada') {
+        await prisma.valorizacion.update({
+          where: { id: val.id },
+          data: { estado: 'pagada', updatedAt: new Date() },
+        })
+      }
+    }
 
     return NextResponse.json(pagos.length === 1 ? pagos[0] : pagos, { status: 201 })
   } catch (error) {
