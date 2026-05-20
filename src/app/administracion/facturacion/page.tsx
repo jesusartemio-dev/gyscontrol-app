@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Loader2, Search, Eye, Receipt, DollarSign, FileSpreadsheet, Check, Ban, Undo2, CalendarDays } from 'lucide-react'
+import { Loader2, Search, Eye, Receipt, DollarSign, FileSpreadsheet, Check, Ban, Undo2, CalendarDays, ClipboardCheck, Upload } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface Proyecto {
@@ -96,7 +96,8 @@ const FLOW_STEPS = [
   { value: 'enviada', label: 'Enviada' },
   { value: 'observada', label: 'Observada' },
   { value: 'corregida', label: 'Corregida' },
-  { value: 'aprobada_cliente', label: 'Aprobada Cliente' },
+  { value: 'aprobada_cliente', label: 'Aprobada' },
+  { value: 'hes_pendiente', label: 'HES' },
   { value: 'facturada', label: 'Facturada' },
   { value: 'pagada', label: 'Pagada' },
 ]
@@ -169,6 +170,15 @@ export default function FacturacionPage() {
   const [factDiasCredito, setFactDiasCredito] = useState<number | ''>('')
   const [factMetodoPago, setFactMetodoPago] = useState('')
   const [factBancoFinanciera, setFactBancoFinanciera] = useState('')
+
+  // Registrar HES dialog
+  const [showHESDialog, setShowHESDialog] = useState(false)
+  const [hesTarget, setHesTarget] = useState<Valorizacion | null>(null)
+  const [hesTipo, setHesTipo] = useState('hes')
+  const [hesNumero, setHesNumero] = useState('')
+  const [hesFecha, setHesFecha] = useState('')
+  const [hesArchivo, setHesArchivo] = useState<File | null>(null)
+  const [uploadingHES, setUploadingHES] = useState(false)
 
   // Generic estado dialog (pagada)
   const [showEstadoDialog, setShowEstadoDialog] = useState(false)
@@ -251,6 +261,65 @@ export default function FacturacionPage() {
     }
     return { byMoneda, total: filtered.length, activas: activas.length }
   }, [filtered])
+
+  // Open registrar HES dialog
+  const openRegistrarHES = (val: Valorizacion) => {
+    setHesTarget(val)
+    setHesTipo('hes')
+    setHesNumero('')
+    setHesFecha(new Date().toISOString().split('T')[0])
+    setHesArchivo(null)
+    setShowHESDialog(true)
+  }
+
+  // Handle registrar HES: sube archivo (opcional) + avanza a hes_pendiente
+  const handleRegistrarHES = async () => {
+    if (!hesTarget) return
+    if (!hesNumero.trim()) {
+      toast.error('Ingresa el número de documento HES')
+      return
+    }
+    setUploadingHES(true)
+    try {
+      // 1. Guardar datos de conformidad en la valorización y avanzar a hes_pendiente
+      const res = await fetch(`/api/proyectos/${hesTarget.proyectoId}/valorizaciones/${hesTarget.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          estado: 'hes_pendiente',
+          tipoConformidad: hesTipo,
+          numeroHES: hesTipo === 'hes' ? hesNumero.trim() : undefined,
+          numeroGuiaRemision: hesTipo === 'guia_remision' ? hesNumero.trim() : undefined,
+          fechaConformidad: hesFecha || undefined,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => null)
+        throw new Error(err?.error || 'Error al registrar HES')
+      }
+
+      // 2. Si hay archivo adjunto, subirlo
+      if (hesArchivo) {
+        const formData = new FormData()
+        formData.append('file', hesArchivo)
+        formData.append('categoria', hesTipo === 'guia_remision' ? 'guia_almacen' : 'hes')
+        const uploadRes = await fetch(
+          `/api/proyectos/${hesTarget.proyectoId}/valorizaciones/${hesTarget.id}/adjuntos`,
+          { method: 'POST', body: formData }
+        )
+        if (!uploadRes.ok) toast.error('Datos guardados pero falló la subida del archivo')
+      }
+
+      toast.success('HES registrado — listo para facturar')
+      setShowHESDialog(false)
+      setHesTarget(null)
+      loadData()
+    } catch (err: any) {
+      toast.error(err.message || 'Error al registrar HES')
+    } finally {
+      setUploadingHES(false)
+    }
+  }
 
   // Open facturar dialog
   const openFacturar = (val: Valorizacion) => {
@@ -512,7 +581,12 @@ export default function FacturacionPage() {
                         <Button variant="ghost" size="icon" onClick={() => setShowDetail(item)} title="Ver detalle">
                           <Eye className="h-4 w-4" />
                         </Button>
-                        {['aprobada_cliente', 'hes_pendiente'].includes(item.estado) && (
+                        {item.estado === 'aprobada_cliente' && (
+                          <Button variant="ghost" size="icon" onClick={() => openRegistrarHES(item)} title="Registrar HES">
+                            <ClipboardCheck className="h-4 w-4 text-amber-600" />
+                          </Button>
+                        )}
+                        {item.estado === 'hes_pendiente' && (
                           <Button variant="ghost" size="icon" onClick={() => openFacturar(item)} title="Facturar">
                             <Receipt className="h-4 w-4 text-purple-600" />
                           </Button>
@@ -635,7 +709,13 @@ export default function FacturacionPage() {
             </div>
           )}
           <DialogFooter className="gap-2">
-            {showDetail && ['aprobada_cliente', 'hes_pendiente'].includes(showDetail.estado) && (
+            {showDetail?.estado === 'aprobada_cliente' && (
+              <Button onClick={() => { setShowDetail(null); openRegistrarHES(showDetail!) }} className="bg-amber-500 hover:bg-amber-600">
+                <ClipboardCheck className="h-4 w-4 mr-2" />
+                Registrar HES
+              </Button>
+            )}
+            {showDetail?.estado === 'hes_pendiente' && (
               <Button onClick={() => { setShowDetail(null); openFacturar(showDetail!) }} className="bg-purple-600 hover:bg-purple-700">
                 <Receipt className="h-4 w-4 mr-2" />
                 Facturar
@@ -868,6 +948,71 @@ export default function FacturacionPage() {
             <Button variant="destructive" onClick={executeAnular} disabled={saving}>
               {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Sí, Anular
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Registrar HES dialog */}
+      <Dialog open={showHESDialog} onOpenChange={open => { if (!open) { setShowHESDialog(false); setHesTarget(null) } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ClipboardCheck className="h-5 w-5 text-amber-600" />
+              Registrar HES / Conformidad
+            </DialogTitle>
+            <DialogDescription>
+              {hesTarget?.codigo} — {hesTarget?.proyecto?.nombre}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label className="text-sm">Tipo de documento *</Label>
+              <Select value={hesTipo} onValueChange={setHesTipo}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="hes">HES (Hoja de Entrada de Servicios)</SelectItem>
+                  <SelectItem value="guia_remision">Guía de Remisión</SelectItem>
+                  <SelectItem value="acta">Acta de conformidad</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-sm">
+                Número de {hesTipo === 'hes' ? 'HES' : hesTipo === 'guia_remision' ? 'Guía de Remisión' : 'Acta'} *
+              </Label>
+              <Input
+                className="mt-1"
+                placeholder={hesTipo === 'hes' ? 'Ej: HES-2026-001' : hesTipo === 'guia_remision' ? 'Ej: GR-001-00123' : 'Ej: ACTA-001'}
+                value={hesNumero}
+                onChange={e => setHesNumero(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label className="text-sm">Fecha de conformidad</Label>
+              <Input type="date" className="mt-1" value={hesFecha} onChange={e => setHesFecha(e.target.value)} />
+            </div>
+            <div>
+              <Label className="text-sm">Adjuntar documento (opcional)</Label>
+              <label className="mt-1 flex items-center gap-2 cursor-pointer border border-dashed rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted/30 transition-colors">
+                <Upload className="h-4 w-4 shrink-0" />
+                {hesArchivo ? hesArchivo.name : 'Seleccionar archivo PDF / imagen'}
+                <input
+                  type="file"
+                  className="hidden"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={e => setHesArchivo(e.target.files?.[0] ?? null)}
+                />
+              </label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowHESDialog(false); setHesTarget(null) }}>Cancelar</Button>
+            <Button onClick={handleRegistrarHES} disabled={uploadingHES || !hesNumero.trim()} className="bg-amber-500 hover:bg-amber-600">
+              {uploadingHES ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ClipboardCheck className="h-4 w-4 mr-2" />}
+              Registrar HES
             </Button>
           </DialogFooter>
         </DialogContent>
