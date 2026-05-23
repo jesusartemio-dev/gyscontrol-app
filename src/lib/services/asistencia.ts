@@ -187,8 +187,15 @@ export async function determinarModoRemoto(
   userId: string,
   fecha: Date = new Date(),
 ): Promise<ModoRemotoResult> {
-  const inicioDia = new Date(fecha)
-  inicioDia.setHours(0, 0, 0, 0)
+  // Compute today's date in Lima timezone and treat as UTC midnight to match
+  // how date-only values are stored in the DB (new Date("YYYY-MM-DD") = UTC midnight).
+  // Without this, after 7pm Lima (= UTC midnight) the server would compute inicioDia
+  // as tomorrow UTC and miss solicitudes/hybrid days that are valid today in Lima.
+  const hoyLima = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Lima',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(fecha)
+  const inicioDia = new Date(hoyLima + 'T00:00:00.000Z')
 
   const solicitud = await prisma.solicitudTrabajoRemoto.findFirst({
     where: {
@@ -223,12 +230,13 @@ export async function determinarModoRemoto(
   }
 
   if (empleado.modalidadTrabajo === 'hibrido') {
-    const dia = DIAS_ENUM[fecha.getDay()]
-    if (empleado.diasRemoto.includes(dia as any)) {
+    // Use Lima weekday — fecha.getDay() returns UTC day which is wrong after 7pm Lima
+    const diaLima = DIAS_ENUM[new Date(hoyLima + 'T12:00:00.000Z').getDay()]
+    if (empleado.diasRemoto.includes(diaLima as any)) {
       return {
         esRemoto: true,
         origen: 'modalidad_hibrida',
-        razon: `Día remoto (${dia})`,
+        razon: `Día remoto (${diaLima})`,
       }
     }
   }
