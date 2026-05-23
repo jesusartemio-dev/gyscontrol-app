@@ -949,6 +949,30 @@ export default function PlanificacionPage() {
   )
   const fechasOrdenadas = useMemo(() => diasHeader.map((d) => d.dateKey), [diasHeader])
 
+  const resumenPorDia = useMemo(() => {
+    return diasHeader.map(({ dateKey, isWeekend, isSaturday, isSunday }) => {
+      const conteoProyecto: Record<string, { count: number; color: string }> = {}
+      let total = 0
+      for (const p of personasFiltradas) {
+        const celdas = (p.dias[dateKey] ?? []).filter((c) => c.tipo === 'proyecto' && c.proyecto)
+        const match =
+          proyectoFiltro === '__all__'
+            ? celdas
+            : celdas.filter((c) => c.proyecto?.id === proyectoFiltro)
+        if (match.length === 0) continue
+        total++
+        for (const c of match) {
+          if (!c.proyecto) continue
+          const codigo = c.proyecto.codigo
+          const color = colorOverrides[c.proyecto.id] ?? c.proyecto.color
+          if (!conteoProyecto[codigo]) conteoProyecto[codigo] = { count: 0, color }
+          conteoProyecto[codigo].count++
+        }
+      }
+      return { dateKey, isWeekend, isSaturday, isSunday, total, conteoProyecto }
+    })
+  }, [diasHeader, personasFiltradas, proyectoFiltro, colorOverrides])
+
   // Keep refs current every render (avoids stale closures in mouseup/keyboard effects)
   orderedUserIdsRef.current = orderedUserIds
   fechasOrdenadasRef.current = fechasOrdenadas
@@ -1655,6 +1679,47 @@ export default function PlanificacionPage() {
                 </div>
                 )
               })}
+
+              {/* Fila resumen: total de personas asignadas por día */}
+              {personasFiltradas.length > 0 && (
+                <div
+                  style={{ display: 'grid', gridTemplateColumns: gridCols }}
+                  className="mt-1 border-t border-dashed pt-1.5 text-xs"
+                >
+                  <div />{/* dept stripe */}
+                  <div className="px-3 py-1 font-semibold text-muted-foreground flex items-center gap-1">
+                    <span>Total</span>
+                  </div>
+                  {resumenPorDia.map(({ dateKey, isSaturday, isSunday, total, conteoProyecto }) => (
+                    <div
+                      key={dateKey}
+                      className={cn(
+                        'text-center px-0.5 py-1 flex flex-col items-center gap-0.5',
+                        isSaturday && 'bg-orange-50/60',
+                        isSunday && 'bg-red-50/60',
+                      )}
+                    >
+                      {total > 0 ? (
+                        <>
+                          <span className="font-bold text-foreground leading-none">{total}</span>
+                          {Object.entries(conteoProyecto).map(([codigo, { count, color }]) => (
+                            <span
+                              key={codigo}
+                              className="text-[9px] text-white rounded px-1 leading-tight whitespace-nowrap"
+                              style={{ backgroundColor: color }}
+                            >
+                              {codigo}:{count}
+                            </span>
+                          ))}
+                        </>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </div>
+                  ))}
+                  <div />{/* Util. col */}
+                </div>
+              )}
             </div>
           </div>
         )}

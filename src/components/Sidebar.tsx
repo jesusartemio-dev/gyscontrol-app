@@ -365,6 +365,7 @@ export default function Sidebar() {
         { href: '/administracion/gastos', label: 'Gestión de Gastos', icon: Receipt },
         { href: '/administracion/gastos/pendientes', label: 'Pendientes', icon: AlertCircle },
         { href: '/administracion/rendiciones', label: 'Rendiciones', icon: FileCheck },
+        { href: '/gestion/valorizaciones', label: 'Valorizaciones', icon: FileSpreadsheet },
         { href: '/administracion/facturacion', label: 'Facturación', icon: FileSpreadsheet },
         { href: '/administracion/cuentas-cobrar', label: 'Cuentas por Cobrar', icon: ArrowDownCircle },
         { href: '/administracion/cuentas-pagar', label: 'Cuentas por Pagar', icon: ArrowUpCircle },
