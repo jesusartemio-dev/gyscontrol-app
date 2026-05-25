@@ -143,22 +143,25 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         data: { costoRealTotal, updatedAt: new Date() }
       })
 
-      // 4. Create EntregaItem
-      const entregaItemId = `ent-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-      await tx.entregaItem.create({
-        data: {
-          id: entregaItemId,
-          pedidoEquipoItemId: id,
-          listaEquipoItemId: itemExistente.listaEquipoItemId || null,
-          proyectoId: pedido.proyectoId as string,
-          fechaEntrega: data.fechaEntregaReal || new Date(),
-          estado: data.estadoEntrega as any,
-          cantidad: itemExistente.cantidadPedida || 0,
-          cantidadEntregada: data.cantidadAtendida || 0,
-          observaciones: data.observacionesEntrega || null,
-          usuarioId: userId,
-        }
-      })
+      // 4. Create EntregaItem (solo si el pedido tiene proyecto asignado)
+      let entregaItemId: string | null = null
+      if (pedido.proyectoId) {
+        entregaItemId = `ent-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        await tx.entregaItem.create({
+          data: {
+            id: entregaItemId,
+            pedidoEquipoItemId: id,
+            listaEquipoItemId: itemExistente.listaEquipoItemId || null,
+            proyectoId: pedido.proyectoId,
+            fechaEntrega: data.fechaEntregaReal || new Date(),
+            estado: data.estadoEntrega as any,
+            cantidad: itemExistente.cantidadPedida || 0,
+            cantidadEntregada: data.cantidadAtendida || 0,
+            observaciones: data.observacionesEntrega || null,
+            usuarioId: userId,
+          }
+        })
+      }
 
       // 5. Create EventoTrazabilidad
       await tx.eventoTrazabilidad.create({
@@ -262,7 +265,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
           costoUnitario: stockActual?.costoUnitarioPromedio ?? undefined,
           costoMoneda: stockActual?.costoMoneda ?? 'PEN',
           usuarioId: userId,
-          entregaItemId: entregaItemId,
+          entregaItemId: entregaItemId ?? undefined,
           observaciones: `Atención desde stock — Pedido ${pedido.codigo}`,
         }, tx as any)
       }

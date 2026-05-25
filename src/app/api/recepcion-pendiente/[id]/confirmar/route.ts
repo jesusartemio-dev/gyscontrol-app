@@ -232,6 +232,10 @@ export async function POST(
         })
 
         // Crear EntregaItem
+        const entregaProyectoId = proyectoId || pedido.proyectoId
+        if (!entregaProyectoId) {
+          throw new Error('No se puede entregar al proyecto: el pedido no tiene un proyecto asignado')
+        }
         entregaItemId = `ent-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
         await tx.entregaItem.create({
           data: {
@@ -239,7 +243,7 @@ export async function POST(
             pedidoEquipoItemId: pedidoItem.id,
             listaEquipoItemId: pedidoItem.listaEquipoItemId || null,
             recepcionPendienteId: id,
-            proyectoId: pedido.proyectoId as string,
+            proyectoId: entregaProyectoId,
             fechaEntrega: new Date(),
             estado: nuevoEstadoEntrega as any,
             cantidad: pedidoItem.cantidadPedida,

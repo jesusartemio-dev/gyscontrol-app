@@ -6,7 +6,7 @@
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronUp, ChevronDown, Eye, Package, Trash2, User } from 'lucide-react'
+import { ChevronUp, ChevronDown, Eye, Package, Trash2, User, Building2, FolderKanban } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
@@ -26,7 +26,7 @@ import type { PedidoEquipo } from '@/types'
 type EstadoPedidoEquipo = 'borrador' | 'enviado' | 'aprobado' | 'atendido' | 'parcial' | 'entregado' | 'cancelado'
 import { formatCurrency } from '@/lib/utils'
 
-type SortField = 'codigo' | 'responsable' | 'fechaPedido' | 'fechaNecesaria' | 'estado' | 'itemsCount' | 'progreso' | 'monto'
+type SortField = 'codigo' | 'responsable' | 'destino' | 'fechaPedido' | 'fechaNecesaria' | 'estado' | 'itemsCount' | 'progreso' | 'monto'
 type SortDirection = 'asc' | 'desc'
 
 interface LogisticaPedidosTableProps {
@@ -83,6 +83,10 @@ export default function LogisticaPedidosTable({ pedidos, loading = false, onDele
         case 'responsable':
           aValue = a.responsable?.name || ''
           bValue = b.responsable?.name || ''
+          break
+        case 'destino':
+          aValue = a.proyecto?.codigo || a.proyecto?.nombre || (a as any).centroCosto?.nombre || ''
+          bValue = b.proyecto?.codigo || b.proyecto?.nombre || (b as any).centroCosto?.nombre || ''
           break
         case 'estado':
           aValue = a.estado || ''
@@ -182,6 +186,12 @@ export default function LogisticaPedidosTable({ pedidos, loading = false, onDele
               <span className="flex items-center gap-1">Código <SortIcon field="codigo" /></span>
             </TableHead>
             <TableHead
+              className="text-xs cursor-pointer hover:bg-gray-50 w-[140px]"
+              onClick={() => handleSort('destino')}
+            >
+              <span className="flex items-center gap-1">Destino <SortIcon field="destino" /></span>
+            </TableHead>
+            <TableHead
               className="text-xs cursor-pointer hover:bg-gray-50"
               onClick={() => handleSort('responsable')}
             >
@@ -259,6 +269,25 @@ export default function LogisticaPedidosTable({ pedidos, loading = false, onDele
                       </span>
                     )}
                   </div>
+                </TableCell>
+                <TableCell className="py-2">
+                  {pedido.proyecto ? (
+                    <div className="flex items-center gap-1.5">
+                      <Building2 className="h-3 w-3 text-blue-400 flex-shrink-0" />
+                      <span className="text-xs font-medium text-blue-700 truncate max-w-[120px]" title={pedido.proyecto.nombre}>
+                        {pedido.proyecto.codigo || pedido.proyecto.nombre}
+                      </span>
+                    </div>
+                  ) : (pedido as any).centroCosto ? (
+                    <div className="flex items-center gap-1.5">
+                      <FolderKanban className="h-3 w-3 text-violet-400 flex-shrink-0" />
+                      <span className="text-xs font-medium text-violet-700 truncate max-w-[120px]" title={(pedido as any).centroCosto.nombre}>
+                        {(pedido as any).centroCosto.nombre}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  )}
                 </TableCell>
                 <TableCell className="py-2">
                   <div className="flex items-center gap-1.5">

@@ -10,7 +10,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
-import { RefreshCw, Truck, Package, Search, Filter, X, CheckCircle, AlertTriangle, Clock, Building2 } from 'lucide-react'
+import { RefreshCw, Truck, Package, Search, Filter, X, CheckCircle, AlertTriangle, Clock, Building2, FolderKanban } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -49,6 +49,7 @@ export default function LogisticaPedidosPage() {
   const [search, setSearch] = useState('')
   const [estado, setEstado] = useState<string>('all')
   const [proyectoId, setProyectoId] = useState<string>('all')
+  const [tipo, setTipo] = useState<'all' | 'proyecto' | 'interno'>('all')
   const fetchData = async () => {
     try {
       setRefreshing(true)
@@ -80,11 +81,15 @@ export default function LogisticaPedidosPage() {
         pedido.codigo?.toLowerCase().includes(s) ||
         pedido.responsable?.name?.toLowerCase().includes(s) ||
         pedido.proyecto?.nombre?.toLowerCase().includes(s) ||
+        pedido.proyecto?.codigo?.toLowerCase().includes(s) ||
+        (pedido as any).centroCosto?.nombre?.toLowerCase().includes(s) ||
         pedido.observacion?.toLowerCase().includes(s)
       if (!match) return false
     }
     if (estado !== 'all' && pedido.estado !== estado) return false
     if (proyectoId !== 'all' && pedido.proyectoId !== proyectoId) return false
+    if (tipo === 'proyecto' && !pedido.proyectoId) return false
+    if (tipo === 'interno' && !pedido.centroCostoId) return false
     return true
   })
 
@@ -100,12 +105,13 @@ export default function LogisticaPedidosPage() {
     }).length,
   }
 
-  const hasFilters = search || estado !== 'all' || proyectoId !== 'all'
+  const hasFilters = search || estado !== 'all' || proyectoId !== 'all' || tipo !== 'all'
 
   const clearFilters = () => {
     setSearch('')
     setEstado('all')
     setProyectoId('all')
+    setTipo('all')
   }
 
   const handleDelete = async (id: string) => {
@@ -211,15 +217,34 @@ export default function LogisticaPedidosPage() {
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
               <Input
-                placeholder="Buscar por código, responsable..."
+                placeholder="Buscar por código, proyecto, centro de costo..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="h-8 pl-8 text-xs"
               />
             </div>
 
-            <Select value={proyectoId} onValueChange={setProyectoId}>
-              <SelectTrigger className="h-8 w-[180px] text-xs">
+            <Select value={tipo} onValueChange={(v) => {
+              setTipo(v as 'all' | 'proyecto' | 'interno')
+              if (v === 'interno') setProyectoId('all')
+            }}>
+              <SelectTrigger className="h-8 w-[150px] text-xs">
+                <FolderKanban className="h-3 w-3 mr-1.5 text-gray-400" />
+                <SelectValue placeholder="Tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" className="text-xs">Todos los tipos</SelectItem>
+                <SelectItem value="proyecto" className="text-xs">De proyecto</SelectItem>
+                <SelectItem value="interno" className="text-xs">Internos (CC)</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={proyectoId}
+              onValueChange={setProyectoId}
+              disabled={tipo === 'interno'}
+            >
+              <SelectTrigger className="h-8 w-[180px] text-xs disabled:opacity-40">
                 <Building2 className="h-3 w-3 mr-1.5 text-gray-400" />
                 <SelectValue placeholder="Proyecto" />
               </SelectTrigger>

@@ -1529,7 +1529,8 @@ export interface CotizacionProveedorItem {
 
 export interface PedidoEquipo {
   id: string
-  proyectoId: string
+  proyectoId?: string | null
+  centroCostoId?: string | null
   responsableId: string
   listaId?: string
   codigo: string                         // ✅ Código obligatorio
@@ -1569,8 +1570,9 @@ export interface PedidoEquipo {
   responsable?: User
   user?: { id: string; name: string | null; email: string } | null
   proyecto?: Pick<Proyecto, 'id' | 'codigo' | 'nombre'>
+  centroCosto?: { id: string; nombre: string; tipo?: string } | null
   lista?: ListaEquipo
-  responsableLogistico?: User         // Relación con responsable de logística
+  responsableLogistico?: User
   items: PedidoEquipoItem[]
 }
 
