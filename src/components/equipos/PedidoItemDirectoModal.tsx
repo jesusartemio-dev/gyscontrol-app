@@ -126,18 +126,17 @@ export function PedidoItemDirectoModal({ open, onClose, pedidoId, onCreated }: P
     [catalogoItems]
   )
 
-  const filteredCatalogo = useMemo(() => {
+  const { filteredCatalogo, totalMatches } = useMemo(() => {
     const words = normalizeStr(searchTerm).split(/\s+/).filter(Boolean)
-    return catalogoItems
-      .filter(eq => {
-        const matchSearch = words.length === 0 || (() => {
-          const haystack = normalizeStr(`${eq.codigo} ${eq.descripcion} ${eq.marca} ${eq.categoriaEquipo?.nombre || ''}`)
-          return words.every(w => haystack.includes(w))
-        })()
-        const matchCat = categoriaFiltro === '__ALL__' || eq.categoriaEquipo?.nombre === categoriaFiltro
-        return matchSearch && matchCat
-      })
-      .slice(0, 50)
+    const all = catalogoItems.filter(eq => {
+      const matchSearch = words.length === 0 || (() => {
+        const haystack = normalizeStr(`${eq.codigo} ${eq.descripcion} ${eq.marca} ${eq.categoriaEquipo?.nombre || ''}`)
+        return words.every(w => haystack.includes(w))
+      })()
+      const matchCat = categoriaFiltro === '__ALL__' || normalizeStr(eq.categoriaEquipo?.nombre) === normalizeStr(categoriaFiltro)
+      return matchSearch && matchCat
+    })
+    return { filteredCatalogo: all.slice(0, 80), totalMatches: all.length }
   }, [catalogoItems, searchTerm, categoriaFiltro])
 
   const handleSelectCatalogo = (equipo: CatalogoEquipo) => {
@@ -296,6 +295,18 @@ export function PedidoItemDirectoModal({ open, onClose, pedidoId, onCreated }: P
                     ))}
                   </SelectContent>
                 </Select>
+              )}
+              {!loadingCatalogo && catalogoItems.length > 0 && (
+                <p className="text-[10px] text-muted-foreground px-0.5">
+                  {searchTerm.trim() || categoriaFiltro !== '__ALL__'
+                    ? totalMatches === 0
+                      ? 'Sin resultados'
+                      : totalMatches > 80
+                        ? `Mostrando 80 de ${totalMatches} resultados`
+                        : `${totalMatches} resultado${totalMatches !== 1 ? 's' : ''}`
+                    : `${catalogoItems.length} equipos en catálogo`
+                  }
+                </p>
               )}
             </div>
 
