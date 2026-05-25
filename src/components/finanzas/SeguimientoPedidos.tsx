@@ -1,4 +1,3 @@
-import { normalizeStr } from '@/lib/utils'
 // ===================================================
 // 📁 Archivo: SeguimientoPedidos.tsx
 // 📌 Ubicación: src/components/finanzas/SeguimientoPedidos.tsx
@@ -10,6 +9,7 @@ import { normalizeStr } from '@/lib/utils'
 // ===================================================
 
 'use client'
+import { normalizeStr } from '@/lib/utils'
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { motion } from 'framer-motion'

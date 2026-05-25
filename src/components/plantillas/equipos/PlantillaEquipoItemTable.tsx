@@ -1,4 +1,3 @@
-import { normalizeStr } from '@/lib/utils'
 // ===================================================
 // 📁 Archivo: PlantillaEquipoItemTable.tsx
 // 📌 Ubicación: src/components/plantillas/equipos/
@@ -7,6 +6,7 @@ import { normalizeStr } from '@/lib/utils'
 // ===================================================
 
 'use client'
+import { normalizeStr } from '@/lib/utils'
 
 import { useState } from 'react'
 import { Save, X, Pencil, Trash2, Filter } from 'lucide-react'

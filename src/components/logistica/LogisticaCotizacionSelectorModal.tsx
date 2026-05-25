@@ -1,4 +1,3 @@
-import { normalizeStr } from '@/lib/utils'
 // ===================================================
 // 📁 Archivo: LogisticaCotizacionSelectorModal.tsx
 // 📌 Descripción: Modal profesional para selección de cotizaciones por ítem
@@ -8,6 +7,7 @@ import { normalizeStr } from '@/lib/utils'
 // ===================================================
 
 'use client'
+import { normalizeStr } from '@/lib/utils'
 
 import { useState, useMemo } from 'react'
 import { ListaEquipoItem, CotizacionProveedorItem } from '@/types'

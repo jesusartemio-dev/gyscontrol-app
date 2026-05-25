@@ -1,4 +1,3 @@
-import { normalizeStr } from '@/lib/utils'
 /**
  * 🎯 CotizacionesProveedorCardView Component
  *
@@ -10,6 +9,7 @@ import { normalizeStr } from '@/lib/utils'
  */
 
 'use client';
+import { normalizeStr } from '@/lib/utils'
 
 import React, { useState, useMemo } from 'react';
 import { CotizacionProveedor } from '@/types';

@@ -1,4 +1,3 @@
-import { normalizeStr } from '@/lib/utils'
 // ===================================================
 // 📁 Archivo: EquipoItemsCardView.tsx
 // 📌 Ubicación: src/components/proyectos/equipos/
@@ -10,6 +9,7 @@ import { normalizeStr } from '@/lib/utils'
 // ===================================================
 
 'use client'
+import { normalizeStr } from '@/lib/utils'
 
 import React, { memo, useMemo, useState } from 'react'
 import type { ProyectoEquipoCotizado, ProyectoEquipoCotizadoItem } from '@/types'

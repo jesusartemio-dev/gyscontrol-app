@@ -1,4 +1,3 @@
-import { normalizeStr } from '@/lib/utils'
 // ===================================================
 // 📁 Archivo: ModalReemplazarReemplazoDesdeCatalogo.tsx
 // 📌 Ubicación: src/components/equipos/
@@ -7,6 +6,7 @@ import { normalizeStr } from '@/lib/utils'
 // ===================================================
 
 'use client'
+import { normalizeStr } from '@/lib/utils'
 
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'

@@ -1,4 +1,3 @@
-import { normalizeStr } from '@/lib/utils'
 // ===================================================
 // 📁 Archivo: page.tsx
 // 📌 Ubicación: src/app/proyectos/[id]/equipos/comparacion/page.tsx
@@ -14,6 +13,7 @@ import { normalizeStr } from '@/lib/utils'
 // ===================================================
 
 'use client'
+import { normalizeStr } from '@/lib/utils'
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'

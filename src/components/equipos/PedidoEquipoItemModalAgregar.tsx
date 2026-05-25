@@ -1,4 +1,3 @@
-import { normalizeStr } from '@/lib/utils'
 /**
  * 🛠️ PedidoEquipoItemModalAgregar - Modal para agregar items de equipo a un pedido
  * 
@@ -11,6 +10,7 @@ import { normalizeStr } from '@/lib/utils'
  */
 
 'use client'
+import { normalizeStr } from '@/lib/utils'
 
 import { useState, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
