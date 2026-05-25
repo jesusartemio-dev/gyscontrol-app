@@ -517,13 +517,20 @@ export function PedidoItemDirectoModal({ open, onClose, pedidoId, onCreated }: P
       <div className="space-y-3">
         <div>
           <Label className="text-[10px] text-muted-foreground">Cantidad *</Label>
-          <Input
-            type="number"
-            min={1}
-            value={cantidadPedida}
-            onChange={(e) => setCantidadPedida(Number(e.target.value))}
-            className="h-8 text-xs mt-1"
-          />
+          <div className="flex items-center gap-2 mt-1">
+            <Input
+              type="number"
+              min={1}
+              value={cantidadPedida}
+              onChange={(e) => setCantidadPedida(Number(e.target.value))}
+              className="h-8 text-xs"
+            />
+            {unidad && (
+              <span className="text-xs text-muted-foreground bg-gray-100 px-2 h-8 flex items-center rounded-md border shrink-0">
+                {unidad}
+              </span>
+            )}
+          </div>
         </div>
         <div>
           <Label className="text-[10px] text-muted-foreground">Comentario</Label>
