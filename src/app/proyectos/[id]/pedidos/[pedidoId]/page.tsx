@@ -54,7 +54,6 @@ import {
   ChevronRight,
   ChevronDown,
   FileText,
-  Plus,
   Warehouse,
   History,
   Activity,
@@ -686,8 +685,7 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
                 className="h-6 text-[10px] gap-1"
                 onClick={() => setShowAgregarDeListaModal(true)}
               >
-                <List className="h-3 w-3" />
-                De lista
+                + Item de Lista
               </Button>
               <TooltipProvider>
                 <Tooltip>
@@ -700,8 +698,7 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
                         onClick={() => setShowItemDirectoModal(true)}
                         disabled={!['admin', 'gerente', 'logistico', 'coordinador_logistico', 'gestor', 'coordinador', 'proyectos'].includes(userRole)}
                       >
-                        <Plus className="h-3 w-3" />
-                        Item Directo
+                        + Item de Catálogo
                       </Button>
                     </span>
                   </TooltipTrigger>
