@@ -118,6 +118,7 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
   const [categoriaFiltro, setCategoriaFiltro] = useState('__ALL__')
   const [estadoFiltro, setEstadoFiltro] = useState('__ALL__')
   const [usoFiltro, setUsoFiltro] = useState('__ALL__')
+  const [marcaFiltro, setMarcaFiltro] = useState('__ALL__')
 
   // Edit state
   const [editTarget, setEditTarget] = useState<Partial<CatalogoEquipo> | null>(null)
@@ -182,13 +183,27 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
   // Reset page on filter change
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchTerm, categoriaFiltro, estadoFiltro, usoFiltro])
+  }, [searchTerm, categoriaFiltro, estadoFiltro, usoFiltro, marcaFiltro])
 
   // Memoized filter values
   const categorias = useMemo(() =>
     [...new Set(equipos.map(eq => eq.categoriaEquipo?.nombre).filter(Boolean))] as string[],
     [equipos]
   )
+
+  // Marcas disponibles según los filtros activos (excluyendo el propio filtro de marca)
+  const marcasDisponibles = useMemo(() => {
+    const base = equipos.filter(eq => {
+      const tieneUso = ((eq as any)._count?.cotizacionEquipoItem || 0) + ((eq as any)._count?.proyectoEquipoCotizadoItem || 0) + ((eq as any)._count?.listaEquipoItem || 0) > 0
+      return (
+        (categoriaFiltro === '__ALL__' || eq.categoriaEquipo?.nombre === categoriaFiltro) &&
+        (estadoFiltro === '__ALL__' || eq.estado === estadoFiltro) &&
+        (usoFiltro === '__ALL__' || (usoFiltro === 'con_uso' ? tieneUso : !tieneUso)) &&
+        (searchTerm === '' || `${eq.codigo || ''} ${eq.descripcion || ''} ${eq.marca || ''}`.toLowerCase().includes(searchTerm.toLowerCase()))
+      )
+    })
+    return [...new Set(base.map(eq => eq.marca).filter(Boolean))].sort() as string[]
+  }, [equipos, categoriaFiltro, estadoFiltro, usoFiltro, searchTerm])
 
   const equiposFiltrados = useMemo(() => {
     return equipos.filter(eq => {
@@ -197,11 +212,12 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
         (categoriaFiltro === '__ALL__' || eq.categoriaEquipo?.nombre === categoriaFiltro) &&
         (estadoFiltro === '__ALL__' || eq.estado === estadoFiltro) &&
         (usoFiltro === '__ALL__' || (usoFiltro === 'con_uso' ? tieneUso : !tieneUso)) &&
+        (marcaFiltro === '__ALL__' || eq.marca === marcaFiltro) &&
         (searchTerm === '' ||
           `${eq.codigo || ''} ${eq.descripcion || ''} ${eq.marca || ''}`.toLowerCase().includes(searchTerm.toLowerCase()))
       )
     })
-  }, [equipos, categoriaFiltro, estadoFiltro, usoFiltro, searchTerm])
+  }, [equipos, categoriaFiltro, estadoFiltro, usoFiltro, marcaFiltro, searchTerm])
 
   // --- Pagination ---
   const totalPages = Math.max(1, Math.ceil(equiposFiltrados.length / pageSize))
@@ -228,16 +244,18 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
     const filters: { key: string; label: string; onClear: () => void }[] = []
     if (searchTerm) filters.push({ key: 'search', label: `"${searchTerm}"`, onClear: () => setSearchTerm('') })
     if (categoriaFiltro !== '__ALL__') filters.push({ key: 'cat', label: categoriaFiltro, onClear: () => setCategoriaFiltro('__ALL__') })
+    if (marcaFiltro !== '__ALL__') filters.push({ key: 'marca', label: `Marca: ${marcaFiltro}`, onClear: () => setMarcaFiltro('__ALL__') })
     if (estadoFiltro !== '__ALL__') filters.push({ key: 'estado', label: `Estado: ${estadoFiltro}`, onClear: () => setEstadoFiltro('__ALL__') })
     if (usoFiltro !== '__ALL__') filters.push({ key: 'uso', label: usoFiltro === 'con_uso' ? 'Con uso' : 'Sin uso', onClear: () => setUsoFiltro('__ALL__') })
     return filters
-  }, [searchTerm, categoriaFiltro, estadoFiltro, usoFiltro])
+  }, [searchTerm, categoriaFiltro, marcaFiltro, estadoFiltro, usoFiltro])
 
   const hasActiveFilters = activeFilters.length > 0
 
   const clearAllFilters = () => {
     setSearchTerm('')
     setCategoriaFiltro('__ALL__')
+    setMarcaFiltro('__ALL__')
     setEstadoFiltro('__ALL__')
     setUsoFiltro('__ALL__')
   }
@@ -736,13 +754,25 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
                   </div>
 
                   {hasCol('categoria') && (
-                    <Select value={categoriaFiltro} onValueChange={setCategoriaFiltro}>
+                    <Select value={categoriaFiltro} onValueChange={(v) => { setCategoriaFiltro(v); setMarcaFiltro('__ALL__') }}>
                       <SelectTrigger className="w-[180px] h-9">
                         <SelectValue>{categoriaFiltro === '__ALL__' ? 'Categoría: Todas' : categoriaFiltro}</SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="__ALL__">Todas las categorías</SelectItem>
                         {categorias.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  )}
+
+                  {hasCol('marca') && marcasDisponibles.length > 0 && (
+                    <Select value={marcaFiltro} onValueChange={setMarcaFiltro}>
+                      <SelectTrigger className="w-[160px] h-9">
+                        <SelectValue>{marcaFiltro === '__ALL__' ? 'Marca: Todas' : marcaFiltro}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__ALL__">Todas las marcas</SelectItem>
+                        {marcasDisponibles.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   )}
