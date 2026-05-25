@@ -5,7 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import CatalogoEquipoForm from '@/components/catalogo/CatalogoEquipoForm'
 import { BotonesImportExport } from '@/components/catalogo/BotonesImportExport'
-import { exportarEquiposAExcel, importarEquiposDesdeExcel, descargarPlantillaCatalogoEquipo } from '@/lib/utils/equiposExcel'
+import { ModalExportarCatalogo } from '@/components/catalogo/ModalExportarCatalogo'
+import { importarEquiposDesdeExcel, descargarPlantillaCatalogoEquipo } from '@/lib/utils/equiposExcel'
 import { importarEquiposDesdeExcelValidado } from '@/lib/utils/equiposImportUtils'
 import { recalcularCatalogoEquipo } from '@/lib/utils/recalculoCatalogoEquipo'
 import { getCategoriasEquipo } from '@/lib/services/categoriaEquipo'
@@ -108,6 +109,7 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
   const [mostrarModal, setMostrarModal] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showPdfImport, setShowPdfImport] = useState(false)
+  const [showExportModal, setShowExportModal] = useState(false)
   const [allCategorias, setAllCategorias] = useState<CategoriaEquipo[]>([])
   const [allUnidades, setAllUnidades] = useState<Unidad[]>([])
 
@@ -259,12 +261,7 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
     setShowPdfImport(true)
   }
 
-  const handleExportar = async () => {
-    try {
-      await exportarEquiposAExcel(equipos as CatalogoEquipo[])
-      toast.success('Equipos exportados')
-    } catch { toast.error('Error al exportar') }
-  }
+  const handleExportar = () => setShowExportModal(true)
 
   const handleImportar = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -603,6 +600,15 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
             )}
           </div>
         </div>
+
+        {/* Modal: Exportar */}
+        <ModalExportarCatalogo
+          isOpen={showExportModal}
+          onClose={() => setShowExportModal(false)}
+          equiposTotal={equipos as CatalogoEquipo[]}
+          equiposFiltrados={equiposFiltrados as CatalogoEquipo[]}
+          activeFilters={activeFilters}
+        />
 
         {/* PDF Import Dialog */}
         <ImportarPdfDialog
