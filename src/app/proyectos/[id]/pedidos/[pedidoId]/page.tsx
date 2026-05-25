@@ -698,16 +698,16 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
                         size="sm"
                         className="h-6 text-[10px] gap-1"
                         onClick={() => setShowItemDirectoModal(true)}
-                        disabled={userRole !== 'admin'}
+                        disabled={!['admin', 'gerente', 'logistico', 'coordinador_logistico', 'gestor', 'coordinador', 'proyectos'].includes(userRole)}
                       >
                         <Plus className="h-3 w-3" />
                         Item Directo
                       </Button>
                     </span>
                   </TooltipTrigger>
-                  {userRole !== 'admin' && (
+                  {!['admin', 'gerente', 'logistico', 'coordinador_logistico', 'gestor', 'coordinador', 'proyectos'].includes(userRole) && (
                     <TooltipContent>
-                      <p className="text-xs">Solo el administrador puede agregar items directos</p>
+                      <p className="text-xs">No tienes permiso para agregar ítems directos</p>
                     </TooltipContent>
                   )}
                 </Tooltip>
