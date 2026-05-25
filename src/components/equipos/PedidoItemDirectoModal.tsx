@@ -54,6 +54,7 @@ export function PedidoItemDirectoModal({ open, onClose, pedidoId, onCreated }: P
 
   const [catalogoItems, setCatalogoItems] = useState<CatalogoEquipo[]>([])
   const [searchTerm, setSearchTerm] = useState('')
+  const [categoriaFiltro, setCategoriaFiltro] = useState('__ALL__')
   const [loadingCatalogo, setLoadingCatalogo] = useState(false)
   const [selectedCatalogo, setSelectedCatalogo] = useState<CatalogoEquipo | null>(null)
   const [rightPanel, setRightPanel] = useState<RightPanel>('empty')
@@ -101,6 +102,7 @@ export function PedidoItemDirectoModal({ open, onClose, pedidoId, onCreated }: P
 
   const resetForm = () => {
     setSearchTerm('')
+    setCategoriaFiltro('__ALL__')
     setSelectedCatalogo(null)
     setRightPanel('empty')
     setCodigo('')
@@ -118,17 +120,25 @@ export function PedidoItemDirectoModal({ open, onClose, pedidoId, onCreated }: P
     setCatalogoEquipoId(null)
   }
 
+  const categoriasDisponibles = useMemo(() =>
+    [...new Set(catalogoItems.map(eq => eq.categoriaEquipo?.nombre).filter(Boolean))]
+      .sort() as string[],
+    [catalogoItems]
+  )
+
   const filteredCatalogo = useMemo(() => {
-    if (!searchTerm.trim()) return catalogoItems.slice(0, 40)
-    const s = searchTerm.toLowerCase()
+    const s = searchTerm.toLowerCase().trim()
     return catalogoItems
-      .filter(eq =>
-        eq.codigo.toLowerCase().includes(s) ||
-        eq.descripcion.toLowerCase().includes(s) ||
-        eq.marca.toLowerCase().includes(s)
-      )
-      .slice(0, 40)
-  }, [catalogoItems, searchTerm])
+      .filter(eq => {
+        const matchSearch = !s ||
+          eq.codigo.toLowerCase().includes(s) ||
+          eq.descripcion.toLowerCase().includes(s) ||
+          eq.marca.toLowerCase().includes(s)
+        const matchCat = categoriaFiltro === '__ALL__' || eq.categoriaEquipo?.nombre === categoriaFiltro
+        return matchSearch && matchCat
+      })
+      .slice(0, 50)
+  }, [catalogoItems, searchTerm, categoriaFiltro])
 
   const handleSelectCatalogo = (equipo: CatalogoEquipo) => {
     setSelectedCatalogo(equipo)
@@ -259,11 +269,11 @@ export function PedidoItemDirectoModal({ open, onClose, pedidoId, onCreated }: P
           </DialogTitle>
         </DialogHeader>
 
-        <div className="grid grid-cols-[270px,1fr] divide-x" style={{ height: 520 }}>
+        <div className="grid grid-cols-[290px,1fr] divide-x" style={{ height: 540 }}>
 
-          {/* LEFT — search + list */}
+          {/* LEFT — search + category + list */}
           <div className="flex flex-col min-h-0">
-            <div className="p-2.5 border-b">
+            <div className="p-2.5 border-b space-y-2">
               <div className="relative">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
                 <Input
@@ -274,6 +284,19 @@ export function PedidoItemDirectoModal({ open, onClose, pedidoId, onCreated }: P
                   autoFocus
                 />
               </div>
+              {categoriasDisponibles.length > 0 && (
+                <Select value={categoriaFiltro} onValueChange={setCategoriaFiltro}>
+                  <SelectTrigger className="h-7 text-xs">
+                    <SelectValue placeholder="Todas las categorías" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__ALL__" className="text-xs">Todas las categorías</SelectItem>
+                    {categoriasDisponibles.map(cat => (
+                      <SelectItem key={cat} value={cat} className="text-xs">{cat}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             <div className="flex-1 overflow-y-auto">
@@ -308,7 +331,7 @@ export function PedidoItemDirectoModal({ open, onClose, pedidoId, onCreated }: P
                         </Badge>
                       )}
                     </div>
-                    <p className="text-[11px] text-muted-foreground truncate leading-tight">{eq.descripcion}</p>
+                    <p className="text-[11px] text-muted-foreground leading-snug line-clamp-2">{eq.descripcion}</p>
                     <p className="text-[10px] text-muted-foreground/60 mt-0.5">
                       {[eq.marca, eq.unidad?.nombre].filter(Boolean).join(' · ')}
                     </p>
