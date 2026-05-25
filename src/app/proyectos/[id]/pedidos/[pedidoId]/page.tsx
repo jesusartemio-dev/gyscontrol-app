@@ -766,7 +766,7 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
                         </div>
                       </td>
                       <td className="px-3 py-2 text-gray-600 max-w-[240px]">
-                        <p className="line-clamp-2 leading-snug text-sm">{item.descripcion}</p>
+                        <p className="line-clamp-2 leading-snug text-xs">{item.descripcion}</p>
                         {((item as any).proveedorNombre || (item as any).listaEquipoItem?.proveedor?.nombre) && (
                           <p className="text-[10px] text-muted-foreground/70 mt-0.5 truncate">
                             {(item as any).proveedorNombre || (item as any).listaEquipoItem?.proveedor?.nombre}
