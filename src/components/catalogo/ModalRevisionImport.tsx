@@ -60,12 +60,12 @@ interface Props {
 function DiffCell({ actual, nuevo, muted }: { actual: string; nuevo: string; muted?: boolean }) {
   const changed = actual !== nuevo
   if (!changed) {
-    return <span className={cn('text-xs text-muted-foreground truncate block', muted && 'opacity-30')}>{nuevo || '—'}</span>
+    return <span className={cn('text-xs text-muted-foreground', muted && 'opacity-30')}>{nuevo || '—'}</span>
   }
   return (
     <div className={cn('space-y-0.5', muted && 'opacity-30')}>
-      <span className="text-[10px] text-muted-foreground line-through block truncate">{actual || '—'}</span>
-      <span className="text-xs font-medium text-amber-700 bg-amber-50 px-1 rounded truncate block">{nuevo || '—'}</span>
+      <span className="text-[10px] text-muted-foreground line-through">{actual || '—'}</span>
+      <span className="text-xs font-medium text-amber-700 bg-amber-50 px-1 rounded block">{nuevo || '—'}</span>
     </div>
   )
 }
@@ -79,7 +79,7 @@ export function ModalRevisionImport({ isOpen, onClose, nuevos, duplicados, onCon
 
   return (
     <Dialog open={isOpen} onOpenChange={(v) => !v && !submitting && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[88vh] flex flex-col gap-0 p-0 overflow-hidden">
+      <DialogContent className="max-w-4xl w-[92vw] max-h-[88vh] flex flex-col gap-0 p-0 overflow-hidden">
         <DialogHeader className="px-5 py-3.5 border-b shrink-0">
           <DialogTitle className="flex items-center gap-2 text-sm font-semibold">
             <FileCheck className="h-4 w-4 text-blue-600" />
@@ -158,7 +158,7 @@ export function ModalRevisionImport({ isOpen, onClose, nuevos, duplicados, onCon
                       {nuevos.map((item) => (
                         <tr key={item.codigo} className="hover:bg-gray-50/80">
                           <td className="px-3 py-2 font-mono text-[11px] text-gray-700">{item.codigo}</td>
-                          <td className="px-3 py-2 text-gray-700 max-w-[180px] truncate">{item.descripcion}</td>
+                          <td className="px-3 py-2 text-gray-700">{item.descripcion}</td>
                           <td className="px-3 py-2">
                             <Badge variant="secondary" className="text-[9px] h-4 px-1 font-normal">
                               {item.categoriaNombre}
@@ -198,12 +198,12 @@ export function ModalRevisionImport({ isOpen, onClose, nuevos, duplicados, onCon
                   <table className="w-full text-xs">
                     <thead className="bg-gray-50 border-b">
                       <tr>
-                        <th className="px-3 py-2 text-left font-medium text-gray-500 w-28">Código</th>
+                        <th className="px-3 py-2 text-left font-medium text-gray-500 w-24">Código</th>
                         <th className="px-3 py-2 text-left font-medium text-gray-500">Descripción</th>
-                        <th className="px-3 py-2 text-left font-medium text-gray-500 w-28">Categoría</th>
-                        <th className="px-3 py-2 text-left font-medium text-gray-500 w-24">Marca</th>
+                        <th className="px-3 py-2 text-left font-medium text-gray-500 w-32">Categoría</th>
+                        <th className="px-3 py-2 text-left font-medium text-gray-500 w-28">Marca</th>
                         <th className={cn(
-                          'px-3 py-2 text-right font-medium w-24 transition-colors',
+                          'px-3 py-2 text-right font-medium w-28 transition-colors',
                           mantenerPrecios ? 'text-gray-300' : 'text-gray-500'
                         )}>
                           P. Lista
@@ -214,7 +214,7 @@ export function ModalRevisionImport({ isOpen, onClose, nuevos, duplicados, onCon
                       {duplicados.map((item) => (
                         <tr key={item.id} className="hover:bg-gray-50/80 align-top">
                           <td className="px-3 py-2 font-mono text-[11px] text-gray-700 pt-2.5">{item.codigo}</td>
-                          <td className="px-3 py-2 max-w-[180px]">
+                          <td className="px-3 py-2">
                             <DiffCell actual={item.existente.descripcion} nuevo={item.nuevo.descripcion} />
                           </td>
                           <td className="px-3 py-2">
