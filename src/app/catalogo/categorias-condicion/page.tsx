@@ -1,5 +1,7 @@
 'use client'
 
+import { normalizeStr } from '@/lib/utils'
+
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import {
@@ -132,8 +134,8 @@ export default function CategoriasCondicionPage() {
   }
 
   const filteredCategorias = categorias.filter(cat =>
-    cat.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    cat.descripcion?.toLowerCase().includes(searchTerm.toLowerCase())
+    normalizeStr(cat.nombre).includes(normalizeStr(searchTerm)) ||
+    normalizeStr(cat.descripcion).includes(normalizeStr(searchTerm))
   )
 
   if (loading) {

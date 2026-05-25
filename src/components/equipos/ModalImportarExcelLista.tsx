@@ -15,7 +15,7 @@ import { Progress } from '@/components/ui/progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
-import { cn } from '@/lib/utils'
+import { cn, normalizeStr } from '@/lib/utils'
 import {
   Upload,
   FileSpreadsheet,
@@ -132,7 +132,7 @@ function VinculacionCombobox({
   const term = search.toLowerCase()
   const filterItem = (qi: any) => {
     if (!term) return true
-    return `${qi.codigo} ${qi.descripcion} ${qi.categoria || ''}`.toLowerCase().includes(term)
+    return normalizeStr(`${qi.codigo} ${qi.descripcion} ${qi.categoria || ''}`).includes(term)
   }
   const filteredItems = groupItems.filter(filterItem)
   const hasResults = filteredItems.length > 0 || (!term || 'sin vincular'.includes(term))

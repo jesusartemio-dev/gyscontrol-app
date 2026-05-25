@@ -1,5 +1,7 @@
 'use client'
 
+import { normalizeStr } from '@/lib/utils'
+
 import { useEffect, useState } from 'react'
 import UnidadServicioModal from '@/components/catalogo/UnidadServicioModal'
 import UnidadServicioTableView from '@/components/catalogo/UnidadServicioTableView'
@@ -69,7 +71,7 @@ export default function Page() {
   }
 
   const filteredUnidades = unidades.filter(unidad =>
-    unidad.nombre.toLowerCase().includes(searchTerm.toLowerCase())
+    normalizeStr(unidad.nombre).includes(normalizeStr(searchTerm))
   )
 
   const handleImportar = async (e: React.ChangeEvent<HTMLInputElement>) => {

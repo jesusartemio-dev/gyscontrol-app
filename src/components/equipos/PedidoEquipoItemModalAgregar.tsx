@@ -1,3 +1,4 @@
+import { normalizeStr } from '@/lib/utils'
 /**
  * 🛠️ PedidoEquipoItemModalAgregar - Modal para agregar items de equipo a un pedido
  * 
@@ -87,8 +88,8 @@ export default function PedidoEquipoItemModalAgregar({
   const filteredItems = useMemo(() => {
     return items.filter(item => {
       const matchesSearch = 
-        item.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.descripcion.toLowerCase().includes(searchTerm.toLowerCase())
+        normalizeStr(item.codigo).includes(normalizeStr(searchTerm)) ||
+        normalizeStr(item.descripcion).includes(normalizeStr(searchTerm))
       
       const restante = item.cantidad - (item.cantidadPedida || 0)
       const pedida = item.cantidadPedida || 0

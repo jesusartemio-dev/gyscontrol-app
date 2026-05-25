@@ -1,5 +1,7 @@
 'use client'
 
+import { normalizeStr } from '@/lib/utils'
+
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -151,8 +153,8 @@ export default function CatalogoRecursosPage() {
 
   const filtrados = recursos.filter(r => {
     const matchBusqueda =
-      r.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-      (r.descripcion ?? '').toLowerCase().includes(busqueda.toLowerCase())
+      normalizeStr(r.nombre).includes(normalizeStr(busqueda)) ||
+      normalizeStr((r.descripcion ?? '')).includes(normalizeStr(busqueda))
     const matchCategoria = filtroCategoria === 'todos' || r.categoria === filtroCategoria
     return matchBusqueda && matchCategoria
   })

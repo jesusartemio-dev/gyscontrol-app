@@ -1,3 +1,4 @@
+import { normalizeStr } from '@/lib/utils'
 // ===================================================
 // Archivo: plantillaEquipoItemExcel.ts
 // Ubicación: src/lib/utils/
@@ -257,7 +258,7 @@ export function validarEImportarPlantillaEquipoItems(
 
     // Detectar si ya existe un item con el mismo código
     const existingItem = existingItems.find(
-      item => item.codigo.toLowerCase().trim() === codigo.toLowerCase().trim()
+      item => normalizeStr(item.codigo) === normalizeStr(codigo)
     )
 
     const importedItem: ImportedPlantillaEquipoItem = {

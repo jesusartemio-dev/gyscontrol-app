@@ -1,5 +1,7 @@
 'use client'
 
+import { normalizeStr } from '@/lib/utils'
+
 /**
  * 📦 BulkImportServicioItemsModal - Modal para importación masiva de ítems de servicio
  *
@@ -308,8 +310,8 @@ export function BulkImportServicioItemsModal({
   }
 
   const filteredItems = servicioItems.filter(item =>
-    item.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.categoria.toLowerCase().includes(searchTerm.toLowerCase())
+    normalizeStr(item.nombre).includes(normalizeStr(searchTerm)) ||
+    normalizeStr(item.categoria).includes(normalizeStr(searchTerm))
   )
 
   const progressValue = (currentStep / 3) * 100

@@ -1,3 +1,4 @@
+import { normalizeStr } from '@/lib/utils'
 // ===================================================
 // 📁 Archivo: ProyectoEquipoFullTable.tsx
 // 📌 Ubicación: src/components/proyectos/equipos/
@@ -62,9 +63,9 @@ const ProyectoEquipoFullTable = memo(function ProyectoEquipoFullTable({
   const filteredItems = useMemo(() => {
     return allItems.filter(item => {
       const matchesSearch = searchTerm === '' ||
-        item.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.descripcion.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.grupoNombre.toLowerCase().includes(searchTerm.toLowerCase())
+        normalizeStr(item.codigo).includes(normalizeStr(searchTerm)) ||
+        normalizeStr(item.descripcion).includes(normalizeStr(searchTerm)) ||
+        normalizeStr(item.grupoNombre).includes(normalizeStr(searchTerm))
 
       const matchesEstado = filterEstado === 'todos' || item.estado === filterEstado
 

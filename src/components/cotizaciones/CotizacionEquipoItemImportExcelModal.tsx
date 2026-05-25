@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
-import { cn } from '@/lib/utils'
+import { cn, normalizeStr } from '@/lib/utils'
 import {
   FileSpreadsheet,
   Upload,
@@ -358,11 +358,11 @@ export default function CotizacionEquipoItemImportExcelModal({
           try {
             // Buscar categoriaId por nombre
             const categoria = categoriasEquipo.find(
-              c => c.nombre.toLowerCase().trim() === item.categoria.toLowerCase().trim()
+              c => normalizeStr(c.nombre) === normalizeStr(item.categoria)
             )
             // Buscar unidadId por nombre
             const unidad = unidades.find(
-              u => u.nombre.toLowerCase().trim() === (item.unidad || '').toLowerCase().trim()
+              u => normalizeStr(u.nombre) === (item.unidad || '').toLowerCase().trim()
             )
 
             // Si no encontramos categoría o unidad, usar valores por defecto o saltar

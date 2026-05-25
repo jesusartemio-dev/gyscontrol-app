@@ -36,7 +36,7 @@ import {
   Building2,
 } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { cn } from '@/lib/utils'
+import { cn, normalizeStr } from '@/lib/utils'
 
 const formatCurrency = (amount: number): string => {
   return new Intl.NumberFormat('en-US', {
@@ -143,7 +143,7 @@ export default function RecursosPage() {
   }
 
   const filteredRecursos = recursos.filter(recurso => {
-    const matchesSearch = recurso.nombre.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesSearch = normalizeStr(recurso.nombre).includes(normalizeStr(searchTerm))
     const matchesTipo = filterTipo === 'all' || recurso.tipo === filterTipo
     const matchesEstado = filterEstado === 'all' || (filterEstado === 'activo' ? recurso.activo : !recurso.activo)
     const matchesOrigen = filterOrigen === 'all' || recurso.origen === filterOrigen

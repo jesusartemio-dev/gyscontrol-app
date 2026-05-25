@@ -1,5 +1,7 @@
 'use client'
 
+import { normalizeStr } from '@/lib/utils'
+
 import { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -111,8 +113,8 @@ export default function PlantillaServicioIndependienteMultiAddModal({
     // Filter by search term
     if (searchTerm.trim()) {
       filtered = filtered.filter(servicio =>
-        servicio.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        servicio.descripcion.toLowerCase().includes(searchTerm.toLowerCase())
+        normalizeStr(servicio.nombre).includes(normalizeStr(searchTerm)) ||
+        normalizeStr(servicio.descripcion).includes(normalizeStr(searchTerm))
       )
     }
 

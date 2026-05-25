@@ -1,3 +1,4 @@
+import { normalizeStr } from '@/lib/utils'
 /**
  * Página de Detalle de Lista de Equipos
  * 
@@ -113,8 +114,8 @@ export default async function ListaEquipoDetallePage({ params, searchParams }: P
   // 🔍 Apply client-side filtering (in production, this should be done server-side)
   const filteredItems = equiposItems.filter(item => {
     const matchesSearch = !equipoSearch || 
-      item.codigo?.toLowerCase().includes(equipoSearch.toLowerCase()) ||
-      item.descripcion?.toLowerCase().includes(equipoSearch.toLowerCase())
+      normalizeStr(item.codigo).includes(normalizeStr(equipoSearch)) ||
+      normalizeStr(item.descripcion).includes(normalizeStr(equipoSearch))
     const matchesCategoria = equipoCategoria === 'all' || item.catalogoEquipo?.categoriaEquipo?.nombre === equipoCategoria
     return matchesSearch && matchesCategoria
   })

@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { ChevronLeft, ChevronRight, Copy, GripVertical, SlidersHorizontal } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, normalizeStr } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -894,7 +894,7 @@ export default function PlanificacionPage() {
   const personasFiltradas = useMemo(() => {
     if (!data?.personas) return []
     return data.personas.filter(
-      (p) => !busqueda || p.nombre.toLowerCase().includes(busqueda.toLowerCase()),
+      (p) => !busqueda || normalizeStr(p.nombre).includes(normalizeStr(busqueda)),
     )
   }, [data?.personas, busqueda])
 

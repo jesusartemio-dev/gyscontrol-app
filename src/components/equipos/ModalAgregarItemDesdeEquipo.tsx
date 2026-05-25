@@ -1,5 +1,7 @@
 'use client'
 
+import { normalizeStr } from '@/lib/utils'
+
 import { useEffect, useState, useMemo } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -91,8 +93,8 @@ export default function ModalAgregarItemDesdeEquipo({
     let filtered = items.filter((item) => {
       const matchGrupo = filtroGrupo === '__ALL__' || item.proyectoEquipo?.nombre === filtroGrupo
       const matchBusqueda = !busqueda ||
-        item.codigo?.toLowerCase().includes(busqueda.toLowerCase()) ||
-        item.descripcion?.toLowerCase().includes(busqueda.toLowerCase())
+        normalizeStr(item.codigo).includes(normalizeStr(busqueda)) ||
+        normalizeStr(item.descripcion).includes(normalizeStr(busqueda))
       return matchGrupo && matchBusqueda
     })
 

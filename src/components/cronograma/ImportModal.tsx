@@ -1,3 +1,4 @@
+import { normalizeStr } from '@/lib/utils'
 // ===================================================
 // 📁 Archivo: ImportModal.tsx
 // 📌 Ubicación: src/components/cronograma/
@@ -82,8 +83,8 @@ export function ImportModal({
 
   // Filter items based on search and category
   const filteredItems = items.filter(item => {
-    const matchesSearch = item.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (item.descripcion && item.descripcion.toLowerCase().includes(searchTerm.toLowerCase()))
+    const matchesSearch = normalizeStr(item.nombre).includes(normalizeStr(searchTerm)) ||
+                         (item.descripcion && normalizeStr(item.descripcion).includes(normalizeStr(searchTerm)))
     const matchesCategory = !categoryFilter || item.categoria === categoryFilter
     return matchesSearch && matchesCategory
   })

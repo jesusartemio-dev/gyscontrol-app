@@ -1,5 +1,7 @@
 'use client'
 
+import { normalizeStr } from '@/lib/utils'
+
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
@@ -76,7 +78,7 @@ export default function ModalSolicitarOtroProveedor({ open, onClose, cotizacion 
   }, [comboOpen])
 
   const filteredProveedores = proveedores.filter(p =>
-    p.nombre.toLowerCase().includes(search.toLowerCase()) ||
+    normalizeStr(p.nombre).includes(normalizeStr(search)) ||
     (p.ruc && p.ruc.includes(search))
   )
 

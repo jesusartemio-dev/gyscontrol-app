@@ -1,5 +1,7 @@
 'use client'
 
+import { normalizeStr } from '@/lib/utils'
+
 import React, { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
@@ -89,7 +91,7 @@ interface CatalogoEppResult {
 
 const normalizarUnidad = (raw: string | undefined): string => {
   if (!raw) return 'und'
-  const lower = raw.toLowerCase().trim()
+  const lower = normalizeStr(raw)
   return UNIDADES.find(u => u.toLowerCase() === lower) ?? 'und'
 }
 

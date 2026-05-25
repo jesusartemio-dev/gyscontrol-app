@@ -57,7 +57,7 @@ import {
   Settings
 } from 'lucide-react';
 import { ListaEquipoMaster } from '@/types/master-detail';
-import { formatCurrency, formatDate, cn } from '@/lib/utils';
+import { formatCurrency, formatDate, cn, normalizeStr } from '@/lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -149,8 +149,8 @@ const ListaEquipoMasterFilters: React.FC<ListaEquipoMasterFiltersProps> = ({
     // Apply search filter
     if (debouncedSearch) {
       filtered = filtered.filter(lista => 
-        lista.nombre.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-        lista.codigo.toLowerCase().includes(debouncedSearch.toLowerCase())
+        normalizeStr(lista.nombre).includes(normalizeStr(debouncedSearch)) ||
+        normalizeStr(lista.codigo).includes(normalizeStr(debouncedSearch))
       );
     }
     

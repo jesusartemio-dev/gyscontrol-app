@@ -1,3 +1,4 @@
+import { normalizeStr } from '@/lib/utils'
 // ===================================================
 // Archivo: cotizacionServicioItemExcel.ts
 // Ubicación: src/lib/utils/
@@ -263,7 +264,7 @@ export function validarEImportarServicioItems(
 
     // Detectar si ya existe un item con el mismo nombre
     const existingItem = existingItems.find(
-      item => item.nombre.toLowerCase().trim() === nombre.toLowerCase().trim()
+      item => normalizeStr(item.nombre) === normalizeStr(nombre)
     )
 
     const importedItem: ImportedServiceItem = {

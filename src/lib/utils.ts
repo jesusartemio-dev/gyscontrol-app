@@ -5,6 +5,12 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/** Normaliza un string para búsqueda: sin tildes, minúsculas. Ej: "UNIÓN" → "union" */
+export function normalizeStr(s: string | null | undefined): string {
+  if (!s) return ''
+  return s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
+}
+
 // 📅 Date formatting utilities
 export const formatDate = (date: Date | string): string => {
   const dateObj = typeof date === 'string' ? new Date(date) : date

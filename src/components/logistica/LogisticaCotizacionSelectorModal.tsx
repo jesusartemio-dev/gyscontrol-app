@@ -1,3 +1,4 @@
+import { normalizeStr } from '@/lib/utils'
 // ===================================================
 // 📁 Archivo: LogisticaCotizacionSelectorModal.tsx
 // 📌 Descripción: Modal profesional para selección de cotizaciones por ítem
@@ -94,7 +95,7 @@ export default function LogisticaCotizacionSelectorModal({
     // Filtrar por búsqueda (proveedor)
     if (searchTerm) {
       filtered = filtered.filter(cot =>
-        cot.cotizacionProveedor?.proveedor?.nombre?.toLowerCase().includes(searchTerm.toLowerCase())
+        normalizeStr(cot.cotizacionProveedor?.proveedor?.nombre).includes(normalizeStr(searchTerm))
       )
     }
 

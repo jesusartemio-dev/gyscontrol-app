@@ -1,3 +1,4 @@
+import { normalizeStr } from '@/lib/utils'
 // ===================================================
 // 📁 Archivo: EquipoItemsCardView.tsx
 // 📌 Ubicación: src/components/proyectos/equipos/
@@ -61,8 +62,8 @@ const EquipoItemsCardView = memo(function EquipoItemsCardView({
   const filteredItems = useMemo(() => {
     return equipo.items?.filter(item => {
       const matchesSearch = searchTerm === '' ||
-        item.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.descripcion.toLowerCase().includes(searchTerm.toLowerCase())
+        normalizeStr(item.codigo).includes(normalizeStr(searchTerm)) ||
+        normalizeStr(item.descripcion).includes(normalizeStr(searchTerm))
 
       const matchesEstado = filterEstado === 'todos' || item.estado === filterEstado
 

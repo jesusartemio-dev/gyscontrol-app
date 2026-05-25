@@ -1,3 +1,4 @@
+import { normalizeStr } from '@/lib/utils'
 // ===================================================
 // 📁 Archivo: catalogoEquipos.ts
 // 📌 Ubicación: src/lib/services/
@@ -38,7 +39,7 @@ export async function obtenerCatalogoEquipos(): Promise<CatalogoEquipo[]> {
 export async function buscarEquipos(query: string): Promise<CatalogoEquipo[]> {
   const equipos = await obtenerCatalogoEquipos()
   return equipos.filter(equipo =>
-    equipo.descripcion.toLowerCase().includes(query.toLowerCase()) ||
-    equipo.codigo.toLowerCase().includes(query.toLowerCase())
+    normalizeStr(equipo.descripcion).includes(normalizeStr(query)) ||
+    normalizeStr(equipo.codigo).includes(normalizeStr(query))
   )
 }

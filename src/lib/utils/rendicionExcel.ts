@@ -1,3 +1,4 @@
+import { normalizeStr } from '@/lib/utils'
 import * as XLSX from 'xlsx'
 
 // ============================================
@@ -148,15 +149,15 @@ export function validarRendicionImport(
 
   const proyectoPorCodigo = new Map<string, ProyectoRef>()
   for (const p of proyectos) {
-    proyectoPorCodigo.set(p.codigo.toLowerCase().trim(), p)
+    proyectoPorCodigo.set(normalizeStr(p.codigo), p)
   }
   const ccPorNombre = new Map<string, CentroCostoRef>()
   for (const cc of centrosCosto) {
-    ccPorNombre.set(cc.nombre.toLowerCase().trim(), cc)
+    ccPorNombre.set(normalizeStr(cc.nombre), cc)
   }
   const empleadoPorEmail = new Map<string, EmpleadoRef>()
   for (const e of empleados) {
-    empleadoPorEmail.set(e.email.toLowerCase().trim(), e)
+    empleadoPorEmail.set(normalizeStr(e.email), e)
   }
 
   const parsedRows: RendicionValidatedRow[] = []

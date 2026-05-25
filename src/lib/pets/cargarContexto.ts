@@ -1,3 +1,4 @@
+import { normalizeStr } from '@/lib/utils'
 import { prisma } from '@/lib/prisma'
 import type { IpercFila, Pets } from '@prisma/client'
 
@@ -57,7 +58,7 @@ export type ContextoPets = {
 function dedupe(arr: string[]): string[] {
   const seen = new Set<string>()
   return arr.filter(s => {
-    const k = s.toLowerCase().trim()
+    const k = normalizeStr(s)
     if (seen.has(k)) return false
     seen.add(k)
     return true

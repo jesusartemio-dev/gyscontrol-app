@@ -1,5 +1,7 @@
 'use client'
 
+import { normalizeStr } from '@/lib/utils'
+
 import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -131,8 +133,8 @@ export default function CatalogoCondicionesPage() {
   const condicionesFiltradas = useMemo(() => {
     return condiciones.filter(cond => {
       const matchSearch = searchTerm === '' ||
-        cond.descripcion.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        cond.codigo.toLowerCase().includes(searchTerm.toLowerCase())
+        normalizeStr(cond.descripcion).includes(normalizeStr(searchTerm)) ||
+        normalizeStr(cond.codigo).includes(normalizeStr(searchTerm))
 
       const matchCategoria = categoriaFiltro === '__ALL__' || cond.categoriaId === categoriaFiltro
       const matchTipo = tipoFiltro === '__ALL__' || cond.tipo === tipoFiltro

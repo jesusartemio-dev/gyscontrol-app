@@ -29,7 +29,7 @@ import { toast } from 'sonner'
 
 import { reordenarCotizacionEquipoItems } from '@/lib/services/cotizacionEquipoItem'
 import type { CotizacionEquipoItem } from '@/types'
-import { cn } from '@/lib/utils'
+import { cn, normalizeStr } from '@/lib/utils'
 
 function monthsAgo(date: string): number {
   return Math.floor((Date.now() - new Date(date).getTime()) / (30.44 * 24 * 60 * 60 * 1000))
@@ -348,9 +348,9 @@ export default function CotizacionEquipoItemTable({
   ) / 100
 
   const filteredItems = localItems.filter(i =>
-    i.descripcion.toLowerCase().includes(filter.toLowerCase()) ||
-    i.codigo.toLowerCase().includes(filter.toLowerCase()) ||
-    i.marca?.toLowerCase().includes(filter.toLowerCase())
+    normalizeStr(i.descripcion).includes(normalizeStr(filter)) ||
+    normalizeStr(i.codigo).includes(normalizeStr(filter)) ||
+    normalizeStr(i.marca).includes(normalizeStr(filter))
   )
 
   const handleDragEnd = async (event: DragEndEvent) => {

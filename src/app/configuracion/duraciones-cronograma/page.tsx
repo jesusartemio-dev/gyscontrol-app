@@ -1,5 +1,7 @@
 'use client'
 
+import { normalizeStr } from '@/lib/utils'
+
 import React, { useState, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -258,7 +260,7 @@ export default function DuracionesCronogramaPage() {
   }
 
   const filteredPlantillas = plantillas.filter(p =>
-    getNivelLabel(p.nivel).toLowerCase().includes(searchTerm.toLowerCase())
+    normalizeStr(getNivelLabel(p.nivel)).includes(normalizeStr(searchTerm))
   )
 
   if (loading) {

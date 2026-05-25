@@ -1,5 +1,7 @@
 'use client'
 
+import { normalizeStr } from '@/lib/utils'
+
 import { useEffect, useState } from 'react'
 import EdtModal from '@/components/catalogo/EdtModal'
 import EdtTableView from '@/components/catalogo/EdtTableView'
@@ -41,7 +43,7 @@ export default function Page() {
   // Filtrar EDTs
   const edtsFiltrados = edts.filter(edt => {
     if (!searchTerm.trim()) return true
-    const term = searchTerm.toLowerCase().trim()
+    const term = normalizeStr(searchTerm)
     const nombreMatch = edt.nombre.toLowerCase().includes(term)
     const descripcionMatch = edt.descripcion?.toLowerCase().includes(term) || false
     return nombreMatch || descripcionMatch

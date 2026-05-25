@@ -1,5 +1,7 @@
 'use client'
 
+import { normalizeStr } from '@/lib/utils'
+
 /**
  * AprobacionCampoList - Lista de registros de campo para aprobar/rechazar
  *
@@ -231,9 +233,9 @@ export function AprobacionCampoList({
   const registrosFiltrados = registros.filter(r => {
     const cumpleProyecto = filtroProyecto === 'todos' || r.proyecto.id === filtroProyecto
     const cumpleBusqueda = filtroBusqueda === '' ||
-      r.proyecto.codigo.toLowerCase().includes(filtroBusqueda.toLowerCase()) ||
-      r.supervisor.name?.toLowerCase().includes(filtroBusqueda.toLowerCase()) ||
-      r.supervisor.email.toLowerCase().includes(filtroBusqueda.toLowerCase())
+      normalizeStr(r.proyecto.codigo).includes(normalizeStr(filtroBusqueda)) ||
+      normalizeStr(r.supervisor.name).includes(normalizeStr(filtroBusqueda)) ||
+      normalizeStr(r.supervisor.email).includes(normalizeStr(filtroBusqueda))
     return cumpleProyecto && cumpleBusqueda
   })
 

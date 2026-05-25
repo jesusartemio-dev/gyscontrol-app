@@ -1,5 +1,7 @@
 'use client'
 
+import { normalizeStr } from '@/lib/utils'
+
 import { useEffect, useState } from 'react'
 import {
   getCategoriasGasto,
@@ -61,7 +63,7 @@ export default function CategoriasGastoPage() {
   // Filtrar categorías
   const categoriasFiltradas = categorias.filter(cat => {
     if (!searchTerm.trim()) return true
-    const term = searchTerm.toLowerCase().trim()
+    const term = normalizeStr(searchTerm)
     const nombreMatch = cat.nombre.toLowerCase().includes(term)
     const descripcionMatch = cat.descripcion?.toLowerCase().includes(term) || false
     return nombreMatch || descripcionMatch

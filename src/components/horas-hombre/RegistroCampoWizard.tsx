@@ -1,5 +1,7 @@
 'use client'
 
+import { normalizeStr } from '@/lib/utils'
+
 /**
  * RegistroCampoWizard - Wizard para registrar horas de campo (cuadrilla)
  *
@@ -544,7 +546,7 @@ export function RegistroCampoWizard({
   // Filtrar personal por búsqueda y rol
   const personalFiltrado = React.useMemo(() => {
     return personalArray.filter(p => {
-      const nombreMatch = (p.user.name || p.user.email || '').toLowerCase().includes(busquedaPersonal.toLowerCase())
+      const nombreMatch = normalizeStr(p.user.name || p.user.email || '').includes(normalizeStr(busquedaPersonal))
       const rolMatch = filtroRol === 'todos' || p.rol === filtroRol
       return nombreMatch && rolMatch
     })

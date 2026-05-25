@@ -1,5 +1,7 @@
 'use client'
 
+import { normalizeStr } from '@/lib/utils'
+
 // ===================================================
 // 📁 Archivo: CatalogoServicioList.tsx
 // 📌 Ubicación: src/components/catalogo/
@@ -45,7 +47,7 @@ export default function CatalogoServicioList({ data, onUpdate, onDelete }: Props
     (filtroCategoria !== '__ALL__' ? s.categoriaId === filtroCategoria : true) &&
     (filtroUnidad !== '__ALL__' ? s.unidadServicioId === filtroUnidad : true) &&
     (filtroRecurso !== '__ALL__' ? s.recursoId === filtroRecurso : true) &&
-    (`${s.nombre} ${s.descripcion}`.toLowerCase().includes(filtroTexto.toLowerCase()))
+    (normalizeStr(`${s.nombre} ${s.descripcion}`).includes(filtroTexto.toLowerCase()))
   )
 
   return (

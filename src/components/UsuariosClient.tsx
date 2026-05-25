@@ -56,7 +56,7 @@ import {
 } from '@/components/ui/table'
 import { DeleteAlertDialog } from '@/components/ui/DeleteAlertDialog'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { cn } from '@/lib/utils'
+import { cn, normalizeStr } from '@/lib/utils'
 import type { RolUsuario } from '@/types/modelos'
 
 // Extended user type with auth info from API
@@ -493,8 +493,8 @@ export default function UsuariosClient() {
   const filteredUsuarios = useMemo(() => {
     return usuarios.filter(user => {
       const matchesSearch = searchQuery === '' ||
-        user.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        user.email?.toLowerCase().includes(searchQuery.toLowerCase())
+        normalizeStr(user.name).includes(normalizeStr(searchQuery)) ||
+        normalizeStr(user.email).includes(normalizeStr(searchQuery))
 
       const matchesRole = roleFilter === 'all' || user.role === roleFilter
 

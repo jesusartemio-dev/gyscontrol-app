@@ -27,7 +27,7 @@ import {
   Plus,
   PackagePlus,
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, normalizeStr } from '@/lib/utils'
 
 interface CatalogoEquipo {
   id: string
@@ -127,11 +127,11 @@ export function PedidoItemDirectoModal({ open, onClose, pedidoId, onCreated }: P
   )
 
   const filteredCatalogo = useMemo(() => {
-    const words = searchTerm.toLowerCase().trim().split(/\s+/).filter(Boolean)
+    const words = normalizeStr(searchTerm).split(/\s+/).filter(Boolean)
     return catalogoItems
       .filter(eq => {
         const matchSearch = words.length === 0 || (() => {
-          const haystack = `${eq.codigo} ${eq.descripcion} ${eq.marca} ${eq.categoriaEquipo?.nombre || ''}`.toLowerCase()
+          const haystack = normalizeStr(`${eq.codigo} ${eq.descripcion} ${eq.marca} ${eq.categoriaEquipo?.nombre || ''}`)
           return words.every(w => haystack.includes(w))
         })()
         const matchCat = categoriaFiltro === '__ALL__' || eq.categoriaEquipo?.nombre === categoriaFiltro

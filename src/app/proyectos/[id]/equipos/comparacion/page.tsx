@@ -1,3 +1,4 @@
+import { normalizeStr } from '@/lib/utils'
 // ===================================================
 // 📁 Archivo: page.tsx
 // 📌 Ubicación: src/app/proyectos/[id]/equipos/comparacion/page.tsx
@@ -344,10 +345,10 @@ export default function ComparacionEquiposPage() {
     const lei = item.lei
     
     const matchesSearch = 
-      pei?.descripcion?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      pei?.marca?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lei?.descripcion?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lei?.codigo?.toLowerCase().includes(searchTerm.toLowerCase())
+      normalizeStr(pei?.descripcion).includes(normalizeStr(searchTerm)) ||
+      normalizeStr(pei?.marca).includes(normalizeStr(searchTerm)) ||
+      normalizeStr(lei?.descripcion).includes(normalizeStr(searchTerm)) ||
+      normalizeStr(lei?.codigo).includes(normalizeStr(searchTerm))
     
     const matchesFilter = filterStatus === 'all' || item.type?.toLowerCase() === filterStatus.toLowerCase()
     

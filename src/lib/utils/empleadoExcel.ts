@@ -1,3 +1,4 @@
+import { normalizeStr } from '@/lib/utils'
 // ===============================
 // 📁 empleadoExcel.ts
 // 🔧 Utilidades para exportar/importar empleados desde Excel
@@ -283,7 +284,7 @@ export async function leerEmpleadosDesdeExcel(file: File): Promise<EmpleadoImpor
     }
 
     const estadoRaw = getColumn(row, 'Estado', 'estado', 'ESTADO', 'Activo', 'activo')
-    const estadoStr = typeof estadoRaw === 'string' ? estadoRaw.toLowerCase().trim() : 'activo'
+    const estadoStr = typeof estadoRaw === 'string' ? normalizeStr(estadoRaw) : 'activo'
     const activo = estadoStr === 'activo' || estadoStr === 'si' || estadoStr === 'sí' || estadoStr === 'true' || estadoStr === '1'
 
     // Parse fecha ingreso

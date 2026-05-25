@@ -1,3 +1,4 @@
+import { normalizeStr } from '@/lib/utils'
 // ===============================
 // 📁 recursoImportUtils.ts
 // 🔧 Utilidades para importar recursos desde Excel
@@ -46,7 +47,7 @@ export async function leerRecursosDesdeExcel(file: File): Promise<RecursoImporta
 
     // Tipo
     const tipoRaw = getColumn(row, 'Tipo', 'tipo', 'TIPO', 'Type', 'type')
-    const tipoStr = typeof tipoRaw === 'string' ? tipoRaw.toLowerCase().trim() : 'individual'
+    const tipoStr = typeof tipoRaw === 'string' ? normalizeStr(tipoRaw) : 'individual'
     const tipo: 'individual' | 'cuadrilla' =
       tipoStr === 'cuadrilla' || tipoStr === 'crew' || tipoStr === 'equipo' || tipoStr === 'grupo'
         ? 'cuadrilla'
@@ -54,7 +55,7 @@ export async function leerRecursosDesdeExcel(file: File): Promise<RecursoImporta
 
     // Origen
     const origenRaw = getColumn(row, 'Origen', 'origen', 'ORIGEN', 'Origin', 'origin')
-    const origenStr = typeof origenRaw === 'string' ? origenRaw.toLowerCase().trim() : 'propio'
+    const origenStr = typeof origenRaw === 'string' ? normalizeStr(origenRaw) : 'propio'
     const origen: 'propio' | 'externo' =
       origenStr === 'externo' || origenStr === 'external' || origenStr === 'tercero'
         ? 'externo'

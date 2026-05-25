@@ -1,3 +1,4 @@
+import { normalizeStr } from '@/lib/utils'
 // ===============================
 // 📁 cargoExcel.ts
 // 🔧 Utilidades para exportar/importar cargos desde Excel
@@ -99,7 +100,7 @@ export async function leerCargosDesdeExcel(file: File): Promise<CargoImportado[]
       throw new Error(`Fila ${index + 2}: El nombre es obligatorio`)
     }
 
-    const estadoRaw = typeof row['Estado'] === 'string' ? row['Estado'].toLowerCase().trim() : 'activo'
+    const estadoRaw = typeof row['Estado'] === 'string' ? normalizeStr(row['Estado']) : 'activo'
     const activo = estadoRaw === 'activo' || estadoRaw === 'si' || estadoRaw === 'sí' || estadoRaw === 'true' || estadoRaw === '1'
 
     return {

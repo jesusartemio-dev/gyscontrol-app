@@ -1,5 +1,7 @@
 'use client'
 
+import { normalizeStr } from '@/lib/utils'
+
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
@@ -162,7 +164,7 @@ export default function PlantillasOrganigramaPage() {
   }
 
   const filtered = plantillas.filter(p =>
-    !search || p.nombre.toLowerCase().includes(search.toLowerCase())
+    !search || normalizeStr(p.nombre).includes(normalizeStr(search))
   )
 
   const deletingPlantilla = plantillas.find(p => p.id === deletingId)

@@ -1,5 +1,7 @@
 'use client'
 
+import { normalizeStr } from '@/lib/utils'
+
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
@@ -63,9 +65,9 @@ export default function CrmClientesPage() {
     // Search filter
     if (searchTerm) {
       filtered = filtered.filter(cliente =>
-        cliente.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        cliente.ruc?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        cliente.correo?.toLowerCase().includes(searchTerm.toLowerCase())
+        normalizeStr(cliente.nombre).includes(normalizeStr(searchTerm)) ||
+        normalizeStr(cliente.ruc).includes(normalizeStr(searchTerm)) ||
+        normalizeStr(cliente.correo).includes(normalizeStr(searchTerm))
       )
     }
 

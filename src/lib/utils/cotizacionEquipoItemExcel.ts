@@ -1,3 +1,4 @@
+import { normalizeStr } from '@/lib/utils'
 // ===================================================
 // Archivo: cotizacionEquipoItemExcel.ts
 // Ubicación: src/lib/utils/
@@ -383,7 +384,7 @@ export function validarEImportarEquipoItems(
   let contadorProvisional = 1
 
   // Crear set de nombres de categorías válidas (lowercase para comparación)
-  const categoriasSet = new Set(categoriasValidas.map(c => c.nombre.toLowerCase().trim()))
+  const categoriasSet = new Set(categoriasValidas.map(c => normalizeStr(c.nombre)))
 
   // Tolerancia para comparación de precios (0.01 = 1 centavo)
   const PRICE_TOLERANCE = 0.01
@@ -471,7 +472,7 @@ export function validarEImportarEquipoItems(
 
     // Validar que la categoría exista (si no viene del catálogo y se especificó una)
     if (!catalogoEquipo && categoriaExcel && categoriasValidas.length > 0) {
-      if (!categoriasSet.has(categoriaExcel.toLowerCase().trim())) {
+      if (!categoriasSet.has(normalizeStr(categoriaExcel))) {
         errores.push(`Fila ${fila}: La categoría '${categoriaExcel}' no existe en el sistema`)
         continue
       }
@@ -551,7 +552,7 @@ export function validarEImportarEquipoItems(
 
     // Detectar si ya existe un item con el mismo código en la cotización
     const existingItem = existingItems.find(
-      item => item.codigo.toLowerCase().trim() === codigo.toLowerCase().trim()
+      item => normalizeStr(item.codigo) === normalizeStr(codigo)
     )
 
     // Verificar si el código está duplicado en el Excel (no se puede agregar al catálogo)

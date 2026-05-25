@@ -1,3 +1,4 @@
+import { normalizeStr } from '@/lib/utils'
 // ===================================================
 // Archivo: exclusionesExcel.ts
 // Ubicacion: src/lib/utils/exclusionesExcel.ts
@@ -79,7 +80,7 @@ export function validarExclusionesImportadas(
     let categoriaId: string | undefined
     const categoriaNombre = row['Categoria'] || row['categoria'] || row['CATEGORIA']
     if (categoriaNombre && typeof categoriaNombre === 'string') {
-      categoriaId = categoriaPorNombre.get(categoriaNombre.toLowerCase().trim())
+      categoriaId = categoriaPorNombre.get(normalizeStr(categoriaNombre))
       if (!categoriaId) {
         errores.push(`Fila ${fila}: Categoria "${categoriaNombre}" no existe`)
         return

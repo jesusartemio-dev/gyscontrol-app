@@ -1,3 +1,4 @@
+import { normalizeStr } from '@/lib/utils'
 /**
  * 🎯 CotizacionesProveedorTableView Component
  *
@@ -74,9 +75,9 @@ const CotizacionesProveedorTableView: React.FC<Props> = ({
   const filteredCotizaciones = useMemo(() => {
     return cotizaciones.filter(cot => {
       const matchesSearch = searchTerm === '' ||
-        cot.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        cot.proveedor?.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        cot.proyecto?.nombre?.toLowerCase().includes(searchTerm.toLowerCase());
+        normalizeStr(cot.codigo).includes(normalizeStr(searchTerm)) ||
+        normalizeStr(cot.proveedor?.nombre).includes(normalizeStr(searchTerm)) ||
+        normalizeStr(cot.proyecto?.nombre).includes(normalizeStr(searchTerm));
 
       const matchesEstado = filterEstado === 'todos' || cot.estado === filterEstado;
 

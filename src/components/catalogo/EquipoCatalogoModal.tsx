@@ -1,5 +1,7 @@
 'use client'
 
+import { normalizeStr } from '@/lib/utils'
+
 // ===================================================
 // 📁 Archivo: EquipoCatalogoModal.tsx
 // 📌 Ubicación: src/components/catalogo/
@@ -34,7 +36,7 @@ export default function EquipoCatalogoModal({ abierto, onClose, onSeleccionar }:
 
   const equiposFiltrados = equipos.filter(eq =>
     (filtroCategoria === '__ALL__' || eq.categoriaId === filtroCategoria) &&
-    (`${eq.codigo} ${eq.descripcion}`.toLowerCase().includes(filtroTexto.toLowerCase()))
+    (normalizeStr(`${eq.codigo} ${eq.descripcion}`).includes(filtroTexto.toLowerCase()))
   )
 
   return (

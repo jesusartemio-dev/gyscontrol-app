@@ -1,3 +1,4 @@
+import { normalizeStr } from '@/lib/utils'
 // ===================================================
 // 📁 Archivo: ModalCrearCotizacionCompleta.tsx
 // 📌 Descripción: Modal completo para crear cotización con proveedor e items
@@ -157,8 +158,8 @@ export default function ModalCrearCotizacionCompleta({
 
   // 🔍 Filtrar items por búsqueda
   const itemsFiltrados = items.filter(item =>
-    item.descripcion.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.codigo.toLowerCase().includes(searchTerm.toLowerCase())
+    normalizeStr(item.descripcion).includes(normalizeStr(searchTerm)) ||
+    normalizeStr(item.codigo).includes(normalizeStr(searchTerm))
   )
 
   // 📊 Estadísticas de items

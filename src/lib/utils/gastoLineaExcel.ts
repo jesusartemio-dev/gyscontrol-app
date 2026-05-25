@@ -1,3 +1,4 @@
+import { normalizeStr } from '@/lib/utils'
 // ===================================================
 // Archivo: gastoLineaExcel.ts
 // Ubicación: src/lib/utils/
@@ -81,7 +82,7 @@ export function validarGastoLineas(
   }
 
   const categoriasMap = new Map<string, string>()
-  categorias.forEach(c => categoriasMap.set(c.nombre.toLowerCase().trim(), c.id))
+  categorias.forEach(c => categoriasMap.set(normalizeStr(c.nombre), c.id))
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]

@@ -1,3 +1,4 @@
+import { normalizeStr } from '@/lib/utils'
 import * as XLSX from 'xlsx'
 
 // ============================================
@@ -137,7 +138,7 @@ export function validarCxCImport(
   }
   const proyectoPorCodigo = new Map<string, ProyectoRef>()
   for (const p of proyectos) {
-    proyectoPorCodigo.set(p.codigo.toLowerCase().trim(), p)
+    proyectoPorCodigo.set(normalizeStr(p.codigo), p)
   }
 
   for (let i = 0; i < rows.length; i++) {

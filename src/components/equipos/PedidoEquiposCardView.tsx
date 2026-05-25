@@ -19,7 +19,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Search, Filter, Eye, Edit, Trash2, Package, Calendar, DollarSign, User, Truck, Clock, X } from 'lucide-react';
 import Link from 'next/link';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { formatCurrency, formatDate, normalizeStr } from '@/lib/utils';
 
 interface Props {
   pedidos: PedidoEquipo[];
@@ -85,9 +85,9 @@ const PedidoEquiposCardView = memo(function PedidoEquiposCardView({
   const filteredPedidos = useMemo(() => {
     return pedidos.filter(pedido => {
       const matchesSearch = searchTerm === '' ||
-        pedido.codigo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        pedido.responsable?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        pedido.items?.some(item => item.descripcion.toLowerCase().includes(searchTerm.toLowerCase()));
+        normalizeStr(pedido.codigo).includes(normalizeStr(searchTerm)) ||
+        normalizeStr(pedido.responsable?.name).includes(normalizeStr(searchTerm)) ||
+        pedido.items?.some(item => normalizeStr(item.descripcion).includes(normalizeStr(searchTerm)));
 
       const matchesEstado = filterEstado === 'todos' || pedido.estado?.toLowerCase() === filterEstado.toLowerCase();
 

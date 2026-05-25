@@ -1,3 +1,4 @@
+import { normalizeStr } from '@/lib/utils'
 // ===================================================
 // Parser de Excel exportado desde MS Project
 // Convierte filas planas con Outline Level en jerarquía de 5 niveles
@@ -461,7 +462,7 @@ function parseAssignmentSheet(
 
   const headers = Object.keys(rawRows[0])
   const findCol = (patterns: string[]) =>
-    headers.find(h => patterns.some(p => h.toLowerCase().includes(p.toLowerCase())))
+    headers.find(h => patterns.some(p => normalizeStr(h).includes(normalizeStr(p))))
 
   const colTaskName = findCol(['Task Name', 'Nombre de tarea', 'Task']) || headers[0]
   const colResourceName = findCol(['Resource Name', 'Nombre del recurso', 'Resource']) || headers[1]
@@ -511,7 +512,7 @@ function parseResourceSheet(workbook: XLSX.WorkBook): MSProjectResource[] {
 
   const headers = Object.keys(rawRows[0])
   const findCol = (patterns: string[]) =>
-    headers.find(h => patterns.some(p => h.toLowerCase().includes(p.toLowerCase())))
+    headers.find(h => patterns.some(p => normalizeStr(h).includes(normalizeStr(p))))
 
   const colId = findCol(['ID']) || headers[0]
   const colName = findCol(['Name', 'Nombre']) || headers[1]
@@ -562,7 +563,7 @@ function parseTaskSheet(workbook: XLSX.WorkBook): { rows: MSProjectRow[]; hasWor
   const headers = Object.keys(firstRow)
 
   const findCol = (patterns: string[]) =>
-    headers.find(h => patterns.some(p => h.toLowerCase().includes(p.toLowerCase())))
+    headers.find(h => patterns.some(p => normalizeStr(h).includes(normalizeStr(p))))
 
   const colId = findCol(['ID']) || headers[0]
   const colName = findCol(['Name', 'Nombre', 'Task Name']) || headers[3]

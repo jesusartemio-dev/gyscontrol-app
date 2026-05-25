@@ -1,3 +1,4 @@
+import { normalizeStr } from '@/lib/utils'
 // ===================================================
 // 📁 Archivo: SelectorMultiListaModal.tsx
 // 📌 Descripción: Modal para seleccionar items de múltiples listas para cotizaciones
@@ -202,8 +203,8 @@ export default function SelectorMultiListaModal({
     
     if (searchTerm) {
       items = items.filter(item =>
-        item.descripcion.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.codigo.toLowerCase().includes(searchTerm.toLowerCase())
+        normalizeStr(item.descripcion).includes(normalizeStr(searchTerm)) ||
+        normalizeStr(item.codigo).includes(normalizeStr(searchTerm))
       )
     }
     

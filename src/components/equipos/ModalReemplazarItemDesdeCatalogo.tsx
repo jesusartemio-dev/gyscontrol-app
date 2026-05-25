@@ -1,3 +1,4 @@
+import { normalizeStr } from '@/lib/utils'
 // ===================================================
 // 📁 Archivo: ModalReemplazarItemDesdeCatalogo.tsx
 // 📌 Ubicación: src/components/equipos/
@@ -170,8 +171,8 @@ export default function ModalReemplazarItemDesdeCatalogo({
     const coincideCategoria =
       categoriaFiltro === 'todas' || e.categoriaId === categoriaFiltro
     const coincideTexto =
-      e.codigo.toLowerCase().includes(search.toLowerCase()) ||
-      e.descripcion.toLowerCase().includes(search.toLowerCase())
+      normalizeStr(e.codigo).includes(normalizeStr(search)) ||
+      normalizeStr(e.descripcion).includes(normalizeStr(search))
     return coincideCategoria && coincideTexto
   })
 

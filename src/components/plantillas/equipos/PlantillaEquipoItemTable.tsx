@@ -1,3 +1,4 @@
+import { normalizeStr } from '@/lib/utils'
 // ===================================================
 // 📁 Archivo: PlantillaEquipoItemTable.tsx
 // 📌 Ubicación: src/components/plantillas/equipos/
@@ -57,8 +58,8 @@ export default function PlantillaEquipoItemTable({ items, onUpdated, onDeleted }
   const totalCliente = items.reduce((sum, i) => sum + i.costoCliente, 0)
 
   const filteredItems = items.filter(i =>
-    i.descripcion.toLowerCase().includes(filter.toLowerCase()) ||
-    i.codigo.toLowerCase().includes(filter.toLowerCase())
+    normalizeStr(i.descripcion).includes(normalizeStr(filter)) ||
+    normalizeStr(i.codigo).includes(normalizeStr(filter))
   )
 
   return (

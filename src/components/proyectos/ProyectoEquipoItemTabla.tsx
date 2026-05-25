@@ -1,5 +1,7 @@
 'use client'
 
+import { normalizeStr } from '@/lib/utils'
+
 // ===================================================
 // 📁 Componente: ProyectoEquipoItemTabla.tsx
 // 📌 Descripción: Tabla para mostrar ítems de equipos de un proyecto
@@ -112,8 +114,8 @@ export default function ProyectoEquipoItemTabla({ items, onUpdated }: Props) {
   const filteredAndSortedItems = items
     .filter(item => {
       const matchesSearch = 
-        item.codigo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.descripcion?.toLowerCase().includes(searchTerm.toLowerCase())
+        normalizeStr(item.codigo).includes(normalizeStr(searchTerm)) ||
+        normalizeStr(item.descripcion).includes(normalizeStr(searchTerm))
       
       const matchesStatus = statusFilter === 'all' || item.estado?.toLowerCase() === statusFilter
       

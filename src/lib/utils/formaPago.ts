@@ -1,3 +1,4 @@
+import { normalizeStr } from '@/lib/utils'
 /**
  * Helpers y constantes para los 3 campos de pago:
  *   - condicionPago: cuándo se paga
@@ -83,7 +84,7 @@ export function parsePagoLegacy(legacyCondicion: string | null | undefined, lega
   if (!legacyCondicion) {
     return { condicion: 'contado', forma: null, dias: legacyDias ?? null }
   }
-  const lower = legacyCondicion.toLowerCase().trim()
+  const lower = normalizeStr(legacyCondicion)
 
   if (lower === 'contado') {
     return { condicion: 'contado', forma: null, dias: null }

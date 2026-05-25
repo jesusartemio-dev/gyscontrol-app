@@ -1,5 +1,7 @@
 'use client'
 
+import { normalizeStr } from '@/lib/utils'
+
 import { useEffect, useState, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import {
@@ -175,8 +177,8 @@ export default function ModalAgregarItemDesdeCatalogo({
     let filtered = equipos.filter((e) => {
       const matchCategoria = categoriaFiltro === 'todas' || e.categoriaId === categoriaFiltro
       const matchSearch = !search ||
-        e.codigo.toLowerCase().includes(search.toLowerCase()) ||
-        e.descripcion.toLowerCase().includes(search.toLowerCase())
+        normalizeStr(e.codigo).includes(normalizeStr(search)) ||
+        normalizeStr(e.descripcion).includes(normalizeStr(search))
       return matchCategoria && matchSearch
     })
 

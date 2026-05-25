@@ -19,7 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ArrowUpDown, ArrowUp, ArrowDown, Search, Filter, Eye, Edit, Trash2, Package, Calendar, DollarSign, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { formatCurrency, formatDate, normalizeStr } from '@/lib/utils';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -86,9 +86,9 @@ const PedidoEquiposTableView = memo(function PedidoEquiposTableView({
   const filteredPedidos = useMemo(() => {
     return pedidos.filter(pedido => {
       const matchesSearch = searchTerm === '' ||
-        pedido.codigo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        pedido.responsable?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        pedido.items?.some(item => item.descripcion.toLowerCase().includes(searchTerm.toLowerCase()));
+        normalizeStr(pedido.codigo).includes(normalizeStr(searchTerm)) ||
+        normalizeStr(pedido.responsable?.name).includes(normalizeStr(searchTerm)) ||
+        pedido.items?.some(item => normalizeStr(item.descripcion).includes(normalizeStr(searchTerm)));
 
       const matchesEstado = filterEstado === 'todos' || pedido.estado?.toLowerCase() === filterEstado.toLowerCase();
 

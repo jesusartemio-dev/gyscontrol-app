@@ -1,5 +1,7 @@
 'use client'
 
+import { normalizeStr } from '@/lib/utils'
+
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import Link from 'next/link'
@@ -143,9 +145,9 @@ export default function SolicitudesRecursoPage() {
   }
 
   const filtradas = solicitudes.filter(s =>
-    s.proyecto.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-    s.proyecto.codigo.toLowerCase().includes(busqueda.toLowerCase()) ||
-    (s.titulo ?? '').toLowerCase().includes(busqueda.toLowerCase())
+    normalizeStr(s.proyecto.nombre).includes(normalizeStr(busqueda)) ||
+    normalizeStr(s.proyecto.codigo).includes(normalizeStr(busqueda)) ||
+    normalizeStr((s.titulo ?? '')).includes(normalizeStr(busqueda))
   )
 
   const totalEstimado = (items: SolicitudItem[]) =>

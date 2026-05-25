@@ -1,3 +1,4 @@
+import { normalizeStr } from '@/lib/utils'
 // ===================================================
 // 📁 Archivo: ImportTareasModal.tsx
 // 📌 Ubicación: src/components/cronograma/
@@ -82,8 +83,8 @@ export function ImportTareasModal({
 
   // Filter servicios based on search, category, and availability
   const filteredServicios = servicios.filter(servicio => {
-    const matchesSearch = servicio.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (servicio.descripcion && servicio.descripcion.toLowerCase().includes(searchTerm.toLowerCase()))
+    const matchesSearch = normalizeStr(servicio.nombre).includes(normalizeStr(searchTerm)) ||
+                         (servicio.descripcion && normalizeStr(servicio.descripcion).includes(normalizeStr(searchTerm)))
     const matchesCategory = !categoryFilter || servicio.categoria === categoryFilter
     return matchesSearch && matchesCategory
   })

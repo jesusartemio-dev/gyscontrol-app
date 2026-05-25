@@ -16,7 +16,7 @@ import {
   X
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
+import { cn, normalizeStr } from '@/lib/utils'
 
 interface PlantillaEquipoItemIndependiente {
   id: string
@@ -74,9 +74,9 @@ export default function PlantillaEquiposView({
   const filteredItems = useMemo(() => {
     return items.filter(item => {
       const matchesSearch =
-        item.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.descripcion.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.marca.toLowerCase().includes(searchTerm.toLowerCase())
+        normalizeStr(item.codigo).includes(normalizeStr(searchTerm)) ||
+        normalizeStr(item.descripcion).includes(normalizeStr(searchTerm)) ||
+        normalizeStr(item.marca).includes(normalizeStr(searchTerm))
       const matchesCategory = categoryFilter === 'all' || item.categoria === categoryFilter
       return matchesSearch && matchesCategory
     })

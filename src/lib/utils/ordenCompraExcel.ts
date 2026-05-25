@@ -1,3 +1,4 @@
+import { normalizeStr } from '@/lib/utils'
 import * as XLSX from 'xlsx'
 
 // ============================================
@@ -154,11 +155,11 @@ export function validarOCImport(
   }
   const proyectoPorCodigo = new Map<string, ProyectoRef>()
   for (const p of proyectos) {
-    proyectoPorCodigo.set(p.codigo.toLowerCase().trim(), p)
+    proyectoPorCodigo.set(normalizeStr(p.codigo), p)
   }
   const ccPorNombre = new Map<string, CentroCostoRef>()
   for (const cc of centrosCosto) {
-    ccPorNombre.set(cc.nombre.toLowerCase().trim(), cc)
+    ccPorNombre.set(normalizeStr(cc.nombre), cc)
   }
 
   // Paso 1: Parsear todas las filas

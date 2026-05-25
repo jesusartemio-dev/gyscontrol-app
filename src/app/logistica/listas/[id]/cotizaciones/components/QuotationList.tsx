@@ -1,5 +1,7 @@
 'use client'
 
+import { normalizeStr } from '@/lib/utils'
+
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -76,9 +78,9 @@ export default function QuotationList({
     // Filter by search term
     if (searchTerm) {
       filtered = filtered.filter(q =>
-        q.descripcion?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        q.cotizacion?.proveedor?.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        q.codigo?.toLowerCase().includes(searchTerm.toLowerCase())
+        normalizeStr(q.descripcion).includes(normalizeStr(searchTerm)) ||
+        normalizeStr(q.cotizacion?.proveedor?.nombre).includes(normalizeStr(searchTerm)) ||
+        normalizeStr(q.codigo).includes(normalizeStr(searchTerm))
       )
     }
 

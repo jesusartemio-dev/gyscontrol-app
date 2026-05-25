@@ -1,5 +1,7 @@
 'use client'
 
+import { normalizeStr } from '@/lib/utils'
+
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
@@ -172,7 +174,7 @@ export default function CatalogoEquipoList({ data, onUpdate, onDelete }: Props) 
   const equiposFiltrados = equipos.filter(eq =>
     (categoriaFiltro !== '__ALL__' ? eq.categoriaEquipo?.nombre === categoriaFiltro : true) &&
     (unidadFiltro !== '__ALL__' ? eq.unidad?.nombre === unidadFiltro : true) &&
-    (`${eq.codigo} ${eq.descripcion}`.toLowerCase().includes(textoFiltro.toLowerCase()))
+    (normalizeStr(`${eq.codigo} ${eq.descripcion}`).includes(textoFiltro.toLowerCase()))
   )
 
   // Empty state check

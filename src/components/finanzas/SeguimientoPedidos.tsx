@@ -1,3 +1,4 @@
+import { normalizeStr } from '@/lib/utils'
 // ===================================================
 // 📁 Archivo: SeguimientoPedidos.tsx
 // 📌 Ubicación: src/components/finanzas/SeguimientoPedidos.tsx
@@ -537,14 +538,14 @@ export default function SeguimientoPedidos({
       return pedidosDetalle.filter(pedido => {
       // Búsqueda simple
       const cumpleBusqueda = busquedaLocal === '' || 
-        pedido.proyectoNombre.toLowerCase().includes(busquedaLocal.toLowerCase()) ||
-        pedido.proveedorPrincipal.toLowerCase().includes(busquedaLocal.toLowerCase()) ||
-        pedido.codigo?.toLowerCase().includes(busquedaLocal.toLowerCase())
+        normalizeStr(pedido.proyectoNombre).includes(normalizeStr(busquedaLocal)) ||
+        normalizeStr(pedido.proveedorPrincipal).includes(normalizeStr(busquedaLocal)) ||
+        normalizeStr(pedido.codigo).includes(normalizeStr(busquedaLocal))
       
       // Filtros básicos
       const cumpleEstado = filtroEstadoLocal === '__ALL__' || pedido.estado === filtroEstadoLocal
       const cumpleProyecto = filtroProyectoLocal === '__ALL__' || 
-        pedido.proyectoNombre.toLowerCase().includes(filtroProyectoLocal.toLowerCase())
+        normalizeStr(pedido.proyectoNombre).includes(normalizeStr(filtroProyectoLocal))
       
       // Filtros avanzados tradicionales
       const cumplePrioridad = filtroPrioridad === '__ALL__' || pedido.prioridad === filtroPrioridad

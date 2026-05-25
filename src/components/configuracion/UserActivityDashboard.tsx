@@ -1,5 +1,7 @@
 'use client'
 
+import { normalizeStr } from '@/lib/utils'
+
 import React, { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import * as XLSX from 'xlsx'
@@ -241,10 +243,9 @@ export default function UserActivityDashboard() {
 
   // Filtro de búsqueda client-side
   const usuariosFiltrados = busqueda
-    ? usuarios.filter(
-        u =>
-          (u.name || '').toLowerCase().includes(busqueda.toLowerCase()) ||
-          u.email.toLowerCase().includes(busqueda.toLowerCase())
+    ? usuarios.filter(u =>
+        normalizeStr(u.name || '').includes(normalizeStr(busqueda)) ||
+        normalizeStr(u.email).includes(normalizeStr(busqueda))
       )
     : usuarios
 

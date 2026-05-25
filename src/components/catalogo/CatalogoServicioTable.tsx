@@ -1,5 +1,7 @@
 'use client'
 
+import { normalizeStr } from '@/lib/utils'
+
 import { useEffect, useState } from 'react'
 import { getUnidadesServicio } from '@/lib/services/unidadServicio'
 import { getRecursos } from '@/lib/services/recurso'
@@ -117,7 +119,7 @@ export default function CatalogoServicioTable({ data, onUpdate, onDelete }: Prop
       (filtroCategoria !== '__ALL__' ? s.categoriaId === filtroCategoria : true) &&
       (filtroUnidad !== '__ALL__' ? s.unidadServicioId === filtroUnidad : true) &&
       (filtroRecurso !== '__ALL__' ? s.recursoId === filtroRecurso : true) &&
-      (`${s.nombre} ${s.descripcion}`.toLowerCase().includes(filtroTexto.toLowerCase()))
+      (normalizeStr(`${s.nombre} ${s.descripcion}`).includes(filtroTexto.toLowerCase()))
     )
     .sort((a, b) => {
       const edtA = a.edt?.nombre || ''

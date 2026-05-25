@@ -1,3 +1,4 @@
+import { normalizeStr } from '@/lib/utils'
 // ===================================================
 // 📁 Archivo: ImportEdtModal.tsx
 // 📌 Ubicación: src/components/cronograma/
@@ -83,8 +84,8 @@ export function ImportEdtModal({
 
   // Filter edts based on search
   const filteredEdts = edts.filter(edt => {
-    const matchesSearch = edt.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          (edt.descripcion && edt.descripcion.toLowerCase().includes(searchTerm.toLowerCase()))
+    const matchesSearch = normalizeStr(edt.nombre).includes(normalizeStr(searchTerm)) ||
+                          (edt.descripcion && normalizeStr(edt.descripcion).includes(normalizeStr(searchTerm)))
     return matchesSearch
   })
 

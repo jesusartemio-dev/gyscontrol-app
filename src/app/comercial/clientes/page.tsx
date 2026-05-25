@@ -1,5 +1,7 @@
 'use client'
 
+import { normalizeStr } from '@/lib/utils'
+
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getClientes } from '@/lib/services/cliente'
@@ -99,10 +101,10 @@ export default function ClientesPage() {
 
     if (searchTerm) {
       filtered = filtered.filter(cliente =>
-        cliente.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        cliente.codigo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        cliente.ruc?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        cliente.correo?.toLowerCase().includes(searchTerm.toLowerCase())
+        normalizeStr(cliente.nombre).includes(normalizeStr(searchTerm)) ||
+        normalizeStr(cliente.codigo).includes(normalizeStr(searchTerm)) ||
+        normalizeStr(cliente.ruc).includes(normalizeStr(searchTerm)) ||
+        normalizeStr(cliente.correo).includes(normalizeStr(searchTerm))
       )
     }
 

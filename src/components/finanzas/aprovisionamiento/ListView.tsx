@@ -1,3 +1,4 @@
+import { normalizeStr } from '@/lib/utils'
 /**
  * 📋 ListView Component
  * 
@@ -153,8 +154,8 @@ export const ListView: React.FC<ListViewProps> = ({
   const filteredAndSortedData = useMemo(() => {
     let filtered = data.items.filter((item) => {
       const matchesSearch = 
-        item.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.label.toLowerCase().includes(searchTerm.toLowerCase());
+        normalizeStr(item.titulo).includes(normalizeStr(searchTerm)) ||
+        normalizeStr(item.label).includes(normalizeStr(searchTerm));
       
       const matchesStatus = statusFilter === 'all' || item.estado === statusFilter;
       const matchesType = typeFilter === 'all' || item.tipo === typeFilter;

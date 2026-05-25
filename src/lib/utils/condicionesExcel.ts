@@ -1,3 +1,4 @@
+import { normalizeStr } from '@/lib/utils'
 // ===================================================
 // Archivo: condicionesExcel.ts
 // Ubicacion: src/lib/utils/condicionesExcel.ts
@@ -85,7 +86,7 @@ export function validarCondicionesImportadas(
     let categoriaId: string | undefined
     const categoriaNombre = row['Categoria'] || row['categoria'] || row['CATEGORIA']
     if (categoriaNombre && typeof categoriaNombre === 'string') {
-      categoriaId = categoriaPorNombre.get(categoriaNombre.toLowerCase().trim())
+      categoriaId = categoriaPorNombre.get(normalizeStr(categoriaNombre))
       if (!categoriaId) {
         errores.push(`Fila ${fila}: Categoria "${categoriaNombre}" no existe`)
         return
@@ -96,7 +97,7 @@ export function validarCondicionesImportadas(
     let tipo: string | undefined
     const tipoValue = row['Tipo'] || row['tipo'] || row['TIPO']
     if (tipoValue && typeof tipoValue === 'string') {
-      const tipoNormalizado = tipoValue.toLowerCase().trim()
+      const tipoNormalizado = normalizeStr(tipoValue)
       if (TIPOS_VALIDOS.includes(tipoNormalizado)) {
         tipo = tipoNormalizado
       } else {

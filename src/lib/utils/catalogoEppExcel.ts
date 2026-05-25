@@ -1,3 +1,4 @@
+import { normalizeStr } from '@/lib/utils'
 // ===================================================
 // 📁 Util: catalogoEppExcel.ts
 // 🔧 Descripción: Plantilla, parser y exportador Excel para CatalogoEPP.
@@ -73,7 +74,7 @@ const toNumber = (v: unknown): number | null => {
 // Mapea label de subcategoría a su value enum (case-insensitive, también acepta el value directo)
 const normalizarSubcategoria = (raw: string): string | null => {
   if (!raw) return null
-  const lower = raw.toLowerCase().trim()
+  const lower = normalizeStr(raw)
   // Match por value
   const byValue = SUBCATEGORIAS_EPP.find(s => s.value === lower)
   if (byValue) return byValue.value
@@ -85,7 +86,7 @@ const normalizarSubcategoria = (raw: string): string | null => {
 
 const normalizarTallaCampo = (raw: string | null): string | null => {
   if (!raw) return null
-  const lower = raw.toLowerCase().trim()
+  const lower = normalizeStr(raw)
   const sinAcentos = lower.replace(/[áàä]/g, 'a').replace(/[éèë]/g, 'e').replace(/[íìï]/g, 'i').replace(/[óòö]/g, 'o').replace(/[úùü]/g, 'u')
   const found = TALLA_CAMPOS.find(t => t.value === sinAcentos || t.label.toLowerCase() === lower)
   return found?.value ?? null

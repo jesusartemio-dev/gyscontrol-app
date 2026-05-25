@@ -1,5 +1,7 @@
 'use client'
 
+import { normalizeStr } from '@/lib/utils'
+
 // ===================================================
 // 📁 Archivo: VistaListaCompacta.tsx
 // 📌 Ubicación: src/components/proyectos/equipos/VistaListaCompacta.tsx
@@ -245,11 +247,11 @@ const CompactItem = ({ item, index }: { item: ComparisonData; index: number }) =
   const filteredAndSortedData = useMemo(() => {
     let filtered = comparisons.filter(item => {
       const matchesSearch = !searchTerm || 
-        (item.pei?.descripcion?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-         item.lei?.descripcion?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-         item.pei?.codigo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-         item.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-         item.grupo.toLowerCase().includes(searchTerm.toLowerCase()))
+        (normalizeStr(item.pei?.descripcion).includes(normalizeStr(searchTerm)) ||
+         normalizeStr(item.lei?.descripcion).includes(normalizeStr(searchTerm)) ||
+         normalizeStr(item.pei?.codigo).includes(normalizeStr(searchTerm)) ||
+         normalizeStr(item.category).includes(normalizeStr(searchTerm)) ||
+         normalizeStr(item.grupo).includes(normalizeStr(searchTerm)))
       
       const matchesType = typeFilter === 'all' || item.type === typeFilter
       const matchesCategory = categoryFilter === 'all' || item.category === categoryFilter

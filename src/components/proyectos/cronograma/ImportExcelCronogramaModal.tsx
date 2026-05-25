@@ -1,5 +1,7 @@
 'use client'
 
+import { normalizeStr } from '@/lib/utils'
+
 import React, { useState, useRef, useCallback } from 'react'
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle
@@ -43,15 +45,15 @@ const SKIP_EDT = '__skip__'
  * Returns the catalog EDT id if exactly one match found, otherwise null.
  */
 function autoMatchEdt(excelName: string, catalog: CatalogEdt[]): string | null {
-  const normalized = excelName.toLowerCase().trim()
+  const normalized = normalizeStr(excelName)
 
   // 1. Exact match first
-  const exact = catalog.find(c => c.nombre.toLowerCase().trim() === normalized)
+  const exact = catalog.find(c => normalizeStr(c.nombre) === normalized)
   if (exact) return exact.id
 
   // 2. Catalog name contained in Excel name (e.g. "PLC" in "2.2. PLC")
   const containedMatches = catalog.filter(c =>
-    normalized.includes(c.nombre.toLowerCase().trim())
+    normalized.includes(normalizeStr(c.nombre))
   )
   if (containedMatches.length === 1) return containedMatches[0].id
 

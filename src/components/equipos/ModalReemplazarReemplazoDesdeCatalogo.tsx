@@ -1,3 +1,4 @@
+import { normalizeStr } from '@/lib/utils'
 // ===================================================
 // 📁 Archivo: ModalReemplazarReemplazoDesdeCatalogo.tsx
 // 📌 Ubicación: src/components/equipos/
@@ -220,8 +221,8 @@ export default function ModalReemplazarReemplazoDesdeCatalogo({
     const matchCategoria =
       categoriaFiltro === 'todas' || e.categoriaId === categoriaFiltro
     const matchTexto =
-      e.codigo.toLowerCase().includes(search.toLowerCase()) ||
-      e.descripcion.toLowerCase().includes(search.toLowerCase())
+      normalizeStr(e.codigo).includes(normalizeStr(search)) ||
+      normalizeStr(e.descripcion).includes(normalizeStr(search))
     return matchCategoria && matchTexto
   })
 

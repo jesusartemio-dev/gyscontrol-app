@@ -1,5 +1,7 @@
 'use client'
 
+import { normalizeStr } from '@/lib/utils'
+
 import { useEffect, useState } from 'react'
 import { Search, Link2, Plus, X } from 'lucide-react'
 import {
@@ -67,7 +69,7 @@ export default function VincularCatalogoModal({ item, isOpen, onClose, onVincula
 
   const equiposFiltrados = equipos.filter(eq =>
     (filtroCategoria === '__ALL__' || eq.categoriaId === filtroCategoria) &&
-    (`${eq.codigo} ${eq.descripcion} ${eq.marca || ''}`.toLowerCase().includes(filtro.toLowerCase()))
+    (normalizeStr(`${eq.codigo} ${eq.descripcion} ${eq.marca || ''}`).includes(filtro.toLowerCase()))
   ).slice(0, 50)
 
   const handleVincularExistente = async (catalogo: CatalogoEquipo) => {

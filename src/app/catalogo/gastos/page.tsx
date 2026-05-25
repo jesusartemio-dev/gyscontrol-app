@@ -1,5 +1,7 @@
 'use client'
 
+import { normalizeStr } from '@/lib/utils'
+
 import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import {
@@ -235,8 +237,8 @@ export default function CatalogoGastosPage() {
   const gastosFiltrados = useMemo(() => {
     return gastos.filter(gasto => {
       const matchSearch = searchTerm === '' ||
-        gasto.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        gasto.descripcion.toLowerCase().includes(searchTerm.toLowerCase())
+        normalizeStr(gasto.codigo).includes(normalizeStr(searchTerm)) ||
+        normalizeStr(gasto.descripcion).includes(normalizeStr(searchTerm))
       const matchCategoria = filterCategoria === 'all' || gasto.categoriaId === filterCategoria
       return matchSearch && matchCategoria
     })

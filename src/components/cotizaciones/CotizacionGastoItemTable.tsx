@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { DeleteAlertDialog } from '@/components/ui/DeleteAlertDialog'
 import CotizacionGastoItemEditModal from './CotizacionGastoItemEditModal'
 import type { CotizacionGastoItem } from '@/types'
-import { cn } from '@/lib/utils'
+import { cn, normalizeStr } from '@/lib/utils'
 
 import { formatCurrency as formatUSD } from '@/lib/utils/currency'
 
@@ -25,8 +25,8 @@ export default function CotizacionGastoItemTable({ items, onUpdate, onDelete, is
   const [filter, setFilter] = useState('')
 
   const filteredItems = items.filter((i) =>
-    i.nombre.toLowerCase().includes(filter.toLowerCase()) ||
-    i.descripcion?.toLowerCase().includes(filter.toLowerCase())
+    normalizeStr(i.nombre).includes(normalizeStr(filter)) ||
+    normalizeStr(i.descripcion).includes(normalizeStr(filter))
   )
 
   const totalInterno = filteredItems.reduce((sum, i) => sum + i.costoInterno, 0)

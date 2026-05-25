@@ -1,5 +1,7 @@
 'use client'
 
+import { normalizeStr } from '@/lib/utils'
+
 import { useEffect, useState } from 'react'
 import { Wrench, Table, Grid3X3, Download, Search, Clock, AlertTriangle, Target } from 'lucide-react'
 
@@ -46,8 +48,8 @@ export default function ProyectoServiciosPage() {
   // Filtrar servicios
   const serviciosFiltrados = servicios.filter(servicio => {
     if (!busqueda) return true
-    return servicio.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-      (servicio as any).edt?.nombre?.toLowerCase().includes(busqueda.toLowerCase())
+    return normalizeStr(servicio.nombre).includes(normalizeStr(busqueda)) ||
+      normalizeStr((servicio as any).edt?.nombre).includes(normalizeStr(busqueda))
   })
 
   // Stats compactos

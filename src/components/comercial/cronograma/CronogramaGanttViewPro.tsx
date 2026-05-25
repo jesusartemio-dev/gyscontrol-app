@@ -1,5 +1,7 @@
 'use client'
 
+import { normalizeStr } from '@/lib/utils'
+
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -391,8 +393,8 @@ export function CronogramaGanttViewPro({ cotizacionId, cronogramaId, refreshKey 
 
     if (searchTerm) {
       filtered = filtered.filter(task =>
-        task.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        task.descripcion?.toLowerCase().includes(searchTerm.toLowerCase())
+        normalizeStr(task.nombre).includes(normalizeStr(searchTerm)) ||
+        normalizeStr(task.descripcion).includes(normalizeStr(searchTerm))
       )
     }
 

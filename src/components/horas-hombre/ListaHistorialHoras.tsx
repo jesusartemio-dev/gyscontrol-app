@@ -1,5 +1,7 @@
 'use client'
 
+import { normalizeStr } from '@/lib/utils'
+
 import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -41,7 +43,7 @@ export function ListaHistorialHoras({
     // Convertir fecha a Date si viene como string
     const fechaRegistro = registro.fecha instanceof Date ? registro.fecha : new Date(registro.fecha)
     const cumpleFecha = !filtroFecha || format(fechaRegistro, 'yyyy-MM') === filtroFecha
-    const cumpleProyecto = !filtroProyecto || registro.proyectoNombre.toLowerCase().includes(filtroProyecto.toLowerCase())
+    const cumpleProyecto = !filtroProyecto || normalizeStr(registro.proyectoNombre).includes(normalizeStr(filtroProyecto))
     const cumpleNivel = !filtroNivel || filtroNivel === 'todos' || registro.nivel === filtroNivel
     return cumpleFecha && cumpleProyecto && cumpleNivel
   })

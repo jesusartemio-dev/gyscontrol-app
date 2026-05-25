@@ -1,5 +1,7 @@
 'use client'
 
+import { normalizeStr } from '@/lib/utils'
+
 import { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -120,9 +122,9 @@ export default function PlantillaEquipoMultiAddModal({
     // Filter by search term
     if (searchTerm.trim()) {
       filtered = filtered.filter(equipo => 
-        equipo.descripcion.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        equipo.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        equipo.marca?.toLowerCase().includes(searchTerm.toLowerCase())
+        normalizeStr(equipo.descripcion).includes(normalizeStr(searchTerm)) ||
+        normalizeStr(equipo.codigo).includes(normalizeStr(searchTerm)) ||
+        normalizeStr(equipo.marca).includes(normalizeStr(searchTerm))
       )
     }
     

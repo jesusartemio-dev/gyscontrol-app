@@ -1,5 +1,7 @@
 'use client'
 
+import { normalizeStr } from '@/lib/utils'
+
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -132,7 +134,7 @@ export default function PlantillasView({
   // Filtrar plantillas
   const filteredPlantillas = useMemo(() => {
     return plantillas.filter(plantilla => {
-      const matchesSearch = plantilla.nombre.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchesSearch = normalizeStr(plantilla.nombre).includes(normalizeStr(searchTerm))
       const plantillaType = getPlantillaType(plantilla)
       const matchesType = typeFilter === 'all' || plantillaType === typeFilter
 

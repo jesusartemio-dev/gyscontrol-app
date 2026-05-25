@@ -1,5 +1,7 @@
 'use client'
 
+import { normalizeStr } from '@/lib/utils'
+
 import { useEffect, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
@@ -201,7 +203,7 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
         (categoriaFiltro === '__ALL__' || eq.categoriaEquipo?.nombre === categoriaFiltro) &&
         (estadoFiltro === '__ALL__' || eq.estado === estadoFiltro) &&
         (usoFiltro === '__ALL__' || (usoFiltro === 'con_uso' ? tieneUso : !tieneUso)) &&
-        (searchTerm === '' || `${eq.codigo || ''} ${eq.descripcion || ''} ${eq.marca || ''}`.toLowerCase().includes(searchTerm.toLowerCase()))
+        (searchTerm === '' || normalizeStr(`${eq.codigo || ''} ${eq.descripcion || ''} ${eq.marca || ''}`).includes(searchTerm.toLowerCase()))
       )
     })
     return [...new Set(base.map(eq => eq.marca).filter(Boolean))].sort() as string[]
@@ -216,7 +218,7 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
         (usoFiltro === '__ALL__' || (usoFiltro === 'con_uso' ? tieneUso : !tieneUso)) &&
         (marcaFiltro === '__ALL__' || eq.marca === marcaFiltro) &&
         (searchTerm === '' ||
-          `${eq.codigo || ''} ${eq.descripcion || ''} ${eq.marca || ''}`.toLowerCase().includes(searchTerm.toLowerCase()))
+          normalizeStr(`${eq.codigo || ''} ${eq.descripcion || ''} ${eq.marca || ''}`).includes(searchTerm.toLowerCase()))
       )
     })
   }, [equipos, categoriaFiltro, estadoFiltro, usoFiltro, marcaFiltro, searchTerm])
@@ -694,7 +696,7 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
             </div>
             <div className="overflow-y-auto flex-1 space-y-2 pr-1">
               {allCategorias
-                .filter(c => !buscarCategoria.trim() || c.nombre.toLowerCase().includes(buscarCategoria.toLowerCase()) || c.descripcion?.toLowerCase().includes(buscarCategoria.toLowerCase()))
+                .filter(c => !buscarCategoria.trim() || normalizeStr(c.nombre).includes(normalizeStr(buscarCategoria)) || normalizeStr(c.descripcion).includes(normalizeStr(buscarCategoria)))
                 .map(cat => (
                   <div key={cat.id} className="rounded-lg border p-3 space-y-1">
                     <p className="text-sm font-semibold text-foreground">{cat.nombre}</p>
@@ -706,7 +708,7 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
                   </div>
                 ))
               }
-              {allCategorias.filter(c => !buscarCategoria.trim() || c.nombre.toLowerCase().includes(buscarCategoria.toLowerCase()) || c.descripcion?.toLowerCase().includes(buscarCategoria.toLowerCase())).length === 0 && (
+              {allCategorias.filter(c => !buscarCategoria.trim() || normalizeStr(c.nombre).includes(normalizeStr(buscarCategoria)) || normalizeStr(c.descripcion).includes(normalizeStr(buscarCategoria))).length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-4">No se encontraron categorías</p>
               )}
             </div>

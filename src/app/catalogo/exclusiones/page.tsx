@@ -1,5 +1,7 @@
 'use client'
 
+import { normalizeStr } from '@/lib/utils'
+
 import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -122,8 +124,8 @@ export default function CatalogoExclusionesPage() {
   const exclusionesFiltradas = useMemo(() => {
     return exclusiones.filter(excl => {
       const matchSearch = searchTerm === '' ||
-        excl.descripcion.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        excl.codigo.toLowerCase().includes(searchTerm.toLowerCase())
+        normalizeStr(excl.descripcion).includes(normalizeStr(searchTerm)) ||
+        normalizeStr(excl.codigo).includes(normalizeStr(searchTerm))
 
       const matchCategoria = categoriaFiltro === '__ALL__' || excl.categoriaId === categoriaFiltro
 

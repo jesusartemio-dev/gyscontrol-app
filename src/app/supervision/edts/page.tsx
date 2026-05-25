@@ -52,7 +52,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { cn } from '@/lib/utils'
+import { cn, normalizeStr } from '@/lib/utils'
 
 interface EdtConResponsable {
   id: string
@@ -284,9 +284,9 @@ export default function SupervisionEdtsPage() {
         (filtroResponsable === 'asignado' && edt.responsable)
       const cumpleBusqueda =
         filtroBusqueda === '' ||
-        edt.nombre.toLowerCase().includes(filtroBusqueda.toLowerCase()) ||
-        edt.proyecto.codigo.toLowerCase().includes(filtroBusqueda.toLowerCase()) ||
-        edt.edt?.nombre.toLowerCase().includes(filtroBusqueda.toLowerCase())
+        normalizeStr(edt.nombre).includes(normalizeStr(filtroBusqueda)) ||
+        normalizeStr(edt.proyecto.codigo).includes(normalizeStr(filtroBusqueda)) ||
+        normalizeStr(edt.edt?.nombre).includes(normalizeStr(filtroBusqueda))
 
       return cumpleFiltroProyecto && cumpleFiltroResponsable && cumpleBusqueda
     })

@@ -37,7 +37,7 @@ import {
 } from '@/components/ui/dialog'
 import { DeleteAlertDialog } from '@/components/ui/DeleteAlertDialog'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { cn } from '@/lib/utils'
+import { cn, normalizeStr } from '@/lib/utils'
 import type { Empleado, User, Cargo, Departamento } from '@/types/modelos'
 import { getEmpleados, createEmpleado, updateEmpleado, deleteEmpleado, EmpleadoPayload } from '@/lib/services/empleado'
 import { getCargos } from '@/lib/services/cargo'
@@ -216,11 +216,11 @@ export default function PersonalClient() {
   const filteredEmpleados = useMemo(() => {
     const filtered = empleados.filter(emp => {
       const matchesSearch = !searchTerm ||
-        emp.user?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        emp.user?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        emp.cargo?.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        emp.departamento?.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        emp.documentoIdentidad?.toLowerCase().includes(searchTerm.toLowerCase())
+        normalizeStr(emp.user?.name).includes(normalizeStr(searchTerm)) ||
+        normalizeStr(emp.user?.email).includes(normalizeStr(searchTerm)) ||
+        normalizeStr(emp.cargo?.nombre).includes(normalizeStr(searchTerm)) ||
+        normalizeStr(emp.departamento?.nombre).includes(normalizeStr(searchTerm)) ||
+        normalizeStr(emp.documentoIdentidad).includes(normalizeStr(searchTerm))
 
       const matchesFilter = filterActivo === '__ALL__' ||
         (filterActivo === 'activo' && emp.activo) ||

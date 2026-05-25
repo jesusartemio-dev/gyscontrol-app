@@ -35,7 +35,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Loader2, Target, DollarSign, Settings, FileText, User, Building2, Calendar, TrendingUp, Search, X } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, normalizeStr } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 
 import {
@@ -300,7 +300,7 @@ export default function OportunidadForm({
                             <SelectContent className="max-h-[200px]">
                               {clientes
                                 .filter(cliente =>
-                                  cliente.nombre.toLowerCase().includes(clienteSearch.toLowerCase()) ||
+                                  normalizeStr(cliente.nombre).includes(normalizeStr(clienteSearch)) ||
                                   (cliente.ruc && cliente.ruc.includes(clienteSearch))
                                 )
                                 .map((cliente) => (

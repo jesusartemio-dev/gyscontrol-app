@@ -49,7 +49,7 @@ import {
   ArrowUpDown
 } from 'lucide-react'
 import ConfirmDialog from '@/components/ConfirmDialog'
-import { buildApiUrl, cn } from '@/lib/utils'
+import { buildApiUrl, cn, normalizeStr } from '@/lib/utils'
 
 const ALLOWED_ROLES = ['proyectos', 'coordinador', 'gestor', 'gerente', 'admin']
 
@@ -186,9 +186,9 @@ export default function ProyectosPage() {
     let filtered = [...proyectos]
     if (searchTerm) {
       filtered = filtered.filter(p =>
-        p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.cliente?.nombre?.toLowerCase().includes(searchTerm.toLowerCase())
+        normalizeStr(p.nombre).includes(normalizeStr(searchTerm)) ||
+        normalizeStr(p.codigo).includes(normalizeStr(searchTerm)) ||
+        normalizeStr(p.cliente?.nombre).includes(normalizeStr(searchTerm))
       )
     }
     if (filterStatus !== 'all') filtered = filtered.filter(p => p.estado === filterStatus)
