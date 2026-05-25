@@ -719,14 +719,11 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
                   <tr className="border-b">
                     <th className="w-5 p-0" />
                     <th className="px-3 py-2 text-left font-medium text-gray-600">Código</th>
-                    <th className="px-3 py-2 text-left font-medium text-gray-600">Descripción</th>
-                    <th className="px-3 py-2 text-left font-medium text-gray-600">Proveedor</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-600">Descripción / Proveedor</th>
                     <th className="px-3 py-2 text-center font-medium text-gray-600">Unidad</th>
-                    <th className="px-3 py-2 text-center font-medium text-gray-600">Pedido</th>
-                    <th className="px-3 py-2 text-center font-medium text-gray-600">Atendido</th>
+                    <th className="px-3 py-2 text-center font-medium text-gray-600 w-20">Cant.</th>
                     <th className="px-3 py-2 text-center font-medium text-gray-600">Estado</th>
-                    <th className="px-3 py-2 text-center font-medium text-gray-600">T. Entrega</th>
-                    <th className="px-3 py-2 text-center font-medium text-gray-600">F.Entrega</th>
+                    <th className="px-3 py-2 text-center font-medium text-gray-600 w-24">Entrega</th>
                     <th className="px-3 py-2 text-right font-medium text-gray-600">Costo</th>
                     {pedido.estado === 'borrador' && <th className="px-3 py-2 w-8" />}
                   </tr>
@@ -744,18 +741,21 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
                           <TipoItemBadge tipoItem={(item as any).tipoItem} catalogoEquipoId={(item as any).catalogoEquipoId} />
                         </div>
                       </td>
-                      <td className="px-3 py-2 text-gray-600 max-w-[180px] truncate">
-                        {item.descripcion}
-                      </td>
-                      <td className="px-3 py-2 text-gray-600 max-w-[120px] truncate">
-                        {(item as any).proveedorNombre || (item as any).listaEquipoItem?.proveedor?.nombre || '—'}
+                      <td className="px-3 py-2 text-gray-600 max-w-[240px]">
+                        <p className="line-clamp-2 leading-snug text-sm">{item.descripcion}</p>
+                        {((item as any).proveedorNombre || (item as any).listaEquipoItem?.proveedor?.nombre) && (
+                          <p className="text-[10px] text-muted-foreground/70 mt-0.5 truncate">
+                            {(item as any).proveedorNombre || (item as any).listaEquipoItem?.proveedor?.nombre}
+                          </p>
+                        )}
                       </td>
                       <td className="px-3 py-2 text-center text-gray-500">{item.unidad}</td>
-                      <td className="px-3 py-2 text-center font-medium text-blue-600">
-                        {item.cantidadPedida}
-                      </td>
-                      <td className="px-3 py-2 text-center font-medium text-green-600">
-                        {item.cantidadAtendida || 0}
+                      <td className="px-3 py-2 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <span className="font-medium text-blue-600">{item.cantidadPedida}</span>
+                          <span className="text-gray-300 text-xs">/</span>
+                          <span className="font-medium text-green-600">{item.cantidadAtendida || 0}</span>
+                        </div>
                       </td>
                       <td className="px-3 py-2 text-center">
                         {(item as any).tipoItem === 'servicio' && (item as any).estadoEntrega === 'entregado' ? (
@@ -792,21 +792,29 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
                         {(() => {
                           const ted = (item as any).tiempoEntregaDias
                           const te = (item as any).tiempoEntrega
-                          if (ted != null) return <span className="text-[10px] text-gray-600">{ted} día{ted !== 1 ? 's' : ''}</span>
-                          if (te) return <span className="text-[10px] text-gray-600">{te}</span>
-                          return <span className="text-gray-400">—</span>
-                        })()}
-                      </td>
-                      <td className="px-3 py-2 text-center">
-                        {(() => {
                           const fEstimada = (item as any).fechaEntregaEstimada
                           const fReal = (item as any).fechaEntregaReal
-                          if (fReal) return <span className="text-[10px] text-green-600">{formatDate(fReal)}</span>
-                          if (fEstimada) {
-                            const superaFecha = pedido.fechaNecesaria && new Date(fEstimada) > new Date(pedido.fechaNecesaria)
-                            return <span className={cn('text-[10px]', superaFecha ? 'font-medium text-red-600' : 'text-gray-600')}>{formatDate(fEstimada)}</span>
-                          }
-                          return <span className="text-gray-400">—</span>
+                          const hasTiempo = ted != null || !!te
+                          const hasFecha = !!fReal || !!fEstimada
+                          if (!hasTiempo && !hasFecha) return <span className="text-gray-400">—</span>
+                          return (
+                            <div className="space-y-0.5">
+                              {hasTiempo && (
+                                <div className="text-[10px] text-gray-600">
+                                  {ted != null ? `${ted} día${ted !== 1 ? 's' : ''}` : te}
+                                </div>
+                              )}
+                              {hasFecha && (
+                                <div className={cn('text-[10px]',
+                                  fReal ? 'text-green-600' :
+                                  pedido.fechaNecesaria && fEstimada && new Date(fEstimada) > new Date(pedido.fechaNecesaria)
+                                    ? 'font-medium text-red-600' : 'text-gray-600'
+                                )}>
+                                  {formatDate(fReal || fEstimada)}
+                                </div>
+                              )}
+                            </div>
+                          )
                         })()}
                       </td>
                       <td className="px-3 py-2 text-right font-medium text-emerald-600">
