@@ -740,6 +740,7 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
                 <thead className="bg-gray-50">
                   <tr className="border-b">
                     <th className="w-5 p-0" />
+                    <th className="px-2 py-2 text-center font-medium text-gray-400 w-7">#</th>
                     <th className="px-3 py-2 text-left font-medium text-gray-600">Código</th>
                     <th className="px-3 py-2 text-left font-medium text-gray-600">Descripción / Proveedor</th>
                     <th className="px-3 py-2 text-center font-medium text-gray-600">Unidad</th>
@@ -753,10 +754,11 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
                 <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleDragEndPedidoItems}>
                   <SortableContext items={localPedidoItems.map((i: any) => i.id)} strategy={verticalListSortingStrategy}>
                 <tbody className="divide-y">
-                  {localPedidoItems.map((item: any) => (
+                  {localPedidoItems.map((item: any, idx: number) => (
                     <SortablePedidoItemRow key={item.id} id={item.id}>
                     {(dragHandle) => (<>
                       {dragHandle}
+                      <td className="px-2 py-2 text-center text-[10px] text-gray-400 w-7 select-none">{idx + 1}</td>
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-1.5">
                           <span className="font-mono font-medium">{item.codigo}</span>
