@@ -127,13 +127,13 @@ export function PedidoItemDirectoModal({ open, onClose, pedidoId, onCreated }: P
   )
 
   const filteredCatalogo = useMemo(() => {
-    const s = searchTerm.toLowerCase().trim()
+    const words = searchTerm.toLowerCase().trim().split(/\s+/).filter(Boolean)
     return catalogoItems
       .filter(eq => {
-        const matchSearch = !s ||
-          eq.codigo.toLowerCase().includes(s) ||
-          eq.descripcion.toLowerCase().includes(s) ||
-          eq.marca.toLowerCase().includes(s)
+        const matchSearch = words.length === 0 || (() => {
+          const haystack = `${eq.codigo} ${eq.descripcion} ${eq.marca} ${eq.categoriaEquipo?.nombre || ''}`.toLowerCase()
+          return words.every(w => haystack.includes(w))
+        })()
         const matchCat = categoriaFiltro === '__ALL__' || eq.categoriaEquipo?.nombre === categoriaFiltro
         return matchSearch && matchCat
       })
