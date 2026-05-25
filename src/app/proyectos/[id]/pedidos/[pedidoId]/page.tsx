@@ -149,6 +149,8 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
   const [revertirRechazo, setRevertirRechazo] = useState<{ confirmando: boolean; motivo: string; procesando: boolean }>({ confirmando: false, motivo: '', procesando: false })
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null)
   const [confirmDeleteItem, setConfirmDeleteItem] = useState<{ id: string; codigo: string } | null>(null)
+  const [editItem, setEditItem] = useState<{ id: string; codigo: string; descripcion: string; cantidad: number; comentario: string } | null>(null)
+  const [editSaving, setEditSaving] = useState(false)
   const [showAgregarDeListaModal, setShowAgregarDeListaModal] = useState(false)
   const [localPedidoItems, setLocalPedidoItems] = useState<any[]>([])
 
@@ -246,6 +248,26 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
       toast.error('Error al eliminar el item')
     } finally {
       setDeletingItemId(null)
+    }
+  }
+
+  const handleSaveEditItem = async () => {
+    if (!editItem) return
+    setEditSaving(true)
+    try {
+      const res = await fetch(`/api/pedido-equipo-item/${editItem.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cantidadPedida: editItem.cantidad, comentarioLogistica: editItem.comentario || null }),
+      })
+      if (!res.ok) { toast.error('Error al guardar'); return }
+      toast.success('Item actualizado')
+      setEditItem(null)
+      await reloadPedido()
+    } catch {
+      toast.error('Error al guardar')
+    } finally {
+      setEditSaving(false)
     }
   }
 
@@ -847,14 +869,23 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
                       </td>
                       {pedido.estado === 'borrador' && (
                         <td className="px-2 py-2">
-                          <button
-                            onClick={() => setConfirmDeleteItem({ id: item.id, codigo: item.codigo })}
-                            disabled={deletingItemId === item.id}
-                            className="p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
-                            title="Eliminar item"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                          <div className="flex items-center gap-0.5">
+                            <button
+                              onClick={() => setEditItem({ id: item.id, codigo: item.codigo, descripcion: item.descripcion, cantidad: item.cantidadPedida, comentario: (item as any).comentarioLogistica || '' })}
+                              className="p-1 rounded hover:bg-blue-50 text-gray-400 hover:text-blue-500 transition-colors"
+                              title="Editar item"
+                            >
+                              <Edit className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => setConfirmDeleteItem({ id: item.id, codigo: item.codigo })}
+                              disabled={deletingItemId === item.id}
+                              className="p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
+                              title="Eliminar item"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
                         </td>
                       )}
                     </>)}
@@ -1090,6 +1121,48 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
         listaIdPrincipal={(pedido as any).listaId}
         onCreated={reloadPedido}
       />
+
+      {/* Dialog editar item */}
+      <Dialog open={!!editItem} onOpenChange={(open) => { if (!open && !editSaving) setEditItem(null) }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-sm">Editar item</DialogTitle>
+          </DialogHeader>
+          {editItem && (
+            <div className="space-y-3 py-1">
+              <p className="text-xs text-muted-foreground font-mono truncate">{editItem.codigo} — {editItem.descripcion}</p>
+              <div>
+                <label className="text-[10px] text-muted-foreground font-medium">Cantidad *</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={editItem.cantidad}
+                  onChange={(e) => setEditItem({ ...editItem, cantidad: Number(e.target.value) })}
+                  className="mt-1 w-full h-8 rounded-md border border-input bg-background px-3 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-muted-foreground font-medium">Comentario</label>
+                <input
+                  type="text"
+                  value={editItem.comentario}
+                  onChange={(e) => setEditItem({ ...editItem, comentario: e.target.value })}
+                  placeholder="Comentario adicional..."
+                  className="mt-1 w-full h-8 rounded-md border border-input bg-background px-3 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" size="sm" className="text-xs h-8" onClick={() => setEditItem(null)} disabled={editSaving}>
+              Cancelar
+            </Button>
+            <Button size="sm" className="text-xs h-8" onClick={handleSaveEditItem} disabled={editSaving || !editItem?.cantidad}>
+              {editSaving ? 'Guardando...' : 'Guardar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog confirmar eliminar item */}
       <Dialog open={!!confirmDeleteItem} onOpenChange={(open) => { if (!open) setConfirmDeleteItem(null) }}>
