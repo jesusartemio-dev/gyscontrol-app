@@ -748,6 +748,11 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
                             {(item as any).proveedorNombre || (item as any).listaEquipoItem?.proveedor?.nombre}
                           </p>
                         )}
+                        {(item as any).comentarioLogistica && (
+                          <p className="text-[10px] text-amber-600/80 italic mt-0.5 truncate">
+                            {(item as any).comentarioLogistica}
+                          </p>
+                        )}
                       </td>
                       <td className="px-3 py-2 text-center text-gray-500">{item.unidad}</td>
                       <td className="px-3 py-2 text-center">
