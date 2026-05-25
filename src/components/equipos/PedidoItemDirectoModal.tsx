@@ -514,7 +514,7 @@ export function PedidoItemDirectoModal({ open, onClose, pedidoId, onCreated }: P
 
   function renderFormFields() {
     return (
-      <div className="grid grid-cols-2 gap-3">
+      <div className="space-y-3">
         <div>
           <Label className="text-[10px] text-muted-foreground">Cantidad *</Label>
           <Input
@@ -526,38 +526,6 @@ export function PedidoItemDirectoModal({ open, onClose, pedidoId, onCreated }: P
           />
         </div>
         <div>
-          <Label className="text-[10px] text-muted-foreground">Precio Unitario</Label>
-          <Input
-            type="number"
-            min={0}
-            step={0.01}
-            value={precioUnitario ?? ''}
-            onChange={(e) => setPrecioUnitario(e.target.value ? Number(e.target.value) : null)}
-            className="h-8 text-xs mt-1"
-            placeholder="0.00"
-          />
-        </div>
-        <div>
-          <Label className="text-[10px] text-muted-foreground">Tiempo de entrega</Label>
-          <Input
-            value={tiempoEntrega}
-            onChange={(e) => setTiempoEntrega(e.target.value)}
-            className="h-8 text-xs mt-1"
-            placeholder="ej: 15 días"
-          />
-        </div>
-        <div>
-          <Label className="text-[10px] text-muted-foreground">Días entrega</Label>
-          <Input
-            type="number"
-            min={0}
-            value={tiempoEntregaDias ?? ''}
-            onChange={(e) => setTiempoEntregaDias(e.target.value ? Number(e.target.value) : null)}
-            className="h-8 text-xs mt-1"
-            placeholder="0"
-          />
-        </div>
-        <div className="col-span-2">
           <Label className="text-[10px] text-muted-foreground">Comentario</Label>
           <Input
             value={comentario}
