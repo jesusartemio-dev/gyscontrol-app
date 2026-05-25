@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import CatalogoEquipoForm from '@/components/catalogo/CatalogoEquipoForm'
 import { BotonesImportExport } from '@/components/catalogo/BotonesImportExport'
 import { ModalExportarCatalogo } from '@/components/catalogo/ModalExportarCatalogo'
+import { ModalRevisionImport, type ItemNuevoRevision, type ItemDuplicadoRevision } from '@/components/catalogo/ModalRevisionImport'
 import { importarEquiposDesdeExcel, descargarPlantillaCatalogoEquipo } from '@/lib/utils/equiposExcel'
 import { importarEquiposDesdeExcelValidado } from '@/lib/utils/equiposImportUtils'
 import { recalcularCatalogoEquipo } from '@/lib/utils/recalculoCatalogoEquipo'
@@ -104,9 +105,10 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
   const [vistaConfig, setVistaConfig] = useState<VistaConfig | null>(null)
   const [importando, setImportando] = useState(false)
   const [errores, setErrores] = useState<string[]>([])
-  const [equiposNuevos, setEquiposNuevos] = useState<CatalogoEquipoPayload[]>([])
-  const [equiposDuplicados, setEquiposDuplicados] = useState<CatalogoEquipoConId[]>([])
-  const [mostrarModal, setMostrarModal] = useState(false)
+  const [revisionNuevos, setRevisionNuevos] = useState<ItemNuevoRevision[]>([])
+  const [revisionDuplicados, setRevisionDuplicados] = useState<ItemDuplicadoRevision[]>([])
+  const [showRevisionModal, setShowRevisionModal] = useState(false)
+  const [submittingRevision, setSubmittingRevision] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showPdfImport, setShowPdfImport] = useState(false)
   const [showExportModal, setShowExportModal] = useState(false)
@@ -292,15 +294,17 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
         getCategoriasEquipo(), getUnidades(), getCatalogoEquipos()
       ])
       const codigosExistentes = existingEquipos.map(eq => eq.codigo)
-      const idPorCodigo: Record<string, string> = existingEquipos.reduce((acc, eq) => {
-        acc[eq.codigo] = eq.id; return acc
-      }, {} as Record<string, string>)
+      const existentePorCodigo: Record<string, CatalogoEquipo> = existingEquipos.reduce((acc, eq) => {
+        acc[eq.codigo] = eq; return acc
+      }, {} as Record<string, CatalogoEquipo>)
 
       const { equiposValidos, errores } = await importarEquiposDesdeExcelValidado(datos, cats, units, codigosExistentes)
       if (errores.length > 0) { setErrores(errores); toast.error('Errores en la importación'); return }
+      if (equiposValidos.length === 0) { toast('No hay equipos para importar'); return }
 
-      const nuevos: CatalogoEquipoPayload[] = []
-      const duplicados: CatalogoEquipoConId[] = []
+      const nuevos: ItemNuevoRevision[] = []
+      const duplicados: ItemDuplicadoRevision[] = []
+
       for (const eq of equiposValidos) {
         const payload: CatalogoEquipoPayload = {
           codigo: eq.codigo, descripcion: eq.descripcion, marca: eq.marca,
@@ -309,41 +313,70 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
           precioVenta: eq.precioVenta, categoriaId: eq.categoriaId,
           unidadId: eq.unidadId, estado: eq.estado,
         }
+        const categoriaNombre = cats.find((c: CategoriaEquipo) => c.id === eq.categoriaId)?.nombre || ''
+        const unidadNombre = units.find((u: Unidad) => u.id === eq.unidadId)?.nombre || ''
+
         if (codigosExistentes.includes(eq.codigo)) {
-          duplicados.push({ ...payload, id: idPorCodigo[eq.codigo] })
-        } else { nuevos.push(payload) }
+          const ex = existentePorCodigo[eq.codigo]
+          duplicados.push({
+            id: ex.id,
+            codigo: eq.codigo,
+            nuevo: { descripcion: eq.descripcion, marca: eq.marca, categoriaNombre, unidadNombre, precioLista: eq.precioLista },
+            existente: {
+              descripcion: ex.descripcion,
+              marca: ex.marca,
+              categoriaNombre: ex.categoriaEquipo?.nombre || '',
+              unidadNombre: ex.unidad?.nombre || '',
+              precioLista: ex.precioLista,
+            },
+            _payload: payload,
+          })
+        } else {
+          nuevos.push({ codigo: eq.codigo, descripcion: eq.descripcion, marca: eq.marca, categoriaNombre, unidadNombre, precioLista: eq.precioLista, _payload: payload })
+        }
       }
-      setEquiposNuevos(nuevos)
-      setEquiposDuplicados(duplicados)
-      if (duplicados.length > 0) { setMostrarModal(true) }
-      else if (nuevos.length > 0) { await crearEquiposNuevos(nuevos) }
-      else { toast('No hay equipos nuevos para importar') }
+
+      setRevisionNuevos(nuevos)
+      setRevisionDuplicados(duplicados)
+      setShowRevisionModal(true)
     } catch { toast.error('Error en la importación') }
     finally { setImportando(false); e.target.value = '' }
   }
 
-  const sobrescribirDuplicados = async () => {
+  const procesarImportacion = async (mantenerPrecios: boolean) => {
+    setSubmittingRevision(true)
     try {
-      if (equiposNuevos.length > 0) await crearEquiposNuevos(equiposNuevos)
-      if (equiposDuplicados.length > 0) {
-        await Promise.all(equiposDuplicados.map(eq => {
-          const { id, ...data } = eq
-          return updateCatalogoEquipo(id, recalcularCatalogoEquipo(data))
+      if (revisionNuevos.length > 0) {
+        const creados = await Promise.all(
+          revisionNuevos.map(item => createCatalogoEquipo(recalcularCatalogoEquipo(item._payload)))
+        )
+        setEquipos(prev => [...prev, ...creados])
+      }
+      if (revisionDuplicados.length > 0) {
+        await Promise.all(revisionDuplicados.map(item => {
+          if (mantenerPrecios) {
+            return updateCatalogoEquipo(item.id, {
+              descripcion: item._payload.descripcion,
+              marca: item._payload.marca,
+              categoriaId: item._payload.categoriaId,
+              unidadId: item._payload.unidadId,
+            })
+          }
+          return updateCatalogoEquipo(item.id, recalcularCatalogoEquipo(item._payload))
         }))
       }
-      toast.success('Equipos procesados')
-      setMostrarModal(false)
-      setEquiposNuevos([])
-      setEquiposDuplicados([])
+
+      const partes = []
+      if (revisionNuevos.length > 0) partes.push(`${revisionNuevos.length} creados`)
+      if (revisionDuplicados.length > 0) partes.push(`${revisionDuplicados.length} actualizados`)
+      toast.success(partes.join(', '))
+
+      setShowRevisionModal(false)
+      setRevisionNuevos([])
+      setRevisionDuplicados([])
       cargarDatos()
     } catch { toast.error('Error al procesar') }
-  }
-
-  const crearEquiposNuevos = async (nuevos: CatalogoEquipoPayload[]) => {
-    const equiposParaCrear = nuevos.map(eq => recalcularCatalogoEquipo(eq))
-    const creados = await Promise.all(equiposParaCrear.map(eq => createCatalogoEquipo(eq)))
-    setEquipos(prev => [...prev, ...creados])
-    toast.success(`${creados.length} equipos importados`)
+    finally { setSubmittingRevision(false) }
   }
 
   const handleUpdated = (actualizado: any) => {
@@ -1104,26 +1137,15 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
           </DialogContent>
         </Dialog>
 
-        {/* Duplicate modal */}
-        <Dialog open={mostrarModal} onOpenChange={setMostrarModal}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <AlertCircle className="h-5 w-5 text-amber-500" />Equipos duplicados
-              </DialogTitle>
-              <DialogDescription>Se encontraron {equiposDuplicados.length} códigos existentes. ¿Sobrescribir?</DialogDescription>
-            </DialogHeader>
-            <div className="bg-gray-50 p-3 rounded-lg max-h-40 overflow-y-auto">
-              <div className="flex flex-wrap gap-1">
-                {equiposDuplicados.map((eq, i) => <Badge key={i} variant="outline" className="text-xs font-mono">{eq.codigo}</Badge>)}
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button onClick={sobrescribirDuplicados} className="flex-1">Sobrescribir</Button>
-              <Button variant="outline" onClick={() => { setMostrarModal(false); setEquiposNuevos([]); setEquiposDuplicados([]) }} className="flex-1">Cancelar</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        {/* Modal: Revisión de importación */}
+        <ModalRevisionImport
+          isOpen={showRevisionModal}
+          onClose={() => { setShowRevisionModal(false); setRevisionNuevos([]); setRevisionDuplicados([]) }}
+          nuevos={revisionNuevos}
+          duplicados={revisionDuplicados}
+          onConfirmar={procesarImportacion}
+          submitting={submittingRevision}
+        />
       </div>
     </TooltipProvider>
   )

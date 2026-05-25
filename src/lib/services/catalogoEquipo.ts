@@ -70,8 +70,11 @@ export async function createCatalogoEquipo(data: {
 export async function updateCatalogoEquipo(id: string, data: {
   nombre?: string
   descripcion?: string
+  marca?: string
+  categoriaId?: string
   categoriaEquipoId?: string
   unidadId?: string
+  estado?: string
   precio?: number
   precioLista?: number
   precioInterno?: number
