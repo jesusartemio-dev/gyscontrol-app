@@ -1,4 +1,3 @@
-import { normalizeStr } from '@/lib/utils'
 /**
  * 📋 ListView Component
  * 
@@ -18,6 +17,7 @@ import { normalizeStr } from '@/lib/utils'
  */
 
 'use client';
+import { normalizeStr } from '@/lib/utils'
 
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';

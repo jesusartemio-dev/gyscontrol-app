@@ -1,4 +1,3 @@
-import { normalizeStr } from '@/lib/utils'
 // ===================================================
 // 📁 Archivo: ImportTareasModal.tsx
 // 📌 Ubicación: src/components/cronograma/
@@ -7,6 +6,7 @@ import { normalizeStr } from '@/lib/utils'
 // ===================================================
 
 'use client'
+import { normalizeStr } from '@/lib/utils'
 
 import React, { useState, useEffect } from 'react'
 import {
