@@ -331,7 +331,8 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
     const url = window.location.href
     const estado = ESTADO_LABELS[pedido.estado || ''] ?? pedido.estado ?? ''
     const numItems = localPedidoItems.length
-    return `📦 *${pedido.codigo}* — ${proyecto.nombre}\nEstado: ${estado} | ${numItems} ítem(s)\n🔗 ${url}`
+    const nombre = (pedido as any).nombre ? ` — ${(pedido as any).nombre}` : ''
+    return `📦 *${pedido.codigo}*${nombre}\nProyecto: ${proyecto.nombre}\nEstado: ${estado} | ${numItems} ítem(s)\n🔗 ${url}`
   }, [pedido, proyecto, localPedidoItems])
 
   const handleCopiarEnlace = useCallback(() => {
