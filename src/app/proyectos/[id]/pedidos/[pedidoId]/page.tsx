@@ -321,20 +321,6 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
   const userRole = session?.user?.role || ''
   const puedeConfirmarRecepcion = ['admin', 'gerente', 'logistico', 'coordinador_logistico', 'gestor', 'coordinador'].includes(userRole)
 
-  if (loading) return <LoadingSkeleton />
-  if (!proyecto || !pedido) notFound()
-
-  const stats = {
-    totalItems: pedido.items?.length || 0,
-    totalCost: pedido.items?.reduce((sum, item) => sum + (item.costoTotal || 0), 0) || 0,
-    entregados: pedido.items?.filter((i) => i.estado === 'entregado').length || 0,
-    parciales: pedido.items?.filter((i) => i.estado === 'parcial').length || 0,
-    pendientes: pedido.items?.filter((i) => i.estado === 'pendiente').length || 0,
-    progress: pedido.items?.length
-      ? Math.min(100, (pedido.items.filter((i) => i.estado === 'entregado').length / pedido.items.length) * 100)
-      : 0,
-  }
-
   const ESTADO_LABELS: Record<string, string> = {
     borrador: 'Borrador', enviado: 'Enviado', aprobado: 'Aprobado',
     atendido: 'Atendido', parcial: 'Parcial', entregado: 'Entregado', cancelado: 'Cancelado',
@@ -359,6 +345,20 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
     if (!text) return
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
   }, [buildShareText])
+
+  if (loading) return <LoadingSkeleton />
+  if (!proyecto || !pedido) notFound()
+
+  const stats = {
+    totalItems: pedido.items?.length || 0,
+    totalCost: pedido.items?.reduce((sum, item) => sum + (item.costoTotal || 0), 0) || 0,
+    entregados: pedido.items?.filter((i) => i.estado === 'entregado').length || 0,
+    parciales: pedido.items?.filter((i) => i.estado === 'parcial').length || 0,
+    pendientes: pedido.items?.filter((i) => i.estado === 'pendiente').length || 0,
+    progress: pedido.items?.length
+      ? Math.min(100, (pedido.items.filter((i) => i.estado === 'entregado').length / pedido.items.length) * 100)
+      : 0,
+  }
 
   const getEstadoBadge = (estado: string) => {
     const styles: Record<string, string> = {
