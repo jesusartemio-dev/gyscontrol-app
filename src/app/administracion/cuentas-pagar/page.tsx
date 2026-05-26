@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Loader2, Search, ArrowUpCircle, AlertTriangle, DollarSign, Clock, CheckCircle, Plus, Ban, Package, ChevronRight, ChevronDown, FileSpreadsheet, Upload, Download, Trash2, Pencil, MoreHorizontal, Eye } from 'lucide-react'
@@ -150,7 +151,7 @@ export default function CuentasPagarPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
-  const [filterEstado, setFilterEstado] = useState<string>('all')
+  const [filterEstados, setFilterEstados] = useState<string[]>([])
 
   // Create dialog
   const [showCreateDialog, setShowCreateDialog] = useState(false)
@@ -290,7 +291,7 @@ export default function CuentasPagarPage() {
 
   const filtered = useMemo(() => {
     let result = items
-    if (filterEstado !== 'all') result = result.filter(i => i.estado === filterEstado)
+    if (filterEstados.length > 0) result = result.filter(i => filterEstados.includes(i.estado))
     if (filterProyectoId !== 'all') result = result.filter(i => i.proyectoId === filterProyectoId)
     if (filterFechaDesde) result = result.filter(i => i.fechaVencimiento >= filterFechaDesde)
     if (filterFechaHasta) result = result.filter(i => i.fechaVencimiento <= filterFechaHasta + 'T23:59:59')
@@ -318,7 +319,7 @@ export default function CuentasPagarPage() {
       return 0
     })
     return result
-  }, [items, filterEstado, filterProyectoId, filterFechaDesde, filterFechaHasta, searchTerm, sortField, sortDir])
+  }, [items, filterEstados, filterProyectoId, filterFechaDesde, filterFechaHasta, searchTerm, sortField, sortDir])
 
   const filteredTotals = useMemo(() => {
     const active = filtered.filter(i => i.estado !== 'anulada')
@@ -862,17 +863,49 @@ export default function CuentasPagarPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Buscar proveedor, RUC, factura, proyecto..." className="pl-9" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
           </div>
-          <Select value={filterEstado} onValueChange={setFilterEstado}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Estado" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los estados</SelectItem>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="h-9 w-48 justify-between font-normal text-sm px-3">
+                <span className="truncate">
+                  {filterEstados.length === 0
+                    ? 'Todos los estados'
+                    : filterEstados.length === 1
+                      ? ESTADOS_CXP.find(e => e.value === filterEstados[0])?.label ?? filterEstados[0]
+                      : `${filterEstados.length} estados`}
+                </span>
+                <ChevronDown className="h-4 w-4 shrink-0 opacity-50 ml-1" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-52 p-1" align="start">
               {ESTADOS_CXP.map(e => (
-                <SelectItem key={e.value} value={e.value}>{e.label}</SelectItem>
+                <label
+                  key={e.value}
+                  className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-100 cursor-pointer text-sm"
+                >
+                  <Checkbox
+                    checked={filterEstados.includes(e.value)}
+                    onCheckedChange={(checked) =>
+                      setFilterEstados(prev =>
+                        checked ? [...prev, e.value] : prev.filter(v => v !== e.value)
+                      )
+                    }
+                  />
+                  {e.label}
+                </label>
               ))}
-            </SelectContent>
-          </Select>
+              {filterEstados.length > 0 && (
+                <>
+                  <div className="border-t my-1" />
+                  <button
+                    className="w-full text-left px-2 py-1.5 text-xs text-muted-foreground hover:bg-gray-100 rounded"
+                    onClick={() => setFilterEstados([])}
+                  >
+                    Limpiar selección
+                  </button>
+                </>
+              )}
+            </PopoverContent>
+          </Popover>
           <Select value={filterProyectoId} onValueChange={setFilterProyectoId}>
             <SelectTrigger className="w-36">
               <SelectValue placeholder="Proyecto" />
@@ -889,8 +922,8 @@ export default function CuentasPagarPage() {
             <span className="text-muted-foreground text-xs">—</span>
             <Input type="date" className="w-36 h-9" value={filterFechaHasta} onChange={e => setFilterFechaHasta(e.target.value)} title="Vencimiento hasta" />
           </div>
-          {(filterEstado !== 'all' || filterProyectoId !== 'all' || filterFechaDesde || filterFechaHasta || searchTerm) && (
-            <Button variant="ghost" size="sm" className="text-muted-foreground h-9" onClick={() => { setFilterEstado('all'); setFilterProyectoId('all'); setFilterFechaDesde(''); setFilterFechaHasta(''); setSearchTerm('') }}>
+          {(filterEstados.length > 0 || filterProyectoId !== 'all' || filterFechaDesde || filterFechaHasta || searchTerm) && (
+            <Button variant="ghost" size="sm" className="text-muted-foreground h-9" onClick={() => { setFilterEstados([]); setFilterProyectoId('all'); setFilterFechaDesde(''); setFilterFechaHasta(''); setSearchTerm('') }}>
               Limpiar filtros
             </Button>
           )}
