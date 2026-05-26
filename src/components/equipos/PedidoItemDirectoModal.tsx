@@ -34,6 +34,7 @@ interface CatalogoEquipo {
   codigo: string
   descripcion: string
   marca: string
+  precioLista: number
   precioInterno: number
   precioVenta: number
   categoriaEquipo?: { id: string; nombre: string } | null
@@ -147,7 +148,7 @@ export function PedidoItemDirectoModal({ open, onClose, pedidoId, onCreated }: P
     setUnidad(equipo.unidad?.nombre || '')
     setCategoriaId(equipo.categoriaEquipo?.id || '')
     setCategoriaNombre(equipo.categoriaEquipo?.nombre || '')
-    setPrecioUnitario(equipo.precioVenta || equipo.precioInterno || null)
+    setPrecioUnitario(equipo.precioLista || null)
     setCatalogoEquipoId(equipo.id)
     setRightPanel('catalogo')
   }
