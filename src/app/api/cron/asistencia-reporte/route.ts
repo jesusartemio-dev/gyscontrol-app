@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { processAlerts } from '@/lib/monitoring/alerts'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,7 +44,6 @@ export async function GET(request: NextRequest) {
     const totalMinTarde = tardanzas.reduce((s, t) => s + t.minutosTarde, 0)
 
     if (ausentes.length > 0 || tardanzas.length > 0) {
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
       const detalles = [
         ausentes.length > 0
           ? `Sin marcaje: ${ausentes
@@ -59,29 +59,15 @@ export async function GET(request: NextRequest) {
         .join('\n')
 
       try {
-        await fetch(`${baseUrl}/api/monitoring/alerts`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            alerts: [
-              {
-                type: 'custom',
-                severity: ausentes.length > 5 ? 'error' : 'warning',
-                title: `Reporte diario de asistencia: ${ausentes.length} sin marcaje, ${tardanzas.length} tardanzas`,
-                message: detalles,
-                route: '/admin/asistencia/dashboard',
-                metadata: {
-                  ausentes: ausentes.length,
-                  tardanzas: tardanzas.length,
-                  totalMinTarde,
-                },
-                timestamp: Date.now(),
-              },
-            ],
-            source: 'cron-asistencia',
-            timestamp: Date.now(),
-          }),
-        })
+        await processAlerts([{
+          type: 'custom',
+          severity: ausentes.length > 5 ? 'error' : 'warning',
+          title: `Reporte diario de asistencia: ${ausentes.length} sin marcaje, ${tardanzas.length} tardanzas`,
+          message: detalles,
+          route: '/admin/asistencia/dashboard',
+          metadata: { ausentes: ausentes.length, tardanzas: tardanzas.length, totalMinTarde },
+          timestamp: Date.now(),
+        }])
       } catch (e) {
         console.error('[cron-asistencia] Error enviando alerta', e)
       }
