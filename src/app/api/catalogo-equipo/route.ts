@@ -46,6 +46,24 @@ function buildPrismaSelect(columnas: string[]) {
 export async function GET(req: NextRequest) {
   try {
     const vista = req.nextUrl.searchParams.get('vista')
+    const lite = req.nextUrl.searchParams.get('lite') === 'true'
+
+    // Lightweight mode for import validation — only essential fields, no _count
+    if (lite) {
+      const equipos = await prisma.catalogoEquipo.findMany({
+        select: {
+          id: true,
+          codigo: true,
+          descripcion: true,
+          marca: true,
+          precioLista: true,
+          categoriaEquipo: { select: { id: true, nombre: true } },
+          unidad: { select: { id: true, nombre: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      })
+      return NextResponse.json(equipos)
+    }
 
     // Without vista param: return everything (backward compatible)
     if (!vista || !VALID_VISTAS.includes(vista)) {

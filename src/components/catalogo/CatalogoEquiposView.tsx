@@ -14,7 +14,7 @@ import { importarEquiposDesdeExcelValidado } from '@/lib/utils/equiposImportUtil
 import { recalcularCatalogoEquipo } from '@/lib/utils/recalculoCatalogoEquipo'
 import { getCategoriasEquipo } from '@/lib/services/categoriaEquipo'
 import { getUnidades } from '@/lib/services/unidad'
-import { getCatalogoEquipos, createCatalogoEquipo, updateCatalogoEquipo, deleteCatalogoEquipo } from '@/lib/services/catalogoEquipo'
+import { getCatalogoEquipos, getCatalogoEquiposParaImport, createCatalogoEquipo, updateCatalogoEquipo, deleteCatalogoEquipo } from '@/lib/services/catalogoEquipo'
 import { getVistaConfig, getCatalogoEquiposVista, updateEquipoVista, type Vista, type VistaConfig } from '@/lib/services/catalogoEquipoVista'
 import CatalogoEquipoPrecioHistorial from '@/components/catalogo/CatalogoEquipoPrecioHistorial'
 import ImportarPdfDialog from '@/components/catalogo/ImportarPdfDialog'
@@ -293,12 +293,12 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
     try {
       const datos = await importarEquiposDesdeExcel(file)
       const [cats, units, existingEquipos] = await Promise.all([
-        getCategoriasEquipo(), getUnidades(), getCatalogoEquipos()
+        getCategoriasEquipo(), getUnidades(), getCatalogoEquiposParaImport()
       ])
       const codigosExistentes = existingEquipos.map(eq => eq.codigo)
-      const existentePorCodigo: Record<string, CatalogoEquipo> = existingEquipos.reduce((acc, eq) => {
+      const existentePorCodigo = existingEquipos.reduce((acc, eq) => {
         acc[eq.codigo] = eq; return acc
-      }, {} as Record<string, CatalogoEquipo>)
+      }, {} as Record<string, typeof existingEquipos[number]>)
 
       const { equiposValidos, errores } = await importarEquiposDesdeExcelValidado(datos, cats, units, codigosExistentes)
       if (errores.length > 0) { setErrores(errores); toast.error('Errores en la importación'); return }
@@ -341,7 +341,11 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
       setRevisionNuevos(nuevos)
       setRevisionDuplicados(duplicados)
       setShowRevisionModal(true)
-    } catch { toast.error('Error en la importación') }
+    } catch (err) {
+      console.error('Error en importación Excel:', err)
+      const msg = err instanceof Error ? err.message : 'Error desconocido'
+      toast.error(`Error en la importación: ${msg}`)
+    }
     finally { setImportando(false); e.target.value = '' }
   }
 

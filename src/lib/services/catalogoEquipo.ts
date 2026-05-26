@@ -21,6 +21,26 @@ export async function getCatalogoEquipoById(id: string): Promise<CatalogoEquipo>
   }
 }
 
+type CatalogoEquipoLite = {
+  id: string
+  codigo: string
+  descripcion: string
+  marca: string
+  precioLista: number
+  categoriaEquipo: { id: string; nombre: string } | null
+  unidad: { id: string; nombre: string } | null
+}
+
+// ✅ Obtener catálogo mínimo para validación de imports (sin _count, sin usuarios)
+export async function getCatalogoEquiposParaImport(): Promise<CatalogoEquipoLite[]> {
+  const res = await fetch(buildApiUrl('/api/catalogo-equipo?lite=true'))
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({ error: 'Error desconocido' }))
+    throw new Error(data.error || 'Error al obtener catálogo para importación')
+  }
+  return await res.json()
+}
+
 // ✅ Obtener todo el catálogo de equipos
 export async function getCatalogoEquipos(): Promise<CatalogoEquipo[]> {
   try {
