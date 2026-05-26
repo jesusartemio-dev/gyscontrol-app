@@ -64,6 +64,8 @@ import {
   ExternalLink,
   Zap,
   GripVertical,
+  Copy,
+  MessageCircle,
 } from 'lucide-react'
 import Link from 'next/link'
 import type { Proyecto, PedidoEquipo } from '@/types'
@@ -333,6 +335,31 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
       : 0,
   }
 
+  const ESTADO_LABELS: Record<string, string> = {
+    borrador: 'Borrador', enviado: 'Enviado', aprobado: 'Aprobado',
+    atendido: 'Atendido', parcial: 'Parcial', entregado: 'Entregado', cancelado: 'Cancelado',
+  }
+
+  const buildShareText = useCallback(() => {
+    if (!pedido || !proyecto) return ''
+    const url = window.location.href
+    const estado = ESTADO_LABELS[pedido.estado || ''] ?? pedido.estado ?? ''
+    const numItems = localPedidoItems.length
+    return `📦 *${pedido.codigo}* — ${proyecto.nombre}\nEstado: ${estado} | ${numItems} ítem(s)\n🔗 ${url}`
+  }, [pedido, proyecto, localPedidoItems])
+
+  const handleCopiarEnlace = useCallback(() => {
+    const text = buildShareText()
+    if (!text) return
+    navigator.clipboard.writeText(text).then(() => toast.success('Copiado al portapapeles'))
+  }, [buildShareText])
+
+  const handleCompartirWhatsApp = useCallback(() => {
+    const text = buildShareText()
+    if (!text) return
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
+  }, [buildShareText])
+
   const getEstadoBadge = (estado: string) => {
     const styles: Record<string, string> = {
       entregado: 'bg-green-100 text-green-700 border-green-200',
@@ -379,6 +406,26 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
             </div>
 
             <div className="flex items-center gap-2">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="sm" onClick={handleCopiarEnlace} className="h-7 text-xs">
+                      <Copy className="h-3 w-3 mr-1" />
+                      Copiar
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="text-xs">Copia mensaje listo para pegar en WhatsApp</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCompartirWhatsApp}
+                className="h-7 text-xs text-green-700 border-green-300 hover:bg-green-50"
+              >
+                <MessageCircle className="h-3 w-3 mr-1" />
+                WhatsApp
+              </Button>
               <Button variant="outline" size="sm" onClick={() => setShowEditModal(true)} className="h-7 text-xs">
                 <Edit className="h-3 w-3 mr-1" />
                 Editar
