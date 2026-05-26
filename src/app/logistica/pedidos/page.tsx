@@ -27,7 +27,6 @@ import type { PedidoEquipo } from '@/types'
 
 const ESTADOS_PEDIDO = [
   { value: 'all', label: 'Todos' },
-  { value: 'borrador', label: 'Borrador' },
   { value: 'enviado', label: 'Enviado' },
   { value: 'aprobado', label: 'Aprobado' },
   { value: 'atendido', label: 'Atendido' },
@@ -35,6 +34,8 @@ const ESTADOS_PEDIDO = [
   { value: 'entregado', label: 'Entregado' },
   { value: 'cancelado', label: 'Cancelado' },
 ]
+
+const ESTADOS_VISIBLES_LOGISTICA = ['enviado', 'aprobado', 'atendido', 'parcial', 'entregado', 'cancelado']
 
 export default function LogisticaPedidosPage() {
   const router = useRouter()
@@ -54,7 +55,7 @@ export default function LogisticaPedidosPage() {
     try {
       setRefreshing(true)
       const data = await getAllPedidoEquipos()
-      setPedidos(data || [])
+      setPedidos((data || []).filter(p => ESTADOS_VISIBLES_LOGISTICA.includes(p.estado || '')))
     } catch (error) {
       console.error('Error fetching data:', error)
       toast.error('Error al cargar pedidos')
