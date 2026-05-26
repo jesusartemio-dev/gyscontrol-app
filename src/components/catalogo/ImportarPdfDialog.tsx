@@ -26,6 +26,7 @@ import type { PdfExtractedItem } from '@/app/api/catalogo-equipo/import-pdf/rout
 
 type ReviewItem = PdfExtractedItem & {
   _selected: boolean
+  _updateMode: 'none' | 'prices' | 'all'
   _categoriaId: string
   _unidadId: string
   _editCodigo: string
@@ -122,6 +123,7 @@ export default function ImportarPdfDialog({ open, onClose, categorias, unidades,
       const reviewItems: ReviewItem[] = result.items.map((item: PdfExtractedItem) => ({
         ...item,
         _selected: item.isNew,
+        _updateMode: 'none' as const,
         _categoriaId: matchCategoria(item.categoriaSugerida, categorias),
         _unidadId: matchUnidad(item.unidadSugerida, unidades),
         _editCodigo: item.codigo,
@@ -173,6 +175,7 @@ export default function ImportarPdfDialog({ open, onClose, categorias, unidades,
     nuevos: items.filter(i => i.isNew).length,
     existentes: items.filter(i => !i.isNew).length,
     seleccionados: selectedNewItems.length,
+    aActualizar: items.filter(i => !i.isNew && i._updateMode !== 'none').length,
   }), [items, selectedNewItems])
 
   const toggleSelectAllNew = () => {
@@ -183,12 +186,14 @@ export default function ImportarPdfDialog({ open, onClose, categorias, unidades,
   // ── Step 3: Import ────────────────────────────────────────────────────
 
   const handleImport = async () => {
-    if (selectedNewItems.length === 0) {
-      toast.warning('Selecciona al menos un equipo nuevo para importar')
+    const itemsToUpdate = items.filter(i => !i.isNew && i._updateMode !== 'none')
+
+    if (selectedNewItems.length === 0 && itemsToUpdate.length === 0) {
+      toast.warning('Selecciona al menos un equipo para importar o actualizar')
       return
     }
 
-    // Validate all selected items have categoria and unidad
+    // Validate all selected new items have categoria and unidad
     const invalid = selectedNewItems.filter(i => !i._categoriaId || !i._unidadId)
     if (invalid.length > 0) {
       toast.warning(`${invalid.length} equipo(s) sin categoría o unidad asignada`)
@@ -219,8 +224,19 @@ export default function ImportarPdfDialog({ open, onClose, categorias, unidades,
         }
       })
 
-      const result = await bulkCreateCatalogoEquipo(payload)
-      toast.success(`${result.created} equipo(s) creados exitosamente`)
+      const updatesPayload = itemsToUpdate.map(item => ({
+        id: item.matchedEquipoId!,
+        modo: item._updateMode as 'prices' | 'all',
+        precioLista: item._editPrecioLista || 0,
+        descripcion: item._editDescripcion.trim(),
+        marca: item._editMarca.trim(),
+      }))
+
+      const result = await bulkCreateCatalogoEquipo(payload, updatesPayload)
+      const parts: string[] = []
+      if (result.created > 0) parts.push(`${result.created} creado(s)`)
+      if (result.updated > 0) parts.push(`${result.updated} actualizado(s)`)
+      toast.success(parts.join(', '))
       setStep('done')
       onSuccess()
       setTimeout(handleClose, 1500)
@@ -248,7 +264,7 @@ export default function ImportarPdfDialog({ open, onClose, categorias, unidades,
             </DialogTitle>
             <p className="text-sm text-gray-600 mt-0.5">
               {step === 'upload' && 'Sube una cotización o catálogo en PDF para extraer equipos con IA'}
-              {step === 'review' && `${stats.total} equipos extraídos — revisa y selecciona los nuevos para importar`}
+              {step === 'review' && `${stats.total} equipos extraídos — selecciona nuevos e indica qué existentes actualizar`}
               {step === 'done' && 'Importación completada'}
             </p>
           </div>
@@ -260,6 +276,11 @@ export default function ImportarPdfDialog({ open, onClose, categorias, unidades,
               <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
                 {stats.existentes} existentes
               </Badge>
+              {stats.aActualizar > 0 && (
+                <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                  {stats.aActualizar} a actualizar
+                </Badge>
+              )}
             </div>
           )}
         </div>
@@ -379,34 +400,49 @@ export default function ImportarPdfDialog({ open, onClose, categorias, unidades,
                     <tbody className="divide-y">
                       {filteredItems.map((item, idx) => {
                         const realIndex = items.indexOf(item)
+                        const isUpdating = !item.isNew && item._updateMode !== 'none'
                         return (
                           <tr
                             key={idx}
                             className={`transition-colors ${
                               !item.isNew
-                                ? 'bg-amber-50/40'
+                                ? isUpdating
+                                  ? 'bg-blue-50/50'
+                                  : 'bg-amber-50/30'
                                 : item._selected
                                   ? 'bg-green-50/40'
                                   : 'hover:bg-gray-50'
                             }`}
                           >
-                            <td className="px-2 py-1.5 text-center">
-                              {item.isNew ? (
-                                <Checkbox
-                                  checked={item._selected}
-                                  onCheckedChange={(checked) => updateItem(realIndex, { _selected: !!checked })}
-                                />
-                              ) : (
-                                <div className="h-4 w-4" />
-                              )}
-                            </td>
-                            <td className="px-2 py-1.5">
-                              {item.isNew ? (
-                                <Badge className="text-[10px] bg-green-100 text-green-700 border-green-200">Nuevo</Badge>
-                              ) : (
-                                <Badge className="text-[10px] bg-amber-100 text-amber-700 border-amber-200">Existe</Badge>
-                              )}
-                            </td>
+                            {item.isNew ? (
+                              <>
+                                <td className="px-2 py-1.5 text-center">
+                                  <Checkbox
+                                    checked={item._selected}
+                                    onCheckedChange={(checked) => updateItem(realIndex, { _selected: !!checked })}
+                                  />
+                                </td>
+                                <td className="px-2 py-1.5">
+                                  <Badge className="text-[10px] bg-green-100 text-green-700 border-green-200">Nuevo</Badge>
+                                </td>
+                              </>
+                            ) : (
+                              <td colSpan={2} className="px-2 py-1.5">
+                                <Select
+                                  value={item._updateMode}
+                                  onValueChange={v => updateItem(realIndex, { _updateMode: v as 'none' | 'prices' | 'all' })}
+                                >
+                                  <SelectTrigger className="h-7 text-xs w-full">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">Sin cambios</SelectItem>
+                                    <SelectItem value="prices">Solo precios</SelectItem>
+                                    <SelectItem value="all">Precio + Descripción</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </td>
+                            )}
                             <td className="px-2 py-1.5">
                               {item.isNew ? (
                                 <Input
@@ -425,12 +461,25 @@ export default function ImportarPdfDialog({ open, onClose, categorias, unidades,
                                   onChange={e => updateItem(realIndex, { _editDescripcion: e.target.value })}
                                   className="h-7 text-xs"
                                 />
+                              ) : item._updateMode === 'all' ? (
+                                <div>
+                                  <Input
+                                    value={item._editDescripcion}
+                                    onChange={e => updateItem(realIndex, { _editDescripcion: e.target.value })}
+                                    className="h-7 text-xs"
+                                  />
+                                  {item.matchedDescripcion && (
+                                    <p className="text-[10px] text-gray-400 mt-0.5 truncate" title={item.matchedDescripcion}>
+                                      Actual: {item.matchedDescripcion}
+                                    </p>
+                                  )}
+                                </div>
                               ) : (
                                 <div>
-                                  <span className="text-xs text-gray-600">{item.descripcion}</span>
-                                  {item.matchedCodigo && (
-                                    <p className="text-[10px] text-amber-600 mt-0.5">
-                                      Coincide con: {item.matchedCodigo}
+                                  <span className="text-xs text-gray-600">{item.matchedDescripcion || item.descripcion}</span>
+                                  {item.matchedCodigo && item.descripcion !== item.matchedDescripcion && (
+                                    <p className="text-[10px] text-amber-600 mt-0.5 truncate" title={item.descripcion}>
+                                      PDF: {item.descripcion}
                                     </p>
                                   )}
                                 </div>
@@ -443,12 +492,18 @@ export default function ImportarPdfDialog({ open, onClose, categorias, unidades,
                                   onChange={e => updateItem(realIndex, { _editMarca: e.target.value })}
                                   className="h-7 text-xs"
                                 />
+                              ) : item._updateMode === 'all' ? (
+                                <Input
+                                  value={item._editMarca}
+                                  onChange={e => updateItem(realIndex, { _editMarca: e.target.value })}
+                                  className="h-7 text-xs"
+                                />
                               ) : (
                                 <span className="text-xs text-gray-500">{item.marca}</span>
                               )}
                             </td>
                             <td className="px-2 py-1.5 text-right">
-                              {item.isNew ? (
+                              {item.isNew || item._updateMode !== 'none' ? (
                                 <Input
                                   type="number"
                                   min={0}
@@ -527,9 +582,16 @@ export default function ImportarPdfDialog({ open, onClose, categorias, unidades,
               <span className="flex items-center gap-1">
                 <Package className="h-3 w-3" /> {stats.total} extraídos
               </span>
-              <span className="flex items-center gap-1">
-                <CheckCircle2 className="h-3 w-3 text-green-600" /> {stats.seleccionados} seleccionados
-              </span>
+              {stats.seleccionados > 0 && (
+                <span className="flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3 text-green-600" /> {stats.seleccionados} nuevo(s)
+                </span>
+              )}
+              {stats.aActualizar > 0 && (
+                <span className="flex items-center gap-1 text-blue-600">
+                  <ArrowRight className="h-3 w-3" /> {stats.aActualizar} a actualizar
+                </span>
+              )}
             </div>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={handleClose} disabled={importing}>
@@ -538,13 +600,20 @@ export default function ImportarPdfDialog({ open, onClose, categorias, unidades,
               <Button
                 size="sm"
                 onClick={handleImport}
-                disabled={importing || stats.seleccionados === 0}
+                disabled={importing || (stats.seleccionados === 0 && stats.aActualizar === 0)}
                 className="bg-purple-600 hover:bg-purple-700"
               >
                 {importing ? (
-                  <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Importando...</>
+                  <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Procesando...</>
                 ) : (
-                  <><Sparkles className="h-3.5 w-3.5 mr-1.5" /> Importar {stats.seleccionados} equipo(s)</>
+                  <>
+                    <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                    {stats.seleccionados > 0 && stats.aActualizar > 0
+                      ? `Importar ${stats.seleccionados} + actualizar ${stats.aActualizar}`
+                      : stats.seleccionados > 0
+                        ? `Importar ${stats.seleccionados} equipo(s)`
+                        : `Actualizar ${stats.aActualizar} equipo(s)`}
+                  </>
                 )}
               </Button>
             </div>

@@ -129,24 +129,33 @@ export async function scanPdfCatalogo(file: File) {
   return await res.json()
 }
 
-// ✅ Crear múltiples equipos en catálogo (bulk)
-export async function bulkCreateCatalogoEquipo(items: {
-  codigo: string
-  descripcion: string
-  marca: string
-  precioLista: number
-  factorCosto: number
-  factorVenta: number
-  precioInterno: number
-  precioVenta: number
-  categoriaId: string
-  unidadId: string
-  estado: string
-}[]) {
+// ✅ Crear múltiples equipos en catálogo (bulk) y/o actualizar existentes
+export async function bulkCreateCatalogoEquipo(
+  items: {
+    codigo: string
+    descripcion: string
+    marca: string
+    precioLista: number
+    factorCosto: number
+    factorVenta: number
+    precioInterno: number
+    precioVenta: number
+    categoriaId: string
+    unidadId: string
+    estado: string
+  }[],
+  updates?: {
+    id: string
+    modo: 'prices' | 'all'
+    precioLista: number
+    descripcion?: string
+    marca?: string
+  }[]
+) {
   const res = await fetch(buildApiUrl('/api/catalogo-equipo/import-pdf/bulk'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ items }),
+    body: JSON.stringify({ items, updates }),
   })
 
   if (!res.ok) {
