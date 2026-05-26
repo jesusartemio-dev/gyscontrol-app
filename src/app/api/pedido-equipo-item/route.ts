@@ -159,11 +159,19 @@ export async function POST(request: Request) {
       fechaOrdenCompraRecomendada.setDate(base.getDate() - tiempoEntregaDias)
     }
 
+    // ✅ Obtener el siguiente orden (al final de la lista)
+    const maxOrdenResult = await prisma.pedidoEquipoItem.aggregate({
+      where: { pedidoId: body.pedidoId },
+      _max: { orden: true },
+    })
+    const nextOrden = (maxOrdenResult._max.orden ?? -1) + 1
+
     // ✅ Crear el nuevo ítem de pedido
     const nuevoItem = await prisma.pedidoEquipoItem.create({
       data: {
         id: `pedido-item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         pedidoId: body.pedidoId,
+        orden: nextOrden,
         responsableId: userId,
         updatedAt: new Date(),
         listaId: body.listaId ?? null,
