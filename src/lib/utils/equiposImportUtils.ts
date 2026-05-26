@@ -52,8 +52,8 @@ export async function importarEquiposDesdeExcelValidado(
       continue
     }
 
-    const codigo = row['Código']
-    if (!codigo || codigo.trim() === '') {
+    const codigo = row['Código'] != null ? String(row['Código']).trim() : ''
+    if (!codigo) {
       errores.push(`Fila ${index + 2}: Código no puede estar vacío.`)
       continue
     }
@@ -73,8 +73,8 @@ export async function importarEquiposDesdeExcelValidado(
 
     equiposValidos.push({
       codigo,
-      descripcion: row['Descripción'] || '',
-      marca: row['Marca'] || '',
+      descripcion: row['Descripción'] != null ? String(row['Descripción']) : '',
+      marca: row['Marca'] != null ? String(row['Marca']) : '',
       precioLista,
       precioInterno,
       factorCosto,
