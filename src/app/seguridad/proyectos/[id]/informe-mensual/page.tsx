@@ -14,6 +14,16 @@ import { PestañaDatos } from './components/PestañaDatos'
 import { PestañaPersonal } from './components/PestañaPersonal'
 import { PestañaJornadas } from './components/PestañaJornadas'
 import { PestañaEPP } from './components/PestañaEPP'
+import {
+  PestañaCharlas,
+  PestañaInspecciones,
+  PestañaObservaciones,
+  PestañaIncidentes,
+  PestañaRiesgosCriticos,
+  PestañaMedioAmbiente,
+  PestañaPrevencionSalud,
+  PestañaActividadGeneral,
+} from './components/PestañaRegistros'
 import { formatearMes } from '@/lib/utils/periodoMes'
 import type { InformeMensualAgregado } from '@/lib/services/informeMensualSeguridad'
 
@@ -55,19 +65,21 @@ export default function InformeMensualPage({
 
   if (!data) return null
 
+  const kpis = data.kpis
+  const reg = data.registrosPorTipo
+
   return (
     <div className="container mx-auto p-6 space-y-5">
-      {/* Header del proyecto con KPIs resumen */}
+      {/* Header del proyecto */}
       <HeaderProyecto
         proyecto={data.proyecto}
         periodo={data.periodo}
-        kpis={data.kpis}
+        kpis={kpis}
       />
 
-      {/* Barra de navegación temporal + acciones */}
+      {/* Barra temporal + acciones */}
       <div className="flex items-center gap-3 flex-wrap">
         <SelectorMes value={mes} onChange={setMes} disabled={isLoading} />
-
         <div className="ml-auto flex gap-2">
           <Button variant="outline" size="sm" disabled>
             <FileText className="h-4 w-4 mr-1.5" />
@@ -80,68 +92,132 @@ export default function InformeMensualPage({
         </div>
       </div>
 
-      {/* Pestañas del informe */}
+      {/* Pestañas */}
       <Tabs defaultValue="resumen">
         <TabsList className="flex-wrap h-auto gap-1">
+          {/* ── Fase 1-2 ── */}
           <TabsTrigger value="resumen">Resumen</TabsTrigger>
-          <TabsTrigger value="datos">Datos del proyecto</TabsTrigger>
+          <TabsTrigger value="datos">Datos</TabsTrigger>
           <TabsTrigger value="personal">
             Personal
-            {data.kpis.personalUnico > 0 && (
+            {kpis.personalUnico > 0 && (
               <Badge variant="secondary" className="ml-1.5 text-[10px] h-4 px-1">
-                {data.kpis.personalUnico}
+                {kpis.personalUnico}
               </Badge>
             )}
           </TabsTrigger>
           <TabsTrigger value="jornadas">
             Jornadas
-            {data.kpis.jornadasTotal > 0 && (
+            {kpis.jornadasTotal > 0 && (
               <Badge variant="secondary" className="ml-1.5 text-[10px] h-4 px-1">
-                {data.kpis.jornadasTotal}
+                {kpis.jornadasTotal}
               </Badge>
             )}
           </TabsTrigger>
           <TabsTrigger value="epp">
             EPP
-            {data.kpis.entregasEppCount > 0 && (
+            {kpis.entregasEppCount > 0 && (
               <Badge variant="secondary" className="ml-1.5 text-[10px] h-4 px-1">
-                {data.kpis.entregasEppCount}
+                {kpis.entregasEppCount}
               </Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="registros" disabled>
-            Registros de seguridad
-            <Badge variant="outline" className="ml-1.5 text-[10px] h-4 px-1 text-muted-foreground">
-              Fase 3
-            </Badge>
+
+          {/* ── Registros de seguridad ── */}
+          <TabsTrigger value="charlas">
+            Charlas
+            {kpis.charlasCount > 0 && (
+              <Badge variant="secondary" className="ml-1.5 text-[10px] h-4 px-1">
+                {kpis.charlasCount}
+              </Badge>
+            )}
           </TabsTrigger>
-          <TabsTrigger value="fotos" disabled>
-            Fotos
+          <TabsTrigger value="inspecciones">
+            Inspecciones
+            {kpis.inspeccionesCount > 0 && (
+              <Badge variant="secondary" className="ml-1.5 text-[10px] h-4 px-1">
+                {kpis.inspeccionesCount}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="observaciones">
+            Observaciones
+            {kpis.observacionesCount > 0 && (
+              <Badge variant="secondary" className="ml-1.5 text-[10px] h-4 px-1">
+                {kpis.observacionesCount}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="incidentes">
+            Incidentes
+            {kpis.incidentesCount > 0 ? (
+              <Badge className="ml-1.5 text-[10px] h-4 px-1 bg-red-100 text-red-700 border-red-200 border">
+                {kpis.incidentesCount}
+              </Badge>
+            ) : (
+              <Badge variant="secondary" className="ml-1.5 text-[10px] h-4 px-1 text-emerald-600">
+                0
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="riesgos">
+            Riesgos
+            {kpis.riesgoCriticoCount > 0 && (
+              <Badge variant="secondary" className="ml-1.5 text-[10px] h-4 px-1">
+                {kpis.riesgoCriticoCount}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="medio-ambiente">
+            Medio ambiente
+            {kpis.medioAmbienteCount > 0 && (
+              <Badge variant="secondary" className="ml-1.5 text-[10px] h-4 px-1">
+                {kpis.medioAmbienteCount}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="prevencion-salud">
+            Prev. salud
+            {kpis.prevencionSaludCount > 0 && (
+              <Badge variant="secondary" className="ml-1.5 text-[10px] h-4 px-1">
+                {kpis.prevencionSaludCount}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="actividad-general">
+            Act. general
+            {kpis.actividadGeneralCount > 0 && (
+              <Badge variant="secondary" className="ml-1.5 text-[10px] h-4 px-1">
+                {kpis.actividadGeneralCount}
+              </Badge>
+            )}
+          </TabsTrigger>
+
+          {/* ── Fase 4 ── */}
+          <TabsTrigger value="reportes" disabled>
+            Reportes semanales
             <Badge variant="outline" className="ml-1.5 text-[10px] h-4 px-1 text-muted-foreground">
-              Fase 3
+              Fase 4
             </Badge>
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="resumen" className="mt-4">
-          <PestañaResumen data={data} />
-        </TabsContent>
+        {/* ── Contenido Fase 1-2 ── */}
+        <TabsContent value="resumen" className="mt-4"><PestañaResumen data={data} /></TabsContent>
+        <TabsContent value="datos" className="mt-4"><PestañaDatos data={data} /></TabsContent>
+        <TabsContent value="personal" className="mt-4"><PestañaPersonal data={data} /></TabsContent>
+        <TabsContent value="jornadas" className="mt-4"><PestañaJornadas data={data} /></TabsContent>
+        <TabsContent value="epp" className="mt-4"><PestañaEPP data={data} /></TabsContent>
 
-        <TabsContent value="datos" className="mt-4">
-          <PestañaDatos data={data} />
-        </TabsContent>
-
-        <TabsContent value="personal" className="mt-4">
-          <PestañaPersonal data={data} />
-        </TabsContent>
-
-        <TabsContent value="jornadas" className="mt-4">
-          <PestañaJornadas data={data} />
-        </TabsContent>
-
-        <TabsContent value="epp" className="mt-4">
-          <PestañaEPP data={data} />
-        </TabsContent>
+        {/* ── Registros de seguridad ── */}
+        <TabsContent value="charlas" className="mt-4"><PestañaCharlas data={data} /></TabsContent>
+        <TabsContent value="inspecciones" className="mt-4"><PestañaInspecciones data={data} /></TabsContent>
+        <TabsContent value="observaciones" className="mt-4"><PestañaObservaciones data={data} /></TabsContent>
+        <TabsContent value="incidentes" className="mt-4"><PestañaIncidentes data={data} /></TabsContent>
+        <TabsContent value="riesgos" className="mt-4"><PestañaRiesgosCriticos data={data} /></TabsContent>
+        <TabsContent value="medio-ambiente" className="mt-4"><PestañaMedioAmbiente data={data} /></TabsContent>
+        <TabsContent value="prevencion-salud" className="mt-4"><PestañaPrevencionSalud data={data} /></TabsContent>
+        <TabsContent value="actividad-general" className="mt-4"><PestañaActividadGeneral data={data} /></TabsContent>
       </Tabs>
     </div>
   )
@@ -174,7 +250,7 @@ function InformeMensualSkeleton() {
         </div>
       </div>
       <Skeleton className="h-10 w-52" />
-      <Skeleton className="h-10 w-full rounded-md" />
+      <Skeleton className="h-12 w-full rounded-md" />
       <Skeleton className="h-64 rounded-xl" />
     </div>
   )
