@@ -80,9 +80,7 @@ export async function POST(req: Request) {
         if (item.tallaCampo && !TALLA_CAMPOS_VALIDOS.includes(item.tallaCampo)) {
           throw new Error(`Tipo de talla inválido: "${item.tallaCampo}"`)
         }
-        if (item.requiereTalla && !item.talla?.toString().trim()) {
-          throw new Error('Requiere talla pero no se indicó el valor de la talla (ej. M, 40)')
-        }
+
 
         const moneda = (item.monedaReferencial ?? 'PEN').toUpperCase()
         if (!['PEN', 'USD'].includes(moneda)) throw new Error(`Moneda inválida: "${moneda}"`)

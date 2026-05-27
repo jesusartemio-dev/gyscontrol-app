@@ -334,7 +334,6 @@ export async function parsearCatalogoEppExcel(file: File): Promise<{
     if (!subcategoria) errores.push({ fila, codigo, mensaje: `Subcategoría inválida: "${subRaw}"` })
     if (!unidad) errores.push({ fila, codigo, mensaje: 'Unidad es obligatoria' })
     if (requiereTalla && !tallaCampo) errores.push({ fila, codigo, mensaje: 'Si requiere talla, debe especificar el Tipo de talla (Calzado/Camisa/Pantalón/Casco)' })
-    if (requiereTalla && !talla) errores.push({ fila, codigo, mensaje: 'Si requiere talla, debe indicar el valor de la talla (ej. M, 40)' })
     if (!['PEN', 'USD'].includes(monedaReferencial)) errores.push({ fila, codigo, mensaje: `Moneda inválida: "${monedaReferencial}"` })
 
     filas.push({
