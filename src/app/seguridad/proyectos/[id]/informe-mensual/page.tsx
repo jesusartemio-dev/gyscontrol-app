@@ -1,8 +1,17 @@
 'use client'
 
 import { use, useState } from 'react'
+import Link from 'next/link'
 import { useQuery } from '@tanstack/react-query'
-import { AlertCircle, Download, FileText } from 'lucide-react'
+import { toast } from 'sonner'
+import {
+  AlertCircle,
+  Archive,
+  Download,
+  FileSpreadsheet,
+  Loader2,
+  Printer,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -14,6 +23,7 @@ import { PestañaDatos } from './components/PestañaDatos'
 import { PestañaPersonal } from './components/PestañaPersonal'
 import { PestañaJornadas } from './components/PestañaJornadas'
 import { PestañaEPP } from './components/PestañaEPP'
+import { PestañaReportesSemanales } from './components/PestañaReportesSemanales'
 import {
   PestañaCharlas,
   PestañaInspecciones,
@@ -27,6 +37,31 @@ import {
 import { formatearMes } from '@/lib/utils/periodoMes'
 import type { InformeMensualAgregado } from '@/lib/services/informeMensualSeguridad'
 
+// ─── Export helpers ───────────────────────────────────────────────────────────
+
+async function descargarBlob(url: string, fallbackFilename: string) {
+  const res = await fetch(url, { credentials: 'include' })
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}))
+    throw new Error(d.error ?? 'Error al generar el archivo')
+  }
+  const blob = await res.blob()
+  const cd = res.headers.get('Content-Disposition') ?? ''
+  const match = cd.match(/filename="?([^"]+)"?/)
+  const filename = match ? match[1] : fallbackFilename
+  const objectUrl = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = objectUrl
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(objectUrl)
+  return filename
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function InformeMensualPage({
   params,
 }: {
@@ -34,6 +69,8 @@ export default function InformeMensualPage({
 }) {
   const { id } = use(params)
   const [mes, setMes] = useState<string>(() => formatearMes(new Date()))
+  const [excelLoading, setExcelLoading] = useState(false)
+  const [zipLoading, setZipLoading] = useState(false)
 
   const { data, isLoading, error } = useQuery<InformeMensualAgregado>({
     queryKey: ['informe-mensual', id, mes],
@@ -49,6 +86,37 @@ export default function InformeMensualPage({
     },
     staleTime: 5 * 60 * 1000,
   })
+
+  const handleExcel = async () => {
+    setExcelLoading(true)
+    try {
+      const filename = await descargarBlob(
+        `/api/seguridad/informe-mensual/${id}/exportar-excel?mes=${mes}`,
+        `Informe_${mes}.xlsx`,
+      )
+      toast.success(`Excel descargado: ${filename}`)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Error al generar Excel')
+    } finally {
+      setExcelLoading(false)
+    }
+  }
+
+  const handleZip = async () => {
+    setZipLoading(true)
+    toast.info('Preparando ZIP… puede tomar hasta 2 minutos con muchas fotos.')
+    try {
+      const filename = await descargarBlob(
+        `/api/seguridad/informe-mensual/${id}/fotos-zip?mes=${mes}`,
+        `fotos_${mes}.zip`,
+      )
+      toast.success(`ZIP descargado: ${filename}`)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Error al generar ZIP')
+    } finally {
+      setZipLoading(false)
+    }
+  }
 
   if (isLoading) return <InformeMensualSkeleton />
 
@@ -77,17 +145,45 @@ export default function InformeMensualPage({
         kpis={kpis}
       />
 
-      {/* Barra temporal + acciones */}
-      <div className="flex items-center gap-3 flex-wrap">
+      {/* Barra temporal + exportadores */}
+      <div className="flex items-center gap-2 flex-wrap">
         <SelectorMes value={mes} onChange={setMes} disabled={isLoading} />
-        <div className="ml-auto flex gap-2">
-          <Button variant="outline" size="sm" disabled>
-            <FileText className="h-4 w-4 mr-1.5" />
-            Exportar PDF
+
+        <div className="ml-auto flex gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExcel}
+            disabled={excelLoading}
+          >
+            {excelLoading ? (
+              <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+            ) : (
+              <FileSpreadsheet className="h-4 w-4 mr-1.5" />
+            )}
+            {excelLoading ? 'Generando…' : 'Excel completo'}
           </Button>
-          <Button variant="outline" size="sm" disabled>
-            <Download className="h-4 w-4 mr-1.5" />
-            Exportar PPT
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleZip}
+            disabled={zipLoading || kpis.fotosCount === 0}
+            title={kpis.fotosCount === 0 ? 'No hay fotos en este mes' : undefined}
+          >
+            {zipLoading ? (
+              <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+            ) : (
+              <Archive className="h-4 w-4 mr-1.5" />
+            )}
+            {zipLoading ? 'Preparando ZIP…' : `Todas las fotos${kpis.fotosCount > 0 ? ` (${kpis.fotosCount})` : ''}`}
+          </Button>
+
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/seguridad/proyectos/${id}/informe-mensual/imprimir?mes=${mes}`} target="_blank">
+              <Printer className="h-4 w-4 mr-1.5" />
+              Vista de impresión
+            </Link>
           </Button>
         </div>
       </div>
@@ -123,7 +219,7 @@ export default function InformeMensualPage({
             )}
           </TabsTrigger>
 
-          {/* ── Registros de seguridad ── */}
+          {/* ── Fase 3: Registros ── */}
           <TabsTrigger value="charlas">
             Charlas
             {kpis.charlasCount > 0 && (
@@ -193,12 +289,14 @@ export default function InformeMensualPage({
             )}
           </TabsTrigger>
 
-          {/* ── Fase 4 ── */}
-          <TabsTrigger value="reportes" disabled>
+          {/* ── Fase 4: Reportes ── */}
+          <TabsTrigger value="reportes">
             Reportes semanales
-            <Badge variant="outline" className="ml-1.5 text-[10px] h-4 px-1 text-muted-foreground">
-              Fase 4
-            </Badge>
+            {data.reportesSemanales.length > 0 && (
+              <Badge variant="secondary" className="ml-1.5 text-[10px] h-4 px-1">
+                {data.reportesSemanales.length}
+              </Badge>
+            )}
           </TabsTrigger>
         </TabsList>
 
@@ -209,7 +307,7 @@ export default function InformeMensualPage({
         <TabsContent value="jornadas" className="mt-4"><PestañaJornadas data={data} /></TabsContent>
         <TabsContent value="epp" className="mt-4"><PestañaEPP data={data} /></TabsContent>
 
-        {/* ── Registros de seguridad ── */}
+        {/* ── Fase 3: Registros ── */}
         <TabsContent value="charlas" className="mt-4"><PestañaCharlas data={data} /></TabsContent>
         <TabsContent value="inspecciones" className="mt-4"><PestañaInspecciones data={data} /></TabsContent>
         <TabsContent value="observaciones" className="mt-4"><PestañaObservaciones data={data} /></TabsContent>
@@ -218,6 +316,9 @@ export default function InformeMensualPage({
         <TabsContent value="medio-ambiente" className="mt-4"><PestañaMedioAmbiente data={data} /></TabsContent>
         <TabsContent value="prevencion-salud" className="mt-4"><PestañaPrevencionSalud data={data} /></TabsContent>
         <TabsContent value="actividad-general" className="mt-4"><PestañaActividadGeneral data={data} /></TabsContent>
+
+        {/* ── Fase 4: Reportes ── */}
+        <TabsContent value="reportes" className="mt-4"><PestañaReportesSemanales data={data} /></TabsContent>
       </Tabs>
     </div>
   )
