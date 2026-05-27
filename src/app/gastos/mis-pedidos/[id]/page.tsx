@@ -2,7 +2,7 @@
 
 import { normalizeStr } from '@/lib/utils'
 
-import React, { useState, useEffect, use, useRef } from 'react'
+import React, { useState, useEffect, use, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { ArrowLeft, Loader2, Building2, Calendar, User, AlertTriangle, Package, Plus, Pencil, Trash2, ArrowRightLeft, Send, Search } from 'lucide-react'
+import { ArrowLeft, Loader2, Building2, Calendar, User, AlertTriangle, Package, Plus, Pencil, Trash2, ArrowRightLeft, Send, Search, Copy, MessageCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { getPedidoInternoById, deletePedidoInterno, type PedidoInterno, type PedidoInternoItem } from '@/lib/services/pedidoInterno'
 import { getCentrosCosto } from '@/lib/services/centroCosto'
@@ -431,6 +431,28 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
     }
   }
 
+  const buildShareText = useCallback(() => {
+    if (!pedido) return ''
+    const url = window.location.href
+    const numItems = pedido.pedidoEquipoItem?.length ?? 0
+    const nombre = pedido.nombre ? ` — ${pedido.nombre}` : ''
+    const cc = pedido.centroCosto?.nombre ?? ''
+    const solicitante = pedido.user?.name ?? ''
+    return `📦 *${pedido.codigo}*${nombre}\nCentro de costo: ${cc}\nSolicitante: ${solicitante}\nEstado: ${pedido.estado} | ${numItems} ítem(s)\n🔗 ${url}`
+  }, [pedido])
+
+  const handleCopiarEnlace = useCallback(() => {
+    const text = buildShareText()
+    if (!text) return
+    navigator.clipboard.writeText(text).then(() => toast.success('Copiado al portapapeles'))
+  }, [buildShareText])
+
+  const handleCompartirWhatsApp = useCallback(() => {
+    const text = buildShareText()
+    if (!text) return
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
+  }, [buildShareText])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
@@ -494,6 +516,21 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
           {pedido.nombre && (
             <p className="text-sm text-muted-foreground">{pedido.nombre}</p>
           )}
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleCopiarEnlace} className="h-8 text-xs">
+            <Copy className="h-3.5 w-3.5 mr-1" />
+            Copiar
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleCompartirWhatsApp}
+            className="h-8 text-xs text-green-700 border-green-300 hover:bg-green-50"
+          >
+            <MessageCircle className="h-3.5 w-3.5 mr-1" />
+            WhatsApp
+          </Button>
         </div>
         {esBorrador && (
           <div className="flex items-center gap-2">
