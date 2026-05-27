@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowLeft,
   CalendarDays,
+  ChevronDown,
   ClipboardCheck,
   ExternalLink,
   HardHat,
@@ -84,6 +85,14 @@ interface ProyectoOpt {
   nombre: string
 }
 
+interface RegistroListaItem {
+  id: string
+  tipo: TipoRegistroSeguridad
+  descripcion: string
+  asistentes: number | null
+  fotos: Array<{ id: string; nombreArchivo: string }>
+}
+
 const TIPO_COLOR: Record<TipoRegistroSeguridad, string> = {
   charla: 'bg-blue-100 text-blue-700 border-blue-200',
   inspeccion: 'bg-emerald-100 text-emerald-700 border-emerald-200',
@@ -93,6 +102,99 @@ const TIPO_COLOR: Record<TipoRegistroSeguridad, string> = {
   riesgo_critico: 'bg-rose-100 text-rose-700 border-rose-200',
   medio_ambiente: 'bg-teal-100 text-teal-700 border-teal-200',
   prevencion_salud: 'bg-violet-100 text-violet-700 border-violet-200',
+}
+
+const TIPO_BORDER: Record<TipoRegistroSeguridad, string> = {
+  charla: 'border-l-blue-500',
+  inspeccion: 'border-l-green-500',
+  observacion: 'border-l-yellow-500',
+  incidente: 'border-l-red-500',
+  actividad_general: 'border-l-gray-400',
+  riesgo_critico: 'border-l-orange-600',
+  medio_ambiente: 'border-l-emerald-600',
+  prevencion_salud: 'border-l-cyan-500',
+}
+
+function RegistrosEvidencia({
+  evidenciaId,
+  jornada,
+}: {
+  evidenciaId: string
+  jornada: EvidenciaResumen['jornada']
+}) {
+  const { data, isLoading } = useQuery<RegistroListaItem[]>({
+    queryKey: ['seguridad', 'registros-ev', evidenciaId],
+    queryFn: async () => {
+      const sp = new URLSearchParams({
+        proyectoId: jornada.proyecto.id,
+        fechaDesde: jornada.fechaTrabajo.slice(0, 10),
+        fechaHasta: jornada.fechaTrabajo.slice(0, 10),
+      })
+      const res = await fetch(`/api/seguridad/registros?${sp}`, { credentials: 'include' })
+      if (!res.ok) throw new Error('Error')
+      return res.json()
+    },
+    staleTime: 60 * 1000,
+  })
+
+  if (isLoading) return (
+    <div className="border-t border-gray-100 px-4 py-3 flex items-center gap-2 text-xs text-muted-foreground">
+      <Loader2 className="h-3.5 w-3.5 animate-spin" /> Cargando registros…
+    </div>
+  )
+  if (!data?.length) return (
+    <div className="border-t border-gray-100 px-4 py-3 text-xs text-muted-foreground">
+      Sin registros en esta evidencia.
+    </div>
+  )
+
+  return (
+    <div className="divide-y divide-gray-100 border-t border-gray-200">
+      {data.map((r) => (
+        <Link
+          key={r.id}
+          href={`/seguridad/registros/${r.id}`}
+          className={cn(
+            'flex items-center gap-3 px-4 py-2.5 bg-white hover:bg-orange-50/40 transition-colors border-l-4',
+            TIPO_BORDER[r.tipo],
+          )}
+        >
+          <div className="h-10 w-10 shrink-0 rounded bg-muted overflow-hidden flex items-center justify-center">
+            {r.fotos[0] ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={`/api/seguridad/registros/fotos/${r.fotos[0].id}/contenido`}
+                alt={r.fotos[0].nombreArchivo}
+                className="h-full w-full object-cover"
+                loading="lazy"
+                onError={(e) => { e.currentTarget.style.display = 'none' }}
+              />
+            ) : (
+              <ImageIcon className="h-4 w-4 text-muted-foreground" />
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className={cn('text-[9px] px-1.5 py-0.5 rounded border font-medium shrink-0', TIPO_COLOR[r.tipo])}>
+                {TIPO_REGISTRO_LABELS[r.tipo]}
+              </span>
+              <span className="text-xs text-gray-700 truncate">{r.descripcion}</span>
+            </div>
+            {r.asistentes != null && (
+              <p className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-1">
+                <Users className="h-3 w-3" /> {r.asistentes} asistentes
+              </p>
+            )}
+          </div>
+          {r.fotos.length > 0 && (
+            <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground shrink-0">
+              <ImageIcon className="h-3 w-3" /> {r.fotos.length}
+            </span>
+          )}
+        </Link>
+      ))}
+    </div>
+  )
 }
 
 const formatFecha = (s: string) =>
@@ -144,6 +246,14 @@ export default function EvidenciasListaPage() {
   const [filtroFechaDesde, setFiltroFechaDesde] = useState(rangoSemana?.fechaDesde ?? hace7DiasISO())
   const [filtroFechaHasta, setFiltroFechaHasta] = useState(rangoSemana?.fechaHasta ?? hoyISO())
   const [filtroEstado, setFiltroEstado] = useState<'todos' | 'abierta' | 'cerrada'>('todos')
+
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const toggleExpand = (id: string) =>
+    setExpandedIds((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
 
   const [dialogAbrir, setDialogAbrir] = useState(false)
   const [jornadaSel, setJornadaSel] = useState<JornadaActiva | null>(null)
@@ -342,98 +452,126 @@ export default function EvidenciasListaPage() {
         </div>
       ) : (
         <div className="space-y-2">
-          {evidencias.map((ev) => (
-            <div
-              key={ev.id}
-              className="border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow bg-white"
-            >
-              <Link href={`/seguridad/evidencias/${ev.id}`} className="block px-4 py-3 space-y-2">
-                <div className="flex items-start justify-between gap-3 flex-wrap">
-                  <div className="flex items-start gap-2 min-w-0 flex-1">
-                    <HardHat className="h-4 w-4 text-orange-600 shrink-0 mt-0.5" />
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-semibold leading-tight">
-                          {ev.jornada.proyecto.nombre}
-                        </span>
-                        <span className="text-[10px] font-mono text-muted-foreground bg-gray-200 px-1.5 py-0.5 rounded shrink-0">
-                          {ev.jornada.proyecto.codigo}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3 flex-wrap mt-1">
-                        <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                          <CalendarDays className="h-3 w-3" />
-                          {formatFecha(ev.jornada.fechaTrabajo)}
-                        </span>
-                        {ev.jornada.supervisor.name && (
-                          <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                            <Users className="h-3 w-3" /> {ev.jornada.supervisor.name}
+          {evidencias.map((ev) => {
+            const isExpanded = expandedIds.has(ev.id)
+            return (
+              <div
+                key={ev.id}
+                className="border border-gray-200 rounded-lg overflow-hidden shadow-sm bg-white"
+              >
+                {/* ── Card header ── */}
+                <div className="px-4 py-3 space-y-2">
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div className="flex items-start gap-2 min-w-0 flex-1">
+                      <HardHat className="h-4 w-4 text-orange-600 shrink-0 mt-0.5" />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-semibold leading-tight">
+                            {ev.jornada.proyecto.nombre}
                           </span>
-                        )}
+                          <span className="text-[10px] font-mono text-muted-foreground bg-gray-200 px-1.5 py-0.5 rounded shrink-0">
+                            {ev.jornada.proyecto.codigo}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 flex-wrap mt-1">
+                          <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                            <CalendarDays className="h-3 w-3" />
+                            {formatFecha(ev.jornada.fechaTrabajo)}
+                          </span>
+                          {ev.jornada.supervisor.name && (
+                            <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                              <Users className="h-3 w-3" /> {ev.jornada.supervisor.name}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Badge
+                        className={cn(
+                          'text-[10px] border',
+                          ev.estado === 'abierta'
+                            ? 'bg-green-100 text-green-700 border-green-200'
+                            : 'bg-gray-200 text-gray-700 border-gray-300',
+                        )}
+                      >
+                        {ev.estado === 'abierta' ? (
+                          <LockOpen className="h-3 w-3 mr-0.5" />
+                        ) : (
+                          <Lock className="h-3 w-3 mr-0.5" />
+                        )}
+                        {ev.estado}
+                      </Badge>
+                      <button
+                        type="button"
+                        onClick={() => toggleExpand(ev.id)}
+                        className="h-6 w-6 flex items-center justify-center rounded hover:bg-gray-100 transition-colors"
+                        title={isExpanded ? 'Ocultar registros' : 'Ver registros'}
+                      >
+                        <ChevronDown
+                          className={cn(
+                            'h-4 w-4 text-muted-foreground transition-transform duration-200',
+                            isExpanded && 'rotate-180',
+                          )}
+                        />
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Badge
-                      className={cn(
-                        'text-[10px] border',
-                        ev.estado === 'abierta'
-                          ? 'bg-green-100 text-green-700 border-green-200'
-                          : 'bg-gray-200 text-gray-700 border-gray-300',
+
+                  {Object.keys(ev.tipoCount).length > 0 && (
+                    <div className="flex gap-1 flex-wrap">
+                      {(Object.entries(ev.tipoCount) as [TipoRegistroSeguridad, number][]).map(
+                        ([tipo, count]) => (
+                          <span
+                            key={tipo}
+                            className={cn(
+                              'text-[9px] px-1.5 py-0.5 rounded border font-medium',
+                              TIPO_COLOR[tipo],
+                            )}
+                          >
+                            {TIPO_REGISTRO_LABELS[tipo]}
+                            {count > 1 && ` ×${count}`}
+                          </span>
+                        ),
                       )}
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-3 text-[11px] text-muted-foreground pt-1 border-t border-gray-100">
+                    <span>{ev.registrosCount} registros</span>
+                    <span className="flex items-center gap-1">
+                      <ImageIcon className="h-3 w-3" /> {ev.fotosCount} fotos
+                    </span>
+                    <span>Abierta por {ev.creadoPor.name ?? '—'}</span>
+                    <Link
+                      href={`/seguridad/evidencias/${ev.id}`}
+                      className="ml-auto flex items-center gap-1 text-orange-600 hover:text-orange-700 font-medium"
                     >
-                      {ev.estado === 'abierta' ? (
-                        <LockOpen className="h-3 w-3 mr-0.5" />
-                      ) : (
-                        <Lock className="h-3 w-3 mr-0.5" />
-                      )}
-                      {ev.estado}
-                    </Badge>
+                      Abrir cuaderno <ExternalLink className="h-3 w-3" />
+                    </Link>
                   </div>
                 </div>
 
-                {Object.keys(ev.tipoCount).length > 0 && (
-                  <div className="flex gap-1 flex-wrap">
-                    {(Object.entries(ev.tipoCount) as [TipoRegistroSeguridad, number][]).map(
-                      ([tipo, count]) => (
-                        <span
-                          key={tipo}
-                          className={cn(
-                            'text-[9px] px-1.5 py-0.5 rounded border font-medium',
-                            TIPO_COLOR[tipo],
-                          )}
-                        >
-                          {TIPO_REGISTRO_LABELS[tipo]}
-                          {count > 1 && ` ×${count}`}
-                        </span>
-                      ),
-                    )}
-                  </div>
+                {/* ── Registros expandibles ── */}
+                {isExpanded && (
+                  <RegistrosEvidencia evidenciaId={ev.id} jornada={ev.jornada} />
                 )}
 
-                <div className="flex items-center gap-3 text-[11px] text-muted-foreground pt-1 border-t border-gray-100">
-                  <span>{ev.registrosCount} registros</span>
-                  <span className="flex items-center gap-1">
-                    <ImageIcon className="h-3 w-3" /> {ev.fotosCount} fotos
-                  </span>
-                  <span className="ml-auto">Abierta por {ev.creadoPor.name ?? '—'}</span>
-                </div>
-              </Link>
-
-              {esAdmin && (
-                <div className="px-4 pb-2 flex justify-end border-t border-gray-100 pt-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 px-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
-                    onClick={() => setConfirmEliminar(ev.id)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5 mr-1" /> Eliminar
-                  </Button>
-                </div>
-              )}
-            </div>
-          ))}
+                {esAdmin && (
+                  <div className="px-4 pb-2 flex justify-end border-t border-gray-100 pt-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                      onClick={() => setConfirmEliminar(ev.id)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5 mr-1" /> Eliminar
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
 

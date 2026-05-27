@@ -354,15 +354,7 @@ export default function Sidebar() {
           ],
         },
         { href: '/seguridad/empleados', label: 'Empleados', icon: Users },
-        {
-          href: '#seguridad-seguimiento',
-          label: 'Seguimiento',
-          icon: ClipboardCheck,
-          submenu: [
-            { href: '/seguridad/evidencias', label: 'Evidencias diarias', icon: ClipboardCheck },
-            { href: '/seguridad/registros', label: 'Todos los registros', icon: FileText },
-          ],
-        },
+        { href: '/seguridad/evidencias', label: 'Evidencias diarias', icon: ClipboardCheck },
         {
           href: '#seguridad-reportes',
           label: 'Reportes',
