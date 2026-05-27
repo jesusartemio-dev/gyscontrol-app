@@ -354,16 +354,16 @@ export default function Sidebar() {
           ],
         },
         { href: '/seguridad/empleados', label: 'Empleados', icon: Users },
-        { href: '/seguridad/evidencias', label: 'Evidencias diarias', icon: ClipboardCheck },
         {
-          href: '#seguridad-reportes',
-          label: 'Reportes',
-          icon: BarChart3,
+          href: '#seguridad-campo',
+          label: 'Registro de campo',
+          icon: ClipboardCheck,
           submenu: [
+            { href: '/seguridad/evidencias', label: 'Evidencias diarias', icon: ClipboardCheck },
             { href: '/seguridad/reportes-semanales', label: 'Reportes semanales', icon: FileBarChart },
-            { href: '/seguridad/reportes', label: 'Reportes EPP', icon: BarChart3 },
           ],
         },
+        { href: '/seguridad/reportes', label: 'Reportes EPP', icon: BarChart3 },
       ],
     },
     // 4.6. Administración - Gestión financiera y administrativa
