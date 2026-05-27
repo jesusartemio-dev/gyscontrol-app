@@ -342,15 +342,36 @@ export default function Sidebar() {
       roles: ['admin', 'gerente', 'gestor', 'seguridad'],
       links: [
         { href: '/seguridad', label: 'Dashboard', icon: LayoutDashboard },
-        { href: '/seguridad/catalogo', label: 'Catálogo EPP', icon: Package },
-        { href: '/seguridad/stock', label: 'Stock EPP', icon: Warehouse },
-        { href: '/seguridad/entregas', label: 'Entregas', icon: ClipboardList },
-        { href: '/seguridad/reposiciones', label: 'Reposiciones', icon: Clock },
+        {
+          href: '#seguridad-epps',
+          label: 'Gestión de EPPs',
+          icon: Package,
+          submenu: [
+            { href: '/seguridad/catalogo', label: 'Catálogo EPP', icon: Package },
+            { href: '/seguridad/stock', label: 'Stock EPP', icon: Warehouse },
+            { href: '/seguridad/entregas', label: 'Entregas', icon: ClipboardList },
+            { href: '/seguridad/reposiciones', label: 'Reposiciones', icon: Clock },
+          ],
+        },
         { href: '/seguridad/empleados', label: 'Empleados', icon: Users },
-        { href: '/seguridad/evidencias', label: 'Evidencias diarias', icon: ClipboardCheck },
-        { href: '/seguridad/registros', label: 'Todos los registros', icon: FileText },
-        { href: '/seguridad/reportes-semanales', label: 'Reportes semanales', icon: FileBarChart },
-        { href: '/seguridad/reportes', label: 'Reportes EPP', icon: BarChart3 },
+        {
+          href: '#seguridad-seguimiento',
+          label: 'Seguimiento',
+          icon: ClipboardCheck,
+          submenu: [
+            { href: '/seguridad/evidencias', label: 'Evidencias diarias', icon: ClipboardCheck },
+            { href: '/seguridad/registros', label: 'Todos los registros', icon: FileText },
+          ],
+        },
+        {
+          href: '#seguridad-reportes',
+          label: 'Reportes',
+          icon: BarChart3,
+          submenu: [
+            { href: '/seguridad/reportes-semanales', label: 'Reportes semanales', icon: FileBarChart },
+            { href: '/seguridad/reportes', label: 'Reportes EPP', icon: BarChart3 },
+          ],
+        },
       ],
     },
     // 4.6. Administración - Gestión financiera y administrativa
