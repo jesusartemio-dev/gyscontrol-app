@@ -173,7 +173,7 @@ export default function TablaPartidas({ valorizacionId, proyectoId, readOnly, ti
         p.montoContractual = parseFloat(value as string) || 0
         p.montoAvance = Math.round(p.montoContractual * (p.porcentajeAvance / 100) * 100) / 100
       } else if (field === 'porcentajeAvance') {
-        let pct = Math.round((parseFloat(value as string) || 0) * 100) / 100
+        let pct = Math.round((parseFloat(value as string) || 0) * 1000000) / 1000000
         if (pct > 100) pct = 100
         if (pct < 0) pct = 0
         p.porcentajeAvance = pct
@@ -192,7 +192,7 @@ export default function TablaPartidas({ valorizacionId, proyectoId, readOnly, ti
     setPartidas(prev => {
       const updated = [...prev]
       const p = { ...updated[index] }
-      p.porcentajeAvance = Math.round(incremento * 100) / 100
+      p.porcentajeAvance = Math.round(incremento * 1000000) / 1000000
       p.montoAvance = Math.round(p.montoContractual * (p.porcentajeAvance / 100) * 100) / 100
       updated[index] = p
       const total = calcularTotal(updated)
@@ -531,12 +531,12 @@ export default function TablaPartidas({ valorizacionId, proyectoId, readOnly, ti
                         </TableCell>
                         <TableCell className="py-1.5 px-2">
                           {readOnly ? (
-                            <span className="text-sm font-mono text-right block font-medium">{p.porcentajeAvance.toFixed(1)}%</span>
+                            <span className="text-sm font-mono text-right block font-medium">{parseFloat(p.porcentajeAvance.toFixed(6))}%</span>
                           ) : (
                             <div>
                               <Input
                                 type="number"
-                                step="0.1"
+                                step="any"
                                 min="0"
                                 max="100"
                                 className={`h-8 text-sm text-right font-mono border-muted ${
