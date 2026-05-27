@@ -5,8 +5,15 @@ import { useQuery } from '@tanstack/react-query'
 import { AlertCircle, Download, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Badge } from '@/components/ui/badge'
 import { HeaderProyecto } from '@/components/seguridad/HeaderProyecto'
 import { SelectorMes } from './components/SelectorMes'
+import { PestañaResumen } from './components/PestañaResumen'
+import { PestañaDatos } from './components/PestañaDatos'
+import { PestañaPersonal } from './components/PestañaPersonal'
+import { PestañaJornadas } from './components/PestañaJornadas'
+import { PestañaEPP } from './components/PestañaEPP'
 import { formatearMes } from '@/lib/utils/periodoMes'
 import type { InformeMensualAgregado } from '@/lib/services/informeMensualSeguridad'
 
@@ -73,24 +80,69 @@ export default function InformeMensualPage({
         </div>
       </div>
 
-      {/* Placeholder contenido — Fase 2 */}
-      <div className="rounded-xl border-2 border-dashed border-muted p-16 text-center space-y-3">
-        <p className="text-base font-semibold text-muted-foreground">
-          Pestañas en construcción — Fase 2
-        </p>
-        <p className="text-sm text-muted-foreground max-w-md mx-auto">
-          Aquí irán las pestañas: Resumen, Jornadas de Campo, Registros de Seguridad, Personal, EPP.
-        </p>
-        <div className="pt-2 text-xs text-muted-foreground/60 space-y-0.5">
-          <p>
-            Datos cargados para {data.periodo.labelMes}: {data.kpis.jornadasTotal} jornadas ·{' '}
-            {(data.kpis.charlasCount + data.kpis.inspeccionesCount + data.kpis.observacionesCount +
-              data.kpis.incidentesCount + data.kpis.riesgoCriticoCount + data.kpis.medioAmbienteCount +
-              data.kpis.prevencionSaludCount + data.kpis.actividadGeneralCount)}{' '}
-            registros de seguridad · {data.kpis.hht.toFixed(1)} HHT
-          </p>
-        </div>
-      </div>
+      {/* Pestañas del informe */}
+      <Tabs defaultValue="resumen">
+        <TabsList className="flex-wrap h-auto gap-1">
+          <TabsTrigger value="resumen">Resumen</TabsTrigger>
+          <TabsTrigger value="datos">Datos del proyecto</TabsTrigger>
+          <TabsTrigger value="personal">
+            Personal
+            {data.kpis.personalUnico > 0 && (
+              <Badge variant="secondary" className="ml-1.5 text-[10px] h-4 px-1">
+                {data.kpis.personalUnico}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="jornadas">
+            Jornadas
+            {data.kpis.jornadasTotal > 0 && (
+              <Badge variant="secondary" className="ml-1.5 text-[10px] h-4 px-1">
+                {data.kpis.jornadasTotal}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="epp">
+            EPP
+            {data.kpis.entregasEppCount > 0 && (
+              <Badge variant="secondary" className="ml-1.5 text-[10px] h-4 px-1">
+                {data.kpis.entregasEppCount}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="registros" disabled>
+            Registros de seguridad
+            <Badge variant="outline" className="ml-1.5 text-[10px] h-4 px-1 text-muted-foreground">
+              Fase 3
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="fotos" disabled>
+            Fotos
+            <Badge variant="outline" className="ml-1.5 text-[10px] h-4 px-1 text-muted-foreground">
+              Fase 3
+            </Badge>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="resumen" className="mt-4">
+          <PestañaResumen data={data} />
+        </TabsContent>
+
+        <TabsContent value="datos" className="mt-4">
+          <PestañaDatos data={data} />
+        </TabsContent>
+
+        <TabsContent value="personal" className="mt-4">
+          <PestañaPersonal data={data} />
+        </TabsContent>
+
+        <TabsContent value="jornadas" className="mt-4">
+          <PestañaJornadas data={data} />
+        </TabsContent>
+
+        <TabsContent value="epp" className="mt-4">
+          <PestañaEPP data={data} />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
@@ -122,7 +174,8 @@ function InformeMensualSkeleton() {
         </div>
       </div>
       <Skeleton className="h-10 w-52" />
-      <Skeleton className="h-48 rounded-xl" />
+      <Skeleton className="h-10 w-full rounded-md" />
+      <Skeleton className="h-64 rounded-xl" />
     </div>
   )
 }
