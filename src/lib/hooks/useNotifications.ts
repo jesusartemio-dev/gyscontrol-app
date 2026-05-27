@@ -50,7 +50,7 @@ const DEFAULT_COUNTS: NotificationCounts = {
 
 const DEFAULT_PREFERENCES: UserPreferences = {
   enabled: true,
-  updateInterval: 30,
+  updateInterval: 300,
   soundEnabled: false
 }
 
@@ -67,19 +67,24 @@ export function useNotifications(): UseNotificationsReturn {
   // 💾 Gestión de preferencias de usuario
   const getStoredPreferences = (): UserPreferences => {
     if (typeof window === 'undefined') {
-      return { enabled: true, updateInterval: 30, soundEnabled: false }
+      return { enabled: true, updateInterval: 300, soundEnabled: false }
     }
-    
+
     try {
       const stored = localStorage.getItem('gys-notification-preferences')
       if (stored) {
-        return { ...{ enabled: true, updateInterval: 30, soundEnabled: false }, ...JSON.parse(stored) }
+        const parsed = JSON.parse(stored)
+        if (typeof parsed.updateInterval === 'number' && parsed.updateInterval < 120) {
+          parsed.updateInterval = 300
+          localStorage.setItem('gys-notification-preferences', JSON.stringify(parsed))
+        }
+        return { ...DEFAULT_PREFERENCES, ...parsed }
       }
     } catch (error) {
       console.error('Error loading notification preferences:', error)
     }
-    
-    return { enabled: true, updateInterval: 30, soundEnabled: false }
+
+    return { enabled: true, updateInterval: 300, soundEnabled: false }
   }
 
   const [preferences, setPreferences] = useState<UserPreferences>(getStoredPreferences)
@@ -181,27 +186,42 @@ export function useNotifications(): UseNotificationsReturn {
     }
   }, [session?.user?.id, preferences.enabled])
 
-  // 🔁 Efecto para actualización automática optimizado
+  // 🔁 Efecto para actualización automática — pausa cuando el tab está oculto
   useEffect(() => {
-    // Limpiar intervalo anterior si existe
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current)
-      intervalRef.current = null
-    }
-
     if (!preferences.enabled || !session?.user) return
 
-    intervalRef.current = setInterval(() => {
-      refreshCounts()
-    }, preferences.updateInterval * 1000)
+    const startInterval = () => {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+      intervalRef.current = setInterval(refreshCounts, preferences.updateInterval * 1000)
+    }
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current)
+          intervalRef.current = null
+        }
+      } else {
+        refreshCounts()
+        startInterval()
+      }
+    }
+
+    // No iniciar si el tab ya está oculto al montar
+    if (!document.hidden) {
+      startInterval()
+    }
+
+    document.addEventListener('visibilitychange', handleVisibility)
 
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
         intervalRef.current = null
       }
+      document.removeEventListener('visibilitychange', handleVisibility)
     }
-  }, [preferences.enabled, preferences.updateInterval, session?.user?.id])
+  }, [preferences.enabled, preferences.updateInterval, session?.user?.id, refreshCounts])
 
   // 🔊 Efecto para detectar nuevas notificaciones y reproducir sonido
   useEffect(() => {
