@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -10,6 +10,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Sun,
   Loader2,
@@ -22,18 +29,29 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
-  UserCircle
+  UserCircle,
+  Building2,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { Badge } from '@/components/ui/badge'
 import { ListaJornadas } from '@/components/horas-hombre/jornada'
 
 type EstadoJornada = 'iniciado' | 'pendiente' | 'aprobado' | 'rechazado'
+type DatePreset = 'todo' | 'hoy' | 'semana' | 'mes' | 'mesAnterior'
+
+const DATE_PRESETS: { value: DatePreset; label: string }[] = [
+  { value: 'todo', label: 'Todo' },
+  { value: 'hoy', label: 'Hoy' },
+  { value: 'semana', label: 'Esta semana' },
+  { value: 'mes', label: 'Este mes' },
+  { value: 'mesAnterior', label: 'Mes pasado' },
+]
 
 interface Proyecto {
   id: string
   codigo: string
   nombre: string
+  cliente?: { id: string; nombre: string } | null
 }
 
 interface Edt {
@@ -109,6 +127,8 @@ export default function JornadaCampoSupervisionPage() {
 
   const [loading, setLoading] = useState(true)
   const [jornadas, setJornadas] = useState<JornadaCompleta[]>([])
+  const [fechaPreset, setFechaPreset] = useState<DatePreset>('todo')
+  const [clienteFilter, setClienteFilter] = useState<string>('todos')
   const [detalleModalOpen, setDetalleModalOpen] = useState(false)
   const [jornadaDetalle, setJornadaDetalle] = useState<JornadaCompleta | null>(null)
   const [aprobando, setAprobando] = useState<string | null>(null)
@@ -116,6 +136,59 @@ export default function JornadaCampoSupervisionPage() {
   const [jornadaRechazar, setJornadaRechazar] = useState<string | null>(null)
   const [motivoRechazo, setMotivoRechazo] = useState('')
   const [procesandoRechazo, setProcesandoRechazo] = useState(false)
+
+  const clientesUnicos = useMemo(() =>
+    Array.from(
+      new Map(
+        jornadas
+          .filter(j => j.proyecto.cliente)
+          .map(j => [j.proyecto.cliente!.id, j.proyecto.cliente!])
+      ).values()
+    ).sort((a, b) => a.nombre.localeCompare(b.nombre)),
+  [jornadas])
+
+  const getDateRange = useCallback((preset: DatePreset) => {
+    const hoy = new Date()
+    const ini = (y: number, m: number, d: number) => new Date(y, m, d, 0, 0, 0)
+    const fin = (y: number, m: number, d: number) => new Date(y, m, d, 23, 59, 59)
+    switch (preset) {
+      case 'hoy':
+        return { desde: ini(hoy.getFullYear(), hoy.getMonth(), hoy.getDate()), hasta: fin(hoy.getFullYear(), hoy.getMonth(), hoy.getDate()) }
+      case 'semana': {
+        const dow = hoy.getDay()
+        const lunes = new Date(hoy)
+        lunes.setDate(hoy.getDate() - (dow === 0 ? 6 : dow - 1))
+        lunes.setHours(0, 0, 0, 0)
+        const domingo = new Date(lunes)
+        domingo.setDate(lunes.getDate() + 6)
+        domingo.setHours(23, 59, 59)
+        return { desde: lunes, hasta: domingo }
+      }
+      case 'mes':
+        return { desde: ini(hoy.getFullYear(), hoy.getMonth(), 1), hasta: fin(hoy.getFullYear(), hoy.getMonth() + 1, 0) }
+      case 'mesAnterior':
+        return { desde: ini(hoy.getFullYear(), hoy.getMonth() - 1, 1), hasta: fin(hoy.getFullYear(), hoy.getMonth(), 0) }
+      default:
+        return { desde: null, hasta: null }
+    }
+  }, [])
+
+  const jornadasFiltradas = useMemo(() => {
+    let result = jornadas
+    if (fechaPreset !== 'todo') {
+      const { desde, hasta } = getDateRange(fechaPreset)
+      if (desde && hasta) {
+        result = result.filter(j => {
+          const f = new Date(j.fechaTrabajo)
+          return f >= desde && f <= hasta
+        })
+      }
+    }
+    if (clienteFilter !== 'todos') {
+      result = result.filter(j => j.proyecto.cliente?.id === clienteFilter)
+    }
+    return result
+  }, [jornadas, fechaPreset, clienteFilter, getDateRange])
 
   const cargarJornadas = useCallback(async (silent = false) => {
     try {
@@ -254,6 +327,50 @@ export default function JornadaCampoSupervisionPage() {
         </p>
       </div>
 
+      {/* Filtros de fecha y cliente */}
+      {!loading && (
+        <div className="bg-white rounded-lg border p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Calendar className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+            <div className="flex items-center gap-1 flex-wrap">
+              {DATE_PRESETS.map(p => (
+                <Button
+                  key={p.value}
+                  variant={fechaPreset === p.value ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-7 text-xs px-2.5"
+                  onClick={() => setFechaPreset(p.value)}
+                >
+                  {p.label}
+                </Button>
+              ))}
+            </div>
+
+            {clientesUnicos.length > 0 && (
+              <>
+                <div className="h-5 w-px bg-gray-200 mx-1" />
+                <Select value={clienteFilter} onValueChange={setClienteFilter}>
+                  <SelectTrigger className="h-7 w-[180px] text-xs">
+                    <Building2 className="h-3 w-3 mr-1.5 text-gray-400 flex-shrink-0" />
+                    <SelectValue placeholder="Cliente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos" className="text-xs">Todos los clientes</SelectItem>
+                    {clientesUnicos.map(c => (
+                      <SelectItem key={c.id} value={c.id} className="text-xs">{c.nombre}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </>
+            )}
+
+            <div className="ml-auto text-xs text-muted-foreground">
+              {jornadasFiltradas.length} de {jornadas.length}
+            </div>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <Card>
           <CardContent className="py-12 flex items-center justify-center">
@@ -263,14 +380,14 @@ export default function JornadaCampoSupervisionPage() {
         </Card>
       ) : (
         <ListaJornadas
-          jornadas={jornadas}
+          jornadas={jornadasFiltradas}
           onVerDetalle={handleVerDetalle}
           onAprobar={handleAprobar}
           onRechazar={handleRechazar}
           aprobando={aprobando}
           loading={loading}
           showSupervisor={true}
-          title="Todas las Jornadas"
+          title={`Todas las Jornadas${fechaPreset !== 'todo' || clienteFilter !== 'todos' ? ` (${jornadasFiltradas.length})` : ''}`}
         />
       )}
 
