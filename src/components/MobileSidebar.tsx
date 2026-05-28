@@ -316,6 +316,7 @@ export default function MobileSidebar() {
         { href: '/seguridad/evidencias', label: 'Evidencias diarias', icon: ClipboardCheck },
         { href: '/seguridad/registros', label: 'Todos los registros', icon: FileText },
         { href: '/seguridad/reportes-semanales', label: 'Reportes semanales', icon: FileBarChart },
+        { href: '/seguridad/proyectos', label: 'Informes por Proyecto', icon: FileText },
         { href: '/seguridad/reportes', label: 'Reportes EPP', icon: BarChart3 },
       ],
     },

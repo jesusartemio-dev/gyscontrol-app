@@ -363,6 +363,7 @@ export default function Sidebar() {
             { href: '/seguridad/reportes-semanales', label: 'Reportes semanales', icon: FileBarChart },
           ],
         },
+        { href: '/seguridad/proyectos', label: 'Informes por Proyecto', icon: FileText },
         { href: '/seguridad/reportes', label: 'Reportes EPP', icon: BarChart3 },
       ],
     },
