@@ -1,15 +1,17 @@
 'use client'
 
-import { use, useState } from 'react'
+import { use, useCallback, useState } from 'react'
 import Link from 'next/link'
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
   AlertCircle,
   Archive,
+  Copy,
   Download,
   FileSpreadsheet,
   Loader2,
+  MessageCircle,
   Printer,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -87,6 +89,45 @@ export default function InformeMensualPage({
     staleTime: 5 * 60 * 1000,
   })
 
+  const buildShareText = useCallback(() => {
+    if (!data) return ''
+    const url = window.location.href
+    const { proyecto, periodo, kpis } = data
+    const totalRegistros =
+      kpis.charlasCount + kpis.inspeccionesCount + kpis.observacionesCount +
+      kpis.incidentesCount + kpis.riesgoCriticoCount + kpis.medioAmbienteCount +
+      kpis.prevencionSaludCount + kpis.actividadGeneralCount
+    const lines = [
+      `📊 *${proyecto.codigo}* — ${proyecto.nombre}`,
+      `📅 Informe ${periodo.labelMes}`,
+      ...(proyecto.cliente ? [`🏢 Cliente: ${proyecto.cliente.nombre}`] : []),
+      `👷 Gestor: ${proyecto.gestor.name ?? proyecto.gestor.email}`,
+      '',
+      `🔑 KPIs del mes:`,
+      `• HHT: ${kpis.hht.toFixed(1)} h (${kpis.hhtAcumulado.toFixed(1)} acumulado)`,
+      `• Personal: ${kpis.personalUnico} persona${kpis.personalUnico !== 1 ? 's' : ''}`,
+      `• Jornadas: ${kpis.jornadasTotal} (${kpis.jornadasAprobadas} aprobadas)`,
+      `• Días sin accidentes: ${kpis.diasSinAccidentes}`,
+      ...(totalRegistros > 0 ? [`• Registros SSOMA: ${totalRegistros}`] : []),
+      ...(kpis.entregasEppCount > 0 ? [`• Entregas EPP: ${kpis.entregasEppCount}`] : []),
+      '',
+      `🔗 ${url}`,
+    ]
+    return lines.join('\n')
+  }, [data])
+
+  const handleCopiarEnlace = useCallback(() => {
+    const text = buildShareText()
+    if (!text) return
+    navigator.clipboard.writeText(text).then(() => toast.success('Copiado al portapapeles'))
+  }, [buildShareText])
+
+  const handleCompartirWhatsApp = useCallback(() => {
+    const text = buildShareText()
+    if (!text) return
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
+  }, [buildShareText])
+
   const handleExcel = async () => {
     setExcelLoading(true)
     try {
@@ -150,6 +191,20 @@ export default function InformeMensualPage({
         <SelectorMes value={mes} onChange={setMes} disabled={isLoading} />
 
         <div className="ml-auto flex gap-2 flex-wrap">
+          <Button variant="outline" size="sm" onClick={handleCopiarEnlace} className="h-8 text-xs">
+            <Copy className="h-3.5 w-3.5 mr-1" />
+            Copiar
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleCompartirWhatsApp}
+            className="h-8 text-xs text-green-700 border-green-300 hover:bg-green-50"
+          >
+            <MessageCircle className="h-3.5 w-3.5 mr-1" />
+            WhatsApp
+          </Button>
+
           <Button
             variant="outline"
             size="sm"
