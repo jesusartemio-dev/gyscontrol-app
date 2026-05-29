@@ -141,11 +141,19 @@ export interface ItemDisponible {
   centroCostoNombre?: string | null
 }
 
+export interface PedidoPendiente {
+  id: string
+  codigo: string
+  proyectoCodigo: string | null
+  centroCostoNombre: string | null
+  totalItems: number
+}
+
 export async function fetchItemsDisponibles(
   asignacion: { proyectoId?: string | null; centroCostoId?: string | null; multiProyecto?: boolean },
   proveedorId?: string,
   options: { mostrarTodos?: boolean } = {}
-): Promise<{ items: ItemDisponible[] }> {
+): Promise<{ items: ItemDisponible[]; pedidosPendientes: PedidoPendiente[] }> {
   const params = new URLSearchParams()
   if (asignacion.multiProyecto) {
     params.set('multiProyecto', 'true')

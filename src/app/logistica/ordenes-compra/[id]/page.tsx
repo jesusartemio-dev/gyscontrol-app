@@ -18,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
-import { getOrdenCompraById, aprobarOC, enviarOC, confirmarOC, cancelarOC, deleteOrdenCompra, registrarRecepcionOC, completarOC, editarAdministrativoOC, fetchItemsDisponibles, type ItemDisponible } from '@/lib/services/ordenCompra'
+import { getOrdenCompraById, aprobarOC, enviarOC, confirmarOC, cancelarOC, deleteOrdenCompra, registrarRecepcionOC, completarOC, editarAdministrativoOC, fetchItemsDisponibles, type ItemDisponible, type PedidoPendiente } from '@/lib/services/ordenCompra'
 import { CONDICIONES_PAGO, FORMAS_PAGO, DIAS_CREDITO_PRESETS, formatPago, formaRequiereDias } from '@/lib/utils/formaPago'
 import OCEstadoStepper from '@/components/logistica/OCEstadoStepper'
 import { RollbackButton } from '@/components/RollbackButton'
@@ -167,6 +167,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
   // Pedido selector state
   const [pedidoSelectorOpen, setPedidoSelectorOpen] = useState(false)
   const [pedidoItemsDisp, setPedidoItemsDisp] = useState<ItemDisponible[]>([])
+  const [pedidosPendientes, setPedidosPendientes] = useState<PedidoPendiente[]>([])
   const [pedidoItemsLoading, setPedidoItemsLoading] = useState(false)
   const [pedidoSelectedIds, setPedidoSelectedIds] = useState<Set<string>>(new Set())
   const [pedidoCantidades, setPedidoCantidades] = useState<Record<string, number>>({})
@@ -237,6 +238,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
       const data = await fetchItemsDisponibles(asignacion, undefined, { mostrarTodos })
       const yaEnOC = new Set(oc.items?.map(i => i.pedidoEquipoItemId).filter(Boolean))
       setPedidoItemsDisp(data.items.filter(i => !yaEnOC.has(i.id)))
+      setPedidosPendientes(data.pedidosPendientes ?? [])
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al cargar items del pedido')
     } finally {
@@ -1470,7 +1472,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
               <div className="flex items-center justify-center py-10">
                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
               </div>
-            ) : pedidoItemsDisp.length === 0 ? (
+            ) : pedidoItemsDisp.length === 0 && pedidosPendientes.length === 0 ? (
               <div className="text-center py-10 text-muted-foreground text-sm">
                 No hay items disponibles en pedidos activos
               </div>
@@ -1578,6 +1580,31 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
                         </div>
                       )
                     })}
+                  </div>
+                )}
+
+                {/* Pedidos en estado "enviado" — pendientes de aprobación */}
+                {pedidosPendientes.length > 0 && (
+                  <div className="mt-1 space-y-2">
+                    {pedidoItemsDisp.length > 0 && (
+                      <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide px-1">
+                        Pendientes de aprobación
+                      </p>
+                    )}
+                    {pedidosPendientes.map(p => (
+                      <div key={p.id} className="border border-amber-200 rounded-lg overflow-hidden bg-amber-50/40 opacity-80">
+                        <div className="flex items-center gap-2 px-3 py-2">
+                          <Package className="h-4 w-4 text-amber-500 shrink-0" />
+                          <span className="font-mono font-semibold text-sm text-amber-900">{p.codigo}</span>
+                          <Badge variant="outline" className="text-[10px] border-amber-300 text-amber-700 bg-amber-50">
+                            {p.totalItems} item{p.totalItems === 1 ? '' : 's'}
+                          </Badge>
+                          <span className="ml-auto text-[10px] font-medium text-amber-700 bg-amber-100 border border-amber-300 rounded px-1.5 py-0.5">
+                            Falta aprobación
+                          </span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

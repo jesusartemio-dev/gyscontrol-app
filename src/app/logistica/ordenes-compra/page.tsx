@@ -251,7 +251,7 @@ export default function OrdenesCompraPage() {
                     className="cursor-pointer hover:bg-muted/50"
                     onClick={() => router.push(`/logistica/ordenes-compra/${oc.id}`)}
                   >
-                    <TableCell className="font-mono text-sm font-medium">{oc.numero}</TableCell>
+                    <TableCell className="font-mono text-sm font-medium whitespace-nowrap">{oc.numero}</TableCell>
                     <TableCell className="max-w-[180px] truncate">{oc.proveedor?.nombre || '-'}</TableCell>
                     <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate" title={oc.proyecto?.nombre || oc.centroCosto?.nombre}>
                       {getCentroCosto(oc)}

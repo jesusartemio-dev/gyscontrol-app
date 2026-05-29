@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, Plus, Trash2, Loader2, Save, PackageSearch, FileText, Search, Pencil, Info, ChevronDown, ChevronRight, Package } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { toast } from 'sonner'
-import { createOrdenCompra, fetchItemsDisponibles, type ItemDisponible } from '@/lib/services/ordenCompra'
+import { createOrdenCompra, fetchItemsDisponibles, type ItemDisponible, type PedidoPendiente } from '@/lib/services/ordenCompra'
 import { getProveedores } from '@/lib/services/proveedor'
 import { CONDICIONES_PAGO, FORMAS_PAGO, DIAS_CREDITO_PRESETS } from '@/lib/utils/formaPago'
 import SelectorAsignacion, { type AsignacionValue } from '@/components/shared/SelectorAsignacion'
@@ -92,6 +92,7 @@ function NuevaOrdenCompraContent() {
   const [selectorOpen, setSelectorOpen] = useState(false)
   const [loadingItems, setLoadingItems] = useState(false)
   const [pedidoItemsDisp, setPedidoItemsDisp] = useState<ItemDisponible[]>([])
+  const [pedidosPendientes, setPedidosPendientes] = useState<PedidoPendiente[]>([])
   const [mostrarTodosLosItems, setMostrarTodosLosItems] = useState(false)
   // Cantidad editable por ítem (cantidad a comprar puede ser menor que la disponible)
   const [cantidadesAcomprar, setCantidadesAcomprar] = useState<Record<string, number>>({})
@@ -235,6 +236,7 @@ function NuevaOrdenCompraContent() {
       const data = await fetchItemsDisponibles(scope, proveedorId || undefined, { mostrarTodos })
       const existingIds = new Set(items.filter(i => i.pedidoEquipoItemId).map(i => i.pedidoEquipoItemId))
       setPedidoItemsDisp(data.items.filter(i => !existingIds.has(i.id)))
+      setPedidosPendientes(data.pedidosPendientes ?? [])
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al cargar items')
     } finally {
@@ -875,7 +877,7 @@ function NuevaOrdenCompraContent() {
               <div className="flex items-center justify-center py-10">
                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
               </div>
-            ) : pedidoItemsDisp.length === 0 ? (
+            ) : pedidoItemsDisp.length === 0 && pedidosPendientes.length === 0 ? (
               <div className="text-center py-10 px-4">
                 <Package className="h-12 w-12 text-muted-foreground/40 mx-auto mb-3" />
                 <p className="text-sm font-medium text-foreground mb-2">
@@ -901,7 +903,6 @@ function NuevaOrdenCompraContent() {
                     <ul className="list-disc list-inside text-left">
                       <li>Todos los items del proyecto ya tienen OC generada.</li>
                       <li>El proyecto no tiene pedidos en estado aprobado / atendido / parcial.</li>
-                      <li>Los pedidos siguen en borrador o enviado (necesitan estar aprobados).</li>
                     </ul>
                   </div>
                 )}
@@ -1028,6 +1029,31 @@ function NuevaOrdenCompraContent() {
                     </div>
                   )
                 })}
+
+                {/* Pedidos en estado "enviado" — pendientes de aprobación */}
+                {pedidosPendientes.length > 0 && (
+                  <div className="mt-1 space-y-2">
+                    {pedidoItemsDisp.length > 0 && (
+                      <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide px-1">
+                        Pendientes de aprobación
+                      </p>
+                    )}
+                    {pedidosPendientes.map(p => (
+                      <div key={p.id} className="border border-amber-200 rounded-lg overflow-hidden bg-amber-50/40 opacity-80">
+                        <div className="flex items-center gap-2 px-3 py-2">
+                          <Package className="h-4 w-4 text-amber-500 shrink-0" />
+                          <span className="font-mono font-semibold text-sm text-amber-900">{p.codigo}</span>
+                          <Badge variant="outline" className="text-[10px] border-amber-300 text-amber-700 bg-amber-50">
+                            {p.totalItems} item{p.totalItems === 1 ? '' : 's'}
+                          </Badge>
+                          <span className="ml-auto text-[10px] font-medium text-amber-700 bg-amber-100 border border-amber-300 rounded px-1.5 py-0.5">
+                            Falta aprobación
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>

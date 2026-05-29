@@ -50,45 +50,58 @@ export async function GET(req: Request) {
       ? {}
       : (proyectoId ? { proyectoId } : { centroCostoId })
 
-    const pedidoItems = await prisma.pedidoEquipoItem.findMany({
-      where: {
-        pedidoEquipo: {
-          ...scopeFilter,
-          estado: { in: ['aprobado', 'atendido', 'parcial'] },
+    const [pedidoItems, pedidosEnviados] = await Promise.all([
+      prisma.pedidoEquipoItem.findMany({
+        where: {
+          pedidoEquipo: {
+            ...scopeFilter,
+            estado: { in: ['aprobado', 'atendido', 'parcial'] },
+          },
+          estado: { notIn: ['cancelado', 'entregado'] },
+          ...proveedorFilter,
         },
-        estado: { notIn: ['cancelado', 'entregado'] },
-        ...proveedorFilter,
-      },
-      select: {
-        id: true,
-        codigo: true,
-        descripcion: true,
-        unidad: true,
-        cantidadPedida: true,
-        precioUnitario: true,
-        precioUnitarioMoneda: true,
-        proveedorId: true,
-        proveedorNombre: true,
-        listaEquipoItemId: true,
-        catalogoEppId: true,
-        listaEquipoItem: {
-          select: { proveedorId: true, proveedor: { select: { nombre: true } } },
-        },
-        ordenCompraItems: { select: { cantidad: true } },
-        pedidoEquipo: {
-          select: {
-            id: true,
-            codigo: true,
-            proyecto: { select: { id: true, codigo: true } },
-            centroCosto: { select: { id: true, nombre: true } },
+        select: {
+          id: true,
+          codigo: true,
+          descripcion: true,
+          unidad: true,
+          cantidadPedida: true,
+          precioUnitario: true,
+          precioUnitarioMoneda: true,
+          proveedorId: true,
+          proveedorNombre: true,
+          listaEquipoItemId: true,
+          catalogoEppId: true,
+          listaEquipoItem: {
+            select: { proveedorId: true, proveedor: { select: { nombre: true } } },
+          },
+          ordenCompraItems: { select: { cantidad: true } },
+          pedidoEquipo: {
+            select: {
+              id: true,
+              codigo: true,
+              proyecto: { select: { id: true, codigo: true } },
+              centroCosto: { select: { id: true, nombre: true } },
+            },
+          },
+          proveedor: {
+            select: { id: true, nombre: true },
           },
         },
-        proveedor: {
-          select: { id: true, nombre: true },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.pedidoEquipo.findMany({
+        where: { ...scopeFilter, estado: 'enviado' },
+        select: {
+          id: true,
+          codigo: true,
+          proyecto: { select: { codigo: true } },
+          centroCosto: { select: { nombre: true } },
+          _count: { select: { items: true } },
         },
-      },
-      orderBy: { createdAt: 'desc' },
-    })
+        orderBy: { codigo: 'asc' },
+      }),
+    ])
 
     const itemsConRestante = pedidoItems
       .map(item => {
@@ -122,6 +135,13 @@ export async function GET(req: Request) {
           centroCostoNombre: item.pedidoEquipo.centroCosto?.nombre ?? null,
         }
       }),
+      pedidosPendientes: pedidosEnviados.map(p => ({
+        id: p.id,
+        codigo: p.codigo,
+        proyectoCodigo: p.proyecto?.codigo ?? null,
+        centroCostoNombre: p.centroCosto?.nombre ?? null,
+        totalItems: p._count.items,
+      })),
     })
   } catch (error) {
     console.error('Error al obtener items disponibles:', error)

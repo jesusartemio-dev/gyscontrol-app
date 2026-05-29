@@ -165,27 +165,15 @@ const styles = StyleSheet.create({
     fontSize: 8,
     color: colors.dark,
   },
-  tableCellRight: {
-    fontSize: 8,
-    color: colors.dark,
-    textAlign: 'right',
-    width: '100%',
-  },
-  tableCellCenter: {
-    fontSize: 8,
-    color: colors.dark,
-    textAlign: 'center',
-    width: '100%',
-  },
   // Anchos de columnas
   colNum:     { width: '4%',  flexShrink: 0, overflow: 'hidden' as const },
-  colCodigo:  { width: '14%', flexShrink: 0, overflow: 'hidden' as const },
-  colDesc:    { width: '34%', flexShrink: 0, overflow: 'hidden' as const },
-  colUnd:     { width: '8%',  flexShrink: 0, overflow: 'hidden' as const },
-  colCant:    { width: '8%',  flexShrink: 0, overflow: 'hidden' as const, textAlign: 'right' as const },
-  colPrecio:  { width: '13%', flexShrink: 0, overflow: 'hidden' as const, textAlign: 'right' as const },
-  colDesc_:   { width: '9%',  flexShrink: 0, overflow: 'hidden' as const, textAlign: 'center' as const },
-  colTotal:   { width: '12%', flexShrink: 0, overflow: 'hidden' as const, textAlign: 'right' as const },
+  colCodigo:  { width: '18%', flexShrink: 0, overflow: 'hidden' as const },
+  colDesc:    { width: '32%', flexShrink: 0, overflow: 'hidden' as const },
+  colUnd:     { width: '6%',  flexShrink: 0, overflow: 'hidden' as const },
+  colCant:    { width: '7%',  flexShrink: 0, overflow: 'hidden' as const },
+  colPrecio:  { width: '13%', flexShrink: 0, overflow: 'hidden' as const },
+  colDesc_:   { width: '8%',  flexShrink: 0, overflow: 'hidden' as const },
+  colTotal:   { width: '12%', flexShrink: 0, overflow: 'hidden' as const },
 
   // ── TOTALES ──────────────────────────────────────────────────────────────────
   totalsContainer: {
@@ -326,24 +314,24 @@ function OrdenCompraPDF({ oc }: Props) {
       )}
       <View style={styles.tableHeader}>
         <View style={styles.colNum}><Text style={styles.tableHeaderText}>N°</Text></View>
-        <View style={styles.colCodigo}><Text style={styles.tableHeaderText}>Código</Text></View>
+        <View style={styles.colCodigo}><Text style={[styles.tableHeaderText, { fontSize: 7 }]}>Código</Text></View>
         <View style={styles.colDesc}><Text style={styles.tableHeaderText}>Descripción</Text></View>
         <View style={styles.colUnd}><Text style={styles.tableHeaderText}>Und.</Text></View>
-        <View style={styles.colCant}><Text style={styles.tableHeaderText}>Cant.</Text></View>
-        <View style={styles.colPrecio}><Text style={styles.tableHeaderText}>P. Unidad</Text></View>
-        <View style={styles.colDesc_}><Text style={styles.tableHeaderText}>Desc.%</Text></View>
-        <View style={styles.colTotal}><Text style={styles.tableHeaderText}>P. Neto</Text></View>
+        <View style={styles.colCant}><Text style={[styles.tableHeaderText, { textAlign: 'right', width: '100%' }]}>Cant.</Text></View>
+        <View style={styles.colPrecio}><Text style={[styles.tableHeaderText, { textAlign: 'right', width: '100%' }]}>P. Unidad</Text></View>
+        <View style={styles.colDesc_}><Text style={[styles.tableHeaderText, { textAlign: 'center', width: '100%' }]}>Desc.%</Text></View>
+        <View style={styles.colTotal}><Text style={[styles.tableHeaderText, { textAlign: 'right', width: '100%' }]}>P. Neto</Text></View>
       </View>
       {items.map((item, i) => (
         <View key={item.id} style={[styles.tableRow, i % 2 === 1 ? styles.tableRowAlt : {}]} wrap={false}>
           <View style={styles.colNum}><Text style={styles.tableCell}>{i + 1}</Text></View>
-          <View style={styles.colCodigo}><Text style={styles.tableCell}>{item.codigo}</Text></View>
+          <View style={styles.colCodigo}><Text style={[styles.tableCell, { fontSize: 7 }]}>{item.codigo}</Text></View>
           <View style={styles.colDesc}><Text style={styles.tableCell}>{item.descripcion}</Text></View>
           <View style={styles.colUnd}><Text style={styles.tableCell}>{item.unidad}</Text></View>
-          <View style={styles.colCant}><Text style={styles.tableCellRight}>{Number(item.cantidad).toFixed(2)}</Text></View>
-          <View style={styles.colPrecio}><Text style={styles.tableCellRight}>{Number(item.precioUnitario).toFixed(2)}</Text></View>
-          <View style={styles.colDesc_}><Text style={styles.tableCellCenter}>{Number(item.descuento ?? 0).toFixed(2)}</Text></View>
-          <View style={styles.colTotal}><Text style={styles.tableCellRight}>{formatCurrency(item.costoTotal, oc.moneda)}</Text></View>
+          <View style={styles.colCant}><Text style={[styles.tableCell, { textAlign: 'right', width: '100%' }]}>{Number(item.cantidad).toFixed(2)}</Text></View>
+          <View style={styles.colPrecio}><Text style={[styles.tableCell, { textAlign: 'right', width: '100%' }]}>{Number(item.precioUnitario).toFixed(2)}</Text></View>
+          <View style={styles.colDesc_}><Text style={[styles.tableCell, { textAlign: 'center', width: '100%' }]}>{Number(item.descuento ?? 0).toFixed(2)}</Text></View>
+          <View style={styles.colTotal}><Text style={[styles.tableCell, { textAlign: 'right', width: '100%' }]}>{formatCurrency(item.costoTotal, oc.moneda)}</Text></View>
         </View>
       ))}
     </View>
