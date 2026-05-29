@@ -2,18 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { prisma } from '@/lib/prisma'
 import { authOptions } from '@/lib/auth'
-import { addDays } from '@/lib/utils/planificacion'
-import { resolverColorProyecto } from '@/lib/utils/planificacion'
+import { addDays, resolverColorProyecto } from '@/lib/utils/planificacion'
 
 const DEPARTAMENTOS_DEFAULT = ['INGENIERIA', 'CONSTRUCCION', 'GESTION', 'PROYECTOS']
 
 /**
  * GET /api/planificacion/ejecutado
- * Devuelve, para el mismo rango que planificación, el cruce de:
- *   - PlanificacionDia  → días planificados por persona/proyecto
- *   - RegistroHoras     → horas aprobadas (de jornadas aprobadas)
- *   - RegistroHorasCampoMiembro → horas pendientes (jornadas sin aprobar)
- *   - Asistencia.ingreso → días con presencia física
+ * Devuelve por persona × día:
+ *   - planificado: proyecto planificado ese día (PlanificacionDia)
+ *   - asistio: tuvo ingreso en Asistencia
+ *   - proyectos: horas aprobadas y pendientes de jornada de campo
  */
 export async function GET(req: NextRequest) {
   try {
@@ -30,11 +28,12 @@ export async function GET(req: NextRequest) {
     const inicio = new Date(inicioStr + 'T00:00:00.000Z')
     if (isNaN(inicio.getTime())) return NextResponse.json({ error: 'Fecha inválida' }, { status: 400 })
 
-    const dias = Array.from({ length: numSemanas * 7 }, (_, i) => addDays(inicio, i))
-    const finStr = dias[dias.length - 1].toISOString().slice(0, 10)
+    const diasObjs = Array.from({ length: numSemanas * 7 }, (_, i) => addDays(inicio, i))
+    const finStr = diasObjs[diasObjs.length - 1].toISOString().slice(0, 10)
     const finDate = new Date(finStr + 'T23:59:59.999Z')
+    const diasStrs = diasObjs.map(d => d.toISOString().slice(0, 10))
 
-    // ── Empleados del rango ───────────────────────────────────────────────────
+    // ── Empleados ─────────────────────────────────────────────────────────────
     const empleados = await prisma.empleado.findMany({
       where: {
         activo: true,
@@ -56,11 +55,10 @@ export async function GET(req: NextRequest) {
       orderBy: [{ departamento: { nombre: 'asc' } }, { user: { name: 'asc' } }],
     })
 
-    if (empleados.length === 0) return NextResponse.json({ personas: [] })
-
+    if (empleados.length === 0) return NextResponse.json({ dias: diasStrs, personas: [] })
     const userIds = empleados.map(e => e.userId)
 
-    // ── PlanificacionDia (días planificados por proyecto) ─────────────────────
+    // ── PlanificacionDia ──────────────────────────────────────────────────────
     const planificaciones = await prisma.planificacionDia.findMany({
       where: {
         userId: { in: userIds },
@@ -69,14 +67,12 @@ export async function GET(req: NextRequest) {
       },
       select: {
         userId: true,
-        proyectoId: true,
-        proyecto: {
-          select: { id: true, codigo: true, nombre: true, colorPlanificacion: true },
-        },
+        fecha: true,
+        proyecto: { select: { id: true, codigo: true, nombre: true, colorPlanificacion: true } },
       },
     })
 
-    // ── RegistroHoras aprobados (origen campo) ────────────────────────────────
+    // ── RegistroHoras aprobados (campo) ───────────────────────────────────────
     const registrosAprobados = await prisma.registroHoras.findMany({
       where: {
         usuarioId: { in: userIds },
@@ -87,13 +83,12 @@ export async function GET(req: NextRequest) {
         usuarioId: true,
         proyectoId: true,
         horasTrabajadas: true,
-        proyecto: {
-          select: { id: true, codigo: true, nombre: true, colorPlanificacion: true },
-        },
+        fechaTrabajo: true,
+        proyecto: { select: { id: true, codigo: true, nombre: true, colorPlanificacion: true } },
       },
     })
 
-    // ── RegistroHorasCampoMiembro pendientes (sin RegistroHoras aún) ──────────
+    // ── Pendientes (RegistroHorasCampoMiembro sin aprobar) ────────────────────
     const pendientes = await prisma.registroHorasCampoMiembro.findMany({
       where: {
         usuarioId: { in: userIds },
@@ -113,9 +108,8 @@ export async function GET(req: NextRequest) {
             registroCampo: {
               select: {
                 proyectoId: true,
-                proyecto: {
-                  select: { id: true, codigo: true, nombre: true, colorPlanificacion: true },
-                },
+                fechaTrabajo: true,
+                proyecto: { select: { id: true, codigo: true, nombre: true, colorPlanificacion: true } },
               },
             },
           },
@@ -123,7 +117,7 @@ export async function GET(req: NextRequest) {
       },
     })
 
-    // ── Asistencia (ingreso por día) ──────────────────────────────────────────
+    // ── Asistencia (ingreso) ──────────────────────────────────────────────────
     const asistencias = await prisma.asistencia.findMany({
       where: {
         userId: { in: userIds },
@@ -133,84 +127,80 @@ export async function GET(req: NextRequest) {
       select: { userId: true, fechaHora: true },
     })
 
-    // ── Días únicos con asistencia por usuario ───────────────────────────────
-    const diasAsistidosPorUser = new Map<string, Set<string>>()
-    for (const a of asistencias) {
-      const dia = new Date(a.fechaHora).toISOString().slice(0, 10)
-      if (!diasAsistidosPorUser.has(a.userId)) diasAsistidosPorUser.set(a.userId, new Set())
-      diasAsistidosPorUser.get(a.userId)!.add(dia)
+    // ── Agregación día a día ──────────────────────────────────────────────────
+    type ProyectoDia = { codigo: string; nombre: string; color: string; horasAprobadas: number; horasPendientes: number }
+    type DiaDato = { asistio: boolean; proyectos: Map<string, ProyectoDia>; planificado: { codigo: string; nombre: string; color: string } | null }
+
+    const personaDias = new Map<string, Map<string, DiaDato>>()
+    for (const emp of empleados) personaDias.set(emp.userId, new Map())
+
+    function getOrCreateDia(userId: string, fechaKey: string): DiaDato {
+      const m = personaDias.get(userId)!
+      if (!m.has(fechaKey)) m.set(fechaKey, { asistio: false, planificado: null, proyectos: new Map() })
+      return m.get(fechaKey)!
     }
 
-    // ── Agregación por persona → proyecto ────────────────────────────────────
-    type ProyectoRaw = {
-      id: string; codigo: string; nombre: string; colorPlanificacion: string | null
-    }
-    type EntradaProyecto = {
-      proyectoId: string; codigo: string; nombre: string; color: string
-      diasPlanificados: number; horasAprobadas: number; horasPendientes: number
-    }
-
-    const personaMap = new Map<string, {
-      userId: string; nombre: string; departamento: string
-      proyectos: Map<string, EntradaProyecto>
-    }>()
-
-    for (const emp of empleados) {
-      personaMap.set(emp.userId, {
-        userId: emp.userId,
-        nombre: emp.user.name || emp.user.email,
-        departamento: emp.departamento?.nombre || '',
-        proyectos: new Map(),
-      })
-    }
-
-    function getOrCreateProyecto(userId: string, proy: ProyectoRaw): EntradaProyecto {
-      const persona = personaMap.get(userId)!
-      if (!persona.proyectos.has(proy.id)) {
-        persona.proyectos.set(proy.id, {
-          proyectoId: proy.id,
-          codigo: proy.codigo,
-          nombre: proy.nombre,
-          color: resolverColorProyecto(proy.id, proy.colorPlanificacion),
-          diasPlanificados: 0,
-          horasAprobadas: 0,
-          horasPendientes: 0,
-        })
+    function getOrCreateProy(dia: DiaDato, p: { id: string; codigo: string; nombre: string; colorPlanificacion: string | null }): ProyectoDia {
+      if (!dia.proyectos.has(p.id)) {
+        dia.proyectos.set(p.id, { codigo: p.codigo, nombre: p.nombre, color: resolverColorProyecto(p.id, p.colorPlanificacion), horasAprobadas: 0, horasPendientes: 0 })
       }
-      return persona.proyectos.get(proy.id)!
+      return dia.proyectos.get(p.id)!
     }
 
-    for (const p of planificaciones) {
-      if (!p.proyecto || !p.proyectoId) continue
-      const entry = getOrCreateProyecto(p.userId, p.proyecto)
-      entry.diasPlanificados++
+    for (const a of asistencias) {
+      const key = new Date(a.fechaHora).toISOString().slice(0, 10)
+      if (!personaDias.has(a.userId)) continue
+      getOrCreateDia(a.userId, key).asistio = true
+    }
+
+    for (const plan of planificaciones) {
+      if (!plan.proyecto) continue
+      const key = new Date(plan.fecha).toISOString().slice(0, 10)
+      const dia = getOrCreateDia(plan.userId, key)
+      if (!dia.planificado) {
+        dia.planificado = { codigo: plan.proyecto.codigo, nombre: plan.proyecto.nombre, color: resolverColorProyecto(plan.proyecto.id, plan.proyecto.colorPlanificacion) }
+      }
     }
 
     for (const r of registrosAprobados) {
       if (!r.proyecto) continue
-      const entry = getOrCreateProyecto(r.usuarioId, r.proyecto)
-      entry.horasAprobadas += r.horasTrabajadas
+      const key = new Date(r.fechaTrabajo).toISOString().slice(0, 10)
+      const dia = getOrCreateDia(r.usuarioId, key)
+      getOrCreateProy(dia, r.proyecto).horasAprobadas += r.horasTrabajadas
     }
 
     for (const p of pendientes) {
       const rc = p.registroCampoTarea.registroCampo
       if (!rc.proyecto) continue
-      const entry = getOrCreateProyecto(p.usuarioId, rc.proyecto)
-      entry.horasPendientes += p.horas
+      const key = new Date(rc.fechaTrabajo).toISOString().slice(0, 10)
+      const dia = getOrCreateDia(p.usuarioId, key)
+      getOrCreateProy(dia, rc.proyecto).horasPendientes += p.horas
     }
 
-    // ── Construir respuesta ───────────────────────────────────────────────────
-    const personas = Array.from(personaMap.values())
-      .filter(p => p.proyectos.size > 0)
-      .map(p => ({
-        userId: p.userId,
-        nombre: p.nombre,
-        departamento: p.departamento,
-        diasConAsistencia: diasAsistidosPorUser.get(p.userId)?.size ?? 0,
-        proyectos: Array.from(p.proyectos.values()).sort((a, b) => a.codigo.localeCompare(b.codigo)),
-      }))
+    // ── Respuesta ────────────────────────────────────────────────────────────
+    const personas = empleados
+      .map(emp => {
+        const diasMap = personaDias.get(emp.userId)!
+        const diasData: Record<string, { asistio: boolean; planificado: { codigo: string; nombre: string; color: string } | null; proyectos: ProyectoDia[] } | null> = {}
+        for (const dStr of diasStrs) {
+          const d = diasMap.get(dStr)
+          diasData[dStr] = d
+            ? {
+                asistio: d.asistio,
+                planificado: d.planificado,
+                proyectos: Array.from(d.proyectos.values()).map(pr => ({
+                  ...pr,
+                  horasAprobadas: Math.round(pr.horasAprobadas * 100) / 100,
+                  horasPendientes: Math.round(pr.horasPendientes * 100) / 100,
+                })),
+              }
+            : null
+        }
+        return { userId: emp.userId, nombre: emp.user.name || emp.user.email, departamento: emp.departamento?.nombre || '', dias: diasData }
+      })
+      .filter(p => Object.values(p.dias).some(d => d !== null))
 
-    return NextResponse.json({ fechaInicio: inicioStr, fechaFin: finStr, personas })
+    return NextResponse.json({ fechaInicio: inicioStr, fechaFin: finStr, dias: diasStrs, personas })
   } catch (error) {
     console.error('[planificacion/ejecutado]', error)
     return NextResponse.json({ error: 'Error al cargar datos ejecutados' }, { status: 500 })

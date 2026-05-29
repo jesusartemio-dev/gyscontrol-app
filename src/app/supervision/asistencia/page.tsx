@@ -735,129 +735,115 @@ export default function SupervisionAsistencia() {
       )}
 
       {/* Tabla detalle */}
-      {vista === 'resumen' ? (
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead>Trabajador</TableHead>
-                  <TableHead>Dpto.</TableHead>
-                  <TableHead>Ingreso</TableHead>
-                  <TableHead>Salida</TableHead>
-                  <TableHead>Horas</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead>Alertas</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {resumenPorPersona.map(r => (
-                  <TableRow key={r.key} className={!r.ingreso || !r.salida ? 'bg-amber-50/50 dark:bg-amber-950/20' : ''}>
-                    <TableCell className="font-mono text-xs whitespace-nowrap">
-                      {new Date(r.fecha + 'T12:00:00').toLocaleDateString('es-PE', {
-                        weekday: 'short', day: '2-digit', month: 'short',
-                      })}
-                    </TableCell>
-                    <TableCell>
-                      <div className="font-medium">{r.nombre}</div>
-                      {r.ubicacion && <div className="text-xs text-muted-foreground">{r.ubicacion}</div>}
-                    </TableCell>
-                    <TableCell className="text-xs">{r.dpto || '—'}</TableCell>
-                    <TableCell>
-                      {r.ingreso ? (
-                        <div>
-                          <div className="font-mono text-sm">
-                            {r.ingreso.hora.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima' })}
-                          </div>
-                          {r.ingreso.minutosTarde > 0 && (
-                            <div className="text-xs text-amber-700">+{formatearTardanza(r.ingreso.minutosTarde)}</div>
-                          )}
-                          {r.ingreso.count > 1 && (
-                            <div className="text-[10px] text-blue-600 font-medium">{r.ingreso.count} marcajes</div>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {r.salida ? (
-                        <div>
-                          <div className="font-mono text-sm">
-                            {r.salida.hora.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima' })}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            {r.salida.esAutoCierre && (
-                              <span className="inline-flex items-center gap-0.5 text-[10px] text-slate-500">
-                                <Moon className="h-3 w-3" /> auto
+      {vista === 'resumen' ? (() => {
+        // Pivot resumenPorPersona → persona × día (matriz)
+        const fmtTime = (d: Date) => d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima' })
+        const diasEnRango: string[] = []
+        const dCur = new Date(desde + 'T12:00:00Z')
+        const dFin = new Date(hasta + 'T12:00:00Z')
+        while (dCur <= dFin) { diasEnRango.push(dCur.toISOString().slice(0, 10)); dCur.setUTCDate(dCur.getUTCDate() + 1) }
+
+        const personaMap = new Map<string, { nombre: string; dpto: string | null; dias: Map<string, typeof resumenPorPersona[0]> }>()
+        for (const r of resumenPorPersona) {
+          if (!personaMap.has(r.email)) personaMap.set(r.email, { nombre: r.nombre, dpto: r.dpto, dias: new Map() })
+          personaMap.get(r.email)!.dias.set(r.fecha, r)
+        }
+        const personas = Array.from(personaMap.values()).sort((a, b) => (a.dpto || '').localeCompare(b.dpto || '') || a.nombre.localeCompare(b.nombre))
+
+        const DIAS_LABEL = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá']
+
+        if (personas.length === 0) return (
+          <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">Sin registros en el rango seleccionado.</div>
+        )
+
+        return (
+          <div className="overflow-x-auto rounded-lg border bg-card shadow-sm">
+            <table className="w-full border-collapse text-sm" style={{ minWidth: `${280 + diasEnRango.length * 92}px` }}>
+              <thead>
+                <tr className="border-b bg-muted/30">
+                  <th className="sticky left-0 z-10 bg-muted/30 text-left px-3 py-2 font-medium text-xs text-muted-foreground w-[180px]">Persona</th>
+                  <th className="sticky left-[180px] z-10 bg-muted/30 text-left px-2 py-2 font-medium text-xs text-muted-foreground w-[100px] border-r">Dpto.</th>
+                  {diasEnRango.map(d => {
+                    const dt = new Date(d + 'T12:00:00Z')
+                    const dow = dt.getUTCDay()
+                    const isWeekend = dow === 0 || dow === 6
+                    return (
+                      <th key={d} className={`text-center px-1 py-1.5 font-medium text-xs w-[92px] ${isWeekend ? 'text-muted-foreground/40' : 'text-muted-foreground'}`}>
+                        <div>{DIAS_LABEL[dow]}</div>
+                        <div className="font-mono">{String(dt.getUTCDate()).padStart(2, '0')}</div>
+                      </th>
+                    )
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {personas.map((persona, pi) => (
+                  <tr key={persona.nombre + pi} className={`border-b last:border-b-0 ${pi % 2 === 0 ? 'bg-background' : 'bg-muted/10'}`}>
+                    <td className={`sticky left-0 z-10 px-3 py-1.5 font-medium text-sm ${pi % 2 === 0 ? 'bg-background' : 'bg-muted/10'}`}>
+                      {persona.nombre}
+                    </td>
+                    <td className={`sticky left-[180px] z-10 px-2 py-1.5 text-xs text-muted-foreground border-r ${pi % 2 === 0 ? 'bg-background' : 'bg-muted/10'}`}>
+                      {persona.dpto || '—'}
+                    </td>
+                    {diasEnRango.map(dStr => {
+                      const dt = new Date(dStr + 'T12:00:00Z')
+                      const dow = dt.getUTCDay()
+                      const isWeekend = dow === 0 || dow === 6
+                      const r = persona.dias.get(dStr)
+
+                      if (!r) return (
+                        <td key={dStr} className={`text-center px-1 py-1.5 ${isWeekend ? 'bg-muted/20' : ''}`}>
+                          <span className="text-muted-foreground/30 text-xs">—</span>
+                        </td>
+                      )
+
+                      const estadoBg = !r.ingreso ? 'bg-muted/30' :
+                        r.ingreso.estado === 'a_tiempo' ? 'bg-emerald-50' :
+                        r.ingreso.estado === 'tarde' ? 'bg-amber-50' :
+                        r.ingreso.estado === 'muy_tarde' ? 'bg-red-50' : ''
+
+                      return (
+                        <td key={dStr} className={`px-1 py-1.5 text-center ${isWeekend ? 'bg-muted/20' : estadoBg}`}>
+                          <div className="flex flex-col items-center gap-0.5 min-h-[52px] justify-center">
+                            {r.ingreso ? (
+                              <span className={`font-mono text-xs font-semibold leading-none ${
+                                r.ingreso.estado === 'a_tiempo' ? 'text-emerald-700' :
+                                r.ingreso.estado === 'tarde' ? 'text-amber-700' : 'text-red-700'
+                              }`}>
+                                {fmtTime(r.ingreso.hora)}
                               </span>
+                            ) : (
+                              <span className="text-[10px] text-muted-foreground/50">sin ing.</span>
                             )}
-                            {r.salida.count > 1 && (
-                              <span className="text-[10px] text-blue-600 font-medium">{r.salida.count} marcajes</span>
+                            {r.salida ? (
+                              <span className="font-mono text-xs text-muted-foreground leading-none">
+                                {fmtTime(r.salida.hora)}{r.salida.esAutoCierre ? '·auto' : ''}
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-amber-600 leading-none">sin sal.</span>
+                            )}
+                            {r.horasTrabajadas != null ? (
+                              <span className={`text-[11px] font-bold leading-none mt-0.5 ${
+                                r.horasTrabajadas < 4 ? 'text-red-600' :
+                                r.horasTrabajadas >= 8 ? 'text-emerald-700' : 'text-amber-700'
+                              }`}>
+                                {fmtHoras(r.horasTrabajadas)}
+                              </span>
+                            ) : null}
+                            {r.ingreso && r.ingreso.minutosTarde > 0 && (
+                              <span className="text-[9px] text-amber-600 leading-none">+{r.ingreso.minutosTarde}m</span>
                             )}
                           </div>
-                        </div>
-                      ) : (
-                        <span className="text-xs font-medium text-amber-600">Sin salida</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {r.horasTrabajadas != null ? (
-                        <span className={`font-mono text-sm font-semibold ${
-                          r.horasTrabajadas < 4 ? 'text-red-600'
-                          : r.horasTrabajadas >= 8 ? 'text-emerald-700'
-                          : 'text-amber-700'
-                        }`}>
-                          {fmtHoras(r.horasTrabajadas)}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {r.ingreso ? (
-                        <Badge className={estadoColor(r.ingreso.estado)} variant="outline">
-                          {r.ingreso.estado.replace('_', ' ')}
-                        </Badge>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {r.alertas.includes('multi_ingreso') && (
-                          <span
-                            title={`Marcó ingreso ${r.ingreso?.count} veces — se muestra el primero`}
-                            className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] text-blue-700"
-                          >
-                            {r.ingreso?.count}× ingreso
-                          </span>
-                        )}
-                        {r.alertas.includes('multi_salida') && (
-                          <span
-                            title={`Marcó salida ${r.salida?.count} veces — se muestra la última`}
-                            className="rounded bg-purple-100 px-1.5 py-0.5 text-[10px] text-purple-700"
-                          >
-                            {r.salida?.count}× salida
-                          </span>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                        </td>
+                      )
+                    })}
+                  </tr>
                 ))}
-                {resumenPorPersona.length === 0 && !loading && (
-                  <TableRow>
-                    <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
-                      Sin registros en el rango seleccionado.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      ) : vista === 'detalle' ? (
+              </tbody>
+            </table>
+          </div>
+        )
+      })() : vista === 'detalle' ? (
       <Card>
         <CardContent className="p-0">
           <Table>
