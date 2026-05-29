@@ -41,6 +41,72 @@ const formatDate = (date: string | null | undefined) =>
 // Constantes y helpers de pago centralizados en src/lib/utils/formaPago.ts
 
 
+function PedidoItemsTable({
+  items,
+  moneda,
+  pedidoSelectedIds,
+  setPedidoSelectedIds,
+  pedidoCantidades,
+  setPedidoCantidades,
+}: {
+  items: ItemDisponible[]
+  moneda: string | undefined
+  pedidoSelectedIds: Set<string>
+  setPedidoSelectedIds: React.Dispatch<React.SetStateAction<Set<string>>>
+  pedidoCantidades: Record<string, number>
+  setPedidoCantidades: React.Dispatch<React.SetStateAction<Record<string, number>>>
+}) {
+  const toggleItem = (id: string) =>
+    setPedidoSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const simbolo = moneda === 'USD' ? 'US$' : 'S/'
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead className="w-[40px]"></TableHead>
+          <TableHead className="w-[110px]">Código</TableHead>
+          <TableHead>Descripción</TableHead>
+          <TableHead className="w-[60px]">Unid.</TableHead>
+          <TableHead className="w-[90px] text-right">P. Unit.</TableHead>
+          <TableHead className="w-[80px] text-right">Cant. disp.</TableHead>
+          <TableHead className="w-[80px] text-right">A comprar</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {items.map(item => {
+          const isSelected = pedidoSelectedIds.has(item.id)
+          return (
+            <TableRow
+              key={item.id}
+              className={isSelected ? 'bg-blue-50' : 'cursor-pointer hover:bg-muted/50'}
+              onClick={() => toggleItem(item.id)}
+            >
+              <TableCell><Checkbox checked={isSelected} onCheckedChange={() => toggleItem(item.id)} /></TableCell>
+              <TableCell className="font-mono text-xs">{item.codigo || '—'}</TableCell>
+              <TableCell className="text-xs">{item.descripcion}</TableCell>
+              <TableCell className="text-xs">{item.unidad}</TableCell>
+              <TableCell className="text-xs text-right font-mono">
+                {item.precioUnitario > 0 ? `${simbolo} ${item.precioUnitario.toFixed(2)}` : '—'}
+              </TableCell>
+              <TableCell className="text-xs text-right font-mono">{item.cantidad}</TableCell>
+              <TableCell className="text-right" onClick={e => e.stopPropagation()}>
+                {isSelected && (
+                  <Input
+                    type="number" min={0.01} max={item.cantidad} step={1}
+                    value={pedidoCantidades[item.id] ?? item.cantidad}
+                    onChange={e => setPedidoCantidades(p => ({ ...p, [item.id]: parseFloat(e.target.value) || item.cantidad }))}
+                    className="h-7 w-20 text-xs text-right"
+                  />
+                )}
+              </TableCell>
+            </TableRow>
+          )
+        })}
+      </TableBody>
+    </Table>
+  )
+}
+
 export default function OrdenCompraDetallePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
@@ -147,7 +213,8 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
     if (!asignacion || !oc) return
     setPedidoItemsLoading(true)
     try {
-      const data = await fetchItemsDisponibles(asignacion, oc.proveedorId, { mostrarTodos })
+      // Sin filtro de proveedor — mostramos ítems de todos los proveedores
+      const data = await fetchItemsDisponibles(asignacion, undefined, { mostrarTodos })
       const yaEnOC = new Set(oc.items?.map(i => i.pedidoEquipoItemId).filter(Boolean))
       setPedidoItemsDisp(data.items.filter(i => !yaEnOC.has(i.id)))
     } catch (err) {
@@ -187,6 +254,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
               precioUnitario: i.precioUnitario,
               pedidoEquipoItemId: i.id,
               listaEquipoItemId: i.listaEquipoItemId ?? null,
+              proveedorOriginalId: i.proveedorId ?? null,
             }
           }),
         }),
@@ -205,15 +273,37 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
     }
   }, [oc, pedidoSelectedIds, pedidoItemsDisp, pedidoCantidades, loadData])
 
-  const pedidoItemsPorPedido = useMemo(() => {
-    const grupos = new Map<string, ItemDisponible[]>()
+  const itemsAgrupados = useMemo(() => {
+    const mismoProveedor: ItemDisponible[] = []
+    const otrosMap = new Map<string, { nombre: string; items: ItemDisponible[] }>()
+
     for (const item of pedidoItemsDisp) {
-      const lista = grupos.get(item.pedidoCodigo) || []
-      lista.push(item)
-      grupos.set(item.pedidoCodigo, lista)
+      if (item.proveedorId === oc?.proveedorId) {
+        mismoProveedor.push(item)
+      } else {
+        const key = item.proveedorId ?? '__sin__'
+        if (!otrosMap.has(key)) otrosMap.set(key, { nombre: item.proveedorNombre ?? 'Sin proveedor asignado', items: [] })
+        otrosMap.get(key)!.items.push(item)
+      }
     }
-    return Array.from(grupos.entries()).sort(([a], [b]) => a.localeCompare(b))
-  }, [pedidoItemsDisp])
+
+    const agruparPorPedido = (items: ItemDisponible[]) => {
+      const m = new Map<string, ItemDisponible[]>()
+      for (const i of items) {
+        const lista = m.get(i.pedidoCodigo) || []
+        lista.push(i)
+        m.set(i.pedidoCodigo, lista)
+      }
+      return Array.from(m.entries()).sort(([a], [b]) => a.localeCompare(b))
+    }
+
+    return {
+      mismoProveedor: agruparPorPedido(mismoProveedor),
+      otrosProveedores: Array.from(otrosMap.entries())
+        .sort(([, a], [, b]) => a.nombre.localeCompare(b.nombre))
+        .map(([provId, { nombre, items }]) => ({ provId, nombre, pedidos: agruparPorPedido(items) })),
+    }
+  }, [pedidoItemsDisp, oc?.proveedorId])
 
   const togglePedidoColapsado = (pedidoCodigo: string) => {
     setPedidosColapsados(prev => ({ ...prev, [pedidoCodigo]: !prev[pedidoCodigo] }))
@@ -1297,7 +1387,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
           <DialogHeader>
             <DialogTitle>Agregar items desde pedidos</DialogTitle>
             <DialogDescription>
-              Items disponibles del proveedor <strong>{oc?.proveedor?.nombre ?? oc?.proveedorId}</strong> aún no cubiertos por esta OC
+              Items de todos los pedidos disponibles. Los que tienen otro proveedor asignado actualizarán la lista al agregarlos.
             </DialogDescription>
           </DialogHeader>
 
@@ -1321,103 +1411,114 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
               </div>
             ) : pedidoItemsDisp.length === 0 ? (
               <div className="text-center py-10 text-muted-foreground text-sm">
-                No hay items disponibles de este proveedor en pedidos activos
+                No hay items disponibles en pedidos activos
               </div>
             ) : (
-              <div className="space-y-1">
-                {pedidoItemsPorPedido.map(([pedidoCodigo, items]) => {
-                  const colapsado = pedidosColapsados[pedidoCodigo]
-                  const todosSeleccionados = items.every(i => pedidoSelectedIds.has(i.id))
-                  const algunoSeleccionado = items.some(i => pedidoSelectedIds.has(i.id))
-                  return (
-                    <div key={pedidoCodigo} className="border rounded-md overflow-hidden">
-                      <div
-                        className="flex items-center gap-2 px-3 py-2 bg-muted/40 cursor-pointer hover:bg-muted/60 select-none"
-                        onClick={() => togglePedidoColapsado(pedidoCodigo)}
-                      >
-                        <Checkbox
-                          checked={todosSeleccionados}
-                          data-state={algunoSeleccionado && !todosSeleccionados ? 'indeterminate' : undefined}
-                          onCheckedChange={() => seleccionarTodosDePedido(pedidoCodigo, items)}
-                          onClick={e => e.stopPropagation()}
-                        />
-                        {colapsado ? <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />}
-                        <span className="font-mono text-sm font-medium">{pedidoCodigo}</span>
-                        <span className="text-xs text-muted-foreground">· {items.length} item{items.length !== 1 ? 's' : ''}</span>
-                        {items[0]?.proyectoCodigo && (
-                          <span className="text-xs text-muted-foreground">· Proyecto {items[0].proyectoCodigo}</span>
-                        )}
-                        {items[0]?.centroCostoNombre && (
-                          <span className="text-xs text-muted-foreground">· {items[0].centroCostoNombre}</span>
-                        )}
-                      </div>
-                      {!colapsado && (
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="w-[40px]"></TableHead>
-                              <TableHead className="w-[110px]">Código</TableHead>
-                              <TableHead>Descripción</TableHead>
-                              <TableHead className="w-[60px]">Unid.</TableHead>
-                              <TableHead className="w-[90px] text-right">P. Unit.</TableHead>
-                              <TableHead className="w-[80px] text-right">Cant. disp.</TableHead>
-                              <TableHead className="w-[80px] text-right">A comprar</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {items.map(item => {
-                              const isSelected = pedidoSelectedIds.has(item.id)
-                              return (
-                                <TableRow
-                                  key={item.id}
-                                  className={isSelected ? 'bg-blue-50' : 'cursor-pointer hover:bg-muted/50'}
-                                  onClick={() => setPedidoSelectedIds(prev => {
-                                    const next = new Set(prev)
-                                    if (next.has(item.id)) next.delete(item.id)
-                                    else next.add(item.id)
-                                    return next
-                                  })}
-                                >
-                                  <TableCell>
-                                    <Checkbox
-                                      checked={isSelected}
-                                      onCheckedChange={() => setPedidoSelectedIds(prev => {
-                                        const next = new Set(prev)
-                                        if (next.has(item.id)) next.delete(item.id)
-                                        else next.add(item.id)
-                                        return next
-                                      })}
-                                    />
-                                  </TableCell>
-                                  <TableCell className="font-mono text-xs">{item.codigo || '—'}</TableCell>
-                                  <TableCell className="text-xs">{item.descripcion}</TableCell>
-                                  <TableCell className="text-xs">{item.unidad}</TableCell>
-                                  <TableCell className="text-xs text-right font-mono">
-                                    {item.precioUnitario > 0 ? `${oc?.moneda === 'USD' ? 'US$' : 'S/'} ${item.precioUnitario.toFixed(2)}` : '—'}
-                                  </TableCell>
-                                  <TableCell className="text-xs text-right font-mono">{item.cantidad}</TableCell>
-                                  <TableCell className="text-right" onClick={e => e.stopPropagation()}>
-                                    {isSelected && (
-                                      <Input
-                                        type="number"
-                                        min={0.01}
-                                        max={item.cantidad}
-                                        step={1}
-                                        value={pedidoCantidades[item.id] ?? item.cantidad}
-                                        onChange={e => setPedidoCantidades(p => ({ ...p, [item.id]: parseFloat(e.target.value) || item.cantidad }))}
-                                        className="h-7 w-20 text-xs text-right"
-                                      />
-                                    )}
-                                  </TableCell>
-                                </TableRow>
-                              )
-                            })}
-                          </TableBody>
-                        </Table>
-                      )}
+              <div className="space-y-3">
+                {/* ── Sección: mismo proveedor ─── */}
+                {itemsAgrupados.mismoProveedor.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground px-1">
+                      Proveedor actual — {oc?.proveedor?.nombre ?? oc?.proveedorId}
+                    </p>
+                    {itemsAgrupados.mismoProveedor.map(([pedidoCodigo, pedidoItems]) => {
+                      const colapsado = pedidosColapsados[pedidoCodigo]
+                      const todosSeleccionados = pedidoItems.every(i => pedidoSelectedIds.has(i.id))
+                      const algunoSeleccionado = pedidoItems.some(i => pedidoSelectedIds.has(i.id))
+                      return (
+                        <div key={pedidoCodigo} className="border rounded-md overflow-hidden">
+                          <div
+                            className="flex items-center gap-2 px-3 py-2 bg-muted/40 cursor-pointer hover:bg-muted/60 select-none"
+                            onClick={() => togglePedidoColapsado(pedidoCodigo)}
+                          >
+                            <Checkbox
+                              checked={todosSeleccionados}
+                              data-state={algunoSeleccionado && !todosSeleccionados ? 'indeterminate' : undefined}
+                              onCheckedChange={() => seleccionarTodosDePedido(pedidoCodigo, pedidoItems)}
+                              onClick={e => e.stopPropagation()}
+                            />
+                            {colapsado ? <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />}
+                            <span className="font-mono text-sm font-medium">{pedidoCodigo}</span>
+                            <span className="text-xs text-muted-foreground">· {pedidoItems.length} item{pedidoItems.length !== 1 ? 's' : ''}</span>
+                            {pedidoItems[0]?.proyectoCodigo && <span className="text-xs text-muted-foreground">· Proy. {pedidoItems[0].proyectoCodigo}</span>}
+                          </div>
+                          {!colapsado && <PedidoItemsTable items={pedidoItems} moneda={oc?.moneda} pedidoSelectedIds={pedidoSelectedIds} setPedidoSelectedIds={setPedidoSelectedIds} pedidoCantidades={pedidoCantidades} setPedidoCantidades={setPedidoCantidades} />}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {/* ── Sección: otros proveedores ─── */}
+                {itemsAgrupados.otrosProveedores.length > 0 && (
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 px-1">
+                      <p className="text-xs font-medium text-muted-foreground">Otros proveedores</p>
+                      <span className="text-[10px] bg-amber-100 text-amber-700 border border-amber-200 rounded px-1.5 py-0.5">
+                        El proveedor en la lista se actualizará a {oc?.proveedor?.nombre ?? 'este proveedor'}
+                      </span>
                     </div>
-                  )
-                })}
+                    {itemsAgrupados.otrosProveedores.map(({ provId, nombre, pedidos }) => {
+                      const provKey = `prov_${provId}`
+                      const provColapsado = pedidosColapsados[provKey]
+                      const todosItemsProv = pedidos.flatMap(([, its]) => its)
+                      const todosSelProv = todosItemsProv.every(i => pedidoSelectedIds.has(i.id))
+                      const algunoSelProv = todosItemsProv.some(i => pedidoSelectedIds.has(i.id))
+                      return (
+                        <div key={provId} className="border border-amber-200 rounded-md overflow-hidden">
+                          <div
+                            className="flex items-center gap-2 px-3 py-2 bg-amber-50 cursor-pointer hover:bg-amber-100 select-none"
+                            onClick={() => togglePedidoColapsado(provKey)}
+                          >
+                            <Checkbox
+                              checked={todosSelProv}
+                              data-state={algunoSelProv && !todosSelProv ? 'indeterminate' : undefined}
+                              onCheckedChange={() => {
+                                const next = new Set(pedidoSelectedIds)
+                                if (todosSelProv) todosItemsProv.forEach(i => next.delete(i.id))
+                                else todosItemsProv.forEach(i => next.add(i.id))
+                                setPedidoSelectedIds(next)
+                              }}
+                              onClick={e => e.stopPropagation()}
+                            />
+                            {provColapsado ? <ChevronRight className="h-3.5 w-3.5 text-amber-600" /> : <ChevronDown className="h-3.5 w-3.5 text-amber-600" />}
+                            <span className="text-sm font-medium text-amber-800">{nombre}</span>
+                            <span className="text-xs text-amber-600">· {todosItemsProv.length} item{todosItemsProv.length !== 1 ? 's' : ''}</span>
+                          </div>
+                          {!provColapsado && (
+                            <div className="divide-y">
+                              {pedidos.map(([pedidoCodigo, pedidoItems]) => {
+                                const colapsado = pedidosColapsados[pedidoCodigo]
+                                const todosSeleccionados = pedidoItems.every(i => pedidoSelectedIds.has(i.id))
+                                const algunoSeleccionado = pedidoItems.some(i => pedidoSelectedIds.has(i.id))
+                                return (
+                                  <div key={pedidoCodigo}>
+                                    <div
+                                      className="flex items-center gap-2 px-4 py-2 bg-amber-50/60 cursor-pointer hover:bg-amber-50 select-none"
+                                      onClick={() => togglePedidoColapsado(pedidoCodigo)}
+                                    >
+                                      <Checkbox
+                                        checked={todosSeleccionados}
+                                        data-state={algunoSeleccionado && !todosSeleccionados ? 'indeterminate' : undefined}
+                                        onCheckedChange={() => seleccionarTodosDePedido(pedidoCodigo, pedidoItems)}
+                                        onClick={e => e.stopPropagation()}
+                                      />
+                                      {colapsado ? <ChevronRight className="h-3 w-3 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 text-muted-foreground" />}
+                                      <span className="font-mono text-xs font-medium">{pedidoCodigo}</span>
+                                      <span className="text-xs text-muted-foreground">· {pedidoItems.length} item{pedidoItems.length !== 1 ? 's' : ''}</span>
+                                      {pedidoItems[0]?.proyectoCodigo && <span className="text-xs text-muted-foreground">· Proy. {pedidoItems[0].proyectoCodigo}</span>}
+                                    </div>
+                                    {!colapsado && <PedidoItemsTable items={pedidoItems} moneda={oc?.moneda} pedidoSelectedIds={pedidoSelectedIds} setPedidoSelectedIds={setPedidoSelectedIds} pedidoCantidades={pedidoCantidades} setPedidoCantidades={setPedidoCantidades} />}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             )}
           </div>

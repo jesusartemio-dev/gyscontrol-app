@@ -26,7 +26,7 @@ export async function POST(req: Request) {
 
     const oc = await prisma.ordenCompra.findUnique({
       where: { id: ordenCompraId },
-      select: { id: true, estado: true, moneda: true },
+      select: { id: true, estado: true, moneda: true, proveedorId: true },
     })
 
     if (!oc) {
@@ -59,6 +59,18 @@ export async function POST(req: Request) {
 
     await prisma.$transaction(async (tx) => {
       await tx.ordenCompraItem.createMany({ data: newItems })
+
+      // Actualizar proveedorId en ListaEquipoItem cuando el ítem viene de otro proveedor
+      const listaIdsACambiar = items
+        .filter((item: any) => item.listaEquipoItemId && item.proveedorOriginalId && item.proveedorOriginalId !== oc.proveedorId)
+        .map((item: any) => item.listaEquipoItemId as string)
+
+      if (listaIdsACambiar.length > 0) {
+        await tx.listaEquipoItem.updateMany({
+          where: { id: { in: listaIdsACambiar } },
+          data: { proveedorId: oc.proveedorId },
+        })
+      }
 
       const allItems = await tx.ordenCompraItem.findMany({
         where: { ordenCompraId },
