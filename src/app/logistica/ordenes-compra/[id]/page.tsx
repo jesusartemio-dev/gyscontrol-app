@@ -1,13 +1,13 @@
 'use client'
 
-import React, { useState, useEffect, use } from 'react'
+import React, { useState, useEffect, use, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { ArrowLeft, Loader2, CheckCircle, CheckCircle2, Send, Package, XCircle, FileDown, Building2, CreditCard, MapPin, AlertTriangle, ShoppingCart, Pencil, Clock, Receipt, Trash2, Plus, Search, Info, Settings2 } from 'lucide-react'
+import { ArrowLeft, Loader2, CheckCircle, CheckCircle2, Send, Package, XCircle, FileDown, Building2, CreditCard, MapPin, AlertTriangle, ShoppingCart, Pencil, Clock, Receipt, Trash2, Plus, Search, Info, Settings2, ChevronDown, ChevronRight } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -18,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
-import { getOrdenCompraById, aprobarOC, enviarOC, confirmarOC, cancelarOC, deleteOrdenCompra, registrarRecepcionOC, completarOC, editarAdministrativoOC } from '@/lib/services/ordenCompra'
+import { getOrdenCompraById, aprobarOC, enviarOC, confirmarOC, cancelarOC, deleteOrdenCompra, registrarRecepcionOC, completarOC, editarAdministrativoOC, fetchItemsDisponibles, type ItemDisponible } from '@/lib/services/ordenCompra'
 import { CONDICIONES_PAGO, FORMAS_PAGO, DIAS_CREDITO_PRESETS, formatPago, formaRequiereDias } from '@/lib/utils/formaPago'
 import OCEstadoStepper from '@/components/logistica/OCEstadoStepper'
 import { RollbackButton } from '@/components/RollbackButton'
@@ -84,6 +84,15 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
   const [showAddManual, setShowAddManual] = useState(false)
   const [manualItem, setManualItem] = useState({ descripcion: '', unidad: 'UND', cantidad: 1, precioUnitario: 0, descuento: 0 })
 
+  // Pedido selector state
+  const [pedidoSelectorOpen, setPedidoSelectorOpen] = useState(false)
+  const [pedidoItemsDisp, setPedidoItemsDisp] = useState<ItemDisponible[]>([])
+  const [pedidoItemsLoading, setPedidoItemsLoading] = useState(false)
+  const [pedidoSelectedIds, setPedidoSelectedIds] = useState<Set<string>>(new Set())
+  const [pedidoCantidades, setPedidoCantidades] = useState<Record<string, number>>({})
+  const [pedidosColapsados, setPedidosColapsados] = useState<Record<string, boolean>>({})
+  const [mostrarTodosItems, setMostrarTodosItems] = useState(false)
+
   // Header edit modal state
   const [headerEditOpen, setHeaderEditOpen] = useState(false)
   const [headerForm, setHeaderForm] = useState({
@@ -123,6 +132,101 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
     } finally {
       setLoading(false)
     }
+  }
+
+  // ── Pedido selector ──────────────────────────────────────────────────────
+  const getAsignacion = useCallback(() => {
+    if (!oc) return null
+    if (oc.proyectoId) return { proyectoId: oc.proyectoId }
+    if (oc.centroCostoId) return { centroCostoId: oc.centroCostoId }
+    return { multiProyecto: true as const }
+  }, [oc])
+
+  const cargarItemsPedido = useCallback(async (mostrarTodos: boolean) => {
+    const asignacion = getAsignacion()
+    if (!asignacion || !oc) return
+    setPedidoItemsLoading(true)
+    try {
+      const data = await fetchItemsDisponibles(asignacion, oc.proveedorId, { mostrarTodos })
+      const yaEnOC = new Set(oc.items?.map(i => i.pedidoEquipoItemId).filter(Boolean))
+      setPedidoItemsDisp(data.items.filter(i => !yaEnOC.has(i.id)))
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al cargar items del pedido')
+    } finally {
+      setPedidoItemsLoading(false)
+    }
+  }, [oc, getAsignacion])
+
+  const openPedidoSelector = useCallback(async () => {
+    setPedidoSelectorOpen(true)
+    setPedidoSelectedIds(new Set())
+    setPedidoCantidades({})
+    await cargarItemsPedido(mostrarTodosItems)
+  }, [cargarItemsPedido, mostrarTodosItems])
+
+  const addItemsDesdePedido = useCallback(async () => {
+    if (!oc || pedidoSelectedIds.size === 0) return
+    const toAdd = pedidoItemsDisp.filter(i => pedidoSelectedIds.has(i.id))
+    setAddingItems(true)
+    try {
+      const res = await fetch('/api/orden-compra-item', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ordenCompraId: oc.id,
+          items: toAdd.map(i => {
+            const cantEditada = pedidoCantidades[i.id]
+            const cantidad = cantEditada && cantEditada > 0 && cantEditada <= i.cantidad
+              ? cantEditada
+              : i.cantidad
+            return {
+              codigo: i.codigo,
+              descripcion: i.descripcion,
+              unidad: i.unidad,
+              cantidad,
+              precioUnitario: i.precioUnitario,
+              pedidoEquipoItemId: i.id,
+              listaEquipoItemId: i.listaEquipoItemId ?? null,
+            }
+          }),
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Error al agregar items')
+      }
+      toast.success(`${toAdd.length} item(s) agregados desde pedido`)
+      setPedidoSelectorOpen(false)
+      await loadData()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al agregar items')
+    } finally {
+      setAddingItems(false)
+    }
+  }, [oc, pedidoSelectedIds, pedidoItemsDisp, pedidoCantidades, loadData])
+
+  const pedidoItemsPorPedido = useMemo(() => {
+    const grupos = new Map<string, ItemDisponible[]>()
+    for (const item of pedidoItemsDisp) {
+      const lista = grupos.get(item.pedidoCodigo) || []
+      lista.push(item)
+      grupos.set(item.pedidoCodigo, lista)
+    }
+    return Array.from(grupos.entries()).sort(([a], [b]) => a.localeCompare(b))
+  }, [pedidoItemsDisp])
+
+  const togglePedidoColapsado = (pedidoCodigo: string) => {
+    setPedidosColapsados(prev => ({ ...prev, [pedidoCodigo]: !prev[pedidoCodigo] }))
+  }
+
+  const seleccionarTodosDePedido = (pedidoCodigo: string, itemsGrupo: ItemDisponible[]) => {
+    const todosSeleccionados = itemsGrupo.every(i => pedidoSelectedIds.has(i.id))
+    setPedidoSelectedIds(prev => {
+      const next = new Set(prev)
+      if (todosSeleccionados) itemsGrupo.forEach(i => next.delete(i.id))
+      else itemsGrupo.forEach(i => next.add(i.id))
+      return next
+    })
   }
 
   const openHeaderEdit = () => {
@@ -793,6 +897,9 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
           <CardTitle className="text-sm font-medium">Items ({oc.items?.length || 0})</CardTitle>
           {esBorrador && (
             <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={openPedidoSelector}>
+                <ShoppingCart className="h-3.5 w-3.5 mr-1" /> Desde Pedido
+              </Button>
               <Button variant="outline" size="sm" onClick={() => { setCatalogoOpen(true); setCatalogoQuery(''); setCatalogoResults([]); setCatalogoSelectedIds(new Set()); setCatalogoCantidades({}) }}>
                 <Search className="h-3.5 w-3.5 mr-1" /> Desde Catálogo
               </Button>
@@ -1183,6 +1290,155 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
         onCancel={deleteValidation.cancelDelete}
         entityLabel="orden de compra"
       />
+
+      {/* ── Pedido Selector Dialog ──────────────────────────── */}
+      <Dialog open={pedidoSelectorOpen} onOpenChange={setPedidoSelectorOpen}>
+        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Agregar items desde pedidos</DialogTitle>
+            <DialogDescription>
+              Items disponibles del proveedor <strong>{oc?.proveedor?.nombre ?? oc?.proveedorId}</strong> aún no cubiertos por esta OC
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Checkbox
+              id="mostrarTodos"
+              checked={mostrarTodosItems}
+              onCheckedChange={async (v) => {
+                const val = !!v
+                setMostrarTodosItems(val)
+                await cargarItemsPedido(val)
+              }}
+            />
+            <label htmlFor="mostrarTodos" className="cursor-pointer">Mostrar también items ya ordenados</label>
+          </div>
+
+          <div className="flex-1 overflow-auto min-h-0">
+            {pedidoItemsLoading ? (
+              <div className="flex items-center justify-center py-10">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : pedidoItemsDisp.length === 0 ? (
+              <div className="text-center py-10 text-muted-foreground text-sm">
+                No hay items disponibles de este proveedor en pedidos activos
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {pedidoItemsPorPedido.map(([pedidoCodigo, items]) => {
+                  const colapsado = pedidosColapsados[pedidoCodigo]
+                  const todosSeleccionados = items.every(i => pedidoSelectedIds.has(i.id))
+                  const algunoSeleccionado = items.some(i => pedidoSelectedIds.has(i.id))
+                  return (
+                    <div key={pedidoCodigo} className="border rounded-md overflow-hidden">
+                      <div
+                        className="flex items-center gap-2 px-3 py-2 bg-muted/40 cursor-pointer hover:bg-muted/60 select-none"
+                        onClick={() => togglePedidoColapsado(pedidoCodigo)}
+                      >
+                        <Checkbox
+                          checked={todosSeleccionados}
+                          data-state={algunoSeleccionado && !todosSeleccionados ? 'indeterminate' : undefined}
+                          onCheckedChange={() => seleccionarTodosDePedido(pedidoCodigo, items)}
+                          onClick={e => e.stopPropagation()}
+                        />
+                        {colapsado ? <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />}
+                        <span className="font-mono text-sm font-medium">{pedidoCodigo}</span>
+                        <span className="text-xs text-muted-foreground">· {items.length} item{items.length !== 1 ? 's' : ''}</span>
+                        {items[0]?.proyectoCodigo && (
+                          <span className="text-xs text-muted-foreground">· Proyecto {items[0].proyectoCodigo}</span>
+                        )}
+                        {items[0]?.centroCostoNombre && (
+                          <span className="text-xs text-muted-foreground">· {items[0].centroCostoNombre}</span>
+                        )}
+                      </div>
+                      {!colapsado && (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-[40px]"></TableHead>
+                              <TableHead className="w-[110px]">Código</TableHead>
+                              <TableHead>Descripción</TableHead>
+                              <TableHead className="w-[60px]">Unid.</TableHead>
+                              <TableHead className="w-[90px] text-right">P. Unit.</TableHead>
+                              <TableHead className="w-[80px] text-right">Cant. disp.</TableHead>
+                              <TableHead className="w-[80px] text-right">A comprar</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {items.map(item => {
+                              const isSelected = pedidoSelectedIds.has(item.id)
+                              return (
+                                <TableRow
+                                  key={item.id}
+                                  className={isSelected ? 'bg-blue-50' : 'cursor-pointer hover:bg-muted/50'}
+                                  onClick={() => setPedidoSelectedIds(prev => {
+                                    const next = new Set(prev)
+                                    if (next.has(item.id)) next.delete(item.id)
+                                    else next.add(item.id)
+                                    return next
+                                  })}
+                                >
+                                  <TableCell>
+                                    <Checkbox
+                                      checked={isSelected}
+                                      onCheckedChange={() => setPedidoSelectedIds(prev => {
+                                        const next = new Set(prev)
+                                        if (next.has(item.id)) next.delete(item.id)
+                                        else next.add(item.id)
+                                        return next
+                                      })}
+                                    />
+                                  </TableCell>
+                                  <TableCell className="font-mono text-xs">{item.codigo || '—'}</TableCell>
+                                  <TableCell className="text-xs">{item.descripcion}</TableCell>
+                                  <TableCell className="text-xs">{item.unidad}</TableCell>
+                                  <TableCell className="text-xs text-right font-mono">
+                                    {item.precioUnitario > 0 ? `${oc?.moneda === 'USD' ? 'US$' : 'S/'} ${item.precioUnitario.toFixed(2)}` : '—'}
+                                  </TableCell>
+                                  <TableCell className="text-xs text-right font-mono">{item.cantidad}</TableCell>
+                                  <TableCell className="text-right" onClick={e => e.stopPropagation()}>
+                                    {isSelected && (
+                                      <Input
+                                        type="number"
+                                        min={0.01}
+                                        max={item.cantidad}
+                                        step={1}
+                                        value={pedidoCantidades[item.id] ?? item.cantidad}
+                                        onChange={e => setPedidoCantidades(p => ({ ...p, [item.id]: parseFloat(e.target.value) || item.cantidad }))}
+                                        className="h-7 w-20 text-xs text-right"
+                                      />
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              )
+                            })}
+                          </TableBody>
+                        </Table>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {pedidoSelectedIds.size > 0 && (
+            <div className="text-xs text-muted-foreground">{pedidoSelectedIds.size} item(s) seleccionado(s)</div>
+          )}
+
+          <DialogFooter className="mt-2">
+            <Button variant="outline" onClick={() => setPedidoSelectorOpen(false)}>Cancelar</Button>
+            <Button
+              onClick={addItemsDesdePedido}
+              disabled={pedidoSelectedIds.size === 0 || addingItems}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              {addingItems && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+              Agregar {pedidoSelectedIds.size > 0 ? `${pedidoSelectedIds.size} item(s)` : 'items'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Catálogo Selector Dialog ────────────────────────── */}
       <Dialog open={catalogoOpen} onOpenChange={setCatalogoOpen}>
