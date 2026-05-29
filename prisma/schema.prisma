@@ -62,6 +62,7 @@ model CatalogoEquipo {
   stockAlmacen                     StockAlmacen[]
   movimientosAlmacen               MovimientoAlmacen[]
   devolucionMaterialItems          DevolucionMaterialItem[]
+  ventaEquipoItems                 VentaEquipoItem[]
 
   @@map("catalogo_equipo")
 }
@@ -159,9 +160,10 @@ model CatalogoGasto {
 }
 
 model Cliente {
-  id                       String                 @id
-  codigo                   String                 @unique
-  numeroSecuencia          Int?                   @default(1)
+  id                                String                 @id
+  codigo                            String                 @unique
+  numeroSecuencia                   Int?                   @default(1)
+  ventaEquipoNumeroSecuencia        Int                    @default(0)
   nombre                   String
   ruc                      String?
   direccion                String?
@@ -183,6 +185,7 @@ model Cliente {
   logoUrl                  String?
   cotizacion               Cotizacion[]
   proyecto                 Proyecto[]
+  ventasEquipo             VentaEquipo[]
   crmContactoCliente       CrmContactoCliente[]
   crmHistorialProyecto     CrmHistorialProyecto[]
   crmOportunidad           CrmOportunidad[]
@@ -338,6 +341,7 @@ model Cotizacion {
   cotizacionGasto           CotizacionGasto[]
   cotizacionServicio        CotizacionServicio[]
   proyecto                  Proyecto[]
+  ventasEquipo              VentaEquipo[]
   cotizacionCondicion       CotizacionCondicion[]
   cotizacionEdt             CotizacionEdt[]
   cotizacionExclusion       CotizacionExclusion[]
@@ -748,6 +752,7 @@ model PedidoEquipo {
   id                         String                      @id
   proyectoId                 String?
   centroCostoId              String?
+  ventaEquipoId              String?
   responsableId              String
   listaId                    String?
   codigo                     String                      @unique
@@ -769,6 +774,7 @@ model PedidoEquipo {
   listaEquipo                ListaEquipo?                @relation(fields: [listaId], references: [id])
   proyecto                   Proyecto?                   @relation(fields: [proyectoId], references: [id])
   centroCosto                CentroCosto?                @relation(fields: [centroCostoId], references: [id])
+  ventaEquipo                VentaEquipo?                @relation(fields: [ventaEquipoId], references: [id], onDelete: SetNull)
   user                       User                        @relation(fields: [responsableId], references: [id])
   pedidoEquipoItem           PedidoEquipoItem[]
   ordenesCompra              OrdenCompra[]
@@ -1818,6 +1824,8 @@ model User {
   planificacionesDia                       PlanificacionDia[]       @relation("PlanificacionPersona")
   planificacionesDiaCreadas                PlanificacionDia[]       @relation("PlanificacionCreador")
   planificacionesDiaActualizadas           PlanificacionDia[]       @relation("PlanificacionActualizador")
+  // Ventas de equipos
+  ventasEquipoComercial                    VentaEquipo[]            @relation("VentaEquipoComercial")
 
   @@map("user")
 }
@@ -3332,6 +3340,15 @@ enum EstadoCotizacion {
   rechazada
 }
 
+enum EstadoVentaEquipo {
+  creado
+  pedido_generado
+  en_entrega
+  entregado
+  facturado
+  cancelado
+}
+
 enum EstadoCotizacionProveedor {
   pendiente
   solicitado
@@ -3904,7 +3921,7 @@ enum EstadoOrdenCompra {
   cancelada
 }
 
-// Imputación: proyectoId y centroCostoId son mutuamente excluyentes.
+// Imputación: proyectoId, centroCostoId y ventaEquipoId son mutuamente excluyentes.
 // Exactamente UNO debe estar presente. Validación en API.
 model OrdenCompra {
   id                   String            @id @default(cuid())
@@ -3913,6 +3930,7 @@ model OrdenCompra {
   centroCostoId        String?
   pedidoEquipoId       String?
   proyectoId           String?
+  ventaEquipoId        String?
   solicitanteId        String
   aprobadorId          String?
   categoriaCosto       CategoriaCosto    @default(equipos)
@@ -3941,6 +3959,7 @@ model OrdenCompra {
   centroCosto     CentroCosto?      @relation(fields: [centroCostoId], references: [id])
   pedidoEquipo    PedidoEquipo?     @relation(fields: [pedidoEquipoId], references: [id])
   proyecto        Proyecto?         @relation(fields: [proyectoId], references: [id])
+  ventaEquipo     VentaEquipo?      @relation(fields: [ventaEquipoId], references: [id], onDelete: SetNull)
   solicitante     User              @relation("OCsolicitante", fields: [solicitanteId], references: [id])
   aprobador       User?             @relation("OCaprobador", fields: [aprobadorId], references: [id])
   items           OrdenCompraItem[]
@@ -5682,4 +5701,61 @@ model PlanificacionDia {
   @@index([proyectoId, fecha])
   @@index([fecha])
   @@map("planificacion_dia")
+}
+
+// ─── Venta de Equipos ──────────────────────────────────────────────────────────
+
+model VentaEquipo {
+  id                   String             @id @default(cuid())
+  codigo               String             @unique
+  numeroSecuencia      Int
+  nombre               String
+  estado               EstadoVentaEquipo  @default(creado)
+  clienteId            String
+  comercialId          String
+  cotizacionId         String
+  moneda               String             @default("USD")
+  tipoCambio           Float              @default(1)
+  totalInterno         Float              @default(0)
+  totalCliente         Float              @default(0)
+  descuento            Float              @default(0)
+  grandTotal           Float              @default(0)
+  fechaEntregaEstimada DateTime?
+  observacion          String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  cliente    Cliente      @relation(fields: [clienteId], references: [id])
+  comercial  User         @relation("VentaEquipoComercial", fields: [comercialId], references: [id], onDelete: Restrict)
+  cotizacion Cotizacion   @relation(fields: [cotizacionId], references: [id])
+  items      VentaEquipoItem[]
+  pedidos    PedidoEquipo[]
+  ordenesCompra OrdenCompra[]
+
+  @@index([clienteId, estado])
+  @@index([estado, createdAt(sort: Desc)])
+  @@map("venta_equipo")
+}
+
+model VentaEquipoItem {
+  id               String   @id @default(cuid())
+  ventaEquipoId    String
+  catalogoEquipoId String?
+  codigo           String?
+  descripcion      String
+  categoria        String?
+  unidad           String?
+  marca            String?
+  cantidad         Float
+  precioUnitarioCliente Float
+  costoCliente     Float    @default(0)
+  costoInterno     Float    @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  ventaEquipo    VentaEquipo     @relation(fields: [ventaEquipoId], references: [id], onDelete: Cascade)
+  catalogoEquipo CatalogoEquipo? @relation(fields: [catalogoEquipoId], references: [id])
+
+  @@index([ventaEquipoId])
+  @@map("venta_equipo_item")
 }

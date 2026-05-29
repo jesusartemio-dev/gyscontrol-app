@@ -707,8 +707,9 @@ export interface CotizacionProveedorItemUpdatePayload
   extends Partial<CotizacionProveedorItemPayload> {}
 
 export interface PedidoEquipoPayload {
-  proyectoId?: string           // Requerido si no hay centroCostoId
-  centroCostoId?: string        // Requerido si no hay proyectoId (pedido interno)
+  proyectoId?: string           // Requerido si no hay centroCostoId ni ventaEquipoId
+  centroCostoId?: string        // Requerido si no hay proyectoId ni ventaEquipoId
+  ventaEquipoId?: string        // Requerido si no hay proyectoId ni centroCostoId
   responsableId: string
   listaId?: string | null
   nombre?: string | null
@@ -1514,3 +1515,53 @@ export interface OrdenCompraUpdatePayload {
   items?: OrdenCompraItemPayload[]
 }
 
+
+// ─── Venta de Equipos ──────────────────────────────────────────────────────────
+
+export interface CrearVentaEquipoData {
+  cotizacionId: string
+  nombre?: string
+  fechaEntregaEstimada?: string
+  observacion?: string
+}
+
+export interface ActualizarVentaEquipoData {
+  nombre?: string
+  estado?: 'creado' | 'pedido_generado' | 'en_entrega' | 'entregado' | 'facturado' | 'cancelado'
+  fechaEntregaEstimada?: string | null
+  observacion?: string | null
+}
+
+export interface FiltrosVentaEquipo {
+  clienteId?: string
+  estado?: string
+  searchText?: string
+  fechaDesde?: string
+  fechaHasta?: string
+}
+
+export interface CrearVentaEquipoItemData {
+  ventaEquipoId: string
+  catalogoEquipoId?: string | null
+  codigo?: string
+  descripcion: string
+  categoria?: string
+  unidad?: string
+  marca?: string
+  cantidad: number
+  precioUnitarioCliente: number
+  costoCliente: number
+  costoInterno: number
+}
+
+export interface ActualizarVentaEquipoItemData {
+  descripcion?: string
+  cantidad?: number
+  precioUnitarioCliente?: number
+  costoCliente?: number
+  costoInterno?: number
+}
+
+export interface FiltrosVentaEquipoItem {
+  ventaEquipoId?: string
+}

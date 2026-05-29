@@ -3080,3 +3080,53 @@ export interface PagoPagar {
 
   cuentaBancaria?: CuentaBancaria | null
 }
+
+// ─── Venta de Equipos ──────────────────────────────────────────────────────────
+
+export type EstadoVentaEquipo = 'creado' | 'pedido_generado' | 'en_entrega' | 'entregado' | 'facturado' | 'cancelado'
+
+export interface VentaEquipo {
+  id: string
+  codigo: string
+  numeroSecuencia: number
+  nombre: string
+  estado: EstadoVentaEquipo
+  clienteId: string
+  comercialId: string
+  cotizacionId: string
+  moneda: string
+  tipoCambio: number
+  totalInterno: number
+  totalCliente: number
+  descuento: number
+  grandTotal: number
+  fechaEntregaEstimada?: string | null
+  observacion?: string | null
+  createdAt: string
+  updatedAt: string
+  cliente?: { id: string; nombre: string; codigo: string }
+  comercial?: { id: string; name: string }
+  cotizacion?: { id: string; codigo: string; nombre: string; estado?: string }
+  items?: VentaEquipoItem[]
+  pedidos?: { id: string; codigo: string; estado: string; nombre?: string | null }[]
+  ordenesCompra?: { id: string; numero: string; estado: string; total: number; moneda: string }[]
+  _count?: { items: number; pedidos: number }
+}
+
+export interface VentaEquipoItem {
+  id: string
+  ventaEquipoId: string
+  catalogoEquipoId?: string | null
+  codigo?: string | null
+  descripcion: string
+  categoria?: string | null
+  unidad?: string | null
+  marca?: string | null
+  cantidad: number
+  precioUnitarioCliente: number
+  costoCliente: number
+  costoInterno: number
+  createdAt: string
+  updatedAt: string
+  catalogoEquipo?: { id: string; codigo: string; precioLogistica?: number | null; fechaActualizacion?: string | null } | null
+}

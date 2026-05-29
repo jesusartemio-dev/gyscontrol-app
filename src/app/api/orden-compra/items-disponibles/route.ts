@@ -97,7 +97,7 @@ export async function GET(req: Request) {
           codigo: true,
           proyecto: { select: { codigo: true } },
           centroCosto: { select: { nombre: true } },
-          _count: { select: { items: true } },
+          _count: { select: { pedidoEquipoItem: true } },
         },
         orderBy: { codigo: 'asc' },
       }),
@@ -140,7 +140,7 @@ export async function GET(req: Request) {
         codigo: p.codigo,
         proyectoCodigo: p.proyecto?.codigo ?? null,
         centroCostoNombre: p.centroCosto?.nombre ?? null,
-        totalItems: p._count.items,
+        totalItems: p._count.pedidoEquipoItem,
       })),
     })
   } catch (error) {

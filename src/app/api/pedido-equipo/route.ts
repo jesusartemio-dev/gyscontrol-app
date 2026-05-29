@@ -21,6 +21,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const proyectoId = searchParams.get('proyectoId')
     const centroCostoId = searchParams.get('centroCostoId')
+    const ventaEquipoId = searchParams.get('ventaEquipoId')
     const soloInternos = searchParams.get('soloInternos') === 'true'
     const estado = searchParams.get('estado')
     const responsableId = searchParams.get('responsableId')
@@ -40,6 +41,10 @@ export async function GET(request: Request) {
 
     if (centroCostoId) {
       whereClause.centroCostoId = centroCostoId
+    }
+
+    if (ventaEquipoId) {
+      whereClause.ventaEquipoId = ventaEquipoId
     }
 
     if (soloInternos) {
@@ -101,6 +106,7 @@ export async function GET(request: Request) {
         fechaEntregaReal: true,
         proyectoId: true,
         centroCostoId: true,
+        ventaEquipoId: true,
         responsableId: true,
         listaId: true,
         esUrgente: true,
@@ -122,6 +128,13 @@ export async function GET(request: Request) {
           },
         },
         proyecto: {
+          select: {
+            id: true,
+            codigo: true,
+            nombre: true,
+          },
+        },
+        ventaEquipo: {
           select: {
             id: true,
             codigo: true,
@@ -235,30 +248,35 @@ export async function POST(request: Request) {
       )
     }
 
-    // Debe tener exactamente uno: proyectoId o centroCostoId
-    if (!body.proyectoId && !body.centroCostoId) {
+    // Debe tener exactamente uno: proyectoId, centroCostoId o ventaEquipoId
+    const origenCount = [body.proyectoId, body.centroCostoId, body.ventaEquipoId].filter(Boolean).length
+    if (origenCount === 0) {
       return NextResponse.json(
-        { error: 'Debe indicar proyectoId o centroCostoId' },
+        { error: 'Debe indicar proyectoId, centroCostoId o ventaEquipoId' },
         { status: 400 }
       )
     }
-    if (body.proyectoId && body.centroCostoId) {
+    if (origenCount > 1) {
       return NextResponse.json(
-        { error: 'proyectoId y centroCostoId son mutuamente excluyentes' },
+        { error: 'proyectoId, centroCostoId y ventaEquipoId son mutuamente excluyentes' },
         { status: 400 }
       )
     }
 
-    // 🔎 Validar existencia de proyecto o centro de costo
+    // 🔎 Validar existencia de proyecto, centro de costo o venta de equipos
     let proyecto: { id: string; codigo: string; nombre: string } | null = null
     let centroCosto: { id: string; nombre: string } | null = null
+    let ventaEquipo: { id: string; codigo: string; nombre: string } | null = null
 
     if (body.proyectoId) {
       proyecto = await prisma.proyecto.findUnique({ where: { id: body.proyectoId } })
       if (!proyecto) return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 })
-    } else {
-      centroCosto = await prisma.centroCosto.findUnique({ where: { id: body.centroCostoId! } })
+    } else if (body.centroCostoId) {
+      centroCosto = await prisma.centroCosto.findUnique({ where: { id: body.centroCostoId } })
       if (!centroCosto) return NextResponse.json({ error: 'Centro de costo no encontrado' }, { status: 404 })
+    } else {
+      ventaEquipo = await prisma.ventaEquipo.findUnique({ where: { id: body.ventaEquipoId! } })
+      if (!ventaEquipo) return NextResponse.json({ error: 'Venta de equipos no encontrada' }, { status: 404 })
     }
 
     // 🔎 Validar existencia de responsable
@@ -290,6 +308,13 @@ export async function POST(request: Request) {
       })
       nuevoNumero = ultimoPedido ? ultimoPedido.numeroSecuencia + 1 : 1
       codigoGenerado = `${proyecto.codigo}-PED-${String(nuevoNumero).padStart(3, '0')}`
+    } else if (ventaEquipo) {
+      const ultimoPedido = await prisma.pedidoEquipo.findFirst({
+        where: { ventaEquipoId: ventaEquipo.id },
+        orderBy: { numeroSecuencia: 'desc' },
+      })
+      nuevoNumero = ultimoPedido ? ultimoPedido.numeroSecuencia + 1 : 1
+      codigoGenerado = `${ventaEquipo.codigo}-PED-${String(nuevoNumero).padStart(3, '0')}`
     } else {
       // Pedido interno: secuencia global de pedidos internos
       const ultimoPedidoInt = await prisma.pedidoEquipo.findFirst({
@@ -339,6 +364,7 @@ export async function POST(request: Request) {
           id: pedidoId,
           proyectoId: body.proyectoId ?? null,
           centroCostoId: body.centroCostoId ?? null,
+          ventaEquipoId: body.ventaEquipoId ?? null,
           responsableId: body.responsableId,
           listaId: body.listaId ?? null,
           codigo: codigoGenerado,
@@ -481,7 +507,7 @@ export async function POST(request: Request) {
             id: `evt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             proyectoId: body.proyectoId ?? null,
             pedidoEquipoId: pedido.id,
-            tipo: 'pedido_urgente',
+            tipo: 'pedido_urgente' as const,
             descripcion: `Pedido urgente creado en borrador. Motivo: ${body.observacion || 'No especificado'}. Pendiente de agregar ítems.`,
             usuarioId: body.responsableId,
             metadata: { esUrgente: true, itemCount: itemsCreados },
@@ -525,7 +551,7 @@ export async function POST(request: Request) {
         session.user.id,
         `Pedido ${resultado.pedido.codigo}`,
         {
-          proyecto: proyecto?.nombre ?? centroCosto?.nombre,
+          proyecto: proyecto?.nombre ?? centroCosto?.nombre ?? ventaEquipo?.nombre,
           codigo: resultado.pedido.codigo,
           fechaNecesaria: body.fechaNecesaria,
           estado: resultado.pedido.estado,
