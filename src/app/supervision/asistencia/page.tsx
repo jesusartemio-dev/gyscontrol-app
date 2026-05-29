@@ -137,7 +137,8 @@ export default function SupervisionAsistencia() {
   const [sortKey, setSortKey] = useState<SortKey>('fechaHora')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
 
-  const [vista, setVista] = useState<'detalle' | 'resumen' | 'por_proyecto'>('detalle')
+  const [vista, setVista] = useState<'detalle' | 'resumen' | 'por_proyecto' | 'horas_dia'>('detalle')
+  const [modoAsistencia, setModoAsistencia] = useState<'todos' | 'campo' | 'remoto' | 'oficina'>('todos')
 
   const [porProyectoData, setPorProyectoData] = useState<{
     userId: string; nombre: string; departamento: string; diasConAsistencia: number
@@ -209,7 +210,8 @@ export default function SupervisionAsistencia() {
       if (saved.busqueda)  setBusqueda(saved.busqueda)
       if (saved.sortKey)   setSortKey(saved.sortKey)
       if (saved.sortDir)   setSortDir(saved.sortDir)
-      if (saved.vista)     setVista(saved.vista)
+      if (saved.vista)           setVista(saved.vista)
+      if (saved.modoAsistencia)  setModoAsistencia(saved.modoAsistencia)
     } catch {}
     cargar(ov)
     fetch('/api/asistencia/visitas-externas-mes')
@@ -222,9 +224,9 @@ export default function SupervisionAsistencia() {
   // Persistir filtros en localStorage cada vez que cambian
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ desde, hasta, estado, metodo, busqueda, sortKey, sortDir, vista }))
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ desde, hasta, estado, metodo, busqueda, sortKey, sortDir, vista, modoAsistencia }))
     } catch {}
-  }, [desde, hasta, estado, metodo, busqueda, sortKey, sortDir, vista])
+  }, [desde, hasta, estado, metodo, busqueda, sortKey, sortDir, vista, modoAsistencia])
 
   const usuariosExcedenUmbral = useMemo(
     () => new Set((visitasMes?.resumen || []).filter(r => r.excedeUmbral).map(r => r.email)),
@@ -353,6 +355,54 @@ export default function SupervisionAsistencia() {
         return fd !== 0 ? fd : a.nombre.localeCompare(b.nombre)
       })
   }, [dataFiltrada])
+
+  const horasDiaData = useMemo(() => {
+    type DiaEntry = { horasTrabajadas: number | null; ubicacion: string | null; modo: 'campo' | 'remoto' | 'oficina' }
+    type PersonaEntry = { nombre: string; email: string; dpto: string | null; dias: Map<string, DiaEntry> }
+
+    const personaDias = new Map<string, { nombre: string; dpto: string | null; dias: Map<string, { ingresos: Fila[]; salidas: Fila[] }> }>()
+    for (const f of dataFiltrada) {
+      if (f.tipo !== 'ingreso' && f.tipo !== 'salida') continue
+      const fechaLima = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit',
+      }).format(new Date(f.fechaHora))
+      const email = f.user.email
+      if (!personaDias.has(email)) personaDias.set(email, { nombre: f.user.name || email, dpto: f.empleado?.departamento?.nombre ?? null, dias: new Map() })
+      const p = personaDias.get(email)!
+      if (!p.dias.has(fechaLima)) p.dias.set(fechaLima, { ingresos: [], salidas: [] })
+      const g = p.dias.get(fechaLima)!
+      if (f.tipo === 'ingreso') g.ingresos.push(f)
+      else g.salidas.push(f)
+    }
+
+    const sortAsc = (a: Fila, b: Fila) => new Date(a.fechaHora).getTime() - new Date(b.fechaHora).getTime()
+    const result: PersonaEntry[] = []
+
+    for (const [email, p] of personaDias) {
+      const dias = new Map<string, DiaEntry>()
+      for (const [fecha, { ingresos, salidas }] of p.dias) {
+        const primerIngreso = ingresos.length > 0 ? [...ingresos].sort(sortAsc)[0] : null
+        const ultimaSalida = salidas.length > 0 ? [...salidas].sort(sortAsc).at(-1)! : null
+        const ref = primerIngreso ?? ultimaSalida
+
+        const horasTrabajadas = primerIngreso && ultimaSalida
+          ? (new Date(ultimaSalida.fechaHora).getTime() - new Date(primerIngreso.fechaHora).getTime()) / 3600000
+          : null
+
+        let modo: 'campo' | 'remoto' | 'oficina' = 'oficina'
+        if (primerIngreso) {
+          if (primerIngreso.metodoMarcaje === 'remoto') modo = 'remoto'
+          else if (primerIngreso.metodoMarcaje === 'visita_externa' || primerIngreso.ubicacion?.tipo === 'planta' || primerIngreso.ubicacion?.tipo === 'obra') modo = 'campo'
+        }
+
+        if (modoAsistencia === 'todos' || modo === modoAsistencia) {
+          dias.set(fecha, { horasTrabajadas, ubicacion: ref?.ubicacion?.nombre ?? null, modo })
+        }
+      }
+      if (dias.size > 0) result.push({ nombre: p.nombre, email, dpto: p.dpto, dias })
+    }
+    return result.sort((a, b) => (a.dpto || '').localeCompare(b.dpto || '') || a.nombre.localeCompare(b.nombre))
+  }, [dataFiltrada, modoAsistencia])
 
   async function confirmarEliminar() {
     if (!filaAEliminar) return
@@ -516,7 +566,7 @@ export default function SupervisionAsistencia() {
             {(loading || porProyectoLoading) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             Filtrar
           </Button>
-          {vista !== 'por_proyecto' && (
+          {vista !== 'por_proyecto' && vista !== 'horas_dia' && (
             <Button
               variant="outline"
               onClick={vista === 'detalle' ? exportarExcel : exportarResumen}
@@ -613,6 +663,12 @@ export default function SupervisionAsistencia() {
           >
             Por Proyecto
           </button>
+          <button
+            onClick={() => setVista('horas_dia')}
+            className={`px-3 py-1.5 transition-colors ${vista === 'horas_dia' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+          >
+            Horas por día
+          </button>
         </div>
         {vista === 'resumen' && (
           <span className="text-xs text-muted-foreground">
@@ -624,7 +680,30 @@ export default function SupervisionAsistencia() {
             Horas de campo ejecutadas (jornadas) agrupadas por proyecto
           </span>
         )}
+        {vista === 'horas_dia' && (
+          <span className="text-xs text-muted-foreground">
+            {horasDiaData.length} persona(s) · horas totales por día según ingreso/salida
+          </span>
+        )}
       </div>
+
+      {/* Filtro de modo para Horas por día */}
+      {vista === 'horas_dia' && (
+        <div className="mb-3 flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">Modo:</span>
+          <div className="flex overflow-hidden rounded-md border text-xs">
+            {(['todos', 'campo', 'remoto', 'oficina'] as const).map(m => (
+              <button
+                key={m}
+                onClick={() => setModoAsistencia(m)}
+                className={`px-3 py-1.5 capitalize transition-colors ${modoAsistencia === m ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+              >
+                {m === 'todos' ? 'Todos' : m === 'campo' ? 'Campo' : m === 'remoto' ? 'Remoto' : 'Oficina'}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Por Proyecto */}
       {vista === 'por_proyecto' && (
@@ -733,6 +812,111 @@ export default function SupervisionAsistencia() {
           </div>
         )
       )}
+
+      {/* Horas por día */}
+      {vista === 'horas_dia' && (() => {
+        const diasEnRango: string[] = []
+        const dCur = new Date(desde + 'T12:00:00Z')
+        const dFin = new Date(hasta + 'T12:00:00Z')
+        while (dCur <= dFin) { diasEnRango.push(dCur.toISOString().slice(0, 10)); dCur.setUTCDate(dCur.getUTCDate() + 1) }
+        const DIAS_LABEL = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá']
+
+        if (horasDiaData.length === 0) return (
+          <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
+            Sin registros de asistencia en el período seleccionado.
+          </div>
+        )
+
+        return (
+          <>
+            <div className="overflow-x-auto rounded-lg border bg-card shadow-sm">
+              <table className="w-full border-collapse text-sm" style={{ minWidth: `${280 + diasEnRango.length * 92}px` }}>
+                <thead>
+                  <tr className="border-b bg-muted/30">
+                    <th className="sticky left-0 z-10 bg-muted/30 text-left px-3 py-2 font-medium text-xs text-muted-foreground w-[180px]">Persona</th>
+                    <th className="sticky left-[180px] z-10 bg-muted/30 text-left px-2 py-2 font-medium text-xs text-muted-foreground w-[100px] border-r">Dpto.</th>
+                    {diasEnRango.map(d => {
+                      const dt = new Date(d + 'T12:00:00Z')
+                      const dow = dt.getUTCDay()
+                      const isWeekend = dow === 0 || dow === 6
+                      return (
+                        <th key={d} className={`text-center px-1 py-1.5 font-medium text-xs w-[92px] ${isWeekend ? 'text-muted-foreground/40' : 'text-muted-foreground'}`}>
+                          <div>{DIAS_LABEL[dow]}</div>
+                          <div className="font-mono">{String(dt.getUTCDate()).padStart(2, '0')}</div>
+                        </th>
+                      )
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {horasDiaData.map((persona, pi) => (
+                    <tr key={persona.email} className={`border-b last:border-b-0 ${pi % 2 === 0 ? 'bg-background' : 'bg-muted/10'}`}>
+                      <td className={`sticky left-0 z-10 px-3 py-1.5 font-medium text-sm ${pi % 2 === 0 ? 'bg-background' : 'bg-muted/10'}`}>
+                        {persona.nombre}
+                      </td>
+                      <td className={`sticky left-[180px] z-10 px-2 py-1.5 text-xs text-muted-foreground border-r ${pi % 2 === 0 ? 'bg-background' : 'bg-muted/10'}`}>
+                        {persona.dpto || '—'}
+                      </td>
+                      {diasEnRango.map(dStr => {
+                        const dt = new Date(dStr + 'T12:00:00Z')
+                        const dow = dt.getUTCDay()
+                        const isWeekend = dow === 0 || dow === 6
+                        const dia = persona.dias.get(dStr)
+
+                        if (!dia) return (
+                          <td key={dStr} className={`text-center px-1 py-1.5 ${isWeekend ? 'bg-muted/20' : ''}`}>
+                            <span className="text-muted-foreground/30 text-xs">—</span>
+                          </td>
+                        )
+
+                        const modoBadge = dia.modo === 'campo'
+                          ? 'bg-orange-100 text-orange-700'
+                          : dia.modo === 'remoto'
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'bg-gray-100 text-gray-600'
+                        const modoLabel = dia.modo === 'campo' ? 'Campo' : dia.modo === 'remoto' ? 'Remoto' : 'Oficina'
+
+                        return (
+                          <td key={dStr} className={`px-1 py-1.5 text-center ${isWeekend ? 'bg-muted/20' : ''}`}>
+                            <div className="flex flex-col items-center gap-0.5 min-h-[52px] justify-center">
+                              {dia.horasTrabajadas != null ? (
+                                <span className={`text-[13px] font-bold leading-none ${
+                                  dia.horasTrabajadas < 4 ? 'text-red-600' :
+                                  dia.horasTrabajadas >= 8 ? 'text-emerald-700' : 'text-amber-700'
+                                }`}>
+                                  {fmtHoras(dia.horasTrabajadas)}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-amber-600 leading-none">sin sal.</span>
+                              )}
+                              {dia.ubicacion && (
+                                <span className="text-[9px] text-muted-foreground leading-none max-w-[80px] truncate" title={dia.ubicacion}>
+                                  {dia.ubicacion}
+                                </span>
+                              )}
+                              <span className={`text-[8px] rounded px-1 leading-tight mt-0.5 ${modoBadge}`}>
+                                {modoLabel}
+                              </span>
+                            </div>
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex flex-wrap gap-4 text-xs text-muted-foreground pt-1">
+              <span className="flex items-center gap-1.5"><span className="font-bold text-emerald-700">8h+</span> Jornada completa</span>
+              <span className="flex items-center gap-1.5"><span className="font-bold text-amber-700">4–8h</span> Jornada parcial</span>
+              <span className="flex items-center gap-1.5"><span className="font-bold text-red-600">&lt;4h</span> Jornada corta</span>
+              <span className="flex items-center gap-1.5"><span className="rounded px-1 bg-orange-100 text-orange-700">Campo</span> visita externa / planta</span>
+              <span className="flex items-center gap-1.5"><span className="rounded px-1 bg-blue-100 text-blue-700">Remoto</span> trabajo remoto</span>
+              <span className="flex items-center gap-1.5"><span className="rounded px-1 bg-gray-100 text-gray-600">Oficina</span> sede</span>
+            </div>
+          </>
+        )
+      })()}
 
       {/* Tabla detalle */}
       {vista === 'resumen' ? (() => {
