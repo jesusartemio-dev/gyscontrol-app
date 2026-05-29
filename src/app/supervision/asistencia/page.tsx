@@ -860,7 +860,7 @@ export default function SupervisionAsistencia() {
         while (dCur <= dFin) { diasEnRango.push(dCur.toISOString().slice(0, 10)); dCur.setUTCDate(dCur.getUTCDate() + 1) }
         const DIAS_LABEL = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá']
 
-        const fmtTime = (d: Date) => d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima' })
+        const fmtTime = (d: Date) => d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Lima' })
 
         if (horasDiaData.length === 0) return (
           <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
@@ -926,30 +926,29 @@ export default function SupervisionAsistencia() {
                           : 'bg-gray-100 text-gray-600'
                         const modoLabel = dia.modo === 'campo' ? 'Campo' : dia.modo === 'remoto' ? 'Remoto' : 'Oficina'
 
+                        const ubicacionCorta = dia.ubicacion ? dia.ubicacion.split('-')[0].trim() : null
                         return (
-                          <td key={dStr} className={`px-1 py-1.5 text-center ${isWeekend ? 'bg-muted/20' : ''}`}>
-                            <div className="flex flex-col items-center gap-0.5 min-h-[52px] justify-center">
-                              <span className="text-[9px] text-muted-foreground font-mono leading-none">
-                                ↑{fmtTime(dia.ingresoHora)}
-                              </span>
-                              <span className="text-[9px] font-mono leading-none text-muted-foreground">
-                                {dia.salidaHora ? `↓${fmtTime(dia.salidaHora)}` : <span className="text-amber-500">↓ –</span>}
+                          <td key={dStr} className={`px-1 py-1 text-center ${isWeekend ? 'bg-muted/20' : ''}`}>
+                            <div className="flex flex-col items-center gap-0.5 justify-center">
+                              <span className="text-[9px] text-muted-foreground font-mono leading-none whitespace-nowrap">
+                                ↑{fmtTime(dia.ingresoHora)}{' '}
+                                {dia.salidaHora
+                                  ? <span>↓{fmtTime(dia.salidaHora)}</span>
+                                  : <span className="text-amber-500">↓–</span>}
                               </span>
                               {dia.horasTrabajadas != null ? (
-                                <span className={`text-[12px] font-bold leading-none mt-0.5 ${
+                                <span className={`text-[12px] font-bold leading-none ${
                                   dia.horasTrabajadas < 4 ? 'text-red-600' :
                                   dia.horasTrabajadas >= 8 ? 'text-emerald-700' : 'text-amber-700'
                                 }`}>
                                   {fmtHoras(dia.horasTrabajadas)}
                                 </span>
                               ) : null}
-                              {dia.ubicacion && (
-                                <span className="text-[9px] text-muted-foreground leading-none max-w-[80px] truncate" title={dia.ubicacion}>
-                                  {dia.ubicacion}
-                                </span>
-                              )}
-                              <span className={`text-[8px] rounded px-1 leading-tight mt-0.5 ${modoBadge}`}>
-                                {modoLabel}
+                              <span
+                                className={`text-[8px] rounded px-1 leading-tight ${modoBadge}`}
+                                title={dia.ubicacion ?? undefined}
+                              >
+                                {ubicacionCorta ? `${ubicacionCorta} · ${modoLabel}` : modoLabel}
                               </span>
                             </div>
                           </td>
@@ -975,7 +974,7 @@ export default function SupervisionAsistencia() {
       {/* Tabla detalle */}
       {vista === 'resumen' ? (() => {
         // Pivot resumenPorPersona → persona × día (matriz)
-        const fmtTime = (d: Date) => d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima' })
+        const fmtTime = (d: Date) => d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Lima' })
         const diasEnRango: string[] = []
         const dCur = new Date(desde + 'T12:00:00Z')
         const dFin = new Date(hasta + 'T12:00:00Z')
