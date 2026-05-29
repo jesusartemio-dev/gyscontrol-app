@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
     if (isNaN(inicio.getTime())) return NextResponse.json({ error: 'Fecha inválida' }, { status: 400 })
 
     const dias = Array.from({ length: numSemanas * 7 }, (_, i) => addDays(inicio, i))
-    const finStr = dias[dias.length - 1]
+    const finStr = dias[dias.length - 1].toISOString().slice(0, 10)
     const finDate = new Date(finStr + 'T23:59:59.999Z')
 
     // ── Empleados del rango ───────────────────────────────────────────────────
