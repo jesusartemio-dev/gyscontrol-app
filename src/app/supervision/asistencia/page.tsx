@@ -362,7 +362,7 @@ export default function SupervisionAsistencia() {
   }, [dataFiltrada])
 
   const horasDiaData = useMemo(() => {
-    type DiaEntry = { horasTrabajadas: number | null; ubicacion: string | null; modo: 'campo' | 'remoto' | 'oficina' }
+    type DiaEntry = { horasTrabajadas: number | null; ubicacion: string | null; modo: 'campo' | 'remoto' | 'oficina'; ingresoHora: Date; salidaHora: Date | null }
     type PersonaEntry = { nombre: string; email: string; dpto: string | null; dias: Map<string, DiaEntry> }
 
     // Agrupar todos los registros por persona (no por día)
@@ -423,6 +423,8 @@ export default function SupervisionAsistencia() {
               horasTrabajadas,
               ubicacion: ingreso.ubicacion?.nombre ?? salida?.ubicacion?.nombre ?? null,
               modo,
+              ingresoHora: new Date(ingreso.fechaHora),
+              salidaHora: salida ? new Date(salida.fechaHora) : null,
             })
           }
         }
@@ -858,6 +860,8 @@ export default function SupervisionAsistencia() {
         while (dCur <= dFin) { diasEnRango.push(dCur.toISOString().slice(0, 10)); dCur.setUTCDate(dCur.getUTCDate() + 1) }
         const DIAS_LABEL = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá']
 
+        const fmtTime = (d: Date) => d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima' })
+
         if (horasDiaData.length === 0) return (
           <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
             Sin registros de asistencia en el período seleccionado.
@@ -925,16 +929,20 @@ export default function SupervisionAsistencia() {
                         return (
                           <td key={dStr} className={`px-1 py-1.5 text-center ${isWeekend ? 'bg-muted/20' : ''}`}>
                             <div className="flex flex-col items-center gap-0.5 min-h-[52px] justify-center">
+                              <span className="text-[9px] text-muted-foreground font-mono leading-none">
+                                ↑{fmtTime(dia.ingresoHora)}
+                              </span>
+                              <span className="text-[9px] font-mono leading-none text-muted-foreground">
+                                {dia.salidaHora ? `↓${fmtTime(dia.salidaHora)}` : <span className="text-amber-500">↓ –</span>}
+                              </span>
                               {dia.horasTrabajadas != null ? (
-                                <span className={`text-[13px] font-bold leading-none ${
+                                <span className={`text-[12px] font-bold leading-none mt-0.5 ${
                                   dia.horasTrabajadas < 4 ? 'text-red-600' :
                                   dia.horasTrabajadas >= 8 ? 'text-emerald-700' : 'text-amber-700'
                                 }`}>
                                   {fmtHoras(dia.horasTrabajadas)}
                                 </span>
-                              ) : (
-                                <span className="text-[10px] text-amber-600 leading-none">sin sal.</span>
-                              )}
+                              ) : null}
                               {dia.ubicacion && (
                                 <span className="text-[9px] text-muted-foreground leading-none max-w-[80px] truncate" title={dia.ubicacion}>
                                   {dia.ubicacion}
