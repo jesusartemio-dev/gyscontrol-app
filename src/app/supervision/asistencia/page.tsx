@@ -139,6 +139,7 @@ export default function SupervisionAsistencia() {
 
   const [vista, setVista] = useState<'detalle' | 'resumen' | 'por_proyecto' | 'horas_dia'>('detalle')
   const [modoAsistencia, setModoAsistencia] = useState<'todos' | 'campo' | 'remoto' | 'oficina'>('todos')
+  const [personasOcultas, setPersonasOcultas] = useState<Set<string>>(new Set())
 
   const [porProyectoData, setPorProyectoData] = useState<{
     userId: string; nombre: string; departamento: string; diasConAsistencia: number
@@ -717,19 +718,27 @@ export default function SupervisionAsistencia() {
 
       {/* Filtro de modo para Horas por día */}
       {vista === 'horas_dia' && (
-        <div className="mb-3 flex items-center gap-2">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
           <span className="text-xs text-muted-foreground">Modo:</span>
           <div className="flex overflow-hidden rounded-md border text-xs">
             {(['todos', 'campo', 'remoto', 'oficina'] as const).map(m => (
               <button
                 key={m}
                 onClick={() => setModoAsistencia(m)}
-                className={`px-3 py-1.5 capitalize transition-colors ${modoAsistencia === m ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+                className={`px-3 py-1.5 transition-colors ${modoAsistencia === m ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
               >
                 {m === 'todos' ? 'Todos' : m === 'campo' ? 'Campo' : m === 'remoto' ? 'Remoto' : 'Oficina'}
               </button>
             ))}
           </div>
+          {personasOcultas.size > 0 && (
+            <button
+              onClick={() => setPersonasOcultas(new Set())}
+              className="text-xs text-muted-foreground underline hover:text-foreground"
+            >
+              Mostrar todas ({personasOcultas.size} oculta{personasOcultas.size !== 1 ? 's' : ''})
+            </button>
+          )}
         </div>
       )}
 
@@ -877,10 +886,19 @@ export default function SupervisionAsistencia() {
                   </tr>
                 </thead>
                 <tbody>
-                  {horasDiaData.map((persona, pi) => (
+                  {horasDiaData.filter(p => !personasOcultas.has(p.email)).map((persona, pi) => (
                     <tr key={persona.email} className={`border-b last:border-b-0 ${pi % 2 === 0 ? 'bg-background' : 'bg-muted/10'}`}>
-                      <td className={`sticky left-0 z-10 px-3 py-1.5 font-medium text-sm ${pi % 2 === 0 ? 'bg-background' : 'bg-muted/10'}`}>
-                        {persona.nombre}
+                      <td className={`sticky left-0 z-10 px-3 py-1.5 text-sm ${pi % 2 === 0 ? 'bg-background' : 'bg-muted/10'}`}>
+                        <div className="flex items-center justify-between gap-1 group">
+                          <span className="font-medium">{persona.nombre}</span>
+                          <button
+                            onClick={() => setPersonasOcultas(prev => new Set([...prev, persona.email]))}
+                            title="Ocultar fila"
+                            className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity text-xs leading-none px-0.5"
+                          >
+                            ×
+                          </button>
+                        </div>
                       </td>
                       <td className={`sticky left-[180px] z-10 px-2 py-1.5 text-xs text-muted-foreground border-r ${pi % 2 === 0 ? 'bg-background' : 'bg-muted/10'}`}>
                         {persona.dpto || '—'}
