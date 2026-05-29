@@ -4,8 +4,11 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
 /**
- * GET /api/catalogo-equipo/search?q=xxx
- * Lightweight search for autocomplete — returns max 10 results matching code or description.
+ * GET /api/catalogo-equipo/search
+ *
+ * Legacy mode (no browse param): q required, returns array for autocomplete.
+ * Browse mode (browse=true): q optional, accepts categoriaId/marca/offset,
+ *   returns { items, total } with categoriaEquipo included.
  */
 export async function GET(req: NextRequest) {
   try {
@@ -14,36 +17,70 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const q = req.nextUrl.searchParams.get('q')?.trim()
-    if (!q || q.length < 2) {
-      return NextResponse.json([])
+    const sp = req.nextUrl.searchParams
+    const browse = sp.get('browse') === 'true'
+
+    if (!browse) {
+      // ── Legacy autocomplete mode ──────────────────────────────────────────
+      const q = sp.get('q')?.trim()
+      if (!q || q.length < 2) return NextResponse.json([])
+
+      const take = Math.min(parseInt(sp.get('limit') || '10') || 10, 50)
+
+      const items = await prisma.catalogoEquipo.findMany({
+        where: {
+          OR: [
+            { codigo: { contains: q, mode: 'insensitive' } },
+            { descripcion: { contains: q, mode: 'insensitive' } },
+          ],
+        },
+        select: {
+          id: true, codigo: true, descripcion: true, marca: true,
+          precioLogistica: true, precioReal: true, precioInterno: true,
+          unidad: { select: { nombre: true } },
+        },
+        take,
+        orderBy: { codigo: 'asc' },
+      })
+
+      return NextResponse.json(items)
     }
 
-    const limitParam = req.nextUrl.searchParams.get('limit')
-    const take = limitParam ? Math.min(parseInt(limitParam) || 10, 50) : 10
+    // ── Browse mode ───────────────────────────────────────────────────────
+    const q = sp.get('q')?.trim() ?? ''
+    const categoriaId = sp.get('categoriaId') ?? ''
+    const marca = sp.get('marca') ?? ''
+    const take = Math.min(parseInt(sp.get('limit') || '20') || 20, 50)
+    const skip = Math.max(parseInt(sp.get('offset') || '0') || 0, 0)
 
-    const items = await prisma.catalogoEquipo.findMany({
-      where: {
-        OR: [
-          { codigo: { contains: q, mode: 'insensitive' } },
-          { descripcion: { contains: q, mode: 'insensitive' } },
-        ],
-      },
-      select: {
-        id: true,
-        codigo: true,
-        descripcion: true,
-        marca: true,
-        precioLogistica: true,
-        precioReal: true,
-        precioInterno: true,
-        unidad: { select: { nombre: true } },
-      },
-      take,
-      orderBy: { codigo: 'asc' },
-    })
+    const where = {
+      ...(q.length >= 2 ? { OR: [
+        { codigo: { contains: q, mode: 'insensitive' as const } },
+        { descripcion: { contains: q, mode: 'insensitive' as const } },
+        { marca: { contains: q, mode: 'insensitive' as const } },
+      ]} : {}),
+      ...(categoriaId ? { categoriaId } : {}),
+      ...(marca ? { marca: { equals: marca, mode: 'insensitive' as const } } : {}),
+    }
 
-    return NextResponse.json(items)
+    const [items, total] = await Promise.all([
+      prisma.catalogoEquipo.findMany({
+        where,
+        select: {
+          id: true, codigo: true, descripcion: true, marca: true,
+          precioLogistica: true, precioReal: true, precioInterno: true,
+          estado: true,
+          unidad: { select: { nombre: true } },
+          categoriaEquipo: { select: { nombre: true } },
+        },
+        take,
+        skip,
+        orderBy: { codigo: 'asc' },
+      }),
+      prisma.catalogoEquipo.count({ where }),
+    ])
+
+    return NextResponse.json({ items, total })
   } catch (error) {
     console.error('Error en búsqueda de catálogo:', error)
     return NextResponse.json({ error: 'Error en búsqueda' }, { status: 500 })

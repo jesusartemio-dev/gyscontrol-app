@@ -142,11 +142,24 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
   // Add/delete item state
   const [catalogoOpen, setCatalogoOpen] = useState(false)
   const [catalogoQuery, setCatalogoQuery] = useState('')
-  const [catalogoResults, setCatalogoResults] = useState<{ id: string; codigo: string; descripcion: string; marca: string; precioLogistica: number | null; precioReal: number | null; precioInterno: number; unidad: { nombre: string } }[]>([])
+  const [catalogoResults, setCatalogoResults] = useState<{
+    id: string; codigo: string; descripcion: string; marca: string
+    precioLogistica: number | null; precioReal: number | null; precioInterno: number
+    estado: string
+    unidad: { nombre: string }
+    categoriaEquipo: { nombre: string }
+  }[]>([])
   const [catalogoLoading, setCatalogoLoading] = useState(false)
   const [catalogoSelectedIds, setCatalogoSelectedIds] = useState<Set<string>>(new Set())
   const [catalogoCantidades, setCatalogoCantidades] = useState<Record<string, number>>({})
   const [addingItems, setAddingItems] = useState(false)
+  const [catalogoCategoriaId, setCatalogoCategoriaId] = useState('')
+  const [catalogoMarca, setCatalogoMarca] = useState('')
+  const [catalogoTotal, setCatalogoTotal] = useState(0)
+  const [catalogoOffset, setCatalogoOffset] = useState(0)
+  const [catalogoHasMore, setCatalogoHasMore] = useState(false)
+  const [catalogoCategorias, setCatalogoCategorias] = useState<{ id: string; nombre: string }[]>([])
+  const [catalogoMarcas, setCatalogoMarcas] = useState<string[]>([])
   const [showAddManual, setShowAddManual] = useState(false)
   const [manualItem, setManualItem] = useState({ descripcion: '', unidad: 'UND', cantidad: 1, precioUnitario: 0, descuento: 0 })
 
@@ -463,27 +476,68 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
     }
   }
 
-  // ── Catálogo search ──────────────────────────────────────
+  // ── Catálogo browse ───────────────────────────────────────
   const catalogoTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const searchCatalogo = async (q: string) => {
-    if (q.length < 2) { setCatalogoResults([]); return }
+  const loadCatalogoPagina = useCallback(async (
+    offset: number,
+    q: string,
+    categoriaId: string,
+    marca: string,
+    append = false,
+  ) => {
     setCatalogoLoading(true)
     try {
-      const res = await fetch(`/api/catalogo-equipo/search?q=${encodeURIComponent(q)}&limit=30`)
-      const data = await res.json()
-      setCatalogoResults(data)
+      const params = new URLSearchParams({ browse: 'true', limit: '20', offset: String(offset) })
+      if (q.length >= 2) params.set('q', q)
+      if (categoriaId) params.set('categoriaId', categoriaId)
+      if (marca) params.set('marca', marca)
+      const res = await fetch(`/api/catalogo-equipo/search?${params}`)
+      const { items, total } = await res.json()
+      setCatalogoResults(prev => append ? [...prev, ...items] : items)
+      setCatalogoTotal(total)
+      const next = offset + items.length
+      setCatalogoOffset(next)
+      setCatalogoHasMore(next < total)
     } catch {
-      setCatalogoResults([])
+      if (!append) setCatalogoResults([])
     } finally {
       setCatalogoLoading(false)
     }
-  }
+  }, [])
 
   const handleCatalogoSearch = (val: string) => {
     setCatalogoQuery(val)
     if (catalogoTimerRef.current) clearTimeout(catalogoTimerRef.current)
-    catalogoTimerRef.current = setTimeout(() => searchCatalogo(val), 300)
+    catalogoTimerRef.current = setTimeout(() => loadCatalogoPagina(0, val, catalogoCategoriaId, catalogoMarca), 300)
+  }
+
+  const handleCatalogoCategoria = (val: string) => {
+    setCatalogoCategoriaId(val)
+    loadCatalogoPagina(0, catalogoQuery, val, catalogoMarca)
+  }
+
+  const handleCatalogoMarca = (val: string) => {
+    setCatalogoMarca(val)
+    loadCatalogoPagina(0, catalogoQuery, catalogoCategoriaId, val)
+  }
+
+  const openCatalogo = async () => {
+    setCatalogoOpen(true)
+    setCatalogoQuery('')
+    setCatalogoResults([])
+    setCatalogoSelectedIds(new Set())
+    setCatalogoCantidades({})
+    setCatalogoCategoriaId('')
+    setCatalogoMarca('')
+    setCatalogoOffset(0)
+    loadCatalogoPagina(0, '', '', '')
+    if (catalogoCategorias.length === 0) {
+      fetch('/api/catalogo-equipo/filtros')
+        .then(r => r.json())
+        .then(({ categorias, marcas }) => { setCatalogoCategorias(categorias); setCatalogoMarcas(marcas) })
+        .catch(() => {})
+    }
   }
 
   const toggleCatalogoSelect = (id: string) => {
@@ -990,7 +1044,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
               <Button variant="outline" size="sm" onClick={openPedidoSelector}>
                 <ShoppingCart className="h-3.5 w-3.5 mr-1" /> Desde Pedido
               </Button>
-              <Button variant="outline" size="sm" onClick={() => { setCatalogoOpen(true); setCatalogoQuery(''); setCatalogoResults([]); setCatalogoSelectedIds(new Set()); setCatalogoCantidades({}) }}>
+              <Button variant="outline" size="sm" onClick={openCatalogo}>
                 <Search className="h-3.5 w-3.5 mr-1" /> Desde Catálogo
               </Button>
               <Button variant="outline" size="sm" onClick={() => setShowAddManual(true)}>
@@ -1543,106 +1597,139 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
 
       {/* ── Catálogo Selector Dialog ────────────────────────── */}
       <Dialog open={catalogoOpen} onOpenChange={setCatalogoOpen}>
-        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
+        <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>Buscar en catálogo de equipos</DialogTitle>
-            <DialogDescription>Busca y selecciona items para agregar a la OC</DialogDescription>
+            <DialogTitle>Catálogo de equipos</DialogTitle>
+            <DialogDescription>
+              {catalogoTotal > 0 ? `${catalogoTotal} item${catalogoTotal !== 1 ? 's' : ''} encontrado${catalogoTotal !== 1 ? 's' : ''}` : 'Selecciona items para agregar a la OC'}
+            </DialogDescription>
           </DialogHeader>
 
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              value={catalogoQuery}
-              onChange={e => handleCatalogoSearch(e.target.value)}
-              placeholder="Buscar por código o descripción... (mín. 2 caracteres)"
-              className="pl-9"
-              autoFocus
-            />
+          {/* Filtros */}
+          <div className="flex gap-2 flex-wrap">
+            <div className="relative flex-1 min-w-[180px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={catalogoQuery}
+                onChange={e => handleCatalogoSearch(e.target.value)}
+                placeholder="Buscar código, descripción o marca..."
+                className="pl-9 h-9"
+                autoFocus
+              />
+            </div>
+            <Select value={catalogoCategoriaId || '__ALL__'} onValueChange={v => handleCatalogoCategoria(v === '__ALL__' ? '' : v)}>
+              <SelectTrigger className="h-9 w-[180px]">
+                <SelectValue placeholder="Categoría" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__ALL__">Todas las categorías</SelectItem>
+                {catalogoCategorias.map(c => <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={catalogoMarca || '__ALL__'} onValueChange={v => handleCatalogoMarca(v === '__ALL__' ? '' : v)}>
+              <SelectTrigger className="h-9 w-[160px]">
+                <SelectValue placeholder="Marca" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__ALL__">Todas las marcas</SelectItem>
+                {catalogoMarcas.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="flex-1 overflow-auto min-h-0">
-            {catalogoLoading ? (
+            {catalogoLoading && catalogoResults.length === 0 ? (
               <div className="flex items-center justify-center py-10">
                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
               </div>
-            ) : catalogoQuery.length < 2 ? (
-              <div className="text-center py-10 text-muted-foreground text-sm">
-                Escribe al menos 2 caracteres para buscar
-              </div>
             ) : catalogoResults.length === 0 ? (
-              <div className="text-center py-10 text-muted-foreground text-sm">
-                No se encontraron items para &quot;{catalogoQuery}&quot;
-              </div>
+              <div className="text-center py-10 text-muted-foreground text-sm">No se encontraron items</div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[40px]"></TableHead>
-                    <TableHead className="w-[140px]">Código</TableHead>
-                    <TableHead>Descripción</TableHead>
-                    <TableHead className="w-[80px]">Marca</TableHead>
-                    <TableHead className="w-[60px]">Unid.</TableHead>
-                    <TableHead className="w-[100px] text-right">Precio</TableHead>
-                    <TableHead className="w-[80px] text-right">Cant.</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {catalogoResults.map(item => {
-                    const isSelected = catalogoSelectedIds.has(item.id)
-                    const precio = item.precioLogistica || item.precioReal || item.precioInterno || 0
-                    return (
-                      <TableRow
-                        key={item.id}
-                        className={isSelected ? 'bg-blue-50' : 'cursor-pointer hover:bg-muted/50'}
-                        onClick={() => toggleCatalogoSelect(item.id)}
-                      >
-                        <TableCell>
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={() => toggleCatalogoSelect(item.id)}
-                          />
-                        </TableCell>
-                        <TableCell className="font-mono text-xs">{item.codigo}</TableCell>
-                        <TableCell className="text-xs">{item.descripcion}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{item.marca || '-'}</TableCell>
-                        <TableCell className="text-xs">{item.unidad.nombre}</TableCell>
-                        <TableCell className="text-xs text-right font-mono">
-                          {precio > 0 ? `S/ ${precio.toFixed(2)}` : '-'}
-                        </TableCell>
-                        <TableCell className="text-right" onClick={e => e.stopPropagation()}>
-                          {isSelected && (
-                            <Input
-                              type="number"
-                              min={1}
-                              value={catalogoCantidades[item.id] || 1}
-                              onChange={e => setCatalogoCantidades(p => ({ ...p, [item.id]: parseInt(e.target.value) || 1 }))}
-                              className="h-7 w-16 text-xs text-right"
-                            />
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
+              <>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[40px]"></TableHead>
+                      <TableHead className="w-[120px]">Código</TableHead>
+                      <TableHead>Descripción</TableHead>
+                      <TableHead className="w-[130px] hidden lg:table-cell">Categoría</TableHead>
+                      <TableHead className="w-[90px] hidden md:table-cell">Marca</TableHead>
+                      <TableHead className="w-[55px]">Unid.</TableHead>
+                      <TableHead className="w-[100px] text-right">Precio</TableHead>
+                      <TableHead className="w-[80px] text-right">Cant.</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {catalogoResults.map(item => {
+                      const isSelected = catalogoSelectedIds.has(item.id)
+                      const precio = item.precioLogistica || item.precioReal || item.precioInterno || 0
+                      const simbolo = oc?.moneda === 'USD' ? 'US$' : 'S/'
+                      return (
+                        <TableRow
+                          key={item.id}
+                          className={isSelected ? 'bg-blue-50' : 'cursor-pointer hover:bg-muted/50'}
+                          onClick={() => toggleCatalogoSelect(item.id)}
+                        >
+                          <TableCell><Checkbox checked={isSelected} onCheckedChange={() => toggleCatalogoSelect(item.id)} /></TableCell>
+                          <TableCell className="font-mono text-xs">{item.codigo}</TableCell>
+                          <TableCell>
+                            <div className="text-xs leading-tight">{item.descripcion}</div>
+                            {item.estado !== 'activo' && item.estado !== 'aprobado' && (
+                              <span className="text-[10px] text-amber-600">{item.estado}</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground hidden lg:table-cell">{item.categoriaEquipo.nombre}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground hidden md:table-cell">{item.marca || '—'}</TableCell>
+                          <TableCell className="text-xs">{item.unidad.nombre}</TableCell>
+                          <TableCell className="text-xs text-right font-mono">
+                            {precio > 0 ? `${simbolo} ${precio.toFixed(2)}` : '—'}
+                          </TableCell>
+                          <TableCell className="text-right" onClick={e => e.stopPropagation()}>
+                            {isSelected && (
+                              <Input
+                                type="number" min={1}
+                                value={catalogoCantidades[item.id] || 1}
+                                onChange={e => setCatalogoCantidades(p => ({ ...p, [item.id]: parseInt(e.target.value) || 1 }))}
+                                className="h-7 w-16 text-xs text-right"
+                              />
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+                {catalogoHasMore && (
+                  <div className="flex justify-center py-3">
+                    <Button
+                      variant="outline" size="sm" disabled={catalogoLoading}
+                      onClick={() => loadCatalogoPagina(catalogoOffset, catalogoQuery, catalogoCategoriaId, catalogoMarca, true)}
+                    >
+                      {catalogoLoading && <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />}
+                      Cargar más ({catalogoTotal - catalogoOffset} restantes)
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
-          {catalogoSelectedIds.size > 0 && (
-            <div className="text-xs text-muted-foreground">{catalogoSelectedIds.size} item(s) seleccionado(s)</div>
-          )}
-
-          <DialogFooter className="mt-2">
-            <Button variant="outline" onClick={() => setCatalogoOpen(false)}>Cancelar</Button>
-            <Button
-              onClick={addCatalogoItems}
-              disabled={catalogoSelectedIds.size === 0 || addingItems}
-              className="bg-orange-600 hover:bg-orange-700"
-            >
-              {addingItems && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-              Agregar {catalogoSelectedIds.size} item(s)
-            </Button>
-          </DialogFooter>
+          <div className="flex items-center justify-between pt-1">
+            <span className="text-xs text-muted-foreground">
+              {catalogoSelectedIds.size > 0 ? `${catalogoSelectedIds.size} seleccionado(s)` : ''}
+            </span>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setCatalogoOpen(false)}>Cancelar</Button>
+              <Button
+                onClick={addCatalogoItems}
+                disabled={catalogoSelectedIds.size === 0 || addingItems}
+                className="bg-orange-600 hover:bg-orange-700"
+              >
+                {addingItems && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+                Agregar {catalogoSelectedIds.size > 0 ? `${catalogoSelectedIds.size} item(s)` : 'items'}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
