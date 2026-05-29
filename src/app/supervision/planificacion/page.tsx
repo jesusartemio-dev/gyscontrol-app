@@ -51,6 +51,7 @@ import {
 } from '@/components/planificacion/CeldaDetalleModal'
 import { computeSeleccionRectangulo, toggleCeldaEnSeleccion } from '@/lib/planificacion/seleccion'
 import { COLORES_PROYECTO } from '@/lib/utils/planificacion'
+import { EjecutadoView } from './EjecutadoView'
 
 const DEPT_ORDER = ['INGENIERIA', 'CONSTRUCCION', 'GESTION', 'PROYECTOS']
 const ROLES_PERMITIDOS = ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos']
@@ -776,6 +777,7 @@ export default function PlanificacionPage() {
   const [departamentos, setDepartamentos] = useState<Departamento[]>([])
   const [personOrder, setPersonOrder] = useState<Record<string, string[]>>({})
   const [loading, setLoading] = useState(true)
+  const [vistaTab, setVistaTab] = useState<'planificado' | 'ejecutado'>('planificado')
 
   const [modalCelda, setModalCelda] = useState<{
     userId: string
@@ -1490,6 +1492,39 @@ export default function PlanificacionPage() {
           </Select>
         </div>
 
+        {/* ── Tab toggle Planificado / Ejecutado ─────────────────────────────── */}
+        <div className="mb-4 flex items-center gap-2">
+          <div className="flex overflow-hidden rounded-lg border text-sm">
+            <button
+              onClick={() => setVistaTab('planificado')}
+              className={`px-3 py-1.5 transition-colors ${vistaTab === 'planificado' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+            >
+              Planificado
+            </button>
+            <button
+              onClick={() => setVistaTab('ejecutado')}
+              className={`px-3 py-1.5 transition-colors ${vistaTab === 'ejecutado' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+            >
+              Ejecutado
+            </button>
+          </div>
+          {vistaTab === 'ejecutado' && (
+            <span className="text-xs text-muted-foreground">
+              Horas de campo registradas en el período · cruzadas con asistencia
+            </span>
+          )}
+        </div>
+
+        {vistaTab === 'ejecutado' && (
+          <EjecutadoView
+            semanaInicio={semanaInicio}
+            numSemanas={numSemanas}
+            departamentosSeleccionados={departamentosSeleccionados}
+            busqueda={busqueda}
+          />
+        )}
+
+        {vistaTab === 'planificado' && (<>
         {/* ── Mobile card view (<768px) ──────────────────────────────────────── */}
         <div className="md:hidden">
           {viewport === 'mobile' && rango !== '1' && (
@@ -1787,6 +1822,7 @@ export default function PlanificacionPage() {
             )
           })}
         </div>
+        </>)}
 
         {modalCelda && (
           <AsignacionCeldaModal

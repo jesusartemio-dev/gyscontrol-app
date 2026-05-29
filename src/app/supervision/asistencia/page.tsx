@@ -137,7 +137,16 @@ export default function SupervisionAsistencia() {
   const [sortKey, setSortKey] = useState<SortKey>('fechaHora')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
 
-  const [vista, setVista] = useState<'detalle' | 'resumen'>('detalle')
+  const [vista, setVista] = useState<'detalle' | 'resumen' | 'por_proyecto'>('detalle')
+
+  const [porProyectoData, setPorProyectoData] = useState<{
+    userId: string; nombre: string; departamento: string; diasConAsistencia: number
+    proyectos: {
+      proyectoId: string; codigo: string; nombre: string; color: string
+      horasAprobadas: number; horasPendientes: number; jornadas: number
+    }[]
+  }[]>([])
+  const [porProyectoLoading, setPorProyectoLoading] = useState(false)
 
   const [filaAEliminar, setFilaAEliminar] = useState<Fila | null>(null)
   const [eliminando, setEliminando] = useState(false)
@@ -170,6 +179,22 @@ export default function SupervisionAsistencia() {
     const j = await r.json()
     setData(Array.isArray(j) ? j : [])
     setLoading(false)
+  }
+
+  async function cargarPorProyecto(ov: { desde?: string; hasta?: string } = {}) {
+    setPorProyectoLoading(true)
+    const d = ov.desde ?? desde
+    const h = ov.hasta ?? hasta
+    const params = new URLSearchParams({ desde: d, hasta: h })
+    try {
+      const r = await fetch(`/api/asistencia/por-proyecto?${params}`)
+      const j = await r.json()
+      setPorProyectoData(Array.isArray(j.personas) ? j.personas : [])
+    } catch {
+      setPorProyectoData([])
+    } finally {
+      setPorProyectoLoading(false)
+    }
   }
 
   // Inicializar desde localStorage y cargar datos con los filtros guardados
@@ -487,17 +512,19 @@ export default function SupervisionAsistencia() {
               />
             </div>
           </div>
-          <Button onClick={() => cargar()} disabled={loading}>
-            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          <Button onClick={() => { cargar(); if (vista === 'por_proyecto') cargarPorProyecto() }} disabled={loading || porProyectoLoading}>
+            {(loading || porProyectoLoading) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             Filtrar
           </Button>
-          <Button
-            variant="outline"
-            onClick={vista === 'detalle' ? exportarExcel : exportarResumen}
-            disabled={dataFiltrada.length === 0}
-          >
-            <FileSpreadsheet className="mr-2 h-4 w-4" /> Exportar Excel
-          </Button>
+          {vista !== 'por_proyecto' && (
+            <Button
+              variant="outline"
+              onClick={vista === 'detalle' ? exportarExcel : exportarResumen}
+              disabled={dataFiltrada.length === 0}
+            >
+              <FileSpreadsheet className="mr-2 h-4 w-4" /> Exportar Excel
+            </Button>
+          )}
         </CardContent>
       </Card>
 
@@ -578,7 +605,13 @@ export default function SupervisionAsistencia() {
             onClick={() => setVista('resumen')}
             className={`px-3 py-1.5 transition-colors ${vista === 'resumen' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
           >
-            Resumen por persona
+            Resumen
+          </button>
+          <button
+            onClick={() => { setVista('por_proyecto'); cargarPorProyecto() }}
+            className={`px-3 py-1.5 transition-colors ${vista === 'por_proyecto' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+          >
+            Por Proyecto
           </button>
         </div>
         {vista === 'resumen' && (
@@ -586,7 +619,120 @@ export default function SupervisionAsistencia() {
             {resumenPorPersona.length} jornada(s) · primer ingreso y última salida por día
           </span>
         )}
+        {vista === 'por_proyecto' && (
+          <span className="text-xs text-muted-foreground">
+            Horas de campo ejecutadas (jornadas) agrupadas por proyecto
+          </span>
+        )}
       </div>
+
+      {/* Por Proyecto */}
+      {vista === 'por_proyecto' && (
+        porProyectoLoading ? (
+          <div className="flex items-center justify-center h-48 gap-2 text-muted-foreground text-sm">
+            <Loader2 className="h-4 w-4 animate-spin" /> Cargando datos por proyecto...
+          </div>
+        ) : porProyectoData.length === 0 ? (
+          <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
+            Sin registros de jornada de campo en el período seleccionado.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* Totales */}
+            {(() => {
+              const totalAprobadas = porProyectoData.reduce((s, p) => s + p.proyectos.reduce((ps, pr) => ps + pr.horasAprobadas, 0), 0)
+              const totalPendientes = porProyectoData.reduce((s, p) => s + p.proyectos.reduce((ps, pr) => ps + pr.horasPendientes, 0), 0)
+              const fmtH = (h: number) => { if (h === 0) return '—'; const hh = Math.floor(h); const mm = Math.round((h - hh) * 60); return mm === 0 ? `${hh}h` : `${hh}h ${mm}m` }
+              return (
+                <div className="flex flex-wrap gap-3">
+                  <Card className="flex-1 min-w-[140px]"><CardContent className="py-3">
+                    <p className="text-xs text-muted-foreground">Personas</p>
+                    <p className="text-2xl font-bold">{porProyectoData.length}</p>
+                  </CardContent></Card>
+                  <Card className="flex-1 min-w-[140px]"><CardContent className="py-3">
+                    <p className="text-xs text-muted-foreground">H. aprobadas</p>
+                    <p className="text-2xl font-bold text-emerald-700">{fmtH(totalAprobadas)}</p>
+                  </CardContent></Card>
+                  {totalPendientes > 0 && (
+                    <Card className="flex-1 min-w-[140px]"><CardContent className="py-3">
+                      <p className="text-xs text-muted-foreground">H. pendientes</p>
+                      <p className="text-2xl font-bold text-amber-700">{fmtH(totalPendientes)}</p>
+                    </CardContent></Card>
+                  )}
+                </div>
+              )
+            })()}
+
+            {/* Tabla */}
+            <Card>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Persona</TableHead>
+                      <TableHead>Dpto.</TableHead>
+                      <TableHead>Proyecto</TableHead>
+                      <TableHead className="text-center">Jornadas</TableHead>
+                      <TableHead className="text-center hidden md:table-cell">Días c/ingreso</TableHead>
+                      <TableHead className="text-right">H. aprobadas</TableHead>
+                      <TableHead className="text-right">H. pendientes</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {porProyectoData.map(persona => {
+                      const fmtH = (h: number) => { if (h === 0) return '—'; const hh = Math.floor(h); const mm = Math.round((h - hh) * 60); return mm === 0 ? `${hh}h` : `${hh}h ${mm}m` }
+                      return persona.proyectos.map((proy, pi) => (
+                        <TableRow key={`${persona.userId}-${proy.proyectoId}`}>
+                          {pi === 0 && (
+                            <TableCell rowSpan={persona.proyectos.length} className="align-top font-medium border-r">
+                              {persona.nombre}
+                            </TableCell>
+                          )}
+                          {pi === 0 && (
+                            <TableCell rowSpan={persona.proyectos.length} className="align-top text-xs text-muted-foreground border-r">
+                              {persona.departamento || '—'}
+                            </TableCell>
+                          )}
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <span className="inline-block h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: proy.color }} />
+                              <span className="font-mono text-xs text-muted-foreground">{proy.codigo}</span>
+                              <span className="text-sm truncate max-w-[200px]">{proy.nombre}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="outline" className="font-mono text-xs">{proy.jornadas}</Badge>
+                          </TableCell>
+                          <TableCell className="text-center hidden md:table-cell">
+                            {pi === 0 ? (
+                              persona.diasConAsistencia > 0
+                                ? <Badge variant="outline" className="font-mono text-xs border-blue-400 text-blue-700">{persona.diasConAsistencia}d</Badge>
+                                : <span className="text-xs text-muted-foreground">—</span>
+                            ) : null}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm">
+                            {proy.horasAprobadas > 0
+                              ? <span className="text-emerald-700 font-semibold">{fmtH(proy.horasAprobadas)}</span>
+                              : <span className="text-muted-foreground text-xs">—</span>}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm">
+                            {proy.horasPendientes > 0
+                              ? <span className="text-amber-700">{fmtH(proy.horasPendientes)}</span>
+                              : <span className="text-muted-foreground text-xs">—</span>}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    })}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+            <p className="text-xs text-muted-foreground text-center">
+              Aprobadas: jornadas de campo aprobadas · Pendientes: iniciadas o en revisión
+            </p>
+          </div>
+        )
+      )}
 
       {/* Tabla detalle */}
       {vista === 'resumen' ? (
@@ -711,7 +857,7 @@ export default function SupervisionAsistencia() {
             </Table>
           </CardContent>
         </Card>
-      ) : (
+      ) : vista === 'detalle' ? (
       <Card>
         <CardContent className="p-0">
           <Table>
@@ -909,7 +1055,7 @@ export default function SupervisionAsistencia() {
           </Table>
         </CardContent>
       </Card>
-      )}
+      ) : null}
 
       {/* Dialog detalle de visitas externas del mes */}
       <Dialog open={dialogVisitas} onOpenChange={setDialogVisitas}>
