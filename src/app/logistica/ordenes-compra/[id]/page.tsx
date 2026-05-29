@@ -162,6 +162,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
   const [catalogoMarcas, setCatalogoMarcas] = useState<string[]>([])
   const [showAddManual, setShowAddManual] = useState(false)
   const [manualItem, setManualItem] = useState({ descripcion: '', unidad: 'UND', cantidad: 1, precioUnitario: 0, descuento: 0 })
+  const [unidades, setUnidades] = useState<{ id: string; nombre: string }[]>([])
 
   // Pedido selector state
   const [pedidoSelectorOpen, setPedidoSelectorOpen] = useState(false)
@@ -199,7 +200,13 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
     (c: any) => c.saldoPendiente != null && c.saldoPendiente < c.monto
   )
 
-  useEffect(() => { loadData() }, [id])
+  useEffect(() => {
+    loadData()
+    fetch('/api/unidad')
+      .then(r => r.json())
+      .then((data: { id: string; nombre: string }[]) => setUnidades(data))
+      .catch(() => {})
+  }, [id])
 
   const loadData = async () => {
     try {
@@ -1748,7 +1755,18 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
             <div className="grid grid-cols-4 gap-3">
               <div>
                 <Label className="text-xs">Unidad</Label>
-                <Input value={manualItem.unidad} onChange={e => setManualItem(p => ({ ...p, unidad: e.target.value }))} />
+                {unidades.length > 0 ? (
+                  <Select value={manualItem.unidad} onValueChange={v => setManualItem(p => ({ ...p, unidad: v }))}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {unidades.map(u => <SelectItem key={u.id} value={u.nombre}>{u.nombre}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input value={manualItem.unidad} onChange={e => setManualItem(p => ({ ...p, unidad: e.target.value }))} />
+                )}
               </div>
               <div>
                 <Label className="text-xs">Cantidad <span className="text-red-500">*</span></Label>
