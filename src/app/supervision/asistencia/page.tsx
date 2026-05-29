@@ -317,8 +317,12 @@ export default function SupervisionAsistencia() {
         const fecha = key.split('|')[1]
         const sortAsc = (a: Fila, b: Fila) => new Date(a.fechaHora).getTime() - new Date(b.fechaHora).getTime()
         const primerIngreso = [...ingresos].sort(sortAsc)[0] ?? null
-        const ultimaSalida = [...salidas].sort(sortAsc).at(-1) ?? null
-        const ref = primerIngreso ?? ultimaSalida!
+        // Solo contar salidas que ocurran DESPUÉS del primer ingreso (evita negativos en turno noche)
+        const salidasPost = primerIngreso
+          ? salidas.filter(s => new Date(s.fechaHora) > new Date(primerIngreso.fechaHora))
+          : salidas
+        const ultimaSalida = [...salidasPost].sort(sortAsc).at(-1) ?? null
+        const ref = primerIngreso ?? ([...salidas].sort(sortAsc).at(-1) ?? null)!
 
         const horasTrabajadas = primerIngreso && ultimaSalida
           ? (new Date(ultimaSalida.fechaHora).getTime() - new Date(primerIngreso.fechaHora).getTime()) / 3600000
@@ -360,46 +364,70 @@ export default function SupervisionAsistencia() {
     type DiaEntry = { horasTrabajadas: number | null; ubicacion: string | null; modo: 'campo' | 'remoto' | 'oficina' }
     type PersonaEntry = { nombre: string; email: string; dpto: string | null; dias: Map<string, DiaEntry> }
 
-    const personaDias = new Map<string, { nombre: string; dpto: string | null; dias: Map<string, { ingresos: Fila[]; salidas: Fila[] }> }>()
+    // Agrupar todos los registros por persona (no por día)
+    const personRecords = new Map<string, { nombre: string; dpto: string | null; records: Fila[] }>()
     for (const f of dataFiltrada) {
       if (f.tipo !== 'ingreso' && f.tipo !== 'salida') continue
-      const fechaLima = new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit',
-      }).format(new Date(f.fechaHora))
       const email = f.user.email
-      if (!personaDias.has(email)) personaDias.set(email, { nombre: f.user.name || email, dpto: f.empleado?.departamento?.nombre ?? null, dias: new Map() })
-      const p = personaDias.get(email)!
-      if (!p.dias.has(fechaLima)) p.dias.set(fechaLima, { ingresos: [], salidas: [] })
-      const g = p.dias.get(fechaLima)!
-      if (f.tipo === 'ingreso') g.ingresos.push(f)
-      else g.salidas.push(f)
+      if (!personRecords.has(email)) {
+        personRecords.set(email, { nombre: f.user.name || email, dpto: f.empleado?.departamento?.nombre ?? null, records: [] })
+      }
+      personRecords.get(email)!.records.push(f)
     }
 
-    const sortAsc = (a: Fila, b: Fila) => new Date(a.fechaHora).getTime() - new Date(b.fechaHora).getTime()
     const result: PersonaEntry[] = []
 
-    for (const [email, p] of personaDias) {
+    for (const [email, { nombre, dpto, records }] of personRecords) {
+      // Ordenar cronológicamente todos los registros de la persona
+      const sorted = [...records].sort((a, b) => new Date(a.fechaHora).getTime() - new Date(b.fechaHora).getTime())
       const dias = new Map<string, DiaEntry>()
-      for (const [fecha, { ingresos, salidas }] of p.dias) {
-        const primerIngreso = ingresos.length > 0 ? [...ingresos].sort(sortAsc)[0] : null
-        const ultimaSalida = salidas.length > 0 ? [...salidas].sort(sortAsc).at(-1)! : null
-        const ref = primerIngreso ?? ultimaSalida
 
-        const horasTrabajadas = primerIngreso && ultimaSalida
-          ? (new Date(ultimaSalida.fechaHora).getTime() - new Date(primerIngreso.fechaHora).getTime()) / 3600000
+      let i = 0
+      while (i < sorted.length) {
+        const rec = sorted[i]
+        if (rec.tipo !== 'ingreso') { i++; continue }
+
+        const ingreso = rec
+        let salida: Fila | null = null
+        let nextI = i + 1
+
+        // Buscar el siguiente salida (cross-day incluido); parar si hay otro ingreso antes
+        for (let j = i + 1; j < sorted.length; j++) {
+          if (sorted[j].tipo === 'salida') {
+            salida = sorted[j]
+            nextI = j + 1
+            break
+          }
+          if (sorted[j].tipo === 'ingreso') break // ingreso sin salida
+        }
+        i = nextI
+
+        const fechaLima = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit',
+        }).format(new Date(ingreso.fechaHora))
+
+        const horasTrabajadas = salida
+          ? (new Date(salida.fechaHora).getTime() - new Date(ingreso.fechaHora).getTime()) / 3600000
           : null
 
         let modo: 'campo' | 'remoto' | 'oficina' = 'oficina'
-        if (primerIngreso) {
-          if (primerIngreso.metodoMarcaje === 'remoto') modo = 'remoto'
-          else if (primerIngreso.metodoMarcaje === 'visita_externa' || primerIngreso.ubicacion?.tipo === 'planta' || primerIngreso.ubicacion?.tipo === 'obra') modo = 'campo'
-        }
+        if (ingreso.metodoMarcaje === 'remoto') modo = 'remoto'
+        else if (ingreso.metodoMarcaje === 'visita_externa' || ingreso.ubicacion?.tipo === 'planta' || ingreso.ubicacion?.tipo === 'obra') modo = 'campo'
 
         if (modoAsistencia === 'todos' || modo === modoAsistencia) {
-          dias.set(fecha, { horasTrabajadas, ubicacion: ref?.ubicacion?.nombre ?? null, modo })
+          // Varios turnos el mismo día: conservar el de más horas
+          const existing = dias.get(fechaLima)
+          if (!existing || (horasTrabajadas ?? 0) > (existing.horasTrabajadas ?? 0)) {
+            dias.set(fechaLima, {
+              horasTrabajadas,
+              ubicacion: ingreso.ubicacion?.nombre ?? salida?.ubicacion?.nombre ?? null,
+              modo,
+            })
+          }
         }
       }
-      if (dias.size > 0) result.push({ nombre: p.nombre, email, dpto: p.dpto, dias })
+
+      if (dias.size > 0) result.push({ nombre, email, dpto, dias })
     }
     return result.sort((a, b) => (a.dpto || '').localeCompare(b.dpto || '') || a.nombre.localeCompare(b.nombre))
   }, [dataFiltrada, modoAsistencia])
