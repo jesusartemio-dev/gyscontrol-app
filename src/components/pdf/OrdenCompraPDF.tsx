@@ -259,9 +259,12 @@ const safeText = (val: any): string => {
   return String(val)
 }
 
+const formatNum = (n: number) =>
+  n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+
 const formatCurrency = (amount: number, moneda = 'PEN') => {
   const symbol = moneda === 'USD' ? 'US$' : 'S/'
-  return `${symbol} ${amount.toFixed(2)}`
+  return `${symbol} ${formatNum(amount)}`
 }
 
 const formatDate = (date: string | null | undefined) => {
@@ -328,9 +331,9 @@ function OrdenCompraPDF({ oc }: Props) {
           <View style={styles.colCodigo}><Text style={[styles.tableCell, { fontSize: 7 }]}>{item.codigo}</Text></View>
           <View style={styles.colDesc}><Text style={styles.tableCell}>{item.descripcion}</Text></View>
           <View style={styles.colUnd}><Text style={styles.tableCell}>{item.unidad}</Text></View>
-          <View style={styles.colCant}><Text style={[styles.tableCell, { textAlign: 'right', width: '100%' }]}>{Number(item.cantidad).toFixed(2)}</Text></View>
-          <View style={styles.colPrecio}><Text style={[styles.tableCell, { textAlign: 'right', width: '100%' }]}>{Number(item.precioUnitario).toFixed(2)}</Text></View>
-          <View style={styles.colDesc_}><Text style={[styles.tableCell, { textAlign: 'center', width: '100%' }]}>{Number(item.descuento ?? 0).toFixed(2)}</Text></View>
+          <View style={styles.colCant}><Text style={[styles.tableCell, { textAlign: 'right', width: '100%' }]}>{formatNum(Number(item.cantidad))}</Text></View>
+          <View style={styles.colPrecio}><Text style={[styles.tableCell, { textAlign: 'right', width: '100%' }]}>{formatNum(Number(item.precioUnitario))}</Text></View>
+          <View style={styles.colDesc_}><Text style={[styles.tableCell, { textAlign: 'center', width: '100%' }]}>{formatNum(Number(item.descuento ?? 0))}</Text></View>
           <View style={styles.colTotal}><Text style={[styles.tableCell, { textAlign: 'right', width: '100%' }]}>{formatCurrency(item.costoTotal, oc.moneda)}</Text></View>
         </View>
       ))}
