@@ -6,7 +6,7 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
@@ -38,6 +38,14 @@ const ESTADOS_PEDIDO = [
 const ESTADOS_VISIBLES_LOGISTICA = ['enviado', 'aprobado', 'atendido', 'parcial', 'entregado', 'cancelado']
 
 export default function LogisticaPedidosPage() {
+  return (
+    <Suspense>
+      <LogisticaPedidosContent />
+    </Suspense>
+  )
+}
+
+function LogisticaPedidosContent() {
   const router = useRouter()
   const { data: session } = useSession()
   const userRole = session?.user?.role || ''
