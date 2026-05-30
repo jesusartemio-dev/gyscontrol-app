@@ -7,7 +7,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
 import { RefreshCw, Truck, Package, Search, Filter, X, CheckCircle, AlertTriangle, Clock, Building2, FolderKanban } from 'lucide-react'
@@ -46,11 +46,17 @@ export default function LogisticaPedidosPage() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
+  const searchParams = useSearchParams()
+
   // Filters
   const [search, setSearch] = useState('')
   const [estado, setEstado] = useState<string>('all')
   const [proyectoId, setProyectoId] = useState<string>('all')
-  const [tipo, setTipo] = useState<'all' | 'proyecto' | 'interno'>('all')
+  const [tipo, setTipo] = useState<'all' | 'proyecto' | 'interno' | 'equipo'>('all')
+
+  // Pre-fill ventaEquipoId filter from URL param
+  const urlVentaEquipoId = searchParams?.get('ventaEquipoId') ?? null
+  const [ventaEquipoId] = useState<string | null>(urlVentaEquipoId)
   const fetchData = async () => {
     try {
       setRefreshing(true)
@@ -84,13 +90,17 @@ export default function LogisticaPedidosPage() {
         pedido.proyecto?.nombre?.toLowerCase().includes(s) ||
         pedido.proyecto?.codigo?.toLowerCase().includes(s) ||
         (pedido as any).centroCosto?.nombre?.toLowerCase().includes(s) ||
+        pedido.ventaEquipo?.codigo?.toLowerCase().includes(s) ||
+        pedido.ventaEquipo?.nombre?.toLowerCase().includes(s) ||
         pedido.observacion?.toLowerCase().includes(s)
       if (!match) return false
     }
     if (estado !== 'all' && pedido.estado !== estado) return false
     if (proyectoId !== 'all' && pedido.proyectoId !== proyectoId) return false
+    if (ventaEquipoId && pedido.ventaEquipoId !== ventaEquipoId) return false
     if (tipo === 'proyecto' && !pedido.proyectoId) return false
     if (tipo === 'interno' && !pedido.centroCostoId) return false
+    if (tipo === 'equipo' && !pedido.ventaEquipoId) return false
     return true
   })
 
@@ -106,7 +116,7 @@ export default function LogisticaPedidosPage() {
     }).length,
   }
 
-  const hasFilters = search || estado !== 'all' || proyectoId !== 'all' || tipo !== 'all'
+  const hasFilters = search || estado !== 'all' || proyectoId !== 'all' || tipo !== 'all' || !!ventaEquipoId
 
   const clearFilters = () => {
     setSearch('')
@@ -173,6 +183,18 @@ export default function LogisticaPedidosPage() {
       </div>
 
       <div className="p-4 space-y-4">
+        {/* Banner when filtered by ventaEquipoId */}
+        {ventaEquipoId && (
+          <div className="bg-orange-50 border border-orange-200 rounded-lg px-4 py-2.5 flex items-center justify-between text-sm">
+            <span className="text-orange-800 font-medium">Filtrando pedidos de venta de equipos</span>
+            <button
+              onClick={() => router.push('/comercial/ventas-equipos')}
+              className="text-orange-600 hover:underline text-xs"
+            >
+              Ver en Comercial →
+            </button>
+          </div>
+        )}
         {/* Stats compactos */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           <div className="bg-white rounded-lg border p-3">
@@ -226,8 +248,8 @@ export default function LogisticaPedidosPage() {
             </div>
 
             <Select value={tipo} onValueChange={(v) => {
-              setTipo(v as 'all' | 'proyecto' | 'interno')
-              if (v === 'interno') setProyectoId('all')
+              setTipo(v as 'all' | 'proyecto' | 'interno' | 'equipo')
+              if (v === 'interno' || v === 'equipo') setProyectoId('all')
             }}>
               <SelectTrigger className="h-8 w-[150px] text-xs">
                 <FolderKanban className="h-3 w-3 mr-1.5 text-gray-400" />
@@ -237,6 +259,7 @@ export default function LogisticaPedidosPage() {
                 <SelectItem value="all" className="text-xs">Todos los tipos</SelectItem>
                 <SelectItem value="proyecto" className="text-xs">De proyecto</SelectItem>
                 <SelectItem value="interno" className="text-xs">Internos (CC)</SelectItem>
+                <SelectItem value="equipo" className="text-xs">Venta Equipos</SelectItem>
               </SelectContent>
             </Select>
 

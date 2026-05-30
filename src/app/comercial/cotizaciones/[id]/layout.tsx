@@ -19,6 +19,7 @@ import {
   FileSpreadsheet,
   Loader2,
   Download,
+  Package,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getCotizacionById } from '@/lib/services/cotizacion'
@@ -30,6 +31,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 import CrearProyectoDesdeCotizacionModal from '@/components/proyectos/CrearProyectoDesdeCotizacionModal'
+import CrearVentaEquipoDesdeCotizacionModal from '@/components/ventas-equipo/CrearVentaEquipoDesdeCotizacionModal'
 import CrearOportunidadDesdeCotizacion from '@/components/crm/CrearOportunidadDesdeCotizacion'
 import CrmIntegrationNotification from '@/components/crm/CrmIntegrationNotification'
 import ResumenTotalesCotizacion from '@/components/cotizaciones/ResumenTotalesCotizacion'
@@ -334,6 +336,27 @@ export default function CotizacionLayout({ children }: CotizacionLayoutProps) {
                       buttonVariant="outline"
                       buttonSize="sm"
                       buttonClassName="h-8 text-purple-700 border-purple-300 hover:bg-purple-50"
+                    />
+                  )
+                )}
+                {(cotizacion as any).ventaEquipoVinculada ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => router.push(`/comercial/ventas-equipos/${(cotizacion as any).ventaEquipoVinculada.id}`)}
+                    className="h-8 text-orange-700 border-orange-300 hover:bg-orange-50"
+                  >
+                    <Package className="h-4 w-4 mr-1" />
+                    <span className="hidden sm:inline">{(cotizacion as any).ventaEquipoVinculada.codigo}</span>
+                    <span className="sm:hidden">Equipos</span>
+                  </Button>
+                ) : (
+                  cotizacion.estado === 'aprobada' && (cotizacion.totalEquiposCliente ?? 0) > 0 && (
+                    <CrearVentaEquipoDesdeCotizacionModal
+                      cotizacion={cotizacion}
+                      buttonVariant="outline"
+                      buttonSize="sm"
+                      buttonClassName="h-8 text-orange-700 border-orange-300 hover:bg-orange-50"
                     />
                   )
                 )}

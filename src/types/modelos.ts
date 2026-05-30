@@ -1531,6 +1531,7 @@ export interface PedidoEquipo {
   id: string
   proyectoId?: string | null
   centroCostoId?: string | null
+  ventaEquipoId?: string | null
   responsableId: string
   listaId?: string
   codigo: string                         // ✅ Código obligatorio
@@ -1571,6 +1572,7 @@ export interface PedidoEquipo {
   user?: { id: string; name: string | null; email: string } | null
   proyecto?: Pick<Proyecto, 'id' | 'codigo' | 'nombre'>
   centroCosto?: { id: string; nombre: string; tipo?: string } | null
+  ventaEquipo?: { id: string; codigo: string; nombre: string } | null
   lista?: ListaEquipo
   responsableLogistico?: User
   items: PedidoEquipoItem[]
