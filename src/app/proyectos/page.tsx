@@ -188,7 +188,8 @@ export default function ProyectosPage() {
       filtered = filtered.filter(p =>
         normalizeStr(p.nombre).includes(normalizeStr(searchTerm)) ||
         normalizeStr(p.codigo).includes(normalizeStr(searchTerm)) ||
-        normalizeStr(p.cliente?.nombre).includes(normalizeStr(searchTerm))
+        normalizeStr(p.cliente?.nombre).includes(normalizeStr(searchTerm)) ||
+        normalizeStr(p.ordenCompraCliente ?? '').includes(normalizeStr(searchTerm))
       )
     }
     if (filterStatus !== 'all') filtered = filtered.filter(p => p.estado === filterStatus)
@@ -685,6 +686,12 @@ export default function ProyectosPage() {
                       <Building2 className="h-3 w-3 text-gray-400 flex-shrink-0" />
                       <span className="truncate">{proyecto.cliente?.nombre || 'Sin cliente'}</span>
                     </div>
+                    {proyecto.ordenCompraCliente && (
+                      <div className="flex items-center gap-1.5 text-[10px] text-gray-500">
+                        <span className="text-gray-400">OC:</span>
+                        <span className="font-mono font-medium text-gray-700">{proyecto.ordenCompraCliente}</span>
+                      </div>
+                    )}
                     <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[10px] text-gray-500">
                       <div className="flex items-center gap-1" title="Comercial">
                         <Users className="h-2.5 w-2.5 text-gray-400 flex-shrink-0" />
@@ -748,6 +755,7 @@ export default function ProyectosPage() {
                     <th className="text-left p-2 font-medium w-20">Código</th>
                     <th className="text-left p-2 font-medium">Nombre</th>
                     <th className="text-left p-2 font-medium hidden md:table-cell">Cliente</th>
+                    <th className="text-left p-2 font-medium hidden lg:table-cell w-28">OC Cliente</th>
                     <th className="text-left p-2 font-medium hidden lg:table-cell">Comercial</th>
                     <th className="text-left p-2 font-medium hidden md:table-cell">Gestor</th>
                     <th className="text-left p-2 font-medium hidden xl:table-cell">Supervisor</th>
@@ -761,7 +769,7 @@ export default function ProyectosPage() {
                 <tbody>
                   {filteredProyectos.length === 0 ? (
                     <tr>
-                      <td colSpan={11} className="text-center py-8 text-gray-500">
+                      <td colSpan={12} className="text-center py-8 text-gray-500">
                         <FolderOpen className="h-10 w-10 mx-auto text-gray-300 mb-2" />
                         <p>No se encontraron proyectos</p>
                       </td>
@@ -784,6 +792,12 @@ export default function ProyectosPage() {
                         </td>
                         <td className="p-2 text-gray-600 max-w-[140px] hidden md:table-cell" title={proyecto.cliente?.nombre}>
                           <span className="line-clamp-2 leading-tight">{proyecto.cliente?.nombre || '—'}</span>
+                        </td>
+                        <td className="p-2 hidden lg:table-cell" title={proyecto.ordenCompraCliente ?? undefined}>
+                          {proyecto.ordenCompraCliente
+                            ? <span className="font-mono text-[10px] text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded">{proyecto.ordenCompraCliente}</span>
+                            : <span className="text-[10px] text-gray-400">—</span>
+                          }
                         </td>
                         <td className="p-2 text-gray-500 text-[10px] truncate max-w-[120px] hidden lg:table-cell" title={proyecto.comercial?.name ?? undefined}>
                           {proyecto.comercial?.name || '—'}
