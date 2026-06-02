@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useRef } from 'react'
+import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { RefreshCw, TreePine, Plus, Download, List, Filter, Zap, Trash2, Clock } from 'lucide-react'
@@ -366,6 +367,42 @@ export function ProyectoCronogramaTreeView({
     }
   }
 
+  const handleDuplicateTarea = async (nodeId: string) => {
+    const node = state.nodes.get(nodeId)
+    if (!node || node.type !== 'tarea') return
+
+    const proyectoActividadId = node.parentId?.replace('actividad-', '')
+    if (!proyectoActividadId) return
+
+    const fechaFinOriginal = new Date(node.data.fechaFin)
+    const fechaInicioNueva = new Date(fechaFinOriginal)
+    fechaInicioNueva.setDate(fechaInicioNueva.getDate() + 1)
+    const fechaFinNueva = new Date(fechaInicioNueva)
+    fechaFinNueva.setDate(fechaFinNueva.getDate() + 1)
+
+    try {
+      const res = await fetch(`/api/proyectos/${proyectoId}/cronograma/tareas`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nombre: node.nombre,
+          proyectoActividadId,
+          fechaInicio: fechaInicioNueva.toISOString(),
+          fechaFin: fechaFinNueva.toISOString(),
+          horasEstimadas: Number(node.data.horasEstimadas) || 0,
+          personasEstimadas: node.data.personasEstimadas || 1,
+          prioridad: node.data.prioridad || 'media',
+          recursoId: node.data.recursoId || undefined,
+        }),
+      })
+      if (!res.ok) throw new Error('Error al duplicar')
+      await actions.loadTree([...state.expandedNodes])
+      toast.success(`Tarea "${node.nombre}" duplicada`)
+    } catch {
+      toast.error('No se pudo duplicar la tarea')
+    }
+  }
+
   const handleDeleteCronograma = async () => {
     if (!selectedCronograma) return
 
@@ -428,6 +465,7 @@ export function ProyectoCronogramaTreeView({
             onAddChild={isReadOnly ? undefined : (type) => handleAddChild(nodeId, type)}
             onEdit={isReadOnly || node.type === 'proyecto' ? undefined : () => handleEditNode(nodeId)}
             onDelete={isReadOnly || node.type === 'proyecto' ? undefined : () => actions.deleteNode(nodeId)}
+            onDuplicate={!isReadOnly && node.type === 'tarea' ? () => handleDuplicateTarea(nodeId) : undefined}
             onImport={isReadOnly ? undefined : () => handleImportItems(nodeId)}
             onSelect={() => actions.selectNode(nodeId)}
             isSelected={isSelected}

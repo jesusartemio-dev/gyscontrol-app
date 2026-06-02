@@ -6,7 +6,7 @@
 // ===================================================
 
 import React from 'react'
-import { ChevronRight, ChevronDown, Plus, Edit, Trash2, Settings2, Download, Users, UserCheck, Wrench } from 'lucide-react'
+import { ChevronRight, ChevronDown, Plus, Edit, Trash2, Settings2, Download, Users, UserCheck, Wrench, Copy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -29,6 +29,7 @@ interface TreeNodeProps {
   showResponsableColumn?: boolean
   onAssignResponsable?: () => void
   onAssignRecurso?: () => void
+  onDuplicate?: () => void
   rowIndex?: number
 }
 
@@ -80,6 +81,7 @@ export function TreeNode({
   showResponsableColumn,
   onAssignResponsable,
   onAssignRecurso,
+  onDuplicate,
   rowIndex
 }: TreeNodeProps) {
   const config = NODE_CONFIG[node.type]
@@ -509,6 +511,20 @@ export function TreeNode({
                 }}>
                   <Edit className="h-4 w-4 mr-2" />
                   Editar
+                </DropdownMenuItem>
+              )}
+
+              {/* Duplicate option - only for tareas */}
+              {!readOnly && node.type === 'tarea' && onDuplicate && (
+                <DropdownMenuItem
+                  onClick={() => {
+                    setDropdownOpen(false)
+                    onDuplicate()
+                  }}
+                  className="text-blue-600"
+                >
+                  <Copy className="h-4 w-4 mr-2" />
+                  Duplicar Tarea
                 </DropdownMenuItem>
               )}
 
