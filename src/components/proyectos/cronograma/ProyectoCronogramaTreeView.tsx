@@ -574,38 +574,40 @@ export function ProyectoCronogramaTreeView({
       if (!resAct.ok) throw new Error('Error al crear actividad')
       const { data: nuevaActividad } = await resAct.json()
 
-      // 2. Obtener tareas de la actividad original
-      const resTareas = await fetch(
-        `/api/proyectos/${proyectoId}/cronograma/tareas?proyectoActividadId=${actividadId}`
+      // 2. Tareas de la actividad original — usar node.children del árbol
+      //    (ya cargados, evita llamada al API que no filtra por actividad)
+      const tareasHijas = (node.children || []).filter(
+        c => c.type === 'tarea' && !c.data?.esExtra && !c.data?.isExtrasGroup
       )
-      if (resTareas.ok) {
-        const { data: tareas } = await resTareas.json()
-        const fiOriginalMs = new Date(fi).getTime()
+      const fiOriginalMs = new Date(fi).getTime()
 
-        // 3. Crear cada tarea manteniendo offset relativo
-        for (const tarea of tareas) {
-          const offsetInicio = new Date(tarea.fechaInicio).getTime() - fiOriginalMs
-          const durTarea     = new Date(tarea.fechaFin).getTime() - new Date(tarea.fechaInicio).getTime()
-          const tareaInicio  = new Date(nuevaFechaInicio.getTime() + offsetInicio)
-          const tareaFin     = new Date(tareaInicio.getTime() + durTarea)
+      // 3. Crear cada tarea manteniendo offset relativo al inicio de la actividad
+      for (const tareaNode of tareasHijas) {
+        const tFi = tareaNode.data.fechaInicio
+        const tFf = tareaNode.data.fechaFin
+        if (!tFi || !tFf) continue
 
-          await fetch(`/api/proyectos/${proyectoId}/cronograma/tareas`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              nombre: tarea.nombre,
-              proyectoActividadId: nuevaActividad.id,
-              fechaInicio: fmt(tareaInicio),
-              fechaFin: fmt(tareaFin),
-              horasEstimadas: Number(tarea.horasEstimadas) || 0,
-              personasEstimadas: tarea.personasEstimadas || 1,
-              prioridad: tarea.prioridad || 'media',
-              recursoId: tarea.recursoId || undefined,
-              responsableId: tarea.responsableId || undefined,
-              esExtra: false,
-            }),
-          })
-        }
+        const offsetInicio = new Date(tFi).getTime() - fiOriginalMs
+        const durTarea     = new Date(tFf).getTime() - new Date(tFi).getTime()
+        const tareaInicio  = new Date(nuevaFechaInicio.getTime() + offsetInicio)
+        const tareaFin     = new Date(tareaInicio.getTime() + durTarea)
+
+        await fetch(`/api/proyectos/${proyectoId}/cronograma/tareas`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            nombre: tareaNode.nombre,
+            proyectoActividadId: nuevaActividad.id,
+            fechaInicio: fmt(tareaInicio),
+            fechaFin: fmt(tareaFin),
+            horasEstimadas: Number(tareaNode.data.horasEstimadas) || 0,
+            personasEstimadas: tareaNode.data.personasEstimadas || 1,
+            prioridad: tareaNode.data.prioridad || 'media',
+            recursoId: tareaNode.data.recursoId || undefined,
+            responsableId: tareaNode.data.responsableId || undefined,
+            esExtra: false,
+          }),
+        })
       }
 
       await actions.loadTree([...state.expandedNodes])
