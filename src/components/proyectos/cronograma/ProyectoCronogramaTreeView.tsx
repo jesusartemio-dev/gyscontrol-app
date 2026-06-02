@@ -15,6 +15,7 @@ import { ImportTareasModal } from '../../cronograma/ImportTareasModal'
 import { AsignarResponsable } from './AsignarResponsable'
 import { AsignarRecurso } from './AsignarRecurso'
 import { CronogramaTreeViewProps, TreeNode as TreeNodeType, NodeType } from '../../cronograma/types'
+import type { EdtImportSelection } from '../../cronograma/ImportEdtModal'
 import { useProyectoCronogramaTree } from './hooks/useProyectoCronogramaTree'
 import '../../cronograma/CronogramaTreeView.css'
 
@@ -318,8 +319,10 @@ export function ProyectoCronogramaTreeView({
     })
   }
 
-  const handleExecuteImport = async (selectedIds: string[]) => {
+  const handleExecuteImport = async (selections: EdtImportSelection[]) => {
     if (!currentImportNode) return
+
+    const selectedIds = selections.map(s => s.edtId)
 
     try {
       setImporting(true)
@@ -334,12 +337,12 @@ export function ProyectoCronogramaTreeView({
 
         if (!response.ok) throw new Error('Error importando tareas')
       }
-      // Para fases, importar EDTs del catálogo
+      // Para fases, importar EDTs del catálogo (con nombres personalizados)
       else if (currentImportNode.type === 'fase') {
         const response = await fetch(`/api/proyectos/${proyectoId}/cronograma/import-edts`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ edtIds: selectedIds, faseId: currentImportNode.id })
+          body: JSON.stringify({ edts: selections, faseId: currentImportNode.id })
         })
 
         if (!response.ok) throw new Error('Error importando EDTs')

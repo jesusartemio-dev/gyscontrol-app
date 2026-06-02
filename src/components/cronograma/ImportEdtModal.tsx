@@ -46,13 +46,18 @@ export interface ImportableEdt {
   [key: string]: any
 }
 
+export interface EdtImportSelection {
+  edtId: string
+  nombre: string
+}
+
 export interface ImportEdtModalProps {
   isOpen: boolean
   onClose: () => void
   title: string
   description: string
   edts: ImportableEdt[]
-  onImport: (selectedIds: string[]) => Promise<void>
+  onImport: (selections: EdtImportSelection[]) => Promise<void>
   loading?: boolean
 }
 
@@ -67,6 +72,7 @@ export function ImportEdtModal({
 }: ImportEdtModalProps) {
 
   const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [customNames, setCustomNames] = useState<Record<string, string>>({})
   const [searchTerm, setSearchTerm] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
   const [showOnlyAvailable, setShowOnlyAvailable] = useState(false)
@@ -76,6 +82,7 @@ export function ImportEdtModal({
   useEffect(() => {
     if (isOpen) {
       setSelectedIds([])
+      setCustomNames({})
       setSearchTerm('')
       setCategoryFilter('')
       setShowOnlyAvailable(false)
@@ -92,19 +99,24 @@ export function ImportEdtModal({
   const handleSelectAll = () => {
     if (selectedIds.length === filteredEdts.length) {
       setSelectedIds([])
+      setCustomNames({})
     } else {
       setSelectedIds(filteredEdts.map(edt => edt.id))
+      setCustomNames(Object.fromEntries(filteredEdts.map(edt => [edt.id, edt.nombre])))
     }
   }
 
-  const handleItemToggle = (itemId: string, isAlreadyAdded: boolean) => {
-    if (isAlreadyAdded) return // Don't allow toggling already added items
+  const handleItemToggle = (edt: ImportableEdt, isAlreadyAdded: boolean) => {
+    if (isAlreadyAdded) return
 
-    setSelectedIds(prev =>
-      prev.includes(itemId)
-        ? prev.filter(id => id !== itemId)
-        : [...prev, itemId]
-    )
+    const isSelected = selectedIds.includes(edt.id)
+    if (isSelected) {
+      setSelectedIds(prev => prev.filter(id => id !== edt.id))
+      setCustomNames(prev => { const n = { ...prev }; delete n[edt.id]; return n })
+    } else {
+      setSelectedIds(prev => [...prev, edt.id])
+      setCustomNames(prev => ({ ...prev, [edt.id]: edt.nombre }))
+    }
   }
 
   const handleImport = async () => {
@@ -117,8 +129,13 @@ export function ImportEdtModal({
       return
     }
 
+    const selections = selectedIds.map(id => ({
+      edtId: id,
+      nombre: (customNames[id] || '').trim() || edts.find(e => e.id === id)?.nombre || id
+    }))
+
     try {
-      await onImport(selectedIds)
+      await onImport(selections)
       onClose()
     } catch (error) {
       console.error('Error in ImportEdtModal handleImport:', error)
@@ -161,24 +178,23 @@ export function ImportEdtModal({
             return (
               <div
                 key={edt.id}
-                className={`flex items-start gap-3 p-3 border rounded-lg transition-colors cursor-pointer ${
+                className={`flex items-start gap-3 p-3 border rounded-lg transition-colors ${
                   isSelected
                     ? 'border-primary bg-primary/5'
-                    : 'border-border hover:border-primary/50'
+                    : 'border-border hover:border-primary/50 cursor-pointer'
                 }`}
-                onClick={() => handleItemToggle(edt.id, false)}
+                onClick={!isSelected ? () => handleItemToggle(edt, false) : undefined}
               >
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 mt-0.5">
                   <Checkbox
                     checked={isSelected}
-                    onCheckedChange={() => handleItemToggle(edt.id, false)}
-                    className="mt-0.5"
+                    onCheckedChange={() => handleItemToggle(edt, false)}
                   />
                 </div>
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <h4 className="font-medium text-sm truncate">{edt.nombre}</h4>
+                    <span className="font-mono text-xs text-muted-foreground shrink-0">{edt.nombre}</span>
                     {displayInfo.length > 0 && (
                       <div className="flex flex-wrap gap-1">
                         {displayInfo.map((info, index) => (
@@ -190,10 +206,25 @@ export function ImportEdtModal({
                     )}
                   </div>
 
-                  {edt.descripcion && (
-                    <p className="text-xs text-muted-foreground mb-2 line-clamp-2">
+                  {edt.descripcion && !isSelected && (
+                    <p className="text-xs text-muted-foreground line-clamp-1">
                       {edt.descripcion}
                     </p>
+                  )}
+
+                  {isSelected && (
+                    <div className="mt-2" onClick={e => e.stopPropagation()}>
+                      <Label className="text-xs text-muted-foreground mb-1 block">
+                        Nombre en el cronograma
+                      </Label>
+                      <Input
+                        value={customNames[edt.id] ?? edt.nombre}
+                        onChange={e => setCustomNames(prev => ({ ...prev, [edt.id]: e.target.value }))}
+                        className="h-7 text-sm"
+                        placeholder={edt.nombre}
+                        autoFocus
+                      />
+                    </div>
                   )}
                 </div>
               </div>

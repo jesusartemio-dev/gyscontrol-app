@@ -151,14 +151,23 @@ export async function POST(
 
     const { id: proyectoId } = await params
     const body = await request.json()
-    const { edtIds, faseId } = body
+    const { edts, edtIds, faseId } = body
 
-    if (!edtIds || !Array.isArray(edtIds) || edtIds.length === 0) {
+    // Soporte para formato nuevo { edts: [{edtId, nombre}] } y legacy { edtIds: string[] }
+    const selections: { edtId: string; nombre?: string }[] = edts && Array.isArray(edts)
+      ? edts
+      : edtIds && Array.isArray(edtIds)
+        ? edtIds.map((id: string) => ({ edtId: id }))
+        : []
+
+    if (selections.length === 0) {
       return NextResponse.json(
         { error: 'Debe proporcionar al menos un EDT para importar' },
         { status: 400 }
       )
     }
+
+    const edtIds_resolved = selections.map(s => s.edtId)
 
     // ✅ Validar que el proyecto existe
     const proyecto = await prisma.proyecto.findUnique({
@@ -204,7 +213,7 @@ export async function POST(
 
     // ✅ Obtener los EDTs del catálogo para importar
     const edtsCatalogo = await prisma.edt.findMany({
-      where: { id: { in: edtIds } },
+      where: { id: { in: edtIds_resolved } },
       include: {
         faseDefault: true,
         catalogoServicio: true
@@ -233,6 +242,10 @@ export async function POST(
           proyectoFaseId = faseProyecto?.id
         }
 
+        // Usar nombre personalizado si fue provisto, o el nombre del catálogo
+        const seleccion = selections.find(s => s.edtId === edtCatalogo.id)
+        const nombreFinal = seleccion?.nombre?.trim() || edtCatalogo.nombre
+
         // Crear el EDT en el proyecto
         const edtProyecto = await prisma.proyectoEdt.create({
           data: {
@@ -240,7 +253,7 @@ export async function POST(
             proyectoId,
             proyectoCronogramaId: cronograma.id,
             proyectoFaseId,
-            nombre: edtCatalogo.nombre,
+            nombre: nombreFinal,
             descripcion: edtCatalogo.descripcion,
             edtId: edtCatalogo.id,
             estado: 'planificado',
