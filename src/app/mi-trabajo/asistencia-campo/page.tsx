@@ -26,12 +26,14 @@ interface Ubicacion {
   id: string
   nombre: string
   tipo: string
+  clienteId: string | null
 }
 
 interface ProyectoOption {
   id: string
   codigo: string
   nombre: string
+  clienteId: string | null
 }
 
 interface Jornada {
@@ -68,6 +70,12 @@ export default function AsistenciaCampoPage() {
   const [proyectos, setProyectos] = useState<ProyectoOption[]>([])
   const [ubicacionSel, setUbicacionSel] = useState('')
   const [proyectoSel, setProyectoSel] = useState('')
+
+  // Proyectos filtrados por el cliente de la ubicación seleccionada
+  const clienteIdUbicacion = ubicaciones.find(u => u.id === ubicacionSel)?.clienteId ?? null
+  const proyectosFiltrados = clienteIdUbicacion
+    ? proyectos.filter(p => p.clienteId === clienteIdUbicacion)
+    : proyectos
   const [jornada, setJornada] = useState<Jornada | null>(null)
   const [asistencias, setAsistencias] = useState<Asistencia[]>([])
   const [qrImg, setQrImg] = useState('')
@@ -88,11 +96,11 @@ export default function AsistenciaCampoPage() {
       .then(r => r.json())
       .then((u: Ubicacion[]) => setUbicaciones(u.filter((x: any) => x.activo !== false)))
 
-    fetch('/api/proyectos?estadosActivos=true&fields=id,codigo,nombre')
+    fetch('/api/proyectos?estadosActivos=true')
       .then(r => r.ok ? r.json() : [])
       .then(data => {
         const lista = Array.isArray(data) ? data : (data.proyectos || data.data || [])
-        setProyectos(lista.map((p: any) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre })))
+        setProyectos(lista.map((p: any) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre, clienteId: p.clienteId ?? null })))
       })
       .catch(() => {})
 
@@ -296,7 +304,7 @@ export default function AsistenciaCampoPage() {
           <CardContent className="space-y-4">
             <div>
               <label className="mb-2 block text-sm font-medium">Ubicación</label>
-              <Select value={ubicacionSel} onValueChange={setUbicacionSel}>
+              <Select value={ubicacionSel} onValueChange={v => { setUbicacionSel(v); setProyectoSel('') }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecciona oficina o planta" />
                 </SelectTrigger>
@@ -319,7 +327,7 @@ export default function AsistenciaCampoPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">Sin proyecto</SelectItem>
-                  {proyectos.map(p => (
+                  {proyectosFiltrados.map(p => (
                     <SelectItem key={p.id} value={p.id}>
                       <span className="font-mono text-xs text-muted-foreground mr-1">{p.codigo}</span>
                       {p.nombre}

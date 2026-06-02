@@ -10,10 +10,25 @@ export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ message: 'No autorizado' }, { status: 401 })
 
-  const data = await prisma.ubicacion.findMany({
+  const ubicaciones = await prisma.ubicacion.findMany({
     orderBy: [{ tipo: 'asc' }, { nombre: 'asc' }],
   })
-  return NextResponse.json(data)
+
+  // Enriquecer con clienteId del proyecto vinculado
+  const proyectoIds = [...new Set(ubicaciones.map(u => u.proyectoId).filter(Boolean))] as string[]
+  const proyectosMap = proyectoIds.length > 0
+    ? Object.fromEntries(
+        (await prisma.proyecto.findMany({
+          where: { id: { in: proyectoIds } },
+          select: { id: true, clienteId: true },
+        })).map(p => [p.id, p.clienteId])
+      )
+    : {}
+
+  return NextResponse.json(ubicaciones.map(u => ({
+    ...u,
+    clienteId: u.proyectoId ? (proyectosMap[u.proyectoId] ?? null) : null,
+  })))
 }
 
 export async function POST(req: Request) {
