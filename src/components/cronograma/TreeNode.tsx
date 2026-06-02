@@ -6,7 +6,7 @@
 // ===================================================
 
 import React from 'react'
-import { ChevronRight, ChevronDown, Plus, Edit, Trash2, Settings2, Download, Users, UserCheck, Wrench, Copy } from 'lucide-react'
+import { ChevronRight, ChevronDown, Plus, Edit, Trash2, Settings2, Download, Users, UserCheck, Wrench, Copy, GripVertical, ArrowUpToLine, ArrowDownToLine } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -30,6 +30,10 @@ interface TreeNodeProps {
   onAssignResponsable?: () => void
   onAssignRecurso?: () => void
   onDuplicate?: () => void
+  onAjustarPosicion?: (posicion: 'inicio_padre' | 'despues_ultimo') => void
+  dragListeners?: Record<string, Function>
+  dragAttributes?: Record<string, any>
+  isDragging?: boolean
   rowIndex?: number
 }
 
@@ -82,6 +86,10 @@ export function TreeNode({
   onAssignResponsable,
   onAssignRecurso,
   onDuplicate,
+  onAjustarPosicion,
+  dragListeners,
+  dragAttributes,
+  isDragging,
   rowIndex
 }: TreeNodeProps) {
   const config = NODE_CONFIG[node.type]
@@ -223,7 +231,7 @@ export function TreeNode({
 
   return (
     <div
-      className={`tree-node group ${isSelected ? 'bg-blue-100 border-l-2 border-l-blue-500' : `${rowIndex != null && rowIndex % 2 === 0 ? 'bg-gray-100' : ''} hover:bg-blue-100/70`} py-0.5 cursor-pointer transition-colors`}
+      className={`tree-node group ${isDragging ? 'opacity-40' : ''} ${isSelected ? 'bg-blue-100 border-l-2 border-l-blue-500' : `${rowIndex != null && rowIndex % 2 === 0 ? 'bg-gray-100' : ''} hover:bg-blue-100/70`} py-0.5 cursor-pointer transition-colors`}
       onClick={onSelect}
     >
       <div className={`grid items-center gap-1 ${
@@ -235,6 +243,17 @@ export function TreeNode({
       }`}>
         {/* Columna 1: Nombre con indentación */}
         <div className="flex items-center gap-1 min-w-0" style={{ paddingLeft: `${node.level * 16 + 8}px` }}>
+          {/* Drag handle — visible on hover when draggable */}
+          {dragListeners && (
+            <div
+              className="opacity-0 group-hover:opacity-40 hover:!opacity-70 cursor-grab active:cursor-grabbing shrink-0 text-gray-400 touch-none"
+              {...dragListeners}
+              {...dragAttributes}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <GripVertical className="h-3.5 w-3.5" />
+            </div>
+          )}
           {/* Toggle button */}
           <Button
             variant="ghost"
@@ -530,6 +549,27 @@ export function TreeNode({
                   <Copy className="h-4 w-4 mr-2" />
                   Duplicar Tarea
                 </DropdownMenuItem>
+              )}
+
+              {/* Ajustar posición - tareas y actividades */}
+              {!readOnly && (node.type === 'tarea' || node.type === 'actividad') && onAjustarPosicion && (
+                <>
+                  <div className="h-px bg-gray-200 my-1" />
+                  <DropdownMenuItem
+                    onClick={() => { setDropdownOpen(false); onAjustarPosicion('inicio_padre') }}
+                    className="text-gray-600"
+                  >
+                    <ArrowUpToLine className="h-4 w-4 mr-2" />
+                    Al inicio del padre
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => { setDropdownOpen(false); onAjustarPosicion('despues_ultimo') }}
+                    className="text-gray-600"
+                  >
+                    <ArrowDownToLine className="h-4 w-4 mr-2" />
+                    Tras último hermano
+                  </DropdownMenuItem>
+                </>
               )}
 
               {/* Delete option - only if not read-only and not proyecto */}

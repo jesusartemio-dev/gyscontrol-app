@@ -5,6 +5,18 @@ import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { RefreshCw, TreePine, Plus, Download, List, Filter, Zap, Trash2, Clock } from 'lucide-react'
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragOverlay,
+  type DragStartEvent,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { Badge } from '@/components/ui/badge'
 import { TreeNode } from '../../cronograma/TreeNode'
 import { TreeHeader } from '../../cronograma/TreeHeader'
@@ -18,6 +30,34 @@ import { CronogramaTreeViewProps, TreeNode as TreeNodeType, NodeType } from '../
 import type { EdtImportSelection } from '../../cronograma/ImportEdtModal'
 import { useProyectoCronogramaTree } from './hooks/useProyectoCronogramaTree'
 import '../../cronograma/CronogramaTreeView.css'
+
+// ── Wrapper sortable para cada fila del árbol ──────────────────────────────
+function SortableNodeWrapper({
+  nodeId,
+  isReadOnly,
+  children,
+}: {
+  nodeId: string
+  isReadOnly: boolean
+  children: (listeners: Record<string, Function> | undefined, attributes: Record<string, any> | undefined, isDragging: boolean) => React.ReactNode
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: nodeId,
+    disabled: isReadOnly,
+  })
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+    >
+      {children(
+        isReadOnly ? undefined : (listeners as Record<string, Function>),
+        isReadOnly ? undefined : attributes,
+        isDragging,
+      )}
+    </div>
+  )
+}
 
 interface ProyectoCronogramaTreeViewProps {
   proyectoId: string
@@ -65,6 +105,98 @@ export function ProyectoCronogramaTreeView({
   // Columnas de asignación: Recurso y Responsable visibles en planificación y ejecución
   const showRecursoColumn = !!selectedCronograma
   const showResponsableColumn = selectedCronograma?.tipo === 'ejecucion' || selectedCronograma?.tipo === 'planificacion'
+
+  // ── DnD state ─────────────────────────────────────────────────────────────
+  const [activeNodeId, setActiveNodeId] = useState<string | null>(null)
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
+  )
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveNodeId(event.active.id as string)
+  }
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+    setActiveNodeId(null)
+    if (!over || active.id === over.id) return
+
+    const activeNode = state.nodes.get(active.id as string)
+    const overNode   = state.nodes.get(over.id   as string)
+    if (!activeNode || !overNode) return
+    if (activeNode.parentId !== overNode.parentId) return  // solo entre hermanos
+
+    const parentNode  = activeNode.parentId ? state.nodes.get(activeNode.parentId) : null
+    const siblingIds: string[] = parentNode
+      ? (parentNode.children?.map(c => c.id) || [])
+      : [...state.rootNodes]
+
+    const oldIndex = siblingIds.indexOf(active.id as string)
+    const newIndex = siblingIds.indexOf(over.id   as string)
+    if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return
+
+    const newOrder = arrayMove(siblingIds, oldIndex, newIndex)
+    try {
+      await Promise.all(
+        newOrder.map((nodeId, index) =>
+          fetch(`/api/proyectos/${proyectoId}/cronograma/tree/${nodeId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orden: index }),
+          })
+        )
+      )
+      await actions.loadTree([...state.expandedNodes])
+    } catch {
+      toast.error('Error al reordenar')
+    }
+  }
+
+  // ── Ajustar posición (snap) ────────────────────────────────────────────────
+  const handleAjustarPosicion = async (nodeId: string, posicion: 'inicio_padre' | 'despues_ultimo') => {
+    const node = state.nodes.get(nodeId)
+    if (!node) return
+
+    const isTarea = node.type === 'tarea'
+    const fi = isTarea ? node.data.fechaInicio : (node.data.fechaInicioComercial || node.data.fechaInicioPlan)
+    const ff = isTarea ? node.data.fechaFin    : (node.data.fechaFinComercial    || node.data.fechaFinPlan)
+    const duracionMs = fi && ff ? new Date(ff).getTime() - new Date(fi).getTime() : 7 * 86400000
+
+    const parent = node.parentId ? state.nodes.get(node.parentId) : null
+    const parentFi = parent?.data.fechaInicioComercial || parent?.data.fechaInicioPlan || parent?.data.fechaInicio
+
+    let newFechaInicio: Date
+
+    if (posicion === 'inicio_padre') {
+      if (!parentFi) { toast.error('El padre no tiene fecha de inicio'); return }
+      newFechaInicio = new Date(parentFi)
+    } else {
+      const siblings = (parent?.children || []).filter(c => c.id !== nodeId)
+      const maxFin = siblings.reduce((max, s) => {
+        const f = s.data.fechaFin || s.data.fechaFinComercial || s.data.fechaFinPlan
+        return f ? Math.max(max, new Date(f).getTime()) : max
+      }, 0)
+      newFechaInicio = maxFin > 0 ? new Date(maxFin + 86400000) : (parentFi ? new Date(parentFi) : new Date())
+    }
+
+    const newFechaFin = new Date(newFechaInicio.getTime() + duracionMs)
+    const fmt = (d: Date) => d.toISOString().split('T')[0]
+
+    try {
+      await fetch(`/api/proyectos/${proyectoId}/cronograma/tree/${nodeId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fechaInicioComercial: fmt(newFechaInicio),
+          fechaFinComercial:    fmt(newFechaFin),
+        }),
+      })
+      await actions.loadTree([...state.expandedNodes])
+      toast.success('Posición ajustada')
+    } catch {
+      toast.error('Error al ajustar posición')
+    }
+  }
 
   // Estado para modal de asignar responsable
   const [responsableModal, setResponsableModal] = useState<{
@@ -450,53 +582,66 @@ export function ProyectoCronogramaTreeView({
   const rowCounterRef = useRef(0)
 
   const renderTree = (nodeIds: string[], level = 0): React.ReactNode => {
-    return nodeIds.map(nodeId => {
-      const node = state.nodes.get(nodeId)
-      if (!node) return null
+    return (
+      <SortableContext items={nodeIds} strategy={verticalListSortingStrategy}>
+        {nodeIds.map(nodeId => {
+          const node = state.nodes.get(nodeId)
+          if (!node) return null
 
-      const isSelected = state.selectedNodeId === nodeId
-      const childNodeIds = node.children?.map(child => child.id) || []
+          const isSelected = state.selectedNodeId === nodeId
+          const childNodeIds = node.children?.map(child => child.id) || []
+          const isReadOnly = selectedCronograma?.tipo === 'comercial' || selectedCronograma?.bloqueado === true
+          const currentRowIndex = rowCounterRef.current++
 
-      // Determinar permisos según el tipo de cronograma o estado de bloqueo
-      const isReadOnly = selectedCronograma?.tipo === 'comercial' || selectedCronograma?.bloqueado === true
-
-      const currentRowIndex = rowCounterRef.current++
-
-      return (
-        <React.Fragment key={nodeId}>
-          <TreeNode
-            node={node}
-            onToggle={() => actions.toggleNode(nodeId)}
-            onAddChild={isReadOnly ? undefined : (type) => handleAddChild(nodeId, type)}
-            onEdit={isReadOnly || node.type === 'proyecto' ? undefined : () => handleEditNode(nodeId)}
-            onDelete={isReadOnly || node.type === 'proyecto' ? undefined : () => actions.deleteNode(nodeId)}
-            onDuplicate={!isReadOnly && node.type === 'tarea' ? () => handleDuplicateTarea(nodeId) : undefined}
-            onImport={isReadOnly ? undefined : () => handleImportItems(nodeId)}
-            onSelect={() => actions.selectNode(nodeId)}
-            isSelected={isSelected}
-            readOnly={isReadOnly}
-            showRecursoColumn={showRecursoColumn}
-            showResponsableColumn={showResponsableColumn}
-            rowIndex={currentRowIndex}
-            onAssignRecurso={
-              !isReadOnly && showRecursoColumn && (node.type === 'edt' || node.type === 'tarea')
-                ? () => handleAssignRecurso(nodeId)
-                : undefined
-            }
-            onAssignResponsable={
-              !isReadOnly && showResponsableColumn && (node.type === 'edt' || node.type === 'tarea')
-                ? () => handleAssignResponsable(nodeId)
-                : undefined
-            }
-          />
-          {state.expandedNodes.has(nodeId) && childNodeIds.length > 0 && (
-            <div className="tree-children">
-              {renderTree(childNodeIds, level + 1)}
-            </div>
-          )}
-        </React.Fragment>
-      )
-    })
+          return (
+            <React.Fragment key={nodeId}>
+              <SortableNodeWrapper nodeId={nodeId} isReadOnly={isReadOnly || node.type === 'proyecto'}>
+                {(dragListeners, dragAttributes, isDragging) => (
+                  <TreeNode
+                    node={node}
+                    onToggle={() => actions.toggleNode(nodeId)}
+                    onAddChild={isReadOnly ? undefined : (type) => handleAddChild(nodeId, type)}
+                    onEdit={isReadOnly || node.type === 'proyecto' ? undefined : () => handleEditNode(nodeId)}
+                    onDelete={isReadOnly || node.type === 'proyecto' ? undefined : () => actions.deleteNode(nodeId)}
+                    onDuplicate={!isReadOnly && node.type === 'tarea' ? () => handleDuplicateTarea(nodeId) : undefined}
+                    onAjustarPosicion={
+                      !isReadOnly && (node.type === 'tarea' || node.type === 'actividad')
+                        ? (pos) => handleAjustarPosicion(nodeId, pos)
+                        : undefined
+                    }
+                    onImport={isReadOnly ? undefined : () => handleImportItems(nodeId)}
+                    onSelect={() => actions.selectNode(nodeId)}
+                    isSelected={isSelected}
+                    readOnly={isReadOnly}
+                    showRecursoColumn={showRecursoColumn}
+                    showResponsableColumn={showResponsableColumn}
+                    rowIndex={currentRowIndex}
+                    dragListeners={dragListeners}
+                    dragAttributes={dragAttributes}
+                    isDragging={isDragging}
+                    onAssignRecurso={
+                      !isReadOnly && showRecursoColumn && (node.type === 'edt' || node.type === 'tarea')
+                        ? () => handleAssignRecurso(nodeId)
+                        : undefined
+                    }
+                    onAssignResponsable={
+                      !isReadOnly && showResponsableColumn && (node.type === 'edt' || node.type === 'tarea')
+                        ? () => handleAssignResponsable(nodeId)
+                        : undefined
+                    }
+                  />
+                )}
+              </SortableNodeWrapper>
+              {state.expandedNodes.has(nodeId) && childNodeIds.length > 0 && (
+                <div className="tree-children">
+                  {renderTree(childNodeIds, level + 1)}
+                </div>
+              )}
+            </React.Fragment>
+          )
+        })}
+      </SortableContext>
+    )
   }
 
   if (state.error) {
@@ -682,7 +827,21 @@ export function ProyectoCronogramaTreeView({
             <>
               <TreeHeader showRecursoColumn={showRecursoColumn} showResponsableColumn={showResponsableColumn} />
               <div className="p-2">
-                {(() => { rowCounterRef.current = 0; return renderTree(state.rootNodes) })()}
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
+                >
+                  {(() => { rowCounterRef.current = 0; return renderTree(state.rootNodes) })()}
+                  <DragOverlay>
+                    {activeNodeId ? (
+                      <div className="bg-white border border-blue-300 rounded shadow-lg px-3 py-1.5 text-sm font-medium text-gray-800 opacity-90">
+                        {state.nodes.get(activeNodeId)?.nombre ?? ''}
+                      </div>
+                    ) : null}
+                  </DragOverlay>
+                </DndContext>
               </div>
             </>
           )}
