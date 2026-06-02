@@ -10,25 +10,10 @@ export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ message: 'No autorizado' }, { status: 401 })
 
-  const ubicaciones = await prisma.ubicacion.findMany({
+  const data = await prisma.ubicacion.findMany({
     orderBy: [{ tipo: 'asc' }, { nombre: 'asc' }],
   })
-
-  // Enriquecer con clienteId del proyecto vinculado
-  const proyectoIds = [...new Set(ubicaciones.map(u => u.proyectoId).filter(Boolean))] as string[]
-  const proyectosMap = proyectoIds.length > 0
-    ? Object.fromEntries(
-        (await prisma.proyecto.findMany({
-          where: { id: { in: proyectoIds } },
-          select: { id: true, clienteId: true },
-        })).map(p => [p.id, p.clienteId])
-      )
-    : {}
-
-  return NextResponse.json(ubicaciones.map(u => ({
-    ...u,
-    clienteId: u.proyectoId ? (proyectosMap[u.proyectoId] ?? null) : null,
-  })))
+  return NextResponse.json(data)
 }
 
 export async function POST(req: Request) {
@@ -53,6 +38,7 @@ export async function POST(req: Request) {
         radioMetros: body.radioMetros ?? 150,
         qrSecret: generarSecret(),
         proyectoId: body.proyectoId || null,
+        clienteId: body.clienteId || null,
         activo: body.activo ?? true,
         toleranciaMinutos: body.toleranciaMinutos ?? 5,
         limiteTardeMinutos: body.limiteTardeMinutos ?? 30,

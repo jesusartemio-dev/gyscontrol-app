@@ -50,11 +50,18 @@ interface Ubicacion {
   latitud: number
   longitud: number
   radioMetros: number
+  clienteId: string | null
   activo: boolean
   toleranciaMinutos: number
   limiteTardeMinutos: number
   horaIngreso: string | null
   horaSalida: string | null
+}
+
+interface ClienteOption {
+  id: string
+  codigo: string
+  nombre: string
 }
 
 const vacia = {
@@ -65,6 +72,7 @@ const vacia = {
   latitud: '',
   longitud: '',
   radioMetros: 150,
+  clienteId: '',
   activo: true,
   toleranciaMinutos: 5,
   limiteTardeMinutos: 30,
@@ -81,6 +89,7 @@ interface GeocodeResult {
 
 export default function UbicacionesPage() {
   const [data, setData] = useState<Ubicacion[]>([])
+  const [clientes, setClientes] = useState<ClienteOption[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [form, setForm] = useState<any>(vacia)
@@ -90,7 +99,14 @@ export default function UbicacionesPage() {
 
   async function cargar() {
     setLoading(true)
-    const r = await fetch('/api/asistencia/ubicaciones')
+    const [r, rc] = await Promise.all([
+      fetch('/api/asistencia/ubicaciones'),
+      fetch('/api/clientes'),
+    ])
+    if (rc.ok) {
+      const cl = await rc.json()
+      setClientes((Array.isArray(cl) ? cl : []).map((c: any) => ({ id: c.id, codigo: c.codigo, nombre: c.nombre })))
+    }
     const j = await r.json()
     setData(j)
     setLoading(false)
@@ -307,6 +323,27 @@ export default function UbicacionesPage() {
                 💡 <strong>Tip sobre precisión GPS:</strong> en plantas industriales con
                 techos metálicos el GPS puede tener 20-100m de error. Usa{' '}
                 <strong>radio 300-500m para plantas</strong> y 100-150m para oficinas.
+              </div>
+
+              <div>
+                <Label>Cliente asociado</Label>
+                <Select value={form.clienteId || '__none__'} onValueChange={v => setForm({ ...form, clienteId: v === '__none__' ? '' : v })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sin cliente (muestra todos los proyectos)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Sin cliente</SelectItem>
+                    {clientes.map(c => (
+                      <SelectItem key={c.id} value={c.id}>
+                        <span className="font-mono text-xs text-muted-foreground mr-1">{c.codigo}</span>
+                        {c.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Filtra los proyectos disponibles al abrir asistencia de campo
+                </p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
