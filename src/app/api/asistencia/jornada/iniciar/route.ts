@@ -43,15 +43,27 @@ export async function POST(req: Request) {
     }
     // Si se pasa proyectoId y aún no tiene RegistroHorasCampo, crear uno
     if (proyectoId && !jornada.registroHorasCampoId) {
-      const rhc = await prisma.registroHorasCampo.create({
-        data: {
-          proyectoId,
-          supervisorId: session.user.id,
-          fechaTrabajo: fecha,
-          estado: 'iniciado',
-          personalPlanificado: [],
-          updatedAt: new Date(),
-        },
+      const [rhc] = await prisma.$transaction(async (tx) => {
+        const rhc = await tx.registroHorasCampo.create({
+          data: {
+            proyectoId,
+            supervisorId: session.user.id,
+            fechaTrabajo: fecha,
+            estado: 'iniciado',
+            personalPlanificado: [],
+            updatedAt: new Date(),
+          },
+        })
+        // Evidencia automática
+        await tx.evidenciaSeguridad.create({
+          data: {
+            registroHorasCampoId: rhc.id,
+            creadoPorId: session.user.id,
+            estado: 'abierta',
+            updatedAt: new Date(),
+          },
+        })
+        return [rhc]
       })
       jornada = await prisma.jornadaAsistencia.update({
         where: { id: jornada.id },
@@ -78,6 +90,16 @@ export async function POST(req: Request) {
         },
       })
       registroHorasCampoId = rhc.id
+
+      // Crear evidencia de seguridad automáticamente
+      await tx.evidenciaSeguridad.create({
+        data: {
+          registroHorasCampoId: rhc.id,
+          creadoPorId: session.user.id,
+          estado: 'abierta',
+          updatedAt: new Date(),
+        },
+      })
     }
 
     return tx.jornadaAsistencia.create({
