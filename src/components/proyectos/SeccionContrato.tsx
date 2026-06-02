@@ -219,13 +219,17 @@ export default function SeccionContrato({ proyecto, onUpdateProyecto }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
-      if (!res.ok) throw new Error('Error al guardar')
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error || `Error ${res.status}`)
+      }
       const { data } = await res.json()
       onUpdateProyecto(data)
       setEditingContrato(false)
       toast.success('Datos de contrato actualizados')
-    } catch {
-      toast.error('Error al guardar contrato')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Error al guardar contrato'
+      toast.error(msg)
     } finally {
       setSavingContrato(false)
     }
