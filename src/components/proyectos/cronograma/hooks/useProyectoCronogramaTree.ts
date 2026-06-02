@@ -327,13 +327,15 @@ export function useProyectoCronogramaTree(proyectoId: string, cronogramaId?: str
           requestBody = {
             nombre: data.nombre,
             proyectoActividadId: parentId.replace('actividad-', ''),
-            fechaInicio: data.fechaInicio,
-            fechaFin: data.fechaFin,
+            fechaInicio: data.fechaInicio || data.fechaInicioComercial,
+            fechaFin: data.fechaFin || data.fechaFinComercial,
             horasEstimadas: data.horasEstimadas || 0,
             personasEstimadas: data.personasEstimadas || 1,
             descripcion: data.descripcion,
             prioridad: data.prioridad || 'media',
-            posicionamiento: data.posicionamiento || 'despues_ultima'
+            posicionamiento: data.posicionamiento || 'despues_ultima',
+            recursoId: data.recursoId || undefined,
+            responsableId: data.responsableId || undefined,
           }
           break
 
