@@ -62,9 +62,9 @@ export function ProyectoCronogramaTreeView({
   const [importItemsData, setImportItemsData] = useState<any[]>([])
   const [currentImportNode, setCurrentImportNode] = useState<{ id: string; type: string } | null>(null)
 
-  // Columnas de asignación: Recurso siempre visible, Responsable solo en ejecución
+  // Columnas de asignación: Recurso y Responsable visibles en planificación y ejecución
   const showRecursoColumn = !!selectedCronograma
-  const showResponsableColumn = selectedCronograma?.tipo === 'ejecucion'
+  const showResponsableColumn = selectedCronograma?.tipo === 'ejecucion' || selectedCronograma?.tipo === 'planificacion'
 
   // Estado para modal de asignar responsable
   const [responsableModal, setResponsableModal] = useState<{
@@ -396,6 +396,7 @@ export function ProyectoCronogramaTreeView({
           personasEstimadas: node.data.personasEstimadas || 1,
           prioridad: node.data.prioridad || 'media',
           recursoId: node.data.recursoId || undefined,
+          responsableId: node.data.responsableId || undefined,
           esExtra: false,
         }),
       })
