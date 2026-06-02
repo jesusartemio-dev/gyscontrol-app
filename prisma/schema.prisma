@@ -1113,6 +1113,7 @@ model Proyecto {
   proyectoEdt                ProyectoEdt[]
   proyectoFase               ProyectoFase[]
   registrosCampo             RegistroHorasCampo[]
+  jornadasAsistencia         JornadaAsistencia[]
   proyectoCondicion          ProyectoCondicion[]
   proyectoExclusion          ProyectoExclusion[]
   // Documentos financieros imputados al proyecto
@@ -1472,6 +1473,7 @@ model RegistroHorasCampo {
   aprobadoPor        User?                     @relation("RegistrosCampoAprobador", fields: [aprobadoPorId], references: [id])
   tareas             RegistroHorasCampoTarea[]
   evidenciaSeguridad EvidenciaSeguridad?
+  jornadaAsistencia  JornadaAsistencia?        @relation("JornadaAsistenciaRegistro")
 
   @@index([proyectoId, estado, fechaTrabajo])
   @@index([supervisorId, estado])
@@ -4466,30 +4468,33 @@ model Dispositivo {
 }
 
 // Jornada de asistencia que activa el supervisor para habilitar el marcaje del día.
-// Es INDEPENDIENTE de RegistroHorasCampo (jornada de proyecto).
+// Al asociarse a un proyecto, crea automáticamente un RegistroHorasCampo vinculado.
 model JornadaAsistencia {
-  id                  String       @id @default(cuid())
-  supervisorId        String
-  ubicacionId         String
-  fecha               DateTime     @db.Date
-  qrSecret            String // secret HMAC para QR rotable (TOTP-like, 30s)
-  latitudInicio       Float
-  longitudInicio      Float
-  activa              Boolean      @default(true)
-  // Override excepcional del horario oficial de la ubicación (turno B, caso puntual).
-  // Si está seteado, se usa para calcular fechaEsperada en lugar de Ubicacion.horaIngreso/horaSalida.
-  horaIngresoOverride String? // "HH:MM"
-  horaSalidaOverride  String? // "HH:MM"
-  motivoOverride      String? // razón del horario excepcional
-  iniciadaEn          DateTime     @default(now())
-  cerradaEn           DateTime?
-  updatedAt           DateTime     @updatedAt
-  supervisor          User         @relation("JornadaAsistenciaSupervisor", fields: [supervisorId], references: [id])
-  ubicacion           Ubicacion    @relation(fields: [ubicacionId], references: [id])
-  asistencias         Asistencia[]
+  id                   String              @id @default(cuid())
+  supervisorId         String
+  ubicacionId          String
+  proyectoId           String?             // proyecto al que corresponde esta jornada
+  registroHorasCampoId String?             @unique // jornada de trabajo creada automáticamente
+  fecha                DateTime            @db.Date
+  qrSecret             String
+  latitudInicio        Float
+  longitudInicio       Float
+  activa               Boolean             @default(true)
+  horaIngresoOverride  String?
+  horaSalidaOverride   String?
+  motivoOverride       String?
+  iniciadaEn           DateTime            @default(now())
+  cerradaEn            DateTime?
+  updatedAt            DateTime            @updatedAt
+  supervisor           User                @relation("JornadaAsistenciaSupervisor", fields: [supervisorId], references: [id])
+  ubicacion            Ubicacion           @relation(fields: [ubicacionId], references: [id])
+  proyecto             Proyecto?           @relation(fields: [proyectoId], references: [id], onDelete: SetNull)
+  registroHorasCampo   RegistroHorasCampo? @relation("JornadaAsistenciaRegistro", fields: [registroHorasCampoId], references: [id], onDelete: SetNull)
+  asistencias          Asistencia[]
 
   @@unique([supervisorId, ubicacionId, fecha])
   @@index([fecha, activa])
+  @@index([proyectoId])
   @@map("jornada_asistencia")
 }
 

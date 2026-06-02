@@ -28,15 +28,24 @@ interface Ubicacion {
   tipo: string
 }
 
+interface ProyectoOption {
+  id: string
+  codigo: string
+  nombre: string
+}
+
 interface Jornada {
   id: string
   ubicacionId: string
+  proyectoId: string | null
+  registroHorasCampoId: string | null
   fecha: string
   activa: boolean
   horaIngresoOverride: string | null
   horaSalidaOverride: string | null
   motivoOverride: string | null
   ubicacion: Ubicacion
+  proyecto: ProyectoOption | null
 }
 
 interface Asistencia {
@@ -56,7 +65,9 @@ export default function AsistenciaCampoPage() {
   const { data: session, status } = useSession()
   const geo = useGeolocation()
   const [ubicaciones, setUbicaciones] = useState<Ubicacion[]>([])
+  const [proyectos, setProyectos] = useState<ProyectoOption[]>([])
   const [ubicacionSel, setUbicacionSel] = useState('')
+  const [proyectoSel, setProyectoSel] = useState('')
   const [jornada, setJornada] = useState<Jornada | null>(null)
   const [asistencias, setAsistencias] = useState<Asistencia[]>([])
   const [qrImg, setQrImg] = useState('')
@@ -77,12 +88,21 @@ export default function AsistenciaCampoPage() {
       .then(r => r.json())
       .then((u: Ubicacion[]) => setUbicaciones(u.filter((x: any) => x.activo !== false)))
 
+    fetch('/api/proyectos?estado=activo&limit=100')
+      .then(r => r.ok ? r.json() : { proyectos: [] })
+      .then(data => {
+        const lista = Array.isArray(data) ? data : (data.proyectos || data.data || [])
+        setProyectos(lista.map((p: any) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre })))
+      })
+      .catch(() => {})
+
     fetch('/api/asistencia/jornada/activa')
       .then(r => r.json())
       .then((j: Jornada | null) => {
         if (j) {
           setJornada(j)
           setUbicacionSel(j.ubicacionId)
+          if (j.proyectoId) setProyectoSel(j.proyectoId)
         }
       })
   }, [status])
@@ -144,6 +164,7 @@ export default function AsistenciaCampoPage() {
           ubicacionId: ubicacionSel,
           latitud: coords.latitud,
           longitud: coords.longitud,
+          proyectoId: proyectoSel || undefined,
         }),
       })
       const j = await r.json()
@@ -288,6 +309,30 @@ export default function AsistenciaCampoPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium">
+                Proyecto <span className="text-muted-foreground font-normal">(opcional)</span>
+              </label>
+              <Select value={proyectoSel} onValueChange={setProyectoSel}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona proyecto del día" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Sin proyecto</SelectItem>
+                  {proyectos.map(p => (
+                    <SelectItem key={p.id} value={p.id}>
+                      <span className="font-mono text-xs text-muted-foreground mr-1">{p.codigo}</span>
+                      {p.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {proyectoSel && (
+                <p className="mt-1 text-xs text-blue-600">
+                  Se creará automáticamente una jornada de trabajo para este proyecto
+                </p>
+              )}
+            </div>
             <p className="text-xs text-muted-foreground">
               <MapPin className="mr-1 inline h-3 w-3" />
               {geo.coords
@@ -319,6 +364,11 @@ export default function AsistenciaCampoPage() {
                 <Wifi className="h-5 w-5 text-emerald-600" />
                 {jornada.ubicacion.nombre}
               </CardTitle>
+              {jornada.proyecto && (
+                <p className="text-xs font-medium text-blue-700 bg-blue-50 rounded px-2 py-1 mt-1">
+                  Proyecto: <span className="font-mono">{jornada.proyecto.codigo}</span> · {jornada.proyecto.nombre}
+                </p>
+              )}
               <p className="text-xs text-muted-foreground">
                 Rota en {segundosRestantes}s
               </p>
