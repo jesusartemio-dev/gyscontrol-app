@@ -425,10 +425,9 @@ export default function UbicacionesPage() {
                 <TableRow>
                   <TableHead>Nombre</TableHead>
                   <TableHead>Tipo</TableHead>
-                  <TableHead>Dirección</TableHead>
+                  <TableHead>Cliente</TableHead>
                   <TableHead>Horario</TableHead>
                   <TableHead>Radio</TableHead>
-                  <TableHead>Reglas</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
@@ -440,8 +439,16 @@ export default function UbicacionesPage() {
                     <TableCell>
                       <Badge variant="outline">{u.tipo}</Badge>
                     </TableCell>
-                    <TableCell className="max-w-[200px] truncate text-xs text-muted-foreground" title={u.direccion || ''}>
-                      {u.direccion || <span className="italic">—</span>}
+                    <TableCell className="text-xs">
+                      {u.clienteId ? (
+                        <span className="font-medium text-green-700">
+                          {clientes.find(c => c.id === u.clienteId)?.codigo ?? '—'}
+                          {' · '}
+                          {clientes.find(c => c.id === u.clienteId)?.nombre ?? u.clienteId}
+                        </span>
+                      ) : (
+                        <span className="text-amber-600 font-medium">Sin cliente</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-xs">
                       {u.horaIngreso && u.horaSalida
@@ -449,9 +456,6 @@ export default function UbicacionesPage() {
                         : <span className="text-muted-foreground">usa calendario</span>}
                     </TableCell>
                     <TableCell>{u.radioMetros} m</TableCell>
-                    <TableCell className="text-xs">
-                      ≤{u.toleranciaMinutos}m ok · ≤{u.limiteTardeMinutos}m tarde
-                    </TableCell>
                     <TableCell>
                       <Badge variant={u.activo ? 'default' : 'secondary'}>
                         {u.activo ? 'activo' : 'inactivo'}
