@@ -210,7 +210,11 @@ export function TreeNode({
       try {
         const date = typeof d === 'string' ? new Date(d) : d
         if (isNaN(date.getTime())) return ''
-        return date.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })
+        // UTC methods evitan el desfase de zona horaria (UTC-5 Perú)
+        const months = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
+        const day = String(date.getUTCDate()).padStart(2, '0')
+        const month = months[date.getUTCMonth()]
+        return `${day} ${month}`
       } catch { return '' }
     }
     if (fechaInicio && fechaFin) return `${fmt(fechaInicio)}–${fmt(fechaFin)}`

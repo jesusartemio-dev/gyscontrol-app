@@ -324,14 +324,14 @@ export function TreeNodeForm({
           ? node.data.fechaFinPlan || node.data.fechaFinComercial || ''
           : node.data.fechaFinComercial || ''
 
-        // Convertir ISO string a YYYY-MM-DD en zona local del navegador
+        // Convertir ISO string a YYYY-MM-DD usando UTC para evitar desfase de zona horaria (UTC-5 Perú)
         const toLocalDateString = (dateStr: string): string => {
           if (!dateStr) return ''
           const date = new Date(dateStr)
           if (isNaN(date.getTime())) return ''
-          const year = date.getFullYear()
-          const month = String(date.getMonth() + 1).padStart(2, '0')
-          const day = String(date.getDate()).padStart(2, '0')
+          const year = date.getUTCFullYear()
+          const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+          const day = String(date.getUTCDate()).padStart(2, '0')
           return `${year}-${month}-${day}`
         }
         if (fechaInicio) {
