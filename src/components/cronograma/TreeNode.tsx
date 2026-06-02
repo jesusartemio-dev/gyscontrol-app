@@ -30,6 +30,7 @@ interface TreeNodeProps {
   onAssignResponsable?: () => void
   onAssignRecurso?: () => void
   onDuplicate?: () => void
+  onDuplicarActividad?: () => void
   onAjustarPosicion?: (posicion: 'inicio_padre' | 'despues_ultimo') => void
   dragListeners?: Record<string, Function>
   dragAttributes?: Record<string, any>
@@ -86,6 +87,7 @@ export function TreeNode({
   onAssignResponsable,
   onAssignRecurso,
   onDuplicate,
+  onDuplicarActividad,
   onAjustarPosicion,
   dragListeners,
   dragAttributes,
@@ -540,14 +542,22 @@ export function TreeNode({
               {/* Duplicate option - only for tareas */}
               {!readOnly && node.type === 'tarea' && onDuplicate && (
                 <DropdownMenuItem
-                  onClick={() => {
-                    setDropdownOpen(false)
-                    onDuplicate()
-                  }}
+                  onClick={() => { setDropdownOpen(false); onDuplicate() }}
                   className="text-blue-600"
                 >
                   <Copy className="h-4 w-4 mr-2" />
                   Duplicar Tarea
+                </DropdownMenuItem>
+              )}
+
+              {/* Duplicate actividad with its tasks */}
+              {!readOnly && node.type === 'actividad' && onDuplicarActividad && (
+                <DropdownMenuItem
+                  onClick={() => { setDropdownOpen(false); onDuplicarActividad() }}
+                  className="text-blue-600"
+                >
+                  <Copy className="h-4 w-4 mr-2" />
+                  Duplicar Actividad (con tareas)
                 </DropdownMenuItem>
               )}
 

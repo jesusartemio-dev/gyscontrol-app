@@ -540,6 +540,81 @@ export function ProyectoCronogramaTreeView({
     }
   }
 
+  const handleDuplicarActividad = async (nodeId: string) => {
+    const node = state.nodes.get(nodeId)
+    if (!node || node.type !== 'actividad') return
+
+    const actividadId = nodeId.replace('actividad-', '')
+    const proyectoEdtId = node.parentId?.replace('edt-', '')
+    if (!proyectoEdtId) return
+
+    const fi = node.data.fechaInicioComercial || node.data.fechaInicioPlan
+    const ff = node.data.fechaFinComercial    || node.data.fechaFinPlan
+    if (!fi || !ff) { toast.error('La actividad no tiene fechas definidas'); return }
+
+    const duracionMs = new Date(ff).getTime() - new Date(fi).getTime()
+    const nuevaFechaInicio = new Date(new Date(ff).getTime() + 86400000) // día siguiente al fin
+    const nuevaFechaFin    = new Date(nuevaFechaInicio.getTime() + duracionMs)
+    const fmt = (d: Date) => d.toISOString().split('T')[0]
+
+    try {
+      // 1. Crear nueva actividad
+      const resAct = await fetch(`/api/proyectos/${proyectoId}/cronograma/actividades`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nombre: node.nombre,
+          proyectoEdtId,
+          fechaInicioPlan: fmt(nuevaFechaInicio),
+          fechaFinPlan: fmt(nuevaFechaFin),
+          horasPlan: Number(node.data.horasPlan) || 0,
+          prioridad: node.data.prioridad || 'media',
+        }),
+      })
+      if (!resAct.ok) throw new Error('Error al crear actividad')
+      const { data: nuevaActividad } = await resAct.json()
+
+      // 2. Obtener tareas de la actividad original
+      const resTareas = await fetch(
+        `/api/proyectos/${proyectoId}/cronograma/tareas?proyectoActividadId=${actividadId}`
+      )
+      if (resTareas.ok) {
+        const { data: tareas } = await resTareas.json()
+        const fiOriginalMs = new Date(fi).getTime()
+
+        // 3. Crear cada tarea manteniendo offset relativo
+        for (const tarea of tareas) {
+          const offsetInicio = new Date(tarea.fechaInicio).getTime() - fiOriginalMs
+          const durTarea     = new Date(tarea.fechaFin).getTime() - new Date(tarea.fechaInicio).getTime()
+          const tareaInicio  = new Date(nuevaFechaInicio.getTime() + offsetInicio)
+          const tareaFin     = new Date(tareaInicio.getTime() + durTarea)
+
+          await fetch(`/api/proyectos/${proyectoId}/cronograma/tareas`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              nombre: tarea.nombre,
+              proyectoActividadId: nuevaActividad.id,
+              fechaInicio: fmt(tareaInicio),
+              fechaFin: fmt(tareaFin),
+              horasEstimadas: Number(tarea.horasEstimadas) || 0,
+              personasEstimadas: tarea.personasEstimadas || 1,
+              prioridad: tarea.prioridad || 'media',
+              recursoId: tarea.recursoId || undefined,
+              responsableId: tarea.responsableId || undefined,
+              esExtra: false,
+            }),
+          })
+        }
+      }
+
+      await actions.loadTree([...state.expandedNodes])
+      toast.success(`Actividad "${node.nombre}" duplicada con sus tareas`)
+    } catch {
+      toast.error('No se pudo duplicar la actividad')
+    }
+  }
+
   const handleDeleteCronograma = async () => {
     if (!selectedCronograma) return
 
@@ -604,6 +679,7 @@ export function ProyectoCronogramaTreeView({
                     onEdit={isReadOnly || node.type === 'proyecto' ? undefined : () => handleEditNode(nodeId)}
                     onDelete={isReadOnly || node.type === 'proyecto' ? undefined : () => actions.deleteNode(nodeId)}
                     onDuplicate={!isReadOnly && node.type === 'tarea' ? () => handleDuplicateTarea(nodeId) : undefined}
+                    onDuplicarActividad={!isReadOnly && node.type === 'actividad' ? () => handleDuplicarActividad(nodeId) : undefined}
                     onAjustarPosicion={
                       !isReadOnly && (node.type === 'tarea' || node.type === 'actividad')
                         ? (pos) => handleAjustarPosicion(nodeId, pos)
