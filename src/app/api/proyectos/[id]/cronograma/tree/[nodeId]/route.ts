@@ -201,20 +201,23 @@ export async function PUT(
 
     console.log('✅ [API TREE UPDATE] Nodo actualizado exitosamente:', { nodeType, realId })
 
+    // ✅ Opción A: Cascada de fechas hacia abajo cuando cambia fechaInicio
+    const newFechaInicioRaw = nodeType === 'tarea' ? updateData.fechaInicio : updateData.fechaInicioPlan
+    if (nodeType !== 'tarea' && currentDates.fechaInicio && newFechaInicioRaw) {
+      const deltaDias = Math.round((newFechaInicioRaw.getTime() - currentDates.fechaInicio.getTime()) / 86400000)
+      if (deltaDias !== 0) {
+        await cascadarFechasHaciaAbajo(nodeType, realId, deltaDias)
+      }
+    }
+
     // ✅ GYS-GEN-12: Solo recalcular padres si fechas/horas realmente cambiaron
     const datesChanged = didDatesChange(nodeType, updateData, currentDates)
-    console.log('🔄 [API TREE UPDATE] ¿Fechas cambiaron?', datesChanged)
-
     if (datesChanged) {
-      console.log('🔄 [API TREE UPDATE] Iniciando recálculo de padres para', { nodeType, nodeId, proyectoId: id })
       try {
         await recalcularPadresPostOperacion(id, nodeType, nodeId)
-        console.log('✅ [API TREE UPDATE] Recálculo de padres completado exitosamente')
       } catch (error) {
         logger.error('❌ [API TREE UPDATE] Error en recálculo de padres:', error)
       }
-    } else {
-      console.log('⏭️ [API TREE UPDATE] Sin cambios en fechas/horas, omitiendo recálculo de padres')
     }
 
     return NextResponse.json({
@@ -586,6 +589,60 @@ async function recalcularFasePadre(faseId: string): Promise<void> {
       // Las fases no tienen campo horasPlan en el esquema actual
     }
   })
+}
+
+// ✅ Opción A: Desplazar todas las fechas de los hijos por deltaDias
+async function cascadarFechasHaciaAbajo(nodeType: string, realId: string, deltaDias: number): Promise<void> {
+  const deltaMs = deltaDias * 86400000
+
+  if (nodeType === 'fase') {
+    const edts = await prisma.proyectoEdt.findMany({
+      where: { proyectoFaseId: realId },
+      select: { id: true, fechaInicioPlan: true, fechaFinPlan: true }
+    })
+    for (const edt of edts) {
+      await prisma.proyectoEdt.update({
+        where: { id: edt.id },
+        data: {
+          fechaInicioPlan: edt.fechaInicioPlan ? new Date(edt.fechaInicioPlan.getTime() + deltaMs) : undefined,
+          fechaFinPlan:    edt.fechaFinPlan    ? new Date(edt.fechaFinPlan.getTime()    + deltaMs) : undefined,
+        }
+      })
+      await cascadarFechasHaciaAbajo('edt', edt.id, deltaDias)
+    }
+
+  } else if (nodeType === 'edt') {
+    const actividades = await prisma.proyectoActividad.findMany({
+      where: { proyectoEdtId: realId },
+      select: { id: true, fechaInicioPlan: true, fechaFinPlan: true }
+    })
+    for (const act of actividades) {
+      await prisma.proyectoActividad.update({
+        where: { id: act.id },
+        data: {
+          fechaInicioPlan: act.fechaInicioPlan ? new Date(act.fechaInicioPlan.getTime() + deltaMs) : undefined,
+          fechaFinPlan:    act.fechaFinPlan    ? new Date(act.fechaFinPlan.getTime()    + deltaMs) : undefined,
+        }
+      })
+      await cascadarFechasHaciaAbajo('actividad', act.id, deltaDias)
+    }
+
+  } else if (nodeType === 'actividad') {
+    const tareas = await prisma.proyectoTarea.findMany({
+      where: { proyectoActividadId: realId },
+      select: { id: true, fechaInicio: true, fechaFin: true }
+    })
+    for (const tarea of tareas) {
+      await prisma.proyectoTarea.update({
+        where: { id: tarea.id },
+        data: {
+          fechaInicio: tarea.fechaInicio ? new Date(tarea.fechaInicio.getTime() + deltaMs) : undefined,
+          fechaFin:    tarea.fechaFin    ? new Date(tarea.fechaFin.getTime()    + deltaMs) : undefined,
+        }
+      })
+    }
+  }
+  // Tarea: nodo hoja, nada que cascadar
 }
 
 // ✅ Obtener fechas actuales del nodo antes de actualizar
