@@ -88,8 +88,8 @@ export default function AsistenciaCampoPage() {
       .then(r => r.json())
       .then((u: Ubicacion[]) => setUbicaciones(u.filter((x: any) => x.activo !== false)))
 
-    fetch('/api/proyectos?estado=activo&limit=100')
-      .then(r => r.ok ? r.json() : { proyectos: [] })
+    fetch('/api/proyectos?estadosActivos=true&fields=id,codigo,nombre')
+      .then(r => r.ok ? r.json() : [])
       .then(data => {
         const lista = Array.isArray(data) ? data : (data.proyectos || data.data || [])
         setProyectos(lista.map((p: any) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre })))
@@ -313,12 +313,12 @@ export default function AsistenciaCampoPage() {
               <label className="mb-2 block text-sm font-medium">
                 Proyecto <span className="text-muted-foreground font-normal">(opcional)</span>
               </label>
-              <Select value={proyectoSel} onValueChange={setProyectoSel}>
+              <Select value={proyectoSel || '__none__'} onValueChange={v => setProyectoSel(v === '__none__' ? '' : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecciona proyecto del día" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sin proyecto</SelectItem>
+                  <SelectItem value="__none__">Sin proyecto</SelectItem>
                   {proyectos.map(p => (
                     <SelectItem key={p.id} value={p.id}>
                       <span className="font-mono text-xs text-muted-foreground mr-1">{p.codigo}</span>
