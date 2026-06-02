@@ -30,6 +30,7 @@ const createTareaSchema = z.object({
   responsableId: z.string().optional(),
   recursoId: z.string().optional(),
   posicionamiento: z.enum(['inicio_padre', 'despues_ultima']).optional(),
+  esExtra: z.boolean().optional(),
 })
 
 // ✅ Schema de validación para actualizar tarea
@@ -317,7 +318,7 @@ export async function POST(
       creadoPorId: session.user.id,
       estado: 'pendiente' as const,
       porcentajeCompletado: 0,
-      esExtra: cronograma.tipo === 'ejecucion'
+      esExtra: validatedData.esExtra ?? (cronograma.tipo === 'ejecucion')
     }
 
     console.log('🔍 [API TAREAS] Datos finales para crear tarea:', tareaData)

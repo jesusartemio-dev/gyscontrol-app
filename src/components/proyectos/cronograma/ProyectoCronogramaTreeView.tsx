@@ -393,6 +393,7 @@ export function ProyectoCronogramaTreeView({
           personasEstimadas: node.data.personasEstimadas || 1,
           prioridad: node.data.prioridad || 'media',
           recursoId: node.data.recursoId || undefined,
+          esExtra: false,
         }),
       })
       if (!res.ok) throw new Error('Error al duplicar')
