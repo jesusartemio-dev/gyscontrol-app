@@ -229,7 +229,7 @@ export async function PUT(
     }
 
     // 🔐 Verificar permisos de edición
-    const rolesConAccesoTotal = ['admin', 'gerente'];
+    const rolesConAccesoTotal = ['admin', 'gerente', 'gestor', 'coordinador'];
     const esComercialDelProyecto = proyectoExistente.comercialId === session.user.id;
     const esGestorDelProyecto = proyectoExistente.gestorId === session.user.id;
 
