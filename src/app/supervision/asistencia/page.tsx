@@ -139,7 +139,7 @@ export default function SupervisionAsistencia() {
   const [sortKey, setSortKey] = useState<SortKey>('fechaHora')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
 
-  const [vista, setVista] = useState<'detalle' | 'resumen' | 'por_proyecto' | 'horas_dia'>('detalle')
+  const [vista, setVista] = useState<'detalle' | 'resumen' | 'por_proyecto' | 'horas_dia' | 'ranking'>('detalle')
   const [modoAsistencia, setModoAsistencia] = useState<'todos' | 'campo' | 'remoto' | 'oficina'>('todos')
   const [personasOcultas, setPersonasOcultas] = useState<Set<string>>(new Set())
 
@@ -362,6 +362,32 @@ export default function SupervisionAsistencia() {
         return fd !== 0 ? fd : a.nombre.localeCompare(b.nombre)
       })
   }, [dataFiltrada])
+
+  // Ranking de tardanzas: agrega por persona la tardanza del ingreso de cada día
+  // (en el rango filtrado). Solo incluye a quien tuvo al menos una tardanza.
+  const rankingTardanzas = useMemo(() => {
+    type R = { email: string; nombre: string; dpto: string | null; minutos: number; vecesTarde: number; diasConIngreso: number }
+    const map = new Map<string, R>()
+    for (const r of resumenPorPersona) {
+      if (!r.ingreso) continue
+      let e = map.get(r.email)
+      if (!e) {
+        e = { email: r.email, nombre: r.nombre, dpto: r.dpto, minutos: 0, vecesTarde: 0, diasConIngreso: 0 }
+        map.set(r.email, e)
+      }
+      e.diasConIngreso++
+      e.minutos += r.ingreso.minutosTarde
+      if (r.ingreso.estado === 'tarde' || r.ingreso.estado === 'muy_tarde') e.vecesTarde++
+    }
+    return Array.from(map.values())
+      .map(e => ({
+        ...e,
+        promedio: e.diasConIngreso > 0 ? e.minutos / e.diasConIngreso : 0,
+        pct: e.diasConIngreso > 0 ? e.vecesTarde / e.diasConIngreso : 0,
+      }))
+      .filter(e => e.minutos > 0 || e.vecesTarde > 0)
+      .sort((a, b) => b.minutos - a.minutos || b.vecesTarde - a.vecesTarde)
+  }, [resumenPorPersona])
 
   const horasDiaData = useMemo(() => {
     type DiaEntry = { horasTrabajadas: number | null; ubicacion: string | null; proyectoCodigo: string | null; modo: 'campo' | 'remoto' | 'oficina'; ingresoHora: Date; salidaHora: Date | null }
@@ -705,6 +731,12 @@ export default function SupervisionAsistencia() {
           >
             Horas por día
           </button>
+          <button
+            onClick={() => setVista('ranking')}
+            className={`px-3 py-1.5 transition-colors ${vista === 'ranking' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+          >
+            Ranking
+          </button>
         </div>
         {vista === 'resumen' && (
           <span className="text-xs text-muted-foreground">
@@ -719,6 +751,11 @@ export default function SupervisionAsistencia() {
         {vista === 'horas_dia' && (
           <span className="text-xs text-muted-foreground">
             {horasDiaData.length} persona(s) · horas totales por día según ingreso/salida
+          </span>
+        )}
+        {vista === 'ranking' && (
+          <span className="text-xs text-muted-foreground">
+            Tardanzas acumuladas por persona en el rango · ordenado de mayor a menor
           </span>
         )}
       </div>
@@ -978,6 +1015,56 @@ export default function SupervisionAsistencia() {
           </>
         )
       })()}
+
+      {/* Ranking de tardanzas */}
+      {vista === 'ranking' && (
+        rankingTardanzas.length === 0 ? (
+          <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
+            Sin tardanzas registradas en el período seleccionado.
+          </div>
+        ) : (
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[40px] text-center">#</TableHead>
+                    <TableHead>Persona</TableHead>
+                    <TableHead className="hidden md:table-cell">Dpto.</TableHead>
+                    <TableHead className="text-center">Veces tarde</TableHead>
+                    <TableHead className="text-right">Tardanza acumulada</TableHead>
+                    <TableHead className="text-right hidden sm:table-cell">Promedio/día</TableHead>
+                    <TableHead className="text-right hidden md:table-cell">% días tarde</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rankingTardanzas.map((r, i) => (
+                    <TableRow key={r.email}>
+                      <TableCell className="text-center font-mono text-xs text-muted-foreground">{i + 1}</TableCell>
+                      <TableCell className="font-medium">{r.nombre}</TableCell>
+                      <TableCell className="hidden md:table-cell text-xs text-muted-foreground">{r.dpto || '—'}</TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant="outline" className={r.vecesTarde > 0 ? 'border-amber-400 text-amber-700' : ''}>
+                          {r.vecesTarde}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-mono font-semibold text-amber-700">
+                        {formatearTardanza(Math.round(r.minutos))}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm hidden sm:table-cell text-muted-foreground">
+                        {Math.round(r.promedio)} min
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm hidden md:table-cell text-muted-foreground">
+                        {Math.round(r.pct * 100)}%
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )
+      )}
 
       {/* Tabla detalle */}
       {vista === 'resumen' ? (() => {
