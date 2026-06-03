@@ -295,7 +295,8 @@ export function JornadaFormModal({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             objetivosDia: objetivosDia.trim(),
-            personalPlanificado
+            personalPlanificado,
+            fechaTrabajo
           })
         })
 
@@ -406,21 +407,27 @@ export function JornadaFormModal({
         <div className="space-y-4">
           {/* Proyecto, EDT y Fecha */}
           {isEditing ? (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-600 bg-gray-50 rounded-lg px-3 py-2">
-              <span className="flex items-center gap-1.5">
+            <div className="flex flex-wrap items-center gap-3 bg-gray-50 rounded-lg px-3 py-2">
+              <span className="flex items-center gap-1.5 text-sm text-gray-600">
                 <Building className="h-3.5 w-3.5 text-gray-400" />
                 <span className="font-medium">{jornada.proyecto.codigo}</span>
               </span>
               {jornada.proyectoEdt && (
-                <span className="flex items-center gap-1.5">
+                <span className="flex items-center gap-1.5 text-sm text-gray-600">
                   <FolderOpen className="h-3.5 w-3.5 text-gray-400" />
                   {jornada.proyectoEdt.edt?.nombre ? `${jornada.proyectoEdt.edt.nombre} - ${jornada.proyectoEdt.nombre}` : jornada.proyectoEdt.nombre}
                 </span>
               )}
-              <span className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 ml-auto">
                 <Calendar className="h-3.5 w-3.5 text-gray-400" />
-                {formatFechaCorta(jornada.fechaTrabajo)}
-              </span>
+                <Input
+                  type="date"
+                  value={fechaTrabajo}
+                  onChange={e => setFechaTrabajo(e.target.value)}
+                  disabled={submitting}
+                  className="h-8 w-[150px] text-sm"
+                />
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

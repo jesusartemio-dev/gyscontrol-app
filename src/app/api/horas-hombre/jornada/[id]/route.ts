@@ -234,6 +234,12 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       }
     }
 
+    // Fecha de trabajo: parsear como fecha local (sin desfase UTC)
+    if (body.fechaTrabajo) {
+      const [y, m, d] = String(body.fechaTrabajo).split('-').map(Number)
+      updateData.fechaTrabajo = new Date(y, m - 1, d, 12, 0, 0, 0)
+    }
+
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json(
         { error: 'No se proporcionaron campos para actualizar' },
