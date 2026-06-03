@@ -148,7 +148,20 @@ interface Departamento {
 type DiaHeader = { dateKey: string; d: Date; isHoy: boolean; isWeekend: boolean; isSaturday: boolean; isSunday: boolean }
 
 // ── Drag-extend types ─────────────────────────────────────────────────────────
-type TurnoDia = 'dia_completo'
+type TurnoDia = 'turno_a' | 'turno_b' | 'turno_c' | 'dia_completo'
+type TurnoAsignable = 'turno_a' | 'turno_b' | 'turno_c'
+
+const TURNO_LETRA: Record<string, string> = { turno_a: 'A', turno_b: 'B', turno_c: 'C', dia_completo: 'A' }
+const TURNO_NOMBRE: Record<string, string> = {
+  turno_a: 'Turno A · Día',
+  turno_b: 'Turno B · Tarde/Noche',
+  turno_c: 'Turno C · Noche',
+  dia_completo: 'Día',
+}
+// Normaliza un turno (incluyendo legacy 'dia_completo') a uno asignable A/B/C.
+function turnoAsignable(turno: string): TurnoAsignable {
+  return turno === 'turno_b' || turno === 'turno_c' ? turno : 'turno_a'
+}
 
 // ── Multi-select types ────────────────────────────────────────────────────────
 type SeleccionState =
@@ -287,6 +300,106 @@ function celdaLabel(codigo: string | undefined, textMode: TextMode): string | nu
   return null
 }
 
+// Bloque de un turno dentro de una celda-día (proyecto o ausencia).
+function TurnoBloque({
+  c,
+  showLetra,
+  dimmed,
+  textMode,
+  dragHandleEnabled,
+  onDragHandleMouseDown,
+  onClickProyecto,
+  onClickAusencia,
+}: {
+  c: CeldaEntry
+  showLetra: boolean
+  dimmed: boolean
+  textMode: TextMode
+  dragHandleEnabled: boolean
+  onDragHandleMouseDown?: (e: React.MouseEvent) => void
+  onClickProyecto: () => void
+  onClickAusencia: () => void
+}) {
+  const letra = TURNO_LETRA[c.turno] ?? 'A'
+  const nombreTurno = TURNO_NOMBRE[c.turno] ?? 'Día'
+
+  if (c.tipo === 'ausencia') {
+    const label = textMode === 'none' ? null : (c.ausencia?.codigo ?? 'AUS')
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div
+            className={cn(
+              'relative flex min-h-0 flex-1 items-center justify-center rounded cursor-pointer text-xs font-medium',
+              dimmed && 'opacity-30',
+            )}
+            style={{ background: 'repeating-linear-gradient(45deg, #f3f4f6, #f3f4f6 4px, #e5e7eb 4px, #e5e7eb 8px)' }}
+            onClick={onClickAusencia}
+          >
+            {showLetra && (
+              <span className="absolute left-0 top-0 rounded-br bg-black/30 px-0.5 text-[7px] font-bold leading-tight text-white">{letra}</span>
+            )}
+            {label && <span className="bg-white/80 rounded px-1">{label}</span>}
+            {c.esExcepcional && (
+              <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-amber-400 border border-white" />
+            )}
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-[200px]">
+          <p className="font-medium text-xs">
+            {nombreTurno} — {c.ausencia?.tipo ?? 'Ausencia'}
+            {c.ausencia?.codigo ? ` (${c.ausencia.codigo})` : ''}
+          </p>
+          {c.notas && <p className="text-xs text-muted-foreground mt-0.5">{c.notas}</p>}
+        </TooltipContent>
+      </Tooltip>
+    )
+  }
+
+  const color = c.proyecto?.color ?? '#6b7280'
+  const label = celdaLabel(c.proyecto?.codigo, textMode)
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div
+          className={cn(
+            'group relative flex min-h-0 flex-1 items-center justify-center rounded cursor-pointer text-[10px] font-bold px-0.5 shadow-sm',
+            dimmed && 'opacity-40',
+          )}
+          style={{ backgroundColor: color, color: 'white' }}
+          onClick={onClickProyecto}
+        >
+          {showLetra && (
+            <span className="absolute left-0 top-0 rounded-br bg-black/25 px-0.5 text-[7px] font-bold leading-tight">{letra}</span>
+          )}
+          {label && <span className="truncate drop-shadow-sm">{label}</span>}
+          {c.esExcepcional && (
+            <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-amber-300 border border-white/60" />
+          )}
+          {dragHandleEnabled && onDragHandleMouseDown && (
+            <div
+              className="absolute right-0 top-[15%] bottom-[15%] w-1.5 rounded-r opacity-0 group-hover:opacity-40 cursor-col-resize transition-opacity"
+              style={{ backgroundColor: 'rgba(255,255,255,0.6)' }}
+              onMouseDown={(e) => {
+                e.stopPropagation()
+                e.preventDefault()
+                onDragHandleMouseDown(e)
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+            />
+          )}
+        </div>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-[220px]">
+        <p className="font-medium text-xs">
+          {nombreTurno} · [{c.proyecto?.codigo}] {c.proyecto?.nombre}
+        </p>
+        {c.notas && <p className="text-xs text-muted-foreground mt-0.5">{c.notas}</p>}
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
 function CeldaDia({
   celda,
   dimmed,
@@ -313,8 +426,8 @@ function CeldaDia({
   isSelected?: boolean
   isInSelectionRect?: boolean
   onClickEmpty: () => void
-  onClickProyecto: () => void
-  onClickAusencia: () => void
+  onClickProyecto: (celda: CeldaEntry) => void
+  onClickAusencia: (celda: CeldaEntry) => void
   onDragHandleMouseDown?: (e: React.MouseEvent) => void
   onMouseDownEmpty?: (e: React.MouseEvent) => void
 }) {
@@ -345,76 +458,24 @@ function CeldaDia({
     )
   }
 
-  const c = celda[0]
-
-  if (c.tipo === 'ausencia') {
-    const label = textMode === 'none' ? null : (c.ausencia?.codigo ?? 'AUS')
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div
-            className={cn(
-              'relative flex items-center justify-center h-full rounded cursor-pointer text-xs font-medium',
-              dimmed && 'opacity-30',
-            )}
-            style={{ background: 'repeating-linear-gradient(45deg, #f3f4f6, #f3f4f6 4px, #e5e7eb 4px, #e5e7eb 8px)' }}
-            onClick={onClickAusencia}
-          >
-            {label && <span className="bg-white/80 rounded px-1">{label}</span>}
-            {c.esExcepcional && (
-              <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-amber-400 border border-white" />
-            )}
-          </div>
-        </TooltipTrigger>
-        <TooltipContent side="top" className="max-w-[200px]">
-          <p className="font-medium text-xs">
-            {c.ausencia?.tipo ?? 'Ausencia'}
-            {c.ausencia?.codigo ? ` (${c.ausencia.codigo})` : ''}
-          </p>
-          {c.notas && <p className="text-xs text-muted-foreground mt-0.5">{c.notas}</p>}
-        </TooltipContent>
-      </Tooltip>
-    )
-  }
-
-  const color = c.proyecto?.color ?? '#6b7280'
-  const label = celdaLabel(c.proyecto?.codigo, textMode)
+  // El drag-extend solo aplica cuando hay un único turno en la celda.
+  const single = celda.length === 1
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <div
-          className={cn(
-            'group relative flex items-center justify-center h-full rounded cursor-pointer text-[10px] font-bold px-0.5 shadow-sm',
-            dimmed && 'opacity-40',
-          )}
-          style={{ backgroundColor: color, color: 'white' }}
-          onClick={onClickProyecto}
-        >
-          {label && <span className="truncate drop-shadow-sm">{label}</span>}
-          {c.esExcepcional && (
-            <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-amber-300 border border-white/60" />
-          )}
-          {dragHandleEnabled && onDragHandleMouseDown && (
-            <div
-              className="absolute right-0 top-[15%] bottom-[15%] w-1.5 rounded-r opacity-0 group-hover:opacity-40 cursor-col-resize transition-opacity"
-              style={{ backgroundColor: 'rgba(255,255,255,0.6)' }}
-              onMouseDown={(e) => {
-                e.stopPropagation()
-                e.preventDefault()
-                onDragHandleMouseDown(e)
-              }}
-              onPointerDown={(e) => e.stopPropagation()}
-            />
-          )}
-        </div>
-      </TooltipTrigger>
-      <TooltipContent side="top" className="max-w-[220px]">
-        <p className="font-medium text-xs">
-          [{c.proyecto?.codigo}] {c.proyecto?.nombre}
-        </p>
-        {c.notas && <p className="text-xs text-muted-foreground mt-0.5">{c.notas}</p>}
-      </TooltipContent>
-    </Tooltip>
+    <div className="flex h-full w-full flex-col gap-px">
+      {celda.map((c) => (
+        <TurnoBloque
+          key={c.id}
+          c={c}
+          showLetra={!single || c.turno !== 'turno_a'}
+          dimmed={dimmed}
+          textMode={textMode}
+          dragHandleEnabled={dragHandleEnabled && single}
+          onDragHandleMouseDown={onDragHandleMouseDown}
+          onClickProyecto={() => onClickProyecto(c)}
+          onClickAusencia={() => onClickAusencia(c)}
+        />
+      ))}
+    </div>
   )
 }
 
@@ -653,8 +714,8 @@ function SortablePersonaRow({
               isSelected={isSelected}
               isInSelectionRect={isInSelectionRect}
               onClickEmpty={isDragActive ? () => {} : () => onClickEmpty(dateKey)}
-              onClickProyecto={isDragActive ? () => {} : () => onClickProyecto(dateKey, celdasDia[0])}
-              onClickAusencia={isDragActive ? () => {} : () => onClickAusencia(dateKey, celdasDia[0])}
+              onClickProyecto={isDragActive ? () => {} : (celda) => onClickProyecto(dateKey, celda)}
+              onClickAusencia={isDragActive ? () => {} : (celda) => onClickAusencia(dateKey, celda)}
               onDragHandleMouseDown={handleDragMouseDown}
               onMouseDownEmpty={handleMouseDownEmpty}
             />
@@ -783,7 +844,8 @@ export default function PlanificacionPage() {
     userId: string
     nombre: string
     fecha: string
-    celda?: CeldaEntry
+    celdasDia: CeldaEntry[]
+    turnoInicial: TurnoAsignable
   } | null>(null)
   const [modalAusencia, setModalAusencia] = useState<CeldaEntry | null>(null)
   const [showCopiarModal, setShowCopiarModal] = useState(false)
@@ -1688,14 +1750,21 @@ export default function PlanificacionPage() {
                               setSeleccionState({ type: 'idle' })
                               return
                             }
-                            setModalCelda({ userId: persona.userId, nombre: persona.nombre, fecha })
+                            setModalCelda({ userId: persona.userId, nombre: persona.nombre, fecha, celdasDia: [], turnoInicial: 'turno_a' })
                           }}
                           onClickProyecto={(fecha, celda) => {
                             setSeleccionState({ type: 'idle' })
                             if (isReadOnly) {
                               setModalDetalle({ nombrePersona: persona.nombre, fecha, celda })
                             } else {
-                              setModalCelda({ userId: persona.userId, nombre: persona.nombre, fecha, celda })
+                              const celdasDia = (persona.dias[fecha] ?? []).filter((c) => c.tipo === 'proyecto')
+                              setModalCelda({
+                                userId: persona.userId,
+                                nombre: persona.nombre,
+                                fecha,
+                                celdasDia,
+                                turnoInicial: turnoAsignable(celda.turno),
+                              })
                             }
                           }}
                           onClickAusencia={(fecha, celda) => {
@@ -1835,7 +1904,8 @@ export default function PlanificacionPage() {
             userId={modalCelda.userId}
             userName={modalCelda.nombre}
             fecha={modalCelda.fecha}
-            celdaExistente={modalCelda.celda}
+            celdasDia={modalCelda.celdasDia}
+            turnoInicial={modalCelda.turnoInicial}
           />
         )}
 

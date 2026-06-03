@@ -34,8 +34,17 @@ interface Props {
   celdas: CeldaMasiva[]
 }
 
+type TurnoVal = 'turno_a' | 'turno_b' | 'turno_c'
+const TURNO_LABELS: Record<TurnoVal, string> = {
+  turno_a: 'Turno A · Día',
+  turno_b: 'Turno B · Tarde/Noche',
+  turno_c: 'Turno C · Noche',
+}
+const TURNOS: TurnoVal[] = ['turno_a', 'turno_b', 'turno_c']
+
 export default function AsignacionMasivaModal({ open, onClose, onDone, celdas }: Props) {
   const [proyectoId, setProyectoId] = useState('')
+  const [turno, setTurno] = useState<TurnoVal>('turno_a')
   const [notas, setNotas] = useState('')
   const [esExcepcional, setEsExcepcional] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -53,6 +62,7 @@ export default function AsignacionMasivaModal({ open, onClose, onDone, celdas }:
   useEffect(() => {
     if (!open) {
       setProyectoId('')
+      setTurno('turno_a')
       setNotas('')
       setEsExcepcional(false)
       return
@@ -78,7 +88,7 @@ export default function AsignacionMasivaModal({ open, onClose, onDone, celdas }:
         return {
           userId,
           fecha,
-          turno: 'dia_completo' as const,
+          turno,
           proyectoId,
           esExcepcional: isWeekend ? esExcepcional : false,
           notas: notas.trim() || null,
@@ -146,6 +156,20 @@ export default function AsignacionMasivaModal({ open, onClose, onDone, celdas }:
         </p>
 
         <div className="space-y-4 mt-1">
+          <div className="space-y-1.5">
+            <Label>Turno</Label>
+            <Select value={turno} onValueChange={(v) => setTurno(v as TurnoVal)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TURNOS.map((t) => (
+                  <SelectItem key={t} value={t}>{TURNO_LABELS[t]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="space-y-1.5">
             <Label>
               Proyecto <span className="text-destructive">*</span>

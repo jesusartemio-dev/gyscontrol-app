@@ -4,8 +4,9 @@ export type PrismaTx = Omit<
   PrismaClient,
   '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
 >
-// Solo dia_completo está habilitado; turno_a/b/c/noche están en el enum DB pero pendientes de definición
-export type TurnoDia = 'dia_completo'
+// Turnos habilitados: A (día), B (tarde/noche), C (noche). 'dia_completo' es legacy
+// (migrado a turno_a) y se mantiene en el tipo solo por compatibilidad de datos antiguos.
+export type TurnoDia = 'turno_a' | 'turno_b' | 'turno_c' | 'dia_completo'
 
 export interface ValidacionError {
   codigo: string
@@ -23,10 +24,6 @@ export interface ValidacionResult {
 }
 
 const ESTADOS_INACTIVOS = ['cerrado', 'pausado', 'cancelado']
-
-function turnosConflicto(turno: TurnoDia): TurnoDia[] {
-  return ['dia_completo']
-}
 
 /**
  * Valida si una celda de planificación puede crearse/actualizarse.
@@ -91,14 +88,14 @@ export async function validarAsignacion(
     })
   }
 
-  // 4. Conflicto con ausencia aprobada/en_curso (celdas con solicitudAusenciaId)
+  // 4. Conflicto con ausencia aprobada/en_curso (celdas con solicitudAusenciaId).
+  // Una ausencia cubre el día completo, así que bloquea cualquier turno (A/B/C).
   if (errores.length === 0) {
     const ausenciaCell = await tx.planificacionDia.findFirst({
       where: {
         userId,
         fecha,
         solicitudAusenciaId: { not: null },
-        turno: { in: turnosConflicto(turno) },
       },
       include: {
         solicitudAusencia: {

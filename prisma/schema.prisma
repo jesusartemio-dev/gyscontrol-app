@@ -5538,13 +5538,13 @@ enum EstadoSolicitudAusencia {
 
 // Turno del día — compartido por SolicitudAusencia y PlanificacionDia
 enum TurnoDia {
-  dia_completo
+  dia_completo // legacy — migrado a turno_a; ya no se usa para nuevas celdas
   am          // deprecated — no usar; existe por compatibilidad histórica
   pm          // deprecated — no usar
-  turno_a     // pendiente — requiere definir horarios reales y reglas antes de habilitar
-  turno_b     // pendiente
-  turno_c     // pendiente
-  turno_noche // pendiente — probablemente redundante con turno_c
+  turno_a     // Día (turno por defecto)
+  turno_b     // Tarde / Noche
+  turno_c     // Noche
+  turno_noche // deprecated — usar turno_c
 }
 
 model TipoAusencia {
@@ -5684,7 +5684,7 @@ model PlanificacionDia {
   id                  String   @id @default(cuid())
   userId              String
   fecha               DateTime @db.Date
-  turno               TurnoDia @default(dia_completo)
+  turno               TurnoDia @default(turno_a)
 
   proyectoId          String? // asignación productiva a proyecto
   solicitudAusenciaId String? // ausencia materializada al aprobar SolicitudAusencia

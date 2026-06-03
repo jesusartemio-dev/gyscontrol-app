@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { toast } from 'sonner'
-import { X, Save, Trash2, Loader2 } from 'lucide-react'
+import { X, Save, Trash2, Loader2, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -36,6 +36,8 @@ interface ProyectoActivo {
   estado: string
 }
 
+type TurnoVal = 'turno_a' | 'turno_b' | 'turno_c'
+
 interface Props {
   open: boolean
   onClose: () => void
@@ -43,23 +45,29 @@ interface Props {
   userId: string
   userName: string
   fecha: string
-  celdaExistente?: CeldaEntry
+  /** Celdas de proyecto ya asignadas ese día (uno por turno). */
+  celdasDia?: CeldaEntry[]
+  /** Turno a preseleccionar al abrir. */
+  turnoInicial?: TurnoVal
 }
 
 const FormSchema = z.object({
   proyectoId: z.string().min(1, 'Seleccione un proyecto'),
-  turno: z.enum(['dia_completo']),
+  turno: z.enum(['turno_a', 'turno_b', 'turno_c']),
   esExcepcional: z.boolean(),
   notas: z.string().max(200).optional(),
 })
 
 type FormValues = z.infer<typeof FormSchema>
 
-const TURNO_LABELS: Record<string, string> = {
-  dia_completo: 'Día completo',
+const TURNO_LABELS: Record<TurnoVal, string> = {
+  turno_a: 'Turno A · Día',
+  turno_b: 'Turno B · Tarde/Noche',
+  turno_c: 'Turno C · Noche',
 }
+const TURNOS: TurnoVal[] = ['turno_a', 'turno_b', 'turno_c']
 
-export default function AsignacionCeldaModal({ open, onClose, onSaved, userId, userName, fecha, celdaExistente }: Props) {
+export default function AsignacionCeldaModal({ open, onClose, onSaved, userId, userName, fecha, celdasDia, turnoInicial }: Props) {
   const [proyectos, setProyectos] = useState<ProyectoActivo[]>([])
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -68,7 +76,9 @@ export default function AsignacionCeldaModal({ open, onClose, onSaved, userId, u
   const isWeekend = fechaDate.getUTCDay() === 0 || fechaDate.getUTCDay() === 6
   const fechaLabel = format(fechaDate, "EEEE d 'de' MMMM yyyy", { locale: es })
 
-  const isEditing = Boolean(celdaExistente)
+  // Solo las celdas de proyecto (las ausencias se editan en otro modal).
+  const celdasProyecto = (celdasDia ?? []).filter((c) => c.tipo === 'proyecto')
+  const celdaDeTurno = (t: string) => celdasProyecto.find((c) => c.turno === t)
 
   const {
     register,
@@ -87,15 +97,18 @@ export default function AsignacionCeldaModal({ open, onClose, onSaved, userId, u
         : FormSchema
     ),
     defaultValues: {
-      proyectoId: celdaExistente?.proyecto?.id ?? '',
-      turno: (celdaExistente?.turno as FormValues['turno']) ?? 'dia_completo',
-      esExcepcional: celdaExistente?.esExcepcional ?? isWeekend,
-      notas: celdaExistente?.notas ?? '',
+      proyectoId: '',
+      turno: turnoInicial ?? 'turno_a',
+      esExcepcional: isWeekend,
+      notas: '',
     },
   })
 
   const proyectoId = watch('proyectoId')
   const esExcepcional = watch('esExcepcional')
+  const turnoSel = watch('turno')
+  const celdaExistente = celdaDeTurno(turnoSel)
+  const isEditing = Boolean(celdaExistente)
 
   useEffect(() => {
     if (!open) return
@@ -105,15 +118,28 @@ export default function AsignacionCeldaModal({ open, onClose, onSaved, userId, u
       .catch(() => toast.error('No se pudieron cargar los proyectos'))
   }, [open])
 
+  // Al abrir, cargar el turno inicial y su celda (si existe).
   useEffect(() => {
     if (!open) return
+    const t = turnoInicial ?? 'turno_a'
+    const existente = celdaDeTurno(t)
     reset({
-      proyectoId: celdaExistente?.proyecto?.id ?? '',
-      turno: (celdaExistente?.turno as FormValues['turno']) ?? 'dia_completo',
-      esExcepcional: celdaExistente?.esExcepcional ?? isWeekend,
-      notas: celdaExistente?.notas ?? '',
+      proyectoId: existente?.proyecto?.id ?? '',
+      turno: t,
+      esExcepcional: existente?.esExcepcional ?? isWeekend,
+      notas: existente?.notas ?? '',
     })
-  }, [open, celdaExistente, isWeekend, reset])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, turnoInicial, fecha])
+
+  // Cambiar de turno carga la asignación de ese turno (o lo deja en blanco).
+  const cambiarTurno = (t: TurnoVal) => {
+    const existente = celdaDeTurno(t)
+    setValue('turno', t)
+    setValue('proyectoId', existente?.proyecto?.id ?? '')
+    setValue('esExcepcional', existente?.esExcepcional ?? isWeekend)
+    setValue('notas', existente?.notas ?? '')
+  }
 
   const onSubmit = handleSubmit(async (values) => {
     setSaving(true)
@@ -196,6 +222,28 @@ export default function AsignacionCeldaModal({ open, onClose, onSaved, userId, u
         <form onSubmit={onSubmit}>
           <div className="space-y-5 px-6 py-5">
             <div className="space-y-1.5">
+              <Label>Turno</Label>
+              <Select value={turnoSel} onValueChange={(v) => cambiarTurno(v as TurnoVal)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TURNOS.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      <span className="flex items-center gap-2">
+                        {TURNO_LABELS[t]}
+                        {celdaDeTurno(t) && <Check className="h-3 w-3 text-emerald-600" />}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                Una persona puede tener un proyecto por turno el mismo día. ✓ = turno ya asignado.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
               <Label>Proyecto <span className="text-destructive">*</span></Label>
               <Select value={proyectoId} onValueChange={(v) => setValue('proyectoId', v)}>
                 <SelectTrigger>
@@ -215,20 +263,6 @@ export default function AsignacionCeldaModal({ open, onClose, onSaved, userId, u
               {errors.proyectoId && (
                 <p className="text-xs text-destructive">{errors.proyectoId.message}</p>
               )}
-            </div>
-
-            <div className="space-y-1.5">
-              <Label>Turno</Label>
-              <Select value={watch('turno')} onValueChange={(v) => setValue('turno', v as FormValues['turno'])}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(TURNO_LABELS).map(([val, label]) => (
-                    <SelectItem key={val} value={val}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
 
             {isWeekend && (
