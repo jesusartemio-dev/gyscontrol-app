@@ -98,6 +98,10 @@ export default function AsistenciaCampoPage() {
   const [dialogHorario, setDialogHorario] = useState(false)
   const [horarioForm, setHorarioForm] = useState({ horaIngresoOverride: '', horaSalidaOverride: '', motivoOverride: '' })
   const [guardandoHorario, setGuardandoHorario] = useState(false)
+  const [dialogTransferir, setDialogTransferir] = useState(false)
+  const [transferSel, setTransferSel] = useState('')
+  const [transferConJornada, setTransferConJornada] = useState(true)
+  const [transfiriendo, setTransfiriendo] = useState(false)
 
   useEffect(() => {
     if (status !== 'authenticated') return
@@ -252,6 +256,48 @@ export default function AsistenciaCampoPage() {
       setDialogHorario(false)
     } finally {
       setGuardandoHorario(false)
+    }
+  }
+
+  function abrirTransferir() {
+    if (!jornada) return
+    setTransferSel('')
+    setTransferConJornada(true)
+    // Cargar el equipo del proyecto (si lo hay) + el resto de usuarios.
+    const pid = jornada.proyectoId
+    fetch(`/api/asistencia/jornada/responsables${pid ? `?proyectoId=${pid}` : ''}`)
+      .then(r => r.ok ? r.json() : { equipo: [], otros: [] })
+      .then((d: { equipo: UsuarioOpt[]; otros: UsuarioOpt[] }) => {
+        setEquipoUsuarios(d.equipo ?? [])
+        setOtrosUsuarios(d.otros ?? [])
+      })
+      .catch(() => {})
+    setDialogTransferir(true)
+  }
+
+  async function transferirAsistencia() {
+    if (!jornada || !transferSel) return
+    setTransfiriendo(true)
+    try {
+      const r = await fetch(`/api/asistencia/jornada/${jornada.id}/transferir`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ supervisorId: transferSel, transferirJornada: transferConJornada }),
+      })
+      const data = await r.json()
+      if (!r.ok) {
+        toast.error(data.error || 'No se pudo transferir la asistencia')
+        return
+      }
+      toast.success(`Asistencia transferida a ${data.responsable?.name || data.responsable?.email}`)
+      setDialogTransferir(false)
+      setJornada(null)
+      setQrImg('')
+      setAsistencias([])
+    } catch {
+      toast.error('No se pudo transferir la asistencia')
+    } finally {
+      setTransfiriendo(false)
     }
   }
 
@@ -476,6 +522,15 @@ export default function AsistenciaCampoPage() {
                 Horario excepcional (Turno B)
               </Button>
               <Button
+                variant="outline"
+                size="sm"
+                className="mt-2 w-full"
+                onClick={abrirTransferir}
+              >
+                <Users className="mr-2 h-4 w-4" />
+                Transferir asistencia
+              </Button>
+              <Button
                 variant="destructive"
                 className="mt-2 w-full"
                 onClick={cerrarJornada}
@@ -629,6 +684,69 @@ export default function AsistenciaCampoPage() {
             <Button onClick={guardarHorario} disabled={guardandoHorario}>
               {guardandoHorario && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Transferir asistencia */}
+      <Dialog open={dialogTransferir} onOpenChange={setDialogTransferir}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Transferir asistencia de campo</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Pasa el control de esta asistencia a otra persona (por ejemplo, si debes
+              retirarte). El nuevo responsable verá la asistencia activa, el QR y los marcajes
+              en su pantalla, y tú dejarás de verla.
+            </p>
+            <div>
+              <label className="mb-2 block text-sm font-medium">Transferir a</label>
+              <Select value={transferSel} onValueChange={setTransferSel}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona persona" />
+                </SelectTrigger>
+                <SelectContent>
+                  {equipoUsuarios.filter(u => u.id !== miId).length > 0 && (
+                    <SelectGroup>
+                      <SelectLabel>Equipo del proyecto</SelectLabel>
+                      {equipoUsuarios.filter(u => u.id !== miId).map(u => (
+                        <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
+                      ))}
+                    </SelectGroup>
+                  )}
+                  <SelectGroup>
+                    <SelectLabel>Otros usuarios</SelectLabel>
+                    {otrosUsuarios.filter(u => u.id !== miId).map(u => (
+                      <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+            {jornada?.registroHorasCampoId && (
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 rounded border-border"
+                  checked={transferConJornada}
+                  onChange={e => setTransferConJornada(e.target.checked)}
+                />
+                <span>
+                  También transferir la <span className="font-medium">jornada de trabajo</span>
+                  {' '}(horas, tareas y avance) a esta persona, para que la procese en su Mi Jornada.
+                </span>
+              </label>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogTransferir(false)} disabled={transfiriendo}>
+              Cancelar
+            </Button>
+            <Button onClick={transferirAsistencia} disabled={!transferSel || transfiriendo}>
+              {transfiriendo && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Transferir
             </Button>
           </DialogFooter>
         </DialogContent>
