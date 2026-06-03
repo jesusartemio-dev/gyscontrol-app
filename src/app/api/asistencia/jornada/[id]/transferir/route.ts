@@ -7,9 +7,9 @@ import crypto from 'crypto'
 const ROLES_ADMIN = ['admin', 'gestor', 'coordinador']
 
 // PATCH /api/asistencia/jornada/[id]/transferir
-// Transfiere la asistencia de campo (JornadaAsistencia: QR + marcaje) a otra
-// persona, p. ej. cuando quien la abrió debe retirarse. Opcionalmente transfiere
-// también la jornada de trabajo asociada (RegistroHorasCampo).
+// Transfiere SOLO la asistencia de campo (JornadaAsistencia: QR + marcaje) a otra
+// persona, p. ej. cuando quien la abrió debe retirarse. La jornada de trabajo
+// (RegistroHorasCampo) se reasigna por separado y de forma independiente.
 // Lo puede hacer el dueño actual de la asistencia o un rol admin/gestor/coordinador.
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions)
@@ -20,7 +20,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params
   const body = await req.json().catch(() => ({}))
   const nuevoId = String(body.supervisorId || '')
-  const transferirJornada = body.transferirJornada !== false // por defecto true
   if (!nuevoId) {
     return NextResponse.json({ error: 'Debe indicar a quién transferir' }, { status: 400 })
   }
@@ -69,23 +68,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     )
   }
 
-  let jornadaTransferida = false
   await prisma.$transaction(async (tx) => {
     await tx.jornadaAsistencia.update({ where: { id }, data: { supervisorId: nuevoId } })
-
-    if (transferirJornada && jornada.registroHorasCampoId) {
-      const rhc = await tx.registroHorasCampo.findUnique({
-        where: { id: jornada.registroHorasCampoId },
-        select: { estado: true },
-      })
-      if (rhc && rhc.estado !== 'aprobado') {
-        await tx.registroHorasCampo.update({
-          where: { id: jornada.registroHorasCampoId },
-          data: { supervisorId: nuevoId },
-        })
-        jornadaTransferida = true
-      }
-    }
 
     await tx.auditLog.create({
       data: {
@@ -94,11 +78,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         entidadId: id,
         accion: 'asistencia.transferida',
         usuarioId: session.user.id,
-        descripcion: `Asistencia transferida a ${nuevo.name || nuevo.email}${jornadaTransferida ? ' (incluida la jornada de trabajo)' : ''}`,
-        cambios: JSON.stringify({ de: jornada.supervisorId, a: nuevoId, transferirJornada }),
+        descripcion: `Asistencia transferida a ${nuevo.name || nuevo.email}`,
+        cambios: JSON.stringify({ de: jornada.supervisorId, a: nuevoId }),
       },
     })
   })
 
-  return NextResponse.json({ ok: true, responsable: nuevo, jornadaTransferida })
+  return NextResponse.json({ ok: true, responsable: nuevo })
 }

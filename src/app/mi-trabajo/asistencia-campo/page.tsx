@@ -100,7 +100,6 @@ export default function AsistenciaCampoPage() {
   const [guardandoHorario, setGuardandoHorario] = useState(false)
   const [dialogTransferir, setDialogTransferir] = useState(false)
   const [transferSel, setTransferSel] = useState('')
-  const [transferConJornada, setTransferConJornada] = useState(true)
   const [transfiriendo, setTransfiriendo] = useState(false)
 
   useEffect(() => {
@@ -262,7 +261,6 @@ export default function AsistenciaCampoPage() {
   function abrirTransferir() {
     if (!jornada) return
     setTransferSel('')
-    setTransferConJornada(true)
     // Cargar el equipo del proyecto (si lo hay) + el resto de usuarios.
     const pid = jornada.proyectoId
     fetch(`/api/asistencia/jornada/responsables${pid ? `?proyectoId=${pid}` : ''}`)
@@ -282,7 +280,7 @@ export default function AsistenciaCampoPage() {
       const r = await fetch(`/api/asistencia/jornada/${jornada.id}/transferir`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ supervisorId: transferSel, transferirJornada: transferConJornada }),
+        body: JSON.stringify({ supervisorId: transferSel }),
       })
       const data = await r.json()
       if (!r.ok) {
@@ -697,9 +695,11 @@ export default function AsistenciaCampoPage() {
           </DialogHeader>
           <div className="space-y-3">
             <p className="text-xs text-muted-foreground">
-              Pasa el control de esta asistencia a otra persona (por ejemplo, si debes
-              retirarte). El nuevo responsable verá la asistencia activa, el QR y los marcajes
-              en su pantalla, y tú dejarás de verla.
+              Pasa el control de <span className="font-medium">esta asistencia</span> (QR y marcajes)
+              a otra persona, por ejemplo si debes retirarte. El nuevo responsable la verá activa
+              en su pantalla y tú dejarás de verla. La <span className="font-medium">jornada de
+              trabajo</span> (horas, tareas y avance) no se mueve aquí: se reasigna por separado
+              desde <span className="font-medium">Mi Jornada</span>.
             </p>
             <div>
               <label className="mb-2 block text-sm font-medium">Transferir a</label>
@@ -725,20 +725,6 @@ export default function AsistenciaCampoPage() {
                 </SelectContent>
               </Select>
             </div>
-            {jornada?.registroHorasCampoId && (
-              <label className="flex items-start gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  className="mt-0.5 h-4 w-4 rounded border-border"
-                  checked={transferConJornada}
-                  onChange={e => setTransferConJornada(e.target.checked)}
-                />
-                <span>
-                  También transferir la <span className="font-medium">jornada de trabajo</span>
-                  {' '}(horas, tareas y avance) a esta persona, para que la procese en su Mi Jornada.
-                </span>
-              </label>
-            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogTransferir(false)} disabled={transfiriendo}>

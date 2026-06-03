@@ -20,6 +20,16 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { useSession } from 'next-auth/react'
+import {
   Plus,
   HardHat,
   Loader2,
@@ -129,6 +139,15 @@ export default function MiJornadaPage() {
   const [reabriendo, setReabriendo] = useState<string | null>(null)
   const [eliminandoRechazada, setEliminandoRechazada] = useState<string | null>(null)
 
+  // Reasignar jornada a otra persona (desde el detalle).
+  const { data: session } = useSession()
+  const miId = (session?.user as { id?: string } | undefined)?.id ?? ''
+  type UsuarioOpt = { id: string; name: string | null; email: string }
+  const [usuariosEquipo, setUsuariosEquipo] = useState<UsuarioOpt[]>([])
+  const [usuariosOtros, setUsuariosOtros] = useState<UsuarioOpt[]>([])
+  const [reasignarSel, setReasignarSel] = useState('')
+  const [reasignando, setReasignando] = useState(false)
+
   const cargarJornadas = useCallback(async () => {
     try {
       setLoading(true)
@@ -226,6 +245,45 @@ export default function MiJornadaPage() {
     } finally {
       setEliminandoRechazada(null)
       setEliminarJornadaId(null)
+    }
+  }
+
+  // Cargar usuarios (equipo del proyecto + otros) al abrir el detalle.
+  useEffect(() => {
+    if (!detalleModalOpen || !jornadaDetalle) {
+      setReasignarSel('')
+      return
+    }
+    fetch(`/api/asistencia/jornada/responsables?proyectoId=${jornadaDetalle.proyecto.id}`)
+      .then(r => (r.ok ? r.json() : { equipo: [], otros: [] }))
+      .then((d: { equipo: UsuarioOpt[]; otros: UsuarioOpt[] }) => {
+        setUsuariosEquipo(d.equipo ?? [])
+        setUsuariosOtros(d.otros ?? [])
+      })
+      .catch(() => {})
+  }, [detalleModalOpen, jornadaDetalle])
+
+  const reasignarJornada = async () => {
+    if (!jornadaDetalle || !reasignarSel) return
+    setReasignando(true)
+    try {
+      const res = await fetch(`/api/horas-hombre/jornada/${jornadaDetalle.id}/reasignar`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ supervisorId: reasignarSel }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast({ variant: 'destructive', title: 'Error', description: data.error ?? 'No se pudo reasignar' })
+        return
+      }
+      toast({ title: 'Jornada reasignada', description: `Nuevo responsable: ${data.responsable?.name || data.responsable?.email}` })
+      setDetalleModalOpen(false)
+      cargarJornadas()
+    } catch {
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo reasignar la jornada' })
+    } finally {
+      setReasignando(false)
     }
   }
 
@@ -359,6 +417,44 @@ export default function MiJornadaPage() {
                 </div>
                 {getEstadoBadge(jornadaDetalle.estado)}
               </div>
+
+              {/* Reasignar jornada a otra persona */}
+              {jornadaDetalle.estado !== 'aprobado' && (
+                <div className="flex flex-col gap-2 rounded-lg border border-dashed border-blue-200 bg-blue-50/40 px-3 py-2.5">
+                  <div>
+                    <span className="text-xs font-medium text-blue-800 sm:text-sm">Reasignar esta jornada</span>
+                    <p className="text-[11px] text-gray-500">
+                      Dejará de aparecerte y pasará al Mi Jornada de la persona elegida para que la procese (horas, tareas y avance).
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Select value={reasignarSel} onValueChange={setReasignarSel}>
+                      <SelectTrigger className="h-8 flex-1">
+                        <SelectValue placeholder="Elegir responsable..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {usuariosEquipo.filter(u => u.id !== miId).length > 0 && (
+                          <SelectGroup>
+                            <SelectLabel>Equipo del proyecto</SelectLabel>
+                            {usuariosEquipo.filter(u => u.id !== miId).map(u => (
+                              <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
+                            ))}
+                          </SelectGroup>
+                        )}
+                        <SelectGroup>
+                          <SelectLabel>Otros usuarios</SelectLabel>
+                          {usuariosOtros.filter(u => u.id !== miId).map(u => (
+                            <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                    <Button size="sm" onClick={reasignarJornada} disabled={!reasignarSel || reasignando}>
+                      {reasignando ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Reasignar'}
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-3 gap-2 sm:flex sm:items-center sm:gap-4 text-xs sm:text-sm">
                 <div className="flex items-center gap-1 justify-center sm:justify-start bg-blue-50 sm:bg-transparent rounded-lg py-2 sm:py-0">

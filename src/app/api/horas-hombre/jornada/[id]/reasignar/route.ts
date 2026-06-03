@@ -16,9 +16,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   }
-  if (!ROLES_REASIGNAR.includes(session.user.role || '')) {
-    return NextResponse.json({ error: 'No tienes permiso para reasignar jornadas' }, { status: 403 })
-  }
 
   const { id } = await params
   const body = await req.json().catch(() => ({}))
@@ -33,6 +30,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   })
   if (!jornada) {
     return NextResponse.json({ error: 'Jornada no encontrada' }, { status: 404 })
+  }
+  // Puede reasignar: el dueño actual de la jornada (desde Mi Jornada) o un rol
+  // de supervisión (admin/gestor/coordinador).
+  const esDueno = jornada.supervisorId === session.user.id
+  const esAdmin = ROLES_REASIGNAR.includes(session.user.role || '')
+  if (!esDueno && !esAdmin) {
+    return NextResponse.json({ error: 'No tienes permiso para reasignar esta jornada' }, { status: 403 })
   }
   if (jornada.estado === 'aprobado') {
     return NextResponse.json({ error: 'No se puede reasignar una jornada ya aprobada' }, { status: 400 })
