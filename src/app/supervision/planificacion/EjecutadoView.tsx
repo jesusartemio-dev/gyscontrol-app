@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { abreviarNombre } from '@/lib/planificacion/format'
+import { MatrizDiaCompacta, type GrupoMatriz } from '@/components/planificacion/MatrizDiaCompacta'
 
 interface ProyectoDia {
   codigo: string
@@ -33,17 +34,6 @@ interface Props {
   busqueda: string
 }
 
-// Mismo set de colores y anchos que la vista Planificado, para que ambos tabs
-// compartan el mismo lenguaje visual (franja vertical de departamento, grid
-// compacto continuo y columna de total a la derecha).
-const DEPT_STYLES = [
-  { stripe: '#3b82f6', rowEven: 'bg-blue-50/20', rowOdd: 'bg-blue-50/50' },
-  { stripe: '#10b981', rowEven: 'bg-emerald-50/20', rowOdd: 'bg-emerald-50/50' },
-  { stripe: '#f59e0b', rowEven: 'bg-amber-50/20', rowOdd: 'bg-amber-50/50' },
-  { stripe: '#8b5cf6', rowEven: 'bg-violet-50/20', rowOdd: 'bg-violet-50/50' },
-  { stripe: '#ef4444', rowEven: 'bg-rose-50/20', rowOdd: 'bg-rose-50/50' },
-]
-
 // Algo más anchas que en Planificado porque la celda muestra horas ("8h30m").
 function colWidthPx(n: number): number {
   if (n <= 1) return 56
@@ -52,28 +42,11 @@ function colWidthPx(n: number): number {
   return 34
 }
 
-function gridTemplate(numDias: number, n: number): string {
-  return `12px 220px repeat(${numDias}, minmax(${colWidthPx(n)}px, 1fr)) 64px`
-}
-
 function fmtH(h: number) {
   if (h === 0) return ''
   const hh = Math.floor(h)
   const mm = Math.round((h - hh) * 60)
   return mm === 0 ? `${hh}h` : `${hh}h${mm}m`
-}
-
-function formatDiaHeader(dateStr: string): { linea1: string; linea2: string; isWeekend: boolean; isSaturday: boolean; isSunday: boolean } {
-  const d = new Date(dateStr + 'T12:00:00Z')
-  const dow = d.getUTCDay()
-  const dias = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá']
-  return {
-    linea1: dias[dow],
-    linea2: String(d.getUTCDate()).padStart(2, '0'),
-    isWeekend: dow === 0 || dow === 6,
-    isSaturday: dow === 6,
-    isSunday: dow === 0,
-  }
 }
 
 // ── Celda de un día ────────────────────────────────────────────────────────
@@ -172,22 +145,18 @@ export function EjecutadoView({ semanaInicio, numSemanas, departamentosSeleccion
 
   useEffect(() => { cargar() }, [cargar])
 
-  const hoyKey = useMemo(() => new Date().toISOString().slice(0, 10), [])
-  const gridCols = useMemo(() => gridTemplate(dias.length, numSemanas), [dias.length, numSemanas])
-  const minWidth = 12 + 220 + dias.length * colWidthPx(numSemanas) + 64
-
   const q = busqueda.trim().toLowerCase()
   const personasFiltradas = q ? personas.filter((p) => p.nombre.toLowerCase().includes(q)) : personas
 
   // Agrupar por departamento conservando el orden de aparición.
-  const grupos = useMemo(() => {
+  const grupos = useMemo<GrupoMatriz<PersonaEjecutada>[]>(() => {
     const map = new Map<string, PersonaEjecutada[]>()
     for (const p of personasFiltradas) {
       const dept = p.departamento || 'Sin área'
       if (!map.has(dept)) map.set(dept, [])
       map.get(dept)!.push(p)
     }
-    return Array.from(map.entries())
+    return Array.from(map.entries()).map(([dept, ps]) => ({ dept, personas: ps }))
   }, [personasFiltradas])
 
   if (loading) {
@@ -209,154 +178,59 @@ export function EjecutadoView({ semanaInicio, numSemanas, departamentosSeleccion
   }
 
   return (
-    <div className="overflow-x-auto">
-      <div style={{ minWidth: `${minWidth}px` }}>
-        {/* Sub-cabecera de semanas (solo multi-semana) */}
-        {numSemanas > 1 && (
-          <div style={{ display: 'grid', gridTemplateColumns: gridCols }} className="text-[10px] font-semibold text-muted-foreground border-b bg-muted/20">
-            <div />
-            <div />
-            {Array.from({ length: numSemanas }, (_, wi) => {
-              const monday = new Date(semanaInicio + 'T00:00:00.000Z')
-              monday.setUTCDate(monday.getUTCDate() + wi * 7)
-              const sunday = new Date(monday.getTime() + 6 * 86400000)
-              const label = `${monday.getUTCDate()} – ${sunday.getUTCDate()} ${sunday.toLocaleDateString('es', { month: 'short', timeZone: 'UTC' })}`
-              return (
-                <div key={wi} className="col-span-7 text-center py-0.5 border-r last:border-r-0 leading-tight">
-                  {label}
-                </div>
-              )
-            })}
-            <div />
-          </div>
+    <div className="space-y-3">
+      <MatrizDiaCompacta<PersonaEjecutada>
+        dias={dias}
+        grupos={grupos}
+        getKey={(p) => p.userId}
+        colWidthPx={colWidthPx(numSemanas)}
+        weekSubHeader={{ semanaInicio, numSemanas }}
+        totalHeader="Total"
+        renderNombre={(p) => (
+          <p className="text-xs font-medium truncate leading-none" title={p.nombre}>
+            {abreviarNombre(p.nombre)}
+          </p>
         )}
-
-        {/* Cabecera de días */}
-        <div style={{ display: 'grid', gridTemplateColumns: gridCols }} className="text-xs font-medium text-muted-foreground border-b mb-0.5 pb-1">
-          <div />
-          <div className="px-3">Persona</div>
-          {dias.map((dStr) => {
-            const { linea1, linea2, isHoy, isSaturday, isSunday } = {
-              ...formatDiaHeader(dStr),
-              isHoy: dStr === hoyKey,
+        renderCelda={(p, dStr) => <DiaCelda dato={p.dias[dStr]} />}
+        renderTotal={(p) => {
+          let aprob = 0
+          let pend = 0
+          for (const dStr of dias) {
+            const dd = p.dias[dStr]
+            if (dd) {
+              for (const pr of dd.proyectos) {
+                aprob += pr.horasAprobadas
+                pend += pr.horasPendientes
+              }
             }
-            return (
-              <div
-                key={dStr}
-                className={cn(
-                  'text-center px-0.5 rounded truncate font-semibold leading-tight',
-                  isSaturday && 'text-orange-500 bg-orange-50/60',
-                  isSunday && 'text-red-500 bg-red-50/60',
-                  isHoy && 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-l-2 border-blue-500',
-                )}
-              >
-                <div>{linea1}</div>
-                <div className="font-mono">{linea2}</div>
-              </div>
-            )
-          })}
-          <div className="text-center">Total</div>
-        </div>
-
-        {/* Grupos por departamento */}
-        {grupos.map(([dept, gPersonas], grupoIdx) => {
-          const deptStyle = DEPT_STYLES[grupoIdx % DEPT_STYLES.length]
+          }
           return (
-            <div key={dept} className="relative">
-              {/* Etiqueta vertical de departamento (rotada) */}
-              <div
-                className="absolute left-0 top-0 bottom-0 flex items-center justify-center overflow-hidden pointer-events-none z-10"
-                style={{ width: 12, backgroundColor: deptStyle.stripe, writingMode: 'vertical-lr', transform: 'rotate(180deg)' }}
-              >
-                <span className="text-[7px] font-bold uppercase tracking-widest text-white select-none whitespace-nowrap px-0.5">
-                  {dept}
-                </span>
-              </div>
-
-              {gPersonas.map((persona, personaIdx) => {
-                // Total de horas de la persona en el período.
-                let totalAprob = 0
-                let totalPend = 0
-                for (const dStr of dias) {
-                  const dd = persona.dias[dStr]
-                  if (dd) {
-                    for (const p of dd.proyectos) {
-                      totalAprob += p.horasAprobadas
-                      totalPend += p.horasPendientes
-                    }
-                  }
-                }
-                return (
-                  <div
-                    key={persona.userId}
-                    style={{ display: 'grid', gridTemplateColumns: gridCols }}
-                    className={cn(
-                      'min-h-[30px] border-b items-stretch hover:brightness-95',
-                      personaIdx % 2 === 0 ? deptStyle.rowEven : deptStyle.rowOdd,
-                    )}
-                  >
-                    {/* Franja de color del departamento */}
-                    <div className="self-stretch" style={{ backgroundColor: deptStyle.stripe, opacity: 0.15 }} />
-
-                    {/* Nombre */}
-                    <div className="flex items-center px-2 overflow-hidden">
-                      <p className="text-xs font-medium truncate leading-none" title={persona.nombre}>
-                        {abreviarNombre(persona.nombre)}
-                      </p>
-                    </div>
-
-                    {/* Celdas por día */}
-                    {dias.map((dStr) => {
-                      const { isSaturday, isSunday } = formatDiaHeader(dStr)
-                      const isHoy = dStr === hoyKey
-                      return (
-                        <div
-                          key={dStr}
-                          className={cn(
-                            'relative flex items-center justify-center px-0.5 py-0.5',
-                            isSaturday && 'bg-orange-100/30',
-                            isSunday && 'bg-red-100/30',
-                            isHoy && 'border-l-2 border-blue-500',
-                          )}
-                        >
-                          <DiaCelda dato={persona.dias[dStr]} />
-                        </div>
-                      )
-                    })}
-
-                    {/* Total de horas */}
-                    <div className="flex flex-col items-center justify-center leading-none">
-                      {totalAprob > 0 ? (
-                        <span className="text-xs font-bold text-emerald-700">{fmtH(totalAprob)}</span>
-                      ) : (
-                        <span className="text-xs font-medium text-muted-foreground">—</span>
-                      )}
-                      {totalPend > 0 && (
-                        <span className="text-[10px] font-medium text-amber-700">{fmtH(totalPend)}⏳</span>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
+            <>
+              {aprob > 0 ? (
+                <span className="text-xs font-bold text-emerald-700">{fmtH(aprob)}</span>
+              ) : (
+                <span className="text-xs font-medium text-muted-foreground">—</span>
+              )}
+              {pend > 0 && <span className="text-[10px] font-medium text-amber-700">{fmtH(pend)}⏳</span>}
+            </>
           )
-        })}
+        }}
+      />
 
-        {/* Leyenda */}
-        <div className="flex flex-wrap gap-4 text-xs text-muted-foreground pt-3">
-          <span className="flex items-center gap-1.5">
-            <span className="rounded px-1 text-[10px] font-bold text-white" style={{ backgroundColor: '#10b981' }}>8h</span> Horas aprobadas
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="rounded px-1 text-[10px] font-bold text-white ring-1 ring-amber-400" style={{ backgroundColor: '#10b981' }}>8h⏳</span> Con horas pendientes
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="inline-block h-2 w-2 rounded-full bg-blue-400/60" /> Asistió sin jornada
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="opacity-40 rounded px-1 text-[10px] font-semibold text-white bg-gray-400">CÓD</span> Planificado sin registro
-          </span>
-        </div>
+      {/* Leyenda */}
+      <div className="flex flex-wrap gap-4 text-xs text-muted-foreground pt-1">
+        <span className="flex items-center gap-1.5">
+          <span className="rounded px-1 text-[10px] font-bold text-white" style={{ backgroundColor: '#10b981' }}>8h</span> Horas aprobadas
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="rounded px-1 text-[10px] font-bold text-white ring-1 ring-amber-400" style={{ backgroundColor: '#10b981' }}>8h⏳</span> Con horas pendientes
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-2 w-2 rounded-full bg-blue-400/60" /> Asistió sin jornada
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="opacity-40 rounded px-1 text-[10px] font-semibold text-white bg-gray-400">CÓD</span> Planificado sin registro
+        </span>
       </div>
     </div>
   )

@@ -20,6 +20,7 @@ import { Loader2, ShieldCheck, FileSpreadsheet, Trash2, Search, ArrowUp, ArrowDo
 import * as XLSX from 'xlsx'
 import { toast } from 'sonner'
 import { formatearTardanza } from '@/lib/utils/formatTardanza'
+import { MatrizDiaCompacta, FranjaDepartamento, DEPT_STYLES, type GrupoMatriz } from '@/components/planificacion/MatrizDiaCompacta'
 
 interface Fila {
   id: string
@@ -785,70 +786,82 @@ export default function SupervisionAsistencia() {
               )
             })()}
 
-            {/* Tabla */}
-            <Card>
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Persona</TableHead>
-                      <TableHead>Dpto.</TableHead>
-                      <TableHead>Proyecto</TableHead>
-                      <TableHead className="text-center">Jornadas</TableHead>
-                      <TableHead className="text-center hidden md:table-cell">Días c/ingreso</TableHead>
-                      <TableHead className="text-right">H. aprobadas</TableHead>
-                      <TableHead className="text-right">H. pendientes</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {porProyectoData.map(persona => {
-                      const fmtH = (h: number) => { if (h === 0) return '—'; const hh = Math.floor(h); const mm = Math.round((h - hh) * 60); return mm === 0 ? `${hh}h` : `${hh}h ${mm}m` }
-                      return persona.proyectos.map((proy, pi) => (
-                        <TableRow key={`${persona.userId}-${proy.proyectoId}`}>
-                          {pi === 0 && (
-                            <TableCell rowSpan={persona.proyectos.length} className="align-top font-medium border-r">
-                              {persona.nombre}
-                            </TableCell>
-                          )}
-                          {pi === 0 && (
-                            <TableCell rowSpan={persona.proyectos.length} className="align-top text-xs text-muted-foreground border-r">
-                              {persona.departamento || '—'}
-                            </TableCell>
-                          )}
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <span className="inline-block h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: proy.color }} />
-                              <span className="font-mono text-xs text-muted-foreground">{proy.codigo}</span>
-                              <span className="text-sm truncate max-w-[200px]">{proy.nombre}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <Badge variant="outline" className="font-mono text-xs">{proy.jornadas}</Badge>
-                          </TableCell>
-                          <TableCell className="text-center hidden md:table-cell">
-                            {pi === 0 ? (
-                              persona.diasConAsistencia > 0
-                                ? <Badge variant="outline" className="font-mono text-xs border-blue-400 text-blue-700">{persona.diasConAsistencia}d</Badge>
-                                : <span className="text-xs text-muted-foreground">—</span>
-                            ) : null}
-                          </TableCell>
-                          <TableCell className="text-right font-mono text-sm">
-                            {proy.horasAprobadas > 0
-                              ? <span className="text-emerald-700 font-semibold">{fmtH(proy.horasAprobadas)}</span>
-                              : <span className="text-muted-foreground text-xs">—</span>}
-                          </TableCell>
-                          <TableCell className="text-right font-mono text-sm">
-                            {proy.horasPendientes > 0
-                              ? <span className="text-amber-700">{fmtH(proy.horasPendientes)}</span>
-                              : <span className="text-muted-foreground text-xs">—</span>}
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    })}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+            {/* Tabla agrupada por departamento (franja vertical) */}
+            {(() => {
+              const fmtH = (h: number) => { if (h === 0) return '—'; const hh = Math.floor(h); const mm = Math.round((h - hh) * 60); return mm === 0 ? `${hh}h` : `${hh}h ${mm}m` }
+              const gruposPP: Array<{ dept: string; personas: typeof porProyectoData }> = []
+              for (const p of porProyectoData) {
+                const dept = p.departamento || 'Sin área'
+                let g = gruposPP.find(x => x.dept === dept)
+                if (!g) { g = { dept, personas: [] }; gruposPP.push(g) }
+                g.personas.push(p)
+              }
+              return (
+                <div className="space-y-3">
+                  {gruposPP.map((grupo, gi) => (
+                    <div key={grupo.dept} className="relative">
+                      <FranjaDepartamento nombre={grupo.dept} color={DEPT_STYLES[gi % DEPT_STYLES.length].stripe} />
+                      <Card className="ml-3">
+                        <CardContent className="p-0">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Persona</TableHead>
+                                <TableHead>Proyecto</TableHead>
+                                <TableHead className="text-center">Jornadas</TableHead>
+                                <TableHead className="text-center hidden md:table-cell">Días c/ingreso</TableHead>
+                                <TableHead className="text-right">H. aprobadas</TableHead>
+                                <TableHead className="text-right">H. pendientes</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {grupo.personas.map(persona => (
+                                persona.proyectos.map((proy, pi) => (
+                                  <TableRow key={`${persona.userId}-${proy.proyectoId}`}>
+                                    {pi === 0 && (
+                                      <TableCell rowSpan={persona.proyectos.length} className="align-top font-medium border-r">
+                                        {persona.nombre}
+                                      </TableCell>
+                                    )}
+                                    <TableCell>
+                                      <div className="flex items-center gap-2">
+                                        <span className="inline-block h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: proy.color }} />
+                                        <span className="font-mono text-xs text-muted-foreground">{proy.codigo}</span>
+                                        <span className="text-sm truncate max-w-[200px]">{proy.nombre}</span>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                      <Badge variant="outline" className="font-mono text-xs">{proy.jornadas}</Badge>
+                                    </TableCell>
+                                    <TableCell className="text-center hidden md:table-cell">
+                                      {pi === 0 ? (
+                                        persona.diasConAsistencia > 0
+                                          ? <Badge variant="outline" className="font-mono text-xs border-blue-400 text-blue-700">{persona.diasConAsistencia}d</Badge>
+                                          : <span className="text-xs text-muted-foreground">—</span>
+                                      ) : null}
+                                    </TableCell>
+                                    <TableCell className="text-right font-mono text-sm">
+                                      {proy.horasAprobadas > 0
+                                        ? <span className="text-emerald-700 font-semibold">{fmtH(proy.horasAprobadas)}</span>
+                                        : <span className="text-muted-foreground text-xs">—</span>}
+                                    </TableCell>
+                                    <TableCell className="text-right font-mono text-sm">
+                                      {proy.horasPendientes > 0
+                                        ? <span className="text-amber-700">{fmtH(proy.horasPendientes)}</span>
+                                        : <span className="text-muted-foreground text-xs">—</span>}
+                                    </TableCell>
+                                  </TableRow>
+                                ))
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  ))}
+                </div>
+              )
+            })()}
             <p className="text-xs text-muted-foreground text-center">
               Aprobadas: jornadas de campo aprobadas · Pendientes: iniciadas o en revisión
             </p>
@@ -862,7 +875,6 @@ export default function SupervisionAsistencia() {
         const dCur = new Date(desde + 'T12:00:00Z')
         const dFin = new Date(hasta + 'T12:00:00Z')
         while (dCur <= dFin) { diasEnRango.push(dCur.toISOString().slice(0, 10)); dCur.setUTCDate(dCur.getUTCDate() + 1) }
-        const DIAS_LABEL = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá']
 
         const fmtTime = (d: Date) => d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Lima' })
 
@@ -872,101 +884,90 @@ export default function SupervisionAsistencia() {
           </div>
         )
 
+        // Agrupar por departamento (horasDiaData ya viene ordenado por dpto y nombre).
+        const visibles = horasDiaData.filter(p => !personasOcultas.has(p.email))
+        const gruposHoras: GrupoMatriz<typeof visibles[0]>[] = []
+        for (const p of visibles) {
+          const dept = p.dpto || 'Sin área'
+          let g = gruposHoras.find(x => x.dept === dept)
+          if (!g) { g = { dept, personas: [] }; gruposHoras.push(g) }
+          g.personas.push(p)
+        }
+
         return (
           <>
-            <div className="overflow-x-auto rounded-lg border bg-card shadow-sm">
-              <table className="w-full border-collapse text-sm" style={{ minWidth: `${280 + diasEnRango.length * 92}px` }}>
-                <thead>
-                  <tr className="border-b bg-muted/30">
-                    <th className="sticky left-0 z-10 bg-muted/30 text-left px-3 py-2 font-medium text-xs text-muted-foreground w-[180px]">Persona</th>
-                    <th className="sticky left-[180px] z-10 bg-muted/30 text-left px-2 py-2 font-medium text-xs text-muted-foreground w-[100px] border-r">Dpto.</th>
-                    {diasEnRango.map(d => {
-                      const dt = new Date(d + 'T12:00:00Z')
-                      const dow = dt.getUTCDay()
-                      const isWeekend = dow === 0 || dow === 6
-                      return (
-                        <th key={d} className={`text-center px-1 py-1.5 font-medium text-xs w-[92px] ${isWeekend ? 'text-muted-foreground/40' : 'text-muted-foreground'}`}>
-                          <div>{DIAS_LABEL[dow]}</div>
-                          <div className="font-mono">{String(dt.getUTCDate()).padStart(2, '0')}</div>
-                        </th>
-                      )
-                    })}
-                  </tr>
-                </thead>
-                <tbody>
-                  {horasDiaData.filter(p => !personasOcultas.has(p.email)).map((persona, pi) => (
-                    <tr key={persona.email} className={`border-b last:border-b-0 ${pi % 2 === 0 ? 'bg-background' : 'bg-muted/10'}`}>
-                      <td className={`sticky left-0 z-10 px-3 py-1.5 text-sm ${pi % 2 === 0 ? 'bg-background' : 'bg-muted/10'}`}>
-                        <div className="flex items-center justify-between gap-1 group">
-                          <span className="font-medium">{persona.nombre}</span>
-                          <button
-                            onClick={() => setPersonasOcultas(prev => new Set([...prev, persona.email]))}
-                            title="Ocultar fila"
-                            className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity text-xs leading-none px-0.5"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      </td>
-                      <td className={`sticky left-[180px] z-10 px-2 py-1.5 text-xs text-muted-foreground border-r ${pi % 2 === 0 ? 'bg-background' : 'bg-muted/10'}`}>
-                        {persona.dpto || '—'}
-                      </td>
-                      {diasEnRango.map(dStr => {
-                        const dt = new Date(dStr + 'T12:00:00Z')
-                        const dow = dt.getUTCDay()
-                        const isWeekend = dow === 0 || dow === 6
-                        const dia = persona.dias.get(dStr)
+            <MatrizDiaCompacta<typeof visibles[0]>
+              dias={diasEnRango}
+              grupos={gruposHoras}
+              getKey={p => p.email}
+              nameColWidthPx={170}
+              colWidthPx={74}
+              rowMinHeightClass="min-h-[48px]"
+              totalHeader="Total"
+              renderNombre={p => (
+                <div className="flex items-center justify-between gap-1 w-full group">
+                  <span className="text-xs font-medium truncate" title={p.nombre}>{p.nombre}</span>
+                  <button
+                    onClick={() => setPersonasOcultas(prev => new Set([...prev, p.email]))}
+                    title="Ocultar fila"
+                    className="shrink-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity text-xs leading-none px-0.5"
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+              renderCelda={(persona, dStr) => {
+                const dia = persona.dias.get(dStr)
+                if (!dia) return <span className="text-muted-foreground/30 text-xs">—</span>
 
-                        if (!dia) return (
-                          <td key={dStr} className={`text-center px-1 py-1.5 ${isWeekend ? 'bg-muted/20' : ''}`}>
-                            <span className="text-muted-foreground/30 text-xs">—</span>
-                          </td>
-                        )
+                const modoBadge = dia.modo === 'campo'
+                  ? 'bg-orange-100 text-orange-700'
+                  : dia.modo === 'remoto'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'bg-gray-100 text-gray-600'
+                const modoLabel = dia.modo === 'campo' ? 'Campo' : dia.modo === 'remoto' ? 'Remoto' : 'Oficina'
 
-                        const modoBadge = dia.modo === 'campo'
-                          ? 'bg-orange-100 text-orange-700'
-                          : dia.modo === 'remoto'
-                          ? 'bg-blue-100 text-blue-700'
-                          : 'bg-gray-100 text-gray-600'
-                        const modoLabel = dia.modo === 'campo' ? 'Campo' : dia.modo === 'remoto' ? 'Remoto' : 'Oficina'
-
-                        // Preferir el código de proyecto de la jornada (ej. "CJM48"); si no
-                        // hay proyecto asignado, caer al nombre corto de la ubicación.
-                        const etiquetaCorta = dia.proyectoCodigo
-                          ?? (dia.ubicacion ? dia.ubicacion.split('-')[0].trim() : null)
-                        return (
-                          <td key={dStr} className={`px-1 py-1 text-center ${isWeekend ? 'bg-muted/20' : ''}`}>
-                            <div className="flex flex-col items-center gap-0.5 justify-center">
-                              <span className="text-[9px] text-muted-foreground font-mono leading-none whitespace-nowrap">
-                                ↑{fmtTime(dia.ingresoHora)}{' '}
-                                {dia.salidaHora
-                                  ? <span>↓{fmtTime(dia.salidaHora)}</span>
-                                  : <span className="text-amber-500">↓–</span>}
-                              </span>
-                              {dia.horasTrabajadas != null ? (
-                                <span className={`text-[12px] font-bold leading-none ${
-                                  dia.horasTrabajadas < 4 ? 'text-red-600' :
-                                  dia.horasTrabajadas >= 8 ? 'text-emerald-700' : 'text-amber-700'
-                                }`}>
-                                  {fmtHoras(dia.horasTrabajadas)}
-                                </span>
-                              ) : null}
-                              <span
-                                className={`text-[8px] rounded px-1 leading-tight ${modoBadge}`}
-                                title={[dia.proyectoCodigo, dia.ubicacion].filter(Boolean).join(' · ') || undefined}
-                              >
-                                {etiquetaCorta ? `${etiquetaCorta} · ${modoLabel}` : modoLabel}
-                              </span>
-                            </div>
-                          </td>
-                        )
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="flex flex-wrap gap-4 text-xs text-muted-foreground pt-1">
+                // Preferir el código de proyecto de la jornada (ej. "CJM48"); si no
+                // hay proyecto asignado, caer al nombre corto de la ubicación.
+                const etiquetaCorta = dia.proyectoCodigo
+                  ?? (dia.ubicacion ? dia.ubicacion.split('-')[0].trim() : null)
+                return (
+                  <div className="flex flex-col items-center gap-0.5 justify-center">
+                    <span className="text-[9px] text-muted-foreground font-mono leading-none whitespace-nowrap">
+                      ↑{fmtTime(dia.ingresoHora)}{' '}
+                      {dia.salidaHora
+                        ? <span>↓{fmtTime(dia.salidaHora)}</span>
+                        : <span className="text-amber-500">↓–</span>}
+                    </span>
+                    {dia.horasTrabajadas != null ? (
+                      <span className={`text-[12px] font-bold leading-none ${
+                        dia.horasTrabajadas < 4 ? 'text-red-600' :
+                        dia.horasTrabajadas >= 8 ? 'text-emerald-700' : 'text-amber-700'
+                      }`}>
+                        {fmtHoras(dia.horasTrabajadas)}
+                      </span>
+                    ) : null}
+                    <span
+                      className={`text-[8px] rounded px-1 leading-tight truncate max-w-full ${modoBadge}`}
+                      title={[dia.proyectoCodigo, dia.ubicacion].filter(Boolean).join(' · ') || undefined}
+                    >
+                      {etiquetaCorta ? `${etiquetaCorta} · ${modoLabel}` : modoLabel}
+                    </span>
+                  </div>
+                )
+              }}
+              renderTotal={persona => {
+                let total = 0
+                for (const dStr of diasEnRango) {
+                  const dia = persona.dias.get(dStr)
+                  if (dia?.horasTrabajadas != null) total += dia.horasTrabajadas
+                }
+                return total > 0
+                  ? <span className="text-xs font-bold text-emerald-700">{fmtHoras(total)}</span>
+                  : <span className="text-xs font-medium text-muted-foreground">—</span>
+              }}
+            />
+            <div className="flex flex-wrap gap-4 text-xs text-muted-foreground pt-3">
               <span className="flex items-center gap-1.5"><span className="font-bold text-emerald-700">8h+</span> Jornada completa</span>
               <span className="flex items-center gap-1.5"><span className="font-bold text-amber-700">4–8h</span> Jornada parcial</span>
               <span className="flex items-center gap-1.5"><span className="font-bold text-red-600">&lt;4h</span> Jornada corta</span>
@@ -994,98 +995,84 @@ export default function SupervisionAsistencia() {
         }
         const personas = Array.from(personaMap.values()).sort((a, b) => (a.dpto || '').localeCompare(b.dpto || '') || a.nombre.localeCompare(b.nombre))
 
-        const DIAS_LABEL = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá']
-
         if (personas.length === 0) return (
           <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">Sin registros en el rango seleccionado.</div>
         )
 
+        // Agrupar por departamento (personas ya viene ordenado por dpto y nombre).
+        const gruposResumen: GrupoMatriz<typeof personas[0]>[] = []
+        for (const p of personas) {
+          const dept = p.dpto || 'Sin área'
+          let g = gruposResumen.find(x => x.dept === dept)
+          if (!g) { g = { dept, personas: [] }; gruposResumen.push(g) }
+          g.personas.push(p)
+        }
+
         return (
-          <div className="overflow-x-auto rounded-lg border bg-card shadow-sm">
-            <table className="w-full border-collapse text-sm" style={{ minWidth: `${280 + diasEnRango.length * 92}px` }}>
-              <thead>
-                <tr className="border-b bg-muted/30">
-                  <th className="sticky left-0 z-10 bg-muted/30 text-left px-3 py-2 font-medium text-xs text-muted-foreground w-[180px]">Persona</th>
-                  <th className="sticky left-[180px] z-10 bg-muted/30 text-left px-2 py-2 font-medium text-xs text-muted-foreground w-[100px] border-r">Dpto.</th>
-                  {diasEnRango.map(d => {
-                    const dt = new Date(d + 'T12:00:00Z')
-                    const dow = dt.getUTCDay()
-                    const isWeekend = dow === 0 || dow === 6
-                    return (
-                      <th key={d} className={`text-center px-1 py-1.5 font-medium text-xs w-[92px] ${isWeekend ? 'text-muted-foreground/40' : 'text-muted-foreground'}`}>
-                        <div>{DIAS_LABEL[dow]}</div>
-                        <div className="font-mono">{String(dt.getUTCDate()).padStart(2, '0')}</div>
-                      </th>
-                    )
-                  })}
-                </tr>
-              </thead>
-              <tbody>
-                {personas.map((persona, pi) => (
-                  <tr key={persona.nombre + pi} className={`border-b last:border-b-0 ${pi % 2 === 0 ? 'bg-background' : 'bg-muted/10'}`}>
-                    <td className={`sticky left-0 z-10 px-3 py-1.5 font-medium text-sm ${pi % 2 === 0 ? 'bg-background' : 'bg-muted/10'}`}>
-                      {persona.nombre}
-                    </td>
-                    <td className={`sticky left-[180px] z-10 px-2 py-1.5 text-xs text-muted-foreground border-r ${pi % 2 === 0 ? 'bg-background' : 'bg-muted/10'}`}>
-                      {persona.dpto || '—'}
-                    </td>
-                    {diasEnRango.map(dStr => {
-                      const dt = new Date(dStr + 'T12:00:00Z')
-                      const dow = dt.getUTCDay()
-                      const isWeekend = dow === 0 || dow === 6
-                      const r = persona.dias.get(dStr)
+          <MatrizDiaCompacta<typeof personas[0]>
+            dias={diasEnRango}
+            grupos={gruposResumen}
+            getKey={p => p.nombre + (p.dpto ?? '')}
+            nameColWidthPx={170}
+            colWidthPx={62}
+            rowMinHeightClass="min-h-[56px]"
+            totalHeader="Total"
+            renderNombre={p => (
+              <span className="text-xs font-medium truncate" title={p.nombre}>{p.nombre}</span>
+            )}
+            renderCelda={(persona, dStr) => {
+              const r = persona.dias.get(dStr)
+              if (!r) return <span className="text-muted-foreground/30 text-xs">—</span>
 
-                      if (!r) return (
-                        <td key={dStr} className={`text-center px-1 py-1.5 ${isWeekend ? 'bg-muted/20' : ''}`}>
-                          <span className="text-muted-foreground/30 text-xs">—</span>
-                        </td>
-                      )
+              const estadoBg = !r.ingreso ? 'bg-muted/40' :
+                r.ingreso.estado === 'a_tiempo' ? 'bg-emerald-50' :
+                r.ingreso.estado === 'tarde' ? 'bg-amber-50' :
+                r.ingreso.estado === 'muy_tarde' ? 'bg-red-50' : ''
 
-                      const estadoBg = !r.ingreso ? 'bg-muted/30' :
-                        r.ingreso.estado === 'a_tiempo' ? 'bg-emerald-50' :
-                        r.ingreso.estado === 'tarde' ? 'bg-amber-50' :
-                        r.ingreso.estado === 'muy_tarde' ? 'bg-red-50' : ''
-
-                      return (
-                        <td key={dStr} className={`px-1 py-1.5 text-center ${isWeekend ? 'bg-muted/20' : estadoBg}`}>
-                          <div className="flex flex-col items-center gap-0.5 min-h-[52px] justify-center">
-                            {r.ingreso ? (
-                              <span className={`font-mono text-xs font-semibold leading-none ${
-                                r.ingreso.estado === 'a_tiempo' ? 'text-emerald-700' :
-                                r.ingreso.estado === 'tarde' ? 'text-amber-700' : 'text-red-700'
-                              }`}>
-                                {fmtTime(r.ingreso.hora)}
-                              </span>
-                            ) : (
-                              <span className="text-[10px] text-muted-foreground/50">sin ing.</span>
-                            )}
-                            {r.salida ? (
-                              <span className="font-mono text-xs text-muted-foreground leading-none">
-                                {fmtTime(r.salida.hora)}{r.salida.esAutoCierre ? '·auto' : ''}
-                              </span>
-                            ) : (
-                              <span className="text-[10px] text-amber-600 leading-none">sin sal.</span>
-                            )}
-                            {r.horasTrabajadas != null ? (
-                              <span className={`text-[11px] font-bold leading-none mt-0.5 ${
-                                r.horasTrabajadas < 4 ? 'text-red-600' :
-                                r.horasTrabajadas >= 8 ? 'text-emerald-700' : 'text-amber-700'
-                              }`}>
-                                {fmtHoras(r.horasTrabajadas)}
-                              </span>
-                            ) : null}
-                            {r.ingreso && r.ingreso.minutosTarde > 0 && (
-                              <span className="text-[9px] text-amber-600 leading-none">+{r.ingreso.minutosTarde}m</span>
-                            )}
-                          </div>
-                        </td>
-                      )
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              return (
+                <div className={`flex h-full w-full flex-col items-center justify-center gap-0.5 rounded py-0.5 ${estadoBg}`}>
+                  {r.ingreso ? (
+                    <span className={`font-mono text-xs font-semibold leading-none ${
+                      r.ingreso.estado === 'a_tiempo' ? 'text-emerald-700' :
+                      r.ingreso.estado === 'tarde' ? 'text-amber-700' : 'text-red-700'
+                    }`}>
+                      {fmtTime(r.ingreso.hora)}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-muted-foreground/50">sin ing.</span>
+                  )}
+                  {r.salida ? (
+                    <span className="font-mono text-xs text-muted-foreground leading-none">
+                      {fmtTime(r.salida.hora)}{r.salida.esAutoCierre ? '·auto' : ''}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-amber-600 leading-none">sin sal.</span>
+                  )}
+                  {r.horasTrabajadas != null ? (
+                    <span className={`text-[11px] font-bold leading-none mt-0.5 ${
+                      r.horasTrabajadas < 4 ? 'text-red-600' :
+                      r.horasTrabajadas >= 8 ? 'text-emerald-700' : 'text-amber-700'
+                    }`}>
+                      {fmtHoras(r.horasTrabajadas)}
+                    </span>
+                  ) : null}
+                  {r.ingreso && r.ingreso.minutosTarde > 0 && (
+                    <span className="text-[9px] text-amber-600 leading-none">+{r.ingreso.minutosTarde}m</span>
+                  )}
+                </div>
+              )
+            }}
+            renderTotal={persona => {
+              let total = 0
+              for (const dStr of diasEnRango) {
+                const r = persona.dias.get(dStr)
+                if (r?.horasTrabajadas != null) total += r.horasTrabajadas
+              }
+              return total > 0
+                ? <span className="text-xs font-bold text-emerald-700">{fmtHoras(total)}</span>
+                : <span className="text-xs font-medium text-muted-foreground">—</span>
+            }}
+          />
         )
       })() : vista === 'detalle' ? (
       <Card>
