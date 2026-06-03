@@ -26,6 +26,18 @@ export async function POST(req: Request) {
 
   const proyectoId: string | null = body.proyectoId || null
 
+  // Responsable de la jornada de trabajo (RegistroHorasCampo): por defecto el
+  // creador, pero puede asignarse a otra persona. El creador queda en creadoPorId
+  // y sigue siendo dueño de la asistencia/QR (JornadaAsistencia.supervisorId).
+  let responsableId: string = session.user.id
+  if (body.responsableId && body.responsableId !== session.user.id) {
+    const existe = await prisma.user.findUnique({ where: { id: body.responsableId }, select: { id: true } })
+    if (!existe) {
+      return NextResponse.json({ message: 'El responsable seleccionado no existe' }, { status: 400 })
+    }
+    responsableId = body.responsableId
+  }
+
   // Buscar jornada existente del día para esta ubicación
   const existente = await prisma.jornadaAsistencia.findUnique({
     where: {
@@ -88,7 +100,7 @@ export async function POST(req: Request) {
       const rhc = await tx.registroHorasCampo.create({
         data: {
           proyectoId,
-          supervisorId: session.user.id,
+          supervisorId: responsableId,
           creadoPorId: session.user.id,
           fechaTrabajo: fecha,
           estado: 'iniciado',

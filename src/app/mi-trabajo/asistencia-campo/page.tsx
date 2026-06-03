@@ -8,7 +8,9 @@ import { Badge } from '@/components/ui/badge'
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
@@ -71,6 +73,13 @@ export default function AsistenciaCampoPage() {
   const [ubicacionSel, setUbicacionSel] = useState('')
   const [proyectoSel, setProyectoSel] = useState('')
 
+  // Responsable de la jornada (RegistroHorasCampo). Por defecto el creador.
+  type UsuarioOpt = { id: string; name: string | null; email: string }
+  const miId = session?.user?.id ?? ''
+  const [responsableSel, setResponsableSel] = useState('')
+  const [equipoUsuarios, setEquipoUsuarios] = useState<UsuarioOpt[]>([])
+  const [otrosUsuarios, setOtrosUsuarios] = useState<UsuarioOpt[]>([])
+
   // Proyectos filtrados por el cliente de la ubicación seleccionada
   const clienteIdUbicacion = ubicaciones.find(u => u.id === ubicacionSel)?.clienteId ?? null
   const proyectosFiltrados = clienteIdUbicacion
@@ -114,6 +123,27 @@ export default function AsistenciaCampoPage() {
         }
       })
   }, [status])
+
+  // Responsable por defecto = el creador (usuario actual).
+  useEffect(() => {
+    if (miId && !responsableSel) setResponsableSel(miId)
+  }, [miId, responsableSel])
+
+  // Al elegir proyecto, cargar el equipo del proyecto + el resto de usuarios.
+  useEffect(() => {
+    if (!proyectoSel) {
+      setEquipoUsuarios([])
+      setOtrosUsuarios([])
+      return
+    }
+    fetch(`/api/asistencia/jornada/responsables?proyectoId=${proyectoSel}`)
+      .then(r => r.ok ? r.json() : { equipo: [], otros: [] })
+      .then((d: { equipo: UsuarioOpt[]; otros: UsuarioOpt[] }) => {
+        setEquipoUsuarios(d.equipo ?? [])
+        setOtrosUsuarios(d.otros ?? [])
+      })
+      .catch(() => {})
+  }, [proyectoSel])
 
   // Poll token cada 10s y live cada 5s
   useEffect(() => {
@@ -173,6 +203,7 @@ export default function AsistenciaCampoPage() {
           latitud: coords.latitud,
           longitud: coords.longitud,
           proyectoId: proyectoSel || undefined,
+          responsableId: proyectoSel ? (responsableSel || undefined) : undefined,
         }),
       })
       const j = await r.json()
@@ -341,6 +372,45 @@ export default function AsistenciaCampoPage() {
                 </p>
               )}
             </div>
+
+            {proyectoSel && (
+              <div>
+                <label className="mb-2 block text-sm font-medium">Responsable de la jornada</label>
+                <Select value={responsableSel} onValueChange={setResponsableSel}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona responsable" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {equipoUsuarios.length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel>Equipo del proyecto</SelectLabel>
+                        {equipoUsuarios.map(u => (
+                          <SelectItem key={u.id} value={u.id}>
+                            {u.name || u.email}{u.id === miId ? ' (yo)' : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
+                    <SelectGroup>
+                      <SelectLabel>Otros usuarios</SelectLabel>
+                      {otrosUsuarios.map(u => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {u.name || u.email}{u.id === miId ? ' (yo)' : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  {!responsableSel || responsableSel === miId ? (
+                    <>Tú serás el responsable: esta jornada de trabajo te aparecerá en <span className="font-medium">Mi Jornada</span> para registrar horas, tareas y avance, y cerrarla.</>
+                  ) : (
+                    <><span className="font-medium">{[...equipoUsuarios, ...otrosUsuarios].find(u => u.id === responsableSel)?.name || 'La persona seleccionada'}</span> será el responsable: la jornada le aparecerá en su <span className="font-medium">Mi Jornada</span> para procesarla. Tú sigues controlando la asistencia/QR y quedas registrado como creador.</>
+                  )}
+                </p>
+              </div>
+            )}
+
             <p className="text-xs text-muted-foreground">
               <MapPin className="mr-1 inline h-3 w-3" />
               {geo.coords
