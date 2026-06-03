@@ -15,8 +15,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ message: 'Datos incompletos' }, { status: 400 })
   }
 
-  const fecha = new Date()
-  fecha.setHours(0, 0, 0, 0)
+  // Fecha de trabajo = "hoy" en zona Lima (UTC-5), fijada al mediodía UTC para
+  // evitar el desfase de un día al mostrarla (un DateTime a medianoche UTC se ve
+  // como el día anterior en Lima). El servidor corre en UTC.
+  const hoyLima = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date())
+  const [anioLima, mesLima, diaLima] = hoyLima.split('-').map(Number)
+  const fecha = new Date(Date.UTC(anioLima, mesLima - 1, diaLima, 12, 0, 0))
 
   const proyectoId: string | null = body.proyectoId || null
 

@@ -64,6 +64,7 @@ interface ModoHoy {
 
 interface JornadaCampo {
   id: string
+  fecha: string
   iniciadaEn: string
   horaIngresoOverride: string | null
   horaSalidaOverride: string | null
@@ -390,7 +391,16 @@ export default function MarcarPage() {
                   <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold text-blue-900 flex flex-wrap items-center gap-x-1.5">
-                      <span>Asistencia de campo activa en {j.ubicacion.nombre}</span>
+                      <span>
+                        Asistencia de campo activa en {j.ubicacion.nombre}
+                        {j.fecha && (
+                          <span className="ml-1 font-normal text-blue-700">
+                            · {new Date(j.fecha).toLocaleDateString('es-PE', {
+                              weekday: 'short', day: '2-digit', month: '2-digit', timeZone: 'UTC',
+                            })}
+                          </span>
+                        )}
+                      </span>
                       {j.proyecto && (
                         <span
                           className="rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-bold text-white"

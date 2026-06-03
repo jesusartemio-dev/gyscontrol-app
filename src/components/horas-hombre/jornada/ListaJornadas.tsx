@@ -194,18 +194,22 @@ export function ListaJornadas({
     ).values()
   ).sort((a, b) => a.nombre.localeCompare(b.nombre)) : []
 
+  // fechaTrabajo representa un día calendario; se formatea en UTC para que no se
+  // corra al día anterior en zonas con offset negativo (Lima, UTC-5).
   const formatFecha = (fecha: string) => {
-    return new Date(fecha).toLocaleDateString('es-CL', {
+    return new Date(fecha).toLocaleDateString('es-PE', {
       day: '2-digit',
       month: '2-digit',
-      year: 'numeric'
+      year: 'numeric',
+      timeZone: 'UTC',
     })
   }
 
   const formatFechaCorta = (fecha: string) => {
-    return new Date(fecha).toLocaleDateString('es-CL', {
+    return new Date(fecha).toLocaleDateString('es-PE', {
       day: 'numeric',
-      month: 'short'
+      month: 'short',
+      timeZone: 'UTC',
     })
   }
 

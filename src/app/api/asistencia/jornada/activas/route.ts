@@ -17,6 +17,7 @@ export async function GET() {
     orderBy: { iniciadaEn: 'desc' },
     select: {
       id: true,
+      fecha: true,
       iniciadaEn: true,
       horaIngresoOverride: true,
       horaSalidaOverride: true,
