@@ -637,45 +637,45 @@ export default function SupervisionAsistencia() {
         </Card>
       )}
 
-      {/* Contadores */}
-      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-8">
-        <Card><CardContent className="py-3">
-          <p className="text-xs text-muted-foreground">Total</p>
-          <p className="text-2xl font-bold">{contadores.total}</p>
-        </CardContent></Card>
-        <Card><CardContent className="py-3">
-          <p className="text-xs text-muted-foreground">A tiempo</p>
-          <p className="text-2xl font-bold text-emerald-700">{contadores.a_tiempo}</p>
-        </CardContent></Card>
-        <Card><CardContent className="py-3">
-          <p className="text-xs text-muted-foreground">Tarde</p>
-          <p className="text-2xl font-bold text-amber-700">{contadores.tarde}</p>
-        </CardContent></Card>
-        <Card><CardContent className="py-3">
-          <p className="text-xs text-muted-foreground">Muy tarde</p>
-          <p className="text-2xl font-bold text-red-700">{contadores.muy_tarde}</p>
-        </CardContent></Card>
-        <Card><CardContent className="py-3">
-          <p className="text-xs text-muted-foreground">Fuera zona</p>
-          <p className="text-2xl font-bold text-orange-700">{contadores.fuera_zona}</p>
-        </CardContent></Card>
-        <Card><CardContent className="py-3">
-          <p className="text-xs text-muted-foreground">Disp. nuevo</p>
-          <p className="text-2xl font-bold text-blue-700">{contadores.dispositivo_nuevo}</p>
-        </CardContent></Card>
-        <Card><CardContent className="py-3">
-          <p className="text-xs text-muted-foreground" title="Marcajes sin escanear QR">Sin QR</p>
-          <p className="text-2xl font-bold text-amber-700">{contadores.sin_qr}</p>
-        </CardContent></Card>
-        <Card><CardContent className="py-3">
-          <p
+      {/* Contadores (tira compacta) */}
+      <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-lg border bg-card px-4 py-2">
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-lg font-bold leading-none">{contadores.total}</span>
+          <span className="text-xs text-muted-foreground">Total</span>
+        </div>
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-lg font-bold leading-none text-emerald-700">{contadores.a_tiempo}</span>
+          <span className="text-xs text-muted-foreground">A tiempo</span>
+        </div>
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-lg font-bold leading-none text-amber-700">{contadores.tarde}</span>
+          <span className="text-xs text-muted-foreground">Tarde</span>
+        </div>
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-lg font-bold leading-none text-red-700">{contadores.muy_tarde}</span>
+          <span className="text-xs text-muted-foreground">Muy tarde</span>
+        </div>
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-lg font-bold leading-none text-orange-700">{contadores.fuera_zona}</span>
+          <span className="text-xs text-muted-foreground">Fuera zona</span>
+        </div>
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-lg font-bold leading-none text-blue-700">{contadores.dispositivo_nuevo}</span>
+          <span className="text-xs text-muted-foreground">Disp. nuevo</span>
+        </div>
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-lg font-bold leading-none text-amber-700">{contadores.sin_qr}</span>
+          <span className="text-xs text-muted-foreground" title="Marcajes sin escanear QR">Sin QR</span>
+        </div>
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-lg font-bold leading-none text-red-700">{contadores.sin_gps}</span>
+          <span
             className="text-xs text-muted-foreground"
             title="Presencial sin coordenadas registradas — bypass del sistema (legacy)"
           >
             Sin GPS
-          </p>
-          <p className="text-2xl font-bold text-red-700">{contadores.sin_gps}</p>
-        </CardContent></Card>
+          </span>
+        </div>
       </div>
 
       {/* Toggle de vista */}

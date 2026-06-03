@@ -68,6 +68,7 @@ interface JornadaCampo {
   horaIngresoOverride: string | null
   horaSalidaOverride: string | null
   ubicacion: { id: string; nombre: string }
+  proyecto: { codigo: string; nombre: string } | null
   supervisor: { name: string | null }
 }
 
@@ -388,10 +389,19 @@ export default function MarcarPage() {
                 <div className="flex items-start gap-2">
                   <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-blue-900">
-                      Asistencia de campo activa en {j.ubicacion.nombre}
+                    <p className="font-semibold text-blue-900 flex flex-wrap items-center gap-x-1.5">
+                      <span>Asistencia de campo activa en {j.ubicacion.nombre}</span>
+                      {j.proyecto && (
+                        <span
+                          className="rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-bold text-white"
+                          title={j.proyecto.nombre}
+                        >
+                          {j.proyecto.codigo}
+                        </span>
+                      )}
                     </p>
                     <p className="mt-0.5">
+                      {j.proyecto ? `Proyecto: ${j.proyecto.nombre} — ` : ''}
                       {j.supervisor.name
                         ? `Supervisor: ${j.supervisor.name} — `
                         : ''}
