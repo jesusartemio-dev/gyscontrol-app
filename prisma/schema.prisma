@@ -1449,6 +1449,7 @@ model RegistroHorasCampo {
   proyectoId      String
   proyectoEdtId   String?
   supervisorId    String
+  creadoPorId     String? // quién creó originalmente la jornada (auditoría; supervisorId puede reasignarse)
   fechaTrabajo    DateTime
   descripcion     String?
   ubicacion       String?
@@ -1471,6 +1472,7 @@ model RegistroHorasCampo {
   proyecto           Proyecto                  @relation(fields: [proyectoId], references: [id])
   proyectoEdt        ProyectoEdt?              @relation(fields: [proyectoEdtId], references: [id])
   supervisor         User                      @relation("RegistrosCampoSupervisor", fields: [supervisorId], references: [id])
+  creadoPor          User?                     @relation("RegistrosCampoCreador", fields: [creadoPorId], references: [id])
   aprobadoPor        User?                     @relation("RegistrosCampoAprobador", fields: [aprobadoPorId], references: [id])
   tareas             RegistroHorasCampoTarea[]
   evidenciaSeguridad EvidenciaSeguridad?
@@ -1749,6 +1751,7 @@ model User {
   configuracionGeneral                     ConfiguracionGeneral[]
   // Registro de horas en campo
   registrosCampoSupervisor                 RegistroHorasCampo[]        @relation("RegistrosCampoSupervisor")
+  registrosCampoCreador                    RegistroHorasCampo[]        @relation("RegistrosCampoCreador")
   registrosCampoAprobador                  RegistroHorasCampo[]        @relation("RegistrosCampoAprobador")
   miembrosCuadrilla                        RegistroHorasCampoMiembro[]
   // Trazabilidad

@@ -33,6 +33,7 @@ import {
   Building2,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { useSession } from 'next-auth/react'
 import { Badge } from '@/components/ui/badge'
 import { ListaJornadas } from '@/components/horas-hombre/jornada'
 
@@ -137,6 +138,14 @@ export default function JornadaCampoSupervisionPage() {
   const [motivoRechazo, setMotivoRechazo] = useState('')
   const [procesandoRechazo, setProcesandoRechazo] = useState(false)
 
+  const { data: session } = useSession()
+  const puedeReasignar = ['admin', 'gestor', 'coordinador'].includes(
+    (session?.user as { role?: string } | undefined)?.role || '',
+  )
+  const [usuariosAsignables, setUsuariosAsignables] = useState<Usuario[]>([])
+  const [reasignarSel, setReasignarSel] = useState('')
+  const [reasignando, setReasignando] = useState(false)
+
   const clientesUnicos = useMemo(() =>
     Array.from(
       new Map(
@@ -211,6 +220,48 @@ export default function JornadaCampoSupervisionPage() {
   useEffect(() => {
     cargarJornadas()
   }, [])
+
+  // Cargar usuarios para el selector de responsable al abrir el detalle.
+  useEffect(() => {
+    if (!detalleModalOpen) {
+      setReasignarSel('')
+      return
+    }
+    if (puedeReasignar && usuariosAsignables.length === 0) {
+      fetch('/api/horas-hombre/jornada/usuarios-asignables')
+        .then((r) => (r.ok ? r.json() : []))
+        .then(setUsuariosAsignables)
+        .catch(() => {})
+    }
+  }, [detalleModalOpen, puedeReasignar, usuariosAsignables.length])
+
+  const reasignarJornada = async () => {
+    if (!jornadaDetalle || !reasignarSel) return
+    setReasignando(true)
+    try {
+      const res = await fetch(`/api/horas-hombre/jornada/${jornadaDetalle.id}/reasignar`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ supervisorId: reasignarSel }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast({ variant: 'destructive', title: 'Error', description: data.error ?? 'No se pudo reasignar' })
+        return
+      }
+      toast({
+        title: 'Jornada reasignada',
+        description: `Nuevo responsable: ${data.responsable?.name || data.responsable?.email}`,
+      })
+      setDetalleModalOpen(false)
+      setReasignarSel('')
+      cargarJornadas(true)
+    } catch {
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo reasignar la jornada' })
+    } finally {
+      setReasignando(false)
+    }
+  }
 
   const handleAprobar = async (jornadaId: string) => {
     try {
@@ -474,11 +525,39 @@ export default function JornadaCampoSupervisionPage() {
                 {getEstadoBadge(jornadaDetalle.estado)}
               </div>
 
-              {/* Creado por */}
+              {/* Responsable actual */}
               {jornadaDetalle.supervisor && (
                 <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-600 bg-gray-50 rounded-lg px-3 py-2">
                   <UserCircle className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                  <span>Creado por: <span className="font-medium">{jornadaDetalle.supervisor.name || jornadaDetalle.supervisor.email}</span></span>
+                  <span>Responsable: <span className="font-medium">{jornadaDetalle.supervisor.name || jornadaDetalle.supervisor.email}</span></span>
+                </div>
+              )}
+
+              {/* Reasignar responsable (admin / gestor / coordinador) */}
+              {puedeReasignar && jornadaDetalle.estado !== 'aprobado' && (
+                <div className="flex flex-col gap-2 rounded-lg border border-dashed border-blue-200 bg-blue-50/40 px-3 py-2.5 sm:flex-row sm:items-center">
+                  <span className="whitespace-nowrap text-xs font-medium text-blue-800 sm:text-sm">
+                    Reasignar a:
+                  </span>
+                  <div className="flex flex-1 items-center gap-2">
+                    <Select value={reasignarSel} onValueChange={setReasignarSel}>
+                      <SelectTrigger className="h-8 flex-1">
+                        <SelectValue placeholder="Elegir responsable..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {usuariosAsignables
+                          .filter((u) => u.id !== jornadaDetalle.supervisor?.id)
+                          .map((u) => (
+                            <SelectItem key={u.id} value={u.id}>
+                              {u.name || u.email}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                    <Button size="sm" onClick={reasignarJornada} disabled={!reasignarSel || reasignando}>
+                      {reasignando ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Reasignar'}
+                    </Button>
+                  </div>
                 </div>
               )}
 

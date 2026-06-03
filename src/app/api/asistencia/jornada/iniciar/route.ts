@@ -89,6 +89,7 @@ export async function POST(req: Request) {
         data: {
           proyectoId,
           supervisorId: session.user.id,
+          creadoPorId: session.user.id,
           fechaTrabajo: fecha,
           estado: 'iniciado',
           personalPlanificado: [],
