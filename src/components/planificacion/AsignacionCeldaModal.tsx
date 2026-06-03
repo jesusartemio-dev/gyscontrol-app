@@ -112,10 +112,24 @@ export default function AsignacionCeldaModal({ open, onClose, onSaved, userId, u
 
   useEffect(() => {
     if (!open) return
+    // Sembrar de inmediato con los proyectos ya asignados ese día, para que el
+    // Select tenga la opción correspondiente desde el primer render (si no, al
+    // fijar el valor antes de que cargue la lista, Radix se queda en placeholder).
+    const seed: ProyectoActivo[] = celdasProyecto
+      .filter((c) => c.proyecto)
+      .map((c) => ({ id: c.proyecto!.id, codigo: c.proyecto!.codigo, nombre: c.proyecto!.nombre, color: c.proyecto!.color, estado: 'activo' }))
+    if (seed.length > 0) setProyectos(seed)
     fetch('/api/planificacion/proyectos-activos')
       .then((r) => r.json())
-      .then(setProyectos)
+      .then((lista: ProyectoActivo[]) => {
+        // Conservar los proyectos asignados que no estén en la lista activa
+        // (p. ej. proyectos ya cerrados), para que sigan siendo seleccionables.
+        const ids = new Set(lista.map((p) => p.id))
+        const faltantes = seed.filter((p) => !ids.has(p.id))
+        setProyectos([...lista, ...faltantes])
+      })
       .catch(() => toast.error('No se pudieron cargar los proyectos'))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   // Al abrir, cargar el turno inicial y su celda (si existe).
