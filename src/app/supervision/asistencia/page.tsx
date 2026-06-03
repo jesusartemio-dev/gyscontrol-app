@@ -38,6 +38,7 @@ interface Fila {
   user: { name: string | null; email: string }
   empleado: { departamento: { nombre: string } | null; cargo: { nombre: string } | null } | null
   ubicacion: { nombre: string; tipo: string } | null
+  jornadaAsistencia: { proyecto: { codigo: string; nombre: string } | null } | null
   dispositivo: { nombre: string | null; modelo: string | null; plataforma: string; aprobado: boolean }
 }
 
@@ -362,7 +363,7 @@ export default function SupervisionAsistencia() {
   }, [dataFiltrada])
 
   const horasDiaData = useMemo(() => {
-    type DiaEntry = { horasTrabajadas: number | null; ubicacion: string | null; modo: 'campo' | 'remoto' | 'oficina'; ingresoHora: Date; salidaHora: Date | null }
+    type DiaEntry = { horasTrabajadas: number | null; ubicacion: string | null; proyectoCodigo: string | null; modo: 'campo' | 'remoto' | 'oficina'; ingresoHora: Date; salidaHora: Date | null }
     type PersonaEntry = { nombre: string; email: string; dpto: string | null; dias: Map<string, DiaEntry> }
 
     // Agrupar todos los registros por persona (no por día)
@@ -422,6 +423,9 @@ export default function SupervisionAsistencia() {
             dias.set(fechaLima, {
               horasTrabajadas,
               ubicacion: ingreso.ubicacion?.nombre ?? salida?.ubicacion?.nombre ?? null,
+              proyectoCodigo: ingreso.jornadaAsistencia?.proyecto?.codigo
+                ?? salida?.jornadaAsistencia?.proyecto?.codigo
+                ?? null,
               modo,
               ingresoHora: new Date(ingreso.fechaHora),
               salidaHora: salida ? new Date(salida.fechaHora) : null,
@@ -926,7 +930,10 @@ export default function SupervisionAsistencia() {
                           : 'bg-gray-100 text-gray-600'
                         const modoLabel = dia.modo === 'campo' ? 'Campo' : dia.modo === 'remoto' ? 'Remoto' : 'Oficina'
 
-                        const ubicacionCorta = dia.ubicacion ? dia.ubicacion.split('-')[0].trim() : null
+                        // Preferir el código de proyecto de la jornada (ej. "CJM48"); si no
+                        // hay proyecto asignado, caer al nombre corto de la ubicación.
+                        const etiquetaCorta = dia.proyectoCodigo
+                          ?? (dia.ubicacion ? dia.ubicacion.split('-')[0].trim() : null)
                         return (
                           <td key={dStr} className={`px-1 py-1 text-center ${isWeekend ? 'bg-muted/20' : ''}`}>
                             <div className="flex flex-col items-center gap-0.5 justify-center">
@@ -946,9 +953,9 @@ export default function SupervisionAsistencia() {
                               ) : null}
                               <span
                                 className={`text-[8px] rounded px-1 leading-tight ${modoBadge}`}
-                                title={dia.ubicacion ?? undefined}
+                                title={[dia.proyectoCodigo, dia.ubicacion].filter(Boolean).join(' · ') || undefined}
                               >
-                                {ubicacionCorta ? `${ubicacionCorta} · ${modoLabel}` : modoLabel}
+                                {etiquetaCorta ? `${etiquetaCorta} · ${modoLabel}` : modoLabel}
                               </span>
                             </div>
                           </td>

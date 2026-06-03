@@ -56,6 +56,9 @@ export async function GET(req: Request) {
         },
       },
       ubicacion: { select: { id: true, nombre: true, tipo: true } },
+      jornadaAsistencia: {
+        select: { proyecto: { select: { codigo: true, nombre: true } } },
+      },
       dispositivo: { select: { nombre: true, modelo: true, plataforma: true, aprobado: true } },
     },
     take: 500,
