@@ -20,9 +20,14 @@ import {
   Home,
   Briefcase,
   Info,
+  Users,
+  ChevronDown,
+  ChevronUp,
+  RefreshCw,
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { formatearTardanza } from '@/lib/utils/formatTardanza'
 
 // Leaflet usa window/document en su inicialización. Lo cargamos client-side
 // para evitar SSR errors y para que su bundle no pese en el primer render.
@@ -66,6 +71,18 @@ interface JornadaCampo {
   supervisor: { name: string | null }
 }
 
+interface MarcajeCampo {
+  id: string
+  userId: string
+  tipo: string
+  fechaHora: string
+  estado: string
+  dentroGeofence: boolean
+  distanciaMetros: number | null
+  minutosTarde: number
+  user: { id: string; name: string | null; email: string }
+}
+
 export default function MarcarPage() {
   const { status } = useSession()
   const geo = useGeolocation()
@@ -74,6 +91,9 @@ export default function MarcarPage() {
   const [loading, setLoading] = useState(false)
   const [modoHoy, setModoHoy] = useState<ModoHoy | null>(null)
   const [jornadasCampo, setJornadasCampo] = useState<JornadaCampo[]>([])
+  const [marcajesPorJornada, setMarcajesPorJornada] = useState<Record<string, MarcajeCampo[]>>({})
+  const [expandidaId, setExpandidaId] = useState<string | null>(null)
+  const [cargandoMarcajes, setCargandoMarcajes] = useState<string | null>(null)
   const [permisoGps, setPermisoGps] = useState<'prompt' | 'granted' | 'denied' | 'unknown'>('unknown')
   const [dialogGpsBloqueado, setDialogGpsBloqueado] = useState(false)
   const [cercanas, setCercanas] = useState<null | {
@@ -100,6 +120,33 @@ export default function MarcarPage() {
     setScannerOpen(false)
     if (tipoSel) await enviarMarcaje(tipoSel, qrPayload)
   })
+
+  // Carga los marcajes de una jornada de campo (quién ha registrado ingreso/salida).
+  // El endpoint en-vivo está abierto a cualquier trabajador autenticado, así que
+  // todos pueden ver la lista — en campo se busca justamente esa transparencia.
+  const cargarMarcajes = async (jornadaId: string) => {
+    setCargandoMarcajes(jornadaId)
+    try {
+      const r = await fetch(`/api/asistencia/jornada/${jornadaId}/en-vivo`)
+      if (r.ok) {
+        const data = await r.json()
+        setMarcajesPorJornada(prev => ({ ...prev, [jornadaId]: data.asistencias || [] }))
+      }
+    } catch {
+      /* silencioso: el conteo simplemente no aparece */
+    } finally {
+      setCargandoMarcajes(null)
+    }
+  }
+
+  const toggleMarcajes = (jornadaId: string) => {
+    if (expandidaId === jornadaId) {
+      setExpandidaId(null)
+    } else {
+      setExpandidaId(jornadaId)
+      cargarMarcajes(jornadaId) // refrescar al abrir para ver datos al día
+    }
+  }
 
   useEffect(() => {
     getDeviceInfo().then(d => {
@@ -329,28 +376,117 @@ export default function MarcarPage() {
 
       {jornadasCampo.length > 0 && (
         <div className="mb-3 space-y-2">
-          {jornadasCampo.map(j => (
-            <div
-              key={j.id}
-              className="flex items-start gap-2 rounded-md border border-blue-300 bg-blue-50 px-3 py-2 text-xs text-blue-800"
-            >
-              <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
-              <div>
-                <p className="font-semibold text-blue-900">
-                  Asistencia de campo activa en {j.ubicacion.nombre}
-                </p>
-                <p className="mt-0.5">
-                  {j.supervisor.name
-                    ? `Supervisor: ${j.supervisor.name} — `
-                    : ''}
-                  Pide el QR a tu supervisor o encargado para registrar tu ingreso/salida.
-                  {j.horaSalidaOverride
-                    ? ` Turno hasta las ${j.horaSalidaOverride}.`
-                    : ''}
-                </p>
+          {jornadasCampo.map(j => {
+            const marcajes = marcajesPorJornada[j.id] || []
+            const expandida = expandidaId === j.id
+            const cargando = cargandoMarcajes === j.id
+            return (
+              <div
+                key={j.id}
+                className="rounded-md border border-blue-300 bg-blue-50 px-3 py-2 text-xs text-blue-800"
+              >
+                <div className="flex items-start gap-2">
+                  <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-blue-900">
+                      Asistencia de campo activa en {j.ubicacion.nombre}
+                    </p>
+                    <p className="mt-0.5">
+                      {j.supervisor.name
+                        ? `Supervisor: ${j.supervisor.name} — `
+                        : ''}
+                      Pide el QR a tu supervisor o encargado para registrar tu ingreso/salida.
+                      {j.horaSalidaOverride
+                        ? ` Turno hasta las ${j.horaSalidaOverride}.`
+                        : ''}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => toggleMarcajes(j.id)}
+                      className="mt-1.5 inline-flex items-center gap-1 font-medium text-blue-700 hover:text-blue-900 hover:underline"
+                    >
+                      <Users className="h-3.5 w-3.5" />
+                      {j.id in marcajesPorJornada
+                        ? `${marcajes.length} ${marcajes.length === 1 ? 'persona ha marcado' : 'personas han marcado'}`
+                        : 'Ver quién ha marcado'}
+                      {expandida ? (
+                        <ChevronUp className="h-3.5 w-3.5" />
+                      ) : (
+                        <ChevronDown className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {expandida && (
+                  <div className="mt-2 border-t border-blue-200 pt-2">
+                    <div className="mb-1.5 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => cargarMarcajes(j.id)}
+                        disabled={cargando}
+                        className="inline-flex items-center gap-1 font-medium text-blue-700 hover:text-blue-900 hover:underline disabled:opacity-50"
+                      >
+                        <RefreshCw className={`h-3.5 w-3.5 ${cargando ? 'animate-spin' : ''}`} />
+                        Actualizar
+                      </button>
+                    </div>
+                    {cargando && marcajes.length === 0 ? (
+                      <p className="flex items-center gap-1 py-2 text-blue-700">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Cargando marcajes…
+                      </p>
+                    ) : marcajes.length === 0 ? (
+                      <p className="py-2 text-blue-700">Aún nadie ha marcado en esta asistencia.</p>
+                    ) : (
+                      <ul className="space-y-1.5">
+                        {marcajes.map(m => (
+                          <li
+                            key={m.id}
+                            className="flex items-center justify-between gap-2 rounded-md bg-white/70 px-2 py-1.5"
+                          >
+                            <div className="min-w-0">
+                              <p className="truncate font-medium text-blue-900">
+                                {m.user.name || m.user.email}
+                              </p>
+                              <p className="text-blue-700">
+                                {new Date(m.fechaHora).toLocaleTimeString('es-PE', {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}{' '}
+                                — {m.tipo}
+                                {m.distanciaMetros != null && !m.dentroGeofence && (
+                                  <span className="text-red-600"> · fuera de sede</span>
+                                )}
+                              </p>
+                            </div>
+                            <div className="flex shrink-0 flex-col items-end gap-0.5">
+                              <Badge
+                                variant="outline"
+                                className={`h-5 ${
+                                  m.estado === 'a_tiempo'
+                                    ? 'bg-emerald-100 text-emerald-700'
+                                    : m.estado === 'tarde'
+                                    ? 'bg-amber-100 text-amber-700'
+                                    : m.estado === 'muy_tarde'
+                                    ? 'bg-red-100 text-red-700'
+                                    : 'bg-orange-100 text-orange-700'
+                                }`}
+                              >
+                                {m.estado.replace('_', ' ')}
+                              </Badge>
+                              {m.minutosTarde > 0 && (
+                                <span className="text-red-600">+{formatearTardanza(m.minutosTarde)}</span>
+                              )}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
