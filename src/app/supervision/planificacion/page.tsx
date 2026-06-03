@@ -466,7 +466,7 @@ function CeldaDia({
         <TurnoBloque
           key={c.id}
           c={c}
-          showLetra={!single || c.turno !== 'turno_a'}
+          showLetra={!single || turnoAsignable(c.turno) !== 'turno_a'}
           dimmed={dimmed}
           textMode={textMode}
           dragHandleEnabled={dragHandleEnabled && single}
