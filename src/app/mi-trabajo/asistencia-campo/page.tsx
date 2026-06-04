@@ -501,15 +501,18 @@ export default function AsistenciaCampoPage() {
                 const sal = jornada.horaSalidaOverride || jornada.ubicacion.horaSalida
                 const esEspecial = !!(jornada.horaIngresoOverride || jornada.horaSalidaOverride)
                 const tieneHorario = !!(ing || sal)
+                const nocturno = !!(ing && sal && sal <= ing)
                 return (
                   <div className={`mt-1 rounded px-2 py-1 text-xs ${esEspecial ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
                     <Clock className="mr-1 inline h-3 w-3" />
-                    {esEspecial ? (
-                      <>Horario especial: <span className="font-medium">{ing || '—'} a {sal || '—'}</span>{jornada.motivoOverride ? ` · ${jornada.motivoOverride}` : ''}</>
-                    ) : tieneHorario ? (
-                      <>Turno día · Horario: <span className="font-medium">{ing} a {sal}</span></>
+                    {tieneHorario ? (
+                      <>
+                        {esEspecial ? 'Horario especial: ' : 'Horario: '}
+                        <span className="font-medium">{ing || '—'} a {sal || '—'}{nocturno ? ' (día siguiente)' : ''}</span>
+                        {esEspecial && jornada.motivoOverride ? ` · ${jornada.motivoOverride}` : ''}
+                      </>
                     ) : (
-                      <>Turno día · Horario según calendario laboral</>
+                      <>Horario según calendario laboral</>
                     )}
                   </div>
                 )
@@ -662,8 +665,10 @@ export default function AsistenciaCampoPage() {
           </DialogHeader>
           <div className="space-y-3">
             <p className="text-xs text-muted-foreground">
-              Sobrescribe el horario oficial de la ubicación solo para esta jornada (ej. Turno B,
+              Sobrescribe el horario oficial de la ubicación solo para esta jornada (ej. turno tarde,
               reunión temprana, obra nocturna). Déjalo vacío para usar el horario normal.
+              {' '}Si la salida es <span className="font-medium">al día siguiente</span> (ej. 19:00 a 07:00),
+              ingrésala igual: el sistema la entiende como del día siguiente.
             </p>
             <div className="grid grid-cols-2 gap-2">
               <div>

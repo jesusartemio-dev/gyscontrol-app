@@ -68,7 +68,7 @@ interface JornadaCampo {
   iniciadaEn: string
   horaIngresoOverride: string | null
   horaSalidaOverride: string | null
-  ubicacion: { id: string; nombre: string }
+  ubicacion: { id: string; nombre: string; horaIngreso: string | null; horaSalida: string | null }
   proyecto: { codigo: string; nombre: string } | null
   supervisor: { name: string | null }
 }
@@ -416,10 +416,20 @@ export default function MarcarPage() {
                         ? `Supervisor: ${j.supervisor.name} — `
                         : ''}
                       Pide el QR a tu supervisor o encargado para registrar tu ingreso/salida.
-                      {j.horaSalidaOverride
-                        ? ` Turno hasta las ${j.horaSalidaOverride}.`
-                        : ''}
                     </p>
+                    {(() => {
+                      const ing = j.horaIngresoOverride || j.ubicacion.horaIngreso
+                      const sal = j.horaSalidaOverride || j.ubicacion.horaSalida
+                      if (!ing && !sal) return null
+                      const especial = !!(j.horaIngresoOverride || j.horaSalidaOverride)
+                      const nocturno = !!(ing && sal && sal <= ing)
+                      return (
+                        <p className={`mt-0.5 font-medium ${especial ? 'text-amber-700' : 'text-blue-700'}`}>
+                          🕐 {especial ? 'Horario especial: ' : 'Horario: '}
+                          {ing || '—'} a {sal || '—'}{nocturno ? ' (día siguiente)' : ''}
+                        </p>
+                      )
+                    })()}
                     <button
                       type="button"
                       onClick={() => toggleMarcajes(j.id)}

@@ -21,7 +21,7 @@ export async function GET() {
       iniciadaEn: true,
       horaIngresoOverride: true,
       horaSalidaOverride: true,
-      ubicacion: { select: { id: true, nombre: true } },
+      ubicacion: { select: { id: true, nombre: true, horaIngreso: true, horaSalida: true } },
       proyecto: { select: { codigo: true, nombre: true } },
       supervisor: { select: { name: true } },
     },
