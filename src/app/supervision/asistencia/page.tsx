@@ -139,9 +139,16 @@ export default function SupervisionAsistencia() {
   const [sortKey, setSortKey] = useState<SortKey>('fechaHora')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
 
-  const [vista, setVista] = useState<'detalle' | 'resumen' | 'por_proyecto' | 'horas_dia' | 'ranking'>('detalle')
+  const [vista, setVista] = useState<'detalle' | 'resumen' | 'por_proyecto' | 'horas_dia' | 'ranking' | 'sesiones'>('detalle')
   const [modoAsistencia, setModoAsistencia] = useState<'todos' | 'campo' | 'remoto' | 'oficina'>('todos')
   const [personasOcultas, setPersonasOcultas] = useState<Set<string>>(new Set())
+
+  // Sesiones de asistencia (JornadaAsistencia) — para que el admin las gestione/elimine.
+  type SesionItem = { id: string; fecha: string; activa: boolean; creador: string; ubicacion: string; proyectoCodigo: string | null; marcajes: number }
+  const [sesiones, setSesiones] = useState<SesionItem[]>([])
+  const [sesionesLoading, setSesionesLoading] = useState(false)
+  const [eliminarSesion, setEliminarSesion] = useState<SesionItem | null>(null)
+  const [eliminandoSesion, setEliminandoSesion] = useState(false)
 
   const [porProyectoData, setPorProyectoData] = useState<{
     userId: string; nombre: string; departamento: string; diasConAsistencia: number
@@ -198,6 +205,42 @@ export default function SupervisionAsistencia() {
       setPorProyectoData([])
     } finally {
       setPorProyectoLoading(false)
+    }
+  }
+
+  async function cargarSesiones(ov: { desde?: string; hasta?: string } = {}) {
+    setSesionesLoading(true)
+    const d = ov.desde ?? desde
+    const h = ov.hasta ?? hasta
+    const params = new URLSearchParams({ desde: d, hasta: h })
+    try {
+      const r = await fetch(`/api/asistencia/jornada/todas?${params}`)
+      const j = await r.json()
+      setSesiones(Array.isArray(j) ? j : [])
+    } catch {
+      setSesiones([])
+    } finally {
+      setSesionesLoading(false)
+    }
+  }
+
+  async function confirmarEliminarSesion() {
+    if (!eliminarSesion) return
+    setEliminandoSesion(true)
+    try {
+      const r = await fetch(`/api/asistencia/jornada/${eliminarSesion.id}`, { method: 'DELETE' })
+      const data = await r.json().catch(() => ({}))
+      if (!r.ok) {
+        toast.error(data.error || 'No se pudo eliminar la asistencia')
+        return
+      }
+      toast.success(`Asistencia eliminada · ${data.marcajesBorrados ?? 0} marcaje(s) borrados`)
+      setEliminarSesion(null)
+      cargarSesiones()
+    } catch {
+      toast.error('No se pudo eliminar la asistencia')
+    } finally {
+      setEliminandoSesion(false)
     }
   }
 
@@ -737,6 +780,12 @@ export default function SupervisionAsistencia() {
           >
             Ranking
           </button>
+          <button
+            onClick={() => { setVista('sesiones'); cargarSesiones() }}
+            className={`px-3 py-1.5 transition-colors ${vista === 'sesiones' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+          >
+            Sesiones
+          </button>
         </div>
         {vista === 'resumen' && (
           <span className="text-xs text-muted-foreground">
@@ -756,6 +805,11 @@ export default function SupervisionAsistencia() {
         {vista === 'ranking' && (
           <span className="text-xs text-muted-foreground">
             Tardanzas acumuladas por persona en el rango · ordenado de mayor a menor
+          </span>
+        )}
+        {vista === 'sesiones' && (
+          <span className="text-xs text-muted-foreground">
+            Asistencias de campo (sesiones de QR) abiertas en el rango{esAdmin ? ' · puedes eliminarlas' : ''}
           </span>
         )}
       </div>
@@ -1065,6 +1119,104 @@ export default function SupervisionAsistencia() {
           </Card>
         )
       )}
+
+      {/* Sesiones de asistencia */}
+      {vista === 'sesiones' && (
+        sesionesLoading ? (
+          <div className="flex items-center justify-center h-32 gap-2 text-muted-foreground text-sm">
+            <Loader2 className="h-4 w-4 animate-spin" /> Cargando sesiones...
+          </div>
+        ) : sesiones.length === 0 ? (
+          <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
+            Sin asistencias de campo en el período seleccionado.
+          </div>
+        ) : (
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Fecha</TableHead>
+                    <TableHead>Creador</TableHead>
+                    <TableHead>Ubicación</TableHead>
+                    <TableHead>Proyecto</TableHead>
+                    <TableHead className="text-center">Marcajes</TableHead>
+                    <TableHead className="text-center">Estado</TableHead>
+                    {esAdmin && <TableHead className="text-right">Acciones</TableHead>}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sesiones.map(s => (
+                    <TableRow key={s.id}>
+                      <TableCell className="whitespace-nowrap font-mono text-xs">
+                        {new Date(s.fecha).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' })}
+                      </TableCell>
+                      <TableCell className="text-sm">{s.creador}</TableCell>
+                      <TableCell className="text-sm">{s.ubicacion}</TableCell>
+                      <TableCell className="text-sm">
+                        {s.proyectoCodigo
+                          ? <span className="font-mono text-xs text-blue-700">{s.proyectoCodigo}</span>
+                          : <span className="text-xs text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant="outline" className="font-mono text-xs">{s.marcajes}</Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {s.activa
+                          ? <Badge variant="outline" className="bg-emerald-100 text-emerald-700">activa</Badge>
+                          : <Badge variant="outline" className="text-muted-foreground">cerrada</Badge>}
+                      </TableCell>
+                      {esAdmin && (
+                        <TableCell className="text-right">
+                          <button
+                            onClick={() => setEliminarSesion(s)}
+                            title="Eliminar asistencia"
+                            className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-3 w-3" /> Eliminar
+                          </button>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )
+      )}
+
+      {/* Confirmar eliminación de sesión de asistencia */}
+      <Dialog open={!!eliminarSesion} onOpenChange={v => !v && setEliminarSesion(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Eliminar asistencia</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 text-sm">
+            <p>
+              Vas a eliminar la asistencia de <span className="font-medium">{eliminarSesion?.ubicacion}</span>
+              {eliminarSesion?.proyectoCodigo ? ` (${eliminarSesion.proyectoCodigo})` : ''}
+              {eliminarSesion && (
+                <> del {new Date(eliminarSesion.fecha).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' })}</>
+              )}
+              {eliminarSesion ? ` (creada por ${eliminarSesion.creador})` : ''}.
+            </p>
+            <p className="rounded-md bg-red-50 px-3 py-2 text-red-700">
+              Se borrarán <span className="font-semibold">{eliminarSesion?.marcajes ?? 0} marcaje(s)</span> registrados (ingresos/salidas).
+              La jornada de trabajo asociada se conserva. Esta acción no se puede deshacer.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEliminarSesion(null)} disabled={eliminandoSesion}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={confirmarEliminarSesion} disabled={eliminandoSesion}>
+              {eliminandoSesion && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Tabla detalle */}
       {vista === 'resumen' ? (() => {
