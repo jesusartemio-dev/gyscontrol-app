@@ -29,6 +29,8 @@ interface Ubicacion {
   nombre: string
   tipo: string
   clienteId: string | null
+  horaIngreso?: string | null
+  horaSalida?: string | null
 }
 
 interface ProyectoOption {
@@ -494,13 +496,24 @@ export default function AsistenciaCampoPage() {
               <p className="text-xs text-muted-foreground">
                 Rota en {segundosRestantes}s
               </p>
-              {(jornada.horaIngresoOverride || jornada.horaSalidaOverride) && (
-                <div className="mt-1 rounded bg-amber-50 px-2 py-1 text-xs text-amber-700">
-                  <Clock className="mr-1 inline h-3 w-3" />
-                  Horario excepcional: {jornada.horaIngresoOverride || '—'} a {jornada.horaSalidaOverride || '—'}
-                  {jornada.motivoOverride && ` · ${jornada.motivoOverride}`}
-                </div>
-              )}
+              {(() => {
+                const ing = jornada.horaIngresoOverride || jornada.ubicacion.horaIngreso
+                const sal = jornada.horaSalidaOverride || jornada.ubicacion.horaSalida
+                const esEspecial = !!(jornada.horaIngresoOverride || jornada.horaSalidaOverride)
+                const tieneHorario = !!(ing || sal)
+                return (
+                  <div className={`mt-1 rounded px-2 py-1 text-xs ${esEspecial ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
+                    <Clock className="mr-1 inline h-3 w-3" />
+                    {esEspecial ? (
+                      <>Horario especial: <span className="font-medium">{ing || '—'} a {sal || '—'}</span>{jornada.motivoOverride ? ` · ${jornada.motivoOverride}` : ''}</>
+                    ) : tieneHorario ? (
+                      <>Turno día · Horario: <span className="font-medium">{ing} a {sal}</span></>
+                    ) : (
+                      <>Turno día · Horario según calendario laboral</>
+                    )}
+                  </div>
+                )
+              })()}
             </CardHeader>
             <CardContent className="flex flex-col items-center">
               {qrImg ? (
@@ -517,7 +530,9 @@ export default function AsistenciaCampoPage() {
                 onClick={abrirDialogHorario}
               >
                 <Settings className="mr-2 h-4 w-4" />
-                Horario excepcional (Turno B)
+                {(jornada.horaIngresoOverride || jornada.horaSalidaOverride)
+                  ? 'Editar horario especial'
+                  : 'Cambiar horario (turno especial)'}
               </Button>
               <Button
                 variant="outline"
@@ -643,7 +658,7 @@ export default function AsistenciaCampoPage() {
       <Dialog open={dialogHorario} onOpenChange={setDialogHorario}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Horario excepcional de la asistencia</DialogTitle>
+            <DialogTitle>Horario especial de la asistencia (turno tarde/noche)</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <p className="text-xs text-muted-foreground">
