@@ -78,6 +78,8 @@ export default function AsistenciaCampoPage() {
   // Responsable de la jornada (RegistroHorasCampo). Por defecto el creador.
   type UsuarioOpt = { id: string; name: string | null; email: string }
   const miId = session?.user?.id ?? ''
+  // admin/gerente pueden eliminar cualquier asistencia; el resto solo la activa.
+  const esAdmin = ['admin', 'gerente'].includes((session?.user as { role?: string } | undefined)?.role ?? '')
   const [responsableSel, setResponsableSel] = useState('')
   const [equipoUsuarios, setEquipoUsuarios] = useState<UsuarioOpt[]>([])
   const [otrosUsuarios, setOtrosUsuarios] = useState<UsuarioOpt[]>([])
@@ -731,18 +733,25 @@ export default function AsistenciaCampoPage() {
                         : <span>cerrada</span>}
                     </p>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                    onClick={() => setEliminarObjetivo(h)}
-                    title="Eliminar asistencia"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  {(esAdmin || h.activa) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      onClick={() => setEliminarObjetivo(h)}
+                      title={h.activa ? 'Eliminar asistencia activa' : 'Eliminar asistencia'}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </li>
               ))}
             </ul>
+            {!esAdmin && (
+              <p className="mt-3 text-[11px] text-muted-foreground">
+                Solo puedes eliminar tu asistencia <span className="font-medium">activa</span> (p. ej. si la abriste por error). Las asistencias pasadas las gestiona un administrador.
+              </p>
+            )}
           </CardContent>
         </Card>
       )}
