@@ -15,7 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from 'sonner'
-import { Loader2, MapPin, Play, StopCircle, Users, Wifi, LogIn, LogOut, CheckCircle2, AlertTriangle, Settings, Clock } from 'lucide-react'
+import { Loader2, MapPin, Play, StopCircle, Users, Wifi, LogIn, LogOut, CheckCircle2, AlertTriangle, Settings, Clock, Trash2 } from 'lucide-react'
 import QRCode from 'qrcode'
 import { useGeolocation } from '@/lib/hooks/useGeolocation'
 import { formatearTardanza } from '@/lib/utils/formatTardanza'
@@ -104,6 +104,11 @@ export default function AsistenciaCampoPage() {
   const [transferSel, setTransferSel] = useState('')
   const [transfiriendo, setTransfiriendo] = useState(false)
 
+  type HistorialItem = { id: string; fecha: string; activa: boolean; ubicacion: string; proyectoCodigo: string | null; marcajes: number }
+  const [historial, setHistorial] = useState<HistorialItem[]>([])
+  const [eliminarObjetivo, setEliminarObjetivo] = useState<HistorialItem | null>(null)
+  const [eliminando, setEliminando] = useState(false)
+
   useEffect(() => {
     if (status !== 'authenticated') return
     fetch('/api/asistencia/ubicaciones')
@@ -127,7 +132,42 @@ export default function AsistenciaCampoPage() {
           if (j.proyectoId) setProyectoSel(j.proyectoId)
         }
       })
+
+    cargarHistorial()
   }, [status])
+
+  function cargarHistorial() {
+    fetch('/api/asistencia/jornada/mias')
+      .then(r => (r.ok ? r.json() : []))
+      .then(setHistorial)
+      .catch(() => {})
+  }
+
+  async function eliminarAsistencia() {
+    if (!eliminarObjetivo) return
+    setEliminando(true)
+    try {
+      const r = await fetch(`/api/asistencia/jornada/${eliminarObjetivo.id}`, { method: 'DELETE' })
+      const data = await r.json().catch(() => ({}))
+      if (!r.ok) {
+        toast.error(data.error || 'No se pudo eliminar la asistencia')
+        return
+      }
+      toast.success(`Asistencia eliminada · ${data.marcajesBorrados ?? 0} marcaje(s) borrados`)
+      // Si era la asistencia activa actual, limpiar la vista.
+      if (jornada?.id === eliminarObjetivo.id) {
+        setJornada(null)
+        setQrImg('')
+        setAsistencias([])
+      }
+      setEliminarObjetivo(null)
+      cargarHistorial()
+    } catch {
+      toast.error('No se pudo eliminar la asistencia')
+    } finally {
+      setEliminando(false)
+    }
+  }
 
   // Responsable por defecto = el creador (usuario actual).
   useEffect(() => {
@@ -218,6 +258,7 @@ export default function AsistenciaCampoPage() {
       }
       const jornadaRes = await fetch('/api/asistencia/jornada/activa').then(rr => rr.json())
       setJornada(jornadaRes)
+      cargarHistorial()
       toast.success('Asistencia de campo activa. Comparte el QR con tu equipo.')
     } finally {
       setLoading(false)
@@ -294,6 +335,7 @@ export default function AsistenciaCampoPage() {
       setJornada(null)
       setQrImg('')
       setAsistencias([])
+      cargarHistorial()
     } catch {
       toast.error('No se pudo transferir la asistencia')
     } finally {
@@ -310,6 +352,7 @@ export default function AsistenciaCampoPage() {
       setJornada(null)
       setQrImg('')
       setAsistencias([])
+      cargarHistorial()
       toast.success('Asistencia cerrada')
     } finally {
       setLoading(false)
@@ -657,6 +700,85 @@ export default function AsistenciaCampoPage() {
           </div>
         </div>
       )}
+
+      {/* Historial de mis asistencias */}
+      {historial.length > 0 && (
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Clock className="h-5 w-5" /> Mis asistencias
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="divide-y">
+              {historial.map(h => (
+                <li key={h.id} className="flex items-center justify-between gap-2 py-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">
+                      {h.ubicacion}
+                      {h.proyectoCodigo && (
+                        <span className="ml-1.5 font-mono text-xs text-blue-700">{h.proyectoCodigo}</span>
+                      )}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(h.fecha).toLocaleDateString('es-PE', {
+                        weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC',
+                      })}
+                      {' · '}{h.marcajes} marcaje{h.marcajes !== 1 ? 's' : ''}
+                      {' · '}
+                      {h.activa
+                        ? <span className="font-medium text-emerald-600">activa</span>
+                        : <span>cerrada</span>}
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    onClick={() => setEliminarObjetivo(h)}
+                    title="Eliminar asistencia"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Confirmar eliminación de asistencia */}
+      <Dialog open={!!eliminarObjetivo} onOpenChange={v => !v && setEliminarObjetivo(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Eliminar asistencia</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 text-sm">
+            <p>
+              Vas a eliminar la asistencia de{' '}
+              <span className="font-medium">{eliminarObjetivo?.ubicacion}</span>
+              {eliminarObjetivo?.proyectoCodigo ? ` (${eliminarObjetivo.proyectoCodigo})` : ''}
+              {eliminarObjetivo && (
+                <> del {new Date(eliminarObjetivo.fecha).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' })}</>
+              )}.
+            </p>
+            <p className="rounded-md bg-red-50 px-3 py-2 text-red-700">
+              Se borrarán <span className="font-semibold">{eliminarObjetivo?.marcajes ?? 0} marcaje(s)</span> registrados (ingresos/salidas).
+              La jornada de trabajo asociada <span className="font-medium">se conserva</span> (puedes eliminarla aparte desde Mi Jornada).
+              Esta acción no se puede deshacer.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEliminarObjetivo(null)} disabled={eliminando}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={eliminarAsistencia} disabled={eliminando}>
+              {eliminando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={dialogHorario} onOpenChange={setDialogHorario}>
         <DialogContent>
