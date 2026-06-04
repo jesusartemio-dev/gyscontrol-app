@@ -134,11 +134,13 @@ export function JornadaActiva({
     0
   )
 
+  // fechaTrabajo es un día calendario; UTC para no correrse al día anterior (Lima).
   const formatFechaCorta = (fecha: string) => {
-    return new Date(fecha).toLocaleDateString('es-CL', {
+    return new Date(fecha).toLocaleDateString('es-PE', {
       weekday: 'short',
       day: 'numeric',
-      month: 'short'
+      month: 'short',
+      timeZone: 'UTC',
     })
   }
 

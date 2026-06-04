@@ -112,16 +112,19 @@ export function MiJornadaTimeline({
     })
   }, [jornadas, tab])
 
+  // fechaTrabajo es un día calendario; se formatea en UTC para no correrse al
+  // día anterior en zonas con offset negativo (Lima, UTC-5).
   const formatFecha = (fecha: string) => {
     const d = new Date(fecha)
-    return d.toLocaleDateString('es-CL', { day: 'numeric', month: 'short' })
+    return d.toLocaleDateString('es-PE', { day: 'numeric', month: 'short', timeZone: 'UTC' })
   }
 
   const formatFechaLarga = (fecha: string) => {
-    return new Date(fecha).toLocaleDateString('es-CL', {
+    return new Date(fecha).toLocaleDateString('es-PE', {
       weekday: 'short',
       day: 'numeric',
-      month: 'short'
+      month: 'short',
+      timeZone: 'UTC',
     })
   }
 

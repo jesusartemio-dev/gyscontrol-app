@@ -287,12 +287,15 @@ export default function MiJornadaPage() {
     }
   }
 
+  // fechaTrabajo es un día calendario; se formatea en UTC para evitar el desfase
+  // de un día en zonas con offset negativo (Lima, UTC-5), igual que en jornada-campo.
   const formatFecha = (fecha: string) => {
-    return new Date(fecha).toLocaleDateString('es-CL', {
+    return new Date(fecha).toLocaleDateString('es-PE', {
       weekday: 'long',
       day: 'numeric',
       month: 'long',
-      year: 'numeric'
+      year: 'numeric',
+      timeZone: 'UTC',
     })
   }
 
