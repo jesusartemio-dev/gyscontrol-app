@@ -19,6 +19,7 @@ interface MiembroTarea {
 
 interface AgregarTareaPayload {
   proyectoTareaId?: string
+  proyectoEdtId?: string // EDT a fijar en la jornada si aún no tiene (cronograma)
   nombreTareaExtra?: string
   descripcion?: string
   fechaInicio?: string
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const { id: jornadaId } = await context.params
     const body: AgregarTareaPayload = await request.json()
 
-    const { proyectoTareaId, nombreTareaExtra, descripcion, fechaInicio, fechaFin, horasEstimadas, personasEstimadas, responsableId, miembros } = body
+    const { proyectoTareaId, proyectoEdtId, nombreTareaExtra, descripcion, fechaInicio, fechaFin, horasEstimadas, personasEstimadas, responsableId, miembros } = body
 
     // Verificar que la jornada existe y está en estado 'iniciado'
     const jornada = await prisma.registroHorasCampo.findUnique({
@@ -83,6 +84,16 @@ export async function POST(request: NextRequest, context: RouteContext) {
         { error: 'Solo se pueden agregar tareas a jornadas en estado "iniciado"' },
         { status: 400 }
       )
+    }
+
+    // Si la jornada no tenía EDT (p. ej. creada automáticamente desde la
+    // asistencia) y se agrega una tarea de cronograma, fijar el EDT elegido para
+    // que el cronograma quede disponible de aquí en adelante.
+    if (proyectoTareaId && proyectoEdtId && !jornada.proyectoEdtId) {
+      await prisma.registroHorasCampo.update({
+        where: { id: jornadaId },
+        data: { proyectoEdtId },
+      })
     }
 
     // Validar que tiene tarea del cronograma o nombre extra

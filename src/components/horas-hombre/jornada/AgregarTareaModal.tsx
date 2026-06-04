@@ -96,6 +96,13 @@ export function AgregarTareaModal({
   const [tareas, setTareas] = useState<TareaDelCronograma[]>([])
   const [tareasExtra, setTareasExtra] = useState<TareaExtraExistente[]>([])
 
+  // EDT: si la jornada no tiene EDT asignado (p. ej. creada automáticamente desde
+  // la asistencia), se permite elegir uno del proyecto para ver el cronograma.
+  type EdtOpcion = { id: string; nombre: string; edt?: { nombre?: string } | null }
+  const [edts, setEdts] = useState<EdtOpcion[]>([])
+  const [edtLocal, setEdtLocal] = useState('')
+  const edtEfectivo = proyectoEdtId || edtLocal
+
   // Formulario
   const [tipoTarea, setTipoTarea] = useState<'cronograma' | 'extra'>('cronograma')
   const [actividadId, setActividadId] = useState('')
@@ -126,12 +133,20 @@ export function AgregarTareaModal({
       setExtraHorasPorPersona('')
       setExtraResponsableId('')
       setMiembrosSeleccionados([])
-      if (proyectoEdtId) {
-        cargarActividades()
-      }
+      setEdtLocal('')
+      setActividades([])
+      setActividadId('')
+      // Si la jornada no tiene EDT, cargar los EDT del proyecto para elegir uno.
+      if (!proyectoEdtId) cargarEdts()
       cargarTareasExtra()
     }
   }, [open, proyectoEdtId])
+
+  // Cargar actividades del EDT efectivo (el de la jornada o el elegido localmente).
+  useEffect(() => {
+    if (open && edtEfectivo) cargarActividades(edtEfectivo)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, edtEfectivo])
 
   // Actualizar tareas cuando cambia la actividad
   useEffect(() => {
@@ -144,12 +159,12 @@ export function AgregarTareaModal({
     setTareaId('')
   }, [actividadId, actividades])
 
-  const cargarActividades = async () => {
-    if (!proyectoEdtId) return
+  const cargarActividades = async (edtId: string) => {
+    if (!edtId) return
 
     try {
       setLoading(true)
-      const response = await fetch(`/api/horas-hombre/actividades-edt/${proyectoEdtId}`)
+      const response = await fetch(`/api/horas-hombre/actividades-edt/${edtId}`)
       if (response.ok) {
         const data = await response.json()
         setActividades(data.actividades || [])
@@ -158,6 +173,29 @@ export function AgregarTareaModal({
       console.error('Error cargando actividades:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // EDTs de ejecución del proyecto (para elegir cuando la jornada no tiene uno).
+  const cargarEdts = async () => {
+    try {
+      const response = await fetch(`/api/proyecto-edt?proyectoId=${proyectoId}&tipoCronograma=ejecucion`)
+      if (!response.ok) return
+      const data = await response.json()
+      const lista: EdtOpcion[] = Array.isArray(data) ? data : []
+      // Dedupe por nombre, igual que el formulario manual de jornada.
+      const vistos = new Set<string>()
+      const unicos = lista.filter((e) => {
+        if (vistos.has(e.nombre)) return false
+        vistos.add(e.nombre)
+        return true
+      })
+      setEdts(unicos)
+      // Preseleccionar el EDT de Construcción ("CON…") si existe, como el manual.
+      const con = unicos.find((e) => e.edt?.nombre?.toUpperCase().startsWith('CON'))
+      if (con) setEdtLocal(con.id)
+    } catch (error) {
+      console.error('Error cargando EDTs:', error)
     }
   }
 
@@ -195,7 +233,8 @@ export function AgregarTareaModal({
   // Determinar qué se envía al API
   const getSubmitPayload = () => {
     if (tipoTarea === 'cronograma') {
-      return { proyectoTareaId: tareaId }
+      // Si la jornada no tenía EDT, se manda el elegido para fijarlo en ella.
+      return { proyectoTareaId: tareaId, proyectoEdtId: proyectoEdtId ? undefined : (edtLocal || undefined) }
     }
     // Extra: crear nueva vs seleccionar existente
     if (creandoNuevaExtra) {
@@ -309,7 +348,32 @@ export function AgregarTareaModal({
             </TabsList>
 
             <TabsContent value="cronograma" className="space-y-2.5 mt-3">
-              {proyectoEdtId ? (
+              {/* Selector de EDT solo cuando la jornada no tiene uno asignado */}
+              {!proyectoEdtId && (
+                edts.length > 0 ? (
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2">
+                    <Label className="text-xs text-gray-600 shrink-0 sm:w-16">EDT</Label>
+                    <Select value={edtLocal} onValueChange={setEdtLocal}>
+                      <SelectTrigger className="h-auto min-h-8 py-1 !whitespace-normal [&_[data-slot=select-value]]:!line-clamp-2 text-sm flex-1">
+                        <SelectValue placeholder="Seleccionar EDT" />
+                      </SelectTrigger>
+                      <SelectContent position="popper" className="max-h-[250px] max-w-[calc(100vw-4rem)]">
+                        {edts.map(e => (
+                          <SelectItem key={e.id} value={e.id}>
+                            {e.edt?.nombre ? `${e.edt.nombre} - ${e.nombre}` : e.nombre}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : (
+                  <div className="text-center text-gray-500 text-xs py-3">
+                    Este proyecto no tiene cronograma de ejecución (EDT). Usa &quot;Tarea extra&quot;.
+                  </div>
+                )
+              )}
+
+              {edtEfectivo && (
                 <>
                   {/* Actividad - inline */}
                   <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2">
@@ -347,10 +411,6 @@ export function AgregarTareaModal({
                     </div>
                   )}
                 </>
-              ) : (
-                <div className="text-center text-gray-500 text-xs py-3">
-                  Sin EDT asignado. Usa &quot;Tarea extra&quot;.
-                </div>
               )}
             </TabsContent>
 
