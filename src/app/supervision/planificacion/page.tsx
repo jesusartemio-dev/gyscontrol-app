@@ -1109,10 +1109,11 @@ export default function PlanificacionPage() {
   // ── Compartir programación del día (texto para WhatsApp) ──────────────────────
   const TURNOS_ORDEN: TurnoAsignable[] = ['turno_a', 'turno_b', 'turno_c']
   // Horas de ingreso por defecto por turno (editables al planificar).
+  // A: 07:30–18:00 (9.5h) · B: 14:00–11:30 (día sig.) · C: 19:30–06:00 (día sig.)
   const TURNO_HORA_DEFAULT: Record<TurnoAsignable, string> = {
     turno_a: '07:30',
-    turno_b: '15:00',
-    turno_c: '22:00',
+    turno_b: '14:00',
+    turno_c: '19:30',
   }
   // Hora efectiva de un turno/día: la guardada o, si no hay, la de por defecto.
   const horaTurno = (dateKey: string, t: TurnoAsignable) =>
