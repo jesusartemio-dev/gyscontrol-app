@@ -1108,6 +1108,15 @@ export default function PlanificacionPage() {
 
   // ── Compartir programación del día (texto para WhatsApp) ──────────────────────
   const TURNOS_ORDEN: TurnoAsignable[] = ['turno_a', 'turno_b', 'turno_c']
+  // Horas de ingreso por defecto por turno (editables al planificar).
+  const TURNO_HORA_DEFAULT: Record<TurnoAsignable, string> = {
+    turno_a: '07:30',
+    turno_b: '15:00',
+    turno_c: '22:00',
+  }
+  // Hora efectiva de un turno/día: la guardada o, si no hay, la de por defecto.
+  const horaTurno = (dateKey: string, t: TurnoAsignable) =>
+    turnoHoras[`${dateKey}|${t}`] ?? TURNO_HORA_DEFAULT[t]
 
   // Agrupa un día por turno → proyecto → personas (primer nombre).
   const datosDiaProgramacion = (dateKey: string) => {
@@ -1137,7 +1146,7 @@ export default function PlanificacionPage() {
     for (const t of TURNOS_ORDEN) {
       const proyMap = porTurno.get(t)
       if (!proyMap || proyMap.size === 0) continue
-      const hora = turnoHoras[`${dateKey}|${t}`]
+      const hora = horaTurno(dateKey, t)
       lineas.push(`TURNO ${TURNO_LETRA[t]}${hora ? ` - Ingreso ${hora}` : ''}`)
       for (const [codigo, info] of proyMap) lineas.push(`· ${codigo}: ${info.personas.join(', ')}`)
       lineas.push('')
@@ -1157,7 +1166,7 @@ export default function PlanificacionPage() {
         fetch('/api/planificacion/turno-hora', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fecha: dateKey, turno: t, horaIngreso: turnoHoras[`${dateKey}|${t}`] || '' }),
+          body: JSON.stringify({ fecha: dateKey, turno: t, horaIngreso: horaTurno(dateKey, t) }),
         }).catch(() => {}),
       ),
     )
@@ -1786,7 +1795,7 @@ export default function PlanificacionPage() {
                                   <span className="w-16 text-xs text-muted-foreground">Turno {TURNO_LETRA[t]}</span>
                                   <Input
                                     type="time"
-                                    value={turnoHoras[`${dateKey}|${t}`] || ''}
+                                    value={horaTurno(dateKey, t)}
                                     onChange={(e) => setHoraTurno(dateKey, t, e.target.value)}
                                     className="h-7 flex-1 text-xs"
                                   />
