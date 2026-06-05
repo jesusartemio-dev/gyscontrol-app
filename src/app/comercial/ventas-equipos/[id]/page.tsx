@@ -14,6 +14,8 @@ import {
   ExternalLink,
   Plus,
   Send,
+  Eye,
+  Trash2,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -22,6 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner'
 import type { VentaEquipo } from '@/types/modelos'
 import GenerarPedidoVentaModal from '@/components/comercial/GenerarPedidoVentaModal'
+import DetallePedidoVentaModal from '@/components/comercial/DetallePedidoVentaModal'
 
 const ESTADO_LABELS: Record<string, string> = {
   creado: 'Creado',
@@ -49,6 +52,8 @@ export default function VentaEquipoDetailPage() {
   const [updatingEstado, setUpdatingEstado] = useState(false)
   const [modalPedido, setModalPedido] = useState(false)
   const [enviandoPedido, setEnviandoPedido] = useState<string | null>(null)
+  const [detallePedidoId, setDetallePedidoId] = useState<string | null>(null)
+  const [eliminandoPedido, setEliminandoPedido] = useState<string | null>(null)
 
   const cargarVenta = () => {
     fetch(`/api/venta-equipo/${id}`)
@@ -81,6 +86,25 @@ export default function VentaEquipoDetailPage() {
       toast.error('No se pudo enviar el pedido')
     } finally {
       setEnviandoPedido(null)
+    }
+  }
+
+  const eliminarPedido = async (pedidoId: string, codigo: string) => {
+    if (!confirm(`¿Eliminar el pedido ${codigo}? Esta acción no se puede deshacer.`)) return
+    setEliminandoPedido(pedidoId)
+    try {
+      const res = await fetch(`/api/pedido-equipo/${pedidoId}`, { method: 'DELETE' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(data.error ?? 'No se pudo eliminar el pedido')
+        return
+      }
+      toast.success('Pedido eliminado')
+      cargarVenta()
+    } catch {
+      toast.error('No se pudo eliminar el pedido')
+    } finally {
+      setEliminandoPedido(null)
     }
   }
 
@@ -282,24 +306,47 @@ export default function VentaEquipoDetailPage() {
                   {venta.pedidos.map((p) => (
                     <div key={p.id} className="flex items-center justify-between gap-2 py-1.5 border-b last:border-0">
                       <button
-                        onClick={() => router.push(`/logistica/pedidos/${p.id}`)}
+                        onClick={() => setDetallePedidoId(p.id)}
                         className="text-sm text-blue-600 hover:underline font-medium"
                       >
                         {p.codigo}
                       </button>
                       <div className="flex items-center gap-1.5">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 px-2 text-[11px]"
+                          onClick={() => setDetallePedidoId(p.id)}
+                          title="Ver detalle"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                        </Button>
                         {p.estado === 'borrador' && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-6 px-2 text-[11px]"
-                            onClick={() => enviarPedidoLogistica(p.id)}
-                            disabled={enviandoPedido === p.id}
-                          >
-                            {enviandoPedido === p.id
-                              ? <Loader2 className="h-3 w-3 animate-spin" />
-                              : <><Send className="mr-1 h-3 w-3" /> Enviar a logística</>}
-                          </Button>
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-6 px-2 text-[11px]"
+                              onClick={() => enviarPedidoLogistica(p.id)}
+                              disabled={enviandoPedido === p.id}
+                            >
+                              {enviandoPedido === p.id
+                                ? <Loader2 className="h-3 w-3 animate-spin" />
+                                : <><Send className="mr-1 h-3 w-3" /> Enviar</>}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 px-2 text-[11px] text-red-600 hover:bg-red-50 hover:text-red-600"
+                              onClick={() => eliminarPedido(p.id, p.codigo)}
+                              disabled={eliminandoPedido === p.id}
+                              title="Eliminar pedido"
+                            >
+                              {eliminandoPedido === p.id
+                                ? <Loader2 className="h-3 w-3 animate-spin" />
+                                : <Trash2 className="h-3.5 w-3.5" />}
+                            </Button>
+                          </>
                         )}
                         <Badge variant="outline" className="text-xs">{p.estado}</Badge>
                       </div>
@@ -334,6 +381,11 @@ export default function VentaEquipoDetailPage() {
           items={venta.items}
         />
       )}
+
+      <DetallePedidoVentaModal
+        pedidoId={detallePedidoId}
+        onClose={() => setDetallePedidoId(null)}
+      />
     </div>
   )
 }

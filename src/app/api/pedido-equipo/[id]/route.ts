@@ -309,10 +309,23 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
+    // Permiso: roles de proyectos/gestión, o el área comercial sobre un pedido de
+    // venta de equipos aún en borrador (para corregirlo sin acceder a logística).
+    const permPedido = await prisma.pedidoEquipo.findUnique({
+      where: { id },
+      select: { estado: true, ventaEquipoId: true, responsableId: true },
+    })
+    if (!permPedido) {
+      return NextResponse.json({ error: 'Pedido no encontrado' }, { status: 404 })
+    }
     const rolesPermitidos = ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos']
-    if (!rolesPermitidos.includes(session.user.role)) {
+    const esBorradorVentaComercial =
+      permPedido.estado === 'borrador' &&
+      !!permPedido.ventaEquipoId &&
+      (session.user.role === 'comercial' || permPedido.responsableId === session.user.id)
+    if (!rolesPermitidos.includes(session.user.role) && !esBorradorVentaComercial) {
       return NextResponse.json(
-        { error: 'Logística no puede eliminar pedidos. Solo el área de Proyectos puede eliminar pedidos.' },
+        { error: 'No tienes permiso para eliminar este pedido.' },
         { status: 403 }
       )
     }
