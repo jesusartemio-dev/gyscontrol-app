@@ -5715,6 +5715,19 @@ model PlanificacionDia {
   @@map("planificacion_dia")
 }
 
+// Hora de ingreso por turno y día, para compartir la programación (ej. WhatsApp).
+model PlanificacionTurnoHora {
+  id          String   @id @default(cuid())
+  fecha       DateTime @db.Date
+  turno       TurnoDia
+  horaIngreso String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([fecha, turno])
+  @@map("planificacion_turno_hora")
+}
+
 // ─── Venta de Equipos ──────────────────────────────────────────────────────────
 
 model VentaEquipo {

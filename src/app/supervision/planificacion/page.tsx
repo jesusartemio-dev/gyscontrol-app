@@ -1073,6 +1073,9 @@ export default function PlanificacionPage() {
     })
   }, [])
 
+  // Hora de ingreso por turno/día (para compartir la programación). Clave: `${fecha}|${turno}`.
+  const [turnoHoras, setTurnoHoras] = useState<Record<string, string>>({})
+
   const reload = useCallback(() => {
     setLoading(true)
     const params = new URLSearchParams({ inicio: semanaInicio, semanas: String(numSemanas) })
@@ -1084,6 +1087,17 @@ export default function PlanificacionPage() {
       .then(setData)
       .catch(() => toast.error('Error al cargar planificación'))
       .finally(() => setLoading(false))
+
+    const fin = new Date(semanaInicio + 'T00:00:00.000Z')
+    fin.setUTCDate(fin.getUTCDate() + numSemanas * 7 - 1)
+    fetch(`/api/planificacion/turno-hora?inicio=${semanaInicio}&fin=${fin.toISOString().slice(0, 10)}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((arr: { fecha: string; turno: string; horaIngreso: string }[]) => {
+        const map: Record<string, string> = {}
+        for (const h of arr) map[`${h.fecha}|${h.turno}`] = h.horaIngreso
+        setTurnoHoras(map)
+      })
+      .catch(() => {})
   }, [semanaInicio, departamentosSeleccionados, numSemanas])
 
   const reloadRef = useRef(reload)
@@ -1091,6 +1105,69 @@ export default function PlanificacionPage() {
 
   const dataRef = useRef<SemanaResponse | null>(null)
   dataRef.current = data
+
+  // ── Compartir programación del día (texto para WhatsApp) ──────────────────────
+  const TURNOS_ORDEN: TurnoAsignable[] = ['turno_a', 'turno_b', 'turno_c']
+
+  // Agrupa un día por turno → proyecto → personas (primer nombre).
+  const datosDiaProgramacion = (dateKey: string) => {
+    const porTurno = new Map<TurnoAsignable, Map<string, { nombre: string; personas: string[] }>>()
+    for (const p of personasFiltradas) {
+      const celdas = p.dias[dateKey] ?? []
+      for (const c of celdas) {
+        if (c.tipo !== 'proyecto' || !c.proyecto) continue
+        const t = turnoAsignable(c.turno)
+        if (!porTurno.has(t)) porTurno.set(t, new Map())
+        const proyMap = porTurno.get(t)!
+        if (!proyMap.has(c.proyecto.codigo)) proyMap.set(c.proyecto.codigo, { nombre: c.proyecto.nombre, personas: [] })
+        const n = p.nombre.trim().split(/\s+/)[0] || p.nombre
+        proyMap.get(c.proyecto.codigo)!.personas.push(n.charAt(0).toUpperCase() + n.slice(1).toLowerCase())
+      }
+    }
+    return porTurno
+  }
+
+  const generarTextoDia = (dateKey: string, d: Date) => {
+    const porTurno = datosDiaProgramacion(dateKey)
+    const dia = String(d.getUTCDate()).padStart(2, '0')
+    const mes = String(d.getUTCMonth() + 1).padStart(2, '0')
+    const wd = d.toLocaleDateString('es', { weekday: 'long', timeZone: 'UTC' })
+    const cap = wd.charAt(0).toUpperCase() + wd.slice(1)
+    const lineas: string[] = [`${cap} ${dia}-${mes}-${d.getUTCFullYear()}`, '']
+    for (const t of TURNOS_ORDEN) {
+      const proyMap = porTurno.get(t)
+      if (!proyMap || proyMap.size === 0) continue
+      const hora = turnoHoras[`${dateKey}|${t}`]
+      lineas.push(`TURNO ${TURNO_LETRA[t]}${hora ? ` - Ingreso ${hora}` : ''}`)
+      for (const [codigo, info] of proyMap) lineas.push(`· ${codigo}: ${info.personas.join(', ')}`)
+      lineas.push('')
+    }
+    return lineas.join('\n').trim()
+  }
+
+  const setHoraTurno = (dateKey: string, turno: TurnoAsignable, hora: string) => {
+    setTurnoHoras((prev) => ({ ...prev, [`${dateKey}|${turno}`]: hora }))
+  }
+
+  const copiarProgramacionDia = async (dateKey: string, d: Date) => {
+    const porTurno = datosDiaProgramacion(dateKey)
+    // Persistir las horas de los turnos presentes ese día.
+    await Promise.all(
+      [...porTurno.keys()].map((t) =>
+        fetch('/api/planificacion/turno-hora', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fecha: dateKey, turno: t, horaIngreso: turnoHoras[`${dateKey}|${t}`] || '' }),
+        }).catch(() => {}),
+      ),
+    )
+    try {
+      await navigator.clipboard.writeText(generarTextoDia(dateKey, d))
+      toast.success('Programación copiada')
+    } catch {
+      toast.error('No se pudo copiar')
+    }
+  }
 
   const handleDragStart = useCallback(
     (info: Omit<DragStateExtending, 'type' | 'direction' | 'celdasPreview' | 'fechaFin'>) => {
@@ -1671,21 +1748,66 @@ export default function PlanificacionPage() {
                     : d.toLocaleDateString('es', { weekday: 'narrow', timeZone: 'UTC' })
                   const dayNum = d.getUTCDate()
                   const showDayName = textMode === 'full' || textMode === 'short'
+                  const porTurno = datosDiaProgramacion(dateKey)
+                  const turnosPresentes = TURNOS_ORDEN.filter((t) => porTurno.has(t))
                   return (
                     <div
                       key={dateKey}
                       className={cn(
-                        'text-center px-0.5 rounded truncate font-semibold',
+                        'text-center px-0.5 rounded font-semibold',
                         isSaturday && 'text-orange-500 bg-orange-50/60',
                         isSunday && 'text-red-500 bg-red-50/60',
                         isHoy && 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-l-2 border-blue-500',
                       )}
                     >
-                      {showDayName ? `${dayName} ${dayNum}` : dayNum}
-                      {isHoy && textMode === 'full' && (
-                        <span className="ml-1 text-[9px] bg-blue-500 text-white rounded px-1 py-px leading-none">
-                          Hoy
-                        </span>
+                      <div className="truncate">
+                        {showDayName ? `${dayName} ${dayNum}` : dayNum}
+                        {isHoy && textMode === 'full' && (
+                          <span className="ml-1 text-[9px] bg-blue-500 text-white rounded px-1 py-px leading-none">
+                            Hoy
+                          </span>
+                        )}
+                      </div>
+                      {turnosPresentes.length > 0 && (
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button
+                              className="mx-auto mt-0.5 flex items-center justify-center text-muted-foreground/60 hover:text-foreground"
+                              title="Compartir programación del día"
+                            >
+                              <Copy className="h-3 w-3" />
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent align="center" className="w-72 text-left">
+                            <p className="mb-2 text-xs font-semibold">Compartir programación del día</p>
+                            <div className="space-y-1.5">
+                              {turnosPresentes.map((t) => (
+                                <div key={t} className="flex items-center gap-2">
+                                  <span className="w-16 text-xs text-muted-foreground">Turno {TURNO_LETRA[t]}</span>
+                                  <Input
+                                    type="time"
+                                    value={turnoHoras[`${dateKey}|${t}`] || ''}
+                                    onChange={(e) => setHoraTurno(dateKey, t, e.target.value)}
+                                    className="h-7 flex-1 text-xs"
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                            <p className="mt-2 mb-1 text-[10px] text-muted-foreground">Vista previa:</p>
+                            <textarea
+                              readOnly
+                              value={generarTextoDia(dateKey, d)}
+                              className="h-36 w-full resize-none rounded border bg-muted/30 p-1.5 font-mono text-[10px] leading-tight"
+                            />
+                            <Button
+                              size="sm"
+                              className="mt-2 w-full"
+                              onClick={() => copiarProgramacionDia(dateKey, d)}
+                            >
+                              <Copy className="mr-1 h-3 w-3" /> Copiar
+                            </Button>
+                          </PopoverContent>
+                        </Popover>
                       )}
                     </div>
                   )
