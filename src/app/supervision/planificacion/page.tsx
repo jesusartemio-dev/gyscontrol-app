@@ -1109,6 +1109,7 @@ export default function PlanificacionPage() {
 
   // ── Compartir programación del día (texto para WhatsApp) ──────────────────────
   const TURNOS_ORDEN: TurnoAsignable[] = ['turno_a', 'turno_b', 'turno_c']
+  const TURNO_EMOJI: Record<TurnoAsignable, string> = { turno_a: '🌅', turno_b: '🌆', turno_c: '🌙' }
 
   // Horario efectivo de un turno/día: el guardado (al asignar) o el de por defecto.
   const horarioTurno = (dateKey: string, t: TurnoAsignable): { ingreso: string; salida: string } => {
@@ -1143,14 +1144,14 @@ export default function PlanificacionPage() {
     const mes = String(d.getUTCMonth() + 1).padStart(2, '0')
     const wd = d.toLocaleDateString('es', { weekday: 'long', timeZone: 'UTC' })
     const cap = wd.charAt(0).toUpperCase() + wd.slice(1)
-    const lineas: string[] = [`${cap} ${dia}-${mes}-${d.getUTCFullYear()}`, '']
+    const lineas: string[] = [`📅 *${cap} ${dia}-${mes}-${d.getUTCFullYear()}*`, '']
     for (const t of TURNOS_ORDEN) {
       const proyMap = porTurno.get(t)
       if (!proyMap || proyMap.size === 0) continue
       const { ingreso, salida } = horarioTurno(dateKey, t)
       const sig = turnoCruzaMedianoche(ingreso, salida) ? ' (día sig.)' : ''
-      lineas.push(`TURNO ${TURNO_LETRA[t]} - ${ingreso} a ${salida}${sig}`)
-      for (const [codigo, info] of proyMap) lineas.push(`· ${codigo}: ${info.personas.join(', ')}`)
+      lineas.push(`${TURNO_EMOJI[t]} *TURNO ${TURNO_LETRA[t]}*  ⏰ ${ingreso} a ${salida}${sig}`)
+      for (const [codigo, info] of proyMap) lineas.push(`• *${codigo}:* ${info.personas.join(', ')}`)
       lineas.push('')
     }
     return lineas.join('\n').trim()
