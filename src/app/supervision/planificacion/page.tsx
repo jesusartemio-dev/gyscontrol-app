@@ -50,6 +50,7 @@ import {
   type CeldaDetalleData,
 } from '@/components/planificacion/CeldaDetalleModal'
 import { computeSeleccionRectangulo, toggleCeldaEnSeleccion } from '@/lib/planificacion/seleccion'
+import { resumenOmisiones } from '@/lib/planificacion/omisiones'
 import { COLORES_PROYECTO } from '@/lib/utils/planificacion'
 import { TURNO_HORA_DEFAULT, turnoCruzaMedianoche } from '@/lib/planificacion/turnos'
 import { EjecutadoView } from './EjecutadoView'
@@ -1304,12 +1305,7 @@ export default function PlanificacionPage() {
           const msgs: string[] = []
           if (result.creadas > 0)
             msgs.push(`✓ ${result.creadas} celda${result.creadas > 1 ? 's' : ''} asignada${result.creadas > 1 ? 's' : ''}`)
-          const aus = result.omitidas?.filter((o: { razon: string }) => o.razon === 'conflicto_ausencia').length ?? 0
-          const fin = result.omitidas?.filter((o: { razon: string }) => o.razon === 'fin_de_semana_no_excepcional').length ?? 0
-          const otro = (result.omitidas?.length ?? 0) - aus - fin
-          if (aus) msgs.push(`⚠ ${aus} omitida${aus > 1 ? 's' : ''} (ausencia)`)
-          if (fin) msgs.push(`⚠ ${fin} omitida${fin > 1 ? 's' : ''} (fin de semana)`)
-          if (otro) msgs.push(`⚠ ${otro} omitida${otro > 1 ? 's' : ''} (otro)`)
+          msgs.push(...resumenOmisiones(result.omitidas ?? []))
           toast.success(msgs.join(' · ') || 'Sin cambios')
           reloadRef.current()
         } catch {

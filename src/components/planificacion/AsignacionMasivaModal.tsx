@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { TURNO_HORA_DEFAULT } from '@/lib/planificacion/turnos'
+import { resumenOmisiones } from '@/lib/planificacion/omisiones'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   Select,
@@ -141,13 +142,7 @@ export default function AsignacionMasivaModal({ open, onClose, onDone, celdas }:
         msgs.push(`✓ ${result.actualizadas} actualizada${result.actualizadas !== 1 ? 's' : ''}`)
 
       const omitidas: Array<{ razon: string }> = result.omitidas ?? []
-      const aus = omitidas.filter((o) => o.razon === 'conflicto_ausencia').length
-      const fin = omitidas.filter((o) => o.razon === 'fin_de_semana_no_excepcional').length
-      const otro = omitidas.length - aus - fin
-
-      if (aus) msgs.push(`⚠ ${aus} omitida${aus !== 1 ? 's' : ''} (ausencia)`)
-      if (fin) msgs.push(`⚠ ${fin} omitida${fin !== 1 ? 's' : ''} (fin de semana)`)
-      if (otro) msgs.push(`⚠ ${otro} omitida${otro !== 1 ? 's' : ''} (otro)`)
+      msgs.push(...resumenOmisiones(omitidas))
 
       toast.success(msgs.join(' · ') || 'Sin cambios')
       onDone()
