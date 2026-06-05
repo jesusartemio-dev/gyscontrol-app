@@ -4,8 +4,6 @@ import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { format } from 'date-fns'
-import { es } from 'date-fns/locale'
 import { toast } from 'sonner'
 import { X, Save, Trash2, Loader2, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -82,7 +80,10 @@ export default function AsignacionCeldaModal({ open, onClose, onSaved, userId, u
 
   const fechaDate = new Date(fecha + 'T00:00:00.000Z')
   const isWeekend = fechaDate.getUTCDay() === 0 || fechaDate.getUTCDay() === 6
-  const fechaLabel = format(fechaDate, "EEEE d 'de' MMMM yyyy", { locale: es })
+  // Formatear en UTC para que coincida con el día real (fecha es @db.Date).
+  const fechaLabel = fechaDate.toLocaleDateString('es', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC',
+  })
 
   // Solo las celdas de proyecto (las ausencias se editan en otro modal).
   const celdasProyecto = (celdasDia ?? []).filter((c) => c.tipo === 'proyecto')
@@ -168,6 +169,17 @@ export default function AsignacionCeldaModal({ open, onClose, onSaved, userId, u
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, turnoInicial, fecha])
+
+  // Re-aplicar el proyecto del turno cuando ya cargaron las opciones: el Select de
+  // Radix puede quedar en placeholder si el valor se fijó antes de montar la opción.
+  useEffect(() => {
+    if (!open) return
+    const existente = celdaDeTurno(turnoSel)
+    if (existente?.proyecto?.id && proyectoId !== existente.proyecto.id) {
+      setValue('proyectoId', existente.proyecto.id)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, turnoSel, proyectos])
 
   // Cambiar de turno carga la asignación de ese turno (o lo deja en blanco).
   const cambiarTurno = (t: TurnoVal) => {

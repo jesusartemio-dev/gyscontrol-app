@@ -129,17 +129,8 @@ export async function validarAsignacion(
     })
   }
 
-  // 6. Warning: persona no asignada al proyecto (no bloquea)
-  const enProyecto = await tx.personalProyecto.findFirst({
-    where: { userId, proyectoId, activo: true },
-    select: { id: true },
-  })
-  if (!enProyecto) {
-    warnings.push({
-      codigo: 'persona_no_en_proyecto',
-      mensaje: 'La persona no está asignada oficialmente a este proyecto',
-    })
-  }
+  // Nota: se puede planificar a cualquier persona en cualquier proyecto, aunque
+  // no esté formalmente en el equipo (PersonalProyecto). No se emite advertencia.
 
   return { valido: errores.length === 0, errores, warnings }
 }
