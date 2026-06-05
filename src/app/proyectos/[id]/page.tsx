@@ -143,6 +143,57 @@ export default function ProyectoHubPage() {
     }
   }
 
+  // Vigencia (fechaInicio/fechaFin del proyecto) — controla qué fechas se pueden planificar
+  const [editingVigencia, setEditingVigencia] = useState(false)
+  const [savingVigencia, setSavingVigencia] = useState(false)
+  const [editFechaInicio, setEditFechaInicio] = useState('')
+  const [editFechaFin, setEditFechaFin] = useState('')
+
+  const toDateInput = (v: string | Date | null | undefined) =>
+    v ? new Date(v).toISOString().slice(0, 10) : ''
+
+  const startEditingVigencia = () => {
+    if (!proyecto) return
+    setEditFechaInicio(toDateInput(proyecto.fechaInicio))
+    setEditFechaFin(toDateInput(proyecto.fechaFin))
+    setEditingVigencia(true)
+  }
+
+  const saveVigencia = async () => {
+    if (!proyecto) return
+    if (!editFechaInicio) {
+      toast.error('La fecha de inicio es obligatoria')
+      return
+    }
+    if (editFechaFin && editFechaFin <= editFechaInicio) {
+      toast.error('La fecha de fin debe ser posterior a la de inicio')
+      return
+    }
+    setSavingVigencia(true)
+    try {
+      const res = await fetch(`/api/proyectos/${proyecto.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fechaInicio: editFechaInicio,
+          fechaFin: editFechaFin || null,
+        }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error || `Error ${res.status}`)
+      }
+      const { data } = await res.json()
+      setProyecto({ ...proyecto, fechaInicio: data.fechaInicio, fechaFin: data.fechaFin })
+      setEditingVigencia(false)
+      toast.success('Vigencia del proyecto actualizada')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al guardar vigencia')
+    } finally {
+      setSavingVigencia(false)
+    }
+  }
+
   // Costo planificado de equipos (montoEstimado de listas)
   const [costoPlanificadoEquipos, setCostoPlanificadoEquipos] = useState(0)
 
@@ -929,6 +980,67 @@ export default function ProyectoHubPage() {
           </Button>
         </motion.div>
       )}
+
+      {/* Vigencia del Proyecto (controla la planificación) */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.2, delay: 0.32 }}
+      >
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-blue-600" />
+                <span className="text-sm font-semibold">Vigencia del Proyecto</span>
+                <span className="text-xs text-muted-foreground">(define qué fechas se pueden planificar)</span>
+              </div>
+              {!editingVigencia ? (
+                <Button variant="ghost" size="sm" className="h-7 px-2" onClick={startEditingVigencia}>
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+              ) : (
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="sm" className="h-7 px-2 text-green-700" onClick={saveVigencia} disabled={savingVigencia}>
+                    {savingVigencia ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setEditingVigencia(false)} disabled={savingVigencia}>
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {editingVigencia ? (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">Inicio *</Label>
+                  <Input type="date" value={editFechaInicio} onChange={e => setEditFechaInicio(e.target.value)} className="h-8 text-sm" />
+                </div>
+                <div>
+                  <Label className="text-xs">Fin</Label>
+                  <Input type="date" value={editFechaFin} onChange={e => setEditFechaFin(e.target.value)} className="h-8 text-sm" />
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <div className="text-xs text-muted-foreground">Inicio</div>
+                  <div className="font-semibold">
+                    {proyecto.fechaInicio ? new Date(proyecto.fechaInicio).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Fin</div>
+                  <div className="font-semibold">
+                    {proyecto.fechaFin ? new Date(proyecto.fechaFin).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Sin definir'}
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
 
       {/* Contrato y Cartas Fianza */}
       <SeccionContrato
