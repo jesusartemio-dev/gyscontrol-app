@@ -5,7 +5,9 @@ import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { TURNO_HORA_DEFAULT } from '@/lib/planificacion/turnos'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   Select,
@@ -45,7 +47,16 @@ const TURNOS: TurnoVal[] = ['turno_a', 'turno_b', 'turno_c']
 export default function AsignacionMasivaModal({ open, onClose, onDone, celdas }: Props) {
   const [proyectoId, setProyectoId] = useState('')
   const [turno, setTurno] = useState<TurnoVal>('turno_a')
+  const [horaIngreso, setHoraIngreso] = useState(TURNO_HORA_DEFAULT.turno_a.ingreso)
+  const [horaSalida, setHoraSalida] = useState(TURNO_HORA_DEFAULT.turno_a.salida)
   const [notas, setNotas] = useState('')
+
+  // Al cambiar de turno, prellenar con su horario por defecto.
+  const cambiarTurno = (t: TurnoVal) => {
+    setTurno(t)
+    setHoraIngreso(TURNO_HORA_DEFAULT[t].ingreso)
+    setHoraSalida(TURNO_HORA_DEFAULT[t].salida)
+  }
   const [esExcepcional, setEsExcepcional] = useState(false)
   const [saving, setSaving] = useState(false)
   const [proyectos, setProyectos] = useState<ProyectoActivo[]>([])
@@ -63,6 +74,8 @@ export default function AsignacionMasivaModal({ open, onClose, onDone, celdas }:
     if (!open) {
       setProyectoId('')
       setTurno('turno_a')
+      setHoraIngreso(TURNO_HORA_DEFAULT.turno_a.ingreso)
+      setHoraSalida(TURNO_HORA_DEFAULT.turno_a.salida)
       setNotas('')
       setEsExcepcional(false)
       return
@@ -105,6 +118,20 @@ export default function AsignacionMasivaModal({ open, onClose, onDone, celdas }:
       if (!res.ok && res.status !== 207) {
         toast.error(result?.error ?? 'Error al asignar celdas')
         return
+      }
+
+      // Guardar el horario del turno para cada día de la selección.
+      if (horaIngreso) {
+        const fechas = [...new Set(celdas.map((c) => c.fecha))]
+        await Promise.all(
+          fechas.map((f) =>
+            fetch('/api/planificacion/turno-hora', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ fecha: f, turno, horaIngreso, horaSalida: horaSalida || undefined }),
+            }).catch(() => {}),
+          ),
+        )
       }
 
       const msgs: string[] = []
@@ -158,7 +185,7 @@ export default function AsignacionMasivaModal({ open, onClose, onDone, celdas }:
         <div className="space-y-4 mt-1">
           <div className="space-y-1.5">
             <Label>Turno</Label>
-            <Select value={turno} onValueChange={(v) => setTurno(v as TurnoVal)}>
+            <Select value={turno} onValueChange={(v) => cambiarTurno(v as TurnoVal)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -168,6 +195,26 @@ export default function AsignacionMasivaModal({ open, onClose, onDone, celdas }:
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>
+              Horario del turno{' '}
+              <span className="font-normal text-muted-foreground">(se usa para compartir la programación)</span>
+            </Label>
+            <div className="flex items-center gap-2">
+              <div className="flex-1">
+                <span className="block text-[11px] text-muted-foreground">Ingreso</span>
+                <Input type="time" value={horaIngreso} onChange={(e) => setHoraIngreso(e.target.value)} className="h-8" />
+              </div>
+              <div className="flex-1">
+                <span className="block text-[11px] text-muted-foreground">Salida</span>
+                <Input type="time" value={horaSalida} onChange={(e) => setHoraSalida(e.target.value)} className="h-8" />
+              </div>
+            </div>
+            {horaIngreso && horaSalida && horaSalida <= horaIngreso && (
+              <p className="text-[11px] text-amber-600">La salida es al día siguiente.</p>
+            )}
           </div>
 
           <div className="space-y-1.5">
