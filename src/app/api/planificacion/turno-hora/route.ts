@@ -31,6 +31,7 @@ export async function GET(req: Request) {
       fecha: h.fecha.toISOString().slice(0, 10),
       turno: h.turno,
       horaIngreso: h.horaIngreso,
+      horaSalida: h.horaSalida,
     })),
   )
 }
@@ -47,12 +48,17 @@ export async function PUT(req: Request) {
   const fechaStr = String(body.fecha || '')
   const turno = String(body.turno || '') as TurnoVal
   const horaIngreso = String(body.horaIngreso || '').trim()
+  const horaSalida = String(body.horaSalida || '').trim()
+  const hhmm = /^([01]\d|2[0-3]):[0-5]\d$/
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaStr) || !TURNOS.includes(turno)) {
     return NextResponse.json({ error: 'Datos inválidos' }, { status: 400 })
   }
-  if (horaIngreso && !/^([01]\d|2[0-3]):[0-5]\d$/.test(horaIngreso)) {
-    return NextResponse.json({ error: 'Hora inválida (HH:MM)' }, { status: 400 })
+  if (horaIngreso && !hhmm.test(horaIngreso)) {
+    return NextResponse.json({ error: 'Hora de ingreso inválida (HH:MM)' }, { status: 400 })
+  }
+  if (horaSalida && !hhmm.test(horaSalida)) {
+    return NextResponse.json({ error: 'Hora de salida inválida (HH:MM)' }, { status: 400 })
   }
 
   const fecha = new Date(`${fechaStr}T00:00:00.000Z`)
@@ -64,8 +70,14 @@ export async function PUT(req: Request) {
 
   const guardada = await prisma.planificacionTurnoHora.upsert({
     where: { fecha_turno: { fecha, turno } },
-    update: { horaIngreso },
-    create: { fecha, turno, horaIngreso },
+    update: { horaIngreso, horaSalida: horaSalida || null },
+    create: { fecha, turno, horaIngreso, horaSalida: horaSalida || null },
   })
-  return NextResponse.json({ ok: true, fecha: fechaStr, turno, horaIngreso: guardada.horaIngreso })
+  return NextResponse.json({
+    ok: true,
+    fecha: fechaStr,
+    turno,
+    horaIngreso: guardada.horaIngreso,
+    horaSalida: guardada.horaSalida,
+  })
 }

@@ -10,7 +10,9 @@ import { toast } from 'sonner'
 import { X, Save, Trash2, Loader2, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { TURNO_HORA_DEFAULT } from '@/lib/planificacion/turnos'
 import {
   Select,
   SelectContent,
@@ -72,6 +74,12 @@ export default function AsignacionCeldaModal({ open, onClose, onSaved, userId, u
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
+  // Horario (ingreso/salida) por turno de este día, para compartir la programación.
+  const [horarios, setHorarios] = useState<Record<string, { ingreso: string; salida: string }>>({})
+  const horarioDe = (t: string) => horarios[t] ?? TURNO_HORA_DEFAULT[t as TurnoVal] ?? { ingreso: '', salida: '' }
+  const setHorario = (t: string, campo: 'ingreso' | 'salida', val: string) =>
+    setHorarios((prev) => ({ ...prev, [t]: { ...horarioDe(t), [campo]: val } }))
+
   const fechaDate = new Date(fecha + 'T00:00:00.000Z')
   const isWeekend = fechaDate.getUTCDay() === 0 || fechaDate.getUTCDay() === 6
   const fechaLabel = format(fechaDate, "EEEE d 'de' MMMM yyyy", { locale: es })
@@ -129,6 +137,21 @@ export default function AsignacionCeldaModal({ open, onClose, onSaved, userId, u
         setProyectos([...lista, ...faltantes])
       })
       .catch(() => toast.error('No se pudieron cargar los proyectos'))
+
+    // Horarios por turno ya guardados para este día (si los hay).
+    fetch(`/api/planificacion/turno-hora?inicio=${fecha}&fin=${fecha}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((arr: { turno: string; horaIngreso: string; horaSalida: string | null }[]) => {
+        const h: Record<string, { ingreso: string; salida: string }> = {}
+        for (const x of arr) {
+          h[x.turno] = {
+            ingreso: x.horaIngreso,
+            salida: x.horaSalida || TURNO_HORA_DEFAULT[x.turno as TurnoVal]?.salida || '',
+          }
+        }
+        setHorarios(h)
+      })
+      .catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
@@ -187,6 +210,16 @@ export default function AsignacionCeldaModal({ open, onClose, onSaved, userId, u
         }
       } else {
         toast.success(data.accion === 'creada' ? 'Asignación creada' : 'Asignación actualizada')
+      }
+
+      // Guardar el horario del turno para este día (ingreso/salida).
+      const hor = horarioDe(values.turno)
+      if (hor.ingreso) {
+        await fetch('/api/planificacion/turno-hora', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fecha, turno: values.turno, horaIngreso: hor.ingreso, horaSalida: hor.salida || undefined }),
+        }).catch(() => {})
       }
 
       onSaved()
@@ -255,6 +288,37 @@ export default function AsignacionCeldaModal({ open, onClose, onSaved, userId, u
               <p className="text-[11px] text-muted-foreground">
                 Una persona puede tener un proyecto por turno el mismo día. ✓ = turno ya asignado.
               </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>
+                Horario del turno{' '}
+                <span className="font-normal text-muted-foreground">(se usa para compartir la programación)</span>
+              </Label>
+              <div className="flex items-center gap-2">
+                <div className="flex-1">
+                  <span className="block text-[11px] text-muted-foreground">Ingreso</span>
+                  <Input
+                    type="time"
+                    value={horarioDe(turnoSel).ingreso}
+                    onChange={(e) => setHorario(turnoSel, 'ingreso', e.target.value)}
+                    className="h-8"
+                  />
+                </div>
+                <div className="flex-1">
+                  <span className="block text-[11px] text-muted-foreground">Salida</span>
+                  <Input
+                    type="time"
+                    value={horarioDe(turnoSel).salida}
+                    onChange={(e) => setHorario(turnoSel, 'salida', e.target.value)}
+                    className="h-8"
+                  />
+                </div>
+              </div>
+              {horarioDe(turnoSel).ingreso && horarioDe(turnoSel).salida &&
+                horarioDe(turnoSel).salida <= horarioDe(turnoSel).ingreso && (
+                  <p className="text-[11px] text-amber-600">La salida es al día siguiente.</p>
+                )}
             </div>
 
             <div className="space-y-1.5">

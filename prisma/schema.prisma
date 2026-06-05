@@ -5721,6 +5721,7 @@ model PlanificacionTurnoHora {
   fecha       DateTime @db.Date
   turno       TurnoDia
   horaIngreso String
+  horaSalida  String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

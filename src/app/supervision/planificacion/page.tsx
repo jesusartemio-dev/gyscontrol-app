@@ -51,6 +51,7 @@ import {
 } from '@/components/planificacion/CeldaDetalleModal'
 import { computeSeleccionRectangulo, toggleCeldaEnSeleccion } from '@/lib/planificacion/seleccion'
 import { COLORES_PROYECTO } from '@/lib/utils/planificacion'
+import { TURNO_HORA_DEFAULT, turnoCruzaMedianoche } from '@/lib/planificacion/turnos'
 import { EjecutadoView } from './EjecutadoView'
 
 const DEPT_ORDER = ['INGENIERIA', 'CONSTRUCCION', 'GESTION', 'PROYECTOS']
@@ -1073,8 +1074,8 @@ export default function PlanificacionPage() {
     })
   }, [])
 
-  // Hora de ingreso por turno/día (para compartir la programación). Clave: `${fecha}|${turno}`.
-  const [turnoHoras, setTurnoHoras] = useState<Record<string, string>>({})
+  // Horario (ingreso/salida) por turno/día. Clave: `${fecha}|${turno}`.
+  const [turnoHoras, setTurnoHoras] = useState<Record<string, { ingreso: string; salida: string | null }>>({})
 
   const reload = useCallback(() => {
     setLoading(true)
@@ -1092,9 +1093,9 @@ export default function PlanificacionPage() {
     fin.setUTCDate(fin.getUTCDate() + numSemanas * 7 - 1)
     fetch(`/api/planificacion/turno-hora?inicio=${semanaInicio}&fin=${fin.toISOString().slice(0, 10)}`)
       .then((r) => (r.ok ? r.json() : []))
-      .then((arr: { fecha: string; turno: string; horaIngreso: string }[]) => {
-        const map: Record<string, string> = {}
-        for (const h of arr) map[`${h.fecha}|${h.turno}`] = h.horaIngreso
+      .then((arr: { fecha: string; turno: string; horaIngreso: string; horaSalida: string | null }[]) => {
+        const map: Record<string, { ingreso: string; salida: string | null }> = {}
+        for (const h of arr) map[`${h.fecha}|${h.turno}`] = { ingreso: h.horaIngreso, salida: h.horaSalida }
         setTurnoHoras(map)
       })
       .catch(() => {})
@@ -1108,16 +1109,15 @@ export default function PlanificacionPage() {
 
   // ── Compartir programación del día (texto para WhatsApp) ──────────────────────
   const TURNOS_ORDEN: TurnoAsignable[] = ['turno_a', 'turno_b', 'turno_c']
-  // Horas de ingreso por defecto por turno (editables al planificar).
-  // A: 07:30–18:00 (9.5h) · B: 14:00–11:30 (día sig.) · C: 19:30–06:00 (día sig.)
-  const TURNO_HORA_DEFAULT: Record<TurnoAsignable, string> = {
-    turno_a: '07:30',
-    turno_b: '14:00',
-    turno_c: '19:30',
+
+  // Horario efectivo de un turno/día: el guardado (al asignar) o el de por defecto.
+  const horarioTurno = (dateKey: string, t: TurnoAsignable): { ingreso: string; salida: string } => {
+    const g = turnoHoras[`${dateKey}|${t}`]
+    return {
+      ingreso: g?.ingreso || TURNO_HORA_DEFAULT[t].ingreso,
+      salida: g?.salida || TURNO_HORA_DEFAULT[t].salida,
+    }
   }
-  // Hora efectiva de un turno/día: la guardada o, si no hay, la de por defecto.
-  const horaTurno = (dateKey: string, t: TurnoAsignable) =>
-    turnoHoras[`${dateKey}|${t}`] ?? TURNO_HORA_DEFAULT[t]
 
   // Agrupa un día por turno → proyecto → personas (primer nombre).
   const datosDiaProgramacion = (dateKey: string) => {
@@ -1147,30 +1147,16 @@ export default function PlanificacionPage() {
     for (const t of TURNOS_ORDEN) {
       const proyMap = porTurno.get(t)
       if (!proyMap || proyMap.size === 0) continue
-      const hora = horaTurno(dateKey, t)
-      lineas.push(`TURNO ${TURNO_LETRA[t]}${hora ? ` - Ingreso ${hora}` : ''}`)
+      const { ingreso, salida } = horarioTurno(dateKey, t)
+      const sig = turnoCruzaMedianoche(ingreso, salida) ? ' (día sig.)' : ''
+      lineas.push(`TURNO ${TURNO_LETRA[t]} - ${ingreso} a ${salida}${sig}`)
       for (const [codigo, info] of proyMap) lineas.push(`· ${codigo}: ${info.personas.join(', ')}`)
       lineas.push('')
     }
     return lineas.join('\n').trim()
   }
 
-  const setHoraTurno = (dateKey: string, turno: TurnoAsignable, hora: string) => {
-    setTurnoHoras((prev) => ({ ...prev, [`${dateKey}|${turno}`]: hora }))
-  }
-
   const copiarProgramacionDia = async (dateKey: string, d: Date) => {
-    const porTurno = datosDiaProgramacion(dateKey)
-    // Persistir las horas de los turnos presentes ese día.
-    await Promise.all(
-      [...porTurno.keys()].map((t) =>
-        fetch('/api/planificacion/turno-hora', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fecha: dateKey, turno: t, horaIngreso: horaTurno(dateKey, t) }),
-        }).catch(() => {}),
-      ),
-    )
     try {
       await navigator.clipboard.writeText(generarTextoDia(dateKey, d))
       toast.success('Programación copiada')
@@ -1789,25 +1775,14 @@ export default function PlanificacionPage() {
                             </button>
                           </PopoverTrigger>
                           <PopoverContent align="center" className="w-72 text-left">
-                            <p className="mb-2 text-xs font-semibold">Compartir programación del día</p>
-                            <div className="space-y-1.5">
-                              {turnosPresentes.map((t) => (
-                                <div key={t} className="flex items-center gap-2">
-                                  <span className="w-16 text-xs text-muted-foreground">Turno {TURNO_LETRA[t]}</span>
-                                  <Input
-                                    type="time"
-                                    value={horaTurno(dateKey, t)}
-                                    onChange={(e) => setHoraTurno(dateKey, t, e.target.value)}
-                                    className="h-7 flex-1 text-xs"
-                                  />
-                                </div>
-                              ))}
-                            </div>
-                            <p className="mt-2 mb-1 text-[10px] text-muted-foreground">Vista previa:</p>
+                            <p className="mb-1.5 text-xs font-semibold">Compartir programación del día</p>
+                            <p className="mb-2 text-[10px] text-muted-foreground">
+                              Las horas de cada turno se definen al asignar el proyecto. Aquí solo se copia.
+                            </p>
                             <textarea
                               readOnly
                               value={generarTextoDia(dateKey, d)}
-                              className="h-36 w-full resize-none rounded border bg-muted/30 p-1.5 font-mono text-[10px] leading-tight"
+                              className="h-40 w-full resize-none rounded border bg-muted/30 p-1.5 font-mono text-[10px] leading-tight"
                             />
                             <Button
                               size="sm"
