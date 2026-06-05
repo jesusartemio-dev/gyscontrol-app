@@ -110,12 +110,13 @@ export default function GenerarPedidoVentaModal({ open, onClose, onCreated, vent
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[85vh] max-w-lg flex-col gap-0 p-0">
+        <DialogHeader className="border-b px-6 py-4">
           <DialogTitle>Generar pedido de equipos</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-3">
+        {/* Cuerpo con scroll interno (el footer queda fijo abajo) */}
+        <div className="flex-1 space-y-3 overflow-y-auto px-6 py-4">
           <p className="text-xs text-muted-foreground">
             Se creará un pedido (en <span className="font-medium">borrador</span>) con los equipos
             seleccionados de esta venta. Luego podrás enviarlo a logística.
@@ -131,17 +132,17 @@ export default function GenerarPedidoVentaModal({ open, onClose, onCreated, vent
             />
           </div>
 
-          <div className="max-h-72 space-y-1.5 overflow-y-auto rounded-md border p-2">
+          <div className="rounded-md border">
             {items.map((it) => (
-              <div key={it.id} className="flex items-center gap-2 py-1">
+              <div key={it.id} className="flex items-start gap-2 border-b px-2 py-2 last:border-0">
                 <input
                   type="checkbox"
-                  className="h-4 w-4 shrink-0 rounded border-border"
+                  className="mt-1 h-4 w-4 shrink-0 rounded border-border"
                   checked={!!sel[it.id]}
                   onChange={(e) => setSel((p) => ({ ...p, [it.id]: e.target.checked }))}
                 />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{it.descripcion}</p>
+                  <p className="line-clamp-2 text-sm font-medium leading-snug">{it.descripcion}</p>
                   <p className="text-xs text-muted-foreground">
                     {it.codigo && <span className="mr-1">{it.codigo}</span>}
                     {it.unidad || 'und'} · ${it.precioUnitarioCliente.toLocaleString('en-US', { minimumFractionDigits: 2 })}
@@ -154,7 +155,7 @@ export default function GenerarPedidoVentaModal({ open, onClose, onCreated, vent
                   value={cant[it.id] ?? 0}
                   onChange={(e) => setCant((p) => ({ ...p, [it.id]: Number(e.target.value) }))}
                   disabled={!sel[it.id]}
-                  className="h-8 w-20 text-right text-sm"
+                  className="h-8 w-16 shrink-0 text-right text-sm"
                 />
               </div>
             ))}
@@ -164,7 +165,7 @@ export default function GenerarPedidoVentaModal({ open, onClose, onCreated, vent
           </p>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="border-t px-6 py-3">
           <Button variant="outline" onClick={onClose} disabled={creando}>
             Cancelar
           </Button>
