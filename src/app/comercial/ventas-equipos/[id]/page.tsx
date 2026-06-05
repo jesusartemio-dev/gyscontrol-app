@@ -12,6 +12,8 @@ import {
   Loader2,
   ShoppingCart,
   ExternalLink,
+  Plus,
+  Send,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -19,6 +21,7 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'sonner'
 import type { VentaEquipo } from '@/types/modelos'
+import GenerarPedidoVentaModal from '@/components/comercial/GenerarPedidoVentaModal'
 
 const ESTADO_LABELS: Record<string, string> = {
   creado: 'Creado',
@@ -44,13 +47,42 @@ export default function VentaEquipoDetailPage() {
   const [venta, setVenta] = useState<VentaEquipo | null>(null)
   const [loading, setLoading] = useState(true)
   const [updatingEstado, setUpdatingEstado] = useState(false)
+  const [modalPedido, setModalPedido] = useState(false)
+  const [enviandoPedido, setEnviandoPedido] = useState<string | null>(null)
 
-  useEffect(() => {
+  const cargarVenta = () => {
     fetch(`/api/venta-equipo/${id}`)
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data) setVenta(data) })
       .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    cargarVenta()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
+
+  const enviarPedidoLogistica = async (pedidoId: string) => {
+    setEnviandoPedido(pedidoId)
+    try {
+      const res = await fetch(`/api/pedido-equipo/${pedidoId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estado: 'enviado' }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(data.error ?? 'No se pudo enviar el pedido')
+        return
+      }
+      toast.success('Pedido enviado a logística')
+      cargarVenta()
+    } catch {
+      toast.error('No se pudo enviar el pedido')
+    } finally {
+      setEnviandoPedido(null)
+    }
+  }
 
   const handleEstadoChange = async (nuevoEstado: string) => {
     if (!venta) return
@@ -223,14 +255,25 @@ export default function VentaEquipoDetailPage() {
                   <ShoppingCart className="h-4 w-4 text-blue-500" />
                   Pedidos ({venta.pedidos?.length ?? venta._count?.pedidos ?? 0})
                 </CardTitle>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-7 text-xs"
-                  onClick={() => router.push(`/logistica/pedidos?ventaEquipoId=${venta.id}`)}
-                >
-                  Ver en Logística
-                </Button>
+                <div className="flex items-center gap-1.5">
+                  {venta.items && venta.items.length > 0 && venta.estado !== 'cancelado' && (
+                    <Button
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => setModalPedido(true)}
+                    >
+                      <Plus className="mr-1 h-3 w-3" /> Generar pedido
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs"
+                    onClick={() => router.push(`/logistica/pedidos?ventaEquipoId=${venta.id}`)}
+                  >
+                    Ver en Logística
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="px-4 pb-4">
@@ -244,7 +287,22 @@ export default function VentaEquipoDetailPage() {
                       >
                         {p.codigo}
                       </button>
-                      <Badge variant="outline" className="text-xs">{p.estado}</Badge>
+                      <div className="flex items-center gap-1.5">
+                        {p.estado === 'borrador' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 px-2 text-[11px]"
+                            onClick={() => enviarPedidoLogistica(p.id)}
+                            disabled={enviandoPedido === p.id}
+                          >
+                            {enviandoPedido === p.id
+                              ? <Loader2 className="h-3 w-3 animate-spin" />
+                              : <><Send className="mr-1 h-3 w-3" /> Enviar a logística</>}
+                          </Button>
+                        )}
+                        <Badge variant="outline" className="text-xs">{p.estado}</Badge>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -266,6 +324,16 @@ export default function VentaEquipoDetailPage() {
           )}
         </div>
       </div>
+
+      {venta.items && (
+        <GenerarPedidoVentaModal
+          open={modalPedido}
+          onClose={() => setModalPedido(false)}
+          onCreated={cargarVenta}
+          ventaId={venta.id}
+          items={venta.items}
+        />
+      )}
     </div>
   )
 }
