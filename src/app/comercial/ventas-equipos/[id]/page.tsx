@@ -13,7 +13,6 @@ import {
   ShoppingCart,
   ExternalLink,
   Plus,
-  Send,
   Eye,
   Trash2,
 } from 'lucide-react'
@@ -51,7 +50,6 @@ export default function VentaEquipoDetailPage() {
   const [loading, setLoading] = useState(true)
   const [updatingEstado, setUpdatingEstado] = useState(false)
   const [modalPedido, setModalPedido] = useState(false)
-  const [enviandoPedido, setEnviandoPedido] = useState<string | null>(null)
   const [detallePedidoId, setDetallePedidoId] = useState<string | null>(null)
   const [eliminandoPedido, setEliminandoPedido] = useState<string | null>(null)
 
@@ -66,28 +64,6 @@ export default function VentaEquipoDetailPage() {
     cargarVenta()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
-
-  const enviarPedidoLogistica = async (pedidoId: string) => {
-    setEnviandoPedido(pedidoId)
-    try {
-      const res = await fetch(`/api/pedido-equipo/${pedidoId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ estado: 'enviado' }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        toast.error(data.error ?? 'No se pudo enviar el pedido')
-        return
-      }
-      toast.success('Pedido enviado a logística')
-      cargarVenta()
-    } catch {
-      toast.error('No se pudo enviar el pedido')
-    } finally {
-      setEnviandoPedido(null)
-    }
-  }
 
   const eliminarPedido = async (pedidoId: string, codigo: string) => {
     if (!confirm(`¿Eliminar el pedido ${codigo}? Esta acción no se puede deshacer.`)) return
@@ -322,31 +298,18 @@ export default function VentaEquipoDetailPage() {
                           <Eye className="h-3.5 w-3.5" />
                         </Button>
                         {p.estado === 'borrador' && (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-6 px-2 text-[11px]"
-                              onClick={() => enviarPedidoLogistica(p.id)}
-                              disabled={enviandoPedido === p.id}
-                            >
-                              {enviandoPedido === p.id
-                                ? <Loader2 className="h-3 w-3 animate-spin" />
-                                : <><Send className="mr-1 h-3 w-3" /> Enviar</>}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-6 px-2 text-[11px] text-red-600 hover:bg-red-50 hover:text-red-600"
-                              onClick={() => eliminarPedido(p.id, p.codigo)}
-                              disabled={eliminandoPedido === p.id}
-                              title="Eliminar pedido"
-                            >
-                              {eliminandoPedido === p.id
-                                ? <Loader2 className="h-3 w-3 animate-spin" />
-                                : <Trash2 className="h-3.5 w-3.5" />}
-                            </Button>
-                          </>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 px-2 text-[11px] text-red-600 hover:bg-red-50 hover:text-red-600"
+                            onClick={() => eliminarPedido(p.id, p.codigo)}
+                            disabled={eliminandoPedido === p.id}
+                            title="Eliminar pedido"
+                          >
+                            {eliminandoPedido === p.id
+                              ? <Loader2 className="h-3 w-3 animate-spin" />
+                              : <Trash2 className="h-3.5 w-3.5" />}
+                          </Button>
                         )}
                         <Badge variant="outline" className="text-xs">{p.estado}</Badge>
                       </div>
@@ -385,6 +348,7 @@ export default function VentaEquipoDetailPage() {
       <DetallePedidoVentaModal
         pedidoId={detallePedidoId}
         onClose={() => setDetallePedidoId(null)}
+        onUpdated={cargarVenta}
       />
     </div>
   )

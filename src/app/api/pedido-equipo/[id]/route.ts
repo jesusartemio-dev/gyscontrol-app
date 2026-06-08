@@ -182,6 +182,7 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
         estado: true,
         codigo: true,
         responsableId: true,
+        ventaEquipoId: true,
         proyecto: {
           select: { nombre: true }
         },
@@ -199,12 +200,21 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
     if (body.estado && body.estado !== pedidoActual.estado) {
       const userRole = session.user.role || ''
       const esCreador = pedidoActual.responsableId === session.user.id
-      const resultado = validarTransicionPedido(pedidoActual.estado, body.estado, userRole, esCreador)
-      if (!resultado.valido) {
-        return NextResponse.json(
-          { error: resultado.error },
-          { status: 403 }
-        )
+      // Excepción: el área comercial puede aprobar (enviado → aprobado) los pedidos
+      // que provienen de una venta de equipos, sin pasar por el área de proyectos.
+      const comercialApruebaVenta =
+        userRole === 'comercial' &&
+        !!pedidoActual.ventaEquipoId &&
+        pedidoActual.estado === 'enviado' &&
+        body.estado === 'aprobado'
+      if (!comercialApruebaVenta) {
+        const resultado = validarTransicionPedido(pedidoActual.estado, body.estado, userRole, esCreador)
+        if (!resultado.valido) {
+          return NextResponse.json(
+            { error: resultado.error },
+            { status: 403 }
+          )
+        }
       }
       // Auto-set dates based on transition
       const fechasTransicion = getFechasPorTransicionPedido(body.estado as EstadoPedidoEquipo)
