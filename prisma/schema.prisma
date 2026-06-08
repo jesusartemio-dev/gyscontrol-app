@@ -1476,6 +1476,7 @@ model RegistroHorasCampo {
   aprobadoPor        User?                     @relation("RegistrosCampoAprobador", fields: [aprobadoPorId], references: [id])
   tareas             RegistroHorasCampoTarea[]
   evidenciaSeguridad EvidenciaSeguridad?
+  evidenciaAvance    EvidenciaAvance?          @relation("JornadaEvidenciaAvance")
   jornadaAsistencia  JornadaAsistencia?        @relation("JornadaAsistenciaRegistro")
 
   @@index([proyectoId, estado, fechaTrabajo])
@@ -1560,6 +1561,92 @@ model RegistroSeguridadFoto {
 
   @@index([registroSeguridadId, orden])
   @@map("registro_seguridad_foto")
+}
+
+// ===========================================================================
+// Evidencias Técnicas / de Avance (Área de Proyectos)
+// Análogo a Evidencias de Seguridad pero para el personal de proyectos que
+// captura avance técnico (montaje, conexionado, pruebas, etc.) por jornada.
+// ===========================================================================
+
+// Contenedor 1:1 por jornada que agrupa los registros de avance técnico
+// capturados durante esa jornada. Se abre una vez y acumula registros mientras
+// esté abierta.
+model EvidenciaAvance {
+  id                   String                @id @default(cuid())
+  registroHorasCampoId String                @unique
+  creadoPorId          String
+  estado               EstadoEvidenciaAvance @default(abierta)
+  observaciones        String?
+  fechaCierre          DateTime?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  jornada   RegistroHorasCampo @relation("JornadaEvidenciaAvance", fields: [registroHorasCampoId], references: [id], onDelete: Cascade)
+  creadoPor User               @relation("EvidenciasAvance", fields: [creadoPorId], references: [id])
+  registros RegistroAvance[]
+
+  @@index([creadoPorId])
+  @@map("evidencia_avance")
+}
+
+enum EstadoEvidenciaAvance {
+  abierta
+  cerrada
+}
+
+// Registro de actividad de avance técnico asociado a una evidencia de jornada.
+model RegistroAvance {
+  id                String             @id @default(cuid())
+  evidenciaAvanceId String
+  autorId           String
+  tipo              TipoRegistroAvance
+  descripcion       String
+  disciplina        String?
+  proyectoTareaId   String?
+  porcentajeAvance  Int?
+  observaciones     String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  evidencia     EvidenciaAvance      @relation(fields: [evidenciaAvanceId], references: [id], onDelete: Cascade)
+  autor         User                 @relation("RegistrosAvanceAutor", fields: [autorId], references: [id])
+  proyectoTarea ProyectoTarea?       @relation(fields: [proyectoTareaId], references: [id])
+  fotos         RegistroAvanceFoto[]
+
+  @@index([evidenciaAvanceId])
+  @@index([autorId, createdAt(sort: Desc)])
+  @@index([tipo, createdAt(sort: Desc)])
+  @@index([proyectoTareaId])
+  @@map("registro_avance")
+}
+
+enum TipoRegistroAvance {
+  avance_general
+  montaje_instalacion
+  conexionado_electrico
+  instrumentacion
+  pruebas_comisionamiento
+  inspeccion_calidad
+}
+
+model RegistroAvanceFoto {
+  id               String   @id @default(cuid())
+  registroAvanceId String
+  nombreArchivo    String
+  urlArchivo       String
+  driveFileId      String?
+  tipoArchivo      String?
+  tamano           Int?
+  leyenda          String?
+  incluirEnReporte Boolean  @default(true)
+  orden            Int      @default(0)
+  createdAt        DateTime @default(now())
+
+  registro RegistroAvance @relation(fields: [registroAvanceId], references: [id], onDelete: Cascade)
+
+  @@index([registroAvanceId, orden])
+  @@map("registro_avance_foto")
 }
 
 // Reporte semanal de seguridad que agrupa los registros de campo de una semana ISO.
@@ -1814,6 +1901,9 @@ model User {
   // Registros de seguridad (charlas NDAD, inspecciones, observaciones)
   registrosSeguridad                       RegistroSeguridad[]         @relation("RegistrosSeguridadIngeniero")
   evidenciasSeguridadCreadas               EvidenciaSeguridad[]        @relation("EvidenciasSeguridad")
+  // Evidencias técnicas / de avance (área de proyectos)
+  evidenciasAvance                         EvidenciaAvance[]           @relation("EvidenciasAvance")
+  registrosAvance                          RegistroAvance[]            @relation("RegistrosAvanceAutor")
   // Reportes semanales de seguridad
   reportesSeguridadCreados                 ReporteSemanalSeguridad[]   @relation("ReportesSeguridadIngeniero")
   reportesSeguridadAprobados               ReporteSemanalSeguridad[]   @relation("ReportesSeguridadAprobador")
@@ -3196,6 +3286,7 @@ model ProyectoTarea {
   creadoPor                   User?                       @relation("TareaCreadaPor", fields: [creadoPorId], references: [id])
   recurso                     Recurso?                    @relation(fields: [recursoId], references: [id], onDelete: SetNull)
   registrosCampoTarea         RegistroHorasCampoTarea[]
+  registrosAvance             RegistroAvance[]
 
   @@index([creadoPorId])
   @@index([recursoId])
