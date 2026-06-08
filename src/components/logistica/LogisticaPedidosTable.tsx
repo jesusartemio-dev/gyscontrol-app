@@ -6,7 +6,7 @@
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronUp, ChevronDown, Eye, Package, Trash2, User, Building2, FolderKanban } from 'lucide-react'
+import { ChevronUp, ChevronDown, Eye, Package, Trash2, User, Building2, FolderKanban, ShoppingCart } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
@@ -85,8 +85,8 @@ export default function LogisticaPedidosTable({ pedidos, loading = false, onDele
           bValue = b.responsable?.name || ''
           break
         case 'destino':
-          aValue = a.proyecto?.codigo || a.proyecto?.nombre || (a as any).centroCosto?.nombre || ''
-          bValue = b.proyecto?.codigo || b.proyecto?.nombre || (b as any).centroCosto?.nombre || ''
+          aValue = a.proyecto?.codigo || a.proyecto?.nombre || (a as any).centroCosto?.nombre || a.ventaEquipo?.codigo || ''
+          bValue = b.proyecto?.codigo || b.proyecto?.nombre || (b as any).centroCosto?.nombre || b.ventaEquipo?.codigo || ''
           break
         case 'estado':
           aValue = a.estado || ''
@@ -283,6 +283,13 @@ export default function LogisticaPedidosTable({ pedidos, loading = false, onDele
                       <FolderKanban className="h-3 w-3 text-violet-400 flex-shrink-0" />
                       <span className="text-xs font-medium text-violet-700 truncate max-w-[120px]" title={(pedido as any).centroCosto.nombre}>
                         {(pedido as any).centroCosto.nombre}
+                      </span>
+                    </div>
+                  ) : pedido.ventaEquipo ? (
+                    <div className="flex items-center gap-1.5">
+                      <ShoppingCart className="h-3 w-3 text-emerald-500 flex-shrink-0" />
+                      <span className="text-xs font-medium text-emerald-700 truncate max-w-[120px]" title={pedido.ventaEquipo.nombre ?? pedido.ventaEquipo.codigo}>
+                        {pedido.ventaEquipo.codigo || pedido.ventaEquipo.nombre}
                       </span>
                     </div>
                   ) : (
