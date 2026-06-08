@@ -29,6 +29,8 @@ import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { getClienteById } from '@/lib/services/cliente'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import ClienteForm from '@/components/clientes/ClienteForm'
 import type { Cliente } from '@/types'
 
 interface ProyectoResumen {
@@ -73,25 +75,27 @@ export default function ClienteDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [logoUploading, setLogoUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [editOpen, setEditOpen] = useState(false)
+
+  const loadCliente = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const data = await getClienteById(clienteId)
+      setCliente(data as ClienteCRM)
+    } catch (err) {
+      setError('Error al cargar el cliente')
+      console.error('Error loading client:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const loadCliente = async () => {
-      try {
-        setLoading(true)
-        setError(null)
-        const data = await getClienteById(clienteId)
-        setCliente(data as ClienteCRM)
-      } catch (err) {
-        setError('Error al cargar el cliente')
-        console.error('Error loading client:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-
     if (clienteId) {
       loadCliente()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clienteId])
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -262,7 +266,7 @@ export default function ClienteDetailPage() {
               <BarChart3 className="h-4 w-4 mr-2" />
               Vista CRM
             </Button>
-            <Button variant="outline">
+            <Button variant="outline" onClick={() => setEditOpen(true)}>
               <Edit3 className="h-4 w-4 mr-2" />
               Editar
             </Button>
@@ -631,6 +635,33 @@ export default function ClienteDetailPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Modal de edición del cliente (incluye el código/sigla) */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar cliente</DialogTitle>
+          </DialogHeader>
+          {cliente && (
+            <ClienteForm
+              initial={{
+                id: cliente.id,
+                codigo: cliente.codigo,
+                numeroSecuencia: cliente.numeroSecuencia,
+                nombre: cliente.nombre,
+                ruc: cliente.ruc,
+                direccion: cliente.direccion,
+                telefono: cliente.telefono,
+                correo: cliente.correo,
+                createdAt: cliente.createdAt,
+                updatedAt: cliente.updatedAt,
+              } as Cliente}
+              onSaved={() => { setEditOpen(false); loadCliente() }}
+              onCancel={() => setEditOpen(false)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </motion.div>
   )
 }
