@@ -1491,6 +1491,7 @@ export interface OrdenCompraPayload {
   centroCostoId?: string
   pedidoEquipoId?: string
   proyectoId?: string
+  ventaEquipoId?: string
   categoriaCosto?: 'equipos' | 'servicios' | 'gastos'
   requiereRecepcion?: boolean
   condicionPago?: string

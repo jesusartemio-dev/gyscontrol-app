@@ -600,10 +600,15 @@ export default function PedidoLogisticaDetailPage() {
     const itemIds = seleccionados.map(([id]) => id).join(',')
     const proyectoId = (pedido as any)?.proyecto?.id
     const centroCostoId = (pedido as any)?.centroCosto?.id
+    const ventaEquipoId = (pedido as any)?.ventaEquipoId
     const params = new URLSearchParams()
     if (proyectoId) params.set('proyectoId', proyectoId)
     else if (centroCostoId) params.set('centroCostoId', centroCostoId)
-    else {
+    else if (ventaEquipoId) {
+      // Pedido generado desde una venta de equipos: imputar a la venta y pasar el pedido
+      params.set('ventaEquipoId', ventaEquipoId)
+      params.set('pedidoId', pedidoId)
+    } else {
       toast.error('El pedido no tiene proyecto ni centro de costo asociado')
       return
     }

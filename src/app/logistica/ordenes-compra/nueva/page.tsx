@@ -75,6 +75,9 @@ function NuevaOrdenCompraContent() {
   const [proveedorId, setProveedorId] = useState('')
   const [asignacion, setAsignacion] = useState<AsignacionValue>({ proyectoId: null, centroCostoId: null })
   const [multiProyecto, setMultiProyecto] = useState(false)
+  // Imputación a venta de equipos (pedidos generados desde una venta no tienen proyecto/centro de costo)
+  const [ventaEquipoId, setVentaEquipoId] = useState<string | null>(null)
+  const [ventaEquipoCodigo, setVentaEquipoCodigo] = useState<string | null>(null)
   const [categoriaCosto, setCategoriaCosto] = useState('equipos')
   const [condicionPago, setCondicionPago] = useState('contado')
   const [formaPago, setFormaPago] = useState('')
@@ -127,7 +130,7 @@ function NuevaOrdenCompraContent() {
   const [manualEditIndex, setManualEditIndex] = useState<number | null>(null)
   const [manualForm, setManualForm] = useState({ codigo: '', descripcion: '', unidad: 'UND', cantidad: 1, precioUnitario: 0 })
 
-  const hasAsignacion = multiProyecto || !!(asignacion.proyectoId || asignacion.centroCostoId)
+  const hasAsignacion = multiProyecto || !!(asignacion.proyectoId || asignacion.centroCostoId || ventaEquipoId)
 
   useEffect(() => {
     getProveedores()
@@ -136,11 +139,50 @@ function NuevaOrdenCompraContent() {
       .finally(() => setLoadingData(false))
   }, [])
 
-  // Leer query params: proyectoId | centroCostoId + pedidoItems (IDs separados por coma)
+  // Leer query params: proyectoId | centroCostoId | ventaEquipoId + pedidoItems (IDs separados por coma)
   useEffect(() => {
     const proyectoIdParam = searchParams.get('proyectoId') || null
     const centroCostoIdParam = searchParams.get('centroCostoId') || null
+    const ventaEquipoIdParam = searchParams.get('ventaEquipoId') || null
+    const pedidoIdParam = searchParams.get('pedidoId') || null
     const pedidoItemsParam = searchParams.get('pedidoItems')
+
+    // Imputación a venta de equipos: los ítems se cargan directo del pedido de venta
+    // (no pasan por fetchItemsDisponibles, que está acotado a proyecto/centro de costo).
+    if (ventaEquipoIdParam) {
+      setVentaEquipoId(ventaEquipoIdParam)
+      const ids = (pedidoItemsParam || '').split(',').filter(Boolean)
+      if (pedidoIdParam) {
+        setLoadingItems(true)
+        fetch(`/api/pedido-equipo/${pedidoIdParam}`)
+          .then(r => (r.ok ? r.json() : null))
+          .then((pedido: any) => {
+            if (!pedido) { toast.error('No se pudo cargar el pedido de la venta'); return }
+            setVentaEquipoCodigo(pedido.codigo ?? null)
+            const itemsPedido: any[] = pedido.items ?? []
+            const elegibles = ids.length > 0 ? itemsPedido.filter(i => ids.includes(i.id)) : itemsPedido
+            const newItems: ItemForm[] = elegibles.map(i => ({
+              codigo: i.codigo ?? '',
+              descripcion: i.descripcion ?? '',
+              unidad: i.unidad || 'UND',
+              cantidad: i.cantidadPedida ?? 1,
+              precioUnitario: i.precioUnitario ?? 0,
+              source: 'pedido' as const,
+              pedidoEquipoItemId: i.id,
+              sourceLabel: pedido.codigo,
+            }))
+            if (newItems.length > 0) {
+              setItems(newItems)
+              toast.success(`${newItems.length} item(s) cargados desde el pedido de la venta`)
+            } else {
+              toast.warning('No hay ítems disponibles del pedido para generar la OC')
+            }
+          })
+          .catch(() => toast.error('Error al cargar los ítems del pedido de la venta'))
+          .finally(() => setLoadingItems(false))
+      }
+      return
+    }
 
     if (proyectoIdParam) {
       setAsignacion({ proyectoId: proyectoIdParam, centroCostoId: null })
@@ -495,8 +537,9 @@ function NuevaOrdenCompraContent() {
       setSaving(true)
       const payload = {
         proveedorId,
-        proyectoId: multiProyecto ? undefined : (asignacion.proyectoId || undefined),
-        centroCostoId: multiProyecto ? undefined : (asignacion.centroCostoId || undefined),
+        proyectoId: multiProyecto || ventaEquipoId ? undefined : (asignacion.proyectoId || undefined),
+        centroCostoId: multiProyecto || ventaEquipoId ? undefined : (asignacion.centroCostoId || undefined),
+        ventaEquipoId: ventaEquipoId || undefined,
         multiProyecto: multiProyecto || undefined,
         categoriaCosto: categoriaCosto as 'equipos' | 'servicios' | 'gastos',
         requiereRecepcion,
@@ -575,35 +618,48 @@ function NuevaOrdenCompraContent() {
             <CardTitle className="text-sm font-medium">Asignar a <span className="text-red-500">*</span></CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {/* Toggle multi-proyecto */}
-            <div className="flex items-center gap-2">
-              <Switch
-                id="multi-proyecto"
-                checked={multiProyecto}
-                onCheckedChange={(v) => {
-                  setMultiProyecto(v)
-                  if (v) setAsignacion({ proyectoId: null, centroCostoId: null })
-                  setItems([])
-                }}
-              />
-              <Label htmlFor="multi-proyecto" className="text-xs cursor-pointer">
-                Consolidar múltiples proyectos
-              </Label>
-            </div>
-
-            {multiProyecto ? (
-              <div className="flex items-start gap-1.5 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md p-2.5">
-                <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-amber-600" />
+            {ventaEquipoId ? (
+              <div className="flex items-start gap-1.5 text-xs text-blue-800 bg-blue-50 border border-blue-200 rounded-md p-2.5">
+                <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-blue-600" />
                 <span>
-                  <strong>Modo consolidado:</strong> los ítems se imputarán a cada proyecto o centro de costo según su pedido de origen.
+                  Imputado a la <strong>venta de equipos</strong>
+                  {ventaEquipoCodigo ? <> <span className="font-mono">{ventaEquipoCodigo}</span></> : null}.
+                  Asigna el proveedor y ajusta precios; al guardar, la OC queda ligada a la venta.
                 </span>
               </div>
             ) : (
-              <SelectorAsignacion
-                value={asignacion}
-                onChange={(val) => { setAsignacion(val); setItems([]) }}
-                placeholder="Seleccionar proyecto o centro de costo"
-              />
+              <>
+                {/* Toggle multi-proyecto */}
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="multi-proyecto"
+                    checked={multiProyecto}
+                    onCheckedChange={(v) => {
+                      setMultiProyecto(v)
+                      if (v) setAsignacion({ proyectoId: null, centroCostoId: null })
+                      setItems([])
+                    }}
+                  />
+                  <Label htmlFor="multi-proyecto" className="text-xs cursor-pointer">
+                    Consolidar múltiples proyectos
+                  </Label>
+                </div>
+
+                {multiProyecto ? (
+                  <div className="flex items-start gap-1.5 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md p-2.5">
+                    <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-amber-600" />
+                    <span>
+                      <strong>Modo consolidado:</strong> los ítems se imputarán a cada proyecto o centro de costo según su pedido de origen.
+                    </span>
+                  </div>
+                ) : (
+                  <SelectorAsignacion
+                    value={asignacion}
+                    onChange={(val) => { setAsignacion(val); setItems([]) }}
+                    placeholder="Seleccionar proyecto o centro de costo"
+                  />
+                )}
+              </>
             )}
 
             <div>
@@ -739,8 +795,8 @@ function NuevaOrdenCompraContent() {
               variant="outline"
               size="sm"
               onClick={openSelector}
-              disabled={!hasAsignacion}
-              title={!hasAsignacion ? 'Selecciona un proyecto o centro de costo primero' : undefined}
+              disabled={!hasAsignacion || !!ventaEquipoId}
+              title={ventaEquipoId ? 'Los ítems ya provienen del pedido de la venta' : !hasAsignacion ? 'Selecciona un proyecto o centro de costo primero' : undefined}
             >
               <FileText className="h-3.5 w-3.5 mr-1" /> Desde Pedidos
             </Button>

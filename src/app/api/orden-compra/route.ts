@@ -112,15 +112,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Debe incluir al menos un item' }, { status: 400 })
     }
 
-    // Imputación: proyectoId XOR centroCostoId, o ninguno si es multi-proyecto
+    // Imputación: proyectoId XOR centroCostoId XOR ventaEquipoId, o ninguno si es multi-proyecto
     const hasProyecto = !!payload.proyectoId
     const hasCentroCosto = !!payload.centroCostoId
+    const hasVenta = !!payload.ventaEquipoId
     const isMultiProyecto = !!payload.multiProyecto
     if (hasProyecto && hasCentroCosto) {
       return NextResponse.json({ error: 'Debe imputar a proyecto O centro de costo, no ambos' }, { status: 400 })
     }
-    if (!hasProyecto && !hasCentroCosto && !isMultiProyecto) {
-      return NextResponse.json({ error: 'Debe seleccionar un proyecto, centro de costo, o activar modo multi-proyecto' }, { status: 400 })
+    if (!hasProyecto && !hasCentroCosto && !hasVenta && !isMultiProyecto) {
+      return NextResponse.json({ error: 'Debe seleccionar un proyecto, centro de costo, venta de equipos, o activar modo multi-proyecto' }, { status: 400 })
     }
 
     // Validate proveedor exists
@@ -143,6 +144,12 @@ export async function POST(req: Request) {
       }
       if (!centroCosto.activo) {
         return NextResponse.json({ error: 'Centro de costo inactivo' }, { status: 400 })
+      }
+    }
+    if (hasVenta) {
+      const venta = await prisma.ventaEquipo.findUnique({ where: { id: payload.ventaEquipoId } })
+      if (!venta) {
+        return NextResponse.json({ error: 'Venta de equipos no encontrada' }, { status: 404 })
       }
     }
 
@@ -197,6 +204,7 @@ export async function POST(req: Request) {
         centroCostoId: payload.centroCostoId || null,
         pedidoEquipoId: pedidoEquipoIdFinal,
         proyectoId: payload.proyectoId || null,
+        ventaEquipoId: payload.ventaEquipoId || null,
         categoriaCosto: payload.categoriaCosto || 'equipos',
         requiereRecepcion: payload.requiereRecepcion ?? true,
         solicitanteId: session.user.id,
