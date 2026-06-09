@@ -1,4 +1,5 @@
 import path from 'path'
+import { readFile } from 'fs/promises'
 import ExcelJS from 'exceljs'
 import { descargarBufferDrive } from '@/lib/services/driveImageLoader'
 import type { ReporteAvanceAgregado } from '@/lib/services/reporteAvance'
@@ -12,7 +13,14 @@ import {
   FOTOS_SLOTS,
   type AggView,
 } from './mapping'
-import { escribirCelda, diasEntre, normalizarFase, extensionDesdeMime } from './helpers'
+import {
+  escribirCelda,
+  diasEntre,
+  normalizarFase,
+  extensionDesdeMime,
+  rangoAAncla,
+  limpiarPlantillaParaExcelJS,
+} from './helpers'
 
 const TEMPLATE_PATH = path.join(
   process.cwd(),
@@ -33,7 +41,10 @@ const LOTE_FOTOS = 4
  */
 export async function generarExcelReporteAvance(agg: ReporteAvanceAgregado): Promise<Buffer> {
   const wb = new ExcelJS.Workbook()
-  await wb.xlsx.readFile(TEMPLATE_PATH)
+  // ExcelJS no puede leer la plantilla con sus charts (Curva S / Histograma = Fase 2);
+  // se limpian en memoria antes de cargar (el archivo en disco no se toca).
+  const plantilla = limpiarPlantillaParaExcelJS(await readFile(TEMPLATE_PATH))
+  await wb.xlsx.load(plantilla as unknown as Parameters<typeof wb.xlsx.load>[0])
 
   const wsReporte = wb.getWorksheet('Reporte')
   if (!wsReporte) throw new Error("Plantilla inválida: falta la hoja 'Reporte'")
@@ -127,7 +138,12 @@ export async function generarExcelReporteAvance(agg: ReporteAvanceAgregado): Pro
           buffer: res.buffer,
           extension: extensionDesdeMime(res.mimeType),
         } as unknown as Parameters<typeof wb.addImage>[0])
-        wsReporte.addImage(imageId, slot.anchorImagen)
+        // ExcelJS acepta { tl:{col,row}, br:{col,row} } en runtime, pero su tipo Anchor
+        // exige campos native* que rellena solo → cast al tipo del parámetro.
+        wsReporte.addImage(
+          imageId,
+          rangoAAncla(slot.anchorImagen) as unknown as Parameters<typeof wsReporte.addImage>[1],
+        )
         escribirCelda(wsReporte, slot.leyendaCelda, foto.leyenda ?? foto.registroDescripcion ?? '')
       } catch (err) {
         console.warn('[excelAvanceGenerator] foto falló, se omite:', err)
