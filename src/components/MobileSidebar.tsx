@@ -182,6 +182,7 @@ export default function MobileSidebar() {
         { href: '/proyectos/listas', label: 'Listas', icon: FileText },
         { href: '/proyectos/pedidos', label: 'Pedidos', icon: Package, badge: 'pedidos-pendientes' as NotificationBadgeType },
         { href: '/proyectos/evidencias', label: 'Evidencias técnicas', icon: ClipboardCheck },
+        { href: '/proyectos/reportes-semanales', label: 'Reportes de avance', icon: FileBarChart },
         { href: '/proyectos/catalogo', label: 'Catálogo', icon: Wrench },
       ],
     },
