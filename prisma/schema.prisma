@@ -1133,6 +1133,7 @@ model Proyecto {
   entregasEpp                EntregaEPP[]
   reportesSemanalesSeguridad ReporteSemanalSeguridad[]
   reportesSemanalesAvance    ReporteSemanalAvance[]      @relation("ReportesAvanceProyecto")
+  avanceSnapshots            ProyectoAvanceSnapshot[]    @relation("AvanceSnapshotsProyecto")
   hitos                      ProyectoHito[]              @relation("HitosProyecto")
   orgNodos                   ProyectoOrgNodo[]
   matrizComunicacion         MatrizComunicacion?
@@ -1686,6 +1687,46 @@ model ReporteSemanalAvance {
   @@map("reporte_semanal_avance")
 }
 
+// Snapshot semanal del % de avance del cronograma de EJECUCIÓN (para la Curva S de avance
+// real). Se toma manualmente por semana; re-tomar la misma semana sobreescribe (upsert).
+model ProyectoAvanceSnapshot {
+  id                   String   @id @default(cuid())
+  proyectoId           String
+  proyectoCronogramaId String? // cronograma de ejecución fotografiado (SetNull si se borra)
+  semanaIso            String // "2026-W05"
+  fechaCorte           DateTime
+  tomadoPorId          String?
+  progresoGeneral      Float // % global ponderado por horas (criterio de progresoService)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  proyecto           Proyecto                      @relation("AvanceSnapshotsProyecto", fields: [proyectoId], references: [id], onDelete: Cascade)
+  proyectoCronograma ProyectoCronograma?           @relation(fields: [proyectoCronogramaId], references: [id], onDelete: SetNull)
+  tomadoPor          User?                         @relation("AvanceSnapshotsTomadoPor", fields: [tomadoPorId], references: [id], onDelete: SetNull)
+  tareas             ProyectoAvanceSnapshotTarea[]
+
+  @@unique([proyectoId, semanaIso])
+  @@index([proyectoId, semanaIso])
+  @@map("proyecto_avance_snapshot")
+}
+
+// Foto del % de una tarea del cronograma en el momento del snapshot (denormalizado para
+// sobrevivir cambios/borrados del cronograma).
+model ProyectoAvanceSnapshotTarea {
+  id                 String   @id @default(cuid())
+  snapshotId         String
+  proyectoTareaId    String?
+  nombreTarea        String
+  proyectoFaseNombre String?
+  horasEstimadas     Decimal  @default(0) @db.Decimal(10, 2)
+  porcentaje         Int
+  createdAt          DateTime @default(now())
+  snapshot      ProyectoAvanceSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  proyectoTarea ProyectoTarea?         @relation("AvanceSnapshotTareaProyectoTarea", fields: [proyectoTareaId], references: [id], onDelete: SetNull)
+
+  @@index([snapshotId])
+  @@map("proyecto_avance_snapshot_tarea")
+}
+
 enum EstadoReporteAvance {
   borrador
   enviado
@@ -1979,6 +2020,7 @@ model User {
   // Reportes semanales de avance (área de proyectos)
   reportesAvanceAutor                      ReporteSemanalAvance[]      @relation("ReportesAvanceAutor")
   reportesAvanceAprobados                  ReporteSemanalAvance[]      @relation("ReportesAvanceAprobador")
+  avanceSnapshotsTomados                   ProyectoAvanceSnapshot[]    @relation("AvanceSnapshotsTomadoPor")
   orgNodos                                 ProyectoOrgNodo[]
   planTrabajoGeneraciones                  PlanTrabajoGeneracion[]
   // Módulo Ausencias
@@ -3214,6 +3256,7 @@ model ProyectoCronograma {
   proyectoEdt              ProyectoEdt[]
   proyectoFase             ProyectoFase[]
   proyectoTarea            ProyectoTarea[]
+  avanceSnapshots          ProyectoAvanceSnapshot[]
 
   @@unique([proyectoId, tipo])
   @@index([proyectoId, tipo])
@@ -3360,6 +3403,7 @@ model ProyectoTarea {
   recurso                     Recurso?                    @relation(fields: [recursoId], references: [id], onDelete: SetNull)
   registrosCampoTarea         RegistroHorasCampoTarea[]
   registrosAvance             RegistroAvance[]
+  avanceSnapshotsTarea        ProyectoAvanceSnapshotTarea[] @relation("AvanceSnapshotTareaProyectoTarea")
 
   @@index([creadoPorId])
   @@index([recursoId])

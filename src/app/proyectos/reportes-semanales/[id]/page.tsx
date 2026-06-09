@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSession } from 'next-auth/react'
 import {
-  ArrowLeft, CheckCircle, Download, Eye, Gauge, Image as ImageIcon, Loader2, Plus,
+  ArrowLeft, Camera, CheckCircle, Download, Eye, Gauge, Image as ImageIcon, Loader2, Plus,
   Save, Send, Trash2, XCircle,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -82,6 +82,7 @@ const ESTADO_COLOR: Record<Estado, string> = {
 }
 
 const ROLES_REVISION = ['admin', 'gerente', 'gestor']
+const ROLES_SNAPSHOT = ['admin', 'gerente', 'gestor', 'proyectos', 'coordinador']
 
 const fechaCorta = (s: string | null) =>
   s ? new Date(s).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: '2-digit' }) : '—'
@@ -116,6 +117,7 @@ export default function ReporteAvanceDetallePage({ params }: { params: Promise<{
   const role = session?.user?.role ?? ''
   const isBypass = ['admin', 'gerente', 'gestor'].includes(role)
   const isRevision = ROLES_REVISION.includes(role)
+  const puedeSnapshot = ROLES_SNAPSHOT.includes(role)
 
   // Estado editable
   const [numero, setNumero] = useState('')
@@ -245,6 +247,30 @@ export default function ReporteAvanceDetallePage({ params }: { params: Promise<{
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Error'),
   })
 
+  // Snapshot semanal de avance (Curva S de avance)
+  const snapshotQuery = useQuery<{ existe: boolean; progresoGeneral: number | null; tareasCapturadas: number }>({
+    queryKey: ['proyectos', 'reporte-avance-snapshot', id],
+    queryFn: async () => {
+      const res = await fetch(`/api/proyectos/reportes-semanales/${id}/snapshot`, { credentials: 'include' })
+      if (!res.ok) throw new Error('Error')
+      return res.json()
+    },
+    enabled: puedeSnapshot,
+  })
+  const snapshotMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/proyectos/reportes-semanales/${id}/snapshot`, { method: 'POST', credentials: 'include' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error ?? 'Error al tomar snapshot')
+      return data as { tareasCapturadas: number; progresoGeneral: number }
+    },
+    onSuccess: (data) => {
+      toast.success(`Snapshot tomado: ${data.tareasCapturadas} tareas · ${data.progresoGeneral.toFixed(1)}% global`)
+      queryClient.invalidateQueries({ queryKey: ['proyectos', 'reporte-avance-snapshot', id] })
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Error al tomar snapshot'),
+  })
+
   const descargarExcel = async (preview = false) => {
     if (preview) setPrevisualizando(true)
     else setDescargando(true)
@@ -355,6 +381,13 @@ export default function ReporteAvanceDetallePage({ params }: { params: Promise<{
               <XCircle className="h-3.5 w-3.5 mr-1" /> Rechazar
             </Button>
           </>
+        )}
+        {puedeSnapshot && (
+          <Button size="sm" variant="outline" onClick={() => snapshotMutation.mutate()} disabled={snapshotMutation.isPending}>
+            {snapshotMutation.isPending
+              ? <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Capturando…</>
+              : <><Camera className="h-3.5 w-3.5 mr-1" /> {snapshotQuery.data?.existe ? 'Actualizar snapshot' : 'Tomar snapshot de avance'}</>}
+          </Button>
         )}
         <Button size="sm" variant="outline" className="ml-auto" onClick={() => descargarExcel(true)} disabled={previsualizando || descargando}>
           {previsualizando
