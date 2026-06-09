@@ -1132,6 +1132,8 @@ model Proyecto {
   devolucionesMaterial       DevolucionMaterial[]
   entregasEpp                EntregaEPP[]
   reportesSemanalesSeguridad ReporteSemanalSeguridad[]
+  reportesSemanalesAvance    ReporteSemanalAvance[]      @relation("ReportesAvanceProyecto")
+  hitos                      ProyectoHito[]              @relation("HitosProyecto")
   orgNodos                   ProyectoOrgNodo[]
   matrizComunicacion         MatrizComunicacion?
   tdrAnalisis                ProyectoTdrAnalisis?
@@ -1649,6 +1651,73 @@ model RegistroAvanceFoto {
   @@map("registro_avance_foto")
 }
 
+// ===========================================================================
+// Reporte Semanal de Avance (Módulo B — área de Proyectos)
+// Reporte semanal de avance del proyecto: alcance, resumen, hitos, variaciones
+// e impedimentos. Lo redacta el autor, se envía a revisión y se aprueba/rechaza.
+// ===========================================================================
+model ReporteSemanalAvance {
+  id          String              @id @default(cuid())
+  proyectoId  String
+  autorId     String
+  semanaIso   String              // "2026-W05"
+  numero      Int?
+  fechaInicio DateTime
+  fechaFin    DateTime
+  fechaCorte  DateTime
+  estado      EstadoReporteAvance @default(borrador)
+  alcanceTexto     String?
+  resumenEjecutivo String?
+  comentariosHitos Json?
+  variaciones      Json?
+  impedimentos     Json?
+  aprobadorId   String?
+  notasRevision String?
+  enviadoAt   DateTime?
+  aprobadoAt  DateTime?
+  rechazadoAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  proyecto  Proyecto @relation("ReportesAvanceProyecto", fields: [proyectoId], references: [id])
+  autor     User     @relation("ReportesAvanceAutor", fields: [autorId], references: [id])
+  aprobador User?    @relation("ReportesAvanceAprobador", fields: [aprobadorId], references: [id])
+  @@unique([proyectoId, semanaIso])
+  @@index([estado, semanaIso(sort: Desc)])
+  @@map("reporte_semanal_avance")
+}
+
+enum EstadoReporteAvance {
+  borrador
+  enviado
+  aprobado
+  rechazado
+}
+
+// Hito del proyecto (contractual o intermedio) con fechas Plan/Pronóstico/Real.
+model ProyectoHito {
+  id String @id @default(cuid())
+  proyectoId String
+  tipo TipoHito @default(intermedio)
+  nombre String
+  orden Int @default(0)
+  fechaPlan DateTime?
+  fechaPronostico DateTime?
+  fechaReal DateTime?
+  comentario String?
+  proyectoFaseId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  proyecto Proyecto @relation("HitosProyecto", fields: [proyectoId], references: [id], onDelete: Cascade)
+  proyectoFase ProyectoFase? @relation("HitosFase", fields: [proyectoFaseId], references: [id])
+  @@index([proyectoId, tipo, orden])
+  @@map("proyecto_hito")
+}
+
+enum TipoHito {
+  contractual
+  intermedio
+}
+
 // Reporte semanal de seguridad que agrupa los registros de campo de una semana ISO.
 // El ingeniero lo redacta, lo envía a revisión y el gerente lo aprueba o rechaza.
 model ReporteSemanalSeguridad {
@@ -1907,6 +1976,9 @@ model User {
   // Reportes semanales de seguridad
   reportesSeguridadCreados                 ReporteSemanalSeguridad[]   @relation("ReportesSeguridadIngeniero")
   reportesSeguridadAprobados               ReporteSemanalSeguridad[]   @relation("ReportesSeguridadAprobador")
+  // Reportes semanales de avance (área de proyectos)
+  reportesAvanceAutor                      ReporteSemanalAvance[]      @relation("ReportesAvanceAutor")
+  reportesAvanceAprobados                  ReporteSemanalAvance[]      @relation("ReportesAvanceAprobador")
   orgNodos                                 ProyectoOrgNodo[]
   planTrabajoGeneraciones                  PlanTrabajoGeneracion[]
   // Módulo Ausencias
@@ -3220,6 +3292,7 @@ model ProyectoFase {
   proyectoEdt          ProyectoEdt[]
   proyectoCronograma   ProyectoCronograma @relation(fields: [proyectoCronogramaId], references: [id], onDelete: Cascade)
   proyecto             Proyecto           @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  hitos                ProyectoHito[]     @relation("HitosFase")
 
   @@unique([proyectoId, proyectoCronogramaId, nombre])
   @@index([proyectoId, proyectoCronogramaId, orden])
