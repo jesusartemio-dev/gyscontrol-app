@@ -28,7 +28,6 @@ const TEMPLATE_PATH = path.join(
 const LOTE_FOTOS = 4
 const SHEET1 = 'xl/worksheets/sheet1.xml' // Datos
 const SHEET2 = 'xl/worksheets/sheet2.xml' // Reporte
-const SHEET2_RELS = 'xl/worksheets/_rels/sheet2.xml.rels'
 const EPOCH_EXCEL = Date.UTC(1899, 11, 30) // serial 0 (sistema 1900 con el bug de bisiesto compensado)
 
 const NS_R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
@@ -138,6 +137,58 @@ function escribir(xml: string, ref: string, value: unknown): string {
   return xml
 }
 
+// ─── Logos del encabezado (siempre incrustados) ──────────────────────────────
+
+const LOGO_DIR = path.join(process.cwd(), 'src', 'lib', 'services', 'excelAvanceGenerator', 'logos')
+
+interface PosLogo { col: number; row: number; colOff: number; rowOff: number; cx: number; cy: number }
+interface LogoSpec { archivo: string; media: string; nombre: string; pos: PosLogo }
+
+const LOGOS_DATOS: LogoSpec[] = [
+  { archivo: 'logo-supervision.png', media: 'logosupervision.png', nombre: 'Logo Supervision', pos: { col: 1, row: 2, colOff: 38100, rowOff: 19050, cx: 904875, cy: 352425 } },
+  { archivo: 'logo-cliente.png', media: 'logocliente.png', nombre: 'Logo Cliente', pos: { col: 8, row: 2, colOff: 161925, rowOff: 57150, cx: 895350, cy: 276225 } },
+  { archivo: 'logo-contratista.png', media: 'logocontratista.png', nombre: 'Logo Contratista', pos: { col: 9, row: 2, colOff: 104775, rowOff: 76200, cx: 771525, cy: 219075 } },
+]
+const LOGOS_REPORTE: LogoSpec[] = [
+  { archivo: 'logo-contratista.png', media: 'logocontratista.png', nombre: 'Logo Contratista', pos: { col: 1, row: 1, colOff: 9525, rowOff: 9525, cx: 1676400, cy: 533400 } },
+  { archivo: 'logo-cliente.png', media: 'logocliente.png', nombre: 'Logo Cliente', pos: { col: 12, row: 0, colOff: 514350, rowOff: 171450, cx: 2600325, cy: 1038225 } },
+]
+
+/** Ancla de tamaño fijo (logos): oneCellAnchor con <xdr:ext cx cy>. */
+function anclaOneCell(p: PosLogo, cNvId: number, rId: number, nombre: string): string {
+  return (
+    `<xdr:oneCellAnchor>` +
+    `<xdr:from><xdr:col>${p.col}</xdr:col><xdr:colOff>${p.colOff}</xdr:colOff><xdr:row>${p.row}</xdr:row><xdr:rowOff>${p.rowOff}</xdr:rowOff></xdr:from>` +
+    `<xdr:ext cx="${p.cx}" cy="${p.cy}"/>` +
+    `<xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${cNvId}" name="${nombre}"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr>` +
+    `<xdr:blipFill><a:blip r:embed="rId${rId}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill>` +
+    `<xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${p.cx}" cy="${p.cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr>` +
+    `</xdr:pic><xdr:clientData/></xdr:oneCellAnchor>`
+  )
+}
+
+/** Ancla de dos celdas (fotos), a partir de un rango 'C72:E80'. */
+function anclaTwoCell(rango: string, cNvId: number, rId: number, nombre: string): string {
+  const a = rangoAAncla(rango)
+  return (
+    `<xdr:twoCellAnchor editAs="oneCell">` +
+    `<xdr:from><xdr:col>${a.tl.col}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${a.tl.row}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>` +
+    `<xdr:to><xdr:col>${a.br.col}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${a.br.row}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>` +
+    `<xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${cNvId}" name="${nombre}"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr>` +
+    `<xdr:blipFill><a:blip r:embed="rId${rId}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill>` +
+    `<xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr>` +
+    `</xdr:pic><xdr:clientData/></xdr:twoCellAnchor>`
+  )
+}
+
+/** Imagen a colocar en un drawing: media (dedup por nombre) + función que arma su ancla. */
+interface Imagen {
+  media: string
+  bytes: Uint8Array
+  ext: string
+  ancla: (cNvId: number, rId: number) => string
+}
+
 // ─── Generador ───────────────────────────────────────────────────────────────
 
 interface FotoOk {
@@ -240,75 +291,117 @@ export async function generarExcelReporteAvance(agg: ReporteAvanceAgregado): Pro
   }
   const fotosOk = descargas.filter((x): x is FotoOk => x != null)
 
-  if (fotosOk.length > 0) {
-    // b. Leyendas
-    fotosOk.forEach((f) => setR(f.slot.leyendaCelda, f.leyenda))
+  // Leyendas de las fotos (celdas de la hoja Reporte).
+  fotosOk.forEach((f) => setR(f.slot.leyendaCelda, f.leyenda))
 
-    // a + c + d. media + drawing1.xml + rels
+  // 7. DRAWINGS — logos SIEMPRE + fotos. Cada hoja referencia UN solo drawing.
+  let drawingSeq = 0
+  const mediaAgregada = new Set<string>()
+  const extsUsadas = new Set<string>()
+  const ctOverrides: string[] = []
+
+  /**
+   * Escribe un drawing en una hoja: media (dedup por nombre), drawingN.xml + sus rels,
+   * la relación en sheetN.xml.rels (la crea si falta), y xmlns:r + <drawing> en la hoja.
+   * Devuelve el XML de la hoja actualizado. cNvPr id y rId únicos dentro del drawing.
+   */
+  function escribirDrawing(sheetNum: number, sheetXml: string, imagenes: Imagen[]): string {
+    if (imagenes.length === 0) return sheetXml
+    drawingSeq += 1
+
     const anchors: string[] = []
-    const dRels: string[] = []
-    const extsUsadas = new Set<string>()
-    fotosOk.forEach((f, idx) => {
-      const n = idx + 1
-      const mediaName = `imgrep${n}.${f.ext}`
-      files[`xl/media/${mediaName}`] = f.bytes
-      extsUsadas.add(f.ext)
-      const a = rangoAAncla(f.slot.anchorImagen) // { tl:{col,row}, br:{col,row} } 0-indexado
-      anchors.push(
-        `<xdr:twoCellAnchor editAs="oneCell">` +
-          `<xdr:from><xdr:col>${a.tl.col}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${a.tl.row}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>` +
-          `<xdr:to><xdr:col>${a.br.col}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${a.br.row}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>` +
-          `<xdr:pic>` +
-          `<xdr:nvPicPr><xdr:cNvPr id="${n}" name="Foto ${n}"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr>` +
-          `<xdr:blipFill><a:blip r:embed="rId${n}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill>` +
-          `<xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr>` +
-          `</xdr:pic><xdr:clientData/></xdr:twoCellAnchor>`,
-      )
-      dRels.push(
-        `<Relationship Id="rId${n}" Type="${NS_R}/image" Target="../media/${mediaName}"/>`,
-      )
+    const rels: string[] = []
+    imagenes.forEach((img, idx) => {
+      const rId = idx + 1
+      const cNvId = idx + 2 // único por drawing, >1
+      if (!mediaAgregada.has(img.media)) {
+        files[`xl/media/${img.media}`] = img.bytes
+        mediaAgregada.add(img.media)
+      }
+      extsUsadas.add(img.ext)
+      anchors.push(img.ancla(cNvId, rId))
+      rels.push(`<Relationship Id="rId${rId}" Type="${NS_R}/image" Target="../media/${img.media}"/>`)
     })
-    files['xl/drawings/drawing1.xml'] = strToU8(
+
+    files[`xl/drawings/drawing${drawingSeq}.xml`] = strToU8(
       `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n` +
         `<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="${NS_R}">` +
         anchors.join('') +
         `</xdr:wsDr>`,
     )
-    files['xl/drawings/_rels/drawing1.xml.rels'] = strToU8(
+    files[`xl/drawings/_rels/drawing${drawingSeq}.xml.rels`] = strToU8(
       `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n` +
         `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
-        dRels.join('') +
+        rels.join('') +
         `</Relationships>`,
     )
 
-    // f. sheet2.xml.rels → relación al drawing
-    const s2relsPrev = files[SHEET2_RELS] ? strFromU8(files[SHEET2_RELS]) : null
-    const ridsExistentes = s2relsPrev ? [...s2relsPrev.matchAll(/Id="rId(\d+)"/g)].map((mm) => Number(mm[1])) : []
-    const ridDraw = `rId${ridsExistentes.length ? Math.max(...ridsExistentes) + 1 : 1}`
-    const drawRel = `<Relationship Id="${ridDraw}" Type="${NS_R}/drawing" Target="../drawings/drawing1.xml"/>`
-    files[SHEET2_RELS] = strToU8(
-      s2relsPrev
-        ? s2relsPrev.replace('</Relationships>', drawRel + '</Relationships>')
+    const sheetRelsPath = `xl/worksheets/_rels/sheet${sheetNum}.xml.rels`
+    const prev = files[sheetRelsPath] ? strFromU8(files[sheetRelsPath]) : null
+    const idsPrev = prev ? [...prev.matchAll(/Id="rId(\d+)"/g)].map((mm) => Number(mm[1])) : []
+    const ridDraw = `rId${idsPrev.length ? Math.max(...idsPrev) + 1 : 1}`
+    const drawRel = `<Relationship Id="${ridDraw}" Type="${NS_R}/drawing" Target="../drawings/drawing${drawingSeq}.xml"/>`
+    files[sheetRelsPath] = strToU8(
+      prev
+        ? prev.replace('</Relationships>', drawRel + '</Relationships>')
         : `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${drawRel}</Relationships>`,
     )
 
-    // 4 + e. Asegurar xmlns:r en <worksheet> y añadir <drawing r:id=…/> antes de </worksheet>
-    if (!/<worksheet[^>]*\sxmlns:r=/.test(sheet2Xml)) {
-      sheet2Xml = sheet2Xml.replace(/<worksheet\b/, `<worksheet xmlns:r="${NS_R}"`)
-    }
-    sheet2Xml = sheet2Xml.replace('</worksheet>', `<drawing r:id="${ridDraw}"/></worksheet>`)
+    ctOverrides.push(
+      `<Override PartName="/xl/drawings/drawing${drawingSeq}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>`,
+    )
 
-    // g. [Content_Types].xml → Default por extensión + Override del drawing
+    let out = sheetXml
+    if (!/<worksheet[^>]*\sxmlns:r=/.test(out)) out = out.replace(/<worksheet\b/, `<worksheet xmlns:r="${NS_R}"`)
+    return out.replace('</worksheet>', `<drawing r:id="${ridDraw}"/></worksheet>`)
+  }
+
+  // Logos en memoria (uno por archivo, reutilizados entre hojas).
+  const logoCache = new Map<string, Uint8Array>()
+  const cargarLogo = (archivo: string): Uint8Array => {
+    let b = logoCache.get(archivo)
+    if (!b) {
+      b = new Uint8Array(readFileSync(path.join(LOGO_DIR, archivo)))
+      logoCache.set(archivo, b)
+    }
+    return b
+  }
+
+  // Datos (sheet1): drawing con los 3 logos.
+  const imgsDatos: Imagen[] = LOGOS_DATOS.map((l) => ({
+    media: l.media,
+    bytes: cargarLogo(l.archivo),
+    ext: 'png',
+    ancla: (cNvId: number, rId: number) => anclaOneCell(l.pos, cNvId, rId, l.nombre),
+  }))
+  sheet1Xml = escribirDrawing(1, sheet1Xml, imgsDatos)
+
+  // Reporte (sheet2): fotos (twoCell) + 2 logos (oneCell) en el MISMO drawing.
+  const imgsReporte: Imagen[] = [
+    ...fotosOk.map((f, idx) => ({
+      media: `imgrepfoto${idx + 1}.${f.ext}`,
+      bytes: f.bytes,
+      ext: f.ext,
+      ancla: (cNvId: number, rId: number) => anclaTwoCell(f.slot.anchorImagen, cNvId, rId, `Foto ${idx + 1}`),
+    })),
+    ...LOGOS_REPORTE.map((l) => ({
+      media: l.media,
+      bytes: cargarLogo(l.archivo),
+      ext: 'png',
+      ancla: (cNvId: number, rId: number) => anclaOneCell(l.pos, cNvId, rId, l.nombre),
+    })),
+  ]
+  sheet2Xml = escribirDrawing(2, sheet2Xml, imgsReporte)
+
+  // [Content_Types].xml: Default por extensión usada + Overrides de los drawings.
+  if (extsUsadas.size > 0) {
     let ct = strFromU8(files['[Content_Types].xml'])
     for (const ext of extsUsadas) {
       if (!new RegExp(`Extension="${ext}"`).test(ct)) {
         ct = ct.replace('</Types>', `<Default Extension="${ext}" ContentType="image/${ext}"/></Types>`)
       }
     }
-    ct = ct.replace(
-      '</Types>',
-      `<Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/></Types>`,
-    )
+    ct = ct.replace('</Types>', ctOverrides.join('') + '</Types>')
     files['[Content_Types].xml'] = strToU8(ct)
   }
 
