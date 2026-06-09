@@ -673,26 +673,11 @@ export default function EvidenciaAvancePage({
                         <div
                           key={r.id}
                           className={cn(
-                            'flex items-center gap-3 px-3 py-2.5 border-l-2',
+                            'px-3 py-2.5 border-l-2',
                             TIPO_BORDER_L[r.tipo],
                           )}
                         >
-                          {/* Thumbnail */}
-                          <div className="h-14 w-14 shrink-0 rounded bg-muted overflow-hidden flex items-center justify-center">
-                            {r.fotos[0] ? (
-                              /* eslint-disable-next-line @next/next/no-img-element */
-                              <img
-                                src={`/api/proyectos/registros-evidencia/fotos/${r.fotos[0].id}/contenido`}
-                                alt={r.fotos[0].nombreArchivo}
-                                className="h-full w-full object-cover"
-                                loading="lazy"
-                                onError={(e) => { e.currentTarget.style.display = 'none' }}
-                              />
-                            ) : (
-                              <ImageIcon className="h-5 w-5 text-muted-foreground" />
-                            )}
-                          </div>
-
+                          <div className="flex items-start gap-3">
                           {/* Contenido */}
                           <div className="flex-1 min-w-0">
                             <p className="text-sm line-clamp-2 leading-snug">{r.descripcion}</p>
@@ -759,6 +744,32 @@ export default function EvidenciaAvancePage({
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
                               </Button>
+                            </div>
+                          )}
+                          </div>
+
+                          {/* Miniaturas: todas las fotos del registro */}
+                          {r.fotos.length > 0 && (
+                            <div className="flex gap-2 flex-wrap mt-2">
+                              {r.fotos.map((f) => (
+                                <a
+                                  key={f.id}
+                                  href={`/api/proyectos/registros-evidencia/fotos/${f.id}/contenido`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="block h-16 w-16 rounded-md overflow-hidden border bg-muted hover:opacity-90 transition"
+                                  title={f.nombreArchivo}
+                                >
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={`/api/proyectos/registros-evidencia/fotos/${f.id}/contenido`}
+                                    alt={f.nombreArchivo}
+                                    className="h-full w-full object-cover"
+                                    loading="lazy"
+                                    onError={(e) => { e.currentTarget.style.display = 'none' }}
+                                  />
+                                </a>
+                              ))}
                             </div>
                           )}
                         </div>
