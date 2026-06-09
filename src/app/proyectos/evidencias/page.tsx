@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { Suspense, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -214,6 +214,14 @@ function hace7DiasISO() {
 }
 
 export default function EvidenciasAvanceListaPage() {
+  return (
+    <Suspense fallback={<div className="container mx-auto p-4 sm:p-6"><Skeleton className="h-40 w-full rounded-lg" /></div>}>
+      <EvidenciasAvanceListaContenido />
+    </Suspense>
+  )
+}
+
+function EvidenciasAvanceListaContenido() {
   const router = useRouter()
   const queryClient = useQueryClient()
   const searchParams = useSearchParams()
