@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
+import { ROLES_BYPASS } from '@/lib/auth/rolesEvidenciaProyecto'
 
 function inicioDelDia(fecha: Date): Date {
   const d = new Date(fecha)
@@ -15,6 +16,8 @@ function finDelDia(fecha: Date): Date {
 
 export interface ListarJornadasActivasOpts {
   userId?: string
+  /** Rol global (enum Role). Decide el alcance: ROLES_BYPASS ven todo; el resto, solo asignados. */
+  role?: string
   soloAsignadas?: boolean
   fecha?: Date
   /** Si se pasan, filtra por rango (ignora `fecha`). Útil para backfill de reportes pasados. */
@@ -28,8 +31,12 @@ export interface ListarJornadasActivasOpts {
  * Devuelve jornadas en estado `iniciado` o `pendiente`. Por defecto NO filtra por fecha
  * — una jornada abierta hace una semana sigue siendo válida para registrar evidencias.
  * Si se pasa `fecha` o `fechaDesde/fechaHasta`, restringe al rango indicado.
- * Si soloAsignadas=true se requiere userId y filtra por proyectos donde el usuario
- * está activo en PersonalProyecto.
+ *
+ * Alcance por rol:
+ *   - ROLES_BYPASS (admin/gerente/gestor): proyectoId libre; soloAsignadas=false ve todas;
+ *     soloAsignadas=true restringe a sus proyectos (PersonalProyecto.activo).
+ *   - Resto (proyectos/coordinador, no-bypass): SIEMPRE limitado a sus proyectos asignados,
+ *     ignorando soloAsignadas=false. Un proyectoId fuera de sus asignaciones devuelve [].
  */
 export async function listarJornadasActivasDelDia(opts: ListarJornadasActivasOpts = {}) {
   const tieneRango = opts.fechaDesde && opts.fechaHasta
@@ -44,15 +51,39 @@ export async function listarJornadasActivasDelDia(opts: ListarJornadasActivasOpt
     where.fechaTrabajo = { gte: inicioDelDia(opts.fecha!), lte: finDelDia(opts.fecha!) }
   }
 
-  if (opts.proyectoId) where.proyectoId = opts.proyectoId
+  // --- Alcance por proyecto según rol ---
+  const isBypass = !!opts.role && (ROLES_BYPASS as readonly string[]).includes(opts.role)
 
-  if (opts.soloAsignadas && opts.userId && !opts.proyectoId) {
-    const asignaciones = await prisma.personalProyecto.findMany({
-      where: { userId: opts.userId, activo: true },
-      select: { proyectoId: true },
-    })
-    const proyectoIds = asignaciones.map((a) => a.proyectoId)
-    where.proyectoId = { in: proyectoIds.length > 0 ? proyectoIds : ['__none__'] }
+  if (isBypass) {
+    // admin/gerente/gestor: proyectoId libre; soloAsignadas (opcional) restringe a sus asignaciones.
+    if (opts.proyectoId) {
+      where.proyectoId = opts.proyectoId
+    } else if (opts.soloAsignadas && opts.userId) {
+      const asignaciones = await prisma.personalProyecto.findMany({
+        where: { userId: opts.userId, activo: true },
+        select: { proyectoId: true },
+      })
+      const proyectoIds = asignaciones.map((a) => a.proyectoId)
+      where.proyectoId = { in: proyectoIds.length > 0 ? proyectoIds : ['__none__'] }
+    }
+  } else {
+    // Roles de campo (proyectos/coordinador) y cualquier no-bypass: SIEMPRE limitado a
+    // PersonalProyecto.activo, ignorando soloAsignadas=false (no puede ampliar su alcance).
+    // Sin userId no ven nada. Si pasan un proyectoId fuera de sus asignaciones, no ven nada ([]).
+    const proyectoIds = opts.userId
+      ? (
+          await prisma.personalProyecto.findMany({
+            where: { userId: opts.userId, activo: true },
+            select: { proyectoId: true },
+          })
+        ).map((a) => a.proyectoId)
+      : []
+
+    if (opts.proyectoId) {
+      where.proyectoId = proyectoIds.includes(opts.proyectoId) ? opts.proyectoId : '__none__'
+    } else {
+      where.proyectoId = { in: proyectoIds.length > 0 ? proyectoIds : ['__none__'] }
+    }
   }
 
   return prisma.registroHorasCampo.findMany({
