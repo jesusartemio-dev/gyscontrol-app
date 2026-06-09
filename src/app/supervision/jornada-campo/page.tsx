@@ -309,8 +309,8 @@ export default function JornadaCampoSupervisionPage() {
         throw new Error(data.error || 'Error al rechazar')
       }
       toast({
-        title: 'Jornada rechazada',
-        description: 'La jornada fue rechazada'
+        title: 'Jornada devuelta',
+        description: 'La jornada volvió al responsable para que la edite o elimine'
       })
       setRechazarModalOpen(false)
       cargarJornadas(true)

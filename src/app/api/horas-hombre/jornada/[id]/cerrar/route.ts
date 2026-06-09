@@ -177,7 +177,10 @@ export async function PUT(request: NextRequest, context: RouteContext) {
         avanceDia: avanceDia.trim(),
         bloqueos: bloqueosValidos.length > 0 ? bloqueosValidos : undefined,
         planSiguiente: planSiguiente?.trim() || null,
-        fechaCierre: new Date()
+        fechaCierre: new Date(),
+        // Limpiar motivo de rechazo previo: si esta jornada fue devuelta y ahora
+        // se reenvía, no debe arrastrar la nota de rechazo anterior.
+        motivoRechazo: null
       }
     })
 

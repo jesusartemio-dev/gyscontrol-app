@@ -98,6 +98,8 @@ interface JornadaActivaData {
   ubicacion?: string | null
   personalPlanificado: PersonalPlanificado[]
   tareas: TareaJornada[]
+  // Presente cuando la jornada fue devuelta por el aprobador (volvió a 'iniciado')
+  motivoRechazo?: string | null
 }
 
 interface JornadaActivaProps {
@@ -324,6 +326,20 @@ export function JornadaActiva({
             </div>
           </div>
         </div>
+
+        {/* Aviso de devolución: la jornada fue rechazada y volvió a edición */}
+        {jornada.motivoRechazo && (
+          <div className="mx-4 mb-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 flex items-start gap-2">
+            <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0 mt-0.5" />
+            <div className="min-w-0 text-xs">
+              <span className="font-semibold text-red-700">Jornada devuelta. </span>
+              <span className="text-red-700">Motivo: {jornada.motivoRechazo}</span>
+              <div className="text-red-600/80 mt-0.5">
+                Corrígela y vuelve a cerrarla para reenviarla a aprobación, o elimínala.
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Objetivos - truncated to 1 line */}
         {jornada.objetivosDia && (

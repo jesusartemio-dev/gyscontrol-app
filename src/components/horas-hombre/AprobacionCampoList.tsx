@@ -208,8 +208,8 @@ export function AprobacionCampoList({
       if (!response.ok) throw new Error(data.error || 'Error al rechazar')
 
       toast({
-        title: 'Registro rechazado',
-        description: 'Se notificará al supervisor'
+        title: 'Jornada devuelta',
+        description: 'Volvió al responsable para que la edite o elimine'
       })
 
       setShowRechazo(false)
