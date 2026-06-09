@@ -50,6 +50,14 @@ const reportes = [
     roles: ['admin', 'gerente', 'gestor', 'coordinador'],
   },
   {
+    titulo: 'Curva S Avance',
+    descripcion: 'Avance físico planificado (línea base) vs real (snapshots semanales). % por semana e índice de avance.',
+    icono: TrendingUp,
+    href: '/gestion/reportes/curva-s-avance',
+    color: 'bg-green-100 text-green-600',
+    roles: ['admin', 'gerente', 'gestor', 'coordinador'],
+  },
+  {
     titulo: 'Aging de CxC',
     descripcion: 'Tabla de antigüedad de cuentas por cobrar. Saldos pendientes agrupados por cliente y tramos de vencimiento: vigente, 1-30, 31-60, 61-90 y +90 días.',
     icono: Clock,
