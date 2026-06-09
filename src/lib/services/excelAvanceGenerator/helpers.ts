@@ -1,5 +1,4 @@
 import type ExcelJS from 'exceljs'
-import { unzipSync, zipSync, strFromU8, strToU8 } from 'fflate'
 
 /**
  * Escribe un valor en una celda respetando el formato de la plantilla:
@@ -40,56 +39,6 @@ export function normalizarFase(nombre: string): string {
 /** Extensión de imagen para ExcelJS a partir del mime. */
 export function extensionDesdeMime(mime: string): 'png' | 'jpeg' {
   return mime === 'image/png' ? 'png' : 'jpeg'
-}
-
-/**
- * ExcelJS NO puede LEER esta plantilla: sus drawings usan el namespace DrawingML por
- * defecto (sin prefijo `xdr:`), que el parser de ExcelJS no reconoce → al reconciliar
- * falla con "Cannot read properties of undefined (reading 'anchors')". Afecta a TODOS
- * los drawings (logos del encabezado y charts de Curva S / Histograma).
- *
- * Solución (Fase 1): devolver una copia EN MEMORIA de la plantilla SIN ningún drawing
- * ni chart, y sin las referencias desde las hojas, para que ExcelJS la cargue. Se
- * pierden los logos/charts precargados de la plantilla; las celdas, formato y merges se
- * conservan, y nuestras fotos se incrustan en un drawing nuevo que crea ExcelJS al
- * escribir. NO modifica el archivo en disco (pendiente: plantilla compatible con xdr:).
- */
-export function limpiarPlantillaParaExcelJS(buf: Buffer): Buffer {
-  const files = unzipSync(new Uint8Array(buf))
-
-  // 1. Copiar todo menos drawings (+rels) y charts.
-  const out: Record<string, Uint8Array> = {}
-  for (const [name, data] of Object.entries(files)) {
-    if (/^xl\/drawings\//.test(name)) continue
-    if (/^xl\/charts\//.test(name)) continue
-    out[name] = data
-  }
-
-  // 2. En cada hoja: quitar las rels a drawings y el elemento <drawing r:id=.../>.
-  for (const name of Object.keys(out)) {
-    if (!/^xl\/worksheets\/_rels\/sheet\d+\.xml\.rels$/.test(name)) continue
-    const ridsQuitar: string[] = []
-    const rels = strFromU8(out[name]).replace(/<Relationship\b[^>]*\/>/g, (tag) => {
-      if (/Type="[^"]*\/drawing"/.test(tag) || /Target="[^"]*drawings\/drawing\d+\.xml"/.test(tag)) {
-        const rid = tag.match(/Id="([^"]+)"/)?.[1]
-        if (rid) ridsQuitar.push(rid)
-        return ''
-      }
-      return tag
-    })
-    out[name] = strToU8(rels)
-
-    const sheetName = name.replace('/_rels/', '/').replace(/\.rels$/, '')
-    if (ridsQuitar.length && out[sheetName]) {
-      let sx = strFromU8(out[sheetName])
-      for (const rid of ridsQuitar) {
-        sx = sx.replace(new RegExp(`<drawing[^>]*r:id="${rid}"[^>]*/>`, 'g'), '')
-      }
-      out[sheetName] = strToU8(sx)
-    }
-  }
-
-  return Buffer.from(zipSync(out))
 }
 
 /** Letra(s) de columna ('A','B','AA'...) → índice 0-based (A=0, B=1, C=2...). */
