@@ -17,19 +17,22 @@ import {
   type CeldaDetalleData,
 } from '@/components/planificacion/CeldaDetalleModal'
 
+function toDateStr(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 function currentMondayUTC(): string {
   const now = new Date()
-  const dow = now.getUTCDay() || 7
-  const ms =
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) - (dow - 1) * 86400000
-  return new Date(ms).toISOString().slice(0, 10)
+  const dow = now.getDay() || 7
+  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (dow - 1))
+  return toDateStr(monday)
 }
 
 function todayUTC(): string {
-  const now = new Date()
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
-    .toISOString()
-    .slice(0, 10)
+  return toDateStr(new Date())
 }
 
 function addWeeks(dateStr: string, n: number): string {
@@ -37,10 +40,17 @@ function addWeeks(dateStr: string, n: number): string {
   return new Date(d.getTime() + n * 7 * 86400000).toISOString().slice(0, 10)
 }
 
+// Parsea "YYYY-MM-DD" como medianoche LOCAL, para que date-fns format()
+// muestre el día correcto sin desfase por zona horaria.
+function parseLocalDate(dateStr: string): Date {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
 function formatWeekLabel(inicioStr: string): string {
-  const d1 = new Date(inicioStr + 'T00:00:00.000Z')
-  const d2 = new Date(d1.getTime() + 6 * 86400000)
-  if (d1.getUTCMonth() === d2.getUTCMonth()) {
+  const d1 = parseLocalDate(inicioStr)
+  const d2 = new Date(d1.getFullYear(), d1.getMonth(), d1.getDate() + 6)
+  if (d1.getMonth() === d2.getMonth()) {
     return `${format(d1, 'd', { locale: es })} – ${format(d2, "d 'de' MMMM yyyy", { locale: es })}`
   }
   return `${format(d1, "d MMM", { locale: es })} – ${format(d2, "d MMM yyyy", { locale: es })}`
@@ -97,8 +107,8 @@ export default function MiPlanificacionPage() {
 
   const diasCards = useMemo((): DiaCard[] => {
     return diasSemana.map((fecha) => {
-      const d = new Date(fecha + 'T00:00:00.000Z')
-      const dow = d.getUTCDay()
+      const d = parseLocalDate(fecha)
+      const dow = d.getDay()
       const label = format(d, "EEEE d 'de' MMMM", { locale: es })
       return {
         fecha,
