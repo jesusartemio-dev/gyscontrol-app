@@ -12,6 +12,18 @@ import { verificarSemanaEditable } from '@/lib/utils/timesheetAprobacion'
 export class ProgresoService {
 
   /**
+   * Avance ponderado por horas estimadas sobre un conjunto de tareas (flat). Es la base
+   * robusta del rollup: pondera por las horas REALES de las tareas, no por el campo
+   * horasPlan (que puede estar en 0 o desfasado y distorsiona el promedio).
+   */
+  private static avanceFlat(tareas: { porcentajeCompletado: number; horasEstimadas: any }[]): number {
+    if (tareas.length === 0) return 0
+    const h = tareas.reduce((s, t) => s + Number(t.horasEstimadas || 0), 0)
+    if (h <= 0) return Math.round(tareas.reduce((s, t) => s + t.porcentajeCompletado, 0) / tareas.length)
+    return Math.round(tareas.reduce((s, t) => s + t.porcentajeCompletado * Number(t.horasEstimadas || 0), 0) / h)
+  }
+
+  /**
    * Actualiza el progreso de una tarea basado en horas registradas
    */
   static async actualizarProgresoTarea(tareaId: string) {
@@ -116,32 +128,16 @@ export class ProgresoService {
     */
    static async actualizarProgresoEDT(edtId: string) {
      try {
-       // Obtener actividades del EDT
-       const actividades = await prisma.proyectoActividad.findMany({
-         where: { proyectoEdtId: edtId }
+       // Avance del EDT = ponderado por horas de TODAS sus tareas (flat, no por horasPlan).
+       const tareas = await prisma.proyectoTarea.findMany({
+         where: { proyectoEdtId: edtId },
+         select: { porcentajeCompletado: true, horasEstimadas: true, horasReales: true }
        })
 
-       if (actividades.length === 0) return
+       if (tareas.length === 0) return
 
-       // Calcular horas reales totales
-       const horasReales = actividades.reduce((sum, act) => sum + Number(act.horasReales), 0)
-       const totalHorasPlan = actividades.reduce((sum, act) => sum + Number(act.horasPlan || 0), 0)
-
-       let progresoPromedio: number
-       if (totalHorasPlan > 0) {
-         // Progreso ponderado: actividades con más horas planificadas pesan más
-         progresoPromedio = Math.round(
-           actividades.reduce((sum, act) => {
-             const peso = Number(act.horasPlan || 0)
-             return sum + act.porcentajeAvance * peso
-           }, 0) / totalHorasPlan
-         )
-       } else {
-         // Fallback: promedio simple si no hay horas planificadas
-         progresoPromedio = Math.round(
-           actividades.reduce((sum, act) => sum + act.porcentajeAvance, 0) / actividades.length
-         )
-       }
+       const horasReales = tareas.reduce((sum, t) => sum + Number(t.horasReales || 0), 0)
+       const progresoPromedio = this.avanceFlat(tareas)
 
        // Actualizar EDT
        await prisma.proyectoEdt.update({
@@ -176,34 +172,20 @@ export class ProgresoService {
     if (!faseId) return
 
     try {
-      // Obtener fase con EDTs
       const fase = await prisma.proyectoFase.findUnique({
         where: { id: faseId },
-        include: {
-          proyectoEdt: true
-        }
+        select: { proyectoId: true }
       })
+      if (!fase) return
 
-      if (!fase || fase.proyectoEdt.length === 0) return
+      // Avance de la fase = ponderado por horas de TODAS sus tareas (vía sus EDTs).
+      const tareas = await prisma.proyectoTarea.findMany({
+        where: { proyectoEdt: { proyectoFaseId: faseId } },
+        select: { porcentajeCompletado: true, horasEstimadas: true }
+      })
+      if (tareas.length === 0) return
 
-      // Calcular progreso ponderado por horas planificadas de EDTs
-      const totalHorasPlan = fase.proyectoEdt.reduce((sum, edt) => sum + Number(edt.horasPlan || 0), 0)
-
-      let progresoPromedio: number
-      if (totalHorasPlan > 0) {
-        // Progreso ponderado: EDTs con más horas planificadas pesan más
-        progresoPromedio = Math.round(
-          fase.proyectoEdt.reduce((sum, edt) => {
-            const peso = Number(edt.horasPlan || 0)
-            return sum + edt.porcentajeAvance * peso
-          }, 0) / totalHorasPlan
-        )
-      } else {
-        // Fallback: promedio simple si no hay horas planificadas
-        progresoPromedio = Math.round(
-          fase.proyectoEdt.reduce((sum, edt) => sum + edt.porcentajeAvance, 0) / fase.proyectoEdt.length
-        )
-      }
+      const progresoPromedio = this.avanceFlat(tareas)
 
       // Actualizar fase
       await prisma.proyectoFase.update({
@@ -228,48 +210,25 @@ export class ProgresoService {
    */
   static async actualizarProgresoProyecto(proyectoId: string) {
     try {
-      // Obtener proyecto con fases
-      const proyecto = await prisma.proyecto.findUnique({
-        where: { id: proyectoId },
-        include: {
-          proyectoFase: true
-        }
+      // progresoGeneral = avance ponderado por horas de TODAS las tareas del cronograma de
+      // ejecución (flat). No usa horasPlan (que distorsionaba el número del proyecto).
+      const cronograma = await prisma.proyectoCronograma.findFirst({
+        where: { proyectoId, tipo: 'ejecucion' },
+        select: { id: true }
       })
+      if (!cronograma) return
 
-      if (!proyecto || proyecto.proyectoFase.length === 0) return
+      const tareas = await prisma.proyectoTarea.findMany({
+        where: { proyectoCronogramaId: cronograma.id },
+        select: { porcentajeCompletado: true, horasEstimadas: true }
+      })
+      if (tareas.length === 0) return
 
-      // Calcular progreso ponderado por horas planificadas de fases
-      // Necesitamos obtener horasPlan de los EDTs de cada fase
-      const fasesConHoras = await Promise.all(
-        proyecto.proyectoFase.map(async (fase) => {
-          const edts = await prisma.proyectoEdt.findMany({
-            where: { proyectoFaseId: fase.id },
-            select: { horasPlan: true }
-          })
-          const horasPlanFase = edts.reduce((sum, edt) => sum + Number(edt.horasPlan || 0), 0)
-          return { ...fase, horasPlanFase }
-        })
-      )
+      const progresoGeneral = this.avanceFlat(tareas)
 
-      const totalHorasPlan = fasesConHoras.reduce((sum, f) => sum + f.horasPlanFase, 0)
-
-      let progresoGeneral: number
-      if (totalHorasPlan > 0) {
-        progresoGeneral = Math.round(
-          fasesConHoras.reduce((sum, f) => sum + f.porcentajeAvance * f.horasPlanFase, 0) / totalHorasPlan
-        )
-      } else {
-        progresoGeneral = Math.round(
-          proyecto.proyectoFase.reduce((sum, fase) => sum + fase.porcentajeAvance, 0) / proyecto.proyectoFase.length
-        )
-      }
-
-      // Actualizar proyecto
       await prisma.proyecto.update({
         where: { id: proyectoId },
-        data: {
-          progresoGeneral
-        }
+        data: { progresoGeneral }
       })
 
     } catch (error) {
@@ -283,13 +242,14 @@ export class ProgresoService {
    * rollup almacenado que pudo quedar desactualizado.
    */
   static async recalcularAvanceCronograma(cronogramaId: string): Promise<{ actividades: number }> {
-    const actividades = await prisma.proyectoActividad.findMany({
-      where: { proyectoCronogramaId: cronogramaId },
-      select: { id: true },
-    })
-    for (const a of actividades) {
-      await this.actualizarProgresoActividad(a.id)
-    }
+    const [actividades, edts, fases] = await Promise.all([
+      prisma.proyectoActividad.findMany({ where: { proyectoCronogramaId: cronogramaId }, select: { id: true } }),
+      prisma.proyectoEdt.findMany({ where: { proyectoCronogramaId: cronogramaId }, select: { id: true } }),
+      prisma.proyectoFase.findMany({ where: { proyectoCronogramaId: cronogramaId }, select: { id: true } }),
+    ])
+    for (const a of actividades) await this.actualizarProgresoActividad(a.id)
+    for (const e of edts) await this.actualizarProgresoEDT(e.id)
+    for (const f of fases) await this.actualizarProgresoFase(f.id) // recomputa fase (flat) y cascada → proyecto
     return { actividades: actividades.length }
   }
 
