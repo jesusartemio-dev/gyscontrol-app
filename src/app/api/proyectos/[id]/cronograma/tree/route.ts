@@ -536,6 +536,12 @@ export async function GET(
       { total: 0, assigned: 0, extrasTotal: 0, extrasAssigned: 0 }
     )
 
+    // Progreso del proyecto = promedio ponderado por horas del avance de sus fases.
+    const totalHorasFases = faseNodes.reduce((s: number, f: any) => s + (Number(f.data?.horasEstimadas) || 0), 0)
+    const proyectoProgress = totalHorasFases > 0
+      ? Math.round(faseNodes.reduce((s: number, f: any) => s + (f.metadata?.progressPercentage || 0) * (Number(f.data?.horasEstimadas) || 0), 0) / totalHorasFases)
+      : (faseNodes.length > 0 ? Math.round(faseNodes.reduce((s: number, f: any) => s + (f.metadata?.progressPercentage || 0), 0) / faseNodes.length) : 0)
+
     const projectNode = {
       id: `proyecto-${id}`,
       type: 'proyecto',
@@ -550,7 +556,7 @@ export async function GET(
       metadata: {
         hasChildren: faseNodes.length > 0,
         totalChildren: faseNodes.length,
-        progressPercentage: 0,
+        progressPercentage: proyectoProgress,
         status: 'pendiente',
         recursosTotales: proyectoRecursos.total,
         recursosAsignados: proyectoRecursos.assigned,
