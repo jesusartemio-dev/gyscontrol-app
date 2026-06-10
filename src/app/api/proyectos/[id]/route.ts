@@ -255,6 +255,33 @@ export async function PUT(
       Object.entries(validatedData).filter(([_, value]) => value !== undefined)
     );
 
+    // 🗓️ Convertir fechas (el frontend envía strings "YYYY-MM-DD") a objetos Date.
+    // Prisma rechaza strings no ISO-8601 completos con un error de validación → 500.
+    const camposFecha = [
+      'fechaInicio',
+      'fechaFin',
+      'fechaFirmaContrato',
+      'fechaInicioContrato',
+      'fechaFinContrato',
+    ];
+    for (const campo of camposFecha) {
+      if (campo in dataToUpdate) {
+        const valor = dataToUpdate[campo];
+        if (valor === null || valor === '') {
+          dataToUpdate[campo] = null;
+        } else if (typeof valor === 'string' || valor instanceof Date) {
+          const fecha = new Date(valor);
+          if (isNaN(fecha.getTime())) {
+            return NextResponse.json(
+              { error: `Fecha inválida en el campo ${campo}` },
+              { status: 400 }
+            );
+          }
+          dataToUpdate[campo] = fecha;
+        }
+      }
+    }
+
     // Si se actualiza adelantoPorcentaje, recalcular adelantoMonto = totalCliente * (% / 100)
     if (dataToUpdate.adelantoPorcentaje !== undefined) {
       const totalCliente = proyectoExistente.totalCliente ?? 0
