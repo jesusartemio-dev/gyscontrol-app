@@ -130,11 +130,13 @@ export function ProyectoCronogramaTreeView({
   const pesoPorNodo = useMemo(() => {
     const acc = new Map<string, number>()
     if (!showPesoColumn || pesoFaseMap.size === 0) return acc
+    const totalPeso = [...pesoFaseMap.values()].reduce((s, v) => s + v.pesoEfectivo, 0) // ~100%
     const walk = (nodeIds: string[], faseInfo: { pesoEfectivo: number; horasFase: number } | null) => {
       for (const id of nodeIds) {
         const node = state.nodes.get(id)
         if (!node) continue
         let info = faseInfo
+        if (node.type === 'proyecto') acc.set(id, totalPeso) // raíz = suma de pesos de fase
         if (node.type === 'fase') info = pesoFaseMap.get(normFase(node.nombre)) ?? null
         if (info && info.horasFase > 0) {
           const h = Number(node.data?.horasEstimadas) || 0

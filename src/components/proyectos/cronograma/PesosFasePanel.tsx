@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { Scale, Loader2, RotateCcw, Save, ChevronRight, ChevronDown, Wand2 } from 'lucide-react'
+import { Scale, Loader2, RotateCcw, Save, ChevronRight, ChevronDown, Wand2, Pencil } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -32,7 +32,7 @@ interface PesosResp {
  * ejecución. NO modifica lo que el usuario escribe: muestra la suma y avisa si no llega a
  * 100% (con un botón para normalizar a mano). Debajo de la fase todo se reparte por horas.
  */
-export function PesosFasePanel({ proyectoId }: { proyectoId: string }) {
+export function PesosFasePanel({ proyectoId, onGuardado }: { proyectoId: string; onGuardado?: () => void }) {
   const [data, setData] = useState<PesosResp | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -97,6 +97,7 @@ export function PesosFasePanel({ proyectoId }: { proyectoId: string }) {
       setData(json)
       setManual(Object.fromEntries(json.fases.map((f) => [f.faseId, f.pesoManual != null ? String(f.pesoManual) : ''])))
       toast.success('Pesos de fase guardados')
+      onGuardado?.() // refresca el árbol (columna Peso) sin tener que recalcular
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error al guardar')
     } finally {
@@ -169,7 +170,11 @@ export function PesosFasePanel({ proyectoId }: { proyectoId: string }) {
                   <th className="text-left py-1.5 font-medium">Fase</th>
                   <th className="text-right py-1.5 font-medium">Horas</th>
                   <th className="text-right py-1.5 font-medium">Sugerido</th>
-                  <th className="text-right py-1.5 font-medium w-24">Peso %</th>
+                  <th className="text-right py-1.5 font-medium w-24">
+                    <span className="inline-flex items-center gap-1 justify-end text-indigo-600">
+                      <Pencil className="h-3 w-3" /> Peso % <span className="text-muted-foreground font-normal">(editable)</span>
+                    </span>
+                  </th>
                   <th className="text-right py-1.5 font-medium">Avance</th>
                 </tr>
               </thead>

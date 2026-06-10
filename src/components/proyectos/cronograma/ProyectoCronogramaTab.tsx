@@ -1168,7 +1168,7 @@ export function ProyectoCronogramaTab({
 
         <TabsContent value="jerarquia" className="mt-3">
           {selectedCronograma?.tipo === 'ejecucion' && (
-            <PesosFasePanel proyectoId={proyectoId} />
+            <PesosFasePanel proyectoId={proyectoId} onGuardado={handleRefresh} />
           )}
           <ProyectoCronogramaTreeView
             proyectoId={proyectoId}
