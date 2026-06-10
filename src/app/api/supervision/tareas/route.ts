@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { ProgresoService } from '@/lib/services/progresoService'
 import { randomUUID } from 'crypto'
 
 export async function GET(request: NextRequest) {
@@ -232,7 +233,15 @@ export async function PATCH(request: NextRequest) {
       if (prioridad) updateData.prioridad = prioridad
       if (porcentajeCompletado !== undefined && estado !== 'completada') updateData.porcentajeCompletado = Math.min(100, Math.max(0, porcentajeCompletado))
       if (personasEstimadas !== undefined) updateData.personasEstimadas = Math.max(1, parseInt(personasEstimadas) || 1)
-      tareaActualizada = await prisma.proyectoTarea.update({ where: { id: tareaId }, data: updateData, include: { user: { select: { id: true, name: true, email: true } } } })
+      const upd = await prisma.proyectoTarea.update({ where: { id: tareaId }, data: updateData, include: { user: { select: { id: true, name: true, email: true } } } })
+      tareaActualizada = upd
+      // Si cambió el % o el estado, propagar el rollup de avance hacia arriba.
+      if (porcentajeCompletado !== undefined || estado) {
+        try {
+          if (upd.proyectoActividadId) await ProgresoService.actualizarProgresoActividad(upd.proyectoActividadId)
+          else await ProgresoService.actualizarProgresoEDT(upd.proyectoEdtId)
+        } catch (e) { console.error('[supervision/tareas] rollup avance', e) }
+      }
     } else {
       const updateData: any = { updatedAt: new Date() }
       if (nombre !== undefined) updateData.nombre = nombre

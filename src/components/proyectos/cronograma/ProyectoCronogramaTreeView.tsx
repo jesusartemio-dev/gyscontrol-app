@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { RefreshCw, TreePine, Plus, Download, List, Filter, Zap, Trash2, Clock } from 'lucide-react'
+import { RefreshCw, TreePine, Plus, Download, List, Filter, Zap, Trash2, Clock, Calculator } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -146,6 +146,27 @@ export function ProyectoCronogramaTreeView({
     walk(state.rootNodes, null)
     return acc
   }, [showPesoColumn, pesoFaseMap, state.nodes, state.rootNodes])
+
+  // Recalcular el avance almacenado del cronograma (rollup desde el % de las tareas).
+  const [recalculando, setRecalculando] = useState(false)
+  const handleRecalcularAvance = async () => {
+    if (!selectedCronograma) return
+    setRecalculando(true)
+    try {
+      const res = await fetch(
+        `/api/proyectos/${proyectoId}/cronograma/recalcular-avance?cronogramaId=${selectedCronograma.id}`,
+        { method: 'POST', credentials: 'include' },
+      )
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Error al recalcular')
+      await actions.loadTree([...state.expandedNodes])
+      onRefresh?.()
+      toast.success('Avance recalculado')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Error al recalcular')
+    } finally {
+      setRecalculando(false)
+    }
+  }
 
   // ── DnD state ─────────────────────────────────────────────────────────────
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null)
@@ -816,6 +837,18 @@ export function ProyectoCronogramaTreeView({
             </Badge>
           </div>
           <div className="flex items-center gap-2">
+            {(selectedCronograma?.tipo === 'ejecucion' || selectedCronograma?.tipo === 'planificacion') && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRecalcularAvance}
+                disabled={recalculando || state.loadingNodes.has('root')}
+                title="Recalcula el % de avance de fases/EDTs/actividades desde el % de las tareas"
+              >
+                <Calculator className={`h-4 w-4 mr-2 ${recalculando ? 'animate-spin' : ''}`} />
+                {recalculando ? 'Recalculando…' : 'Recalcular avance'}
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"

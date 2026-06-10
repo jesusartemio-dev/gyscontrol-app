@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { ProgresoService } from '@/lib/services/progresoService'
 import { validarPermisoCronogramaPorTarea } from '@/lib/services/cronogramaPermisos'
 
 // ✅ GET /api/proyecto-edt/[id]/tareas/[tareaId] - Obtener tarea individual
@@ -177,6 +178,12 @@ export async function PUT(
         }
       }
     })
+
+    // Propagar el rollup de avance hacia arriba (sin recalcular el % de la tarea).
+    try {
+      if (tareaActualizada.proyectoActividadId) await ProgresoService.actualizarProgresoActividad(tareaActualizada.proyectoActividadId)
+      else await ProgresoService.actualizarProgresoEDT(tareaActualizada.proyectoEdtId)
+    } catch (e) { console.error('[proyecto-edt/tareas] rollup avance', e) }
 
     return NextResponse.json({
       success: true,

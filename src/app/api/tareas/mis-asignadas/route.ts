@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { ProgresoService } from '@/lib/services/progresoService'
 
 export async function GET(request: NextRequest) {
   try {
@@ -256,7 +257,7 @@ export async function PATCH(request: NextRequest) {
         )
       }
 
-      tareaActualizada = await prisma.proyectoTarea.update({
+      const upd = await prisma.proyectoTarea.update({
         where: { id: tareaId },
         data: {
           ...(estado && { estado }),
@@ -267,6 +268,12 @@ export async function PATCH(request: NextRequest) {
           })
         }
       })
+      tareaActualizada = upd
+      // Propagar el rollup de avance hacia arriba (sin recalcular el % de la tarea).
+      try {
+        if (upd.proyectoActividadId) await ProgresoService.actualizarProgresoActividad(upd.proyectoActividadId)
+        else await ProgresoService.actualizarProgresoEDT(upd.proyectoEdtId)
+      } catch (e) { console.error('[mis-asignadas] rollup avance', e) }
     } else {
       // Tarea de servicio
       const tarea = await prisma.tarea.findFirst({

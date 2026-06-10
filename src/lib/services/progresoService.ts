@@ -278,6 +278,22 @@ export class ProgresoService {
   }
 
   /**
+   * Recalcula el avance almacenado de TODO un cronograma (actividad → EDT → fase → proyecto)
+   * a partir del % actual de las tareas. No modifica el % de las tareas; solo refresca el
+   * rollup almacenado que pudo quedar desactualizado.
+   */
+  static async recalcularAvanceCronograma(cronogramaId: string): Promise<{ actividades: number }> {
+    const actividades = await prisma.proyectoActividad.findMany({
+      where: { proyectoCronogramaId: cronogramaId },
+      select: { id: true },
+    })
+    for (const a of actividades) {
+      await this.actualizarProgresoActividad(a.id)
+    }
+    return { actividades: actividades.length }
+  }
+
+  /**
     * Método principal para registrar horas y actualizar progreso
     */
    static async registrarHorasYActualizarProgreso(
