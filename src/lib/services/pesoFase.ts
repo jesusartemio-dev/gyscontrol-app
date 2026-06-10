@@ -24,6 +24,7 @@ export interface PesosFaseResultado {
   horasTotal: number
   fases: PesoFaseItem[]
   avanceGlobal: number // % 0-100, ponderado por pesoEfectivo
+  sumaPesos: number // Σ pesoEfectivo (puede no dar 100; el UI lo indica)
 }
 
 /** Peso de un nodo (EDT/actividad/tarea) dentro de su fase: reparto lineal por horas. */
@@ -42,7 +43,7 @@ export async function calcularPesosFase(proyectoId: string): Promise<PesosFaseRe
     select: { id: true },
   })
   if (!cronograma) {
-    return { cronogramaId: null, horasTotal: 0, fases: [], avanceGlobal: 0 }
+    return { cronogramaId: null, horasTotal: 0, fases: [], avanceGlobal: 0, sumaPesos: 0 }
   }
 
   const [fasesRaw, tareas] = await Promise.all([
@@ -85,8 +86,9 @@ export async function calcularPesosFase(proyectoId: string): Promise<PesosFaseRe
     return { f, horasFase, avanceFase, pesoHorasDefault, raw }
   })
 
-  // Paso 2: normalizar el raw a 100% para obtener pesoEfectivo.
-  const sumaRaw = base.reduce((s, b) => s + b.raw, 0)
+  // Paso 2: pesoEfectivo = peso usado SIN normalizar (lo que el usuario asignó, o el
+  // sugerido por horas si está vacío). La suma puede no dar 100% → el UI lo indica y
+  // ofrece normalizar a mano; nunca se modifica el valor que el usuario escribió.
   const fases: PesoFaseItem[] = base.map((b) => ({
     faseId: b.f.id,
     nombre: b.f.nombre,
@@ -95,12 +97,13 @@ export async function calcularPesosFase(proyectoId: string): Promise<PesosFaseRe
     avanceFase: Number(b.avanceFase.toFixed(2)),
     pesoHorasDefault: Number(b.pesoHorasDefault.toFixed(2)),
     pesoManual: b.f.pesoManual,
-    pesoEfectivo: Number((sumaRaw > 0 ? (b.raw / sumaRaw) * 100 : repartoEquitativo).toFixed(2)),
+    pesoEfectivo: Number(b.raw.toFixed(2)),
   }))
 
+  const sumaPesos = Number(fases.reduce((s, f) => s + f.pesoEfectivo, 0).toFixed(2))
   const avanceGlobal = Number(
     fases.reduce((s, f) => s + (f.pesoEfectivo / 100) * f.avanceFase, 0).toFixed(2),
   )
 
-  return { cronogramaId: cronograma.id, horasTotal, fases, avanceGlobal }
+  return { cronogramaId: cronograma.id, horasTotal, fases, avanceGlobal, sumaPesos }
 }

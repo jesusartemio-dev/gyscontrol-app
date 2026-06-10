@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { Scale, Loader2, RotateCcw, Save, ChevronRight, ChevronDown } from 'lucide-react'
+import { Scale, Loader2, RotateCcw, Save, ChevronRight, ChevronDown, Wand2 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -24,12 +24,13 @@ interface PesosResp {
   horasTotal: number
   fases: PesoFaseItem[]
   avanceGlobal: number
+  sumaPesos: number
 }
 
 /**
  * Panel compacto y colapsable para asignar a mano el peso % de cada FASE del cronograma de
- * ejecución. Debajo de la fase todo se reparte por horas. Los pesos se normalizan a 100%
- * automáticamente; la columna mostrada suma EXACTAMENTE 100% (método del resto mayor).
+ * ejecución. NO modifica lo que el usuario escribe: muestra la suma y avisa si no llega a
+ * 100% (con un botón para normalizar a mano). Debajo de la fase todo se reparte por horas.
  */
 export function PesosFasePanel({ proyectoId }: { proyectoId: string }) {
   const [data, setData] = useState<PesosResp | null>(null)
@@ -55,28 +56,26 @@ export function PesosFasePanel({ proyectoId }: { proyectoId: string }) {
 
   useEffect(() => { cargar() }, [proyectoId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Cálculo en vivo (raw = manual ?? sugerido; normaliza a 100%); display con resto mayor.
+  // Peso usado por fase = lo que el usuario escribió, o el sugerido por horas si está vacío.
+  // NO se normaliza: lo que ves es lo que se usa. La suma puede no dar 100 → se indica.
   const live = useMemo(() => {
     if (!data) return null
-    const n = data.fases.length || 1
     const raws = data.fases.map((f) => {
-      const txt = manual[f.faseId]
-      const v = txt !== undefined && txt !== '' ? Number(txt) : f.pesoHorasDefault
+      const t = manual[f.faseId]
+      const v = t !== undefined && t !== '' ? Number(t) : f.pesoHorasDefault
       return Number.isFinite(v) && v >= 0 ? v : 0
     })
-    const sumaRaw = raws.reduce((s, r) => s + r, 0)
-    const efectivos = raws.map((r) => (sumaRaw > 0 ? (r / sumaRaw) * 100 : 100 / n))
-    const efectivosDisplay = repartirA100(efectivos, 1) // suma EXACTA 100.0
-    const avanceGlobal = data.fases.reduce((s, f, i) => s + (efectivos[i] / 100) * f.avanceFase, 0)
-    return { efectivos, efectivosDisplay, avanceGlobal }
+    const suma = raws.reduce((s, r) => s + r, 0)
+    const avanceGlobal = data.fases.reduce((s, f, i) => s + (raws[i] / 100) * f.avanceFase, 0)
+    return { raws, suma, avanceGlobal }
   }, [data, manual])
+
+  const cuadra = live ? Math.abs(live.suma - 100) < 0.05 : true
+  const delta = live ? 100 - live.suma : 0
 
   const dirty = useMemo(() => {
     if (!data) return false
-    return data.fases.some((f) => {
-      const txt = manual[f.faseId] ?? ''
-      return txt !== (f.pesoManual != null ? String(f.pesoManual) : '')
-    })
+    return data.fases.some((f) => (manual[f.faseId] ?? '') !== (f.pesoManual != null ? String(f.pesoManual) : ''))
   }, [data, manual])
 
   const guardar = async () => {
@@ -109,11 +108,19 @@ export function PesosFasePanel({ proyectoId }: { proyectoId: string }) {
     if (data) setManual(Object.fromEntries(data.fases.map((f) => [f.faseId, ''])))
   }
 
+  // Reescala los valores actuales para que sumen 100% y los escribe en los inputs (acción
+  // explícita del usuario; nunca automática).
+  const normalizar = () => {
+    if (!data || !live || live.suma <= 0) return
+    const norm = repartirA100(live.raws.map((r) => (r / live.suma) * 100), 1)
+    setManual(Object.fromEntries(data.fases.map((f, i) => [f.faseId, String(norm[i])])))
+  }
+
   if (loading) return <Skeleton className="h-9 w-full rounded-lg mb-2" />
   if (!data || data.fases.length === 0) return null
 
   const avanceGlobal = live?.avanceGlobal ?? data.avanceGlobal
-  const sumaEfectivo = live ? live.efectivosDisplay.reduce((s, v) => s + v, 0) : 100
+  const suma = live?.suma ?? data.sumaPesos
 
   return (
     <Card className="mb-2">
@@ -128,7 +135,9 @@ export function PesosFasePanel({ proyectoId }: { proyectoId: string }) {
         <span className="font-medium">Pesos por fase</span>
         <span className="text-muted-foreground text-xs">
           · Avance global <span className="font-mono font-semibold text-foreground">{avanceGlobal.toFixed(1)}%</span>
-          {' · '}suma <span className={`font-mono ${Math.round(sumaEfectivo * 10) === 1000 ? 'text-emerald-600' : 'text-amber-600'}`}>{sumaEfectivo.toFixed(1)}%</span>
+          {' · '}suma{' '}
+          <span className={`font-mono font-semibold ${cuadra ? 'text-emerald-600' : 'text-amber-600'}`}>{suma.toFixed(1)}%</span>
+          {!cuadra && <span className="text-amber-600"> ({delta > 0 ? 'faltan' : 'sobran'} {Math.abs(delta).toFixed(1)}%)</span>}
         </span>
         {dirty && <span className="text-[10px] text-amber-600 font-medium">· sin guardar</span>}
         <span className="ml-auto text-xs text-muted-foreground">{open ? 'ocultar' : 'editar'}</span>
@@ -137,9 +146,17 @@ export function PesosFasePanel({ proyectoId }: { proyectoId: string }) {
       {/* Tabla editable (colapsable) */}
       {open && (
         <div className="px-3 pb-3 border-t">
-          <div className="flex justify-end gap-2 py-2">
+          <div className="flex items-center justify-end gap-2 py-2">
+            {!cuadra && (
+              <span className="text-xs text-amber-600 mr-auto">
+                ⚠ La suma es {suma.toFixed(1)}% — {delta > 0 ? 'faltan' : 'sobran'} {Math.abs(delta).toFixed(1)}%.
+              </span>
+            )}
             <Button size="sm" variant="ghost" className="h-7" onClick={usarSugeridos} disabled={saving}>
               <RotateCcw className="h-3.5 w-3.5 mr-1" /> Usar sugeridos
+            </Button>
+            <Button size="sm" variant="ghost" className="h-7" onClick={normalizar} disabled={saving || cuadra}>
+              <Wand2 className="h-3.5 w-3.5 mr-1" /> Normalizar a 100%
             </Button>
             <Button size="sm" className="h-7" onClick={guardar} disabled={!dirty || saving}>
               {saving ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Save className="h-3.5 w-3.5 mr-1" />} Guardar
@@ -153,12 +170,11 @@ export function PesosFasePanel({ proyectoId }: { proyectoId: string }) {
                   <th className="text-right py-1.5 font-medium">Horas</th>
                   <th className="text-right py-1.5 font-medium">Sugerido</th>
                   <th className="text-right py-1.5 font-medium w-24">Peso %</th>
-                  <th className="text-right py-1.5 font-medium">Efectivo</th>
                   <th className="text-right py-1.5 font-medium">Avance</th>
                 </tr>
               </thead>
               <tbody>
-                {data.fases.map((f, i) => (
+                {data.fases.map((f) => (
                   <tr key={f.faseId} className="border-b last:border-0">
                     <td className="py-1 font-medium">{f.nombre}</td>
                     <td className="py-1 text-right text-muted-foreground">{f.horasFase}h</td>
@@ -174,9 +190,6 @@ export function PesosFasePanel({ proyectoId }: { proyectoId: string }) {
                         onChange={(e) => setManual((p) => ({ ...p, [f.faseId]: e.target.value }))}
                       />
                     </td>
-                    <td className="py-1 text-right font-mono font-medium text-indigo-600">
-                      {(live ? live.efectivosDisplay[i] : f.pesoEfectivo).toFixed(1)}%
-                    </td>
                     <td className="py-1 text-right font-mono">{f.avanceFase.toFixed(1)}%</td>
                   </tr>
                 ))}
@@ -185,15 +198,17 @@ export function PesosFasePanel({ proyectoId }: { proyectoId: string }) {
                   <td className="py-1.5">Total</td>
                   <td className="py-1.5 text-right text-muted-foreground">{data.horasTotal}h</td>
                   <td className="py-1.5" />
-                  <td className="py-1.5" />
-                  <td className="py-1.5 text-right font-mono text-emerald-600">{sumaEfectivo.toFixed(1)}%</td>
+                  <td className={`py-1.5 text-right font-mono ${cuadra ? 'text-emerald-600' : 'text-amber-600'}`}>
+                    {suma.toFixed(1)}%
+                  </td>
                   <td className="py-1.5 text-right font-mono">{avanceGlobal.toFixed(1)}%</td>
                 </tr>
               </tbody>
             </table>
           </div>
           <p className="text-[11px] text-muted-foreground mt-1.5">
-            Vacío = usa el sugerido por horas. Se normaliza a 100% automáticamente. Debajo de la fase, EDT/actividad/tarea se reparten por horas.
+            Vacío = usa el sugerido por horas. No se modifica lo que escribes: si la suma no da 100%,
+            ajústala o usa &quot;Normalizar a 100%&quot;. Debajo de la fase, EDT/actividad/tarea se reparten por horas.
           </p>
         </div>
       )}
