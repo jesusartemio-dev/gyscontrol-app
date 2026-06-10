@@ -153,6 +153,7 @@ export default function ProyectoServiciosPage() {
                 <th className="text-center p-3 font-medium">Horas</th>
                 <th className="text-center p-3 font-medium w-24">Progreso</th>
                 <th className="text-right p-3 font-medium">Cliente</th>
+                <th className="text-right p-3 font-medium">% Peso</th>
                 <th className="text-right p-3 font-medium">Presupuesto</th>
                 {hayCostoPlanificado && (
                   <th className="text-right p-3 font-medium">Plan</th>
@@ -172,6 +173,7 @@ export default function ProyectoServiciosPage() {
                 const edtId = (servicio as any).edt?.id
                 const planEdt = edtId ? costoPorEdt[edtId] : undefined
                 const ppto = servicio.subtotalInterno
+                const pesoPct = totalCosto > 0 ? (servicio.subtotalCliente / totalCosto) * 100 : 0
                 const plan = planEdt?.costo || 0
                 const varianza = plan > 0 ? ((plan - ppto) / ppto) * 100 : 0
                 const excede = plan > ppto && ppto > 0
@@ -197,6 +199,9 @@ export default function ProyectoServiciosPage() {
                     </td>
                     <td className="p-3 text-right font-medium text-green-600">
                       {formatCurrency(servicio.subtotalCliente)}
+                    </td>
+                    <td className="p-3 text-right font-medium text-indigo-600">
+                      {pesoPct.toFixed(1)}%
                     </td>
                     <td className="p-3 text-right text-muted-foreground">
                       {formatCurrency(ppto)}
@@ -229,7 +234,7 @@ export default function ProyectoServiciosPage() {
               {hayCostoPlanificado && edtsNoCotizados.length > 0 && (
                 <>
                   <tr className="border-t-2 bg-amber-50/50">
-                    <td className="p-3 text-xs font-medium text-amber-700" colSpan={hayCostoPlanificado ? 9 : 7}>
+                    <td className="p-3 text-xs font-medium text-amber-700" colSpan={hayCostoPlanificado ? 10 : 8}>
                       <span className="flex items-center gap-1">
                         <AlertTriangle className="h-3.5 w-3.5" />
                         EDTs en cronograma sin presupuesto comercial ({edtsNoCotizados.length})
@@ -252,6 +257,7 @@ export default function ProyectoServiciosPage() {
                         </div>
                       </td>
                       <td className="p-3 text-right text-muted-foreground/50 text-xs">$0</td>
+                      <td className="p-3 text-right text-muted-foreground/50 text-xs">—</td>
                       <td className="p-3 text-right text-muted-foreground/50 text-xs">$0</td>
                       <td className={`p-3 text-right font-medium ${edt.costo > 0 ? 'text-red-600' : 'text-muted-foreground/50'}`}>
                         {edt.costo > 0 ? formatCurrency(edt.costo) : '—'}
@@ -276,6 +282,7 @@ export default function ProyectoServiciosPage() {
                   <span className="text-muted-foreground">Total</span>
                 </td>
                 <td className="p-3 text-right text-green-600">{formatCurrency(totalCosto)}</td>
+                <td className="p-3 text-right text-indigo-600">{totalCosto > 0 ? '100%' : '—'}</td>
                 <td className="p-3 text-right">{formatCurrency(totalInterno)}</td>
                 {hayCostoPlanificado && (
                   <td className={`p-3 text-right ${totalPlanificado > totalInterno ? 'text-red-600' : 'text-indigo-600'}`}>
@@ -310,6 +317,7 @@ export default function ProyectoServiciosPage() {
             const edtId = (servicio as any).edt?.id
             const planEdt = edtId ? costoPorEdt[edtId] : undefined
             const ppto = servicio.subtotalInterno
+            const pesoPct = totalCosto > 0 ? (servicio.subtotalCliente / totalCosto) * 100 : 0
             const plan = planEdt?.costo || 0
             const excede = plan > ppto && ppto > 0
 
@@ -343,7 +351,7 @@ export default function ProyectoServiciosPage() {
                   <div className="flex justify-between pt-2 border-t text-sm">
                     <div>
                       <div className="font-semibold text-green-600">{formatCurrency(servicio.subtotalCliente)}</div>
-                      <div className="text-[10px] text-muted-foreground">Cliente</div>
+                      <div className="text-[10px] text-muted-foreground">Cliente · <span className="text-indigo-600 font-medium">{pesoPct.toFixed(1)}% peso</span></div>
                     </div>
                     <div className="text-right">
                       <div className="font-medium text-muted-foreground">{formatCurrency(ppto)}</div>

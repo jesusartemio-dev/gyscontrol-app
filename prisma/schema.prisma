@@ -3330,6 +3330,7 @@ model ProyectoFase {
   fechaFinReal         DateTime?
   estado               EstadoFase         @default(planificado)
   porcentajeAvance     Int                @default(0)
+  pesoManual           Float? // peso % de la fase asignado a mano (null = usar peso por horas). Se normaliza a 100% al calcular.
   createdAt            DateTime           @default(now())
   updatedAt            DateTime
   proyectoEdt          ProyectoEdt[]

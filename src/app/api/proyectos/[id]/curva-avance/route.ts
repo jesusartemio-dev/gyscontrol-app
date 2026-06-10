@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { construirCurvaAvance } from '@/lib/utils/curvaAvance'
+import { calcularPesosFase } from '@/lib/services/pesoFase'
 
 const ROLES = ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos']
 
@@ -38,23 +39,33 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     const tareasPlan = cronoPlan
       ? await prisma.proyectoTarea.findMany({
           where: { proyectoCronogramaId: cronoPlan.id },
-          select: { fechaInicio: true, fechaFin: true, horasEstimadas: true },
+          select: {
+            fechaInicio: true,
+            fechaFin: true,
+            horasEstimadas: true,
+            proyectoEdt: { select: { proyectoFase: { select: { nombre: true } } } },
+          },
         })
       : []
 
-    const snapshots = await prisma.proyectoAvanceSnapshot.findMany({
-      where: { proyectoId: id },
-      orderBy: { semanaIso: 'asc' },
-      select: { semanaIso: true, fechaCorte: true, progresoGeneral: true },
-    })
+    const [snapshots, pesos] = await Promise.all([
+      prisma.proyectoAvanceSnapshot.findMany({
+        where: { proyectoId: id },
+        orderBy: { semanaIso: 'asc' },
+        select: { semanaIso: true, fechaCorte: true, progresoGeneral: true },
+      }),
+      calcularPesosFase(id),
+    ])
 
     const baselineTareas = tareasPlan.map((t) => ({
+      faseNombre: t.proyectoEdt?.proyectoFase?.nombre ?? null,
       fechaInicio: t.fechaInicio,
       fechaFin: t.fechaFin,
       horasEstimadas: Number(t.horasEstimadas ?? 0),
     }))
+    const pesosFase = pesos.fases.map((f) => ({ faseNombre: f.nombre, pesoEfectivo: f.pesoEfectivo }))
 
-    const curva = construirCurvaAvance(baselineTareas, snapshots)
+    const curva = construirCurvaAvance(baselineTareas, snapshots, pesosFase)
 
     return NextResponse.json({
       weeks: curva.weeks,

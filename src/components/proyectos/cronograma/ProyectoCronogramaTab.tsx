@@ -51,6 +51,7 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { ProyectoCronogramaTreeView } from './ProyectoCronogramaTreeView'
+import { PesosFasePanel } from './PesosFasePanel'
 import { ProyectoGanttView } from './ProyectoGanttView'
 // CronogramaGanttViewPro deshabilitado - funcionalidad consolidada en Gantt
 import { ProyectoDependencyManager } from './ProyectoDependencyManager'
@@ -1166,6 +1167,9 @@ export function ProyectoCronogramaTab({
         </TabsList>
 
         <TabsContent value="jerarquia" className="mt-3">
+          {selectedCronograma?.tipo === 'ejecucion' && (
+            <PesosFasePanel proyectoId={proyectoId} />
+          )}
           <ProyectoCronogramaTreeView
             proyectoId={proyectoId}
             refreshKey={refreshKey}

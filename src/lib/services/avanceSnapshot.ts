@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { calcularPesosFase } from '@/lib/services/pesoFase'
 
 export interface ResultadoSnapshot {
   snapshotId: string
@@ -42,20 +43,10 @@ export async function tomarSnapshot(
     },
   })
 
-  // 3. progresoGeneral ponderado por horasEstimadas (fallback promedio simple si Σh = 0).
-  let sumaPeso = 0
-  let sumaPond = 0
-  for (const t of tareas) {
-    const h = Number(t.horasEstimadas ?? 0)
-    sumaPeso += h
-    sumaPond += t.porcentajeCompletado * h
-  }
-  const progresoGeneral =
-    tareas.length === 0
-      ? 0
-      : sumaPeso > 0
-        ? sumaPond / sumaPeso
-        : tareas.reduce((s, t) => s + t.porcentajeCompletado, 0) / tareas.length
+  // 3. progresoGeneral ponderado por el PESO de cada fase (pesoManual normalizado, o por
+  //    horas si no hay manual). Mismo criterio que el cronograma y la Curva S → una sola verdad.
+  const pesos = await calcularPesosFase(proyectoId)
+  const progresoGeneral = pesos.avanceGlobal
 
   // 4. Upsert del snapshot + reemplazo atómico de las tareas hijas.
   const snapshot = await prisma.$transaction(async (tx) => {
