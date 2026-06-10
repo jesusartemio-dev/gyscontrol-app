@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -105,6 +105,47 @@ export function ProyectoCronogramaTreeView({
   // Columnas de asignación: Recurso y Responsable visibles en planificación y ejecución
   const showRecursoColumn = !!selectedCronograma
   const showResponsableColumn = selectedCronograma?.tipo === 'ejecucion' || selectedCronograma?.tipo === 'planificacion'
+  // Columna Peso: solo en ejecución (el peso por fase aplica al cronograma vivo)
+  const showPesoColumn = selectedCronograma?.tipo === 'ejecucion'
+
+  // ── Pesos por fase (para la columna Peso del árbol) ───────────────────────
+  // Map normNombreFase → { pesoEfectivo (%), horasFase }. peso(nodo) = pesoEfectivo × horasNodo/horasFase.
+  const [pesoFaseMap, setPesoFaseMap] = useState<Map<string, { pesoEfectivo: number; horasFase: number }>>(new Map())
+  const normFase = (s: string) => (s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim()
+  useEffect(() => {
+    if (!showPesoColumn) { setPesoFaseMap(new Map()); return }
+    let cancel = false
+    fetch(`/api/proyectos/${proyectoId}/pesos-fase`, { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancel || !d?.fases) return
+        setPesoFaseMap(new Map(d.fases.map((f: { nombre: string; pesoEfectivo: number; horasFase: number }) =>
+          [normFase(f.nombre), { pesoEfectivo: f.pesoEfectivo, horasFase: f.horasFase }])))
+      })
+      .catch(() => {})
+    return () => { cancel = true }
+  }, [proyectoId, showPesoColumn, selectedCronograma?.id, refreshKey])
+
+  // peso por nodo: recorre el árbol cargado llevando la info de su fase.
+  const pesoPorNodo = useMemo(() => {
+    const acc = new Map<string, number>()
+    if (!showPesoColumn || pesoFaseMap.size === 0) return acc
+    const walk = (nodeIds: string[], faseInfo: { pesoEfectivo: number; horasFase: number } | null) => {
+      for (const id of nodeIds) {
+        const node = state.nodes.get(id)
+        if (!node) continue
+        let info = faseInfo
+        if (node.type === 'fase') info = pesoFaseMap.get(normFase(node.nombre)) ?? null
+        if (info && info.horasFase > 0) {
+          const h = Number(node.data?.horasEstimadas) || 0
+          acc.set(id, (info.pesoEfectivo * h) / info.horasFase)
+        }
+        walk(node.children?.map((c) => c.id) || [], info)
+      }
+    }
+    walk(state.rootNodes, null)
+    return acc
+  }, [showPesoColumn, pesoFaseMap, state.nodes, state.rootNodes])
 
   // ── DnD state ─────────────────────────────────────────────────────────────
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null)
@@ -693,6 +734,8 @@ export function ProyectoCronogramaTreeView({
                     readOnly={isReadOnly}
                     showRecursoColumn={showRecursoColumn}
                     showResponsableColumn={showResponsableColumn}
+                    showPesoColumn={showPesoColumn}
+                    pesoGlobal={pesoPorNodo.get(nodeId)}
                     rowIndex={currentRowIndex}
                     dragListeners={dragListeners}
                     dragAttributes={dragAttributes}
@@ -903,7 +946,7 @@ export function ProyectoCronogramaTreeView({
             </div>
           ) : (
             <>
-              <TreeHeader showRecursoColumn={showRecursoColumn} showResponsableColumn={showResponsableColumn} />
+              <TreeHeader showRecursoColumn={showRecursoColumn} showResponsableColumn={showResponsableColumn} showPesoColumn={showPesoColumn} />
               <div className="p-2">
                 <DndContext
                   sensors={sensors}

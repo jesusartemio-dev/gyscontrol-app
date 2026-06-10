@@ -27,6 +27,8 @@ interface TreeNodeProps {
   executionMode?: boolean
   showRecursoColumn?: boolean
   showResponsableColumn?: boolean
+  showPesoColumn?: boolean
+  pesoGlobal?: number
   onAssignResponsable?: () => void
   onAssignRecurso?: () => void
   onDuplicate?: () => void
@@ -84,6 +86,8 @@ export function TreeNode({
   executionMode = false,
   showRecursoColumn,
   showResponsableColumn,
+  showPesoColumn,
+  pesoGlobal,
   onAssignResponsable,
   onAssignRecurso,
   onDuplicate,
@@ -236,13 +240,18 @@ export function TreeNode({
       className={`tree-node group ${isDragging ? 'opacity-40' : ''} ${isSelected ? 'bg-blue-100 border-l-2 border-l-blue-500' : `${rowIndex != null && rowIndex % 2 === 0 ? 'bg-gray-100' : ''} hover:bg-blue-100/70`} py-0.5 cursor-pointer transition-colors`}
       onClick={onSelect}
     >
-      <div className={`grid items-center gap-1 ${
-        showRecursoColumn && showResponsableColumn
-          ? 'grid-cols-[1fr_80px_65px_120px_55px_55px_100px_100px_28px]'
-          : (showRecursoColumn || showResponsableColumn)
-            ? 'grid-cols-[1fr_80px_65px_120px_55px_55px_100px_28px]'
-            : 'grid-cols-[1fr_80px_65px_120px_55px_55px_28px]'
-      }`}>
+      <div
+        className="grid items-center gap-1"
+        style={{
+          gridTemplateColumns: [
+            '1fr', '80px', '65px', '120px', '55px', '55px',
+            ...(showPesoColumn ? ['55px'] : []),
+            ...(showRecursoColumn ? ['100px'] : []),
+            ...(showResponsableColumn ? ['100px'] : []),
+            '28px',
+          ].join(' '),
+        }}
+      >
         {/* Columna 1: Nombre con indentación */}
         <div className="flex items-center gap-1 min-w-0" style={{ paddingLeft: `${node.level * 16 + 8}px` }}>
           {/* Drag handle — visible on hover when draggable */}
@@ -348,6 +357,13 @@ export function TreeNode({
         <div className="text-right text-[11px] text-gray-600 font-mono pr-1">
           {totalHours > 0 ? `${totalHours}h` : ''}
         </div>
+
+        {/* Columna: Peso (calculado por horas dentro de su fase) */}
+        {showPesoColumn && (
+          <div className="text-right text-[11px] text-indigo-600 font-mono font-medium pr-1">
+            {pesoGlobal != null && pesoGlobal > 0 ? `${pesoGlobal.toFixed(1)}%` : ''}
+          </div>
+        )}
 
         {/* Columna: Recurso */}
         {showRecursoColumn && (
