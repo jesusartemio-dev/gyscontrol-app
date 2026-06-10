@@ -1,6 +1,7 @@
 'use client'
 
 import { normalizeStr } from '@/lib/utils'
+import { repartirA100 } from '@/lib/utils/repartirA100'
 
 import { useEffect, useState } from 'react'
 import { Wrench, Table, Grid3X3, Download, Search, Clock, AlertTriangle, Target } from 'lucide-react'
@@ -59,6 +60,9 @@ export default function ProyectoServiciosPage() {
   )
   const totalCosto = servicios.reduce((sum, s) => sum + (s.subtotalCliente || 0), 0)
   const totalInterno = servicios.reduce((sum, s) => sum + (s.subtotalInterno || 0), 0)
+  // % Peso por servicio con método del resto mayor → la columna suma EXACTAMENTE 100%.
+  const pesosArr = repartirA100(servicios.map(s => totalCosto > 0 ? ((s.subtotalCliente || 0) / totalCosto) * 100 : 0), 2)
+  const pesoPorId: Record<string, number> = Object.fromEntries(servicios.map((s, i) => [s.id, pesosArr[i] ?? 0]))
   const costoPorEdt = cronogramaStats.costoPorEdt || {}
   const totalPlanificado = Object.values(costoPorEdt).reduce((sum, e) => sum + e.costo, 0)
   const hayCostoPlanificado = totalPlanificado > 0
@@ -173,7 +177,7 @@ export default function ProyectoServiciosPage() {
                 const edtId = (servicio as any).edt?.id
                 const planEdt = edtId ? costoPorEdt[edtId] : undefined
                 const ppto = servicio.subtotalInterno
-                const pesoPct = totalCosto > 0 ? (servicio.subtotalCliente / totalCosto) * 100 : 0
+                const pesoPct = pesoPorId[servicio.id] ?? 0
                 const plan = planEdt?.costo || 0
                 const varianza = plan > 0 ? ((plan - ppto) / ppto) * 100 : 0
                 const excede = plan > ppto && ppto > 0
@@ -201,7 +205,7 @@ export default function ProyectoServiciosPage() {
                       {formatCurrency(servicio.subtotalCliente)}
                     </td>
                     <td className="p-3 text-right font-medium text-indigo-600">
-                      {pesoPct.toFixed(1)}%
+                      {pesoPct.toFixed(2)}%
                     </td>
                     <td className="p-3 text-right text-muted-foreground">
                       {formatCurrency(ppto)}
@@ -317,7 +321,7 @@ export default function ProyectoServiciosPage() {
             const edtId = (servicio as any).edt?.id
             const planEdt = edtId ? costoPorEdt[edtId] : undefined
             const ppto = servicio.subtotalInterno
-            const pesoPct = totalCosto > 0 ? (servicio.subtotalCliente / totalCosto) * 100 : 0
+            const pesoPct = pesoPorId[servicio.id] ?? 0
             const plan = planEdt?.costo || 0
             const excede = plan > ppto && ppto > 0
 
@@ -351,7 +355,7 @@ export default function ProyectoServiciosPage() {
                   <div className="flex justify-between pt-2 border-t text-sm">
                     <div>
                       <div className="font-semibold text-green-600">{formatCurrency(servicio.subtotalCliente)}</div>
-                      <div className="text-[10px] text-muted-foreground">Cliente · <span className="text-indigo-600 font-medium">{pesoPct.toFixed(1)}% peso</span></div>
+                      <div className="text-[10px] text-muted-foreground">Cliente · <span className="text-indigo-600 font-medium">{pesoPct.toFixed(2)}% peso</span></div>
                     </div>
                     <div className="text-right">
                       <div className="font-medium text-muted-foreground">{formatCurrency(ppto)}</div>
