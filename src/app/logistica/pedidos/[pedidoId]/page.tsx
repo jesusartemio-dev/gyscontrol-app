@@ -58,7 +58,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { cn } from '@/lib/utils'
+import { cn, formatDate } from '@/lib/utils'
 
 // 🎯 Icons
 import {
@@ -99,14 +99,6 @@ const formatCurrency = (amount: number, currency: string = 'USD'): string => {
     currency,
     minimumFractionDigits: 2
   }).format(amount)
-}
-
-const formatDate = (dateString: string | Date): string => {
-  return new Date(dateString).toLocaleDateString('es-ES', {
-    day: '2-digit',
-    month: '2-digit',
-    year: '2-digit'
-  })
 }
 
 const getEstadoBadgeClass = (estado: string): string => {
