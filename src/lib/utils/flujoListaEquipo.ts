@@ -18,7 +18,7 @@ export interface FlujoEstado {
 }
 
 export const flujoEstados: Record<EstadoListaEquipo, FlujoEstado> = {
-  borrador:    { siguiente: 'por_revisar',                                roles: ['proyectos', 'admin'] },
+  borrador:    { siguiente: 'por_revisar',                                roles: ['proyectos', 'coordinador', 'gestor', 'admin'] },
   por_revisar: { siguiente: 'por_cotizar',  retroceder: 'borrador',      roles: ['coordinador', 'admin'] },
   por_cotizar: { siguiente: 'por_aprobar',  retroceder: 'por_revisar',   roles: ['logistico', 'coordinador_logistico', 'admin'] },
   por_aprobar: { siguiente: 'aprobada',     retroceder: 'por_cotizar',   roles: ['gestor', 'admin'] },
