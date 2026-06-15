@@ -60,11 +60,13 @@ const AVANZAR_POR_CONTEXTO: Record<string, string[]> = {
 const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
   estado,
   pedidoId,
+  usuarioId,
   contexto = 'logistica',
   onUpdated,
 }) => {
   const { data: session } = useSession()
   const userRole = session?.user?.role || ''
+  const esCreador = !!usuarioId && session?.user?.id === usuarioId
   const [isUpdating, setIsUpdating] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [pendingEstado, setPendingEstado] = useState('')
@@ -206,6 +208,18 @@ const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
               targetEstado="parcial"
               targetLabel="Volver a Parcial"
               onSuccess={() => onUpdated?.('parcial')}
+            />
+          )}
+
+          {/* Revertir cancelado → borrador */}
+          {estado === 'cancelado' && (esCreador || ['admin', 'gerente'].includes(userRole)) && (
+            <RollbackButton
+              entityType="pedidoEquipo"
+              entityId={pedidoId}
+              currentEstado={estado}
+              targetEstado="borrador"
+              targetLabel="Volver a Borrador"
+              onSuccess={() => onUpdated?.('borrador')}
             />
           )}
 

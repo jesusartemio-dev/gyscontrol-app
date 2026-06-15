@@ -38,11 +38,12 @@ const VALID_ROLLBACKS: Record<RollbackEntity, Record<string, string[]>> = {
     aprobada:    ['por_aprobar'],
   },
   pedidoEquipo: {
-    enviado:  ['borrador'],
-    aprobado: ['enviado'],
-    atendido: ['aprobado'],
-    parcial:  ['atendido'],
+    enviado:   ['borrador'],
+    aprobado:  ['enviado'],
+    atendido:  ['aprobado'],
+    parcial:   ['atendido'],
     entregado: ['parcial'],
+    cancelado: ['borrador'],
   },
   recepcionPendiente: {
     en_almacen: ['pendiente'],

@@ -57,18 +57,22 @@ export async function POST(
       return NextResponse.json({ error: 'targetEstado es requerido' }, { status: 400 })
     }
 
-    // Verificar roles por targetEstado
-    const rolesPermitidos = ROLES_POR_TARGET[targetEstado]
-    if (!rolesPermitidos || !rolesPermitidos.includes(session.user.role)) {
-      return NextResponse.json({ error: 'Sin permisos para retroceder a este estado' }, { status: 403 })
-    }
-
     const pedido = await prisma.pedidoEquipo.findUnique({
       where: { id },
-      select: { estado: true, codigo: true, proyectoId: true, listaId: true },
+      select: { estado: true, codigo: true, proyectoId: true, listaId: true, responsableId: true },
     })
     if (!pedido) {
       return NextResponse.json({ error: 'Pedido no encontrado' }, { status: 404 })
+    }
+
+    // Verificar roles por targetEstado (el creador siempre puede revertir su pedido cancelado)
+    const esCreador = pedido.responsableId === session.user.id
+    const esCancelado = pedido.estado === 'cancelado' && targetEstado === 'borrador'
+    const rolesPermitidos = ROLES_POR_TARGET[targetEstado]
+    if (!esCancelado || !esCreador) {
+      if (!rolesPermitidos || !rolesPermitidos.includes(session.user.role)) {
+        return NextResponse.json({ error: 'Sin permisos para retroceder a este estado' }, { status: 403 })
+      }
     }
 
     if (!isValidRollback('pedidoEquipo', pedido.estado, targetEstado)) {

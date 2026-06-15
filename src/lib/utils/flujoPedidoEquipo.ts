@@ -25,7 +25,7 @@ export const flujoEstadosPedido: Record<EstadoPedidoEquipo, FlujoPedidoEstado> =
   atendido:   { siguiente: 'parcial',    cancelar: 'cancelado', roles: ['logistico', 'coordinador_logistico', 'admin'] },
   parcial:    { siguiente: 'entregado',  cancelar: 'cancelado', roles: ['logistico', 'coordinador_logistico', 'admin'] },
   entregado:  {                                                  roles: [] },
-  cancelado:  {                                                  roles: [] },
+  cancelado:  { siguiente: 'borrador',                          roles: ['admin', 'gerente'] },
 }
 
 export const estadosPedidoList: { key: EstadoPedidoEquipo; label: string }[] = [
@@ -77,6 +77,11 @@ export function validarTransicionPedido(
 
   // Excepción: el creador del pedido siempre puede enviar o cancelar su propio borrador
   if (esCreador && estadoActual === 'borrador' && (nuevoEstado === 'enviado' || nuevoEstado === 'cancelado')) {
+    return { valido: true }
+  }
+
+  // Excepción: el creador puede revertir un pedido cancelado a borrador
+  if (esCreador && estadoActual === 'cancelado' && nuevoEstado === 'borrador') {
     return { valido: true }
   }
 

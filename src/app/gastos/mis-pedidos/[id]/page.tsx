@@ -579,6 +579,7 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
       <PedidoEstadoFlujoBanner
         estado={pedido.estado}
         pedidoId={pedido.id}
+        usuarioId={pedido.user?.id}
         contexto="proyectos"
         onUpdated={handleEstadoUpdated}
       />
