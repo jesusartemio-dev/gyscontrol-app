@@ -273,13 +273,26 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
     console.log('🔍 Eliminando PedidoEquipoItem con ID:', id)
 
     // ✅ Buscar el ítem en la base de datos para validar que existe
-    const item = await prisma.pedidoEquipoItem.findUnique({ where: { id } })
+    const item = await (prisma.pedidoEquipoItem as any).findUnique({
+      where: { id },
+      include: {
+        recepcionesPendientes: { where: { estado: { in: ['en_almacen', 'entregado_proyecto'] } }, select: { id: true, estado: true } }
+      }
+    })
 
     // ⚠️ Si no existe, devolver error 404
     if (!item) {
       return NextResponse.json(
         { error: 'Ítem no encontrado para eliminar' },
         { status: 404 }
+      )
+    }
+
+    // ⚠️ No se puede eliminar si hay recepciones activas
+    if (item.recepcionesPendientes?.length > 0) {
+      return NextResponse.json(
+        { error: 'No se puede eliminar: el item tiene recepciones en almacén o entregadas. Retrocede las recepciones primero.' },
+        { status: 409 }
       )
     }
 

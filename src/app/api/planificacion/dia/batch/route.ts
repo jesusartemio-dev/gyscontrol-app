@@ -17,7 +17,7 @@ const AsignacionSchema = z.object({
   notas: z.string().nullable().optional(),
 })
 
-export const BatchSchema = z.object({
+const BatchSchema = z.object({
   asignaciones: z.array(AsignacionSchema).min(1).max(50),
 })
 

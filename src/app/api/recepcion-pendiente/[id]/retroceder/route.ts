@@ -51,9 +51,9 @@ export async function POST(
 
     const pedidoItem = recepcion.pedidoEquipoItem || null
     const pedido = pedidoItem?.pedidoEquipo || null
-    const ocNumero = recepcion.ordenCompraItem.ordenCompra.numero
-    const proyectoId = pedido?.proyectoId || recepcion.ordenCompraItem.ordenCompra.proyectoId || null
-    const itemCodigo = pedidoItem?.codigo || recepcion.ordenCompraItem.codigo
+    const ocNumero = recepcion.ordenCompraItem?.ordenCompra?.numero || '—'
+    const proyectoId = pedido?.proyectoId || recepcion.ordenCompraItem?.ordenCompra?.proyectoId || null
+    const itemCodigo = pedidoItem?.codigo || recepcion.ordenCompraItem?.codigo || '—'
 
     // ═══════════════════════════════════════
     // RETROCESO: en_almacen → pendiente
@@ -141,6 +141,7 @@ export async function POST(
         let estadoItem: string = 'atendido'
         if (nuevoEstadoEntrega === 'entregado') estadoItem = 'entregado'
         else if (nuevoEstadoEntrega === 'parcial') estadoItem = 'parcial'
+        else if (nuevoEstadoEntrega === 'pendiente') estadoItem = 'pendiente'
 
         await tx.pedidoEquipoItem.update({
           where: { id: pedidoItem.id },

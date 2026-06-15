@@ -89,6 +89,7 @@ import {
   Warehouse,
   Wrench,
   Download,
+  Trash2,
 } from 'lucide-react'
 import TipoItemBadge from '@/components/shared/TipoItemBadge'
 
@@ -647,6 +648,28 @@ export default function PedidoLogisticaDetailPage() {
   // Revertir entrega directa
   const [revirtiendoItemId, setRevirtiendoItemId] = useState<string | null>(null)
   const [revertirConfirm, setRevertirConfirm] = useState<{ itemId: string; descripcion: string } | null>(null)
+  const [eliminarItemConfirm, setEliminarItemConfirm] = useState<{ itemId: string; descripcion: string } | null>(null)
+  const [eliminandoItemId, setEliminandoItemId] = useState<string | null>(null)
+
+  const handleEliminarItem = async () => {
+    if (!eliminarItemConfirm) return
+    const { itemId } = eliminarItemConfirm
+    setEliminandoItemId(itemId)
+    setEliminarItemConfirm(null)
+    try {
+      const res = await fetch(`/api/pedido-equipo-item/${itemId}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Error al eliminar item')
+      }
+      toast.success('Item eliminado del pedido')
+      await cargarDatos()
+    } catch (err: any) {
+      toast.error(err.message || 'Error al eliminar item')
+    } finally {
+      setEliminandoItemId(null)
+    }
+  }
 
   const handleRevertirEntrega = async () => {
     if (!revertirConfirm) return
@@ -1780,6 +1803,11 @@ export default function PedidoLogisticaDetailPage() {
                             !tieneOCItem &&
                             !tieneREQItem &&
                             !(item as any).recepcionesPendientes?.some((r: any) => ['en_almacen', 'entregado_proyecto'].includes(r.estado))
+                          const puedeEliminar = ['admin', 'gerente'].includes(userRole) &&
+                            (item.cantidadAtendida || 0) === 0 &&
+                            !tieneOCItem &&
+                            !tieneREQItem &&
+                            !(item as any).recepcionesPendientes?.some((r: any) => r.estado === 'en_almacen')
                           return (
                             <div className="flex items-center gap-1 justify-center">
                               {puedeAtender && (
@@ -1812,6 +1840,19 @@ export default function PedidoLogisticaDetailPage() {
                                     ? <span className="animate-spin">↻</span>
                                     : '↩'}
                                   {' '}Revertir
+                                </Button>
+                              )}
+                              {puedeEliminar && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setEliminarItemConfirm({ itemId: item.id, descripcion: item.descripcion })}
+                                  disabled={eliminandoItemId === item.id}
+                                  className="h-6 text-[10px] px-2 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                  title="Eliminar item del pedido"
+                                >
+                                  <Trash2 className="h-3 w-3 mr-1" />
+                                  Eliminar
                                 </Button>
                               )}
                             </div>
@@ -2912,6 +2953,37 @@ export default function PedidoLogisticaDetailPage() {
               </div>
             )
           })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal confirmación eliminar item */}
+      <Dialog open={!!eliminarItemConfirm} onOpenChange={(open) => { if (!open) setEliminarItemConfirm(null) }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-medium flex items-center gap-2 text-red-700">
+              <Trash2 className="h-4 w-4" />
+              ¿Eliminar item?
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-xs text-gray-600">
+            <p>Se eliminará permanentemente el item:</p>
+            <p className="font-medium text-gray-800 bg-red-50 border border-red-200 rounded px-3 py-2">
+              {eliminarItemConfirm?.descripcion}
+            </p>
+            <p>Esta acción no se puede deshacer. Las recepciones pendientes vinculadas también serán eliminadas.</p>
+          </div>
+          <DialogFooter className="gap-2 mt-2">
+            <Button variant="outline" size="sm" onClick={() => setEliminarItemConfirm(null)} className="h-8 text-xs">
+              Cancelar
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleEliminarItem}
+              className="h-8 text-xs bg-red-600 hover:bg-red-700 text-white"
+            >
+              Sí, eliminar item
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
