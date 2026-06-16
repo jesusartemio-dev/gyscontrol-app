@@ -14,6 +14,8 @@ import {
   type AggView,
 } from './mapping'
 import { diasEntre, normalizarFase, extensionDesdeMime, rangoAAncla } from './helpers'
+import { inyectarHojaAvance, inyectarHojaCurvaS } from './avanceSheets'
+import { obtenerArbolAvanceConPesos } from '@/lib/services/arbolAvance'
 
 const TEMPLATE_PATH = path.join(
   process.cwd(),
@@ -403,6 +405,16 @@ export async function generarExcelReporteAvance(agg: ReporteAvanceAgregado): Pro
     }
     ct = ct.replace('</Types>', ctOverrides.join('') + '</Types>')
     files['[Content_Types].xml'] = strToU8(ct)
+  }
+
+  // 8. HOJAS Avance (sheet3) + Curva S (sheet4) — matriz jerárquica con pesos y cuadro.
+  //    Usa el árbol de ejecución+baseline con pesos (una sola fuente). No toca Datos/Reporte.
+  try {
+    const arbol = await obtenerArbolAvanceConPesos(agg.cabecera.proyecto.id)
+    inyectarHojaAvance(files, arbol)
+    inyectarHojaCurvaS(files)
+  } catch (e) {
+    console.warn('[excelAvanceGenerator] hoja Avance/Curva S falló, se omite:', e)
   }
 
   // Devolver las hojas modificadas al ZIP y serializar.
