@@ -76,9 +76,29 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       )
     }
 
+    const { proyectoTareaId, registroHorasCampoTareaId, ...restData } = parsed.data
+
+    // Si se provee registroHorasCampoTareaId pero no proyectoTareaId, derivar del servidor
+    let resolvedProyectoTareaId = proyectoTareaId
+    if (registroHorasCampoTareaId && proyectoTareaId === undefined) {
+      const jornadaTarea = await prisma.registroHorasCampoTarea.findUnique({
+        where: { id: registroHorasCampoTareaId },
+        select: { proyectoTareaId: true },
+      })
+      resolvedProyectoTareaId = jornadaTarea?.proyectoTareaId ?? null
+    }
+
     const actualizado = await prisma.registroAvance.update({
       where: { id },
-      data: { ...parsed.data },
+      data: {
+        ...restData,
+        ...(proyectoTareaId !== undefined || resolvedProyectoTareaId !== undefined
+          ? { proyectoTareaId: resolvedProyectoTareaId ?? null }
+          : {}),
+        ...(registroHorasCampoTareaId !== undefined
+          ? { registroHorasCampoTareaId: registroHorasCampoTareaId ?? null }
+          : {}),
+      },
       include: REGISTRO_AVANCE_INCLUDE,
     })
 

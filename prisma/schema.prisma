@@ -1600,27 +1600,30 @@ enum EstadoEvidenciaAvance {
 
 // Registro de actividad de avance técnico asociado a una evidencia de jornada.
 model RegistroAvance {
-  id                String             @id @default(cuid())
-  evidenciaAvanceId String
-  autorId           String
-  tipo              TipoRegistroAvance
-  descripcion       String
-  disciplina        String?
-  proyectoTareaId   String?
-  porcentajeAvance  Int?
-  observaciones     String?
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
+  id                         String             @id @default(cuid())
+  evidenciaAvanceId          String
+  autorId                    String
+  tipo                       TipoRegistroAvance
+  descripcion                String
+  disciplina                 String?
+  proyectoTareaId            String?
+  registroHorasCampoTareaId  String?
+  porcentajeAvance           Int?
+  observaciones              String?
+  createdAt                  DateTime           @default(now())
+  updatedAt                  DateTime           @updatedAt
 
-  evidencia     EvidenciaAvance      @relation(fields: [evidenciaAvanceId], references: [id], onDelete: Cascade)
-  autor         User                 @relation("RegistrosAvanceAutor", fields: [autorId], references: [id])
-  proyectoTarea ProyectoTarea?       @relation(fields: [proyectoTareaId], references: [id])
-  fotos         RegistroAvanceFoto[]
+  evidencia               EvidenciaAvance         @relation(fields: [evidenciaAvanceId], references: [id], onDelete: Cascade)
+  autor                   User                    @relation("RegistrosAvanceAutor", fields: [autorId], references: [id])
+  proyectoTarea           ProyectoTarea?          @relation(fields: [proyectoTareaId], references: [id])
+  registroHorasCampoTarea RegistroHorasCampoTarea? @relation(fields: [registroHorasCampoTareaId], references: [id], onDelete: SetNull)
+  fotos                   RegistroAvanceFoto[]
 
   @@index([evidenciaAvanceId])
   @@index([autorId, createdAt(sort: Desc)])
   @@index([tipo, createdAt(sort: Desc)])
   @@index([proyectoTareaId])
+  @@index([registroHorasCampoTareaId])
   @@map("registro_avance")
 }
 
@@ -1831,9 +1834,10 @@ model RegistroHorasCampoTarea {
   porcentajeFinal   Int?
   createdAt         DateTime @default(now())
 
-  registroCampo RegistroHorasCampo          @relation(fields: [registroCampoId], references: [id], onDelete: Cascade)
-  proyectoTarea ProyectoTarea?              @relation(fields: [proyectoTareaId], references: [id])
-  miembros      RegistroHorasCampoMiembro[]
+  registroCampo   RegistroHorasCampo          @relation(fields: [registroCampoId], references: [id], onDelete: Cascade)
+  proyectoTarea   ProyectoTarea?              @relation(fields: [proyectoTareaId], references: [id])
+  miembros        RegistroHorasCampoMiembro[]
+  registrosAvance RegistroAvance[]
 
   @@index([registroCampoId])
   @@index([proyectoTareaId])

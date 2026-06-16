@@ -91,8 +91,16 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const { evidenciaAvanceId, tipo, descripcion, disciplina, proyectoTareaId, porcentajeAvance, observaciones } =
-      parsed.data
+    const {
+      evidenciaAvanceId,
+      tipo,
+      descripcion,
+      disciplina,
+      proyectoTareaId,
+      registroHorasCampoTareaId,
+      porcentajeAvance,
+      observaciones,
+    } = parsed.data
 
     const evidencia = await prisma.evidenciaAvance.findUnique({
       where: { id: evidenciaAvanceId },
@@ -119,6 +127,16 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Si se provee registroHorasCampoTareaId pero no proyectoTareaId, derivar del servidor
+    let resolvedProyectoTareaId = proyectoTareaId ?? null
+    if (registroHorasCampoTareaId && !proyectoTareaId) {
+      const jornadaTarea = await prisma.registroHorasCampoTarea.findUnique({
+        where: { id: registroHorasCampoTareaId },
+        select: { proyectoTareaId: true },
+      })
+      resolvedProyectoTareaId = jornadaTarea?.proyectoTareaId ?? null
+    }
+
     const creado = await prisma.registroAvance.create({
       data: {
         evidenciaAvanceId,
@@ -126,7 +144,8 @@ export async function POST(req: NextRequest) {
         tipo,
         descripcion,
         disciplina: disciplina ?? null,
-        proyectoTareaId: proyectoTareaId ?? null,
+        proyectoTareaId: resolvedProyectoTareaId,
+        registroHorasCampoTareaId: registroHorasCampoTareaId ?? null,
         porcentajeAvance: porcentajeAvance ?? null,
         observaciones: observaciones ?? null,
       },

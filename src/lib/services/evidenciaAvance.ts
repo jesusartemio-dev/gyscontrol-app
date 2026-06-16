@@ -33,6 +33,13 @@ export const EVIDENCIA_AVANCE_INCLUDE = {
     include: {
       autor: { select: { id: true, name: true } },
       proyectoTarea: { select: { id: true, nombre: true } },
+      registroHorasCampoTarea: {
+        select: {
+          id: true,
+          nombreTareaExtra: true,
+          proyectoTarea: { select: { id: true, nombre: true } },
+        },
+      },
       fotos: { orderBy: { orden: 'asc' } },
     },
   },

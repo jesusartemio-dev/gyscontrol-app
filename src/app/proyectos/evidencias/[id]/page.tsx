@@ -84,11 +84,17 @@ interface RegistroLista {
   descripcion: string
   disciplina: string | null
   proyectoTareaId: string | null
+  registroHorasCampoTareaId: string | null
   porcentajeAvance: number | null
   observaciones: string | null
   createdAt: string
   autor: { id: string; name: string | null }
   proyectoTarea: { id: string; nombre: string } | null
+  registroHorasCampoTarea: {
+    id: string
+    nombreTareaExtra: string | null
+    proyectoTarea: { id: string; nombre: string } | null
+  } | null
   fotos: FotoLista[]
 }
 
@@ -202,13 +208,14 @@ export default function EvidenciaAvancePage({
       descripcion: '',
       disciplina: null,
       proyectoTareaId: null,
+      registroHorasCampoTareaId: null,
       porcentajeAvance: null,
       observaciones: null,
     },
   })
 
   const tipo = form.watch('tipo')
-  const proyectoTareaSel = form.watch('proyectoTareaId')
+  const jornadaTareaSel = form.watch('registroHorasCampoTareaId')
 
   // ── Mutations ──────────────────────────────────────────────────────────────
 
@@ -275,6 +282,7 @@ export default function EvidenciaAvancePage({
             descripcion: data.descripcion,
             disciplina: data.disciplina ?? null,
             proyectoTareaId: data.proyectoTareaId ?? null,
+            registroHorasCampoTareaId: data.registroHorasCampoTareaId ?? null,
             porcentajeAvance: data.porcentajeAvance ?? null,
             observaciones: data.observaciones ?? null,
           },
@@ -309,6 +317,7 @@ export default function EvidenciaAvancePage({
         descripcion: '',
         disciplina: null,
         proyectoTareaId: null,
+        registroHorasCampoTareaId: null,
         porcentajeAvance: null,
         observaciones: null,
       })
@@ -412,10 +421,8 @@ export default function EvidenciaAvancePage({
   ).size
   const enviando = form.formState.isSubmitting || crearMutation.isPending || editarMutation.isPending
 
-  // Tareas de la jornada con proyectoTarea (para el select del modal)
+  // Todas las tareas de la jornada (cronograma + extras) para el select del modal
   const tareasJornada = ev.jornada.tareas
-    .filter((t): t is JornadaTarea & { proyectoTarea: { id: string; nombre: string } } => !!t.proyectoTarea)
-    .map((t) => t.proyectoTarea)
 
   /** Secciones con registros abren por default; vacías cierran. El usuario puede invertir. */
   const isSectionOpen = (tipoSec: TipoRegistroAvance) => {
@@ -440,6 +447,7 @@ export default function EvidenciaAvancePage({
       descripcion: '',
       disciplina: null,
       proyectoTareaId: null,
+      registroHorasCampoTareaId: null,
       porcentajeAvance: null,
       observaciones: null,
     })
@@ -449,12 +457,19 @@ export default function EvidenciaAvancePage({
   }
 
   const openEditModal = (r: RegistroLista) => {
+    // Compat hacia atrás: si el registro tiene proyectoTareaId pero no registroHorasCampoTareaId,
+    // intentar encontrar la tarea de jornada correspondiente por proyectoTarea.id
+    const matchingJornadaTareaId =
+      r.registroHorasCampoTareaId
+      ?? ev.jornada.tareas.find((t) => t.proyectoTarea?.id === r.proyectoTareaId)?.id
+      ?? null
     form.reset({
       evidenciaAvanceId: id,
       tipo: r.tipo,
       descripcion: r.descripcion,
       disciplina: r.disciplina ?? null,
       proyectoTareaId: r.proyectoTareaId ?? null,
+      registroHorasCampoTareaId: matchingJornadaTareaId,
       porcentajeAvance: r.porcentajeAvance ?? null,
       observaciones: r.observaciones ?? null,
     })
@@ -701,10 +716,19 @@ export default function EvidenciaAvancePage({
                                   </span>
                                 </>
                               )}
-                              {r.proyectoTarea && (
+                              {(r.registroHorasCampoTarea || r.proyectoTarea) && (
                                 <>
                                   <span>·</span>
-                                  <span className="truncate max-w-[140px]">{r.proyectoTarea.nombre}</span>
+                                  <span className="truncate max-w-[140px]">
+                                    {r.registroHorasCampoTarea
+                                      ? (r.registroHorasCampoTarea.proyectoTarea?.nombre
+                                          ?? r.registroHorasCampoTarea.nombreTareaExtra
+                                          ?? 'Tarea extra')
+                                      : r.proyectoTarea!.nombre}
+                                  </span>
+                                  {r.registroHorasCampoTarea && !r.registroHorasCampoTarea.proyectoTarea && (
+                                    <span className="text-[10px] bg-yellow-100 text-yellow-700 px-1 rounded shrink-0">Extra</span>
+                                  )}
                                 </>
                               )}
                               {r.fotos.length > 0 && (
@@ -844,12 +868,19 @@ export default function EvidenciaAvancePage({
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="tarea-modal" className="text-sm">Tarea del cronograma (opcional)</Label>
+              <Label htmlFor="tarea-modal" className="text-sm">Tarea de la jornada (opcional)</Label>
               <Select
-                value={proyectoTareaSel ?? SIN_TAREA}
-                onValueChange={(v) =>
-                  form.setValue('proyectoTareaId', v === SIN_TAREA ? null : v, { shouldDirty: true })
-                }
+                value={jornadaTareaSel ?? SIN_TAREA}
+                onValueChange={(v) => {
+                  if (v === SIN_TAREA) {
+                    form.setValue('registroHorasCampoTareaId', null, { shouldDirty: true })
+                    form.setValue('proyectoTareaId', null, { shouldDirty: true })
+                  } else {
+                    const t = tareasJornada.find((t) => t.id === v)
+                    form.setValue('registroHorasCampoTareaId', v, { shouldDirty: true })
+                    form.setValue('proyectoTareaId', t?.proyectoTarea?.id ?? null, { shouldDirty: true })
+                  }
+                }}
                 disabled={enviando}
               >
                 <SelectTrigger id="tarea-modal">
@@ -859,7 +890,8 @@ export default function EvidenciaAvancePage({
                   <SelectItem value={SIN_TAREA}>Sin tarea</SelectItem>
                   {tareasJornada.map((t) => (
                     <SelectItem key={t.id} value={t.id}>
-                      {t.nombre}
+                      {t.proyectoTarea?.nombre ?? t.nombreTareaExtra ?? 'Tarea extra'}
+                      {!t.proyectoTarea && ' (Extra)'}
                     </SelectItem>
                   ))}
                 </SelectContent>

@@ -39,6 +39,7 @@ export const crearRegistroAvanceSchema = z.object({
   descripcion: z.string().trim().min(3, 'La descripción es muy corta').max(2000, 'Máximo 2000 caracteres'),
   disciplina: z.string().trim().max(120).nullable().optional(),
   proyectoTareaId: z.string().min(1).nullable().optional(),
+  registroHorasCampoTareaId: z.string().min(1).nullable().optional(),
   porcentajeAvance: z.number().int().min(0).max(100).nullable().optional(),
   observaciones: z.string().trim().max(2000).nullable().optional(),
 })
@@ -50,6 +51,7 @@ export const actualizarRegistroAvanceSchema = z.object({
   descripcion: z.string().trim().min(3).max(2000).optional(),
   disciplina: z.string().trim().max(120).nullable().optional(),
   proyectoTareaId: z.string().min(1).nullable().optional(),
+  registroHorasCampoTareaId: z.string().min(1).nullable().optional(),
   porcentajeAvance: z.number().int().min(0).max(100).nullable().optional(),
   observaciones: z.string().trim().max(2000).nullable().optional(),
 })

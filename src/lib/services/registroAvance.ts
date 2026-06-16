@@ -167,6 +167,13 @@ const REGISTRO_AVANCE_INCLUDE = {
   },
   autor: { select: { id: true, name: true, email: true } },
   proyectoTarea: { select: { id: true, nombre: true } },
+  registroHorasCampoTarea: {
+    select: {
+      id: true,
+      nombreTareaExtra: true,
+      proyectoTarea: { select: { id: true, nombre: true } },
+    },
+  },
   fotos: { orderBy: { orden: 'asc' } },
 } as const satisfies Prisma.RegistroAvanceInclude
 
