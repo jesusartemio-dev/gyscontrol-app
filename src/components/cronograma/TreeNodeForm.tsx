@@ -97,6 +97,30 @@ export function TreeNodeForm({
   const [creadoPorNombre, setCreadoPorNombre] = useState<string | null>(null)
   const [autoLlenandoRecurso, setAutoLlenandoRecurso] = useState(false)
 
+  // Duraciones por defecto (días) por nivel, desde "Duraciones de Cronograma".
+  // Se usan para calcular la fecha fin tentativa al crear. Fallback si no hay config.
+  const [duracionesDias, setDuracionesDias] = useState<Record<string, number>>({
+    fase: 60, edt: 45, actividad: 7, tarea: 2
+  })
+
+  useEffect(() => {
+    if (!isOpen) return
+    fetch('/api/configuracion/duraciones-cronograma')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d?.data && Array.isArray(d.data)) {
+          setDuracionesDias(prev => {
+            const next = { ...prev }
+            for (const row of d.data) {
+              if (row?.nivel && typeof row.duracionDias === 'number') next[row.nivel] = row.duracionDias
+            }
+            return next
+          })
+        }
+      })
+      .catch(() => {})
+  }, [isOpen])
+
   // Función para calcular fechas según posicionamiento
   const calculateDatesFromPositioning = async (posicionamiento: PositioningMode, parentId?: string) => {
     console.log('🔍 [FRONT FORM] calculateDatesFromPositioning called:', { posicionamiento, parentId, nodeType })
@@ -107,7 +131,36 @@ export function TreeNodeForm({
     }
 
     try {
-      // Obtener información del padre (EDT o Actividad según el tipo de nodo)
+      // El input type="date" solo acepta YYYY-MM-DD. Las fechas heredadas del padre
+      // llegan como ISO completo (2026-05-25T00:00:00.000Z) → normalizar (UTC, sin desfase).
+      const toInputDate = (v: string): string => {
+        if (!v) return ''
+        const d = new Date(v)
+        if (isNaN(d.getTime())) return ''
+        const y = d.getUTCFullYear()
+        const m = String(d.getUTCMonth() + 1).padStart(2, '0')
+        const day = String(d.getUTCDate()).padStart(2, '0')
+        return `${y}-${m}-${day}`
+      }
+      // Suma días a una fecha (YYYY-MM-DD o ISO) y devuelve YYYY-MM-DD (UTC).
+      const addDaysStr = (v: string, days: number): string => {
+        const base = toInputDate(v)
+        if (!base) return ''
+        const d = new Date(base)
+        d.setUTCDate(d.getUTCDate() + days)
+        return toInputDate(d.toISOString())
+      }
+
+      // ── FASE: inicia en la Vigencia del proyecto (nodo raíz del árbol) ──
+      if (nodeType === 'fase') {
+        const projNode = Array.from(nodes.values()).find((n: any) => n.type === 'proyecto')
+        const ini = toInputDate(projNode?.data?.fechaInicioComercial || '')
+        const result = { fechaInicio: ini, fechaFin: ini ? addDaysStr(ini, duracionesDias.fase) : '' }
+        console.log('✅ [FRONT FORM] Fechas fase (vigencia proyecto):', result)
+        return result
+      }
+
+      // Obtener información del padre (Fase, EDT o Actividad según el tipo de nodo)
       const parentNode = nodes.get(parentId)
       console.log('🔍 [FRONT FORM] Parent node:', parentNode)
 
@@ -118,6 +171,35 @@ export function TreeNodeForm({
 
       let fechaInicio = ''
       let fechaFin = ''
+
+      // ── EDT: inicio = fase padre (primer hijo) o tras el último EDT hermano ──
+      if (nodeType === 'edt') {
+        let ini = parentNode.data.fechaInicioComercial || parentNode.data.fechaInicioPlan || ''
+        if (posicionamiento === 'despues_ultima') {
+          try {
+            const proyectoId = window.location.pathname.split('/')[2]
+            const faseRealId = parentId.replace('fase-', '')
+            const resp = await fetch(`/api/proyectos/${proyectoId}/cronograma/edts?faseId=${faseRealId}`)
+            if (resp.ok) {
+              const data = await resp.json()
+              const edts = (data.data || []).filter((e: any) => e.fechaFinPlan)
+              if (edts.length > 0) {
+                const ultimo = edts.reduce((a: any, b: any) =>
+                  new Date(b.fechaFinPlan) > new Date(a.fechaFinPlan) ? b : a)
+                const f = new Date(ultimo.fechaFinPlan)
+                f.setUTCDate(f.getUTCDate() + 1) // día siguiente al fin del hermano
+                ini = f.toISOString()
+              }
+            }
+          } catch (e) {
+            console.error('❌ [FRONT FORM] Error obteniendo EDTs hermanos:', e)
+          }
+        }
+        const iniYMD = toInputDate(ini)
+        const result = { fechaInicio: iniYMD, fechaFin: iniYMD ? addDaysStr(iniYMD, duracionesDias.edt) : '' }
+        console.log('✅ [FRONT FORM] Fechas EDT:', result)
+        return result
+      }
 
       if (posicionamiento === 'inicio_padre') {
         // Al inicio del padre - usar fechas del padre (EDT o Actividad)
@@ -258,8 +340,10 @@ export function TreeNodeForm({
         }
       }
 
-      console.log('✅ [FRONT FORM] Fechas finales calculadas:', { fechaInicio, fechaFin })
-      return { fechaInicio, fechaFin }
+      // Normalizar a YYYY-MM-DD para el input type="date" (idempotente si ya viene en ese formato)
+      const result = { fechaInicio: toInputDate(fechaInicio), fechaFin: toInputDate(fechaFin) }
+      console.log('✅ [FRONT FORM] Fechas finales calculadas:', result)
+      return result
     } catch (error) {
       console.error('❌ [FRONT FORM] Error calculando fechas:', error)
       return { fechaInicio: '', fechaFin: '' }
@@ -307,7 +391,7 @@ export function TreeNodeForm({
         }
       })
     }
-  }, [formData.posicionamiento, parentId, mode])
+  }, [formData.posicionamiento, parentId, mode, duracionesDias])
 
   // Estado del recurso seleccionado (para auto-fill de personas en cuadrillas)
   const [recursoInfo, setRecursoInfo] = useState<{ tipo: string; totalPersonas: number } | null>(null)

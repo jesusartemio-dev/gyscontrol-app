@@ -50,11 +50,8 @@ export async function GET() {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    // Verificar permisos
-    const userRole = session.user.role
-    if (!['admin', 'gerente', 'comercial'].includes(userRole)) {
-      return NextResponse.json({ error: 'No tiene permisos para ver duraciones' }, { status: 403 })
-    }
+    // Lectura: datos de referencia usados por el cronograma (cualquier usuario autenticado).
+    // La modificación (POST/PUT/DELETE) sigue restringida a admin/gerente.
 
     // Obtener duraciones de BD usando consulta directa
     const duraciones = await prisma.$queryRaw`
