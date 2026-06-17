@@ -32,7 +32,13 @@ export default function RecursoSelect({ value, onChange, disabled }: Props) {
   const [recursos, setRecursos] = useState<Recurso[]>([])
 
   useEffect(() => {
-    getRecursos(true).then(setRecursos)
+    getRecursos(true).then((data) =>
+      setRecursos(
+        [...data].sort((a, b) =>
+          a.nombre.localeCompare(b.nombre, 'es', { numeric: true, sensitivity: 'base' })
+        )
+      )
+    )
   }, [])
 
   const handleChange = (v: string) => {
