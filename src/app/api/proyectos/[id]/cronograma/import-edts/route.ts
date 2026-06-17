@@ -182,19 +182,34 @@ export async function POST(
       )
     }
 
-    // ✅ Obtener el cronograma del proyecto (preferiblemente el de planificación baseline)
-    let cronograma = await prisma.proyectoCronograma.findFirst({
-      where: {
-        proyectoId,
-        tipo: 'planificacion',
-        esBaseline: true
-      }
-    })
+    // ✅ Resolver el cronograma destino a partir de la fase donde se importa.
+    // Cada cronograma (planificación, ejecución) tiene sus propias fases, así que
+    // debemos importar al cronograma DUEÑO de la fase destino — no al baseline de
+    // planificación (que suele estar bloqueado y haría fallar la importación en ejecución).
+    let cronograma: { id: string } | null = null
 
+    const faseLimpia = faseId ? faseId.replace('fase-', '') : null
+    if (faseLimpia) {
+      const faseDestino = await prisma.proyectoFase.findUnique({
+        where: { id: faseLimpia },
+        select: { proyectoCronogramaId: true }
+      })
+      if (faseDestino?.proyectoCronogramaId) {
+        cronograma = await prisma.proyectoCronograma.findUnique({
+          where: { id: faseDestino.proyectoCronogramaId },
+          select: { id: true }
+        })
+      }
+    }
+
+    // Fallback (sin fase): planificación baseline, o cualquier cronograma activo
     if (!cronograma) {
-      // Fallback: obtener cualquier cronograma activo
       cronograma = await prisma.proyectoCronograma.findFirst({
-        where: { proyectoId }
+        where: { proyectoId, tipo: 'planificacion', esBaseline: true },
+        select: { id: true }
+      }) || await prisma.proyectoCronograma.findFirst({
+        where: { proyectoId },
+        select: { id: true }
       })
     }
 
@@ -319,7 +334,7 @@ export async function POST(
         errores
       },
       metadata: {
-        totalSolicitados: edtIds.length,
+        totalSolicitados: edtIds_resolved.length,
         totalExitosos: resultados.length,
         totalErrores: errores.length
       }

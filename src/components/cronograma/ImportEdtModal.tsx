@@ -114,7 +114,7 @@ export function ImportEdtModal({
       setSelectedIds(prev => prev.filter(id => id !== edt.id))
       setCustomNames(prev => { const n = { ...prev }; delete n[edt.id]; return n })
     } else {
-      setSelectedIds(prev => [...prev, edt.id])
+      setSelectedIds(prev => prev.includes(edt.id) ? prev : [...prev, edt.id])
       setCustomNames(prev => ({ ...prev, [edt.id]: edt.nombre }))
     }
   }
@@ -185,7 +185,7 @@ export function ImportEdtModal({
                 }`}
                 onClick={!isSelected ? () => handleItemToggle(edt, false) : undefined}
               >
-                <div className="flex items-center gap-2 mt-0.5">
+                <div className="flex items-center gap-2 mt-0.5" onClick={e => e.stopPropagation()}>
                   <Checkbox
                     checked={isSelected}
                     onCheckedChange={() => handleItemToggle(edt, false)}
