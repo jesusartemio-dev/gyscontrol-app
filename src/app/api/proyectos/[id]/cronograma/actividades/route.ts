@@ -206,46 +206,18 @@ export async function POST(
       )
     }
 
-    // ✅ Determinar el cronograma automáticamente si no se especifica
+    // ✅ Determinar el cronograma: usar el DUEÑO del EDT padre (no el baseline de
+    // planificación, que suele estar bloqueado y haría fallar la creación en ejecución).
     let cronogramaId = validatedData.proyectoCronogramaId
-    console.log('🔍 [API ACTIVIDADES] Cronograma ID inicial:', cronogramaId)
     if (!cronogramaId || cronogramaId === 'current') {
-      console.log('🔍 [API ACTIVIDADES] Buscando cronograma baseline automáticamente...')
-      // Obtener el cronograma baseline del proyecto (solo planificación puede ser baseline)
-      let cronograma = await prisma.proyectoCronograma.findFirst({
-        where: {
-          proyectoId: id,
-          esBaseline: true,
-          tipo: 'planificacion' // Solo planificación puede ser baseline
-        }
-      })
+      cronogramaId = edt.proyectoCronogramaId
+    }
 
-      // Si no hay baseline de planificación, buscar cualquier cronograma de planificación
-      if (!cronograma) {
-        const cronogramaPlanificacion = await prisma.proyectoCronograma.findFirst({
-          where: {
-            proyectoId: id,
-            tipo: 'planificacion'
-          },
-          orderBy: { createdAt: 'desc' } // El más reciente
-        })
-        if (cronogramaPlanificacion) {
-          cronograma = cronogramaPlanificacion
-          console.log('🔍 [API ACTIVIDADES] Usando cronograma de planificación más reciente:', cronograma.id)
-        }
-      }
-      console.log('🔍 [API ACTIVIDADES] Cronograma baseline encontrado:', cronograma)
-
-      if (!cronograma) {
-        console.log('❌ [API ACTIVIDADES] No se encontró cronograma baseline de planificación')
-        return NextResponse.json(
-          { error: 'No se encontró un cronograma de planificación marcado como baseline. Cree y marque como baseline un cronograma de planificación primero.' },
-          { status: 404 }
-        )
-      }
-
-      cronogramaId = cronograma.id
-      console.log('✅ [API ACTIVIDADES] Cronograma baseline ID determinado:', cronogramaId)
+    if (!cronogramaId) {
+      return NextResponse.json(
+        { error: 'No se pudo determinar el cronograma del EDT' },
+        { status: 404 }
+      )
     }
 
     // ✅ Validar permisos: solo admin/gerente/gestor/coordinador y NO en cronograma comercial
