@@ -379,23 +379,27 @@ export function JornadaActiva({
                       <span className="text-[11px] text-gray-400 truncate hidden sm:inline">{miembrosStr}</span>
                     </div>
 
-                    {/* Actions - visible on hover (desktop) / always (mobile) */}
-                    <div className="flex items-center gap-0.5 flex-shrink-0 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                    {/* Actions - siempre visibles, colores distintos para no confundir editar/eliminar */}
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
                       <Button
-                        variant="ghost"
+                        variant="outline"
                         size="sm"
                         onClick={() => handleEditarTarea(tarea)}
-                        className="h-6 w-6 p-0 text-gray-400 hover:text-blue-600 hover:bg-blue-50"
+                        title="Editar tarea"
+                        aria-label="Editar tarea"
+                        className="h-8 w-8 p-0 border-blue-200 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                       >
-                        <Pencil className="h-3 w-3" />
+                        <Pencil className="h-4 w-4" />
                       </Button>
                       <Button
-                        variant="ghost"
+                        variant="outline"
                         size="sm"
                         onClick={() => setTareaAEliminar(tarea)}
-                        className="h-6 w-6 p-0 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                        title="Eliminar tarea"
+                        aria-label="Eliminar tarea"
+                        className="h-8 w-8 p-0 border-red-200 text-red-600 hover:text-red-700 hover:bg-red-50"
                       >
-                        <Trash2 className="h-3 w-3" />
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
