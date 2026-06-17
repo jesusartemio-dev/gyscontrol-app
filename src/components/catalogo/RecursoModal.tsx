@@ -390,7 +390,15 @@ export default function RecursoModal({ isOpen, onClose, recurso, onCreated, onUp
                 min="0"
                 placeholder="85.50"
                 value={costoHora || ''}
-                onChange={(e) => setCostoHora(parseFloat(e.target.value) || 0)}
+                onChange={(e) => {
+                  const c = parseFloat(e.target.value) || 0
+                  setCostoHora(c)
+                  // Si hay % de descuento (por defecto 35% al crear), autocompletar el Costo/Hora Proyecto.
+                  const pct = parseFloat(porcentajeProyecto)
+                  if (!isNaN(pct) && c > 0) {
+                    setCostoHoraProyecto(Math.round((c - c * pct / 100) * 100) / 100)
+                  }
+                }}
                 required
                 disabled={loading}
               />
