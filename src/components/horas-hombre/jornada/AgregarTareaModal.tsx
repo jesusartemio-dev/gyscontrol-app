@@ -386,6 +386,9 @@ export function AgregarTareaModal({
                         {actividades.map(a => (
                           <SelectItem key={a.id} value={a.id}>
                             {a.nombre}
+                            {a.tareas.length === 0 && (
+                              <span className="text-gray-400 text-xs ml-1">(sin tareas disponibles)</span>
+                            )}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -396,16 +399,22 @@ export function AgregarTareaModal({
                   {actividadId && (
                     <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2">
                       <Label className="text-xs text-gray-600 shrink-0 sm:w-16">Tarea</Label>
-                      <Select value={tareaId} onValueChange={setTareaId} disabled={loading}>
+                      <Select value={tareaId} onValueChange={setTareaId} disabled={loading || tareas.length === 0}>
                         <SelectTrigger className="h-auto min-h-8 py-1 !whitespace-normal [&_[data-slot=select-value]]:!line-clamp-2 text-sm flex-1">
-                          <SelectValue placeholder="Seleccionar tarea" />
+                          <SelectValue placeholder={tareas.length === 0 ? 'No hay tareas disponibles' : 'Seleccionar tarea'} />
                         </SelectTrigger>
                         <SelectContent position="popper" className="max-h-[250px] max-w-[calc(100vw-4rem)]">
-                          {tareas.map(t => (
-                            <SelectItem key={t.id} value={t.id}>
-                              {t.nombre}
-                            </SelectItem>
-                          ))}
+                          {tareas.length === 0 ? (
+                            <div className="px-2 py-2 text-xs text-gray-400 text-center">
+                              No hay tareas disponibles (completadas o al 100%)
+                            </div>
+                          ) : (
+                            tareas.map(t => (
+                              <SelectItem key={t.id} value={t.id}>
+                                {t.nombre}
+                              </SelectItem>
+                            ))
+                          )}
                         </SelectContent>
                       </Select>
                     </div>
