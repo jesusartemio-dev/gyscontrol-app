@@ -135,10 +135,10 @@ export function PesosFasePanel({ proyectoId, onGuardado }: { proyectoId: string;
         <Scale className="h-4 w-4 text-indigo-500" />
         <span className="font-medium">Pesos por fase</span>
         <span className="text-muted-foreground text-xs">
-          · Avance global <span className="font-mono font-semibold text-foreground">{avanceGlobal.toFixed(1)}%</span>
+          · Avance global <span className="font-mono font-semibold text-foreground">{avanceGlobal.toFixed(2)}%</span>
           {' · '}suma{' '}
-          <span className={`font-mono font-semibold ${cuadra ? 'text-emerald-600' : 'text-amber-600'}`}>{suma.toFixed(1)}%</span>
-          {!cuadra && <span className="text-amber-600"> ({delta > 0 ? 'faltan' : 'sobran'} {Math.abs(delta).toFixed(1)}%)</span>}
+          <span className={`font-mono font-semibold ${cuadra ? 'text-emerald-600' : 'text-amber-600'}`}>{suma.toFixed(2)}%</span>
+          {!cuadra && <span className="text-amber-600"> ({delta > 0 ? 'faltan' : 'sobran'} {Math.abs(delta).toFixed(2)}%)</span>}
         </span>
         {dirty && <span className="text-[10px] text-amber-600 font-medium">· sin guardar</span>}
         <span className="ml-auto text-xs text-muted-foreground">{open ? 'ocultar' : 'editar'}</span>
@@ -150,7 +150,7 @@ export function PesosFasePanel({ proyectoId, onGuardado }: { proyectoId: string;
           <div className="flex items-center justify-end gap-2 py-2">
             {!cuadra && (
               <span className="text-xs text-amber-600 mr-auto">
-                ⚠ La suma es {suma.toFixed(1)}% — {delta > 0 ? 'faltan' : 'sobran'} {Math.abs(delta).toFixed(1)}%.
+                ⚠ La suma es {suma.toFixed(2)}% — {delta > 0 ? 'faltan' : 'sobran'} {Math.abs(delta).toFixed(2)}%.
               </span>
             )}
             <Button size="sm" variant="ghost" className="h-7" onClick={usarSugeridos} disabled={saving}>
@@ -183,19 +183,19 @@ export function PesosFasePanel({ proyectoId, onGuardado }: { proyectoId: string;
                   <tr key={f.faseId} className="border-b last:border-0">
                     <td className="py-1 font-medium">{f.nombre}</td>
                     <td className="py-1 text-right text-muted-foreground">{f.horasFase}h</td>
-                    <td className="py-1 text-right text-muted-foreground">{f.pesoHorasDefault.toFixed(1)}%</td>
+                    <td className="py-1 text-right text-muted-foreground">{f.pesoHorasDefault.toFixed(2)}%</td>
                     <td className="py-1 text-right">
                       <Input
                         type="number"
                         min={0}
-                        step="0.1"
+                        step="0.01"
                         className="h-7 text-right text-sm ml-auto w-20"
-                        placeholder={f.pesoHorasDefault.toFixed(1)}
+                        placeholder={f.pesoHorasDefault.toFixed(2)}
                         value={manual[f.faseId] ?? ''}
                         onChange={(e) => setManual((p) => ({ ...p, [f.faseId]: e.target.value }))}
                       />
                     </td>
-                    <td className="py-1 text-right font-mono">{f.avanceFase.toFixed(1)}%</td>
+                    <td className="py-1 text-right font-mono">{f.avanceFase.toFixed(2)}%</td>
                   </tr>
                 ))}
                 {/* Total */}
@@ -204,9 +204,9 @@ export function PesosFasePanel({ proyectoId, onGuardado }: { proyectoId: string;
                   <td className="py-1.5 text-right text-muted-foreground">{data.horasTotal}h</td>
                   <td className="py-1.5" />
                   <td className={`py-1.5 text-right font-mono ${cuadra ? 'text-emerald-600' : 'text-amber-600'}`}>
-                    {suma.toFixed(1)}%
+                    {suma.toFixed(2)}%
                   </td>
-                  <td className="py-1.5 text-right font-mono">{avanceGlobal.toFixed(1)}%</td>
+                  <td className="py-1.5 text-right font-mono">{avanceGlobal.toFixed(2)}%</td>
                 </tr>
               </tbody>
             </table>
