@@ -136,9 +136,15 @@ export function ProyectoCronogramaTreeView({
         const node = state.nodes.get(id)
         if (!node) continue
         let info = faseInfo
-        if (node.type === 'proyecto') acc.set(id, totalPeso) // raíz = suma de pesos de fase
-        if (node.type === 'fase') info = pesoFaseMap.get(normFase(node.nombre)) ?? null
-        if (info && info.horasFase > 0) {
+        if (node.type === 'proyecto') {
+          acc.set(id, totalPeso) // raíz = suma de pesos de fase
+        } else if (node.type === 'fase') {
+          // La fase muestra su peso efectivo completo (sin escalar por horas:
+          // horasFase del endpoint incluye extras y no coincide con las horas del nodo).
+          info = pesoFaseMap.get(normFase(node.nombre)) ?? null
+          if (info) acc.set(id, info.pesoEfectivo)
+        } else if (info && info.horasFase > 0) {
+          // Nodos bajo la fase: reparten el peso de la fase por horas.
           const h = Number(node.data?.horasEstimadas) || 0
           acc.set(id, (info.pesoEfectivo * h) / info.horasFase)
         }
@@ -200,14 +206,19 @@ export function ProyectoCronogramaTreeView({
     if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return
 
     const newOrder = arrayMove(siblingIds, oldIndex, newIndex)
+    // Solo persistir nodos reales; los sintéticos (p. ej. "extras-group-…") no existen
+    // en BD y el endpoint los rechaza con 400.
+    const esNodoReal = (nid: string) => /^(fase|edt|actividad|tarea)-/.test(nid)
     try {
       await Promise.all(
         newOrder.map((nodeId, index) =>
-          fetch(`/api/proyectos/${proyectoId}/cronograma/tree/${nodeId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ orden: index }),
-          })
+          esNodoReal(nodeId)
+            ? fetch(`/api/proyectos/${proyectoId}/cronograma/tree/${nodeId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ orden: index }),
+              })
+            : Promise.resolve()
         )
       )
       await actions.loadTree([...state.expandedNodes])
