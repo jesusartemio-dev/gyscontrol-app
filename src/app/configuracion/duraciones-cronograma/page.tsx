@@ -49,7 +49,7 @@ export default function DuracionesCronogramaPage() {
   const [formData, setFormData] = useState<FormData>({
     nivel: 'edt',
     duracionDias: 1,
-    horasPorDia: 8,
+    horasPorDia: 9.5,
     bufferPorcentaje: 10
   })
 
@@ -79,7 +79,7 @@ export default function DuracionesCronogramaPage() {
     setFormData({
       nivel: 'edt',
       duracionDias: 1,
-      horasPorDia: 8,
+      horasPorDia: 9.5,
       bufferPorcentaje: 10
     })
     setDialogOpen(true)
@@ -529,10 +529,11 @@ export default function DuracionesCronogramaPage() {
                     type="number"
                     min="1"
                     max="24"
+                    step="0.5"
                     value={isNaN(formData.horasPorDia) ? '' : formData.horasPorDia}
                     onChange={(e) => {
-                      const value = parseInt(e.target.value)
-                      setFormData(prev => ({ ...prev, horasPorDia: isNaN(value) ? 8 : value }))
+                      const value = parseFloat(e.target.value)
+                      setFormData(prev => ({ ...prev, horasPorDia: isNaN(value) ? 9.5 : value }))
                     }}
                   />
                 </div>

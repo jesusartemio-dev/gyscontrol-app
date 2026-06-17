@@ -3004,7 +3004,7 @@ model PlantillaDuracionCronograma {
   id               String   @id
   nivel            String   @unique
   duracionDias     Float
-  horasPorDia      Int      @default(8)
+  horasPorDia      Float    @default(9.5)
   bufferPorcentaje Float    @default(10.0)
   activo           Boolean  @default(true)
   createdAt        DateTime @default(now())
