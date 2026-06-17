@@ -30,6 +30,7 @@ const VALID_ROLLBACKS: Record<RollbackEntity, Record<string, string[]>> = {
     enviada: ['aprobada'],
     aprobada: ['borrador'],
     cancelada: ['borrador'],
+    completada: ['borrador'],
   },
   listaEquipo: {
     por_revisar: ['borrador'],
@@ -129,6 +130,23 @@ async function checkOrdenCompraRollback(id: string, targetEstado: string): Promi
     }
   }
 
+  if (oc.estado === 'completada' && targetEstado === 'borrador') {
+    // Solo bloquear si hay cuentas por pagar con pagos registrados
+    const cxpConPagos = await prisma.cuentaPorPagar.count({
+      where: {
+        ordenCompraId: id,
+        estado: { in: ['pagada', 'parcial'] },
+      },
+    })
+    if (cxpConPagos > 0) {
+      blockers.push({
+        entity: 'CuentaPorPagar',
+        count: cxpConPagos,
+        message: `Tiene ${cxpConPagos} cuenta(s) por pagar con pagos registrados — anúlalas primero`,
+      })
+    }
+  }
+
   if (['confirmada', 'parcial'].includes(oc.estado) && targetEstado === 'enviada') {
     // Bloquear si hay recepciones activas (no rechazadas)
     const recepcionCount = await prisma.recepcionPendiente.count({
@@ -154,9 +172,11 @@ async function checkOrdenCompraRollback(id: string, targetEstado: string): Promi
   let message: string
 
   if (targetEstado === 'borrador') {
-    fieldsToClean = ['fechaAprobacion', 'aprobadorId']
+    fieldsToClean = ['fechaAprobacion', 'aprobadorId', 'fechaEnvio', 'fechaConfirmacion']
     message = allowed
-      ? 'La OC volverá a Borrador. Podrás editar precios y cantidades.'
+      ? oc.estado === 'completada'
+        ? 'La OC volverá a Borrador. Todas las recepciones serán eliminadas y podrás editar los ítems.'
+        : 'La OC volverá a Borrador. Podrás editar precios y cantidades.'
       : `No se puede retroceder:\n${blockers.map(b => `· ${b.message}`).join('\n')}`
   } else if (targetEstado === 'enviada') {
     fieldsToClean = ['fechaConfirmacion']

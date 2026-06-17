@@ -898,6 +898,16 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
             )}
           </>
         )}
+        {oc.estado === 'completada' && ['admin', 'gerente'].includes(userRole) && (
+          <RollbackButton
+            entityType="ordenCompra"
+            entityId={oc.id}
+            currentEstado={oc.estado}
+            targetEstado="borrador"
+            targetLabel="Corregir (volver a Borrador)"
+            onSuccess={() => loadData()}
+          />
+        )}
         {['enviada', 'confirmada', 'parcial', 'completada'].includes(oc.estado) && (
           <DescargarOCPDFButton oc={oc} />
         )}

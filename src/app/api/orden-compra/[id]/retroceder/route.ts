@@ -84,25 +84,52 @@ export async function POST(
     if (targetEstado === 'borrador') {
       cleanFields.fechaAprobacion = null
       cleanFields.aprobadorId = null
+      cleanFields.fechaEnvio = null
+      cleanFields.fechaConfirmacion = null
     } else if (targetEstado === 'aprobada') {
       cleanFields.fechaEnvio = null
     } else if (targetEstado === 'enviada') {
       cleanFields.fechaConfirmacion = null
     }
 
-    const updated = await prisma.ordenCompra.update({
-      where: { id },
-      data: {
-        estado: targetEstado as any,
-        ...cleanFields,
-        updatedAt: new Date(),
-      },
-      include: {
-        proveedor: true,
-        solicitante: { select: { id: true, name: true, email: true } },
-        aprobador: { select: { id: true, name: true, email: true } },
-        items: true,
-      },
+    // completada → borrador: eliminar recepciones y resetear cantidadRecibida en transacción
+    const esCorreccionCompletada = oc.estado === 'completada' && targetEstado === 'borrador'
+
+    const updated = await prisma.$transaction(async (tx) => {
+      if (esCorreccionCompletada) {
+        // Obtener todos los items de esta OC
+        const items = await tx.ordenCompraItem.findMany({
+          where: { ordenCompraId: id },
+          select: { id: true },
+        })
+        const itemIds = items.map((i) => i.id)
+
+        // Eliminar todas las recepciones vinculadas (en cualquier estado)
+        await tx.recepcionPendiente.deleteMany({
+          where: { ordenCompraItemId: { in: itemIds } },
+        })
+
+        // Resetear cantidadRecibida a 0 en todos los items
+        await tx.ordenCompraItem.updateMany({
+          where: { ordenCompraId: id },
+          data: { cantidadRecibida: 0, updatedAt: new Date() },
+        })
+      }
+
+      return tx.ordenCompra.update({
+        where: { id },
+        data: {
+          estado: targetEstado as any,
+          ...cleanFields,
+          updatedAt: new Date(),
+        },
+        include: {
+          proveedor: true,
+          solicitante: { select: { id: true, name: true, email: true } },
+          aprobador: { select: { id: true, name: true, email: true } },
+          items: true,
+        },
+      })
     })
 
     // Registrar evento de trazabilidad
