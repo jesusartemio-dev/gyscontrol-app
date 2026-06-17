@@ -20,7 +20,7 @@ import { BotonesImportExport } from '@/components/catalogo/BotonesImportExport'
 
 interface PlantillaDuracion {
   id: string
-  nivel: 'edt' | 'actividad' | 'tarea'
+  nivel: 'fase' | 'edt' | 'actividad' | 'tarea'
   duracionDias: number
   horasPorDia: number
   bufferPorcentaje: number
@@ -30,7 +30,7 @@ interface PlantillaDuracion {
 }
 
 interface FormData {
-  nivel: 'edt' | 'actividad' | 'tarea'
+  nivel: 'fase' | 'edt' | 'actividad' | 'tarea'
   duracionDias: number
   horasPorDia: number
   bufferPorcentaje: number
@@ -492,12 +492,13 @@ export default function DuracionesCronogramaPage() {
                 <Label htmlFor="nivel">Nivel Jerárquico</Label>
                 <Select
                   value={formData.nivel}
-                  onValueChange={(value: 'edt' | 'actividad' | 'tarea') => setFormData(prev => ({ ...prev, nivel: value }))}
+                  onValueChange={(value: 'fase' | 'edt' | 'actividad' | 'tarea') => setFormData(prev => ({ ...prev, nivel: value }))}
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="fase">Fase (Etapa del proyecto)</SelectItem>
                     <SelectItem value="edt">EDT (Estructura de Desglose)</SelectItem>
                     <SelectItem value="actividad">Actividad (Agrupación)</SelectItem>
                     <SelectItem value="tarea">Tarea (Acción ejecutable)</SelectItem>

@@ -283,9 +283,17 @@ export function TreeNodeForm({
               fechaFinComercial: dates.fechaFin || prev.fechaFinComercial
             }
           })
+        } else if (nodeType === 'fase' || nodeType === 'edt') {
+          // Fase/EDT: dejamos las fechas vacías; el backend las completa por defecto
+          // (fase = inicio de la Vigencia del proyecto; EDT = tras el último hermano / inicio de su fase).
+          setFormData(prev => ({
+            ...prev,
+            fechaInicioComercial: '',
+            fechaFinComercial: ''
+          }))
         } else {
           console.log('⚠️ [FRONT FORM] No se obtuvieron fechas, usando fechas por defecto')
-          // Si no hay fechas del EDT, usar fechas por defecto
+          // Actividad/Tarea sin padre ni hermanos: fallback de hoy + 7 días
           const today = new Date().toISOString().split('T')[0]
           const nextWeek = new Date()
           nextWeek.setDate(nextWeek.getDate() + 7)

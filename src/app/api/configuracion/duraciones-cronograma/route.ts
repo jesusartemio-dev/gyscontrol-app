@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic'
 
 // Schema para crear duraciones
 const createDuracionSchema = z.object({
-  nivel: z.enum(['edt', 'actividad', 'tarea']),
+  nivel: z.enum(['fase', 'edt', 'actividad', 'tarea']),
   duracionDias: z.number().min(0.1, 'Duración debe ser mayor a 0'),
   horasPorDia: z.number().min(1).max(24),
   bufferPorcentaje: z.number().min(0).max(100).default(10)
@@ -24,6 +24,10 @@ const createDuracionSchema = z.object({
 
 // Schema para actualizar duraciones
 const updateDuracionesSchema = z.object({
+  fase: z.object({
+    duracionDias: z.number().min(0),
+    horasPorDia: z.number().min(1).max(24)
+  }).optional(),
   edt: z.object({
     duracionDias: z.number().min(0),
     horasPorDia: z.number().min(1).max(24)

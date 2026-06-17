@@ -14,6 +14,7 @@ import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { logger } from '@/lib/logger'
 import { validarPermisoCronograma } from '@/lib/services/cronogramaPermisos'
+import { fechasFaseDefault } from '@/lib/services/cronogramaFechasDefault'
 
 // ✅ Schema de validación para crear fase
 const createFaseSchema = z.object({
@@ -117,10 +118,10 @@ export async function POST(
     const permiso = await validarPermisoCronograma(validatedData.proyectoCronogramaId)
     if (!permiso.ok) return permiso.response
 
-    // ✅ Validar que el proyecto existe
+    // ✅ Validar que el proyecto existe (fechaInicio = Vigencia, para fechas por defecto)
     const proyecto = await prisma.proyecto.findUnique({
       where: { id },
-      select: { id: true, nombre: true }
+      select: { id: true, nombre: true, fechaInicio: true }
     })
 
     if (!proyecto) {
@@ -160,6 +161,15 @@ export async function POST(
       )
     }
 
+    // ✅ Fechas: si no se envían, la fase inicia en la Vigencia del proyecto (+14 días tentativos)
+    let fechaInicioPlan = validatedData.fechaInicioPlan ? new Date(validatedData.fechaInicioPlan) : null
+    let fechaFinPlan = validatedData.fechaFinPlan ? new Date(validatedData.fechaFinPlan) : null
+    if (!fechaInicioPlan) {
+      const def = await fechasFaseDefault(proyecto.fechaInicio)
+      fechaInicioPlan = def.fechaInicioPlan
+      if (!fechaFinPlan) fechaFinPlan = def.fechaFinPlan
+    }
+
     // ✅ Crear la fase
     const fase = await prisma.proyectoFase.create({
       data: {
@@ -169,8 +179,8 @@ export async function POST(
         nombre: validatedData.nombre,
         descripcion: validatedData.descripcion,
         orden: validatedData.orden,
-        fechaInicioPlan: validatedData.fechaInicioPlan ? new Date(validatedData.fechaInicioPlan) : null,
-        fechaFinPlan: validatedData.fechaFinPlan ? new Date(validatedData.fechaFinPlan) : null,
+        fechaInicioPlan,
+        fechaFinPlan,
         estado: 'planificado',
         porcentajeAvance: 0,
         updatedAt: new Date()

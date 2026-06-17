@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { validarPermisoCronograma } from '@/lib/services/cronogramaPermisos'
+import { fechasEdtDefault } from '@/lib/services/cronogramaFechasDefault'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
@@ -169,10 +170,10 @@ export async function POST(
 
     const edtIds_resolved = selections.map(s => s.edtId)
 
-    // ✅ Validar que el proyecto existe
+    // ✅ Validar que el proyecto existe (fechaInicio = Vigencia, para fechas por defecto)
     const proyecto = await prisma.proyecto.findUnique({
       where: { id: proyectoId },
-      select: { id: true, nombre: true }
+      select: { id: true, nombre: true, fechaInicio: true }
     })
 
     if (!proyecto) {
@@ -261,6 +262,20 @@ export async function POST(
         const seleccion = selections.find(s => s.edtId === edtCatalogo.id)
         const nombreFinal = seleccion?.nombre?.trim() || edtCatalogo.nombre
 
+        // ✅ Fechas por defecto: inicio tras el último EDT hermano (o inicio de la fase / vigencia).
+        // Como cada EDT creado queda persistido, los siguientes se escalonan secuencialmente.
+        const faseDestino = proyectoFaseId
+          ? await prisma.proyectoFase.findUnique({
+              where: { id: proyectoFaseId },
+              select: { fechaInicioPlan: true }
+            })
+          : null
+        const fechasDef = await fechasEdtDefault(
+          proyectoFaseId,
+          faseDestino?.fechaInicioPlan ?? null,
+          proyecto.fechaInicio
+        )
+
         // Crear el EDT en el proyecto
         const edtProyecto = await prisma.proyectoEdt.create({
           data: {
@@ -271,6 +286,8 @@ export async function POST(
             nombre: nombreFinal,
             descripcion: edtCatalogo.descripcion,
             edtId: edtCatalogo.id,
+            fechaInicioPlan: fechasDef.fechaInicioPlan,
+            fechaFinPlan: fechasDef.fechaFinPlan,
             estado: 'planificado',
             porcentajeAvance: 0,
             horasPlan: 0, // Se calculará después basado en servicios

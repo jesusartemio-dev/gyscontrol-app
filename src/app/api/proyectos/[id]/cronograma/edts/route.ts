@@ -15,6 +15,7 @@ import { z } from 'zod'
 import { recalcularPadresPostOperacion } from '@/lib/utils/cronogramaRollup'
 import { logger } from '@/lib/logger'
 import { validarPermisoCronograma } from '@/lib/services/cronogramaPermisos'
+import { fechasEdtDefault } from '@/lib/services/cronogramaFechasDefault'
 
 // ✅ Schema de validación para crear EDT
 const createEdtSchema = z.object({
@@ -141,10 +142,10 @@ export async function POST(
     // ✅ Validar datos de entrada
     const validatedData = createEdtSchema.parse(body)
 
-    // ✅ Validar que el proyecto existe
+    // ✅ Validar que el proyecto existe (fechaInicio = Vigencia, para fechas por defecto)
     const proyecto = await prisma.proyecto.findUnique({
       where: { id },
-      select: { id: true, nombre: true }
+      select: { id: true, nombre: true, fechaInicio: true }
     })
 
     if (!proyecto) {
@@ -168,13 +169,15 @@ export async function POST(
 
     // ✅ Determinar el cronograma (por defecto el comercial si existe)
     let cronogramaId = null
+    let faseFechaInicio: Date | null = null
     if (validatedData.proyectoFaseId) {
       // Si se especifica una fase, obtener el cronograma de esa fase
       const fase = await prisma.proyectoFase.findUnique({
         where: { id: validatedData.proyectoFaseId },
-        select: { proyectoCronogramaId: true }
+        select: { proyectoCronogramaId: true, fechaInicioPlan: true }
       })
       cronogramaId = fase?.proyectoCronogramaId
+      faseFechaInicio = fase?.fechaInicioPlan ?? null
     } else {
       // Buscar cronograma comercial por defecto
       const cronogramaComercial = await prisma.proyectoCronograma.findFirst({
@@ -197,6 +200,15 @@ export async function POST(
     const permiso = await validarPermisoCronograma(cronogramaId)
     if (!permiso.ok) return permiso.response
 
+    // ✅ Fechas: si no se envían, el EDT inicia tras el último EDT hermano (o inicio de su fase / vigencia)
+    let fechaInicioPlan = validatedData.fechaInicioPlan ? new Date(validatedData.fechaInicioPlan) : null
+    let fechaFinPlan = validatedData.fechaFinPlan ? new Date(validatedData.fechaFinPlan) : null
+    if (!fechaInicioPlan) {
+      const def = await fechasEdtDefault(validatedData.proyectoFaseId, faseFechaInicio, proyecto.fechaInicio)
+      fechaInicioPlan = def.fechaInicioPlan
+      if (!fechaFinPlan) fechaFinPlan = def.fechaFinPlan
+    }
+
     // ✅ Crear el EDT
     const edt = await prisma.proyectoEdt.create({
       data: {
@@ -206,8 +218,8 @@ export async function POST(
         proyectoFaseId: validatedData.proyectoFaseId,
         nombre: validatedData.nombre,
         edtId: validatedData.edtId,
-        fechaInicioPlan: validatedData.fechaInicioPlan ? new Date(validatedData.fechaInicioPlan) : null,
-        fechaFinPlan: validatedData.fechaFinPlan ? new Date(validatedData.fechaFinPlan) : null,
+        fechaInicioPlan,
+        fechaFinPlan,
         horasPlan: validatedData.horasPlan,
         responsableId: validatedData.responsableId,
         prioridad: validatedData.prioridad,

@@ -59,7 +59,7 @@ export function validarDuracionesCronograma(
   const nuevas: Omit<any, 'id' | 'createdAt' | 'updatedAt'>[] = []
   const actualizaciones: string[] = []
 
-  const nivelesValidos = ['edt', 'actividad', 'tarea']
+  const nivelesValidos = ['fase', 'edt', 'actividad', 'tarea']
 
   datos.forEach((fila, index) => {
     const filaNum = index + 2 // +2 porque Excel cuenta desde 1 y hay header
