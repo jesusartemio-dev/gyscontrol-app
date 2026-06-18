@@ -459,19 +459,18 @@ async function doWork(
         },
       })
 
-    // 4. Guardar esqueleto inmediatamente (estructura completa con placeholders)
-    push({ tipo: 'progreso', mensaje: 'Guardando estructura inicial...' })
-    await guardarParcial()
+    // 4. Esqueleto: inicia el guardado en background sin bloquear las etapas
+    let saveChain: Promise<unknown> = guardarParcial().catch(err => {
+      console.error('⚠️ Error en guardado esqueleto PETS:', err)
+    })
 
-    // 5. Cola de guardados secuencial (evita escrituras concurrentes)
-    let saveChain = Promise.resolve<unknown>(null)
     const queueSave = () => {
       saveChain = saveChain.then(guardarParcial).catch(err => {
         console.error('⚠️ Error en guardado parcial PETS:', err)
       })
     }
 
-    // 6. Etapas + restricciones en paralelo — cada etapa guarda al completar
+    // 5. Etapas + restricciones en paralelo — cada etapa guarda al completar
     const [etapasResult, restricciones] = await Promise.all([
       procesarEtapas(ctx, etapas, userId, push, (idx, contenido) => {
         etapasContenido[idx] = contenido
@@ -485,10 +484,10 @@ async function doWork(
     ])
     push({ tipo: 'restricciones', count: restricciones.length })
 
-    // 7. Esperar a que terminen todos los guardados parciales encolados
+    // 6. Esperar a que terminen todos los guardados parciales encolados
     await saveChain
 
-    // 8. Guardado final canónico con el contenido completo y limpio
+    // 7. Guardado final canónico con el contenido completo y limpio
     push({ tipo: 'progreso', mensaje: 'Guardando contenido final...' })
     const contenidoFinal: PetsContenido = {
       personal,
