@@ -114,6 +114,56 @@ function repartirActividades(
   })
 }
 
+// ─── Helper: contenido parcial con placeholders ───────────────────────────────
+
+function buildContenidoParcial(
+  ctx: ContextoPets,
+  etapasIndice: EtapaIndice[],
+  etapasContenido: Array<EtapaContenido | null>,
+  restricciones: Array<{ texto: string }>,
+  personal: Array<{ rol: string }>
+): PetsContenido {
+  const PLACEHOLDER: BloqueComo[] = [{ tipo: 'parrafo', texto: '(generando...)' }]
+
+  return {
+    personal,
+    epp: {
+      basico: ctx.mpp?.eppPorCategoria.basico.map(n => ({ nombre: n })) ?? [],
+      bioseguridad: ctx.mpp?.eppPorCategoria.bioseguridad.map(n => ({ nombre: n })) ?? [],
+      especifico: ctx.mpp?.eppPorCategoria.especifico.map(n => ({ nombre: n })) ?? [],
+      mppRef: ctx.mpp?.codigoDocumento ?? '',
+    },
+    recursos: { equipos: [], herramientas: [], materiales: [] },
+    procedimiento: {
+      etapas: etapasIndice.map((etapa, i) => ({
+        letra: String.fromCharCode(65 + i),
+        titulo: etapa.titulo,
+        pasos: etapasContenido[i]
+          ? etapasContenido[i]!.pasos.map((paso, j) => ({
+              numero: j + 1,
+              que: paso.que,
+              como: paso.como,
+              quien: paso.quien,
+            }))
+          : etapa.pasos.map((paso, j) => ({
+              numero: j + 1,
+              que: paso.que,
+              como: PLACEHOLDER,
+              quien: paso.quien.map(r => ({ rol: r })),
+            })),
+      })),
+    },
+    restricciones,
+    cambios: [
+      {
+        fecha: format(new Date(), 'dd/MM/yyyy'),
+        version: ctx.pets.revision ?? '01',
+        descripcion: 'Generado automáticamente por IA',
+      },
+    ],
+  }
+}
+
 // ─── Generadores de secciones ─────────────────────────────────────────────────
 
 async function generarIndice(
@@ -254,7 +304,8 @@ async function procesarEtapas(
   ctx: ContextoPets,
   etapas: EtapaIndice[],
   userId: string,
-  push: PushFn
+  push: PushFn,
+  onEtapaCompletada?: (idx: number, contenido: EtapaContenido) => void
 ): Promise<EtapaContenido[]> {
   const sem = new Semaphore(3)
   const actividadesPorEtapa = repartirActividades(
@@ -276,6 +327,7 @@ async function procesarEtapas(
         push({ tipo: 'etapa_inicio', etapaLetra: letra, etapaTitulo: etapa.titulo })
         const contenido = await generarEtapa(ctx, etapa, letra, actividadesPorEtapa[idx], userId)
         push({ tipo: 'etapa_ok', etapaLetra: letra, etapaTitulo: etapa.titulo, pasosCount: contenido.pasos.length })
+        onEtapaCompletada?.(idx, contenido)
         return { idx, contenido }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
@@ -377,31 +429,68 @@ async function doWork(
   }
 
   try {
-    // Índice
+    // 1. Generar índice
     const etapas = await generarIndice(ctx, userId, push)
     push({ tipo: 'indice', etapas: etapas.map(e => ({ titulo: e.titulo, pasosCount: e.pasos.length })) })
 
-    // Etapas en paralelo + restricciones en paralelo con la primera etapa
-    const [etapasContenido, restricciones] = await Promise.all([
-      procesarEtapas(ctx, etapas, userId, push),
-      generarRestricciones(ctx, etapas.map(e => e.titulo), userId, push),
-    ])
-    push({ tipo: 'restricciones', count: restricciones.length })
-
-    // Personal desde MPP o IPERC
+    // 2. Personal (disponible desde el índice, no necesita IA)
     const puestosUniq =
       ctx.mpp?.puestos.length
         ? ctx.mpp.puestos
         : (ctx.iperc?.actividadesAgrupadas
             .flatMap(a => a.puestos)
             .filter((v, i, arr) => arr.indexOf(v) === i) ?? [])
-
     const personal =
       puestosUniq.length > 0
         ? puestosUniq.map(p => ({ rol: p }))
         : [{ rol: 'Supervisor de Proyecto' }]
 
-    const contenido: PetsContenido = {
+    // 3. Estado mutable compartido para guardados incrementales
+    const etapasContenido: Array<EtapaContenido | null> = new Array(etapas.length).fill(null)
+    const restriccionesActuales: Array<{ texto: string }> = []
+
+    const guardarParcial = () =>
+      prisma.pets.update({
+        where: { id: petsId },
+        data: {
+          contenido: buildContenidoParcial(
+            ctx, etapas, etapasContenido, restriccionesActuales, personal
+          ) as object,
+        },
+      })
+
+    // 4. Guardar esqueleto inmediatamente (estructura completa con placeholders)
+    push({ tipo: 'progreso', mensaje: 'Guardando estructura inicial...' })
+    await guardarParcial()
+
+    // 5. Cola de guardados secuencial (evita escrituras concurrentes)
+    let saveChain = Promise.resolve<unknown>(null)
+    const queueSave = () => {
+      saveChain = saveChain.then(guardarParcial).catch(err => {
+        console.error('⚠️ Error en guardado parcial PETS:', err)
+      })
+    }
+
+    // 6. Etapas + restricciones en paralelo — cada etapa guarda al completar
+    const [etapasResult, restricciones] = await Promise.all([
+      procesarEtapas(ctx, etapas, userId, push, (idx, contenido) => {
+        etapasContenido[idx] = contenido
+        queueSave()
+      }),
+      generarRestricciones(ctx, etapas.map(e => e.titulo), userId, push).then(r => {
+        restriccionesActuales.push(...r)
+        queueSave()
+        return r
+      }),
+    ])
+    push({ tipo: 'restricciones', count: restricciones.length })
+
+    // 7. Esperar a que terminen todos los guardados parciales encolados
+    await saveChain
+
+    // 8. Guardado final canónico con el contenido completo y limpio
+    push({ tipo: 'progreso', mensaje: 'Guardando contenido final...' })
+    const contenidoFinal: PetsContenido = {
       personal,
       epp: {
         basico: ctx.mpp?.eppPorCategoria.basico.map(n => ({ nombre: n })) ?? [],
@@ -411,7 +500,7 @@ async function doWork(
       },
       recursos: { equipos: [], herramientas: [], materiales: [] },
       procedimiento: {
-        etapas: etapasContenido.map((etapa, i) => ({
+        etapas: etapasResult.map((etapa, i) => ({
           letra: String.fromCharCode(65 + i),
           titulo: etapa.titulo,
           pasos: etapa.pasos.map((paso, j) => ({
@@ -431,11 +520,9 @@ async function doWork(
         },
       ],
     }
-
-    push({ tipo: 'progreso', mensaje: 'Guardando contenido generado...' })
     await prisma.pets.update({
       where: { id: petsId },
-      data: { contenido: contenido as object },
+      data: { contenido: contenidoFinal as object },
     })
     push({ tipo: 'guardado' })
   } finally {
