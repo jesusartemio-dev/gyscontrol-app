@@ -131,8 +131,11 @@ export function inyectarHojaAvance(files: Record<string, Uint8Array>, arbol: Arb
     xml = setCell(xml, `${L}13`, S_PCT, 'formula', fases.map((f) => `$D$${f.realRow}*${L}${f.realRow}`).join('+') || '0')
   }
 
-  // 4. Matriz (filas 15+). Se construyen como bloques <row> y se insertan antes de </sheetData>.
-  const filas: string[] = []
+  // 4. Matriz (filas 15+). Acumular en Map<rowNum, xml> y ordenar al final para que Excel
+  //    no rechace el archivo por filas fuera de orden (los EDTs/ACTs/TAREAs tienen row-numbers
+  //    intercalados pero se generan en bloques separados).
+  const filasMap = new Map<number, string>()
+  const addRow = (n: number, inner: string) => filasMap.set(n, `<row r="${n}">${inner}</row>`)
   const indent = (nivel: number, nombre: string) => '  '.repeat(Math.max(0, nivel - 1)) + nombre
   for (const fl of fases) {
     const first = fl.firstTaskRow ?? fl.lb0Row, last = fl.lastTaskRow ?? fl.realRow
@@ -141,12 +144,12 @@ export function inyectarHojaAvance(files: Record<string, Uint8Array>, arbol: Arb
       cell(`C${fl.lb0Row}`, S_GRISPCT, 'formula', `SUM(C${first}:C${last})`), cell(`D${fl.lb0Row}`, S_GRISPCT, 'num', fl.pesoFaseDec),
       cell(`E${fl.lb0Row}`, S_GRIS, 'str', 'LB 0')]
     for (let i = 0; i < N; i++) c.push(cell(`${wcol(i)}${fl.lb0Row}`, S_GRISPCT, 'formula', `SUMPRODUCT($D$${first}:$D$${last},${wcol(i)}${first}:${wcol(i)}${last})`))
-    filas.push(`<row r="${fl.lb0Row}">${c.join('')}</row>`)
+    addRow(fl.lb0Row, c.join(''))
     // FASE — fila REAL
     c = [cell(`A${fl.realRow}`, S_GRIS, 'empty'), cell(`B${fl.realRow}`, S_GRIS, 'empty'), cell(`C${fl.realRow}`, S_GRIS, 'empty'),
       cell(`D${fl.realRow}`, S_GRISPCT, 'formula', `+D${fl.lb0Row}`), cell(`E${fl.realRow}`, S_GRIS, 'str', 'REAL')]
     for (let i = 0; i < N; i++) c.push(cell(`${wcol(i)}${fl.realRow}`, S_GRISPCT, 'formula', `SUMPRODUCT($D$${first}:$D$${last},${wcol(i)}${first + 1}:${wcol(i)}${last + 1})`))
-    filas.push(`<row r="${fl.realRow}">${c.join('')}</row>`)
+    addRow(fl.realRow, c.join(''))
 
     // EDTs (decorativos, 1 fila)
     for (const e of fl.edts) {
@@ -155,30 +158,31 @@ export function inyectarHojaAvance(files: Record<string, Uint8Array>, arbol: Arb
       else c.push(cell(`D${e.row}`, S_EDT, 'empty'))
       c.push(cell(`E${e.row}`, S_EDT, 'str', '---'))
       for (let i = 0; i < N; i++) c.push(cell(`${wcol(i)}${e.row}`, S_EDT, 'empty'))
-      filas.push(`<row r="${e.row}">${c.join('')}</row>`)
+      addRow(e.row, c.join(''))
     }
     // ACTs (decorativos, 1 fila)
     for (const a of fl.acts) {
       c = [cell(`A${a.row}`, S_ACT, 'str', a.nodo.wbs), cell(`B${a.row}`, S_ACT, 'str', indent(3, a.nodo.nombre)), cell(`C${a.row}`, S_ACT, 'empty'), cell(`D${a.row}`, S_ACT, 'empty'), cell(`E${a.row}`, S_ACT, 'str', '---')]
       for (let i = 0; i < N; i++) c.push(cell(`${wcol(i)}${a.row}`, S_ACT, 'empty'))
-      filas.push(`<row r="${a.row}">${c.join('')}</row>`)
+      addRow(a.row, c.join(''))
     }
     // TAREAS (2 filas)
     for (const t of fl.tareas) {
       c = [cell(`A${t.lb0Row}`, null, 'str', t.nodo.wbs), cell(`B${t.lb0Row}`, null, 'str', indent(4, t.nodo.nombre)),
         cell(`C${t.lb0Row}`, S_PCT, 'formula', `D${t.lb0Row}*$D$${fl.lb0Row}`), cell(`D${t.lb0Row}`, S_PCT, 'num', t.d), cell(`E${t.lb0Row}`, null, 'str', 'LB 0')]
       for (let i = 0; i < N; i++) { const v = round4(lb0Frac(t.nodo.fechaInicio, t.nodo.fechaFin, semanas[i].corte)); if (v > 0) c.push(cell(`${wcol(i)}${t.lb0Row}`, S_AZ, 'num', v)) }
-      filas.push(`<row r="${t.lb0Row}">${c.join('')}</row>`)
+      addRow(t.lb0Row, c.join(''))
       // REAL: D vacío (clave para el SUMPRODUCT); última semana = %compl/100 si >0
       c = [cell(`A${t.realRow}`, null, 'empty'), cell(`B${t.realRow}`, null, 'empty'), cell(`E${t.realRow}`, null, 'str', 'REAL')]
       if (N > 0 && t.nodo.porcentajeCompletado > 0) c.push(cell(`${wcol(N - 1)}${t.realRow}`, S_RJ, 'num', round4(t.nodo.porcentajeCompletado / 100)))
-      filas.push(`<row r="${t.realRow}">${c.join('')}</row>`)
+      addRow(t.realRow, c.join(''))
     }
   }
 
-  // Insertar las filas de la matriz antes de </sheetData>.
+  // Insertar las filas ordenadas numéricamente antes de </sheetData>.
+  const xmlFilas = [...filasMap.keys()].sort((a, b) => a - b).map((n) => filasMap.get(n)!).join('')
   const sd = xml.indexOf('</sheetData>')
-  if (sd !== -1) xml = xml.slice(0, sd) + filas.join('') + xml.slice(sd)
+  if (sd !== -1) xml = xml.slice(0, sd) + xmlFilas + xml.slice(sd)
   // Ampliar dimension si hace falta.
   xml = xml.replace(/<dimension ref="[^"]*"\/>/, `<dimension ref="A1:${colLetter(lastCol)}${r}"/>`)
 
