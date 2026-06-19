@@ -242,11 +242,16 @@ export async function PATCH(request: NextRequest) {
     let tareaActualizada
 
     if (tipo === 'proyecto_tarea') {
-      // Verificar que la tarea pertenece al usuario
+      // Verificar que la tarea pertenece al usuario (+ traer proyectoId denormalizado)
       const tarea = await prisma.proyectoTarea.findFirst({
         where: {
           id: tareaId,
           responsableId: session.user.id
+        },
+        include: {
+          proyectoEdt: {
+            select: { proyectoId: true }
+          }
         }
       })
 
@@ -257,6 +262,12 @@ export async function PATCH(request: NextRequest) {
         )
       }
 
+      // Determinar el nuevo porcentaje antes del update (para el histórico)
+      const nuevoProgreso: number | undefined =
+        estado === 'completada' ? 100 :
+        progreso !== undefined ? (progreso as number) :
+        undefined
+
       const upd = await prisma.proyectoTarea.update({
         where: { id: tareaId },
         data: {
@@ -265,10 +276,30 @@ export async function PATCH(request: NextRequest) {
           ...(estado === 'completada' && {
             porcentajeCompletado: 100,
             fechaFinReal: new Date()
-          })
+          }),
+          updatedAt: new Date()
         }
       })
       tareaActualizada = upd
+
+      // Registrar histórico de avance fechado (no debe romper el flujo si falla)
+      if (nuevoProgreso !== undefined) {
+        try {
+          await prisma.proyectoTareaAvance.create({
+            data: {
+              proyectoTareaId: tareaId,
+              proyectoId: tarea.proyectoEdt.proyectoId,
+              fecha: new Date(),
+              porcentaje: nuevoProgreso,
+              origen: 'oficina',
+              usuarioId: session.user.id,
+            }
+          })
+        } catch (e) {
+          console.error('[mis-asignadas] histórico ProyectoTareaAvance:', e)
+        }
+      }
+
       // Propagar el rollup de avance hacia arriba (sin recalcular el % de la tarea).
       try {
         if (upd.proyectoActividadId) await ProgresoService.actualizarProgresoActividad(upd.proyectoActividadId)

@@ -1134,6 +1134,7 @@ model Proyecto {
   reportesSemanalesSeguridad ReporteSemanalSeguridad[]
   reportesSemanalesAvance    ReporteSemanalAvance[]      @relation("ReportesAvanceProyecto")
   avanceSnapshots            ProyectoAvanceSnapshot[]    @relation("AvanceSnapshotsProyecto")
+  avancesTarea               ProyectoTareaAvance[]
   hitos                      ProyectoHito[]              @relation("HitosProyecto")
   orgNodos                   ProyectoOrgNodo[]
   matrizComunicacion         MatrizComunicacion?
@@ -2040,6 +2041,7 @@ model User {
   planificacionesDiaActualizadas           PlanificacionDia[]       @relation("PlanificacionActualizador")
   // Ventas de equipos
   ventasEquipoComercial                    VentaEquipo[]            @relation("VentaEquipoComercial")
+  avancesTareaRegistrados                  ProyectoTareaAvance[]
 
   @@map("user")
 }
@@ -3409,6 +3411,7 @@ model ProyectoTarea {
   registrosCampoTarea         RegistroHorasCampoTarea[]
   registrosAvance             RegistroAvance[]
   avanceSnapshotsTarea        ProyectoAvanceSnapshotTarea[] @relation("AvanceSnapshotTareaProyectoTarea")
+  avances                     ProyectoTareaAvance[]
 
   @@index([creadoPorId])
   @@index([recursoId])
@@ -3419,6 +3422,26 @@ model ProyectoTarea {
   @@index([proyectoEdtId, orden])
   @@index([responsableId, fechaFin])
   @@map("proyecto_tarea")
+}
+
+model ProyectoTareaAvance {
+  id               String            @id @default(cuid())
+  proyectoTareaId  String
+  proyectoId       String
+  fecha            DateTime          // fecha del avance (fechaTrabajo en campo, now() en oficina)
+  porcentaje       Int               // 0-100
+  origen           OrigenAvanceTarea
+  usuarioId        String?
+  createdAt        DateTime          @default(now())
+
+  proyectoTarea    ProyectoTarea     @relation(fields: [proyectoTareaId], references: [id], onDelete: Cascade)
+  proyecto         Proyecto          @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  usuario          User?             @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+
+  @@index([proyectoId, fecha])
+  @@index([proyectoTareaId, fecha])
+  @@index([proyectoId, origen, fecha])
+  @@map("proyecto_tarea_avance")
 }
 
 model RegistroProgreso {
@@ -3692,6 +3715,12 @@ enum OrigenListaItem {
 enum OrigenTrabajo {
   oficina
   campo
+}
+
+enum OrigenAvanceTarea {
+  campo
+  oficina
+  automatico
 }
 
 enum EstadoRegistroCampo {
