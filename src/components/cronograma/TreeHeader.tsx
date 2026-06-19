@@ -5,7 +5,7 @@ export function TreeHeader({ showRecursoColumn, showResponsableColumn, showPesoC
 }) {
   // Columnas dinámicas (mismas anchuras de siempre). La de Peso solo aparece si showPesoColumn.
   const cols = ['1fr', '80px', '65px', '120px', '55px', '55px']
-  if (showPesoColumn) cols.push('55px')
+  if (showPesoColumn) { cols.push('60px'); cols.push('60px') }
   if (showRecursoColumn) cols.push('100px')
   if (showResponsableColumn) cols.push('100px')
   cols.push('28px')
@@ -21,7 +21,8 @@ export function TreeHeader({ showRecursoColumn, showResponsableColumn, showPesoC
       <div className="text-center">Fechas</div>
       <div className="text-right pr-1">Dur</div>
       <div className="text-right pr-1">Work</div>
-      {showPesoColumn && <div className="text-right pr-1">Peso</div>}
+      {showPesoColumn && <div className="text-right pr-1">P.Global</div>}
+      {showPesoColumn && <div className="text-right pr-1">P.Parcial</div>}
       {showRecursoColumn && <div className="text-center">Recurso</div>}
       {showResponsableColumn && <div className="text-center">Responsable</div>}
       <div></div>

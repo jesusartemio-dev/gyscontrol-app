@@ -28,7 +28,8 @@ interface TreeNodeProps {
   showRecursoColumn?: boolean
   showResponsableColumn?: boolean
   showPesoColumn?: boolean
-  pesoGlobal?: number
+  pesoGlobalHH?: number
+  pesoParcial?: number
   onAssignResponsable?: () => void
   onAssignRecurso?: () => void
   onDuplicate?: () => void
@@ -87,7 +88,8 @@ export function TreeNode({
   showRecursoColumn,
   showResponsableColumn,
   showPesoColumn,
-  pesoGlobal,
+  pesoGlobalHH,
+  pesoParcial,
   onAssignResponsable,
   onAssignRecurso,
   onDuplicate,
@@ -245,7 +247,7 @@ export function TreeNode({
         style={{
           gridTemplateColumns: [
             '1fr', '80px', '65px', '120px', '55px', '55px',
-            ...(showPesoColumn ? ['55px'] : []),
+            ...(showPesoColumn ? ['60px', '60px'] : []),
             ...(showRecursoColumn ? ['100px'] : []),
             ...(showResponsableColumn ? ['100px'] : []),
             '28px',
@@ -358,10 +360,17 @@ export function TreeNode({
           {totalHours > 0 ? `${totalHours}h` : ''}
         </div>
 
-        {/* Columna: Peso (calculado por horas dentro de su fase) */}
+        {/* Columna: Peso Global (hh-hombre, normalizado al proyecto) */}
         {showPesoColumn && (
-          <div className="text-right text-[11px] text-indigo-600 font-mono font-medium pr-1">
-            {pesoGlobal != null && pesoGlobal > 0 ? `${pesoGlobal.toFixed(1)}%` : ''}
+          <div className="text-right text-[11px] text-indigo-500 font-mono pr-1">
+            {pesoGlobalHH != null && pesoGlobalHH > 0 ? `${pesoGlobalHH.toFixed(1)}%` : ''}
+          </div>
+        )}
+
+        {/* Columna: Peso Parcial (hh dentro del padre inmediato) */}
+        {showPesoColumn && (
+          <div className="text-right text-[11px] text-violet-600 font-mono pr-1">
+            {pesoParcial != null && pesoParcial > 0 ? `${pesoParcial.toFixed(1)}%` : ''}
           </div>
         )}
 

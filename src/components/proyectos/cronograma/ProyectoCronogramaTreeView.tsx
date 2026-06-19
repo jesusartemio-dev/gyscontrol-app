@@ -108,8 +108,8 @@ export function ProyectoCronogramaTreeView({
   // Columna Peso: solo en ejecución (el peso por fase aplica al cronograma vivo)
   const showPesoColumn = selectedCronograma?.tipo === 'ejecucion'
 
-  // ── Pesos por fase (para la columna Peso del árbol) ───────────────────────
-  // Map normNombreFase → { pesoEfectivo (%), horasFase }. peso(nodo) = pesoEfectivo × horasNodo/horasFase.
+  // ── Pesos por fase (para las columnas Peso / Peso Global / Peso Parcial del árbol) ──────
+  // Map normNombreFase → { pesoEfectivo (%), horasFase (hh = horasEstimadas×personasEstimadas) }.
   const [pesoFaseMap, setPesoFaseMap] = useState<Map<string, { pesoEfectivo: number; horasFase: number }>>(new Map())
   const normFase = (s: string) => (s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim()
   useEffect(() => {
@@ -126,32 +126,71 @@ export function ProyectoCronogramaTreeView({
     return () => { cancel = true }
   }, [proyectoId, showPesoColumn, selectedCronograma?.id, refreshKey])
 
-  // peso por nodo: recorre el árbol cargado llevando la info de su fase.
+  // pesoPorNodo: Peso Global (hh) y Peso Parcial (hh) por nodo, basados en horas-hombre.
+  // pesoGlobal  = pesoEfectivo × hhNodo / hhFase / Σpesos × 100  (normalizado al proyecto)
+  // pesoParcial = hhNodo / hhPadre × 100                          (dentro del padre inmediato)
   const pesoPorNodo = useMemo(() => {
-    const acc = new Map<string, number>()
+    const acc = new Map<string, { pesoGlobal: number; pesoParcial: number }>()
     if (!showPesoColumn || pesoFaseMap.size === 0) return acc
-    const totalPeso = [...pesoFaseMap.values()].reduce((s, v) => s + v.pesoEfectivo, 0) // ~100%
-    const walk = (nodeIds: string[], faseInfo: { pesoEfectivo: number; horasFase: number } | null) => {
-      for (const id of nodeIds) {
-        const node = state.nodes.get(id)
-        if (!node) continue
-        let info = faseInfo
-        if (node.type === 'proyecto') {
-          acc.set(id, totalPeso) // raíz = suma de pesos de fase
-        } else if (node.type === 'fase') {
-          // La fase muestra su peso efectivo completo (sin escalar por horas:
-          // horasFase del endpoint incluye extras y no coincide con las horas del nodo).
-          info = pesoFaseMap.get(normFase(node.nombre)) ?? null
-          if (info) acc.set(id, info.pesoEfectivo)
-        } else if (info && info.horasFase > 0) {
-          // Nodos bajo la fase: reparten el peso de la fase por horas.
-          const h = Number(node.data?.horasEstimadas) || 0
-          acc.set(id, (info.pesoEfectivo * h) / info.horasFase)
-        }
-        walk(node.children?.map((c) => c.id) || [], info)
+
+    const sumaPesos  = [...pesoFaseMap.values()].reduce((s, v) => s + v.pesoEfectivo, 0)
+    const sumHhFases = [...pesoFaseMap.values()].reduce((s, v) => s + v.horasFase, 0)
+
+    // Paso 1: hh por nodo (bottom-up). Tareas: horas×personas; fases: del servidor; resto: suma hijos.
+    const hhMap = new Map<string, number>()
+    const computeHh = (nodeId: string): number => {
+      const node = state.nodes.get(nodeId)
+      if (!node) return 0
+      if (node.type === 'fase') {
+        const v = pesoFaseMap.get(normFase(node.nombre))?.horasFase ?? 0
+        hhMap.set(nodeId, v)
+        for (const child of (node.children || [])) computeHh(child.id)
+        return v
       }
+      if (node.type === 'tarea') {
+        const v = (Number(node.data?.horasEstimadas) || 0) * (Number(node.data?.personasEstimadas) || 1)
+        hhMap.set(nodeId, v)
+        return v
+      }
+      const total = (node.children || []).reduce((s: number, c: { id: string }) => s + computeHh(c.id), 0)
+      hhMap.set(nodeId, total)
+      return total
     }
-    walk(state.rootNodes, null)
+    for (const rootId of state.rootNodes) computeHh(rootId)
+
+    // Paso 2: asignar pesoGlobal + pesoParcial (top-down, necesita hh del padre)
+    const assign = (
+      nodeId: string,
+      faseInfo: { pesoEfectivo: number; horasFase: number } | null,
+      parentHh: number
+    ) => {
+      const node = state.nodes.get(nodeId)
+      if (!node) return
+      const hhNode = hhMap.get(nodeId) ?? 0
+      let pesoGlobal = 0
+      let pesoParcial = 0
+
+      if (node.type === 'fase') {
+        const fi = pesoFaseMap.get(normFase(node.nombre)) ?? null
+        faseInfo = fi
+        if (fi) {
+          pesoGlobal  = sumaPesos  > 0 ? (fi.pesoEfectivo / sumaPesos)  * 100 : fi.pesoEfectivo
+          pesoParcial = sumHhFases > 0 ? (fi.horasFase    / sumHhFases) * 100 : 0
+        }
+      } else if (faseInfo && faseInfo.horasFase > 0) {
+        pesoGlobal  = sumaPesos > 0
+          ? (faseInfo.pesoEfectivo * hhNode / faseInfo.horasFase / sumaPesos) * 100
+          : (faseInfo.pesoEfectivo * hhNode / faseInfo.horasFase)
+        pesoParcial = parentHh > 0 ? (hhNode / parentHh) * 100 : 0
+      }
+
+      acc.set(nodeId, {
+        pesoGlobal:  Number(pesoGlobal.toFixed(2)),
+        pesoParcial: Number(pesoParcial.toFixed(2)),
+      })
+      for (const child of (node.children || [])) assign(child.id, faseInfo, hhNode)
+    }
+    for (const rootId of state.rootNodes) assign(rootId, null, 0)
     return acc
   }, [showPesoColumn, pesoFaseMap, state.nodes, state.rootNodes])
 
@@ -769,7 +808,8 @@ export function ProyectoCronogramaTreeView({
                     showRecursoColumn={showRecursoColumn}
                     showResponsableColumn={showResponsableColumn}
                     showPesoColumn={showPesoColumn}
-                    pesoGlobal={pesoPorNodo.get(nodeId)}
+                    pesoGlobalHH={pesoPorNodo.get(nodeId)?.pesoGlobal}
+                    pesoParcial={pesoPorNodo.get(nodeId)?.pesoParcial}
                     rowIndex={currentRowIndex}
                     dragListeners={dragListeners}
                     dragAttributes={dragAttributes}
