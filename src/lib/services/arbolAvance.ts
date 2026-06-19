@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { calcularPesosFase, pesoNodo, type PesoFaseItem } from './pesoFase'
+import { hh } from './horasHombre'
 
 // Árbol jerárquico FASE → EDT → ACTIVIDAD → TAREA con horas, avance y pesos, para que el
 // generador de Excel (hoja Avance) y la curva consuman una sola fuente. Reutiliza
@@ -13,10 +14,11 @@ export interface NodoAvance {
   tipo: TipoNodo
   nivel: number // 1=fase, 2=edt, 3=actividad, 4=tarea
   nombre: string
-  horasEstimadas: number // del nodo = suma de sus tareas
-  porcentajeCompletado: number // tarea: su %, nodo: rollup ponderado por horas
+  horasEstimadas: number // horas brutas del nodo (para mostrar)
+  horasHombre: number    // horasEstimadas × personasEstimadas acumulado (para pesos)
+  porcentajeCompletado: number // tarea: su %, nodo: rollup ponderado por horas-hombre
   pesoGlobal: number // peso del nodo en el proyecto (normalizado a Σ=100)
-  pesoParcial: number // peso dentro de su padre (por horas)
+  pesoParcial: number // peso dentro de su padre (por horas-hombre)
   fechaInicio: Date | null // solo tareas
   fechaFin: Date | null // solo tareas
   proyectoTareaId: string | null
@@ -45,7 +47,7 @@ function wavg(items: { pct: number; horas: number }[]): number {
 }
 
 interface FilaTarea {
-  id: string; nombre: string; orden: number; horasEstimadas: unknown; porcentajeCompletado: number
+  id: string; nombre: string; orden: number; horasEstimadas: unknown; personasEstimadas: number; porcentajeCompletado: number
   fechaInicio: Date; fechaFin: Date; proyectoActividadId: string | null; proyectoEdtId: string
 }
 
@@ -63,7 +65,7 @@ async function construirArbol(
     prisma.proyectoFase.findMany({ where: { proyectoCronogramaId: cronogramaId }, orderBy: { orden: 'asc' }, select: { id: true, nombre: true, orden: true } }),
     prisma.proyectoEdt.findMany({ where: { proyectoCronogramaId: cronogramaId }, orderBy: { orden: 'asc' }, select: { id: true, nombre: true, orden: true, proyectoFaseId: true } }),
     prisma.proyectoActividad.findMany({ where: { proyectoCronogramaId: cronogramaId }, orderBy: { orden: 'asc' }, select: { id: true, nombre: true, orden: true, proyectoEdtId: true } }),
-    prisma.proyectoTarea.findMany({ where: { proyectoCronogramaId: cronogramaId }, orderBy: { orden: 'asc' }, select: { id: true, nombre: true, orden: true, horasEstimadas: true, porcentajeCompletado: true, fechaInicio: true, fechaFin: true, proyectoActividadId: true, proyectoEdtId: true } }),
+    prisma.proyectoTarea.findMany({ where: { proyectoCronogramaId: cronogramaId }, orderBy: { orden: 'asc' }, select: { id: true, nombre: true, orden: true, horasEstimadas: true, personasEstimadas: true, porcentajeCompletado: true, fechaInicio: true, fechaFin: true, proyectoActividadId: true, proyectoEdtId: true } }),
   ])
 
   const tareasByAct = new Map<string, FilaTarea[]>()
@@ -78,12 +80,14 @@ async function construirArbol(
   for (const e of edts) { const k = e.proyectoFaseId ?? '__sinfase__'; (edtsByFase.get(k) ?? edtsByFase.set(k, []).get(k)!).push(e) }
 
   const tareaNodo = (t: FilaTarea, wbs: string): NodoAvance => ({
-    wbs, tipo: 'tarea', nivel: 4, nombre: t.nombre, horasEstimadas: Number(t.horasEstimadas || 0),
+    wbs, tipo: 'tarea', nivel: 4, nombre: t.nombre,
+    horasEstimadas: Number(t.horasEstimadas || 0),
+    horasHombre: hh(t),
     porcentajeCompletado: t.porcentajeCompletado, pesoGlobal: 0, pesoParcial: 0,
     fechaInicio: t.fechaInicio, fechaFin: t.fechaFin, proyectoTareaId: t.id, hijos: [],
   })
 
-  // ── Pasada 1: estructura + horas + % + pesoParcial (local) ──
+  // ── Pasada 1: estructura + horas (raw y hh) + % + pesoParcial (por horas-hombre) ──
   const faseNodes: NodoAvance[] = fases.map((f, fi) => {
     const wbsF = String(fi + 1)
     const edtsF = edtsByFase.get(f.id) ?? []
@@ -97,10 +101,12 @@ async function construirArbol(
         const ts = tareasByAct.get(a.id) ?? []
         const tareaNodes = ts.map((t, ti) => tareaNodo(t, `${wbsA}.${ti + 1}`))
         const horasAct = tareaNodes.reduce((s, n) => s + n.horasEstimadas, 0)
-        tareaNodes.forEach((n) => { n.pesoParcial = round2(horasAct > 0 ? (n.horasEstimadas / horasAct) * 100 : 0) })
+        const hhAct    = tareaNodes.reduce((s, n) => s + n.horasHombre, 0)
+        tareaNodes.forEach((n) => { n.pesoParcial = round2(hhAct > 0 ? (n.horasHombre / hhAct) * 100 : 0) })
         return {
-          wbs: wbsA, tipo: 'actividad' as const, nivel: 3, nombre: a.nombre, horasEstimadas: horasAct,
-          porcentajeCompletado: round2(wavg(tareaNodes.map((n) => ({ pct: n.porcentajeCompletado, horas: n.horasEstimadas })))),
+          wbs: wbsA, tipo: 'actividad' as const, nivel: 3, nombre: a.nombre,
+          horasEstimadas: horasAct, horasHombre: hhAct,
+          porcentajeCompletado: round2(wavg(tareaNodes.map((n) => ({ pct: n.porcentajeCompletado, horas: n.horasHombre })))),
           pesoGlobal: 0, pesoParcial: 0, fechaInicio: null, fechaFin: null, proyectoTareaId: null, hijos: tareaNodes,
         }
       })
@@ -108,42 +114,50 @@ async function construirArbol(
         const wbsA = `${wbsE}.${actNodes.length + 1}`
         const tareaNodes = huerfanas.map((t, ti) => tareaNodo(t, `${wbsA}.${ti + 1}`))
         const horasAct = tareaNodes.reduce((s, n) => s + n.horasEstimadas, 0)
-        tareaNodes.forEach((n) => { n.pesoParcial = round2(horasAct > 0 ? (n.horasEstimadas / horasAct) * 100 : 0) })
-        actNodes.push({ wbs: wbsA, tipo: 'actividad', nivel: 3, nombre: '(sin actividad)', horasEstimadas: horasAct,
-          porcentajeCompletado: round2(wavg(tareaNodes.map((n) => ({ pct: n.porcentajeCompletado, horas: n.horasEstimadas })))),
-          pesoGlobal: 0, pesoParcial: 0, fechaInicio: null, fechaFin: null, proyectoTareaId: null, hijos: tareaNodes })
+        const hhAct    = tareaNodes.reduce((s, n) => s + n.horasHombre, 0)
+        tareaNodes.forEach((n) => { n.pesoParcial = round2(hhAct > 0 ? (n.horasHombre / hhAct) * 100 : 0) })
+        actNodes.push({
+          wbs: wbsA, tipo: 'actividad', nivel: 3, nombre: '(sin actividad)',
+          horasEstimadas: horasAct, horasHombre: hhAct,
+          porcentajeCompletado: round2(wavg(tareaNodes.map((n) => ({ pct: n.porcentajeCompletado, horas: n.horasHombre })))),
+          pesoGlobal: 0, pesoParcial: 0, fechaInicio: null, fechaFin: null, proyectoTareaId: null, hijos: tareaNodes,
+        })
       }
       const horasEdt = actNodes.reduce((s, n) => s + n.horasEstimadas, 0)
-      actNodes.forEach((n) => { n.pesoParcial = round2(horasEdt > 0 ? (n.horasEstimadas / horasEdt) * 100 : 0) })
+      const hhEdt    = actNodes.reduce((s, n) => s + n.horasHombre, 0)
+      actNodes.forEach((n) => { n.pesoParcial = round2(hhEdt > 0 ? (n.horasHombre / hhEdt) * 100 : 0) })
       return {
-        wbs: wbsE, tipo: 'edt' as const, nivel: 2, nombre: e.nombre, horasEstimadas: horasEdt,
-        porcentajeCompletado: round2(wavg(actNodes.map((n) => ({ pct: n.porcentajeCompletado, horas: n.horasEstimadas })))),
+        wbs: wbsE, tipo: 'edt' as const, nivel: 2, nombre: e.nombre,
+        horasEstimadas: horasEdt, horasHombre: hhEdt,
+        porcentajeCompletado: round2(wavg(actNodes.map((n) => ({ pct: n.porcentajeCompletado, horas: n.horasHombre })))),
         pesoGlobal: 0, pesoParcial: 0, fechaInicio: null, fechaFin: null, proyectoTareaId: null, hijos: actNodes,
       }
     })
     const horasFase = edtNodes.reduce((s, n) => s + n.horasEstimadas, 0)
-    edtNodes.forEach((n) => { n.pesoParcial = round2(horasFase > 0 ? (n.horasEstimadas / horasFase) * 100 : 0) })
+    const hhFase    = edtNodes.reduce((s, n) => s + n.horasHombre, 0)
+    edtNodes.forEach((n) => { n.pesoParcial = round2(hhFase > 0 ? (n.horasHombre / hhFase) * 100 : 0) })
     return {
-      wbs: wbsF, tipo: 'fase' as const, nivel: 1, nombre: f.nombre, horasEstimadas: horasFase,
-      porcentajeCompletado: round2(wavg(edtNodes.map((n) => ({ pct: n.porcentajeCompletado, horas: n.horasEstimadas })))),
+      wbs: wbsF, tipo: 'fase' as const, nivel: 1, nombre: f.nombre,
+      horasEstimadas: horasFase, horasHombre: hhFase,
+      porcentajeCompletado: round2(wavg(edtNodes.map((n) => ({ pct: n.porcentajeCompletado, horas: n.horasHombre })))),
       pesoGlobal: 0, pesoParcial: 0, fechaInicio: null, fechaFin: null, proyectoTareaId: null, hijos: edtNodes,
     }
   })
 
-  // pesoParcial de fase = por horas dentro del proyecto
-  const horasTotalFases = faseNodes.reduce((s, n) => s + n.horasEstimadas, 0)
-  faseNodes.forEach((n) => { n.pesoParcial = round2(horasTotalFases > 0 ? (n.horasEstimadas / horasTotalFases) * 100 : 0) })
+  // pesoParcial de fase = por horas-hombre dentro del proyecto
+  const hhTotalFases = faseNodes.reduce((s, n) => s + n.horasHombre, 0)
+  faseNodes.forEach((n) => { n.pesoParcial = round2(hhTotalFases > 0 ? (n.horasHombre / hhTotalFases) * 100 : 0) })
 
-  // ── Pasada 2: pesoGlobal = pesoNodo(pesoEfectivoFase, horasNodo, horasFase) / Σpesos × 100 ──
-  const fijarPesoGlobal = (nodo: NodoAvance, pesoEfFase: number, horasFase: number) => {
-    const bruto = pesoNodo(pesoEfFase, nodo.horasEstimadas, horasFase) // pesoEfFase × horas/horasFase
+  // ── Pasada 2: pesoGlobal = pesoNodo(pesoEfectivoFase, hhNodo, hhFase) / Σpesos × 100 ──
+  const fijarPesoGlobal = (nodo: NodoAvance, pesoEfFase: number, hhFaseTotal: number) => {
+    const bruto = pesoNodo(pesoEfFase, nodo.horasHombre, hhFaseTotal)
     nodo.pesoGlobal = round2(sumaPesos > 0 ? (bruto / sumaPesos) * 100 : 0)
-    nodo.hijos.forEach((h) => fijarPesoGlobal(h, pesoEfFase, horasFase))
+    nodo.hijos.forEach((h) => fijarPesoGlobal(h, pesoEfFase, hhFaseTotal))
   }
   for (const fase of faseNodes) {
     const pesoEfFase = pesoEfectivoPorFase.get(normFase(fase.nombre))
-      ?? (horasTotalFases > 0 ? (fase.horasEstimadas / horasTotalFases) * 100 : 0) // fallback por horas (baseline sin match)
-    fijarPesoGlobal(fase, pesoEfFase, fase.horasEstimadas)
+      ?? (hhTotalFases > 0 ? (fase.horasHombre / hhTotalFases) * 100 : 0) // fallback hh (baseline sin match)
+    fijarPesoGlobal(fase, pesoEfFase, fase.horasHombre)
   }
 
   return faseNodes

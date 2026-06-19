@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { hh } from './horasHombre'
 
 // Peso por fase del cronograma de EJECUCIÓN.
 //  - Cada fase puede tener un `pesoManual` (escrito a mano). Si es null, su peso por defecto
@@ -56,19 +57,20 @@ export async function calcularPesosFase(proyectoId: string): Promise<PesosFaseRe
       where: { proyectoCronogramaId: cronograma.id },
       select: {
         horasEstimadas: true,
+        personasEstimadas: true,
         porcentajeCompletado: true,
         proyectoEdt: { select: { proyectoFaseId: true } },
       },
     }),
   ])
 
-  // Horas y avance ponderado por fase (avance nested == flat cuando el peso son horas).
+  // Horas-hombre y avance ponderado por fase. horasPorFase acumula hh = horasEstimadas × personasEstimadas.
   const horasPorFase = new Map<string, number>()
-  const pondPorFase = new Map<string, number>() // Σ(% × horas)
+  const pondPorFase = new Map<string, number>() // Σ(% × hh)
   for (const t of tareas) {
     const faseId = t.proyectoEdt?.proyectoFaseId
     if (!faseId) continue // tarea de un EDT sin fase: no se atribuye
-    const h = Number(t.horasEstimadas ?? 0)
+    const h = hh(t)
     horasPorFase.set(faseId, (horasPorFase.get(faseId) ?? 0) + h)
     pondPorFase.set(faseId, (pondPorFase.get(faseId) ?? 0) + t.porcentajeCompletado * h)
   }

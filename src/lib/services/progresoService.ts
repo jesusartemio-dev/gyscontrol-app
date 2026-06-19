@@ -8,6 +8,7 @@
 import { prisma } from '@/lib/prisma'
 import { obtenerCostoHoraPEN } from '@/lib/utils/costoHoraSnapshot'
 import { verificarSemanaEditable } from '@/lib/utils/timesheetAprobacion'
+import { hh } from './horasHombre'
 
 export class ProgresoService {
 
@@ -16,11 +17,11 @@ export class ProgresoService {
    * robusta del rollup: pondera por las horas REALES de las tareas, no por el campo
    * horasPlan (que puede estar en 0 o desfasado y distorsiona el promedio).
    */
-  private static avanceFlat(tareas: { porcentajeCompletado: number; horasEstimadas: any }[]): number {
+  private static avanceFlat(tareas: { porcentajeCompletado: number; horasEstimadas: any; personasEstimadas?: any }[]): number {
     if (tareas.length === 0) return 0
-    const h = tareas.reduce((s, t) => s + Number(t.horasEstimadas || 0), 0)
+    const h = tareas.reduce((s, t) => s + hh(t), 0)
     if (h <= 0) return Math.round(tareas.reduce((s, t) => s + t.porcentajeCompletado, 0) / tareas.length)
-    return Math.round(tareas.reduce((s, t) => s + t.porcentajeCompletado * Number(t.horasEstimadas || 0), 0) / h)
+    return Math.round(tareas.reduce((s, t) => s + t.porcentajeCompletado * hh(t), 0) / h)
   }
 
   /**
@@ -77,31 +78,15 @@ export class ProgresoService {
       const actividad = await prisma.proyectoActividad.findUnique({
         where: { id: actividadId },
         include: {
-          proyectoTarea: true
+          proyectoTarea: { select: { porcentajeCompletado: true, horasEstimadas: true, personasEstimadas: true, horasReales: true } }
         }
       })
 
       if (!actividad || actividad.proyectoTarea.length === 0) return
 
-      // Calcular progreso ponderado por horas estimadas
+      // Calcular progreso ponderado por horas-hombre
       const horasReales = actividad.proyectoTarea.reduce((sum, tarea) => sum + Number(tarea.horasReales), 0)
-      const totalHorasEstimadas = actividad.proyectoTarea.reduce((sum, tarea) => sum + Number(tarea.horasEstimadas || 0), 0)
-
-      let progresoPromedio: number
-      if (totalHorasEstimadas > 0) {
-        // Progreso ponderado: tareas con más horas pesan más
-        progresoPromedio = Math.round(
-          actividad.proyectoTarea.reduce((sum, tarea) => {
-            const peso = Number(tarea.horasEstimadas || 0)
-            return sum + tarea.porcentajeCompletado * peso
-          }, 0) / totalHorasEstimadas
-        )
-      } else {
-        // Fallback: promedio simple si no hay horas estimadas
-        progresoPromedio = Math.round(
-          actividad.proyectoTarea.reduce((sum, tarea) => sum + tarea.porcentajeCompletado, 0) / actividad.proyectoTarea.length
-        )
-      }
+      const progresoPromedio = this.avanceFlat(actividad.proyectoTarea)
 
       // Actualizar actividad
       await prisma.proyectoActividad.update({
@@ -131,7 +116,7 @@ export class ProgresoService {
        // Avance del EDT = ponderado por horas de TODAS sus tareas (flat, no por horasPlan).
        const tareas = await prisma.proyectoTarea.findMany({
          where: { proyectoEdtId: edtId },
-         select: { porcentajeCompletado: true, horasEstimadas: true, horasReales: true }
+         select: { porcentajeCompletado: true, horasEstimadas: true, personasEstimadas: true, horasReales: true }
        })
 
        if (tareas.length === 0) return
@@ -181,7 +166,7 @@ export class ProgresoService {
       // Avance de la fase = ponderado por horas de TODAS sus tareas (vía sus EDTs).
       const tareas = await prisma.proyectoTarea.findMany({
         where: { proyectoEdt: { proyectoFaseId: faseId } },
-        select: { porcentajeCompletado: true, horasEstimadas: true }
+        select: { porcentajeCompletado: true, horasEstimadas: true, personasEstimadas: true }
       })
       if (tareas.length === 0) return
 
@@ -220,7 +205,7 @@ export class ProgresoService {
 
       const tareas = await prisma.proyectoTarea.findMany({
         where: { proyectoCronogramaId: cronograma.id },
-        select: { porcentajeCompletado: true, horasEstimadas: true }
+        select: { porcentajeCompletado: true, horasEstimadas: true, personasEstimadas: true }
       })
       if (tareas.length === 0) return
 
