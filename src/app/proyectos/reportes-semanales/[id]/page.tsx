@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { ESTADO_REPORTE_AVANCE_LABELS } from '@/lib/validators/reporteAvance'
 import { cn } from '@/lib/utils'
+import { CurvaSAvanceChart } from '@/components/proyectos/CurvaSAvanceChart'
 
 // ─── Types (fechas llegan como string por el fetch) ──────────────────────────
 type Estado = 'borrador' | 'enviado' | 'aprobado' | 'rechazado'
@@ -622,6 +623,11 @@ export default function ReporteAvanceDetallePage({ params }: { params: Promise<{
           </div>
         </CardContent>
       </Card>
+
+      {/* Curva S de Avance */}
+      {detalleQuery.data?.proyecto.id && (
+        <CurvaSAvanceChart proyectoId={detalleQuery.data.proyecto.id} />
+      )}
 
       {/* Metadata */}
       <Card>
