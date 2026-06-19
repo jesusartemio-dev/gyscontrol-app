@@ -189,7 +189,7 @@ export function inyectarHojaAvance(files: Record<string, Uint8Array>, arbol: Arb
   files[SHEET3] = strToU8(xml)
 }
 
-/** Rellena la hoja Curva S (sheet4): cuadro PREVISTO/REAL que lee de Avance. */
+/** Rellena la hoja Curva S (sheet4): cuadro PREVISTO/REAL + gráfico nativo de líneas. */
 export function inyectarHojaCurvaS(files: Record<string, Uint8Array>, semanasN?: number): void {
   let xml = strFromU8(files[SHEET4])
 
@@ -207,13 +207,126 @@ export function inyectarHojaCurvaS(files: Record<string, Uint8Array>, semanasN?:
     xml = setCell(xml, `${ccol(i)}8`, S_NAR, 'str', `Sem ${i + 1}`)
     // Fecha de corte: primera lee de Avance!F11; las demás = anterior + 7
     xml = setCell(xml, `${ccol(i)}9`, null, 'formula', i === 0 ? `+Avance!${acol(0)}11` : `${ccol(i - 1)}9+7`)
-    xml = setCell(xml, `${ccol(i)}10`, S_PCT, 'formula', `+Avance!${acol(i)}12`) // PREVISTO ← Gbl LB1
+    xml = setCell(xml, `${ccol(i)}10`, S_PCT, 'formula', `+Avance!${acol(i)}12`) // PREVISTO ← Gbl LB0
     xml = setCell(xml, `${ccol(i)}11`, S_PCT, 'formula', `+Avance!${acol(i)}13`) // REAL ← Gbl REAL
     xml = setCell(xml, `${ccol(i)}13`, S_PCT, 'formula', `${ccol(i)}11-${ccol(i)}10`) // variación
   }
 
-  // TODO: gráfico de líneas nativo (xl/charts/chart1.xml + drawing + rels + Content_Types)
-  // que lea PREVISTO(fila 10) y REAL(fila 11) con categorías en fila 8. Pendiente.
+  // ── Gráfico nativo: line chart con 2 series (PREVISTO azul, REAL verde) ──────────────────
+  const lastCol = ccol(N - 1)
+  const catRef  = `'Curva S'!$C$8:$${lastCol}$8`
+  const NS_R_VAL  = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+  const NS_REL  = 'http://schemas.openxmlformats.org/package/2006/relationships'
+  const NS_C    = 'http://schemas.openxmlformats.org/drawingml/2006/chart'
+  const NS_A    = 'http://schemas.openxmlformats.org/drawingml/2006/main'
+  const NS_XDR  = 'http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing'
 
+  const lineSerie = (idx: number, color: string, valRow: number, txRef: string, txVal: string) =>
+    `<c:ser>` +
+    `<c:idx val="${idx}"/><c:order val="${idx}"/>` +
+    `<c:tx><c:strRef><c:f>${txRef}</c:f>` +
+    `<c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>${txVal}</c:v></c:pt></c:strCache>` +
+    `</c:strRef></c:tx>` +
+    `<c:spPr><a:ln w="28575"><a:solidFill><a:srgbClr val="${color}"/></a:solidFill></a:ln></c:spPr>` +
+    `<c:marker><c:symbol val="none"/></c:marker>` +
+    `<c:cat><c:strRef><c:f>${catRef}</c:f></c:strRef></c:cat>` +
+    `<c:val><c:numRef><c:f>'Curva S'!$C$${valRow}:$${lastCol}$${valRow}</c:f></c:numRef></c:val>` +
+    `<c:smooth val="0"/>` +
+    `</c:ser>`
+
+  // 1. chart1.xml
+  files['xl/charts/chart1.xml'] = strToU8(
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+    `<c:chartSpace xmlns:c="${NS_C}" xmlns:a="${NS_A}" xmlns:r="${NS_R_VAL}">` +
+    `<c:chart>` +
+    `<c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>Curva S de Avance</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>` +
+    `<c:autoTitleDeleted val="0"/>` +
+    `<c:plotArea><c:layout/>` +
+    `<c:lineChart>` +
+    `<c:grouping val="standard"/><c:varyColors val="0"/>` +
+    lineSerie(0, '0000FF', 10, `'Curva S'!$B$10`, 'PREVISTO') +
+    lineSerie(1, '00B050', 11, `'Curva S'!$B$11`, 'REAL') +
+    `<c:axId val="111111111"/><c:axId val="222222222"/>` +
+    `</c:lineChart>` +
+    `<c:catAx>` +
+    `<c:axId val="111111111"/>` +
+    `<c:scaling><c:orientation val="minMax"/></c:scaling>` +
+    `<c:delete val="0"/><c:axPos val="b"/>` +
+    `<c:crossAx val="222222222"/>` +
+    `</c:catAx>` +
+    `<c:valAx>` +
+    `<c:axId val="222222222"/>` +
+    `<c:scaling><c:orientation val="minMax"/><c:min val="0"/><c:max val="1"/></c:scaling>` +
+    `<c:delete val="0"/><c:axPos val="l"/>` +
+    `<c:numFmt formatCode="0%" sourceLinked="0"/>` +
+    `<c:crossAx val="111111111"/>` +
+    `</c:valAx>` +
+    `</c:plotArea>` +
+    `<c:legend><c:legendPos val="b"/></c:legend>` +
+    `<c:plotVisOnly val="1"/>` +
+    `</c:chart>` +
+    `</c:chartSpace>`
+  )
+
+  // 2. drawing_curvas.xml — nombre distinto a drawing1/drawing2 usados por fotos/logos
+  files['xl/drawings/drawing_curvas.xml'] = strToU8(
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+    `<xdr:wsDr xmlns:xdr="${NS_XDR}" xmlns:a="${NS_A}" xmlns:r="${NS_R_VAL}">` +
+    `<xdr:twoCellAnchor>` +
+    `<xdr:from><xdr:col>1</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>14</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>` +
+    `<xdr:to><xdr:col>13</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>37</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>` +
+    `<xdr:graphicFrame macro="">` +
+    `<xdr:nvGraphicFramePr>` +
+    `<xdr:cNvPr id="2" name="Curva S Chart"/>` +
+    `<xdr:cNvGraphicFramePr/>` +
+    `</xdr:nvGraphicFramePr>` +
+    `<xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm>` +
+    `<a:graphic>` +
+    `<a:graphicData uri="${NS_C}">` +
+    `<c:chart xmlns:c="${NS_C}" r:id="rId1"/>` +
+    `</a:graphicData>` +
+    `</a:graphic>` +
+    `</xdr:graphicFrame>` +
+    `<xdr:clientData/>` +
+    `</xdr:twoCellAnchor>` +
+    `</xdr:wsDr>`
+  )
+
+  // 3. drawing_curvas.xml.rels
+  files['xl/drawings/_rels/drawing_curvas.xml.rels'] = strToU8(
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+    `<Relationships xmlns="${NS_REL}">` +
+    `<Relationship Id="rId1" Type="${NS_R_VAL}/chart" Target="../charts/chart1.xml"/>` +
+    `</Relationships>`
+  )
+
+  // 4. sheet4.xml.rels — crear o fusionar
+  const sheet4RelsKey = 'xl/worksheets/_rels/sheet4.xml.rels'
+  const prevRels = files[sheet4RelsKey] ? strFromU8(files[sheet4RelsKey]) : null
+  const prevIds  = prevRels ? [...prevRels.matchAll(/Id="rId(\d+)"/g)].map(m => Number(m[1])) : []
+  const rIdDraw  = `rId${prevIds.length ? Math.max(...prevIds) + 1 : 1}`
+  const drawRel  = `<Relationship Id="${rIdDraw}" Type="${NS_R_VAL}/drawing" Target="../drawings/drawing_curvas.xml"/>`
+  files[sheet4RelsKey] = strToU8(
+    prevRels
+      ? prevRels.replace('</Relationships>', drawRel + '</Relationships>')
+      : `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+        `<Relationships xmlns="${NS_REL}">${drawRel}</Relationships>`
+  )
+
+  // 5. sheet4.xml: xmlns:r ya existe en la plantilla; añadir <drawing> justo antes de </worksheet>
+  if (!/xmlns:r=/.test(xml)) xml = xml.replace('<worksheet ', `<worksheet xmlns:r="${NS_R_VAL}" `)
+  xml = xml.replace('</worksheet>', `<drawing r:id="${rIdDraw}"/></worksheet>`)
   files[SHEET4] = strToU8(xml)
+
+  // 6. [Content_Types].xml
+  let ct = strFromU8(files['[Content_Types].xml'])
+  const ctAdd = [
+    { part: '/xl/charts/chart1.xml',            ct: 'application/vnd.openxmlformats-officedocument.drawingml.chart+xml' },
+    { part: '/xl/drawings/drawing_curvas.xml',   ct: 'application/vnd.openxmlformats-officedocument.drawing+xml' },
+  ]
+  for (const e of ctAdd) {
+    if (!ct.includes(`PartName="${e.part}"`))
+      ct = ct.replace('</Types>', `<Override PartName="${e.part}" ContentType="${e.ct}"/></Types>`)
+  }
+  files['[Content_Types].xml'] = strToU8(ct)
 }
