@@ -88,7 +88,7 @@ export function inyectarHojaAvance(files: Record<string, Uint8Array>, arbol: Arb
   let r = 15
   const fases: FaseLay[] = []
   for (const fase of arbol.ejecucion) {
-    const fl: FaseLay = { nodo: fase, lb0Row: r, realRow: r + 1, horasFase: fase.horasEstimadas, pesoFaseDec: round4(fase.pesoGlobal / 100), firstTaskRow: null, lastTaskRow: null, firstEdtRow: null, edts: [], acts: [], tareas: [] }
+    const fl: FaseLay = { nodo: fase, lb0Row: r, realRow: r + 1, horasFase: fase.horasHombre, pesoFaseDec: round4(fase.pesoGlobal / 100), firstTaskRow: null, lastTaskRow: null, firstEdtRow: null, edts: [], acts: [], tareas: [] }
     r += 2
     fase.hijos.forEach((edt, ei) => {
       const edtRow = r; r += 1; fl.edts.push({ nodo: edt, row: edtRow }); if (ei === 0) fl.firstEdtRow = edtRow
@@ -102,10 +102,10 @@ export function inyectarHojaAvance(files: Record<string, Uint8Array>, arbol: Arb
         })
       })
     })
-    // d = horasTarea/horasFase (4 dec); la última tarea con horas>0 absorbe el sobrante → Σ=1.0
+    // d = hhTarea/hhFase (4 dec); la última tarea con hh>0 absorbe el sobrante → Σ=1.0
     let lastIdx = -1
-    fl.tareas.forEach((t, i) => { if (t.nodo.horasEstimadas > 0) lastIdx = i })
-    fl.tareas.forEach((t) => { t.d = fl.horasFase > 0 ? round4(t.nodo.horasEstimadas / fl.horasFase) : 0 })
+    fl.tareas.forEach((t, i) => { if (t.nodo.horasHombre > 0) lastIdx = i })
+    fl.tareas.forEach((t) => { t.d = fl.horasFase > 0 ? round4(t.nodo.horasHombre / fl.horasFase) : 0 })
     if (lastIdx >= 0 && fl.horasFase > 0) {
       const sumOtros = fl.tareas.reduce((s, t, i) => (i === lastIdx ? s : s + t.d), 0)
       fl.tareas[lastIdx].d = round4(1 - sumOtros)
