@@ -39,6 +39,86 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 }
 
 /**
+ * DELETE /api/proyectos/reportes-semanales/[id]/snapshot
+ * Elimina el snapshot semanal de avance del proyecto del reporte [id].
+ * Las filas hijas (ProyectoAvanceSnapshotTarea) se borran por CASCADE.
+ */
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params
+    const session = await getServerSession(authOptions)
+    if (!session?.user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    if (!(ROLES_PERMITIDOS as readonly string[]).includes(session.user.role))
+      return NextResponse.json({ error: 'Sin permisos para borrar snapshot' }, { status: 403 })
+
+    const reporte = await prisma.reporteSemanalAvance.findUnique({
+      where: { id },
+      select: { proyectoId: true, semanaIso: true },
+    })
+    if (!reporte) return NextResponse.json({ error: 'Reporte no encontrado' }, { status: 404 })
+
+    try {
+      await prisma.proyectoAvanceSnapshot.delete({
+        where: { proyectoId_semanaIso: { proyectoId: reporte.proyectoId, semanaIso: reporte.semanaIso } },
+      })
+    } catch (e: unknown) {
+      if ((e as { code?: string })?.code === 'P2025')
+        return NextResponse.json({ error: 'No existe snapshot para esta semana' }, { status: 404 })
+      throw e
+    }
+
+    return NextResponse.json({ ok: true })
+  } catch (e) {
+    console.error('[DELETE /api/proyectos/reportes-semanales/[id]/snapshot]', e)
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
+  }
+}
+
+/**
+ * PUT /api/proyectos/reportes-semanales/[id]/snapshot
+ * Corrige manualmente el progresoGeneral del snapshot existente (backfill manual).
+ * No toca las filas hijas; solo ajusta el número global de la curva S.
+ */
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params
+    const session = await getServerSession(authOptions)
+    if (!session?.user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    if (!(ROLES_PERMITIDOS as readonly string[]).includes(session.user.role))
+      return NextResponse.json({ error: 'Sin permisos para editar snapshot' }, { status: 403 })
+
+    const body = await req.json()
+    const { progresoGeneral } = body
+    if (typeof progresoGeneral !== 'number' || progresoGeneral < 0 || progresoGeneral > 100)
+      return NextResponse.json({ error: 'progresoGeneral debe ser un número entre 0 y 100' }, { status: 400 })
+
+    const reporte = await prisma.reporteSemanalAvance.findUnique({
+      where: { id },
+      select: { proyectoId: true, semanaIso: true },
+    })
+    if (!reporte) return NextResponse.json({ error: 'Reporte no encontrado' }, { status: 404 })
+
+    let snapshot
+    try {
+      snapshot = await prisma.proyectoAvanceSnapshot.update({
+        where: { proyectoId_semanaIso: { proyectoId: reporte.proyectoId, semanaIso: reporte.semanaIso } },
+        data: { progresoGeneral },
+        select: { progresoGeneral: true },
+      })
+    } catch (e: unknown) {
+      if ((e as { code?: string })?.code === 'P2025')
+        return NextResponse.json({ error: 'No existe snapshot para esta semana; tómalo primero' }, { status: 404 })
+      throw e
+    }
+
+    return NextResponse.json({ ok: true, progresoGeneral: snapshot.progresoGeneral })
+  } catch (e) {
+    console.error('[PUT /api/proyectos/reportes-semanales/[id]/snapshot]', e)
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
+  }
+}
+
+/**
  * GET /api/proyectos/reportes-semanales/[id]/snapshot
  * Indica si ya existe un snapshot para la semana del reporte (para el texto del botón).
  */

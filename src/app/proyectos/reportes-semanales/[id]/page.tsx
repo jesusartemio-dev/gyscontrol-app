@@ -6,8 +6,8 @@ import { useRouter } from 'next/navigation'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSession } from 'next-auth/react'
 import {
-  ArrowLeft, Camera, CheckCircle, Download, Eye, Gauge, Image as ImageIcon, Loader2, Plus,
-  Save, Send, Trash2, XCircle,
+  ArrowLeft, Camera, CheckCircle, Download, Eye, Gauge, Image as ImageIcon, Loader2, Pencil,
+  Plus, Save, Send, Trash2, XCircle,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -132,9 +132,13 @@ export default function ReporteAvanceDetallePage({ params }: { params: Promise<{
   const [confirmEnviar, setConfirmEnviar] = useState(false)
   const [confirmAprobar, setConfirmAprobar] = useState(false)
   const [confirmRechazar, setConfirmRechazar] = useState(false)
+  const [confirmBorrarSnapshot, setConfirmBorrarSnapshot] = useState(false)
+  const [editarSnapshotOpen, setEditarSnapshotOpen] = useState(false)
+  const [editValorProgreso, setEditValorProgreso] = useState('')
   const [notasRechazo, setNotasRechazo] = useState('')
   const [descargando, setDescargando] = useState(false)
   const [previsualizando, setPrevisualizando] = useState(false)
+  const [refreshCurva, setRefreshCurva] = useState(0)
 
   const detalleQuery = useQuery<Detalle>({
     queryKey: ['proyectos', 'reporte-avance', id],
@@ -271,6 +275,39 @@ export default function ReporteAvanceDetallePage({ params }: { params: Promise<{
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Error al tomar snapshot'),
   })
+  const borrarSnapshotMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/proyectos/reportes-semanales/${id}/snapshot`, {
+        method: 'DELETE', credentials: 'include',
+      })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Error al borrar snapshot')
+    },
+    onSuccess: () => {
+      toast.success('Snapshot eliminado')
+      queryClient.invalidateQueries({ queryKey: ['proyectos', 'reporte-avance-snapshot', id] })
+      setRefreshCurva((k) => k + 1)
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Error al borrar snapshot'),
+  })
+  const editarSnapshotMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/proyectos/reportes-semanales/${id}/snapshot`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ progresoGeneral: Number(editValorProgreso) }),
+      })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Error al actualizar snapshot')
+      return res.json()
+    },
+    onSuccess: () => {
+      toast.success('Snapshot actualizado')
+      queryClient.invalidateQueries({ queryKey: ['proyectos', 'reporte-avance-snapshot', id] })
+      setRefreshCurva((k) => k + 1)
+      setEditarSnapshotOpen(false)
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Error al actualizar snapshot'),
+  })
 
   const descargarExcel = async (preview = false) => {
     if (preview) setPrevisualizando(true)
@@ -388,6 +425,22 @@ export default function ReporteAvanceDetallePage({ params }: { params: Promise<{
             {snapshotMutation.isPending
               ? <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Capturando…</>
               : <><Camera className="h-3.5 w-3.5 mr-1" /> {snapshotQuery.data?.existe ? 'Actualizar snapshot' : 'Tomar snapshot de avance'}</>}
+          </Button>
+        )}
+        {puedeSnapshot && snapshotQuery.data?.existe && (
+          <Button size="sm" variant="outline"
+            onClick={() => {
+              setEditValorProgreso(String(snapshotQuery.data?.progresoGeneral ?? ''))
+              setEditarSnapshotOpen(true)
+            }}
+            disabled={editarSnapshotMutation.isPending}>
+            <Pencil className="h-3.5 w-3.5 mr-1" /> Editar snapshot
+          </Button>
+        )}
+        {puedeSnapshot && snapshotQuery.data?.existe && (
+          <Button size="sm" variant="outline" className="text-red-600 border-red-300 hover:bg-red-50"
+            onClick={() => setConfirmBorrarSnapshot(true)} disabled={borrarSnapshotMutation.isPending}>
+            <Trash2 className="h-3.5 w-3.5 mr-1" /> Borrar snapshot
           </Button>
         )}
         <Button size="sm" variant="outline" className="ml-auto" onClick={() => descargarExcel(true)} disabled={previsualizando || descargando}>
@@ -626,7 +679,7 @@ export default function ReporteAvanceDetallePage({ params }: { params: Promise<{
 
       {/* Curva S de Avance */}
       {detalleQuery.data?.proyecto.id && (
-        <CurvaSAvanceChart proyectoId={detalleQuery.data.proyecto.id} />
+        <CurvaSAvanceChart proyectoId={detalleQuery.data.proyecto.id} refreshKey={refreshCurva} />
       )}
 
       {/* Metadata */}
@@ -669,6 +722,66 @@ export default function ReporteAvanceDetallePage({ params }: { params: Promise<{
             <AlertDialogAction className="bg-emerald-600 hover:bg-emerald-700"
               onClick={() => { setConfirmAprobar(false); aprobarMutation.mutate() }} disabled={aprobarMutation.isPending}>
               Aprobar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={editarSnapshotOpen} onOpenChange={setEditarSnapshotOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Editar avance del snapshot</AlertDialogTitle>
+            <AlertDialogDescription>
+              Corrige el % global de esta semana (lo que muestra la línea Real de la curva).
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="px-6 pb-2 space-y-1">
+            <Label className="text-sm">Avance global %</Label>
+            <Input
+              type="number"
+              min={0}
+              max={100}
+              step={0.1}
+              value={editValorProgreso}
+              onChange={(e) => setEditValorProgreso(e.target.value)}
+              placeholder="0–100"
+              className="h-9"
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => editarSnapshotMutation.mutate()}
+              disabled={
+                editarSnapshotMutation.isPending ||
+                editValorProgreso.trim() === '' ||
+                Number(editValorProgreso) < 0 ||
+                Number(editValorProgreso) > 100
+              }
+            >
+              {editarSnapshotMutation.isPending ? 'Guardando…' : 'Guardar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmBorrarSnapshot} onOpenChange={setConfirmBorrarSnapshot}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Borrar el snapshot de avance?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminará el corte de avance de esta semana. La línea Real de la curva S dejará
+              de mostrar este punto. Esta acción no puede deshacerse.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => { setConfirmBorrarSnapshot(false); borrarSnapshotMutation.mutate() }}
+              disabled={borrarSnapshotMutation.isPending}
+            >
+              Borrar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

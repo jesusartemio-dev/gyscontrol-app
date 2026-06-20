@@ -30,7 +30,7 @@ interface CurvaAvanceResponse {
 const pct = (n: number | null | undefined) => (n == null ? '—' : `${n.toFixed(1)}%`)
 
 // ─── Componente principal ─────────────────────────────────────────────────────
-export function CurvaSAvanceChart({ proyectoId }: { proyectoId: string }) {
+export function CurvaSAvanceChart({ proyectoId, refreshKey }: { proyectoId: string; refreshKey?: number | string }) {
   const [data, setData] = useState<CurvaAvanceResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -46,7 +46,8 @@ export function CurvaSAvanceChart({ proyectoId }: { proyectoId: string }) {
       .then((result: CurvaAvanceResponse) => setData(result))
       .catch((e: Error) => setError(e.message || 'Error al cargar datos'))
       .finally(() => setLoading(false))
-  }, [proyectoId])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proyectoId, refreshKey])
 
   if (!proyectoId) return null
 
