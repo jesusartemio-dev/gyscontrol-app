@@ -213,6 +213,8 @@ export async function PUT(request: NextRequest, context: RouteContext) {
 
     // Actualizar ProyectoTarea: progreso + horas al cerrar
     // Las APIs de listado ya solo devuelven tareas de ejecucion, así que siempre es ejecucion
+    const fechaJornada = new Date(jornada.fechaTrabajo)
+    fechaJornada.setHours(0, 0, 0, 0)
     const tareasConProgreso = new Set<string>()
     for (const [proyectoTareaId, porcentaje] of progresoMap.entries()) {
       const horasIncremento = horasPorTarea[proyectoTareaId] || 0
@@ -226,6 +228,24 @@ export async function PUT(request: NextRequest, context: RouteContext) {
 
       await prisma.proyectoTarea.update({ where: { id: proyectoTareaId }, data: updateData })
       tareasConProgreso.add(proyectoTareaId)
+
+      // Registrar histórico de avance de campo (fallo aislado: no corta el loop ni el cierre)
+      try {
+        await prisma.proyectoTareaAvance.upsert({
+          where: { proyectoTareaId_fecha: { proyectoTareaId, fecha: fechaJornada } },
+          update: { porcentaje, origen: 'campo', usuarioId: session.user.id },
+          create: {
+            proyectoTareaId,
+            proyectoId: jornada.proyecto.id,
+            fecha: fechaJornada,
+            porcentaje,
+            origen: 'campo',
+            usuarioId: session.user.id,
+          },
+        })
+      } catch (e) {
+        console.error(`[cerrar-jornada] histórico ProyectoTareaAvance tarea ${proyectoTareaId}:`, e)
+      }
     }
 
     // Incrementar horas para tareas sin progreso enviado (solo horas, sin tocar porcentaje)

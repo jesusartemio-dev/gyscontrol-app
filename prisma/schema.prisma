@@ -3438,6 +3438,7 @@ model ProyectoTareaAvance {
   proyecto         Proyecto          @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
   usuario          User?             @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
 
+  @@unique([proyectoTareaId, fecha])
   @@index([proyectoId, fecha])
   @@index([proyectoTareaId, fecha])
   @@index([proyectoId, origen, fecha])

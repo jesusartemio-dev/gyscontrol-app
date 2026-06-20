@@ -285,15 +285,19 @@ export async function PATCH(request: NextRequest) {
       // Registrar histórico de avance fechado (no debe romper el flujo si falla)
       if (nuevoProgreso !== undefined) {
         try {
-          await prisma.proyectoTareaAvance.create({
-            data: {
+          const fechaAvance = new Date()
+          fechaAvance.setHours(0, 0, 0, 0)
+          await prisma.proyectoTareaAvance.upsert({
+            where: { proyectoTareaId_fecha: { proyectoTareaId: tareaId, fecha: fechaAvance } },
+            update: { porcentaje: nuevoProgreso, origen: 'oficina', usuarioId: session.user.id },
+            create: {
               proyectoTareaId: tareaId,
               proyectoId: tarea.proyectoEdt.proyectoId,
-              fecha: new Date(),
+              fecha: fechaAvance,
               porcentaje: nuevoProgreso,
               origen: 'oficina',
               usuarioId: session.user.id,
-            }
+            },
           })
         } catch (e) {
           console.error('[mis-asignadas] histórico ProyectoTareaAvance:', e)
