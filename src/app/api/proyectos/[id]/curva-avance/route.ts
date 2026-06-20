@@ -74,6 +74,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       cronogramaPlanId: cronoPlan?.id ?? null,
       cronogramaEjecId: cronoEjec?.id ?? null,
       proyecto,
+      snapshots: snapshots.map((s) => ({ semanaIso: s.semanaIso, progresoGeneral: s.progresoGeneral })),
     })
   } catch (e) {
     console.error('[GET /api/proyectos/[id]/curva-avance]', e)
