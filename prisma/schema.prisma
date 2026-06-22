@@ -2242,6 +2242,8 @@ model CobroValorizacion {
   montoADesembolsar      Float?    // lo que efectivamente recibe GYS
   adelantoBanpro         Float?    // si ya se giró un adelanto
   saldoAGirar            Float?    // = montoADesembolsar - adelantoBanpro
+  numeroFacturaInteres   String?   // N° de factura emitida por la financiera por el interés
+  numeroFacturaGastos    String?   // N° de factura emitida por la financiera por comisión/gastos
   // Legacy (mantener para compatibilidad)
   montoDescontado        Float?    // total costos/descuentos
   montoNeto              Float?    // = montoADesembolsar (alias)

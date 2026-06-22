@@ -2795,7 +2795,7 @@ export interface HojaDeGastos {
     pedidoEquipo?: { id: string; codigo: string }
     pedidoEquipoItem?: { id: string; codigo: string; descripcion: string }
     proyecto?: Pick<Proyecto, 'id' | 'codigo' | 'nombre'>
-    recepciones?: Array<{ id: string; estado: string }>
+    recepciones?: Array<{ id: string; estado: string; fechaEntregaProyecto?: string | Date | null; entregadoPor?: { id: string; name: string } | null }>
     conformidad?: string | null
     comentarioConformidad?: string | null
     sinComprobante?: boolean

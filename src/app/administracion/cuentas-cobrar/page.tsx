@@ -14,7 +14,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Loader2, Search, ArrowDownCircle, AlertTriangle, DollarSign, Clock, CheckCircle, Plus, Ban, Download, Upload, Trash2, ChevronDown, Pencil, CalendarDays, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import CxCImportExcelModal from '@/components/administracion/CxCImportExcelModal'
-import { exportarCxCAExcel, exportarCxCFormatoAdmin } from '@/lib/utils/cuentasCobrarExcel'
+import { exportarCxCAExcel, exportarCxCFormatoAdmin, exportarCxCContable, exportarCxCFinanciero } from '@/lib/utils/cuentasCobrarExcel'
 
 interface CuentaBancaria {
   id: string
@@ -55,10 +55,30 @@ interface Proyecto {
   ordenCompraCliente?: string | null
 }
 
+interface CobroValorizacion {
+  tipo: string
+  financiera: string | null
+  tasaDescuentoPct: number | null
+  fechaDesembolso: string | null
+  numeroOperacion: string | null
+  excedenteMonto: number | null
+  valorAFinanciar: number | null
+  interesMonto: number | null
+  comisionEstructuracion: number | null
+  gastosAdicionales: number | null
+  montoADesembolsar: number | null
+  adelantoBanpro: number | null
+  saldoAGirar: number | null
+  numeroFacturaInteres: string | null
+  numeroFacturaGastos: string | null
+  [key: string]: unknown
+}
+
 interface Valorizacion {
   id: string
   codigo: string
   numero?: number
+  cobro?: CobroValorizacion | null
 }
 
 interface CuentaPorCobrar {
@@ -162,6 +182,7 @@ export default function CuentasCobrarPage() {
   const [filterPeriodPreset, setFilterPeriodPreset] = useState<string>(savedFilters.filterPeriodPreset ?? 'all')
   const [filterPeriodDesde, setFilterPeriodDesde] = useState<string>(savedFilters.filterPeriodDesde ?? '')
   const [filterPeriodHasta, setFilterPeriodHasta] = useState<string>(savedFilters.filterPeriodHasta ?? '')
+  const [filterOrdenCompra, setFilterOrdenCompra] = useState<string>(savedFilters.filterOrdenCompra ?? '')
 
   // Create dialog
   const [showCreateDialog, setShowCreateDialog] = useState(false)
@@ -244,10 +265,10 @@ export default function CuentasCobrarPage() {
     try {
       localStorage.setItem('gyscontrol:cuentas-cobrar:filtros', JSON.stringify({
         searchTerm, filterEstado, filterCliente, filterProyecto, filterMoneda,
-        filterPeriodPreset, filterPeriodDesde, filterPeriodHasta,
+        filterPeriodPreset, filterPeriodDesde, filterPeriodHasta, filterOrdenCompra,
       }))
     } catch {}
-  }, [searchTerm, filterEstado, filterCliente, filterProyecto, filterMoneda, filterPeriodPreset, filterPeriodDesde, filterPeriodHasta])
+  }, [searchTerm, filterEstado, filterCliente, filterProyecto, filterMoneda, filterPeriodPreset, filterPeriodDesde, filterPeriodHasta, filterOrdenCompra])
 
   const loadData = async () => {
     try {
@@ -323,6 +344,10 @@ export default function CuentasCobrarPage() {
         i.descripcion?.toLowerCase().includes(term)
       )
     }
+    if (filterOrdenCompra) {
+      const oc = filterOrdenCompra.toLowerCase()
+      result = result.filter(i => i.ordenCompraCliente?.toLowerCase().includes(oc))
+    }
     if (filterPeriodPreset !== 'all') {
       const { desde, hasta } = getRangoFechas(filterPeriodPreset, filterPeriodDesde, filterPeriodHasta)
       if (desde || hasta) {
@@ -333,7 +358,7 @@ export default function CuentasCobrarPage() {
       }
     }
     return result
-  }, [items, filterEstado, filterCliente, filterProyecto, filterMoneda, searchTerm, filterPeriodPreset, filterPeriodDesde, filterPeriodHasta])
+  }, [items, filterEstado, filterCliente, filterProyecto, filterMoneda, searchTerm, filterPeriodPreset, filterPeriodDesde, filterPeriodHasta, filterOrdenCompra])
 
   const totals = useMemo(() => {
     const activas = filtered.filter(i => i.estado !== 'anulada')
@@ -348,7 +373,7 @@ export default function CuentasCobrarPage() {
     return { byMoneda, total: filtered.length, activas: activas.length }
   }, [filtered])
 
-  const hasActiveFilters = filterEstado !== 'all' || filterCliente !== 'all' || filterProyecto !== 'all' || filterMoneda !== 'all' || filterPeriodPreset !== 'all' || !!searchTerm
+  const hasActiveFilters = filterEstado !== 'all' || filterCliente !== 'all' || filterProyecto !== 'all' || filterMoneda !== 'all' || filterPeriodPreset !== 'all' || !!searchTerm || !!filterOrdenCompra
 
   const clearFilters = () => {
     setSearchTerm('')
@@ -359,6 +384,7 @@ export default function CuentasCobrarPage() {
     setFilterPeriodPreset('all')
     setFilterPeriodDesde('')
     setFilterPeriodHasta('')
+    setFilterOrdenCompra('')
   }
 
   // --- Create ---
@@ -709,6 +735,12 @@ export default function CuentasCobrarPage() {
               <DropdownMenuItem onClick={() => exportarCxCFormatoAdmin(filtered)}>
                 Formato administración
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => exportarCxCContable(filtered)}>
+                Formato contable
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => exportarCxCFinanciero(filtered)}>
+                Formato financiero
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           <Button variant="outline" size="sm" onClick={() => setShowImportDialog(true)}>
@@ -867,6 +899,12 @@ export default function CuentasCobrarPage() {
               <SelectItem value="PEN">PEN</SelectItem>
             </SelectContent>
           </Select>
+          <Input
+            placeholder="OC cliente..."
+            className="w-36"
+            value={filterOrdenCompra}
+            onChange={e => setFilterOrdenCompra(e.target.value)}
+          />
           <Select value={filterPeriodPreset} onValueChange={v => { setFilterPeriodPreset(v); if (v !== 'custom') { setFilterPeriodDesde(''); setFilterPeriodHasta('') } }}>
             <SelectTrigger className="w-44">
               <CalendarDays className="h-4 w-4 mr-1 text-muted-foreground shrink-0" />

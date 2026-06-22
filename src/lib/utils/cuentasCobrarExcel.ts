@@ -746,6 +746,750 @@ export async function exportarCxCFormatoAdmin(items: CxCAdminExportRow[]) {
 }
 
 // ============================================
+// TIPOS ENRIQUECIDOS (para exports Contable y Financiero)
+// ============================================
+
+/** Datos de factoring/negociación provenientes de CobroValorizacion */
+export interface CxCCobroData {
+  tipo: string
+  financiera: string | null
+  tasaDescuentoPct: number | null      // almacenado como 1.38 = 1.38%
+  fechaDesembolso: string | null
+  numeroOperacion: string | null
+  excedenteMonto: number | null        // "Retenido" por la financiera
+  valorAFinanciar: number | null
+  interesMonto: number | null
+  comisionEstructuracion: number | null
+  gastosAdicionales: number | null
+  montoADesembolsar: number | null     // "Monto Neto Financiero" = lo que recibe GYS
+  adelantoBanpro: number | null        // monto del adelanto ya girado
+  saldoAGirar: number | null           // = montoADesembolsar - adelantoBanpro
+  numeroFacturaInteres: string | null  // N° factura financiera por el interés
+  numeroFacturaGastos: string | null   // N° factura financiera por comisión/gastos
+  [key: string]: unknown               // permite campos extra del modelo Prisma
+}
+
+/** Fila enriquecida con CobroValorizacion — usada en exports Contable y Financiero */
+export interface CxCRichRow {
+  id?: string
+  numeroDocumento: string | null
+  descripcion: string | null
+  monto: number
+  moneda: string
+  tipoCambio?: number | null
+  montoPagado: number
+  saldoPendiente: number
+  fechaEmision: string
+  fechaRecepcion?: string | null
+  fechaVencimiento: string
+  condicionPago?: string | null
+  formaPago?: string | null
+  diasCredito?: number | null
+  bancoFinanciera?: string | null
+  ordenCompraCliente?: string | null
+  numeroHES?: string | null
+  numeroGuiaRemision?: string | null
+  numeroNegociacion?: string | null
+  estado: string
+  observaciones: string | null
+  cliente?: { nombre: string; ruc: string | null } | null
+  proyecto?: { codigo: string; nombre: string } | null
+  valorizacion?: {
+    codigo: string
+    cobro?: CxCCobroData | null
+  } | null
+  pagos?: Array<{
+    monto: number
+    fechaPago: string
+    medioPago: string
+    numeroOperacion: string | null
+    observaciones: string | null
+    esDetraccion?: boolean
+    detraccionPorcentaje?: number | null
+    detraccionMonto?: number | null
+    detraccionFechaPago?: string | null
+    numeroConstanciaBN?: string | null
+    esRetencion?: boolean
+    retencionPorcentaje?: number | null
+    retencionMonto?: number | null
+    retencionNumeroConstancia?: string | null
+    cuentaBancaria?: { nombreBanco: string; numeroCuenta: string } | null
+  }>
+}
+
+// ============================================
+// HELPERS PUROS (lógica de negocio aislada)
+// ============================================
+
+/**
+ * Monto Neto Contable = monto factura - total detracciones - total retenciones.
+ * SUPUESTO: representa el neto real a cobrar descontando los importes que SUNAT/cliente
+ * retienen. Confirmar con administración si esta es la definición correcta.
+ */
+export function calcularMontoNetoContable(cxc: CxCRichRow): number {
+  const totalDetraccion = cxc.pagos
+    ?.filter(p => p.esDetraccion)
+    .reduce((s, p) => s + (p.detraccionMonto ?? p.monto), 0) ?? 0
+  const totalRetencion = cxc.pagos
+    ?.filter(p => p.esRetencion)
+    .reduce((s, p) => s + (p.retencionMonto ?? p.monto), 0) ?? 0
+  return cxc.monto - totalDetraccion - totalRetencion
+}
+
+/** Fecha del último PagoCobro (pagos ya ordenados desc por fechaPago desde la API). */
+export function obtenerFechaUltimoPago(cxc: CxCRichRow): Date | null {
+  const pagosNetos = cxc.pagos?.filter(p => !p.esDetraccion && !p.esRetencion)
+  if (!pagosNetos?.length) return null
+  const raw = pagosNetos[0].fechaPago
+  const d = new Date(raw)
+  return isNaN(d.getTime()) ? null : d
+}
+
+/** Fecha estimada de pago: base (recepción o emisión) + días crédito. */
+function calcularFechaEstimadaPago(cxc: CxCRichRow): Date | null {
+  const base = cxc.fechaRecepcion ?? cxc.fechaEmision
+  if (!base || !cxc.diasCredito) return null
+  const d = new Date(base)
+  if (isNaN(d.getTime())) return null
+  d.setDate(d.getDate() + cxc.diasCredito)
+  return d
+}
+
+/** "Servicio" si hay HES, "Bien" si hay guía de remisión, "" si ninguno. */
+function calcularClasificacion(cxc: CxCRichRow): string {
+  if (cxc.numeroHES) return 'Servicio'
+  if (cxc.numeroGuiaRemision) return 'Bien'
+  return ''
+}
+
+/** "SI" si hay CobroValorizacion o numeroNegociacion; "NO" en caso contrario. */
+function calcularNegociado(cxc: CxCRichRow): string {
+  return (cxc.valorizacion?.cobro || cxc.numeroNegociacion) ? 'SI' : 'NO'
+}
+
+/**
+ * Texto de días por vencer / vencidos — misma lógica que exportarCxCFormatoAdmin.
+ * Reutilizado en ambos exports nuevos.
+ */
+function calcularDiasPorVencer(cxc: CxCRichRow, today: Date): string {
+  if (cxc.estado === 'pagada') return 'Pagada'
+  if (cxc.estado === 'anulada') return 'Anulada'
+  const venc = cxc.fechaVencimiento ? new Date(cxc.fechaVencimiento) : null
+  if (!venc || isNaN(venc.getTime())) return ''
+  const diff = Math.floor((venc.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+  if (diff > 0) return `${diff} días por vencer`
+  if (diff < 0) return `${Math.abs(diff)} días vencidos`
+  return 'Vence hoy'
+}
+
+/**
+ * Entidad Financiera para el reporte Financiero.
+ * Prioriza CobroValorizacion.financiera; fallback a CxC.bancoFinanciera.
+ */
+function obtenerEntidadFinanciera(cxc: CxCRichRow): string {
+  return cxc.valorizacion?.cobro?.financiera ?? cxc.bancoFinanciera ?? ''
+}
+
+/**
+ * Suma de los PagoCobro que NO son detracción ni retención (efectivo real recibido).
+ * Relación: calcularCobradoEfectivo(cxc) + Σdetrac + Σretenc = cxc.montoPagado
+ */
+export function calcularCobradoEfectivo(cxc: CxCRichRow): number {
+  return cxc.pagos
+    ?.filter(p => !p.esDetraccion && !p.esRetencion)
+    .reduce((s, p) => s + p.monto, 0) ?? 0
+}
+
+/**
+ * Monto de DETRACCIÓN convertido a soles (PEN) para mostrar en el reporte Contable.
+ *
+ * SUPUESTO DE MONEDA: los PagoCobro no tienen campo moneda propio; se registran en
+ * la misma moneda que la CxC padre (el cálculo "monto × %det" se aplica al monto de
+ * la factura en su moneda original). Por lo tanto:
+ *   - Factura PEN → detracción ya está en soles.
+ *   - Factura USD → detracción está en USD; se convierte × tipoCambio (PEN/USD).
+ * Si la factura es USD y no hay tipoCambio registrado, se devuelve el monto original
+ * sin convertir (el valor vendrá en USD pero es lo mejor que podemos mostrar).
+ */
+export function detraccionEnSoles(cxc: CxCRichRow): number | null {
+  const pago = cxc.pagos?.find(p => p.esDetraccion) ?? null
+  if (!pago) return null
+  const monto = pago.detraccionMonto ?? pago.monto
+  if (cxc.moneda === 'PEN') return monto
+  if (cxc.moneda === 'USD' && cxc.tipoCambio) {
+    return Math.round(monto * cxc.tipoCambio * 100) / 100
+  }
+  return monto // fallback: sin tipo de cambio disponible
+}
+
+/**
+ * Monto de RETENCIÓN convertido a soles (PEN). Mismo criterio que detraccionEnSoles.
+ */
+export function retencionEnSoles(cxc: CxCRichRow): number | null {
+  const pago = cxc.pagos?.find(p => p.esRetencion) ?? null
+  if (!pago) return null
+  const monto = pago.retencionMonto ?? pago.monto
+  if (cxc.moneda === 'PEN') return monto
+  if (cxc.moneda === 'USD' && cxc.tipoCambio) {
+    return Math.round(monto * cxc.tipoCambio * 100) / 100
+  }
+  return monto // fallback: sin tipo de cambio disponible
+}
+
+// Constantes de estilo compartidas (misma paleta que exportarCxCFormatoAdmin)
+const HDR_FILL_PRIMARY = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FF1E3A8A' } }
+const HDR_FILL_GROUP   = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FF2563EB' } }
+const HDR_FONT_WHITE   = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 }
+const BORDER_DATA      = {
+  top:    { style: 'thin' as const, color: { argb: 'FFE5E7EB' } },
+  bottom: { style: 'thin' as const, color: { argb: 'FFE5E7EB' } },
+  left:   { style: 'thin' as const, color: { argb: 'FFE5E7EB' } },
+  right:  { style: 'thin' as const, color: { argb: 'FFE5E7EB' } },
+}
+const ALIGN_CENTER = { vertical: 'middle' as const, horizontal: 'center' as const, wrapText: true }
+const ALIGN_LEFT   = { vertical: 'middle' as const, horizontal: 'left' as const }
+const FMT_MONEY    = '#,##0.00'
+const FMT_DATE     = 'dd/mm/yyyy'
+const FMT_RATE     = '0.00%'   // tasaDescuentoPct almacenada como 1.38 → /100 → 0.0138 → "1.38%"
+const FMT_INT      = '0'
+
+/** Aplica estilo de cabecera a todas las celdas de las filas 1..nRows de ws. */
+function applyHeaderStyle(ws: any, nRows: number, fillGroup?: string[]): void {
+  for (let r = 1; r <= nRows; r++) {
+    ws.getRow(r).eachCell({ includeEmpty: false }, (cell: any) => {
+      cell.fill = HDR_FILL_PRIMARY
+      cell.font = HDR_FONT_WHITE
+      cell.alignment = ALIGN_CENTER
+      cell.border = {
+        top:    { style: 'thin', color: { argb: 'FFFFFFFF' } },
+        bottom: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+        left:   { style: 'thin', color: { argb: 'FFFFFFFF' } },
+        right:  { style: 'thin', color: { argb: 'FFFFFFFF' } },
+      }
+    })
+  }
+  if (fillGroup) {
+    for (const ref of fillGroup) ws.getCell(ref).fill = HDR_FILL_GROUP
+  }
+}
+
+/** Aplica bordes finos a una celda de datos. */
+function setBorderData(cell: any): void {
+  cell.border = BORDER_DATA
+}
+
+/** Descarga el buffer como .xlsx en el browser (mismo patrón que los exports existentes). */
+async function downloadBuffer(buffer: ArrayBuffer | Uint8Array, filename: string): Promise<void> {
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
+// ============================================
+// EXPORTAR FORMATO CONTABLE (25 columnas, 2 filas de cabecera + hoja Detalle)
+// ============================================
+/**
+ * Genera el reporte Contable de CxC — libro con dos hojas:
+ *
+ * Hoja 1 "CxC Contable" (25 col):
+ *   A–R: columnas individuales (merge vertical fila 1+2)
+ *   S–U: Grupo Detracción (Nro. Constancia | Monto (S/) | Fecha)
+ *   V–X: Grupo Retención  (Nro. Retención  | Monto (S/) | Fecha)
+ *   Y:   Observaciones (merge vertical)
+ *
+ *   • Monto Neto  = monto − detracción − retención (en moneda de factura)
+ *   • Cobrado     = Σ PagoCobro sin detrac/retenc (efectivo recibido, moneda factura)
+ *   • Pagado      = montoPagado (total liquidado incl. detrac/retenc, moneda factura)
+ *   • Detracción Monto / Retención Monto → siempre en soles (S/)
+ *   • Totales: Monto Factura, Monto Neto, Cobrado, Pagado, Saldo
+ *
+ * Hoja 2 "Detalle de Pagos": una fila por PagoCobro, ordenada N°Doc → FechaPago asc.
+ */
+export async function exportarCxCContable(items: CxCRichRow[]): Promise<void> {
+  const ExcelJS = (await import('exceljs')).default
+  const wb = new ExcelJS.Workbook()
+  const ws = wb.addWorksheet('CxC Contable')
+
+  // ── Layout: 25 columnas ───────────────────────────────────────────────────────
+  // A(1)  N° Documento    B(2)  Cliente         C(3)  RUC
+  // D(4)  Proyecto        E(5)  Valorización     F(6)  Monto Factura
+  // G(7)  Moneda          H(8)  Monto Neto       I(9)  Cobrado [NEW]
+  // J(10) Pagado          K(11) Saldo            L(12) Fecha Emisión
+  // M(13) Fecha Venc.     N(14) Fecha Est. Pago  O(15) Fecha de Pago
+  // P(16) Estado          Q(17) Descripción      R(18) Clasificación
+  // Grupo Detracción: S(19) Nro. Constancia | T(20) Monto (S/) | U(21) Fecha
+  // Grupo Retención:  V(22) Nro. Retención  | W(23) Monto (S/) | X(24) Fecha
+  // Y(25) Observaciones
+  const colWidths = [
+    16, // A  N° Documento
+    35, // B  Cliente
+    14, // C  RUC
+    14, // D  Proyecto
+    16, // E  Valorización
+    14, // F  Monto Factura
+    8,  // G  Moneda
+    14, // H  Monto Neto
+    14, // I  Cobrado
+    14, // J  Pagado
+    14, // K  Saldo
+    12, // L  Fecha Emisión
+    12, // M  Fecha Vencimiento
+    14, // N  Fecha Estimada de Pago
+    12, // O  Fecha de Pago
+    12, // P  Estado
+    30, // Q  Descripción
+    12, // R  Clasificación
+    16, // S  Detracción – Nro. Constancia
+    14, // T  Detracción – Monto (S/)
+    12, // U  Detracción – Fecha
+    16, // V  Retención – Nro. Retención
+    14, // W  Retención – Monto (S/)
+    12, // X  Retención – Fecha
+    30, // Y  Observaciones
+  ]
+  ws.columns = colWidths.map(w => ({ width: w }))
+
+  // ── Cabecera (2 filas) ────────────────────────────────────────────────────────
+  const SOLO_COLS = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','Y']
+  const SOLO_HDRS = [
+    'N° Documento','Cliente','RUC','Proyecto','Valorización',
+    'Monto\nFactura','Moneda','Monto\nNeto','Cobrado','Pagado','Saldo',
+    'Fecha\nEmisión','Fecha\nVencimiento','Fecha Estimada\nde Pago','Fecha\nde Pago',
+    'Estado','Descripción','Clasificación',
+    'Observaciones',
+  ]
+  for (let i = 0; i < SOLO_COLS.length; i++) {
+    ws.getCell(`${SOLO_COLS[i]}1`).value = SOLO_HDRS[i]
+    ws.mergeCells(`${SOLO_COLS[i]}1:${SOLO_COLS[i]}2`)
+  }
+
+  ws.mergeCells('S1:U1'); ws.getCell('S1').value = 'Detracción'
+  ws.getCell('S2').value = 'Nro. Constancia'
+  ws.getCell('T2').value = 'Monto (S/)'
+  ws.getCell('U2').value = 'Fecha'
+
+  ws.mergeCells('V1:X1'); ws.getCell('V1').value = 'Retención'
+  ws.getCell('V2').value = 'Nro. Retención'
+  ws.getCell('W2').value = 'Monto (S/)'
+  ws.getCell('X2').value = 'Fecha'
+
+  applyHeaderStyle(ws, 2, ['S1', 'V1'])
+  ws.getRow(1).height = 28
+  ws.getRow(2).height = 22
+
+  // ── Datos ─────────────────────────────────────────────────────────────────────
+  const DATA_START = 3
+
+  // índices de columna para la fila de totales
+  const COL_MONTO   = 6  // F
+  const COL_NETO    = 8  // H
+  const COL_COBRADO = 9  // I
+  const COL_PAGADO  = 10 // J
+  const COL_SALDO   = 11 // K
+
+  for (let i = 0; i < items.length; i++) {
+    const cxc     = items[i]
+    const rowNum  = DATA_START + i
+    const row     = ws.getRow(rowNum)
+
+    const detraccion   = cxc.pagos?.find(p => p.esDetraccion) ?? null
+    const retencion    = cxc.pagos?.find(p => p.esRetencion)  ?? null
+    const fechaEmision = cxc.fechaEmision     ? new Date(cxc.fechaEmision)     : null
+    const fechaVenc    = cxc.fechaVencimiento ? new Date(cxc.fechaVencimiento) : null
+    const fechaEst     = calcularFechaEstimadaPago(cxc)
+    const fechaPago    = obtenerFechaUltimoPago(cxc)
+    const montoNeto    = calcularMontoNetoContable(cxc)
+    const cobrado      = calcularCobradoEfectivo(cxc)
+    const clasificac   = calcularClasificacion(cxc)
+    const detSoles     = detraccionEnSoles(cxc)
+    const retSoles     = retencionEnSoles(cxc)
+
+    // ── Validación de cuadre en moneda de factura ──────────────────────────────
+    // montoNeto = monto − Σdetrac_fact − Σretenc_fact, por lo que la suma siempre
+    // debería ser 0. Cualquier diferencia indica datos inconsistentes en BD.
+    const totalDetFact = cxc.pagos?.filter(p => p.esDetraccion).reduce((s, p) => s + (p.detraccionMonto ?? p.monto), 0) ?? 0
+    const totalRetFact = cxc.pagos?.filter(p => p.esRetencion).reduce((s, p) => s + (p.retencionMonto ?? p.monto), 0) ?? 0
+    const cuadreDiff   = Math.abs(cxc.monto - (montoNeto + totalDetFact + totalRetFact))
+    if (cuadreDiff >= 0.01) {
+      console.warn(`[CxC Contable] Cuadre fallido para "${cxc.numeroDocumento ?? 'S/N'}": monto=${cxc.monto}, neto=${montoNeto}, detrac=${totalDetFact}, retenc=${totalRetFact}, diff=${cuadreDiff.toFixed(2)}`)
+    }
+
+    const cells: [number, any, string?][] = [
+      [1,  cxc.numeroDocumento ?? ''],
+      [2,  cxc.cliente?.nombre ?? ''],
+      [3,  cxc.cliente?.ruc ?? ''],
+      [4,  cxc.proyecto?.codigo ?? ''],
+      [5,  cxc.valorizacion?.codigo ?? ''],
+      [6,  cxc.monto,            FMT_MONEY],
+      [7,  cxc.moneda],
+      [8,  montoNeto,            FMT_MONEY],
+      [9,  cobrado,              FMT_MONEY],  // Cobrado: efectivo neto
+      [10, cxc.montoPagado,      FMT_MONEY],  // Pagado: total incl. detrac+retenc
+      [11, cxc.saldoPendiente,   FMT_MONEY],
+      [12, fechaEmision,         FMT_DATE],
+      [13, fechaVenc,            FMT_DATE],
+      [14, fechaEst,             FMT_DATE],
+      [15, fechaPago,            FMT_DATE],
+      [16, cxc.estado],
+      [17, cxc.descripcion ?? ''],
+      [18, clasificac],
+      // Detracción
+      [19, detraccion?.numeroConstanciaBN ?? ''],
+      [20, detSoles,             FMT_MONEY],  // Siempre en S/
+      [21, detraccion?.detraccionFechaPago ? new Date(detraccion.detraccionFechaPago) : null, FMT_DATE],
+      // Retención
+      [22, retencion?.retencionNumeroConstancia ?? ''],
+      [23, retSoles,             FMT_MONEY],  // Siempre en S/
+      [24, retencion?.fechaPago ? new Date(retencion.fechaPago) : null, FMT_DATE],
+      // Observaciones
+      [25, cxc.observaciones ?? ''],
+    ]
+
+    for (const [col, val, fmt] of cells) {
+      const cell = row.getCell(col)
+      cell.value = val ?? null
+      if (fmt) cell.numFmt = fmt
+      setBorderData(cell)
+    }
+
+    for (const col of [1, 2, 3, 4, 5, 7, 16, 17, 18, 19, 22, 25]) {
+      row.getCell(col).alignment = ALIGN_LEFT
+    }
+  }
+
+  // ── Fila de Totales ──────────────────────────────────────────────────────────
+  const lastData = DATA_START + items.length - 1
+  const totRow   = DATA_START + items.length
+
+  if (items.length > 0) {
+    const tr = ws.getRow(totRow)
+    tr.getCell(1).value = 'TOTALES'
+    tr.getCell(1).font  = { bold: true }
+
+    tr.getCell(2).value = items.some(x => x.moneda !== items[0].moneda)
+      ? '⚠ Mix PEN/USD — totales brutos por columna'
+      : ''
+    tr.getCell(2).font = { italic: true, color: { argb: 'FF6B7280' }, size: 9 }
+
+    for (const col of [COL_MONTO, COL_NETO, COL_COBRADO, COL_PAGADO, COL_SALDO]) {
+      const colLetter = ws.getColumn(col).letter
+      const cell = tr.getCell(col)
+      cell.value = { formula: `SUM(${colLetter}${DATA_START}:${colLetter}${lastData})` }
+      cell.numFmt = FMT_MONEY
+      cell.font   = { bold: true }
+      setBorderData(cell)
+    }
+  }
+
+  ws.views = [{ state: 'frozen', ySplit: 2 }]
+  ws.autoFilter = { from: { row: 2, column: 1 }, to: { row: 2, column: 25 } }
+
+  // ── Hoja 2: Detalle de Pagos ─────────────────────────────────────────────────
+  const wsDet = wb.addWorksheet('Detalle de Pagos')
+  const DET_COLS = ['N° Documento','Cliente','Proyecto','Valorización','Fecha de Pago','Tipo','Medio de Pago','Monto','Moneda','Observaciones']
+  const detColWidths = [16, 35, 14, 16, 12, 14, 16, 14, 8, 40]
+  wsDet.columns = detColWidths.map(w => ({ width: w }))
+
+  // Cabecera simple (1 fila)
+  const detHdrRow = wsDet.getRow(1)
+  DET_COLS.forEach((h, i) => {
+    const cell = detHdrRow.getCell(i + 1)
+    cell.value = h
+    cell.fill = HDR_FILL_PRIMARY
+    cell.font = HDR_FONT_WHITE
+    cell.alignment = ALIGN_CENTER
+    cell.border = { top: { style: 'thin', color: { argb: 'FFFFFFFF' } }, bottom: { style: 'thin', color: { argb: 'FFFFFFFF' } }, left: { style: 'thin', color: { argb: 'FFFFFFFF' } }, right: { style: 'thin', color: { argb: 'FFFFFFFF' } } }
+  })
+  detHdrRow.height = 24
+
+  // Recopilar todos los pagos y ordenar: N°Doc asc, luego fechaPago asc
+  type DetallePago = {
+    numeroDoc: string
+    cliente: string
+    proyecto: string
+    valorizacion: string
+    fechaPago: Date | null
+    tipo: string
+    medioPago: string
+    monto: number
+    moneda: string
+    observaciones: string
+  }
+  const detalles: DetallePago[] = []
+  for (const cxc of items) {
+    if (!cxc.pagos?.length) continue
+    for (const p of cxc.pagos) {
+      const tipo = p.esDetraccion ? 'Detracción' : p.esRetencion ? 'Retención' : 'Efectivo'
+      const fechaPagoDate = p.fechaPago ? new Date(p.fechaPago) : null
+      detalles.push({
+        numeroDoc:    cxc.numeroDocumento ?? '',
+        cliente:      cxc.cliente?.nombre ?? '',
+        proyecto:     cxc.proyecto?.codigo ?? '',
+        valorizacion: cxc.valorizacion?.codigo ?? '',
+        fechaPago:    fechaPagoDate,
+        tipo,
+        medioPago:    p.medioPago,
+        monto:        p.monto,
+        moneda:       cxc.moneda,
+        observaciones: p.observaciones ?? '',
+      })
+    }
+  }
+  // Sort: N° Documento asc, luego fechaPago asc
+  detalles.sort((a, b) => {
+    const docCmp = a.numeroDoc.localeCompare(b.numeroDoc)
+    if (docCmp !== 0) return docCmp
+    const ta = a.fechaPago?.getTime() ?? 0
+    const tb = b.fechaPago?.getTime() ?? 0
+    return ta - tb
+  })
+
+  let detRow = 2
+  for (const d of detalles) {
+    const row = wsDet.getRow(detRow)
+    const detCells: [number, any, string?][] = [
+      [1, d.numeroDoc],
+      [2, d.cliente],
+      [3, d.proyecto],
+      [4, d.valorizacion],
+      [5, d.fechaPago,  FMT_DATE],
+      [6, d.tipo],
+      [7, d.medioPago],
+      [8, d.monto,      FMT_MONEY],
+      [9, d.moneda],
+      [10, d.observaciones],
+    ]
+    for (const [col, val, fmt] of detCells) {
+      const cell = row.getCell(col)
+      cell.value = val ?? null
+      if (fmt) cell.numFmt = fmt
+      setBorderData(cell)
+    }
+    for (const col of [1, 2, 3, 4, 6, 7, 9, 10]) {
+      row.getCell(col).alignment = ALIGN_LEFT
+    }
+    detRow++
+  }
+
+  wsDet.views = [{ state: 'frozen', ySplit: 1 }]
+  wsDet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 10 } }
+
+  // ── Descarga ─────────────────────────────────────────────────────────────────
+  const now     = new Date()
+  const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
+  await downloadBuffer(await wb.xlsx.writeBuffer(), `CuentasPorCobrar_Contable_${dateStr}.xlsx`)
+}
+
+// ============================================
+// EXPORTAR FORMATO FINANCIERO (29 columnas, 2 filas de cabecera)
+// ============================================
+/**
+ * Genera el reporte Financiero de CxC con datos de factoring/negociación.
+ *
+ * Columnas individuales (A–P): merge vertical fila 1+2.
+ * Grupo Adelanto (Q–R), Saldo (S–T), Retenido (U–V): 2 subcols c/u.
+ * Grupo Costos (W–AB): 6 subcols.
+ * Columna individual (AC): Observaciones.
+ *
+ * Si una CxC no tiene CobroValorizacion, las columnas de factoring van vacías (no 0).
+ * Totales: Monto Factura (F), Monto Neto (G), Interés (X), Comisión (Z), Gastos (AA).
+ */
+export async function exportarCxCFinanciero(items: CxCRichRow[]): Promise<void> {
+  const ExcelJS = (await import('exceljs')).default
+  const wb = new ExcelJS.Workbook()
+  const ws = wb.addWorksheet('CxC Financiero')
+
+  const colWidths = [
+    16,  // A  N° Documento
+    35,  // B  Cliente
+    14,  // C  RUC
+    14,  // D  Proyecto
+    16,  // E  Valorización
+    14,  // F  Monto Factura
+    14,  // G  Monto Neto
+    12,  // H  Fecha Emisión
+    14,  // I  Fecha Estimada de Pago
+    12,  // J  Fecha Pago
+    18,  // K  Días por vencer
+    10,  // L  Negociado
+    20,  // M  Entidad Financiera
+    16,  // N  Nro. Negociación
+    18,  // O  Banco (Desembolso)
+    16,  // P  Nro. Operación
+    14,  // Q  Adelanto – Monto
+    12,  // R  Adelanto – Fecha
+    14,  // S  Saldo – Monto
+    12,  // T  Saldo – Fecha (sin campo en BD)
+    14,  // U  Retenido – Monto
+    12,  // V  Retenido – Fecha (sin campo en BD)
+    10,  // W  Costos – Tasa
+    14,  // X  Costos – Interés
+    16,  // Y  Costos – Nro. Factura Interés (TODO)
+    14,  // Z  Costos – Comisión
+    14,  // AA Costos – Gastos
+    16,  // AB Costos – Nro. Factura Gastos (TODO)
+    30,  // AC Observaciones
+  ]
+  ws.columns = colWidths.map(w => ({ width: w }))
+
+  // ── Cabecera ──────────────────────────────────────────────────────────────────
+  const SOLO_COLS_FIN = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','AC']
+  const soloHeadersFin = [
+    'N° Documento','Cliente','RUC','Proyecto','Valorización',
+    'Monto\nFactura','Monto\nNeto','Fecha\nEmisión','Fecha Estimada\nde Pago','Fecha\nPago',
+    'Días\npor Vencer','Negociado','Entidad\nFinanciera','Nro.\nNegociación',
+    'Banco\n(Desembolso)','Nro.\nOperación',
+    'Observaciones',
+  ]
+  for (let i = 0; i < SOLO_COLS_FIN.length; i++) {
+    ws.getCell(`${SOLO_COLS_FIN[i]}1`).value = soloHeadersFin[i]
+    ws.mergeCells(`${SOLO_COLS_FIN[i]}1:${SOLO_COLS_FIN[i]}2`)
+  }
+
+  // Grupos fila 1 → subcolumnas fila 2
+  ws.mergeCells('Q1:R1'); ws.getCell('Q1').value = 'Adelanto'
+  ws.getCell('Q2').value = 'Monto'; ws.getCell('R2').value = 'Fecha'
+
+  ws.mergeCells('S1:T1'); ws.getCell('S1').value = 'Saldo'
+  ws.getCell('S2').value = 'Monto'; ws.getCell('T2').value = 'Fecha'
+
+  ws.mergeCells('U1:V1'); ws.getCell('U1').value = 'Retenido'
+  ws.getCell('U2').value = 'Monto'; ws.getCell('V2').value = 'Fecha'
+
+  ws.mergeCells('W1:AB1'); ws.getCell('W1').value = 'Costos del Financiamiento'
+  ws.getCell('W2').value = 'Tasa'
+  ws.getCell('X2').value = 'Interés'
+  // TODO: agregar numeroFacturaInteres a CobroValorizacion si admin lo requiere
+  ws.getCell('Y2').value = 'Nro. Factura'
+  ws.getCell('Z2').value = 'Comisión'
+  ws.getCell('AA2').value = 'Gastos'
+  // TODO: agregar numeroFacturaGastos a CobroValorizacion si admin lo requiere
+  ws.getCell('AB2').value = 'Nro. Factura'
+
+  applyHeaderStyle(ws, 2, ['Q1', 'S1', 'U1', 'W1'])
+  ws.getRow(1).height = 28
+  ws.getRow(2).height = 22
+
+  // ── Datos ─────────────────────────────────────────────────────────────────────
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const DATA_START = 3
+
+  const COL_MONTO_F   = 6   // F  Monto Factura
+  const COL_NETO_F    = 7   // G  Monto Neto
+  const COL_INTERES   = 24  // X  Interés
+  const COL_COMISION  = 26  // Z  Comisión
+  const COL_GASTOS    = 27  // AA Gastos
+
+  for (let i = 0; i < items.length; i++) {
+    const cxc = items[i]
+    const rowNum = DATA_START + i
+    const row = ws.getRow(rowNum)
+
+    const cobro = cxc.valorizacion?.cobro ?? null
+    const fechaEmision   = cxc.fechaEmision ? new Date(cxc.fechaEmision) : null
+    const fechaEstimada  = calcularFechaEstimadaPago(cxc)
+    const fechaUltimoPago = obtenerFechaUltimoPago(cxc)
+    const negociado      = calcularNegociado(cxc)
+    const diasTxt        = calcularDiasPorVencer(cxc, today)
+    const entidadFin     = obtenerEntidadFinanciera(cxc)
+
+    // Monto Neto Financiero = CobroValorizacion.montoADesembolsar (vacío si no hay cobro)
+    const montoNetoFin   = cobro?.montoADesembolsar ?? null
+
+    // Banco desembolso = primer pago neto (cuentaBancaria) o vacío
+    const pagoNeto = cxc.pagos?.find(p => !p.esDetraccion && !p.esRetencion) ?? null
+
+    // Tasa: almacenada como 1.38 (= 1.38%); para Excel % dividir /100
+    const tasaPct = cobro?.tasaDescuentoPct != null ? cobro.tasaDescuentoPct / 100 : null
+
+    const cells: [number, any, string?][] = [
+      [1,  cxc.numeroDocumento ?? ''],
+      [2,  cxc.cliente?.nombre ?? ''],
+      [3,  cxc.cliente?.ruc ?? ''],
+      [4,  cxc.proyecto?.codigo ?? ''],
+      [5,  cxc.valorizacion?.codigo ?? ''],
+      [6,  cxc.monto,            FMT_MONEY],
+      [7,  montoNetoFin,         FMT_MONEY],    // null si no tiene factoring
+      [8,  fechaEmision,         FMT_DATE],
+      [9,  fechaEstimada,        FMT_DATE],
+      [10, fechaUltimoPago,      FMT_DATE],
+      [11, diasTxt],
+      [12, negociado],
+      [13, entidadFin],
+      [14, cxc.numeroNegociacion ?? cobro?.numeroOperacion ?? ''],
+      [15, pagoNeto?.cuentaBancaria?.nombreBanco ?? ''],
+      [16, pagoNeto?.numeroOperacion ?? ''],
+      // Adelanto
+      [17, cobro?.adelantoBanpro ?? null,       FMT_MONEY],
+      [18, cobro?.fechaDesembolso ? new Date(cobro.fechaDesembolso as string) : null, FMT_DATE],
+      // Saldo
+      [19, cobro?.saldoAGirar ?? null,          FMT_MONEY],
+      [20, null],   // sin campo Fecha Saldo en BD
+      // Retenido
+      [21, cobro?.excedenteMonto != null ? Number(cobro.excedenteMonto) : null, FMT_MONEY],
+      [22, null],   // sin campo Fecha Retenido en BD
+      // Costos
+      [23, tasaPct,             FMT_RATE],
+      [24, cobro?.interesMonto ?? null,               FMT_MONEY],
+      [25, cobro?.numeroFacturaInteres ?? ''],
+      [26, cobro?.comisionEstructuracion ?? null,     FMT_MONEY],
+      [27, cobro?.gastosAdicionales ?? null,          FMT_MONEY],
+      [28, cobro?.numeroFacturaGastos ?? ''],
+      [29, cxc.observaciones ?? ''],
+    ]
+
+    for (const [col, val, fmt] of cells) {
+      const cell = row.getCell(col)
+      cell.value = val ?? null
+      if (fmt) cell.numFmt = fmt
+      setBorderData(cell)
+    }
+
+    for (const col of [1, 2, 3, 4, 5, 7, 11, 12, 13, 14, 15, 16, 25, 28, 29]) {
+      row.getCell(col).alignment = ALIGN_LEFT
+    }
+  }
+
+  // ── Fila de Totales ────────────────────────────────────────────────────────────
+  const lastData = DATA_START + items.length - 1
+  const totRow   = DATA_START + items.length
+
+  if (items.length > 0) {
+    const tr = ws.getRow(totRow)
+    tr.getCell(1).value = 'TOTALES'
+    tr.getCell(1).font  = { bold: true }
+
+    tr.getCell(2).value = items.some(i => i.moneda !== items[0].moneda)
+      ? '⚠ Mix PEN/USD — totales brutos por columna'
+      : ''
+    tr.getCell(2).font = { italic: true, color: { argb: 'FF6B7280' }, size: 9 }
+
+    for (const col of [COL_MONTO_F, COL_NETO_F, COL_INTERES, COL_COMISION, COL_GASTOS]) {
+      const colLetter = ws.getColumn(col).letter
+      const cell = tr.getCell(col)
+      cell.value = { formula: `SUM(${colLetter}${DATA_START}:${colLetter}${lastData})` }
+      cell.numFmt = FMT_MONEY
+      cell.font   = { bold: true }
+      setBorderData(cell)
+    }
+  }
+
+  // ── Freeze y autoFilter ────────────────────────────────────────────────────────
+  ws.views = [{ state: 'frozen', ySplit: 2 }]
+  ws.autoFilter = { from: { row: 2, column: 1 }, to: { row: 2, column: 29 } }
+
+  const today2 = new Date()
+  const dateStr = `${today2.getFullYear()}-${String(today2.getMonth()+1).padStart(2,'0')}-${String(today2.getDate()).padStart(2,'0')}`
+  await downloadBuffer(await wb.xlsx.writeBuffer(), `CuentasPorCobrar_Financiero_${dateStr}.xlsx`)
+}
+
+// ============================================
 // HELPERS
 // ============================================
 function parseDateStr(val: any): Date | null {

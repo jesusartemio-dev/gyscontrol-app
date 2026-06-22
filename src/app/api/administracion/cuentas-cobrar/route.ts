@@ -8,7 +8,14 @@ const ROLES_ALLOWED = ['admin', 'gerente', 'administracion']
 const includeRelations = {
   proyecto: { select: { id: true, codigo: true, nombre: true } },
   cliente: { select: { id: true, nombre: true, ruc: true } },
-  valorizacion: { select: { id: true, codigo: true, numero: true } },
+  valorizacion: {
+    select: {
+      id: true,
+      codigo: true,
+      numero: true,
+      cobro: true,
+    },
+  },
   pagos: {
     include: { cuentaBancaria: { select: { id: true, nombreBanco: true, numeroCuenta: true } } },
     orderBy: { fechaPago: 'desc' as const },
