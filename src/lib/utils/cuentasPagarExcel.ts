@@ -77,6 +77,13 @@ export interface CxPAdminExportRow extends CxPExportRow {
   formaPago?: string | null
   diasCredito?: number | null
   detraccionPorcentaje?: number | null
+  tipoCambio?: number | null
+  descripcion?: string | null
+  numeroCheque?: string | null
+  numeroLetra?: string | null
+  enviadaContador?: boolean
+  fechaEnvioContador?: string | null
+  enviadaPor?: { id: string; name: string | null } | null
   pagos?: CxPAdminPagoRow[]
 }
 
@@ -445,8 +452,8 @@ export async function exportarCxPAExcel(items: CxPExportRow[]) {
 }
 
 // ============================================
-// EXPORTAR FORMATO ADMINISTRACIÓN (21 columnas)
-// Reproduce el Excel manual de admin: doc/factura (verde), pago (azul), constancia (rojo).
+// EXPORTAR FORMATO ADMINISTRACIÓN (24 columnas)
+// A-L: doc/factura (verde), M-X: pago/contabilidad (azul)
 // ============================================
 const ESTADO_LABEL_CXP: Record<string, string> = {
   pendiente: 'Pend. de Pago',
@@ -454,6 +461,7 @@ const ESTADO_LABEL_CXP: Record<string, string> = {
   pagada: 'Pagada',
   vencida: 'Vencida',
   anulada: 'Anulada',
+  pendiente_documentos: 'Pend. Documentos',
 }
 
 function formaPagoLabel(formaPago?: string | null, diasCredito?: number | null): string {
@@ -479,161 +487,234 @@ function centroCostoCxP(item: CxPAdminExportRow): string {
   return ''
 }
 
+function formatDateShort(dateStr: string | null | undefined): string {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return ''
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`
+}
+
 export async function exportarCxPFormatoAdmin(items: CxPAdminExportRow[]) {
   const ExcelJS = (await import('exceljs')).default
   const wb = new ExcelJS.Workbook()
   const ws = wb.addWorksheet('CxP Administración')
 
   const FILL_VERDE = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FF86EFAC' } }
-  const FILL_AZUL = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FF93C5FD' } }
+  const FILL_AZUL  = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FF93C5FD' } }
   const FONT_HEADER = { bold: true, color: { argb: 'FF000000' }, size: 11 }
   const FONT_HEADER_RED = { bold: true, color: { argb: 'FFDC2626' }, size: 11 }
+  const NCOLS = 24  // A-X
 
-  // Anchos
-  const colWidths = [
-    6,   // A Nro.
-    32,  // B Proveedor
-    13,  // C Fecha factura
-    16,  // D Referencia de proveedor
-    14,  // E Centro de costo
-    13,  // F Fecha vencimiento
-    14,  // G Orden de Compra
-    12,  // H Total
-    12,  // I A pagar
-    9,   // J Moneda
-    14,  // K Estado
-    16,  // L Forma de pago
-    12,  // M Nro. Cheque
-    12,  // N Nro. Letra
-    14,  // O Nro. Único
-    14,  // P Banco
-    13,  // Q Detracción pendiente
-    13,  // R Fecha de pago detracción
-    14,  // S Monto pagado detracción
-    16,  // T Nro. Constancia Detracción
-    32,  // U Observación
+  // Anchos de columna
+  ws.columns = [
+    { width: 6  },  // A  Nro.
+    { width: 32 },  // B  Proveedor
+    { width: 13 },  // C  Fecha factura
+    { width: 16 },  // D  Referencia de proveedor
+    { width: 26 },  // E  Descripción
+    { width: 14 },  // F  Centro de costo
+    { width: 13 },  // G  Fecha vencimiento
+    { width: 14 },  // H  Orden de Compra
+    { width: 12 },  // I  Total
+    { width: 12 },  // J  A pagar
+    { width: 9  },  // K  Moneda
+    { width: 14 },  // L  Estado
+    { width: 18 },  // M  Enviada al contador
+    { width: 16 },  // N  Forma de pago
+    { width: 13 },  // O  Fecha de pago
+    { width: 13 },  // P  Nro. Cheque
+    { width: 13 },  // Q  Nro. Letra
+    { width: 14 },  // R  Nro. Único
+    { width: 14 },  // S  Banco
+    { width: 13 },  // T  Detracción pendiente
+    { width: 13 },  // U  Fecha pago detracción
+    { width: 14 },  // V  Monto pagado detracción (S/)
+    { width: 16 },  // W  Nro. Constancia
+    { width: 32 },  // X  Observación
   ]
-  ws.columns = colWidths.map(w => ({ width: w }))
 
   // ===== Cabecera (fila 1) =====
   const headers = [
-    'Nro.',                          // A
-    'Proveedor',                     // B
-    'Fecha factura',                 // C
-    'Referencia de proveedor',       // D
-    'Centro de costo',               // E
-    'Fecha vencimiento',             // F
-    'Orden de Compra',               // G
-    'Total',                         // H
-    'A pagar',                       // I
-    'Moneda',                        // J
-    'Estado',                        // K
-    'Forma de pago',                 // L
-    'Nro. Cheque',                   // M
-    'Nro. Letra',                    // N
-    'Nro. Único',                    // O
-    'Banco',                         // P
-    'Detracción\npendiente',         // Q
-    'Fecha de pago\ndetracción',     // R
-    'Monto pagado\ndetracción',      // S
-    'Nro. Constancia\nDetracción',   // T
-    'Observación',                   // U
+    'Nro.',                           // A  1
+    'Proveedor',                      // B  2
+    'Fecha factura',                  // C  3
+    'Referencia\nde proveedor',       // D  4
+    'Descripción',                    // E  5
+    'Centro de costo',                // F  6
+    'Fecha\nvencimiento',             // G  7
+    'Orden de Compra',                // H  8
+    'Total',                          // I  9
+    'A pagar',                        // J 10
+    'Moneda',                         // K 11
+    'Estado',                         // L 12
+    'Enviada al\ncontador',           // M 13
+    'Forma de pago',                  // N 14
+    'Fecha de pago',                  // O 15
+    'Nro. Cheque',                    // P 16
+    'Nro. Letra',                     // Q 17
+    'Nro. Único',                     // R 18
+    'Banco',                          // S 19
+    'Detracción\npendiente',          // T 20
+    'Fecha pago\ndetracción',         // U 21
+    'Monto detrac.\n(S/)',            // V 22
+    'Nro. Constancia\nDetracción',    // W 23
+    'Observación',                    // X 24
   ]
   for (let i = 0; i < headers.length; i++) {
     ws.getCell(1, i + 1).value = headers[i]
   }
 
-  // Estilos cabecera
-  // A-L verde (datos del documento), M-U azul (datos del pago)
+  // Estilos cabecera: A-L verde, M-X azul
   const r1 = ws.getRow(1)
   r1.height = 32
-  for (let i = 1; i <= 21; i++) {
+  for (let i = 1; i <= NCOLS; i++) {
     const cell = r1.getCell(i)
-    cell.font = (i === 20) ? FONT_HEADER_RED : FONT_HEADER  // T en rojo
+    cell.font = (i === 23) ? FONT_HEADER_RED : FONT_HEADER  // W Nro.Constancia en rojo
     cell.fill = (i <= 12) ? FILL_VERDE : FILL_AZUL
     cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true }
     cell.border = {
-      top: { style: 'thin', color: { argb: 'FF000000' } },
+      top:    { style: 'thin', color: { argb: 'FF000000' } },
       bottom: { style: 'thin', color: { argb: 'FF000000' } },
-      left: { style: 'thin', color: { argb: 'FF000000' } },
-      right: { style: 'thin', color: { argb: 'FF000000' } },
+      left:   { style: 'thin', color: { argb: 'FF000000' } },
+      right:  { style: 'thin', color: { argb: 'FF000000' } },
     }
   }
 
+  // ===== Ordenar: fechaRecepcion DESC =====
+  const sorted = [...items].sort((a, b) => {
+    const da = a.fechaRecepcion ? new Date(a.fechaRecepcion).getTime() : 0
+    const db = b.fechaRecepcion ? new Date(b.fechaRecepcion).getTime() : 0
+    return db - da
+  })
+
   // ===== Datos =====
   let dataRow = 2
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i]
-    const fechaFactura = item.fechaRecepcion ? new Date(item.fechaRecepcion) : null
-    const fechaVencimiento = item.fechaVencimiento ? new Date(item.fechaVencimiento) : null
+  let totalMonto = 0
+  let totalSaldo = 0
 
-    // Pagos por tipo
-    const pagoCheque = item.pagos?.find(p => !p.esDetraccion && p.medioPago === 'cheque')
-    const pagoLetra = item.pagos?.find(p => !p.esDetraccion && p.medioPago === 'letra')
-    const pagoTransferencia = item.pagos?.find(p => !p.esDetraccion && p.medioPago === 'transferencia')
-    const pagoNoDetraccion = item.pagos?.find(p => !p.esDetraccion) // para Banco
-    const detraccion = item.pagos?.find(p => p.esDetraccion)
+  for (let i = 0; i < sorted.length; i++) {
+    const item = sorted[i]
+    const fechaFactura   = item.fechaRecepcion  ? new Date(item.fechaRecepcion)  : null
+    const fechaVencim    = item.fechaVencimiento ? new Date(item.fechaVencimiento) : null
 
-    const row = ws.getRow(dataRow)
-    row.getCell(1).value = i + 1                                          // A
-    row.getCell(2).value = item.proveedor?.nombre ?? ''                   // B
-    row.getCell(3).value = fechaFactura                                   // C
-    row.getCell(4).value = item.numeroFactura ?? ''                       // D
-    row.getCell(5).value = centroCostoCxP(item)                           // E
-    row.getCell(6).value = fechaVencimiento                               // F
-    row.getCell(7).value = item.ordenCompra?.numero ?? ''                 // G
-    row.getCell(8).value = item.monto                                     // H
-    row.getCell(9).value = item.saldoPendiente                            // I
-    row.getCell(10).value = item.moneda                                   // J
-    row.getCell(11).value = ESTADO_LABEL_CXP[item.estado] ?? item.estado  // K
-    row.getCell(12).value = formaPagoLabel(item.formaPago, item.diasCredito) // L
-    row.getCell(13).value = pagoCheque?.numeroOperacion ?? ''             // M
-    row.getCell(14).value = pagoLetra?.numeroOperacion ?? ''              // N
-    row.getCell(15).value = pagoTransferencia?.numeroOperacion ?? ''      // O
-    row.getCell(16).value = pagoNoDetraccion?.cuentaBancaria?.nombreBanco ?? ''  // P
+    // Pagos ordinarios (no detracción) ordenados por fecha desc
+    const pagosOrdinarios = (item.pagos ?? [])
+      .filter(p => !p.esDetraccion)
+      .sort((a, b) => new Date(b.fechaPago).getTime() - new Date(a.fechaPago).getTime())
 
-    // Q: Detracción pendiente = monto * % - sum(pagos detracción)
+    const pagoTransferencia = pagosOrdinarios.find(p => p.medioPago === 'transferencia')
+    const pagoNoDetraccion  = pagosOrdinarios[0]  // último pago ordinario para Banco y Fecha
+    const detraccion        = (item.pagos ?? []).find(p => p.esDetraccion)
+
+    // M: Enviada al contador — texto compuesto
+    let enviadaLabel = ''
+    if (item.enviadaContador) {
+      const fechaEnvio = item.fechaEnvioContador ? formatDateShort(item.fechaEnvioContador) : ''
+      const por = item.enviadaPor?.name ?? ''
+      enviadaLabel = ['Sí', fechaEnvio, por ? `(${por})` : ''].filter(Boolean).join(' ')
+    }
+
+    // T: Detracción pendiente
     let detraccionPendiente: number | null = null
     if (item.detraccionPorcentaje && item.detraccionPorcentaje > 0) {
       const esperada = Math.round(item.monto * item.detraccionPorcentaje / 100 * 100) / 100
-      const pagada = (item.pagos ?? [])
+      const pagada   = (item.pagos ?? [])
         .filter(p => p.esDetraccion)
         .reduce((sum, p) => sum + (p.detraccionMonto ?? p.monto ?? 0), 0)
       detraccionPendiente = Math.max(0, Math.round((esperada - pagada) * 100) / 100)
     }
-    row.getCell(17).value = detraccionPendiente                           // Q
-    row.getCell(18).value = detraccion?.detraccionFechaPago ? new Date(detraccion.detraccionFechaPago) : null  // R
-    row.getCell(19).value = detraccion?.detraccionMonto ?? detraccion?.monto ?? null  // S
-    row.getCell(20).value = detraccion?.numeroConstanciaBN ?? ''          // T
-    row.getCell(21).value = item.observaciones ?? ''                      // U
+
+    // V: Monto detracción pagado en S/
+    // detraccionMonto ya es PEN (depósito al BN); si la factura es USD y hay tipoCambio, convertir
+    let montoDetraccionPEN: number | null = null
+    if (detraccion) {
+      const raw = detraccion.detraccionMonto ?? detraccion.monto ?? 0
+      if (item.moneda === 'USD' && item.tipoCambio && item.tipoCambio > 0) {
+        montoDetraccionPEN = Math.round(raw * item.tipoCambio * 100) / 100
+      } else {
+        montoDetraccionPEN = raw
+      }
+    }
+
+    const row = ws.getRow(dataRow)
+    row.getCell(1).value  = i + 1                                                   // A
+    row.getCell(2).value  = item.proveedor?.nombre ?? ''                            // B
+    row.getCell(3).value  = fechaFactura                                            // C
+    row.getCell(4).value  = item.numeroFactura ?? ''                                // D
+    row.getCell(5).value  = item.descripcion ?? ''                                  // E
+    row.getCell(6).value  = centroCostoCxP(item)                                    // F
+    row.getCell(7).value  = fechaVencim                                             // G
+    row.getCell(8).value  = item.ordenCompra?.numero ?? ''                          // H
+    row.getCell(9).value  = item.monto                                              // I
+    row.getCell(10).value = item.saldoPendiente                                     // J
+    row.getCell(11).value = item.moneda                                             // K
+    row.getCell(12).value = ESTADO_LABEL_CXP[item.estado] ?? item.estado            // L
+    row.getCell(13).value = enviadaLabel                                            // M
+    row.getCell(14).value = formaPagoLabel(item.formaPago, item.diasCredito)        // N
+    row.getCell(15).value = pagoNoDetraccion?.fechaPago ? new Date(pagoNoDetraccion.fechaPago) : null  // O
+    row.getCell(16).value = item.numeroCheque ?? ''                                 // P
+    row.getCell(17).value = item.numeroLetra ?? ''                                  // Q
+    row.getCell(18).value = pagoTransferencia?.numeroOperacion ?? ''                // R
+    row.getCell(19).value = pagoNoDetraccion?.cuentaBancaria?.nombreBanco ?? ''     // S
+    row.getCell(20).value = detraccionPendiente                                     // T
+    row.getCell(21).value = detraccion?.detraccionFechaPago ? new Date(detraccion.detraccionFechaPago) : null  // U
+    row.getCell(22).value = montoDetraccionPEN                                      // V
+    row.getCell(23).value = detraccion?.numeroConstanciaBN ?? ''                    // W
+    row.getCell(24).value = item.observaciones ?? ''                                // X
+
+    // Acumular totales
+    totalMonto += item.monto
+    totalSaldo += item.saldoPendiente
 
     // Bordes de datos
-    for (let c = 1; c <= 21; c++) {
+    for (let c = 1; c <= NCOLS; c++) {
       row.getCell(c).border = {
-        top: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+        top:    { style: 'thin', color: { argb: 'FFE5E7EB' } },
         bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
-        left: { style: 'thin', color: { argb: 'FFE5E7EB' } },
-        right: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+        left:   { style: 'thin', color: { argb: 'FFE5E7EB' } },
+        right:  { style: 'thin', color: { argb: 'FFE5E7EB' } },
       }
     }
 
     dataRow++
   }
 
-  // ===== Formatos numéricos =====
-  const lastRow = dataRow - 1
-  if (lastRow >= 2) {
-    // Fechas: C, F, R
-    for (const col of ['C', 'F', 'R']) {
-      for (let r = 2; r <= lastRow; r++) ws.getCell(`${col}${r}`).numFmt = 'dd/mm/yyyy'
+  // ===== Fila de totales =====
+  if (sorted.length > 0) {
+    const totalRowIdx = dataRow
+    const tRow = ws.getRow(totalRowIdx)
+    tRow.getCell(1).value = 'TOTAL'
+    tRow.getCell(9).value = totalMonto
+    tRow.getCell(10).value = totalSaldo
+    for (let c = 1; c <= NCOLS; c++) {
+      const cell = tRow.getCell(c)
+      cell.font = { bold: true }
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } }
+      cell.border = {
+        top:    { style: 'medium', color: { argb: 'FF000000' } },
+        bottom: { style: 'thin',   color: { argb: 'FFE5E7EB' } },
+        left:   { style: 'thin',   color: { argb: 'FFE5E7EB' } },
+        right:  { style: 'thin',   color: { argb: 'FFE5E7EB' } },
+      }
     }
-    // Montos: H, I, Q, S
-    for (const col of ['H', 'I', 'Q', 'S']) {
-      for (let r = 2; r <= lastRow; r++) ws.getCell(`${col}${r}`).numFmt = '#,##0.00'
+    ws.getCell(`I${totalRowIdx}`).numFmt  = '#,##0.00'
+    ws.getCell(`J${totalRowIdx}`).numFmt  = '#,##0.00'
+  }
+
+  // ===== Formatos numéricos =====
+  const lastDataRow = dataRow - 1
+  if (lastDataRow >= 2) {
+    for (const col of ['C', 'G', 'O', 'U']) {
+      for (let r = 2; r <= lastDataRow; r++) ws.getCell(`${col}${r}`).numFmt = 'dd/mm/yyyy'
+    }
+    for (const col of ['I', 'J', 'T', 'V']) {
+      for (let r = 2; r <= lastDataRow; r++) ws.getCell(`${col}${r}`).numFmt = '#,##0.00'
     }
   }
 
+  // Congelar bajo cabecera y autoFilter
   ws.views = [{ state: 'frozen', ySplit: 1 }]
+  ws.autoFilter = { from: 'A1', to: { row: 1, column: NCOLS } }
 
   const buffer = await wb.xlsx.writeBuffer()
   const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })

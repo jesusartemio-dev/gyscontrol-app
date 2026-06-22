@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Loader2, Search, ArrowUpCircle, AlertTriangle, DollarSign, Clock, CheckCircle, Plus, Ban, Package, ChevronRight, ChevronDown, FileSpreadsheet, Upload, Download, Trash2, Pencil, MoreHorizontal, Eye } from 'lucide-react'
+import { Loader2, Search, ArrowUpCircle, AlertTriangle, DollarSign, Clock, CheckCircle, Plus, Ban, Package, ChevronRight, ChevronDown, FileSpreadsheet, Upload, Download, Trash2, Pencil, MoreHorizontal, Eye, ClipboardCheck, X } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import toast from 'react-hot-toast'
 import CxPImportExcelModal from '@/components/administracion/CxPImportExcelModal'
@@ -95,6 +95,12 @@ interface CuentaPorPagar {
   ordenCompra?: OrdenCompra | null
   pedidoEquipo?: { id: string; codigo: string } | null
   pedidoEquipoItem?: { id: string; codigo: string; descripcion: string } | null
+  numeroCheque?: string | null
+  numeroLetra?: string | null
+  enviadaContador?: boolean
+  fechaEnvioContador?: string | null
+  enviadaPorId?: string | null
+  enviadaPor?: { id: string; name: string | null } | null
   pagos?: PagoPagar[]
   adjuntos?: Array<{
     id: string
@@ -172,6 +178,8 @@ export default function CuentasPagarPage() {
     detraccionPorcentaje: '',
     guardarDetraccionDefault: false,
     observaciones: '',
+    numeroCheque: '',
+    numeroLetra: '',
   })
 
   // Pago dialog
@@ -206,7 +214,13 @@ export default function CuentasPagarPage() {
     detraccionPorcentaje: '',
     guardarDetraccionDefault: false,
     observaciones: '',
+    numeroCheque: '',
+    numeroLetra: '',
   })
+
+  // Selección múltiple para acciones en lote
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkLoading, setBulkLoading] = useState(false)
 
   // OCs sin factura panel
   const [ocsSinFacturaExpanded, setOcsSinFacturaExpanded] = useState(false)
@@ -352,6 +366,8 @@ export default function CuentasPagarPage() {
       detraccionPorcentaje: '',
       guardarDetraccionDefault: false,
       observaciones: '',
+      numeroCheque: '',
+      numeroLetra: '',
     })
     setCreateErrors(new Set())
   }
@@ -452,6 +468,8 @@ export default function CuentasPagarPage() {
           detraccionPorcentaje: createForm.detraccionPorcentaje ? parseFloat(createForm.detraccionPorcentaje) : null,
           guardarDetraccionDefault: createForm.guardarDetraccionDefault,
           observaciones: createForm.observaciones || null,
+          numeroCheque: createForm.numeroCheque || null,
+          numeroLetra: createForm.numeroLetra || null,
         }),
       })
       if (!res.ok) {
@@ -482,6 +500,8 @@ export default function CuentasPagarPage() {
       detraccionPorcentaje: cuenta.detraccionPorcentaje != null ? String(cuenta.detraccionPorcentaje) : '',
       guardarDetraccionDefault: false,
       observaciones: cuenta.observaciones ?? '',
+      numeroCheque: cuenta.numeroCheque ?? '',
+      numeroLetra: cuenta.numeroLetra ?? '',
     })
   }
 
@@ -517,6 +537,8 @@ export default function CuentasPagarPage() {
           detraccionPorcentaje: detraccion,
           guardarDetraccionDefault: editForm.guardarDetraccionDefault,
           observaciones: editForm.observaciones || null,
+          numeroCheque: editForm.numeroCheque || null,
+          numeroLetra: editForm.numeroLetra || null,
         }),
       })
       if (!res.ok) {
@@ -559,6 +581,53 @@ export default function CuentasPagarPage() {
       toast.success('Observaciones guardadas')
     } catch {
       toast.error('Error al guardar observaciones')
+    }
+  }
+
+  // --- Acciones en lote: enviar / desmarcar al contador ---
+  const handleBulkMarcarContador = async () => {
+    if (selectedIds.size === 0) return
+    setBulkLoading(true)
+    try {
+      const res = await fetch('/api/administracion/cuentas-pagar/enviar-contador', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Error')
+      }
+      toast.success(`${selectedIds.size} CxP marcada${selectedIds.size > 1 ? 's' : ''} como enviada${selectedIds.size > 1 ? 's' : ''} al contador`)
+      setSelectedIds(new Set())
+      loadData()
+    } catch (e: any) {
+      toast.error(e.message || 'Error al marcar')
+    } finally {
+      setBulkLoading(false)
+    }
+  }
+
+  const handleBulkDesmarcarContador = async () => {
+    if (selectedIds.size === 0) return
+    setBulkLoading(true)
+    try {
+      const res = await fetch('/api/administracion/cuentas-pagar/enviar-contador', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Error')
+      }
+      toast.success(`${selectedIds.size} CxP desmarcada${selectedIds.size > 1 ? 's' : ''}`)
+      setSelectedIds(new Set())
+      loadData()
+    } catch (e: any) {
+      toast.error(e.message || 'Error al desmarcar')
+    } finally {
+      setBulkLoading(false)
     }
   }
 
@@ -931,12 +1000,55 @@ export default function CuentasPagarPage() {
         <div className="text-xs text-muted-foreground">{filtered.length} resultado{filtered.length !== 1 ? 's' : ''}</div>
       </div>
 
+      {/* Barra de acciones en lote */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-lg">
+          <span className="text-sm font-medium text-blue-800">{selectedIds.size} seleccionada{selectedIds.size > 1 ? 's' : ''}</span>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 text-xs border-blue-300 text-blue-700 hover:bg-blue-100"
+            onClick={handleBulkMarcarContador}
+            disabled={bulkLoading}
+          >
+            {bulkLoading ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <ClipboardCheck className="h-3.5 w-3.5 mr-1.5" />}
+            Marcar como enviadas al contador
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 text-xs text-muted-foreground hover:text-foreground"
+            onClick={handleBulkDesmarcarContador}
+            disabled={bulkLoading}
+          >
+            Desmarcar enviadas
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 w-8 p-0 ml-auto"
+            onClick={() => setSelectedIds(new Set())}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+
       {/* Tabla */}
       <Card>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-10 px-4">
+                  <Checkbox
+                    checked={filtered.length > 0 && filtered.every(i => selectedIds.has(i.id))}
+                    onCheckedChange={(checked) => {
+                      if (checked) setSelectedIds(new Set(filtered.map(i => i.id)))
+                      else setSelectedIds(new Set())
+                    }}
+                  />
+                </TableHead>
                 <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('numeroFactura')}>Factura</TableHead>
                 <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('proveedor')}>
                   Proveedor {sortField === 'proveedor' && (sortDir === 'asc' ? '↑' : '↓')}
@@ -960,7 +1072,7 @@ export default function CuentasPagarPage() {
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                     <DollarSign className="h-8 w-8 mx-auto mb-2 opacity-40" />
                     No hay cuentas por pagar
                   </TableCell>
@@ -969,7 +1081,20 @@ export default function CuentasPagarPage() {
                 filtered.map(item => {
                   const vencida = isVencida(item.fechaVencimiento, item.estado)
                   return (
-                    <TableRow key={item.id} className={`${item.estado === 'anulada' ? 'opacity-50' : ''} ${vencida ? 'bg-red-50/50' : ''}`}>
+                    <TableRow key={item.id} className={`${item.estado === 'anulada' ? 'opacity-50' : ''} ${vencida ? 'bg-red-50/50' : ''} ${selectedIds.has(item.id) ? 'bg-blue-50/60' : ''}`}>
+                      <TableCell className="px-4 w-10">
+                        <Checkbox
+                          checked={selectedIds.has(item.id)}
+                          onCheckedChange={(checked) => {
+                            setSelectedIds(prev => {
+                              const next = new Set(prev)
+                              if (checked) next.add(item.id)
+                              else next.delete(item.id)
+                              return next
+                            })
+                          }}
+                        />
+                      </TableCell>
                       <TableCell className="font-mono text-sm">
                         <div>{item.numeroFactura || <span className="text-muted-foreground italic text-xs">Sin factura</span>}</div>
                         {item.proyecto && <div className="text-xs text-muted-foreground font-sans">{item.proyecto.codigo}</div>}
@@ -1015,9 +1140,17 @@ export default function CuentasPagarPage() {
                         })()}
                       </TableCell>
                       <TableCell>
-                        <Badge className={`${getEstadoColor(item.estado)} text-xs`}>
-                          {ESTADOS_CXP.find(e => e.value === item.estado)?.label || item.estado}
-                        </Badge>
+                        <div className="flex flex-col gap-1">
+                          <Badge className={`${getEstadoColor(item.estado)} text-xs w-fit`}>
+                            {ESTADOS_CXP.find(e => e.value === item.estado)?.label || item.estado}
+                          </Badge>
+                          {item.enviadaContador && (
+                            <span className="flex items-center gap-1 text-[10px] text-green-700 font-medium">
+                              <ClipboardCheck className="h-3 w-3" />
+                              Env. contador
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
@@ -1057,7 +1190,7 @@ export default function CuentasPagarPage() {
             {filtered.length > 0 && (
               <tfoot>
                 <tr className="border-t bg-muted/30 text-xs font-medium">
-                  <td colSpan={3} className="px-4 py-2 text-muted-foreground">{filteredTotals.count} registros</td>
+                  <td colSpan={4} className="px-4 py-2 text-muted-foreground">{filteredTotals.count} registros</td>
                   <td className="px-4 py-2 text-right font-mono">
                     {filteredTotals.montoPEN > 0 && <div>S/ {filteredTotals.montoPEN.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</div>}
                     {filteredTotals.montoUSD > 0 && <div>$ {filteredTotals.montoUSD.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</div>}
@@ -1333,6 +1466,16 @@ export default function CuentasPagarPage() {
                 <Input placeholder="Descripción del gasto o servicio" value={createForm.descripcion} onChange={e => setCreateForm(f => ({ ...f, descripcion: e.target.value }))} />
               </div>
             )}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>N° Cheque</Label>
+                <Input placeholder="Ej: 00123456" value={createForm.numeroCheque} onChange={e => setCreateForm(f => ({ ...f, numeroCheque: e.target.value }))} />
+              </div>
+              <div>
+                <Label>N° Letra</Label>
+                <Input placeholder="Ej: L-001" value={createForm.numeroLetra} onChange={e => setCreateForm(f => ({ ...f, numeroLetra: e.target.value }))} />
+              </div>
+            </div>
             <div>
               <Label>Observaciones</Label>
               <Input placeholder="Notas adicionales" value={createForm.observaciones} onChange={e => setCreateForm(f => ({ ...f, observaciones: e.target.value }))} />
@@ -1776,6 +1919,16 @@ export default function CuentasPagarPage() {
               )}
             </div>
 
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>N° Cheque</Label>
+                <Input placeholder="Ej: 00123456" value={editForm.numeroCheque} onChange={e => setEditForm(f => ({ ...f, numeroCheque: e.target.value }))} />
+              </div>
+              <div>
+                <Label>N° Letra</Label>
+                <Input placeholder="Ej: L-001" value={editForm.numeroLetra} onChange={e => setEditForm(f => ({ ...f, numeroLetra: e.target.value }))} />
+              </div>
+            </div>
             <div>
               <Label>Descripción / Servicio</Label>
               <Input placeholder="Servicio eléctrico..." value={editForm.descripcion} onChange={e => setEditForm(f => ({ ...f, descripcion: e.target.value }))} />

@@ -26,6 +26,7 @@ const includeRelations = {
     include: { subidoPor: { select: { id: true, name: true } } },
     orderBy: { createdAt: 'desc' as const },
   },
+  enviadaPor: { select: { id: true, name: true } },
 }
 
 export async function GET(req: Request) {
@@ -75,8 +76,9 @@ export async function POST(req: Request) {
     const {
       proveedorId, proyectoId, ordenCompraId, pedidoEquipoId, pedidoEquipoItemId,
       tipoOrigen, numeroFactura, descripcion, monto, moneda, tipoCambio,
-      fechaRecepcion, fechaVencimiento, condicionPago, diasCredito,
+      fechaRecepcion, fechaVencimiento, condicionPago, formaPago, diasCredito,
       detraccionPorcentaje, guardarDetraccionDefault, observaciones,
+      numeroCheque, numeroLetra,
     } = body
 
     if (!proveedorId || !monto || !fechaRecepcion || !fechaVencimiento) {
@@ -104,9 +106,12 @@ export async function POST(req: Request) {
         fechaRecepcion: new Date(fechaRecepcion),
         fechaVencimiento: new Date(fechaVencimiento),
         condicionPago: condicionPago || 'contado',
+        formaPago: formaPago || null,
         diasCredito: diasCredito ? Number(diasCredito) : null,
         detraccionPorcentaje: detraccion,
         observaciones: observaciones || null,
+        numeroCheque: numeroCheque || null,
+        numeroLetra: numeroLetra || null,
         updatedAt: new Date(),
       },
       include: includeRelations,

@@ -1987,6 +1987,7 @@ model User {
   recepcionesRechazadas                    RecepcionPendiente[]        @relation("RecepcionRechazador")
   cxpAdjuntos                              CxPAdjunto[]                @relation("CxPAdjuntoSubidoPor")
   cxcAdjuntos                              CxCAdjunto[]                @relation("CxCAdjuntoSubidoPor")
+  cxpEnviadasPorMi                         CuentaPorPagar[]            @relation("CxPEnviadaPor")
   // Selección cotización ganadora
   seleccionesRealizadas                    ListaEquipoItem[]           @relation("ListaEquipoItemSeleccionador")
   // Solicitudes de recursos de ejecución
@@ -4405,6 +4406,13 @@ model CuentaPorPagar {
   detraccionPorcentaje Float?
   estado             EstadoCuentaPagar @default(pendiente)
   observaciones      String?
+  // Nros. de cheque/letra vinculados a esta CxP (para control interno)
+  numeroCheque       String?
+  numeroLetra        String?
+  // Trazabilidad de envío al contador
+  enviadaContador    Boolean           @default(false)
+  fechaEnvioContador DateTime?
+  enviadaPorId       String?
   createdAt          DateTime          @default(now())
   updatedAt          DateTime
 
@@ -4413,6 +4421,7 @@ model CuentaPorPagar {
   ordenCompra      OrdenCompra?      @relation(fields: [ordenCompraId], references: [id])
   pedidoEquipo     PedidoEquipo?     @relation(fields: [pedidoEquipoId], references: [id])
   pedidoEquipoItem PedidoEquipoItem? @relation(fields: [pedidoEquipoItemId], references: [id])
+  enviadaPor       User?             @relation("CxPEnviadaPor", fields: [enviadaPorId], references: [id])
   pagos            PagoPagar[]
   adjuntos         CxPAdjunto[]
 
