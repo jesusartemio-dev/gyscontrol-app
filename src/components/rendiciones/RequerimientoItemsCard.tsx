@@ -67,7 +67,11 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
   const [saving, setSaving] = useState(false)
   const [uploadingFile, setUploadingFile] = useState(false)
   const [deletingItem, setDeletingItem] = useState<string | null>(null)
-  const [bloqueadoRecepcion, setBloqueadoRecepcion] = useState<{ estado: string } | null>(null)
+  const [bloqueadoRecepcion, setBloqueadoRecepcion] = useState<{
+    estado: string
+    fechaEntregaProyecto?: string | Date | null
+    entregadoPor?: { name: string } | null
+  } | null>(null)
 
   // Modal agregar ítem — versión completa
   const [showAddItem, setShowAddItem] = useState(false)
@@ -944,7 +948,11 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
                                         type="button"
                                         onClick={() => {
                                           if (bloqueadoPorRecepcion) {
-                                            setBloqueadoRecepcion({ estado: recepcionActiva.estado })
+                                            setBloqueadoRecepcion({
+                                              estado: recepcionActiva.estado,
+                                              fechaEntregaProyecto: recepcionActiva.fechaEntregaProyecto,
+                                              entregadoPor: recepcionActiva.entregadoPor,
+                                            })
                                             return
                                           }
                                           setConfirmDelete({ type: 'item', id: item.id, msg: '¿Eliminar este ítem del requerimiento?' })
@@ -1820,9 +1828,32 @@ export default function RequerimientoItemsCard({ hoja, onChanged, canAddComproba
             <DialogDescription asChild>
               <div className="space-y-3 pt-1">
                 {bloqueadoRecepcion?.estado === 'entregado_proyecto' ? (
-                  <p className="text-sm text-foreground">
-                    Este ítem ya fue <strong>entregado al proyecto</strong>. No es posible eliminarlo porque hay trazabilidad de entrega registrada.
-                  </p>
+                  <div className="space-y-3">
+                    <p className="text-sm text-foreground">
+                      Este ítem ya fue <strong>entregado al proyecto</strong>. No es posible eliminarlo porque hay trazabilidad de entrega registrada.
+                    </p>
+                    <div className="bg-muted/50 border rounded-md p-3 text-xs space-y-1">
+                      {bloqueadoRecepcion.fechaEntregaProyecto && (
+                        <p>
+                          <span className="text-muted-foreground">Fecha de entrega:</span>{' '}
+                          <strong>{new Date(bloqueadoRecepcion.fechaEntregaProyecto).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })}</strong>
+                        </p>
+                      )}
+                      {bloqueadoRecepcion.entregadoPor && (
+                        <p>
+                          <span className="text-muted-foreground">Entregado por:</span>{' '}
+                          <strong>{bloqueadoRecepcion.entregadoPor.name}</strong>
+                        </p>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Para anularlo, ve a{' '}
+                      <a href="/logistica/recepciones" className="text-primary underline underline-offset-2 font-medium" target="_blank" rel="noopener noreferrer">
+                        Logística → Recepciones
+                      </a>{' '}
+                      y busca la entrega de este ítem para revertirla.
+                    </p>
+                  </div>
                 ) : (
                   <>
                     <p className="text-sm text-foreground">

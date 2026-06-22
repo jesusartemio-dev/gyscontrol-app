@@ -30,7 +30,14 @@ const includeRelations = {
       },
       pedidoEquipo: { select: { id: true, codigo: true } },
       proyecto: { select: { id: true, codigo: true, nombre: true } },
-      recepciones: { select: { id: true, estado: true } },
+      recepciones: {
+          select: {
+            id: true,
+            estado: true,
+            fechaEntregaProyecto: true,
+            entregadoPor: { select: { id: true, name: true } },
+          },
+        },
     },
     orderBy: { createdAt: 'asc' as const },
   },
