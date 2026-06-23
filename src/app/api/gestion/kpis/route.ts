@@ -2,6 +2,120 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { calcularCostosLaborales } from '@/lib/utils/costosLaborales'
+
+function kpiConvertir(amount: number, from: string, to: string, tc: number): number {
+  if (from === to) return amount
+  if (from === 'PEN' && to === 'USD') return amount / tc
+  if (from === 'USD' && to === 'PEN') return amount * tc
+  return amount
+}
+
+function kpiCostoHoraPEN(
+  emp: { sueldoPlanilla: number | null; sueldoHonorarios: number | null; asignacionFamiliar: number; emo: number },
+  horasMensuales: number,
+): number {
+  const costos = calcularCostosLaborales({
+    sueldoPlanilla: emp.sueldoPlanilla || 0,
+    sueldoHonorarios: emp.sueldoHonorarios || 0,
+    asignacionFamiliar: emp.asignacionFamiliar || 0,
+    emo: emp.emo || 25,
+  })
+  return horasMensuales > 0 ? costos.totalMensual / horasMensuales : 0
+}
+
+async function calcularCostosEjecutados(
+  proyectos: { id: string; moneda: string | null; tipoCambio: number | null }[],
+  tcDefault: number,
+  horasMes: number,
+): Promise<Map<string, number>> {
+  const [ocsByProyectoMoneda, snapshotHoras, fallbackHoras, gastosData] = await Promise.all([
+    prisma.ordenCompra.groupBy({
+      by: ['proyectoId', 'moneda'],
+      where: { estado: { notIn: ['cancelada', 'borrador'] }, proyectoId: { not: null } },
+      _sum: { total: true },
+    }),
+    prisma.$queryRaw<{ proyectoId: string; total: number }[]>`
+      SELECT "proyectoId", COALESCE(SUM("horasTrabajadas" * "costoHora"), 0) as "total"
+      FROM registro_horas
+      WHERE "costoHora" IS NOT NULL AND "aprobado" = true
+      GROUP BY "proyectoId"
+    `,
+    prisma.registroHoras.groupBy({
+      by: ['proyectoId', 'usuarioId'],
+      where: { costoHora: null, aprobado: true },
+      _sum: { horasTrabajadas: true },
+    }),
+    prisma.$queryRaw<{ proyectoId: string; moneda: string; total: number }[]>`
+      SELECT hdg."proyectoId", gl."moneda", COALESCE(SUM(gl."monto"), 0) as "total"
+      FROM gasto_linea gl
+      JOIN hoja_de_gastos hdg ON gl."hojaDeGastosId" = hdg."id"
+      WHERE hdg."estado" IN ('validado', 'cerrado') AND hdg."proyectoId" IS NOT NULL
+      GROUP BY hdg."proyectoId", gl."moneda"
+    `,
+  ])
+
+  const snapshotMap = new Map(snapshotHoras.map(s => [s.proyectoId, Number(s.total)]))
+
+  const fallbackUserIds = [...new Set(fallbackHoras.map(h => h.usuarioId))]
+  const empleados = fallbackUserIds.length > 0
+    ? await prisma.empleado.findMany({
+        where: { userId: { in: fallbackUserIds } },
+        select: { userId: true, sueldoPlanilla: true, sueldoHonorarios: true, asignacionFamiliar: true, emo: true },
+      })
+    : []
+  const empMap = new Map(empleados.map(e => [e.userId, e]))
+
+  const fallbackHorasMap = new Map<string, { usuarioId: string; horas: number }[]>()
+  for (const h of fallbackHoras) {
+    const arr = fallbackHorasMap.get(h.proyectoId) || []
+    arr.push({ usuarioId: h.usuarioId, horas: h._sum.horasTrabajadas || 0 })
+    fallbackHorasMap.set(h.proyectoId, arr)
+  }
+
+  const ocMap = new Map<string, { moneda: string; total: number }[]>()
+  for (const oc of ocsByProyectoMoneda) {
+    if (!oc.proyectoId) continue
+    const arr = ocMap.get(oc.proyectoId) || []
+    arr.push({ moneda: oc.moneda, total: oc._sum.total || 0 })
+    ocMap.set(oc.proyectoId, arr)
+  }
+
+  const gastosMap = new Map<string, { moneda: string; total: number }[]>()
+  for (const g of gastosData) {
+    const arr = gastosMap.get(g.proyectoId) || []
+    arr.push({ moneda: g.moneda, total: Number(g.total) })
+    gastosMap.set(g.proyectoId, arr)
+  }
+
+  const costosMap = new Map<string, number>()
+  for (const p of proyectos) {
+    const moneda = p.moneda || 'USD'
+    const tc = p.tipoCambio || tcDefault
+
+    let costoEquipos = 0
+    for (const oc of ocMap.get(p.id) || []) {
+      costoEquipos += kpiConvertir(oc.total, oc.moneda, moneda, tc)
+    }
+
+    const costoSnapshotPEN = snapshotMap.get(p.id) || 0
+    let costoFallbackPEN = 0
+    for (const h of fallbackHorasMap.get(p.id) || []) {
+      const emp = empMap.get(h.usuarioId)
+      if (emp) costoFallbackPEN += h.horas * kpiCostoHoraPEN(emp, horasMes)
+    }
+    const costoServicios = kpiConvertir(costoSnapshotPEN + costoFallbackPEN, 'PEN', moneda, tc)
+
+    let costoGastos = 0
+    for (const g of gastosMap.get(p.id) || []) {
+      costoGastos += kpiConvertir(g.total, g.moneda, moneda, tc)
+    }
+
+    costosMap.set(p.id, costoEquipos + costoServicios + costoGastos)
+  }
+
+  return costosMap
+}
 
 // States considered "active" for projects
 const ACTIVE_STATES = [
@@ -156,12 +270,13 @@ async function getComercialKpis() {
 async function getProyectosKpis() {
   const now = new Date()
 
+  const config = await prisma.configuracionGeneral.findFirst()
+  const tcDefault = config ? Number(config.tipoCambio) : 3.75
+  const horasMes = config?.horasMensuales || 192
+
   const [proyectosActivos, tareasAtrasadas, edtsConHoras] = await Promise.all([
-    // Active projects with financial data
     prisma.proyecto.findMany({
-      where: {
-        estado: { in: [...ACTIVE_STATES] },
-      },
+      where: { estado: { in: [...ACTIVE_STATES] } },
       select: {
         id: true,
         codigo: true,
@@ -169,18 +284,14 @@ async function getProyectosKpis() {
         estado: true,
         totalInterno: true,
         totalCliente: true,
-        totalReal: true,
         progresoGeneral: true,
+        moneda: true,
+        tipoCambio: true,
       }
     }),
-    // Overdue tasks (not completed, past due date)
     prisma.proyectoTarea.count({
-      where: {
-        estado: { in: ['pendiente', 'en_progreso'] },
-        fechaFin: { lt: now },
-      }
+      where: { estado: { in: ['pendiente', 'en_progreso'] }, fechaFin: { lt: now } },
     }),
-    // EDTs with hours for deviation calculation
     prisma.proyectoEdt.findMany({
       where: {
         proyecto: { estado: { in: [...ACTIVE_STATES] } },
@@ -208,7 +319,7 @@ async function getProyectosKpis() {
     if (plan > 0) {
       totalHorasPlan += plan
       totalHorasReales += real
-      if (real > plan * 1.1) edtsConDesviacion++ // >10% over
+      if (real > plan * 1.1) edtsConDesviacion++
     }
   })
 
@@ -216,17 +327,16 @@ async function getProyectosKpis() {
     ? Math.round(((totalHorasReales - totalHorasPlan) / totalHorasPlan) * 100 * 10) / 10
     : 0
 
-  // KPI 5: Proyectos en Rojo (costo real > presupuesto interno)
-  const proyectosEnRojo = proyectosActivos.filter(p =>
-    p.totalReal > 0 && p.totalInterno > 0 && p.totalReal > p.totalInterno
-  )
-  const proyectosConCosto = proyectosActivos.filter(p => p.totalReal > 0 && p.totalInterno > 0)
+  // KPI 5: Proyectos en Rojo — usa costos ejecutados reales (OC + Horas + Gastos)
+  const costosMap = await calcularCostosEjecutados(proyectosActivos, tcDefault, horasMes)
+
+  const proyectosConPresupuesto = proyectosActivos.filter(p => p.totalInterno > 0)
+  const proyectosConCosto = proyectosConPresupuesto.filter(p => (costosMap.get(p.id) || 0) > 0)
+  const proyectosEnRojo = proyectosConCosto.filter(p => (costosMap.get(p.id) || 0) > p.totalInterno)
 
   // KPI 6: Tareas Atrasadas
   const totalTareasActivas = await prisma.proyectoTarea.count({
-    where: {
-      estado: { in: ['pendiente', 'en_progreso'] },
-    }
+    where: { estado: { in: ['pendiente', 'en_progreso'] } },
   })
 
   return {
@@ -243,11 +353,14 @@ async function getProyectosKpis() {
       porcentaje: proyectosConCosto.length > 0
         ? Math.round((proyectosEnRojo.length / proyectosConCosto.length) * 100)
         : 0,
-      detalle: proyectosEnRojo.slice(0, 5).map(p => ({
-        codigo: p.codigo,
-        nombre: p.nombre,
-        sobrecosto: Math.round(((p.totalReal - p.totalInterno) / p.totalInterno) * 100),
-      })),
+      detalle: proyectosEnRojo.slice(0, 5).map(p => {
+        const costo = costosMap.get(p.id) || 0
+        return {
+          codigo: p.codigo,
+          nombre: p.nombre,
+          sobrecosto: Math.round(((costo - p.totalInterno) / p.totalInterno) * 100),
+        }
+      }),
     },
     tareasAtrasadas: {
       valor: tareasAtrasadas,
@@ -415,8 +528,11 @@ async function getLogisticaKpis() {
 // FINANCIERO / GERENCIA KPIs
 // ==========================================
 async function getFinancieroKpis() {
+  const config = await prisma.configuracionGeneral.findFirst()
+  const tcDefault = config ? Number(config.tipoCambio) : 3.75
+  const horasMes = config?.horasMensuales || 192
+
   const [proyectos, horasData, calendario] = await Promise.all([
-    // All non-cancelled projects with financial data
     prisma.proyecto.findMany({
       where: {
         estado: { notIn: ['cancelado'] },
@@ -429,49 +545,53 @@ async function getFinancieroKpis() {
         estado: true,
         totalInterno: true,
         totalCliente: true,
-        totalReal: true,
         grandTotal: true,
         progresoGeneral: true,
+        moneda: true,
+        tipoCambio: true,
       }
     }),
-    // Hours grouped by user for utilization
     prisma.registroHoras.groupBy({
       by: ['usuarioId'],
       _sum: { horasTrabajadas: true },
       _count: true,
       where: {
         fechaTrabajo: {
-          gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1), // current month
+          gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
         }
       }
     }),
-    // Calendar for available hours
     prisma.calendarioLaboral.findFirst({
       where: { activo: true },
       select: { horasPorDia: true },
     }),
   ])
 
+  // Costos ejecutados reales: OC + RegistroHoras + Gastos
+  const costosMap = await calcularCostosEjecutados(proyectos, tcDefault, horasMes)
+
   // KPI 10: Margen Real por Proyecto
-  const proyectosConCostos = proyectos.filter(p => p.totalReal > 0 && p.totalCliente > 0)
-  const margenes = proyectosConCostos.map(p => ({
-    codigo: p.codigo,
-    nombre: p.nombre,
-    margen: Math.round(((p.totalCliente - p.totalReal) / p.totalCliente) * 100 * 10) / 10,
-    ganancia: Math.round(p.totalCliente - p.totalReal),
-  }))
+  const proyectosConCostos = proyectos.filter(p => (costosMap.get(p.id) || 0) > 0 && p.totalCliente > 0)
+  const margenes = proyectosConCostos.map(p => {
+    const costo = costosMap.get(p.id) || 0
+    return {
+      codigo: p.codigo,
+      nombre: p.nombre,
+      margen: Math.round(((p.totalCliente - costo) / p.totalCliente) * 100 * 10) / 10,
+      ganancia: Math.round(p.totalCliente - costo),
+    }
+  })
   const margenPromedio = margenes.length > 0
     ? Math.round(margenes.reduce((s, m) => s + m.margen, 0) / margenes.length * 10) / 10
     : 0
 
-  // Total revenue and costs
   const totalRevenue = proyectos.reduce((s, p) => s + p.totalCliente, 0)
-  const totalCost = proyectos.filter(p => p.totalReal > 0).reduce((s, p) => s + p.totalReal, 0)
+  const totalCost = proyectos.reduce((s, p) => s + (costosMap.get(p.id) || 0), 0)
 
   // KPI 11: Utilización de Recursos
   const horasPorDia = calendario?.horasPorDia || 8
   const now = new Date()
-  const diasLaboralesEnMes = 22 // approximation
+  const diasLaboralesEnMes = 22
   const diasTranscurridos = Math.min(now.getDate(), diasLaboralesEnMes)
   const horasDisponiblesPorPersona = diasTranscurridos * horasPorDia
 
@@ -485,20 +605,19 @@ async function getFinancieroKpis() {
     ? Math.round(utilizaciones.reduce((s, u) => s + u.utilizacion, 0) / utilizaciones.length)
     : 0
 
-  // KPI 12: Índice de Salud de Proyectos (composite score)
+  // KPI 12: Índice de Salud de Proyectos — usa costos ejecutados para penalizar sobrecosto
   const proyectosActivos = proyectos.filter(p => (ACTIVE_STATES as readonly string[]).includes(p.estado as string))
   const saludProyectos = proyectosActivos.map(p => {
     let score = 100
+    const costoEjecutado = costosMap.get(p.id) || 0
 
-    // Cost health: penalize if over budget
-    if (p.totalReal > 0 && p.totalInterno > 0) {
-      const costRatio = p.totalReal / p.totalInterno
-      if (costRatio > 1.15) score -= 40      // >15% over: critical
-      else if (costRatio > 1.05) score -= 20  // >5% over: warning
-      else if (costRatio > 1.0) score -= 10   // slightly over
+    if (costoEjecutado > 0 && p.totalInterno > 0) {
+      const costRatio = costoEjecutado / p.totalInterno
+      if (costRatio > 1.15) score -= 40
+      else if (costRatio > 1.05) score -= 20
+      else if (costRatio > 1.0) score -= 10
     }
 
-    // Progress health: penalize low progress
     if (p.progresoGeneral < 10 && p.estado === 'en_ejecucion') score -= 20
 
     return {
@@ -526,8 +645,8 @@ async function getFinancieroKpis() {
       totalCost: Math.round(totalCost),
       gananciaTotal: Math.round(totalRevenue - totalCost),
       proyectosAnalizados: proyectosConCostos.length,
-      peores: margenes.sort((a, b) => a.margen - b.margen).slice(0, 3),
-      mejores: margenes.sort((a, b) => b.margen - a.margen).slice(0, 3),
+      peores: [...margenes].sort((a, b) => a.margen - b.margen).slice(0, 3),
+      mejores: [...margenes].sort((a, b) => b.margen - a.margen).slice(0, 3),
     },
     utilizacionRecursos: {
       promedio: utilizacionPromedio,
@@ -538,7 +657,7 @@ async function getFinancieroKpis() {
     saludProyectos: {
       promedio: saludPromedio,
       distribucion: saludDistribucion,
-      detalle: saludProyectos.sort((a, b) => a.score - b.score).slice(0, 5),
+      detalle: [...saludProyectos].sort((a, b) => a.score - b.score).slice(0, 5),
     },
   }
 }
