@@ -438,7 +438,7 @@ export function TimesheetSemanal({
                       <div className="min-w-0 flex-1">
                         {/* Fila 1: código proyecto + EDT */}
                         <div className="truncate font-semibold leading-tight text-gray-700">
-                          {registro.origen === 'campo' && <span className="text-orange-600 mr-0.5">C</span>}
+                          {registro.origen === 'campo' && <span className="text-orange-600 mr-0.5">J</span>}
                           {registro.proyectoNombre.split(' - ')[0]}
                           {registro.edtNombre && registro.edtNombre !== 'Sin EDT' && (
                             <span className="text-gray-400 font-normal"> · {registro.edtNombre}</span>

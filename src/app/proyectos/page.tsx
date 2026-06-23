@@ -94,6 +94,8 @@ export default function ProyectosPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; proyecto?: Proyecto }>({ show: false })
   const { page, limit, handlePageChange, handleLimitChange, reset: resetPagination } = usePagination(1, 12)
 
+  const isAdmin = session?.user.role === 'admin'
+
   useEffect(() => {
     if (status === 'loading') return
     const role = session?.user.role
@@ -730,14 +732,16 @@ export default function ProyectosPage() {
                         <Eye className="h-3 w-3 mr-1" />
                         Ver
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 w-7 p-0 text-red-500 hover:text-red-700"
-                        onClick={() => setDeleteConfirm({ show: true, proyecto })}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
+                      {isAdmin && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 w-7 p-0 text-red-500 hover:text-red-700"
+                          onClick={() => setDeleteConfirm({ show: true, proyecto })}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -842,14 +846,16 @@ export default function ProyectosPage() {
                             >
                               <Eye className="h-3 w-3" />
                             </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
-                              onClick={() => setDeleteConfirm({ show: true, proyecto })}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
+                            {isAdmin && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                                onClick={() => setDeleteConfirm({ show: true, proyecto })}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            )}
                           </div>
                         </td>
                       </tr>

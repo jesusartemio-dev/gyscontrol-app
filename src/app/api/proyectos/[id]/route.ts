@@ -329,7 +329,7 @@ export async function PUT(
   }
 }
 
-// ✅ DELETE - Eliminar proyecto (solo admin/gerente)
+// ✅ DELETE - Eliminar proyecto (solo admin)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -340,9 +340,8 @@ export async function DELETE(
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    // 🔐 Solo admin y gerente pueden eliminar proyectos
-    const rolesPermitidos = ['admin', 'gerente'];
-    if (!rolesPermitidos.includes(session.user.role)) {
+    // 🔐 Solo admin puede eliminar proyectos
+    if (session.user.role !== 'admin') {
       return NextResponse.json(
         { error: 'Sin permisos para eliminar proyectos' },
         { status: 403 }

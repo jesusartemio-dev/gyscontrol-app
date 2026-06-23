@@ -635,7 +635,10 @@ function TimesheetContent() {
           {/* Proyectos esta semana */}
           {proyectosTrabajados.length > 0 && (
             <div className="bg-white border rounded-lg p-3">
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">Proyectos esta semana</h3>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-semibold text-gray-700">Proyectos esta semana</h3>
+                <span className="text-sm font-bold text-blue-700">{totalHoras}h total</span>
+              </div>
               <div className="flex flex-wrap gap-2">
                 {proyectosTrabajados.map((proyecto, index) => (
                   <div key={index} className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-full">
