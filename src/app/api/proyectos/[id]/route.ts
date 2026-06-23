@@ -218,6 +218,7 @@ export async function PUT(
         estado: true,
         nombre: true,
         totalCliente: true,
+        descuento: true,
       }
     });
 
@@ -286,6 +287,13 @@ export async function PUT(
     if (dataToUpdate.adelantoPorcentaje !== undefined) {
       const totalCliente = proyectoExistente.totalCliente ?? 0
       dataToUpdate.adelantoMonto = Math.round(totalCliente * (dataToUpdate.adelantoPorcentaje / 100) * 100) / 100
+    }
+
+    // Si cambia descuento o totalCliente, recalcular grandTotal
+    if ('descuento' in dataToUpdate || 'totalCliente' in dataToUpdate) {
+      const nuevoTotal = dataToUpdate.totalCliente ?? proyectoExistente.totalCliente ?? 0
+      const nuevoDescuento = dataToUpdate.descuento ?? proyectoExistente.descuento ?? 0
+      dataToUpdate.grandTotal = Math.round((nuevoTotal - nuevoDescuento) * 100) / 100
     }
 
     const proyectoActualizado = await prisma.proyecto.update({

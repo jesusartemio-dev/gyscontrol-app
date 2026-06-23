@@ -29,18 +29,26 @@ export class ProgresoService {
    */
   static async actualizarProgresoTarea(tareaId: string) {
     try {
-      // Obtener tarea con horas registradas
+      // Obtener tarea con ambas fuentes de horas: timesheets (RegistroHoras) y jornadas de campo
       const tarea = await prisma.proyectoTarea.findUnique({
         where: { id: tareaId },
         include: {
-          registroHoras: true
+          registroHoras: { select: { horasTrabajadas: true } },
+          registrosCampoTarea: {
+            include: { miembros: { select: { horas: true } } }
+          }
         }
       })
 
       if (!tarea) return
 
-      // Calcular horas reales totales
-      const horasReales = tarea.registroHoras.reduce((sum, registro) => sum + registro.horasTrabajadas, 0)
+      // Fuente 1: timesheets de oficina/campo (RegistroHoras)
+      const horasTimesheet = tarea.registroHoras.reduce((sum, r) => sum + r.horasTrabajadas, 0)
+      // Fuente 2: jornadas de campo (RegistroHorasCampoTarea → miembros)
+      const horasCampo = tarea.registrosCampoTarea.reduce(
+        (sum, ct) => sum + ct.miembros.reduce((s, m) => s + m.horas, 0), 0
+      )
+      const horasReales = horasTimesheet + horasCampo
 
       // Calcular progreso basado en horas
       let porcentajeAvance = 0

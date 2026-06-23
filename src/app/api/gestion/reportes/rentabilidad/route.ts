@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
 }
 
 async function getProyectoDetalle(proyectoId: string, tcDefault: number, horasMes: number) {
-  const [proyecto, ocsByCurrency, costoSnapshotRaw, horasSinSnapshot, gastosByCurrency] = await Promise.all([
+  const [proyecto, ocsByCurrency, costoSnapshotRaw, horasSinSnapshot, gastosByCurrency, hhByMoneda] = await Promise.all([
     prisma.proyecto.findUnique({
       where: { id: proyectoId },
       select: {
@@ -105,6 +105,15 @@ async function getProyectoDetalle(proyectoId: string, tcDefault: number, horasMe
         AND hdg."estado" IN ('validado', 'cerrado')
       GROUP BY gl."moneda"
     `,
+    // HH valorizaciones aprobadas: ingreso por servicios HH facturados al cliente
+    prisma.$queryRaw<{ moneda: string; total: number }[]>`
+      SELECT v."moneda", COALESCE(SUM(hh."subtotal" - hh."descuentoMonto"), 0) as "total"
+      FROM valorizacion_hh hh
+      JOIN valorizacion v ON hh."valorizacionId" = v."id"
+      WHERE v."proyectoId" = ${proyectoId}
+        AND v."estado" IN ('aprobada_cliente', 'hes_pendiente', 'facturada', 'pagada')
+      GROUP BY v."moneda"
+    `,
   ])
 
   if (!proyecto) {
@@ -136,7 +145,13 @@ async function getProyectoDetalle(proyectoId: string, tcDefault: number, horasMe
   const costoServiciosR = round2(costoServicios)
   costoGastos = round2(costoGastos)
 
-  const ingreso = proyecto.totalCliente
+  // HH income: valorizaciones aprobadas de HH, convertidas a moneda del proyecto
+  let ingresoHH = 0
+  for (const hh of hhByMoneda) {
+    ingresoHH += convertir(Number(hh.total), hh.moneda, monedaProy, tc)
+  }
+
+  const ingreso = round2(proyecto.totalCliente + ingresoHH)
   const costoTotal = round2(costoEquipos + costoServiciosR + costoGastos)
   const presupuestoTotal = round2(proyecto.totalEquiposInterno + proyecto.totalServiciosInterno + proyecto.totalGastosInterno)
   const margen = round2(ingreso - costoTotal)
@@ -181,7 +196,7 @@ async function getProyectoDetalle(proyectoId: string, tcDefault: number, horasMe
 }
 
 async function getResumenTodos(tcDefault: number, horasMes: number) {
-  const [proyectos, ocsByProyectoMoneda, snapshotByProyecto, horasSinSnapshotByProyecto, gastosByProyectoMoneda] = await Promise.all([
+  const [proyectos, ocsByProyectoMoneda, snapshotByProyecto, horasSinSnapshotByProyecto, gastosByProyectoMoneda, hhByProyecto] = await Promise.all([
     prisma.proyecto.findMany({
       where: { estado: { notIn: ['cancelado'] } },
       select: {
@@ -227,6 +242,15 @@ async function getResumenTodos(tcDefault: number, horasMes: number) {
         AND hdg."proyectoId" IS NOT NULL
       GROUP BY hdg."proyectoId", gl."moneda"
     `,
+    // HH valorizaciones aprobadas grouped by proyectoId + moneda
+    prisma.$queryRaw<{ proyectoId: string; moneda: string; total: number }[]>`
+      SELECT v."proyectoId", v."moneda", COALESCE(SUM(hh."subtotal" - hh."descuentoMonto"), 0) as "total"
+      FROM valorizacion_hh hh
+      JOIN valorizacion v ON hh."valorizacionId" = v."id"
+      WHERE v."estado" IN ('aprobada_cliente', 'hes_pendiente', 'facturada', 'pagada')
+        AND v."proyectoId" IS NOT NULL
+      GROUP BY v."proyectoId", v."moneda"
+    `,
   ])
 
   // Build snapshot map: proyectoId → total PEN
@@ -271,10 +295,25 @@ async function getResumenTodos(tcDefault: number, horasMes: number) {
     gastosMap.set(g.proyectoId, arr)
   }
 
+  // Build HH income map
+  const hhMap = new Map<string, { moneda: string; total: number }[]>()
+  for (const hh of hhByProyecto) {
+    if (!hh.proyectoId) continue
+    const arr = hhMap.get(hh.proyectoId) || []
+    arr.push({ moneda: hh.moneda, total: Number(hh.total) })
+    hhMap.set(hh.proyectoId, arr)
+  }
+
   const resumen = proyectos.map(p => {
     const monedaProy = p.moneda || 'USD'
     const tc = p.tipoCambio || tcDefault
-    const ingreso = p.totalCliente
+
+    // HH income: valorizaciones HH aprobadas
+    let ingresoHH = 0
+    for (const hh of hhMap.get(p.id) || []) {
+      ingresoHH += convertir(hh.total, hh.moneda, monedaProy, tc)
+    }
+    const ingreso = round2(p.totalCliente + ingresoHH)
 
     // Convert OCs
     let costoEquipos = 0
