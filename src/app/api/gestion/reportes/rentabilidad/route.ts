@@ -89,11 +89,12 @@ async function getProyectoDetalle(proyectoId: string, tcDefault: number, horasMe
       FROM registro_horas
       WHERE "proyectoId" = ${proyectoId}
         AND "costoHora" IS NOT NULL
+        AND "aprobado" = true
     `,
     // Fallback: hours grouped by user for records WITHOUT snapshot
     prisma.registroHoras.groupBy({
       by: ['usuarioId'],
-      where: { proyectoId, costoHora: null },
+      where: { proyectoId, costoHora: null, aprobado: true },
       _sum: { horasTrabajadas: true },
     }),
     // Gastos grouped by GastoLinea.moneda
@@ -225,12 +226,13 @@ async function getResumenTodos(tcDefault: number, horasMes: number) {
       SELECT "proyectoId", COALESCE(SUM("horasTrabajadas" * "costoHora"), 0) as "total"
       FROM registro_horas
       WHERE "costoHora" IS NOT NULL
+        AND "aprobado" = true
       GROUP BY "proyectoId"
     `,
     // Fallback: hours without snapshot grouped by proyectoId + usuarioId
     prisma.registroHoras.groupBy({
       by: ['proyectoId', 'usuarioId'],
-      where: { costoHora: null },
+      where: { costoHora: null, aprobado: true },
       _sum: { horasTrabajadas: true },
     }),
     // Gastos grouped by proyectoId + moneda (from GastoLinea)
