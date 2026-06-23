@@ -160,8 +160,11 @@ function TimesheetContent() {
     return estado === 'enviado' || estado === 'aprobado'
   }
 
-  const getEstadoBadge = (fecha: string, origen: string | null) => {
-    if (origen !== 'oficina') return null
+  const getEstadoBadge = (fecha: string, origen: string | null, aprobado?: boolean) => {
+    if (origen === 'campo') {
+      if (aprobado) return <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-300">Aprobado</Badge>
+      return <Badge variant="outline" className="text-xs bg-gray-50 text-gray-500 border-gray-300">Pendiente</Badge>
+    }
     const key = getWeekKey(fecha)
     const estado = aprobacionesMapa[key]
     if (!estado || estado === 'borrador') return null
@@ -817,10 +820,10 @@ function TimesheetContent() {
                           )}
                         </TableCell>
                         <TableCell className="py-2 hidden sm:table-cell">
-                          {getEstadoBadge(r.fechaTrabajo, r.origen)}
+                          {getEstadoBadge(r.fechaTrabajo, r.origen, r.aprobado)}
                         </TableCell>
                         <TableCell className="py-2" onClick={e => e.stopPropagation()}>
-                          {!semanaLocked(r.fechaTrabajo, r.origen) && (
+                          {r.origen !== 'campo' && !semanaLocked(r.fechaTrabajo, r.origen) && (
                             <Button
                               variant="ghost"
                               size="sm"

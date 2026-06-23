@@ -80,7 +80,7 @@ async function getProyectoDetalle(proyectoId: string, tcDefault: number, horasMe
     // OCs grouped by currency
     prisma.ordenCompra.groupBy({
       by: ['moneda'],
-      where: { proyectoId, estado: { not: 'cancelada' } },
+      where: { proyectoId, estado: { notIn: ['cancelada', 'borrador'] } },
       _sum: { total: true },
     }),
     // Snapshot cost: SUM(horas * costoHora) for records WITH snapshot (result in PEN)
@@ -218,7 +218,7 @@ async function getResumenTodos(tcDefault: number, horasMes: number) {
     // OCs grouped by proyectoId + moneda
     prisma.ordenCompra.groupBy({
       by: ['proyectoId', 'moneda'],
-      where: { estado: { not: 'cancelada' }, proyectoId: { not: null } },
+      where: { estado: { notIn: ['cancelada', 'borrador'] }, proyectoId: { not: null } },
       _sum: { total: true },
     }),
     // Snapshot cost per project (PEN)

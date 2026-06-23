@@ -45,6 +45,9 @@ import {
   MapPin,
   Monitor,
   Send,
+  Copy,
+  MessageSquare,
+  Check,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -168,11 +171,47 @@ export default function SupervisionTimesheetPage() {
 
   // Summary
   const [resumen, setResumen] = useState<any>(null)
+  const [copied, setCopied] = useState(false)
 
   // Reject dialog
   const [rejectId, setRejectId] = useState<string | null>(null)
   const [motivoRechazo, setMotivoRechazo] = useState('')
   const [processing, setProcessing] = useState(false)
+
+  const generarMensajeWhatsapp = (): string => {
+    if (!resumen) return ''
+    const { semana, semanaActual: sa } = resumen
+    const semanaLabel = parseSemanaLabel(semana)
+    const rango = formatSemanaRango(semana)
+    const lines: string[] = []
+    lines.push(`📋 *Resumen Timesheet – ${semanaLabel}*`)
+    if (rango) lines.push(`_${rango}_`)
+    lines.push('')
+    if (sa.sinEnviar.length > 0) {
+      lines.push(`⏳ *Sin enviar (${sa.sinEnviar.length} ${sa.sinEnviar.length === 1 ? 'persona' : 'personas'}):*`)
+      for (const u of sa.sinEnviar) lines.push(`• ${u.nombre} — ${u.horas}h`)
+      lines.push('')
+    }
+    if (sa.pendientes.length > 0) {
+      lines.push(`🕐 *Pendientes de aprobación (${sa.pendientes.length} ${sa.pendientes.length === 1 ? 'persona' : 'personas'}):*`)
+      for (const u of sa.pendientes) lines.push(`• ${u.nombre} — ${u.horas}h`)
+      lines.push('')
+    }
+    const stats: string[] = []
+    if (sa.aprobados > 0) stats.push(`✅ Aprobados: ${sa.aprobados}`)
+    if (sa.rechazados > 0) stats.push(`❌ Rechazados: ${sa.rechazados}`)
+    if (stats.length > 0) { lines.push(...stats); lines.push('') }
+    if (sa.sinEnviar.length > 0) lines.push('_Por favor enviar sus horas para aprobación_ 🙏')
+    return lines.join('\n')
+  }
+
+  const handleCopiarWhatsapp = async () => {
+    const mensaje = generarMensajeWhatsapp()
+    if (!mensaje) return
+    await navigator.clipboard.writeText(mensaje)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2500)
+  }
 
   const cargarResumen = useCallback(async () => {
     try {
@@ -645,10 +684,124 @@ export default function SupervisionTimesheetPage() {
               {conteosPorEstado.rechazado}
             </span>
           </TabsTrigger>
+          <TabsTrigger value="recordatorio" className="flex items-center gap-1.5">
+            <MessageSquare className="h-3.5 w-3.5" />
+            WhatsApp
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value={tab} className="mt-4">
-          {loading ? (
+          {tab === 'recordatorio' ? (
+            /* ── Tab Recordatorio WhatsApp ── */
+            <div className="space-y-4">
+              {!resumen ? (
+                <div className="text-center py-8 text-muted-foreground">Cargando resumen...</div>
+              ) : (
+                <>
+                  {/* Tarjetas de resumen */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <Card>
+                      <CardContent className="p-3 flex items-center gap-2">
+                        <Clock className="h-5 w-5 text-amber-500 shrink-0" />
+                        <div>
+                          <p className="text-xl font-bold text-amber-600">{resumen.semanaActual.sinEnviar.length}</p>
+                          <p className="text-xs text-muted-foreground">Sin enviar</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-3 flex items-center gap-2">
+                        <AlertCircle className="h-5 w-5 text-yellow-500 shrink-0" />
+                        <div>
+                          <p className="text-xl font-bold text-yellow-600">{resumen.semanaActual.pendientes.length}</p>
+                          <p className="text-xs text-muted-foreground">Pendientes</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-3 flex items-center gap-2">
+                        <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
+                        <div>
+                          <p className="text-xl font-bold text-green-600">{resumen.semanaActual.aprobados}</p>
+                          <p className="text-xs text-muted-foreground">Aprobados</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-3 flex items-center gap-2">
+                        <XCircle className="h-5 w-5 text-red-500 shrink-0" />
+                        <div>
+                          <p className="text-xl font-bold text-red-600">{resumen.semanaActual.rechazados}</p>
+                          <p className="text-xs text-muted-foreground">Rechazados</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Detalle de personas sin enviar */}
+                  {resumen.semanaActual.sinEnviar.length > 0 && (
+                    <Card>
+                      <CardContent className="p-4">
+                        <h3 className="text-sm font-semibold text-amber-700 mb-3 flex items-center gap-2">
+                          <Clock className="h-4 w-4" /> Sin enviar esta semana
+                        </h3>
+                        <div className="flex flex-wrap gap-2">
+                          {resumen.semanaActual.sinEnviar.map((u: any) => (
+                            <div key={u.id} className="flex items-center gap-2 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-full">
+                              <span className="text-sm font-medium text-amber-800">{u.nombre}</span>
+                              <span className="text-xs font-bold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full">{u.horas}h</span>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Detalle de pendientes */}
+                  {resumen.semanaActual.pendientes.length > 0 && (
+                    <Card>
+                      <CardContent className="p-4">
+                        <h3 className="text-sm font-semibold text-yellow-700 mb-3 flex items-center gap-2">
+                          <AlertCircle className="h-4 w-4" /> Pendientes de aprobación
+                        </h3>
+                        <div className="flex flex-wrap gap-2">
+                          {resumen.semanaActual.pendientes.map((u: any) => (
+                            <div key={u.id} className="flex items-center gap-2 bg-yellow-50 border border-yellow-200 px-3 py-1.5 rounded-full">
+                              <span className="text-sm font-medium text-yellow-800">{u.nombre}</span>
+                              <span className="text-xs font-bold text-yellow-600 bg-yellow-100 px-1.5 py-0.5 rounded-full">{u.horas}h</span>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Mensaje WhatsApp */}
+                  <Card>
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                          <MessageSquare className="h-4 w-4 text-green-600" /> Mensaje para WhatsApp
+                        </h3>
+                        <Button
+                          size="sm"
+                          variant={copied ? 'default' : 'outline'}
+                          className={cn('gap-1.5 transition-all', copied && 'bg-green-600 hover:bg-green-700 border-green-600')}
+                          onClick={handleCopiarWhatsapp}
+                        >
+                          {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                          {copied ? '¡Copiado!' : 'Copiar'}
+                        </Button>
+                      </div>
+                      <pre className="text-xs font-mono bg-gray-50 border rounded-lg p-3 whitespace-pre-wrap leading-relaxed text-gray-700 max-h-64 overflow-y-auto">
+                        {generarMensajeWhatsapp() || 'No hay datos para esta semana.'}
+                      </pre>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
+            </div>
+          ) : loading ? (
             <div className="text-center py-8 text-muted-foreground">Cargando...</div>
           ) : aprobacionesTabActual.length === 0 ? (
             <div className="text-center py-8">
