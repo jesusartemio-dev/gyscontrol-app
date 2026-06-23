@@ -25,12 +25,12 @@ const FiltrosProyectosSchema = z.object({
 // 🎯 Función para calcular KPIs básicos
 function calcularKPIsProyecto(proyecto: any) {
   return {
-    totalListas: 0, // TODO: Implementar cuando se agreguen relaciones
-    totalPedidos: 0, // TODO: Implementar cuando se agreguen relaciones
+    totalListas: proyecto._count?.listaEquipo ?? 0,
+    totalPedidos: proyecto._count?.pedidoEquipo ?? 0,
     equiposPendientes: 0,
     equiposCompletados: 0,
     montoTotal: proyecto.totalCliente || 0,
-    progreso: 0
+    progreso: proyecto.progresoGeneral ?? 0
   }
 }
 
@@ -84,8 +84,10 @@ export async function GET(request: NextRequest) {
           fechaInicio: true,
           fechaFin: true,
           totalCliente: true,
+          progresoGeneral: true,
           clienteId: true,
-          createdAt: true
+          createdAt: true,
+          _count: { select: { listaEquipo: true, pedidoEquipo: true } }
         },
         skip,
         take: limit,

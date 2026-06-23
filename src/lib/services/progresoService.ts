@@ -196,17 +196,23 @@ export class ProgresoService {
   static async actualizarProgresoProyecto(proyectoId: string) {
     try {
       // progresoGeneral = avance ponderado por horas de TODAS las tareas del cronograma de
-      // ejecución (flat). No usa horasPlan (que distorsionaba el número del proyecto).
+      // ejecución (flat). Fallback: tareas ligadas al proyecto vía fases/EDTs si no hay
+      // cronograma de tipo 'ejecucion'.
       const cronograma = await prisma.proyectoCronograma.findFirst({
         where: { proyectoId, tipo: 'ejecucion' },
         select: { id: true }
       })
-      if (!cronograma) return
 
-      const tareas = await prisma.proyectoTarea.findMany({
-        where: { proyectoCronogramaId: cronograma.id },
-        select: { porcentajeCompletado: true, horasEstimadas: true, personasEstimadas: true }
-      })
+      const tareas = cronograma
+        ? await prisma.proyectoTarea.findMany({
+            where: { proyectoCronogramaId: cronograma.id },
+            select: { porcentajeCompletado: true, horasEstimadas: true, personasEstimadas: true }
+          })
+        : await prisma.proyectoTarea.findMany({
+            where: { proyectoEdt: { proyectoFase: { proyectoId } } },
+            select: { porcentajeCompletado: true, horasEstimadas: true, personasEstimadas: true }
+          })
+
       if (tareas.length === 0) return
 
       const progresoGeneral = this.avanceFlat(tareas)
