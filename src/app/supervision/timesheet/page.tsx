@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -169,7 +169,7 @@ export default function SupervisionTimesheetPage() {
   // Users list for filter
   const [usuarios, setUsuarios] = useState<{ id: string; name: string }[]>([])
 
-  // Summary
+  // Summary (semana actual)
   const [resumen, setResumen] = useState<any>(null)
   const [copied, setCopied] = useState(false)
 
@@ -178,30 +178,37 @@ export default function SupervisionTimesheetPage() {
   const [motivoRechazo, setMotivoRechazo] = useState('')
   const [processing, setProcessing] = useState(false)
 
+  // Agrupación global de sin_enviar por usuario (todas las semanas)
+  const sinEnviarGlobal = useMemo(() => {
+    const map = new Map<string, { nombre: string; semanas: { semana: string; horas: number }[] }>()
+    for (const a of aprobaciones) {
+      if (a.estado !== 'sin_enviar') continue
+      if (!map.has(a.usuario.id)) map.set(a.usuario.id, { nombre: a.usuario.name, semanas: [] })
+      map.get(a.usuario.id)!.semanas.push({ semana: a.semana, horas: a.totalHoras })
+    }
+    return [...map.values()]
+      .map(u => ({ ...u, semanas: u.semanas.sort((a, b) => a.semana.localeCompare(b.semana)) }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre))
+  }, [aprobaciones])
+
   const generarMensajeWhatsapp = (): string => {
-    if (!resumen) return ''
-    const { semana, semanaActual: sa } = resumen
-    const semanaLabel = parseSemanaLabel(semana)
-    const rango = formatSemanaRango(semana)
+    if (sinEnviarGlobal.length === 0) return 'No hay horas sin enviar pendientes. ✅'
+    const totalSemanas = sinEnviarGlobal.reduce((s, u) => s + u.semanas.length, 0)
     const lines: string[] = []
-    lines.push(`📋 *Resumen Timesheet – ${semanaLabel}*`)
-    if (rango) lines.push(`_${rango}_`)
+    lines.push('📋 *Horas Sin Enviar – Resumen General*')
     lines.push('')
-    if (sa.sinEnviar.length > 0) {
-      lines.push(`⏳ *Sin enviar (${sa.sinEnviar.length} ${sa.sinEnviar.length === 1 ? 'persona' : 'personas'}):*`)
-      for (const u of sa.sinEnviar) lines.push(`• ${u.nombre} — ${u.horas}h`)
-      lines.push('')
+    lines.push(`⏳ *${sinEnviarGlobal.length} ${sinEnviarGlobal.length === 1 ? 'persona' : 'personas'} con ${totalSemanas} ${totalSemanas === 1 ? 'semana' : 'semanas'} pendientes:*`)
+    lines.push('')
+    for (const u of sinEnviarGlobal) {
+      const semanasStr = u.semanas.map(s => {
+        const num = s.semana.split('-W')[1]
+        return `Sem.${num} (${s.horas}h)`
+      }).join(', ')
+      const totalH = Math.round(u.semanas.reduce((s, x) => s + x.horas, 0) * 10) / 10
+      lines.push(`• ${u.nombre} — ${semanasStr}${u.semanas.length > 1 ? ` → *${totalH}h total*` : ''}`)
     }
-    if (sa.pendientes.length > 0) {
-      lines.push(`🕐 *Pendientes de aprobación (${sa.pendientes.length} ${sa.pendientes.length === 1 ? 'persona' : 'personas'}):*`)
-      for (const u of sa.pendientes) lines.push(`• ${u.nombre} — ${u.horas}h`)
-      lines.push('')
-    }
-    const stats: string[] = []
-    if (sa.aprobados > 0) stats.push(`✅ Aprobados: ${sa.aprobados}`)
-    if (sa.rechazados > 0) stats.push(`❌ Rechazados: ${sa.rechazados}`)
-    if (stats.length > 0) { lines.push(...stats); lines.push('') }
-    if (sa.sinEnviar.length > 0) lines.push('_Por favor enviar sus horas para aprobación_ 🙏')
+    lines.push('')
+    lines.push('_Por favor enviar sus horas para aprobación_ 🙏')
     return lines.join('\n')
   }
 
@@ -694,17 +701,17 @@ export default function SupervisionTimesheetPage() {
           {tab === 'recordatorio' ? (
             /* ── Tab Recordatorio WhatsApp ── */
             <div className="space-y-4">
-              {!resumen ? (
-                <div className="text-center py-8 text-muted-foreground">Cargando resumen...</div>
+              {loading ? (
+                <div className="text-center py-8 text-muted-foreground">Cargando...</div>
               ) : (
                 <>
-                  {/* Tarjetas de resumen */}
+                  {/* Tarjetas resumen global */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <Card>
                       <CardContent className="p-3 flex items-center gap-2">
                         <Clock className="h-5 w-5 text-amber-500 shrink-0" />
                         <div>
-                          <p className="text-xl font-bold text-amber-600">{resumen.semanaActual.sinEnviar.length}</p>
+                          <p className="text-xl font-bold text-amber-600">{conteosPorEstado.sin_enviar}</p>
                           <p className="text-xs text-muted-foreground">Sin enviar</p>
                         </div>
                       </CardContent>
@@ -713,7 +720,7 @@ export default function SupervisionTimesheetPage() {
                       <CardContent className="p-3 flex items-center gap-2">
                         <AlertCircle className="h-5 w-5 text-yellow-500 shrink-0" />
                         <div>
-                          <p className="text-xl font-bold text-yellow-600">{resumen.semanaActual.pendientes.length}</p>
+                          <p className="text-xl font-bold text-yellow-600">{conteosPorEstado.enviado}</p>
                           <p className="text-xs text-muted-foreground">Pendientes</p>
                         </div>
                       </CardContent>
@@ -722,7 +729,7 @@ export default function SupervisionTimesheetPage() {
                       <CardContent className="p-3 flex items-center gap-2">
                         <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
                         <div>
-                          <p className="text-xl font-bold text-green-600">{resumen.semanaActual.aprobados}</p>
+                          <p className="text-xl font-bold text-green-600">{conteosPorEstado.aprobado}</p>
                           <p className="text-xs text-muted-foreground">Aprobados</p>
                         </div>
                       </CardContent>
@@ -731,47 +738,49 @@ export default function SupervisionTimesheetPage() {
                       <CardContent className="p-3 flex items-center gap-2">
                         <XCircle className="h-5 w-5 text-red-500 shrink-0" />
                         <div>
-                          <p className="text-xl font-bold text-red-600">{resumen.semanaActual.rechazados}</p>
+                          <p className="text-xl font-bold text-red-600">{conteosPorEstado.rechazado}</p>
                           <p className="text-xs text-muted-foreground">Rechazados</p>
                         </div>
                       </CardContent>
                     </Card>
                   </div>
 
-                  {/* Detalle de personas sin enviar */}
-                  {resumen.semanaActual.sinEnviar.length > 0 && (
+                  {/* Personas sin enviar – todas las semanas */}
+                  {sinEnviarGlobal.length > 0 ? (
                     <Card>
-                      <CardContent className="p-4">
-                        <h3 className="text-sm font-semibold text-amber-700 mb-3 flex items-center gap-2">
-                          <Clock className="h-4 w-4" /> Sin enviar esta semana
+                      <CardContent className="p-4 space-y-3">
+                        <h3 className="text-sm font-semibold text-amber-700 flex items-center gap-2">
+                          <Clock className="h-4 w-4" />
+                          Sin enviar — {sinEnviarGlobal.length} {sinEnviarGlobal.length === 1 ? 'persona' : 'personas'},&nbsp;
+                          {conteosPorEstado.sin_enviar} {conteosPorEstado.sin_enviar === 1 ? 'semana' : 'semanas'} pendientes
                         </h3>
-                        <div className="flex flex-wrap gap-2">
-                          {resumen.semanaActual.sinEnviar.map((u: any) => (
-                            <div key={u.id} className="flex items-center gap-2 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-full">
-                              <span className="text-sm font-medium text-amber-800">{u.nombre}</span>
-                              <span className="text-xs font-bold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full">{u.horas}h</span>
-                            </div>
-                          ))}
+                        <div className="divide-y">
+                          {sinEnviarGlobal.map(u => {
+                            const totalH = Math.round(u.semanas.reduce((s, x) => s + x.horas, 0) * 10) / 10
+                            return (
+                              <div key={u.nombre} className="py-2 flex items-start gap-3">
+                                <span className="text-sm font-semibold text-gray-800 min-w-[140px]">{u.nombre}</span>
+                                <div className="flex flex-wrap gap-1.5 flex-1">
+                                  {u.semanas.map(s => (
+                                    <span key={s.semana} className="text-xs bg-amber-50 border border-amber-200 text-amber-700 px-2 py-0.5 rounded-full">
+                                      Sem.{s.semana.split('-W')[1]} · {s.horas}h
+                                    </span>
+                                  ))}
+                                </div>
+                                {u.semanas.length > 1 && (
+                                  <span className="text-xs font-bold text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full shrink-0">{totalH}h total</span>
+                                )}
+                              </div>
+                            )
+                          })}
                         </div>
                       </CardContent>
                     </Card>
-                  )}
-
-                  {/* Detalle de pendientes */}
-                  {resumen.semanaActual.pendientes.length > 0 && (
+                  ) : (
                     <Card>
-                      <CardContent className="p-4">
-                        <h3 className="text-sm font-semibold text-yellow-700 mb-3 flex items-center gap-2">
-                          <AlertCircle className="h-4 w-4" /> Pendientes de aprobación
-                        </h3>
-                        <div className="flex flex-wrap gap-2">
-                          {resumen.semanaActual.pendientes.map((u: any) => (
-                            <div key={u.id} className="flex items-center gap-2 bg-yellow-50 border border-yellow-200 px-3 py-1.5 rounded-full">
-                              <span className="text-sm font-medium text-yellow-800">{u.nombre}</span>
-                              <span className="text-xs font-bold text-yellow-600 bg-yellow-100 px-1.5 py-0.5 rounded-full">{u.horas}h</span>
-                            </div>
-                          ))}
-                        </div>
+                      <CardContent className="p-6 text-center text-sm text-green-700">
+                        <CheckCircle className="h-8 w-8 mx-auto mb-2 text-green-500" />
+                        Todos han enviado sus horas ✅
                       </CardContent>
                     </Card>
                   )}
@@ -793,8 +802,8 @@ export default function SupervisionTimesheetPage() {
                           {copied ? '¡Copiado!' : 'Copiar'}
                         </Button>
                       </div>
-                      <pre className="text-xs font-mono bg-gray-50 border rounded-lg p-3 whitespace-pre-wrap leading-relaxed text-gray-700 max-h-64 overflow-y-auto">
-                        {generarMensajeWhatsapp() || 'No hay datos para esta semana.'}
+                      <pre className="text-xs font-mono bg-gray-50 border rounded-lg p-3 whitespace-pre-wrap leading-relaxed text-gray-700 max-h-72 overflow-y-auto">
+                        {generarMensajeWhatsapp()}
                       </pre>
                     </CardContent>
                   </Card>
