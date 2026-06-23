@@ -29,26 +29,35 @@ export class ProgresoService {
    */
   static async actualizarProgresoTarea(tareaId: string) {
     try {
-      // Obtener tarea con ambas fuentes de horas: timesheets (RegistroHoras) y jornadas de campo
+      // Obtener tarea con ambas fuentes de horas:
+      // 1. RegistroHoras: timesheets + jornadas ya aprobadas (convertidas por aprobar/route.ts)
+      // 2. RegistroHorasCampoMiembro sin registroHorasId: jornadas cerradas pero aún pendientes
+      //    de aprobación (el RegistroHoras todavía no fue creado). Una vez aprobadas el campo
+      //    registroHorasId queda seteado y las horas pasan a contarse desde RegistroHoras.
       const tarea = await prisma.proyectoTarea.findUnique({
         where: { id: tareaId },
         include: {
           registroHoras: { select: { horasTrabajadas: true } },
           registrosCampoTarea: {
-            include: { miembros: { select: { horas: true } } }
+            include: {
+              miembros: {
+                where: { registroHorasId: null }, // solo pendientes, evita doble conteo
+                select: { horas: true }
+              }
+            }
           }
         }
       })
 
       if (!tarea) return
 
-      // Fuente 1: timesheets de oficina/campo (RegistroHoras)
+      // Fuente 1: RegistroHoras (timesheets + campo aprobado)
       const horasTimesheet = tarea.registroHoras.reduce((sum, r) => sum + r.horasTrabajadas, 0)
-      // Fuente 2: jornadas de campo (RegistroHorasCampoTarea → miembros)
-      const horasCampo = tarea.registrosCampoTarea.reduce(
+      // Fuente 2: campo pendiente de aprobación (registroHorasId IS NULL)
+      const horasCampoPendiente = tarea.registrosCampoTarea.reduce(
         (sum, ct) => sum + ct.miembros.reduce((s, m) => s + m.horas, 0), 0
       )
-      const horasReales = horasTimesheet + horasCampo
+      const horasReales = horasTimesheet + horasCampoPendiente
 
       // Calcular progreso basado en horas
       let porcentajeAvance = 0
