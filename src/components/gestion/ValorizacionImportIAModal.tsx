@@ -250,11 +250,13 @@ function DiffVerificar({
 }) {
   const { resumen } = diff
   const pct = resumen.totalCampos > 0 ? Math.round(resumen.coinciden / resumen.totalCampos * 100) : 0
+  const hayDifPartidas = diff.partidas.some(p => !p.coincide && !p.soloEnSistema)
+  const soloEnSistema = diff.partidas.filter(p => p.soloEnSistema)
 
   return (
     <div className="space-y-4">
-      {/* Resumen */}
-      <div className="flex items-center gap-3 flex-wrap">
+      {/* Resumen badges */}
+      <div className="flex items-center gap-2 flex-wrap">
         <Badge variant="default" className="bg-green-600 text-white">
           <CheckCircle2 className="h-3 w-3 mr-1" /> {resumen.coinciden} coinciden
         </Badge>
@@ -272,79 +274,89 @@ function DiffVerificar({
         <span className="text-xs text-muted-foreground ml-auto">{pct}% de coincidencia</span>
       </div>
 
-      {resumen.difieren === 0 && resumen.partidasSoloDoc === 0 && resumen.partidasSoloSistema === 0 ? (
-        <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-md p-4 text-center">
-          <CheckCircle2 className="h-8 w-8 mx-auto mb-2 text-green-600" />
-          <p className="text-sm font-medium text-green-800 dark:text-green-300">Los datos coinciden perfectamente</p>
-          <p className="text-xs text-muted-foreground mt-1">El sistema está alineado con el documento del cliente.</p>
-        </div>
-      ) : (
-        <>
-          {/* Diff cabecera */}
-          {diff.cabecera.some(d => !d.coincide) && (
-            <div className="rounded-md border overflow-hidden">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide p-3 border-b bg-muted/30">
-                Diferencias en cabecera
-              </p>
-              <table className="w-full text-xs">
-                <thead className="bg-muted/20">
-                  <tr>
-                    <th className="text-left p-2 font-medium">Campo</th>
-                    <th className="text-left p-2 font-medium">En sistema</th>
-                    <th className="text-left p-2 font-medium">En documento</th>
-                    <th className="p-2"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {diff.cabecera.filter(d => !d.coincide).map((d, i) => (
-                    <tr key={i} className="border-t bg-red-50/40 dark:bg-red-950/10">
-                      <td className="p-2 font-medium text-muted-foreground">{d.label}</td>
-                      <td className="p-2">{d.valorSistema ?? '—'}{d.unidad ? ` ${d.unidad}` : ''}</td>
-                      <td className="p-2 font-semibold text-red-700 dark:text-red-400">{d.valorDocumento ?? '—'}{d.unidad ? ` ${d.unidad}` : ''}</td>
-                      <td className="p-2"><AlertTriangle className="h-3 w-3 text-amber-500" /></td>
-                    </tr>
-                  ))}
-                  {diff.cabecera.filter(d => d.coincide).map((d, i) => (
-                    <tr key={`ok-${i}`} className="border-t opacity-50">
-                      <td className="p-2 text-muted-foreground">{d.label}</td>
-                      <td className="p-2">{d.valorSistema ?? '—'}</td>
-                      <td className="p-2">{d.valorDocumento ?? '—'}</td>
-                      <td className="p-2"><CheckCircle2 className="h-3 w-3 text-green-500" /></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+      {/* Cabecera — siempre visible */}
+      <div className="rounded-md border overflow-hidden">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide p-3 border-b bg-muted/30">
+          Verificación de cabecera
+        </p>
+        <table className="w-full text-xs">
+          <thead className="bg-muted/20">
+            <tr>
+              <th className="text-left p-2 font-medium">Campo</th>
+              <th className="text-left p-2 font-medium">En sistema</th>
+              <th className="text-left p-2 font-medium">En documento</th>
+              <th className="p-2 w-6"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {diff.cabecera.map((d, i) => (
+              <tr key={i} className={`border-t ${!d.coincide ? 'bg-red-50/40 dark:bg-red-950/10' : 'opacity-60'}`}>
+                <td className={`p-2 ${!d.coincide ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>{d.label}</td>
+                <td className="p-2">{d.valorSistema ?? '—'}{d.unidad ? ` ${d.unidad}` : ''}</td>
+                <td className={`p-2 ${!d.coincide ? 'font-semibold text-red-700 dark:text-red-400' : ''}`}>
+                  {d.valorDocumento ?? '—'}{d.unidad ? ` ${d.unidad}` : ''}
+                </td>
+                <td className="p-2">
+                  {d.coincide
+                    ? <CheckCircle2 className="h-3 w-3 text-green-500" />
+                    : <AlertTriangle className="h-3 w-3 text-amber-500" />}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
-          {/* Diff partidas */}
-          {diff.partidas.some(p => !p.coincide) && (
-            <div className="rounded-md border overflow-hidden">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide p-3 border-b bg-muted/30">
-                Diferencias en partidas
-              </p>
-              <div className="max-h-56 overflow-y-auto">
-                {diff.partidas.filter(p => !p.coincide).map((p, pi) => (
-                  <div key={pi} className="border-b last:border-0 p-3">
-                    <p className="text-xs font-medium mb-1">
-                      {p.soloEnDocumento && <Badge variant="secondary" className="mr-2 text-[10px]">Solo en doc</Badge>}
-                      {p.soloEnSistema && <Badge variant="secondary" className="mr-2 text-[10px]">Solo en sistema</Badge>}
-                      #{p.numero} — {p.descripcion}
-                    </p>
-                    {p.diffs.filter(d => !d.coincide).map((d, di) => (
-                      <div key={di} className="flex gap-4 text-xs text-muted-foreground pl-2">
-                        <span className="w-28 shrink-0">{d.label}</span>
-                        <span className="line-through">{d.valorSistema ?? '—'}{d.unidad ? ` ${d.unidad}` : ''}</span>
-                        <ChevronRight className="h-3 w-3 shrink-0 text-red-400 mt-px" />
-                        <span className="font-semibold text-red-700 dark:text-red-400">{d.valorDocumento ?? '—'}{d.unidad ? ` ${d.unidad}` : ''}</span>
-                      </div>
-                    ))}
+      {/* Partidas con diferencias numéricas reales */}
+      {hayDifPartidas && (
+        <div className="rounded-md border overflow-hidden">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide p-3 border-b bg-muted/30">
+            Diferencias en partidas
+          </p>
+          <div className="max-h-48 overflow-y-auto">
+            {diff.partidas.filter(p => !p.coincide && !p.soloEnSistema).map((p, pi) => (
+              <div key={pi} className="border-b last:border-0 p-3">
+                <p className="text-xs font-medium mb-1">
+                  {p.soloEnDocumento && <Badge variant="secondary" className="mr-2 text-[10px]">Solo en doc</Badge>}
+                  #{p.numero} — {p.descripcion}
+                </p>
+                {p.diffs.filter(d => !d.coincide).map((d, di) => (
+                  <div key={di} className="flex gap-3 text-xs text-muted-foreground pl-2 mt-0.5">
+                    <span className="w-28 shrink-0">{d.label}</span>
+                    <span className="line-through">{d.valorSistema ?? '—'}{d.unidad ? ` ${d.unidad}` : ''}</span>
+                    <ChevronRight className="h-3 w-3 shrink-0 text-red-400 mt-px" />
+                    <span className="font-semibold text-red-700 dark:text-red-400">{d.valorDocumento ?? '—'}{d.unidad ? ` ${d.unidad}` : ''}</span>
                   </div>
                 ))}
               </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Partidas "solo en sistema" — con nota explicativa */}
+      {soloEnSistema.length > 0 && (
+        <div className="rounded-md border border-blue-200 dark:border-blue-800 overflow-hidden">
+          <div className="p-3 border-b bg-blue-50/50 dark:bg-blue-950/20 flex items-start gap-2">
+            <AlertTriangle className="h-3.5 w-3.5 text-blue-500 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs font-semibold text-blue-800 dark:text-blue-300">
+                Partidas internas sin equivalente en el documento
+              </p>
+              <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
+                El cliente consolida estas partidas en un solo ítem. No es un error —
+                el total facturado coincide con el documento.
+              </p>
             </div>
-          )}
-        </>
+          </div>
+          <div className="divide-y">
+            {soloEnSistema.map((p, i) => (
+              <p key={i} className="text-xs text-muted-foreground p-3">
+                #{p.numero} — {p.descripcion}
+              </p>
+            ))}
+          </div>
+        </div>
       )}
 
       <div className="flex justify-end pt-2">
