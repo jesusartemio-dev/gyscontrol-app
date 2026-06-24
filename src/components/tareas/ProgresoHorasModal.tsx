@@ -27,7 +27,8 @@ import {
   User,
   AlertCircle,
   CheckCircle,
-  PlusCircle
+  PlusCircle,
+  Info
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -80,6 +81,14 @@ export function ProgresoHorasModal({ tarea, open, onClose, userId, onActualizado
   const [guardandoAprox, setGuardandoAprox] = useState(false)
   const [mostrarFormAprox, setMostrarFormAprox] = useState(false)
 
+  // Horas del día seleccionado (para detectar solapamiento)
+  const [horasDia, setHorasDia] = useState<{
+    horasRegistradas: number
+    horasPorDia: number
+    horasDisponibles: number
+  } | null>(null)
+  const [loadingHorasDia, setLoadingHorasDia] = useState(false)
+
   // Progreso
   const [progresoEdit, setProgresoEdit] = useState(0)
   const [guardandoProgreso, setGuardandoProgreso] = useState(false)
@@ -105,6 +114,20 @@ export function ProgresoHorasModal({ tarea, open, onClose, userId, onActualizado
     }
   }, [tarea])
 
+  const fetchHorasDia = useCallback(async (fecha: string) => {
+    if (!fecha) return
+    setLoadingHorasDia(true)
+    try {
+      const res = await fetch(`/api/horas-hombre/horas-dia?fecha=${fecha}`)
+      const json = await res.json()
+      if (json.success) setHorasDia(json.data)
+    } catch {
+      // silencioso
+    } finally {
+      setLoadingHorasDia(false)
+    }
+  }, [])
+
   useEffect(() => {
     if (open && tarea) {
       setProgresoEdit(tarea.progreso)
@@ -112,10 +135,18 @@ export function ProgresoHorasModal({ tarea, open, onClose, userId, onActualizado
       setHorasAprox('')
       setDescAprox('')
       setMostrarFormAprox(false)
+      setHorasDia(null)
       setFechaAprox(format(new Date(), 'yyyy-MM-dd'))
       cargarHoras()
     }
   }, [open, tarea, cargarHoras])
+
+  // Consultar horas del día cada vez que cambia la fecha o se abre el form
+  useEffect(() => {
+    if (mostrarFormAprox && fechaAprox) {
+      fetchHorasDia(fechaAprox)
+    }
+  }, [fechaAprox, mostrarFormAprox, fetchHorasDia])
 
   const guardarProgreso = async () => {
     if (!tarea) return
@@ -151,6 +182,22 @@ export function ProgresoHorasModal({ tarea, open, onClose, userId, onActualizado
     const h = parseFloat(horasAprox)
     if (isNaN(h) || h <= 0 || h > 24) {
       toast({ title: 'Ingresa horas válidas (0.5 - 24)', variant: 'destructive' })
+      return
+    }
+    if (horasDia && horasDia.horasDisponibles <= 0) {
+      toast({
+        title: 'Sin horas disponibles ese día',
+        description: `Ya tienes ${horasDia.horasRegistradas}h registradas (máximo ${horasDia.horasPorDia}h).`,
+        variant: 'destructive'
+      })
+      return
+    }
+    if (horasDia && h > horasDia.horasDisponibles) {
+      toast({
+        title: 'Excede las horas disponibles',
+        description: `Solo puedes agregar hasta ${horasDia.horasDisponibles}h más ese día.`,
+        variant: 'destructive'
+      })
       return
     }
     setGuardandoAprox(true)
@@ -307,18 +354,46 @@ export function ProgresoHorasModal({ tarea, open, onClose, userId, onActualizado
                             onChange={e => setFechaAprox(e.target.value)}
                             className="h-8 text-xs mt-1"
                           />
+                          {/* Indicador de horas del día */}
+                          {loadingHorasDia ? (
+                            <p className="text-[10px] text-gray-400 mt-1 flex items-center gap-1">
+                              <RefreshCw className="h-2.5 w-2.5 animate-spin" /> Consultando...
+                            </p>
+                          ) : horasDia && (
+                            <div className={`mt-1.5 rounded px-2 py-1 text-[10px] flex items-center gap-1 ${
+                              horasDia.horasDisponibles <= 0
+                                ? 'bg-red-100 text-red-700 border border-red-200'
+                                : horasDia.horasRegistradas > 0
+                                  ? 'bg-amber-100 text-amber-700 border border-amber-200'
+                                  : 'bg-green-100 text-green-700 border border-green-200'
+                            }`}>
+                              <Info className="h-2.5 w-2.5 shrink-0" />
+                              {horasDia.horasDisponibles <= 0
+                                ? `Día completo (${horasDia.horasRegistradas}h / ${horasDia.horasPorDia}h)`
+                                : horasDia.horasRegistradas > 0
+                                  ? `${horasDia.horasRegistradas}h ya registradas — quedan ${horasDia.horasDisponibles}h`
+                                  : `Día libre — hasta ${horasDia.horasPorDia}h disponibles`
+                              }
+                            </div>
+                          )}
                         </div>
                         <div>
-                          <Label className="text-xs text-gray-600">Horas</Label>
+                          <Label className="text-xs text-gray-600">
+                            Horas
+                            {horasDia && horasDia.horasDisponibles > 0 && (
+                              <span className="ml-1 text-gray-400">(máx. {horasDia.horasDisponibles}h)</span>
+                            )}
+                          </Label>
                           <Input
                             type="number"
                             min="0.5"
-                            max="24"
+                            max={horasDia ? horasDia.horasDisponibles : 24}
                             step="0.5"
-                            placeholder="8"
+                            placeholder={horasDia?.horasDisponibles ? String(horasDia.horasDisponibles) : '8'}
                             value={horasAprox}
                             onChange={e => setHorasAprox(e.target.value)}
-                            className="h-8 text-xs mt-1"
+                            className={`h-8 text-xs mt-1 ${(horasDia?.horasDisponibles ?? 1) <= 0 ? 'border-red-300' : ''}`}
+                            disabled={(horasDia?.horasDisponibles ?? 1) <= 0}
                           />
                         </div>
                       </div>
