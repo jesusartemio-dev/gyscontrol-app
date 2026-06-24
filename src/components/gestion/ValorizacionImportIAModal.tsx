@@ -125,20 +125,33 @@ function FileDropzone({ onFile }: { onFile: (f: File) => void }) {
   )
 }
 
+const ESTADO_LABELS: Record<string, string> = {
+  borrador: 'Borrador', enviada: 'Enviada', revision: 'En revisión',
+  aprobada: 'Aprobada', rechazada: 'Rechazada', pagada: 'Pagada',
+}
+
 // ── Subcomponente: Preview crear ──────────────────────────
 
 function PreviewCrear({
   resultado,
+  valsExistentes,
   onConfirm,
   onDiscard,
   saving,
 }: {
   resultado: ValorizacionExtracted
+  valsExistentes: ValResumen[]
   onConfirm: () => void
   onDiscard: () => void
   saving: boolean
 }) {
   const { cabecera: c, partidas, advertencias, confianza } = resultado
+  const [confirmado, setConfirmado] = useState(false)
+  const hayValsExistentes = valsExistentes.length > 0
+  const ultimaVal = valsExistentes[valsExistentes.length - 1]
+  // Estados que indican progreso real (no solo borrador)
+  const valsActivas = valsExistentes.filter(v => v.estado !== 'borrador')
+
   return (
     <div className="space-y-4">
       {/* Confianza */}
@@ -149,7 +162,41 @@ function PreviewCrear({
         {c.codigoDocumento && <span className="text-xs text-muted-foreground">{c.codigoDocumento}</span>}
       </div>
 
-      {/* Advertencias */}
+      {/* Advertencia: valorizaciones existentes */}
+      {hayValsExistentes && (
+        <div className="rounded-md border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 p-3 space-y-2">
+          <p className="text-xs font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+            Este proyecto ya tiene {valsExistentes.length} valorización{valsExistentes.length > 1 ? 'es' : ''} registrada{valsExistentes.length > 1 ? 's' : ''}
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {valsExistentes.map(v => (
+              <span key={v.id} className="inline-flex items-center gap-1 text-[10px] bg-white dark:bg-black/20 border rounded px-1.5 py-0.5 text-amber-900 dark:text-amber-200">
+                Val. {v.numero} — {ESTADO_LABELS[v.estado] ?? v.estado}
+              </span>
+            ))}
+          </div>
+          {valsActivas.length > 0 && (
+            <p className="text-xs text-amber-700 dark:text-amber-400">
+              {valsActivas.length} de ellas ya fueron enviadas o aprobadas.
+              {ultimaVal && ` La última (Val. ${ultimaVal.numero}) está en estado "${ESTADO_LABELS[ultimaVal.estado] ?? ultimaVal.estado}".`}
+            </p>
+          )}
+          <label className="flex items-start gap-2 cursor-pointer mt-1">
+            <input
+              type="checkbox"
+              checked={confirmado}
+              onChange={e => setConfirmado(e.target.checked)}
+              className="mt-0.5 accent-amber-600"
+            />
+            <span className="text-xs text-amber-800 dark:text-amber-300">
+              Confirmo que quiero crear una nueva valorización adicional
+            </span>
+          </label>
+        </div>
+      )}
+
+      {/* Advertencias IA */}
       {advertencias.length > 0 && (
         <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md p-3 space-y-1">
           <p className="text-xs font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-1">
@@ -231,7 +278,12 @@ function PreviewCrear({
       {/* Acciones */}
       <div className="flex justify-end gap-3 pt-2">
         <Button variant="outline" onClick={onDiscard} disabled={saving}>Descartar</Button>
-        <Button onClick={onConfirm} disabled={saving} className="bg-teal-600 hover:bg-teal-700 text-white">
+        <Button
+          onClick={onConfirm}
+          disabled={saving || (hayValsExistentes && !confirmado)}
+          className="bg-teal-600 hover:bg-teal-700 text-white disabled:opacity-50"
+          title={hayValsExistentes && !confirmado ? 'Confirma la advertencia antes de continuar' : undefined}
+        >
           {saving ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Creando...</> : <><CheckCircle2 className="h-4 w-4 mr-2" />Crear Valorización</>}
         </Button>
       </div>
@@ -407,17 +459,17 @@ export function ValorizacionImportIAModal({
     }
   }, [open, propProyectoId, propValId, forceVerify])
 
-  // Load valorizations when project changes (verify mode)
+  // Load valorizations when project changes (both modes)
   useEffect(() => {
     const pid = selectedProyectoId
-    if (!pid || mode !== 'verificar') { setValList([]); return }
+    if (!pid) { setValList([]); return }
     setLoadingVals(true)
     fetch(`/api/gestion/valorizaciones?proyectoId=${pid}`)
       .then(r => r.json())
       .then((data: ValResumen[]) => setValList(data))
       .catch(() => setValList([]))
       .finally(() => setLoadingVals(false))
-  }, [selectedProyectoId, mode])
+  }, [selectedProyectoId])
 
   // ── Procesamiento SSE ──────────────────────────────────
 
@@ -679,6 +731,7 @@ export function ValorizacionImportIAModal({
             </div>
             <PreviewCrear
               resultado={resultado}
+              valsExistentes={valList}
               onConfirm={handleCrear}
               onDiscard={onClose}
               saving={saving}
