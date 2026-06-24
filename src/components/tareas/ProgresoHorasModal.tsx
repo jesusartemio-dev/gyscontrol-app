@@ -12,7 +12,6 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Calendar } from '@/components/ui/calendar'
 import {
   Table,
   TableBody,
@@ -364,54 +363,97 @@ export function ProgresoHorasModal({ tarea, open, onClose, userId, onActualizado
                         <AlertCircle className="h-3.5 w-3.5" />
                         Horas aproximadas — se guardan en el timesheet
                       </div>
-                      {/* Calendario con puntos de color por día */}
+                      {/* Mini calendario custom */}
                       <div className="space-y-2">
-                        <div className="flex justify-center">
-                          <Calendar
-                            mode="single"
-                            selected={fechaSeleccionada}
-                            onSelect={(d) => {
-                              setFechaSeleccionada(d)
-                              setHorasDia(null)
-                            }}
-                            month={mesCalendario}
-                            onMonthChange={(m) => setMesCalendario(m)}
-                            disabled={{ after: new Date() }}
-                            className="rounded-md border"
-                            components={{
-                              Chevron: (props) => props.orientation === 'left'
-                                ? <ChevronLeft className="h-4 w-4" />
-                                : <ChevronRight className="h-4 w-4" />,
-                              DayButton: ({ day, modifiers, className, children, ...btnProps }) => {
-                                const dateStr = format(day.date, 'yyyy-MM-dd')
-                                const horas = horasMes[dateStr] ?? 0
-                                const dotColor = horas >= horasPorDia
-                                  ? 'bg-red-400'
-                                  : horas > 0
-                                    ? 'bg-amber-400'
-                                    : ''
-                                return (
-                                  <button className={cn(className, 'relative')} {...btnProps}>
-                                    {children}
-                                    {dotColor && (
-                                      <span className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 h-1.5 w-1.5 rounded-full ${dotColor}`} />
-                                    )}
-                                  </button>
-                                )
-                              }
-                            }}
-                          />
-                        </div>
+                        {(() => {
+                          const hoy = new Date()
+                          const año = mesCalendario.getFullYear()
+                          const mes = mesCalendario.getMonth() // 0-indexed
+                          // Primer día del mes (0=Dom...6=Sáb). Convertir a lunes-primero.
+                          const primerDia = new Date(año, mes, 1).getDay()
+                          const offset = primerDia === 0 ? 6 : primerDia - 1
+                          const diasEnMes = new Date(año, mes + 1, 0).getDate()
+                          const celdas: (number | null)[] = [
+                            ...Array(offset).fill(null),
+                            ...Array.from({ length: diasEnMes }, (_, i) => i + 1),
+                          ]
+                          while (celdas.length % 7 !== 0) celdas.push(null)
+                          const selectedStr = fechaSeleccionada ? format(fechaSeleccionada, 'yyyy-MM-dd') : ''
+                          const mesNombre = new Date(año, mes).toLocaleDateString('es-PE', { month: 'long', year: 'numeric' })
+                          return (
+                            <div className="rounded-md border bg-white p-2 select-none">
+                              {/* Navegación mes */}
+                              <div className="flex items-center justify-between mb-1.5 px-1">
+                                <button
+                                  type="button"
+                                  onClick={() => setMesCalendario(new Date(año, mes - 1, 1))}
+                                  className="p-0.5 rounded hover:bg-gray-100"
+                                >
+                                  <ChevronLeft className="h-4 w-4 text-gray-500" />
+                                </button>
+                                <span className="text-xs font-medium capitalize">{mesNombre}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setMesCalendario(new Date(año, mes + 1, 1))}
+                                  disabled={año > hoy.getFullYear() || (año === hoy.getFullYear() && mes >= hoy.getMonth())}
+                                  className="p-0.5 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-default"
+                                >
+                                  <ChevronRight className="h-4 w-4 text-gray-500" />
+                                </button>
+                              </div>
+                              {/* Cabecera L M M J V S D */}
+                              <div className="grid grid-cols-7">
+                                {['L','M','M','J','V','S','D'].map((d, i) => (
+                                  <div key={i} className="h-7 flex items-center justify-center text-[10px] font-medium text-gray-400">{d}</div>
+                                ))}
+                              </div>
+                              {/* Días */}
+                              <div className="grid grid-cols-7">
+                                {celdas.map((dia, i) => {
+                                  if (!dia) return <div key={i} className="h-8 w-8" />
+                                  const dateStr = `${año}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`
+                                  const horas = horasMes[dateStr] ?? 0
+                                  const esFuturo = new Date(año, mes, dia) > hoy
+                                  const esSeleccionado = dateStr === selectedStr
+                                  const isPartial = horas > 0 && horas < horasPorDia
+                                  const isFull = horas >= horasPorDia
+                                  return (
+                                    <button
+                                      key={i}
+                                      type="button"
+                                      disabled={esFuturo}
+                                      onClick={() => { setFechaSeleccionada(new Date(año, mes, dia)); setHorasDia(null) }}
+                                      className={cn(
+                                        'h-8 w-8 mx-auto relative flex flex-col items-center justify-center rounded-full text-xs transition-colors',
+                                        esFuturo ? 'text-gray-200 cursor-default' : 'hover:bg-gray-100',
+                                        esSeleccionado ? 'bg-primary text-white hover:bg-primary' : 'text-gray-700'
+                                      )}
+                                    >
+                                      <span className="leading-none">{dia}</span>
+                                      {(isPartial || isFull) && (
+                                        <span className={cn(
+                                          'absolute bottom-0.5 h-1 w-1 rounded-full',
+                                          isFull ? 'bg-red-400' : 'bg-amber-400',
+                                          esSeleccionado && 'bg-white'
+                                        )} />
+                                      )}
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )
+                        })()}
 
                         {/* Leyenda */}
-                        <div className="flex gap-3 px-1 text-[10px] text-gray-500">
-                          <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-full bg-amber-400" />Con horas</span>
-                          <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-full bg-red-400" />Jornada completa</span>
+                        <div className="flex gap-3 text-[10px] text-gray-500">
+                          <span className="flex items-center gap-1"><span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />Con horas</span>
+                          <span className="flex items-center gap-1"><span className="inline-block h-1.5 w-1.5 rounded-full bg-red-400" />Jornada completa</span>
                         </div>
 
                         {/* Fila: horas + indicador del día seleccionado */}
                         <div className="flex gap-3 items-start">
-                          <div className="w-32 shrink-0">
+                          <div className="w-28 shrink-0">
                             <Label className="text-xs text-gray-600">Horas</Label>
                             <Input
                               type="number"
