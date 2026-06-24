@@ -164,19 +164,31 @@ function PreviewCrear({
       {/* Cabecera */}
       <div className="rounded-md border p-4 space-y-3">
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Datos del documento</p>
+        {/* Cifra principal: subtotal sin IGV (lo que el cliente destaca en el documento) */}
+        <div className="bg-teal-50 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-800 rounded-md p-3 flex items-center justify-between">
+          <div>
+            <p className="text-xs text-teal-700 dark:text-teal-400 font-medium">Subtotal sin IGV</p>
+            <p className="text-xs text-teal-600 dark:text-teal-500 mt-0.5">Cifra principal del documento</p>
+          </div>
+          <p className="text-xl font-bold text-teal-700 dark:text-teal-300">
+            {c.moneda} {fmtNum(c.subtotalSinIGV ?? c.montoValorizacion)}
+          </p>
+        </div>
         <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
           {c.clienteNombre && <><span className="text-muted-foreground">Cliente</span><span className="font-medium">{c.clienteNombre}</span></>}
           {c.proyectoNombre && <><span className="text-muted-foreground">Proyecto</span><span className="font-medium">{c.proyectoNombre}</span></>}
           <span className="text-muted-foreground">Período</span>
           <span className="font-medium">{fmtDate(c.periodoInicio)} — {fmtDate(c.periodoFin)}</span>
           <span className="text-muted-foreground">Moneda</span><span className="font-medium">{c.moneda}</span>
-          <span className="text-muted-foreground">Monto val.</span><span className="font-medium">{fmtNum(c.montoValorizacion)}</span>
+          {c.montoValorizacion != null && c.subtotalSinIGV != null && Math.abs(c.montoValorizacion - c.subtotalSinIGV) > 0.5 && (
+            <><span className="text-muted-foreground">Monto bruto</span><span className="font-medium">{fmtNum(c.montoValorizacion)}</span></>
+          )}
           <span className="text-muted-foreground">IGV {c.igvPorcentaje}%</span>
-          <span className="font-medium">{c.montoValorizacion != null ? fmtNum(c.montoValorizacion * c.igvPorcentaje / 100) : '—'}</span>
-          <span className="text-muted-foreground">Neto a recibir</span>
+          <span className="font-medium">{(c.subtotalSinIGV ?? c.montoValorizacion) != null ? fmtNum((c.subtotalSinIGV ?? c.montoValorizacion)! * c.igvPorcentaje / 100) : '—'}</span>
+          <span className="text-muted-foreground">Neto con IGV</span>
           <span className="font-semibold text-green-700 dark:text-green-400">{c.moneda} {fmtNum(c.netoARecibir)}</span>
-          {c.adelantoPorcentaje > 0 && <><span className="text-muted-foreground">Adelanto</span><span>{c.adelantoPorcentaje}%</span></>}
-          {c.descuentoComercialPorcentaje > 0 && <><span className="text-muted-foreground">Descuento</span><span>{c.descuentoComercialPorcentaje}%</span></>}
+          {c.adelantoPorcentaje > 0 && <><span className="text-muted-foreground">Amort. adelanto</span><span>{c.adelantoPorcentaje}%</span></>}
+          {c.descuentoComercialPorcentaje > 0 && <><span className="text-muted-foreground">Descuento comercial</span><span>{c.descuentoComercialPorcentaje}%</span></>}
           {c.fondoGarantiaPorcentaje > 0 && <><span className="text-muted-foreground">Fondo garantía</span><span>{c.fondoGarantiaPorcentaje}%</span></>}
         </div>
       </div>

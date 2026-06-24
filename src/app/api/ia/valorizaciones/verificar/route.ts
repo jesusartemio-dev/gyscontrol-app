@@ -85,6 +85,7 @@ export async function POST(request: NextRequest) {
           moneda: val.moneda ?? 'USD',
           presupuestoContractual: val.presupuestoContractual ?? 0,
           montoValorizacion: val.montoValorizacion ?? 0,
+          subtotal: val.subtotal ?? 0,
           descuentoComercialPorcentaje: val.descuentoComercialPorcentaje ?? 0,
           adelantoPorcentaje: val.adelantoPorcentaje ?? 0,
           igvPorcentaje: val.igvPorcentaje ?? 18,

@@ -18,11 +18,16 @@ export interface ValorizacionExtractedCabecera {
   periodoFin: string | null      // ISO date YYYY-MM-DD
   moneda: string                 // 'USD' | 'PEN'
   presupuestoContractual: number | null
+  // Monto BRUTO = suma de ítems × % avance, ANTES de descuentos/deducciones/IGV
   montoValorizacion: number | null
+  // Neto SIN IGV = monto bruto − descuentos − amortización adelanto − fondo garantía
+  // Es lo que el cliente llama "valorización a cobrar" o "subtotal". MÉTRICA PRINCIPAL.
+  subtotalSinIGV: number | null
   descuentoComercialPorcentaje: number
   adelantoPorcentaje: number
   igvPorcentaje: number
   fondoGarantiaPorcentaje: number
+  // Neto CON IGV = subtotalSinIGV + IGV. El sistema lo llama "netoARecibir".
   netoARecibir: number | null
   observaciones: string | null
 }
@@ -162,15 +167,26 @@ const SYSTEM_PROMPT = `You are a JSON extraction API for Peruvian engineering an
 The documents are client-issued Excel files that certify work progress for billing purposes.
 They are written in Spanish and use Peruvian accounting conventions (PEN or USD, IGV=18%).
 
-A valorización document contains:
-- HEADER: project name/code, client name, document code, billing period (start and end dates),
-  currency, contractual budget, financial conditions (discount%, advance%, IGV%, guarantee fund%)
-- PARTIDAS (line items): sequential items showing what % of each contract item was completed.
-  Each partida has: number, description, unit, quantity, unit price, contractual amount,
-  accumulated % from prior valuations, accumulated % in this valuation, increment %, amount this period.
-- TOTALS: total valorization amount, IGV, net to receive.
+A valorización document has this financial structure (UNDERSTAND THIS CAREFULLY):
+1. GROSS AMOUNT (montoValorizacion): Sum of all work items × their advance %. BEFORE any deductions.
+2. DEDUCTIONS: commercial discount, advance amortization (amortización de adelanto), guarantee fund (fondo de garantía).
+   These appear as separate line items or percentages in a summary section.
+3. SUBTOTAL WITHOUT IGV (subtotalSinIGV): = gross - all deductions. This is what appears as "valorización neta",
+   "monto valorizado", "subtotal", "valorización a cobrar", or the main figure the client highlights.
+   THIS IS THE KEY METRIC. It does NOT include IGV.
+4. IGV (18% typically): Applied on subtotalSinIGV.
+5. NET WITH IGV (netoARecibir): = subtotalSinIGV + IGV. The final amount to be paid.
 
-CRITICAL RULES:
+CRITICAL FIELD MAPPING RULES:
+- montoValorizacion = GROSS amount (step 1 above). If the document shows a "total valorización" before deductions, use that.
+  If only one total figure is visible, it's likely the subtotalSinIGV (step 3), NOT the gross.
+- subtotalSinIGV = the amount AFTER deductions but BEFORE IGV. Often the most prominent figure in the document.
+- netoARecibir = the FINAL amount INCLUDING IGV (subtotalSinIGV + IGV amount).
+- If you see two similar amounts and one ≈ the other × 1.18, the smaller is subtotalSinIGV and the larger is netoARecibir.
+- adelantoPorcentaje = the advance percentage deducted (if shown as %). If shown as a fixed amount, estimate % if possible.
+- descuentoComercialPorcentaje = ONLY the explicit commercial discount %, NOT advance amortization.
+
+OTHER RULES:
 - Respond ONLY with raw JSON. No markdown, no code fences, no explanations.
 - Dates must be in YYYY-MM-DD format. If only month/year visible, use first/last day of month.
 - Percentages as numbers 0-100 (not 0-1).
@@ -200,6 +216,7 @@ Responde ÚNICAMENTE con este JSON (sin texto adicional):
     "moneda": "USD",
     "presupuestoContractual": 0,
     "montoValorizacion": 0,
+    "subtotalSinIGV": 0,
     "descuentoComercialPorcentaje": 0,
     "adelantoPorcentaje": 0,
     "igvPorcentaje": 18,
@@ -286,6 +303,7 @@ function parseExtracted(raw: Record<string, unknown>): ValorizacionExtracted {
     moneda: (cab.moneda as string) || 'USD',
     presupuestoContractual: cab.presupuestoContractual != null ? Number(cab.presupuestoContractual) : null,
     montoValorizacion: cab.montoValorizacion != null ? Number(cab.montoValorizacion) : null,
+    subtotalSinIGV: cab.subtotalSinIGV != null ? Number(cab.subtotalSinIGV) : null,
     descuentoComercialPorcentaje: Number(cab.descuentoComercialPorcentaje) || 0,
     adelantoPorcentaje: Number(cab.adelantoPorcentaje) || 0,
     igvPorcentaje: Number(cab.igvPorcentaje) || 18,
@@ -356,6 +374,8 @@ interface SistemaVal {
   moneda: string
   presupuestoContractual: number
   montoValorizacion: number
+  // subtotal = montoValorizacion − descuento − adelanto (antes de IGV). Es la cifra principal.
+  subtotal: number
   descuentoComercialPorcentaje: number
   adelantoPorcentaje: number
   igvPorcentaje: number
@@ -386,7 +406,35 @@ function numEq(a: number | null, b: number | null, tolerance = 0.1): boolean {
 export function buildDiff(extraido: ValorizacionExtracted, sistema: SistemaVal): ValorizacionDiff {
   const cab = extraido.cabecera
 
+  // El subtotalSinIGV del documento = la cifra que el gestor compara con el sistema.subtotal.
+  // Si la IA no pudo distinguirlo del montoValorizacion, usamos montoValorizacion como fallback.
+  const docSubtotal = cab.subtotalSinIGV ?? cab.montoValorizacion
+
   const headerDiffs: CampoDiff[] = [
+    {
+      campo: 'subtotal',
+      label: 'Subtotal sin IGV ★',
+      valorSistema: sistema.subtotal,
+      valorDocumento: docSubtotal,
+      coincide: numEq(sistema.subtotal, docSubtotal),
+      unidad: cab.moneda,
+    },
+    {
+      campo: 'netoARecibir',
+      label: 'Neto con IGV',
+      valorSistema: sistema.netoARecibir,
+      valorDocumento: cab.netoARecibir,
+      coincide: numEq(sistema.netoARecibir, cab.netoARecibir),
+      unidad: cab.moneda,
+    },
+    {
+      campo: 'montoValorizacion',
+      label: 'Monto bruto (antes deducciones)',
+      valorSistema: sistema.montoValorizacion,
+      valorDocumento: cab.montoValorizacion,
+      coincide: numEq(sistema.montoValorizacion, cab.montoValorizacion),
+      unidad: cab.moneda,
+    },
     {
       campo: 'periodoInicio',
       label: 'Inicio período',
@@ -402,22 +450,6 @@ export function buildDiff(extraido: ValorizacionExtracted, sistema: SistemaVal):
       coincide: sistema.periodoFin?.split('T')[0] === cab.periodoFin,
     },
     {
-      campo: 'montoValorizacion',
-      label: 'Monto valorización',
-      valorSistema: sistema.montoValorizacion,
-      valorDocumento: cab.montoValorizacion,
-      coincide: numEq(sistema.montoValorizacion, cab.montoValorizacion),
-      unidad: cab.moneda,
-    },
-    {
-      campo: 'netoARecibir',
-      label: 'Neto a recibir',
-      valorSistema: sistema.netoARecibir,
-      valorDocumento: cab.netoARecibir,
-      coincide: numEq(sistema.netoARecibir, cab.netoARecibir),
-      unidad: cab.moneda,
-    },
-    {
       campo: 'igvPorcentaje',
       label: 'IGV %',
       valorSistema: sistema.igvPorcentaje,
@@ -427,7 +459,7 @@ export function buildDiff(extraido: ValorizacionExtracted, sistema: SistemaVal):
     },
     {
       campo: 'descuentoComercialPorcentaje',
-      label: 'Descuento %',
+      label: 'Descuento comercial %',
       valorSistema: sistema.descuentoComercialPorcentaje,
       valorDocumento: cab.descuentoComercialPorcentaje,
       coincide: numEq(sistema.descuentoComercialPorcentaje, cab.descuentoComercialPorcentaje, 0.01),
@@ -435,7 +467,7 @@ export function buildDiff(extraido: ValorizacionExtracted, sistema: SistemaVal):
     },
     {
       campo: 'adelantoPorcentaje',
-      label: 'Adelanto %',
+      label: 'Amortización adelanto %',
       valorSistema: sistema.adelantoPorcentaje,
       valorDocumento: cab.adelantoPorcentaje,
       coincide: numEq(sistema.adelantoPorcentaje, cab.adelantoPorcentaje, 0.01),
