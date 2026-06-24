@@ -1615,11 +1615,23 @@ export function RegistroHorasWizard({
               </p>
             </div>
           ) : (
-            <p className="text-[11px] text-muted-foreground">
-              Para ajustar el avance de esta tarea, ve a
-              <span className="mx-1 font-medium">Mis Tareas</span>
-              (solo el responsable puede modificarlo).
-            </p>
+            <div className="p-3 rounded-lg border bg-gray-50 border-gray-200 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-700">Avance actual</span>
+                <span className="text-sm font-semibold text-gray-900">
+                  {elementoSeleccionado?.progreso ?? 0}%
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div
+                  className={`h-2 rounded-full ${(elementoSeleccionado?.progreso ?? 0) === 100 ? 'bg-green-500' : 'bg-blue-500'}`}
+                  style={{ width: `${elementoSeleccionado?.progreso ?? 0}%` }}
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Solo el responsable de la tarea puede modificar el avance.
+              </p>
+            </div>
           )
         )}
       </div>

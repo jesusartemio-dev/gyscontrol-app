@@ -35,7 +35,8 @@ import {
   Check,
   LayoutGrid,
   List,
-  Zap
+  Zap,
+  BarChart2
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import {
@@ -50,6 +51,8 @@ import { useToast } from '@/hooks/use-toast'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import Link from 'next/link'
+import { useSession } from 'next-auth/react'
+import { ProgresoHorasModal } from './ProgresoHorasModal'
 
 interface TareaAsignada {
   id: string
@@ -97,11 +100,15 @@ export function TareasAsignadasDashboard({
   onMarcarCompletada,
   onRecargar
 }: TareasAsignadasDashboardProps) {
+  const { data: session } = useSession()
+  const userId = session?.user?.id ?? ''
+
   const [filtroPrioridad, setFiltroPrioridad] = useState<string>('todas')
   const [filtroEstado, setFiltroEstado] = useState<string>('activas')
   const [filtroProyecto, setFiltroProyecto] = useState<string>('todos')
   const [tareaSeleccionada, setTareaSeleccionada] = useState<TareaAsignada | null>(null)
   const [vistaActual, setVistaActual] = useState<'tabla' | 'card'>('tabla')
+  const [tareaParaProgreso, setTareaParaProgreso] = useState<TareaAsignada | null>(null)
 
   // Estados para edición de progreso y estado
   const [editandoProgreso, setEditandoProgreso] = useState<string | null>(null)
@@ -516,8 +523,17 @@ export function TareasAsignadasDashboard({
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-1">
-                              <Button variant="ghost" size="sm" onClick={() => setTareaSeleccionada(tarea)} className="h-7 px-2">
+                              <Button variant="ghost" size="sm" onClick={() => setTareaSeleccionada(tarea)} className="h-7 px-2" title="Ver detalle">
                                 <Eye className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2"
+                                title="Ver horas y avance"
+                                onClick={() => setTareaParaProgreso(tarea)}
+                              >
+                                <BarChart2 className="h-3.5 w-3.5" />
                               </Button>
                               <Link
                                 href={`/mi-trabajo/timesheet?tareaId=${tarea.id}&proyectoId=${tarea.proyectoId}${tarea.proyectoEdtId ? `&edtId=${tarea.proyectoEdtId}` : ''}&tipo=${tarea.tipo}`}
@@ -879,6 +895,14 @@ export function TareasAsignadasDashboard({
           )}
         </DialogContent>
       </Dialog>
+
+      <ProgresoHorasModal
+        tarea={tareaParaProgreso}
+        open={!!tareaParaProgreso}
+        onClose={() => setTareaParaProgreso(null)}
+        userId={userId}
+        onActualizado={() => { onRecargar?.(); setTareaParaProgreso(null) }}
+      />
     </div>
   )
 }
