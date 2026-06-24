@@ -91,7 +91,8 @@ const ESTADO_LABELS: Record<string, string> = {
 }
 
 function formatFecha(iso: string) {
-  return format(new Date(iso), 'dd/MM/yyyy', { locale: es })
+  const [year, month, day] = iso.slice(0, 10).split('-').map(Number)
+  return format(new Date(year, month - 1, day), 'dd/MM/yyyy', { locale: es })
 }
 
 function buildSteps(sol: Solicitud): StatusStep[] {

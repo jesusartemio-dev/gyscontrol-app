@@ -58,7 +58,8 @@ const POR_APROBAR_ESTADOS = ['pendiente']
 const HISTORICO_ESTADOS = ['aprobada', 'rechazada', 'cancelada', 'en_curso', 'finalizada']
 
 function formatFecha(iso: string) {
-  return format(new Date(iso), 'dd/MM/yyyy', { locale: es })
+  const [year, month, day] = iso.slice(0, 10).split('-').map(Number)
+  return format(new Date(year, month - 1, day), 'dd/MM/yyyy', { locale: es })
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────

@@ -62,7 +62,8 @@ const ESTADO_LABELS: Record<string, string> = {
 }
 
 function formatFecha(iso: string) {
-  return format(new Date(iso), "dd 'de' MMMM 'de' yyyy", { locale: es })
+  const [year, month, day] = iso.slice(0, 10).split('-').map(Number)
+  return format(new Date(year, month - 1, day), "dd 'de' MMMM 'de' yyyy", { locale: es })
 }
 
 function buildSteps(sol: Solicitud): StatusStep[] {
@@ -270,11 +271,11 @@ export default function MiAusenciaDetallePage() {
             </div>
             <div className="flex justify-between">
               <dt className="text-muted-foreground">Fecha inicio</dt>
-              <dd>{format(new Date(solicitud.fechaInicio), 'dd/MM/yyyy', { locale: es })} — {TURNO_LABELS[solicitud.turnoInicio]}</dd>
+              <dd>{formatFecha(solicitud.fechaInicio)} — {TURNO_LABELS[solicitud.turnoInicio]}</dd>
             </div>
             <div className="flex justify-between">
               <dt className="text-muted-foreground">Fecha fin</dt>
-              <dd>{format(new Date(solicitud.fechaFin), 'dd/MM/yyyy', { locale: es })} — {TURNO_LABELS[solicitud.turnoFin]}</dd>
+              <dd>{formatFecha(solicitud.fechaFin)} — {TURNO_LABELS[solicitud.turnoFin]}</dd>
             </div>
             <div className="flex justify-between">
               <dt className="text-muted-foreground">Días hábiles</dt>

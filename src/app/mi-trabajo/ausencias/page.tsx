@@ -75,7 +75,8 @@ const ESTADO_VARIANTS: Record<string, 'default' | 'secondary' | 'destructive' | 
 const HORAS_POR_DIA = 9.5
 
 function formatFecha(iso: string) {
-  return format(new Date(iso), 'dd/MM/yyyy', { locale: es })
+  const [year, month, day] = iso.slice(0, 10).split('-').map(Number)
+  return format(new Date(year, month - 1, day), 'dd/MM/yyyy', { locale: es })
 }
 
 function SaldoCard({ s }: { s: SaldoAusencia }) {
