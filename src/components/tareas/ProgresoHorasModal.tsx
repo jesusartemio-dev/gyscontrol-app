@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Calendar } from '@/components/ui/calendar'
 import {
   Table,
   TableBody,
@@ -75,11 +76,16 @@ export function ProgresoHorasModal({ tarea, open, onClose, userId, onActualizado
   const [loading, setLoading] = useState(false)
 
   // Form horas aproximadas (solo si no hay registros y es owner)
-  const [fechaAprox, setFechaAprox] = useState('')
+  const [fechaSeleccionada, setFechaSeleccionada] = useState<Date | undefined>(undefined)
   const [horasAprox, setHorasAprox] = useState('')
   const [descAprox, setDescAprox] = useState('')
   const [guardandoAprox, setGuardandoAprox] = useState(false)
   const [mostrarFormAprox, setMostrarFormAprox] = useState(false)
+
+  // Horas del mes (para colorear el calendario)
+  const [horasMes, setHorasMes] = useState<Record<string, number>>({})
+  const [horasPorDia, setHorasPorDia] = useState<number>(9.5)
+  const [mesCalendario, setMesCalendario] = useState<Date>(new Date())
 
   // Horas del día seleccionado (para detectar solapamiento)
   const [horasDia, setHorasDia] = useState<{
@@ -128,25 +134,50 @@ export function ProgresoHorasModal({ tarea, open, onClose, userId, onActualizado
     }
   }, [])
 
+  const fetchHorasMes = useCallback(async (date: Date) => {
+    try {
+      const anio = date.getFullYear()
+      const mes = date.getMonth() + 1
+      const res = await fetch(`/api/horas-hombre/horas-mes?anio=${anio}&mes=${mes}`)
+      const json = await res.json()
+      if (json.success) {
+        setHorasMes(json.data.dias)
+        setHorasPorDia(json.data.horasPorDia)
+      }
+    } catch {
+      // silencioso
+    }
+  }, [])
+
   useEffect(() => {
     if (open && tarea) {
+      const hoy = new Date()
       setProgresoEdit(tarea.progreso)
       setMarcarCompletada(tarea.estado === 'completada')
       setHorasAprox('')
       setDescAprox('')
       setMostrarFormAprox(false)
       setHorasDia(null)
-      setFechaAprox(format(new Date(), 'yyyy-MM-dd'))
+      setHorasMes({})
+      setFechaSeleccionada(hoy)
+      setMesCalendario(hoy)
       cargarHoras()
     }
   }, [open, tarea, cargarHoras])
 
-  // Consultar horas del día cada vez que cambia la fecha o se abre el form
+  // Cargar horas del mes cuando se abre el form o cambia el mes
   useEffect(() => {
-    if (mostrarFormAprox && fechaAprox) {
-      fetchHorasDia(fechaAprox)
+    if (mostrarFormAprox) {
+      fetchHorasMes(mesCalendario)
     }
-  }, [fechaAprox, mostrarFormAprox, fetchHorasDia])
+  }, [mostrarFormAprox, mesCalendario, fetchHorasMes])
+
+  // Consultar horas del día cada vez que cambia la fecha seleccionada
+  useEffect(() => {
+    if (mostrarFormAprox && fechaSeleccionada) {
+      fetchHorasDia(format(fechaSeleccionada, 'yyyy-MM-dd'))
+    }
+  }, [fechaSeleccionada, mostrarFormAprox, fetchHorasDia])
 
   const guardarProgreso = async () => {
     if (!tarea) return
@@ -175,7 +206,7 @@ export function ProgresoHorasModal({ tarea, open, onClose, userId, onActualizado
   }
 
   const guardarHorasAprox = async () => {
-    if (!tarea || !horasAprox || !descAprox.trim() || !fechaAprox) {
+    if (!tarea || !horasAprox || !descAprox.trim() || !fechaSeleccionada) {
       toast({ title: 'Completa todos los campos', variant: 'destructive' })
       return
     }
@@ -200,13 +231,14 @@ export function ProgresoHorasModal({ tarea, open, onClose, userId, onActualizado
       })
       return
     }
+    const fechaStr = format(fechaSeleccionada, 'yyyy-MM-dd')
     setGuardandoAprox(true)
     try {
       const res = await fetch('/api/horas-hombre/registrar-simple', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          fecha: fechaAprox,
+          fecha: fechaStr,
           horas: h,
           descripcion: descAprox.trim(),
           proyectoId: tarea.proyectoId,
@@ -345,56 +377,90 @@ export function ProgresoHorasModal({ tarea, open, onClose, userId, onActualizado
                         <AlertCircle className="h-3.5 w-3.5" />
                         Horas aproximadas — se guardan en el timesheet
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <Label className="text-xs text-gray-600">Fecha</Label>
-                          <Input
-                            type="date"
-                            value={fechaAprox}
-                            onChange={e => setFechaAprox(e.target.value)}
-                            className="h-8 text-xs mt-1"
+                      {/* Calendario con días coloreados según horas ya registradas */}
+                      <div className="flex gap-3 items-start">
+                        <div className="shrink-0">
+                          <Calendar
+                            mode="single"
+                            selected={fechaSeleccionada}
+                            onSelect={(d) => {
+                              setFechaSeleccionada(d)
+                              setHorasDia(null)
+                            }}
+                            month={mesCalendario}
+                            onMonthChange={(m) => setMesCalendario(m)}
+                            disabled={{ after: new Date() }}
+                            modifiers={{
+                              partial: Object.entries(horasMes)
+                                .filter(([, h]) => h > 0 && h < horasPorDia)
+                                .map(([d]) => new Date(`${d}T12:00:00Z`)),
+                              full: Object.entries(horasMes)
+                                .filter(([, h]) => h >= horasPorDia)
+                                .map(([d]) => new Date(`${d}T12:00:00Z`)),
+                            }}
+                            modifiersClassNames={{
+                              partial: 'bg-amber-100 text-amber-800 font-semibold',
+                              full: 'bg-red-100 text-red-700 line-through opacity-60',
+                            }}
+                            className="rounded-md border p-1 text-xs"
                           />
-                          {/* Indicador de horas del día */}
+                          {/* Leyenda */}
+                          <div className="flex gap-3 mt-1 px-1 text-[10px] text-gray-500">
+                            <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-sm bg-amber-100 border border-amber-300" />Parcial</span>
+                            <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-sm bg-red-100 border border-red-300" />Completo</span>
+                          </div>
+                        </div>
+
+                        {/* Panel derecho: horas + indicador del día */}
+                        <div className="flex-1 space-y-3 pt-1">
+                          <div>
+                            <Label className="text-xs text-gray-600">
+                              Horas
+                              {horasDia && horasDia.horasDisponibles > 0 && (
+                                <span className="ml-1 text-gray-400">(máx. {horasDia.horasDisponibles}h)</span>
+                              )}
+                            </Label>
+                            <Input
+                              type="number"
+                              min="0.5"
+                              max={horasDia ? horasDia.horasDisponibles : 24}
+                              step="0.5"
+                              placeholder={horasDia?.horasDisponibles ? String(horasDia.horasDisponibles) : '8'}
+                              value={horasAprox}
+                              onChange={e => setHorasAprox(e.target.value)}
+                              className={`h-8 text-xs mt-1 ${(horasDia?.horasDisponibles ?? 1) <= 0 ? 'border-red-300' : ''}`}
+                              disabled={(horasDia?.horasDisponibles ?? 1) <= 0}
+                            />
+                          </div>
+
+                          {/* Indicador de horas del día seleccionado */}
                           {loadingHorasDia ? (
-                            <p className="text-[10px] text-gray-400 mt-1 flex items-center gap-1">
+                            <p className="text-[10px] text-gray-400 flex items-center gap-1">
                               <RefreshCw className="h-2.5 w-2.5 animate-spin" /> Consultando...
                             </p>
-                          ) : horasDia && (
-                            <div className={`mt-1.5 rounded px-2 py-1 text-[10px] flex items-center gap-1 ${
+                          ) : horasDia ? (
+                            <div className={`rounded px-2 py-1.5 text-[10px] flex items-start gap-1 ${
                               horasDia.horasDisponibles <= 0
                                 ? 'bg-red-100 text-red-700 border border-red-200'
                                 : horasDia.horasRegistradas > 0
                                   ? 'bg-amber-100 text-amber-700 border border-amber-200'
                                   : 'bg-green-100 text-green-700 border border-green-200'
                             }`}>
-                              <Info className="h-2.5 w-2.5 shrink-0" />
-                              {horasDia.horasDisponibles <= 0
-                                ? `Día completo (${horasDia.horasRegistradas}h / ${horasDia.horasPorDia}h)`
-                                : horasDia.horasRegistradas > 0
-                                  ? `${horasDia.horasRegistradas}h ya registradas — quedan ${horasDia.horasDisponibles}h`
-                                  : `Día libre — hasta ${horasDia.horasPorDia}h disponibles`
-                              }
+                              <Info className="h-2.5 w-2.5 shrink-0 mt-0.5" />
+                              <span>
+                                {horasDia.horasDisponibles <= 0
+                                  ? `Día completo — ${horasDia.horasRegistradas}h / ${horasDia.horasPorDia}h`
+                                  : horasDia.horasRegistradas > 0
+                                    ? `${horasDia.horasRegistradas}h registradas\nQuedan ${horasDia.horasDisponibles}h`
+                                    : `Día libre — hasta ${horasDia.horasPorDia}h`
+                                }
+                              </span>
                             </div>
-                          )}
-                        </div>
-                        <div>
-                          <Label className="text-xs text-gray-600">
-                            Horas
-                            {horasDia && horasDia.horasDisponibles > 0 && (
-                              <span className="ml-1 text-gray-400">(máx. {horasDia.horasDisponibles}h)</span>
-                            )}
-                          </Label>
-                          <Input
-                            type="number"
-                            min="0.5"
-                            max={horasDia ? horasDia.horasDisponibles : 24}
-                            step="0.5"
-                            placeholder={horasDia?.horasDisponibles ? String(horasDia.horasDisponibles) : '8'}
-                            value={horasAprox}
-                            onChange={e => setHorasAprox(e.target.value)}
-                            className={`h-8 text-xs mt-1 ${(horasDia?.horasDisponibles ?? 1) <= 0 ? 'border-red-300' : ''}`}
-                            disabled={(horasDia?.horasDisponibles ?? 1) <= 0}
-                          />
+                          ) : fechaSeleccionada ? (
+                            <p className="text-[10px] text-gray-400">
+                              {format(fechaSeleccionada, 'dd MMM yyyy', { locale: undefined })}
+                            </p>
+                          ) : null}
                         </div>
                       </div>
                       <div>
