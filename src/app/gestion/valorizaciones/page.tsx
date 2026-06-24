@@ -11,8 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, FileSpreadsheet, Loader2, Search, Eye, Send, CheckCircle, Edit, Ban, Upload, Download, AlertTriangle, RefreshCw, Trash2, Clock, Undo2, Info, CalendarDays } from 'lucide-react'
-import { Textarea } from '@/components/ui/textarea'
+import { Plus, FileSpreadsheet, Loader2, Search, Eye, Upload, Download, Clock, Info, CalendarDays } from 'lucide-react'
 import toast from 'react-hot-toast'
 import ValorizacionImportExcelModal from '@/components/gestion/ValorizacionImportExcelModal'
 import { exportarValAExcel } from '@/lib/utils/valorizacionExcel'
@@ -108,40 +107,14 @@ function getRangoFechas(preset: string, desde: string, hasta: string): { desde: 
   return { desde: null, hasta: null }
 }
 
-const ROLES_TRANSICION_VAL: Record<string, string[]> = {
-  'borrador→enviada':               ['gestor', 'coordinador', 'gerente', 'admin'],
-  'borrador→anulada':               ['gerente', 'admin'],
-  'enviada→observada':              ['gestor', 'coordinador', 'gerente', 'admin'],
-  'enviada→aprobada_cliente':       ['gestor', 'coordinador', 'gerente', 'admin'],
-  'enviada→borrador':               ['gestor', 'coordinador', 'gerente', 'admin'],
-  'enviada→anulada':                ['gerente', 'admin'],
-  'observada→corregida':            ['gestor', 'coordinador', 'gerente', 'admin'],
-  'observada→enviada':              ['gestor', 'coordinador', 'gerente', 'admin'],
-  'observada→anulada':              ['gerente', 'admin'],
-  'corregida→aprobada_cliente':     ['gestor', 'coordinador', 'gerente', 'admin'],
-  'corregida→observada':            ['gestor', 'coordinador', 'gerente', 'admin'],
-  'corregida→enviada':              ['gestor', 'coordinador', 'gerente', 'admin'],
-  'corregida→anulada':              ['gerente', 'admin'],
-  'aprobada_cliente→hes_pendiente': ['gestor', 'coordinador', 'gerente', 'administracion', 'admin'],
-  'aprobada_cliente→enviada':       ['gerente', 'admin'],
-  'aprobada_cliente→anulada':       ['gerente', 'admin'],
-  'hes_pendiente→facturada':        ['gerente', 'administracion', 'admin'],
-  'hes_pendiente→aprobada_cliente': ['gerente', 'administracion', 'admin'],
-  'hes_pendiente→anulada':          ['gerente', 'admin'],
-  'facturada→pagada':               ['gerente', 'administracion', 'admin'],
-  'facturada→hes_pendiente':        ['gerente', 'administracion', 'admin'],
-  'facturada→aprobada_cliente':     ['gerente', 'admin'],
-  'facturada→anulada':              ['gerente', 'admin'],
-  'pagada→facturada':               ['gerente', 'admin'],
-  'pagada→anulada':                 ['gerente', 'admin'],
-}
+// Estados visibles para el rol administracion (desde enviada en adelante)
+const ESTADOS_ADMIN = ['enviada', 'observada', 'corregida', 'aprobada_cliente', 'hes_pendiente', 'facturada', 'pagada', 'anulada']
 
 export default function ValorizacionesPage() {
   const router = useRouter()
   const { data: session } = useSession()
   const userRole = session?.user?.role ?? ''
-  const puede = (desde: string, hacia: string) =>
-    (ROLES_TRANSICION_VAL[`${desde}→${hacia}`] ?? []).includes(userRole)
+  const esAdmin = userRole === 'administracion'
   const [items, setItems] = useState<Valorizacion[]>([])
   const [proyectos, setProyectos] = useState<Proyecto[]>([])
   const [loading, setLoading] = useState(true)
@@ -172,19 +145,6 @@ export default function ValorizacionesPage() {
   const [formObservaciones, setFormObservaciones] = useState('')
 
   const [showImportDialog, setShowImportDialog] = useState(false)
-
-  // Estado transition dialog
-  const [showEstadoDialog, setShowEstadoDialog] = useState(false)
-  const [estadoTarget, setEstadoTarget] = useState<{ val: Valorizacion; estado: string } | null>(null)
-
-  // Observar dialog
-  const [showObservarDialog, setShowObservarDialog] = useState(false)
-  const [observarTarget, setObservarTarget] = useState<Valorizacion | null>(null)
-  const [motivoObservacion, setMotivoObservacion] = useState('')
-
-  // Eliminar dialog
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
-  const [deleteTarget, setDeleteTarget] = useState<Valorizacion | null>(null)
 
   useEffect(() => { loadData() }, [])
 
@@ -239,7 +199,7 @@ export default function ValorizacionesPage() {
   }
 
   const filtered = useMemo(() => {
-    let result = items
+    let result = esAdmin ? items.filter(i => ESTADOS_ADMIN.includes(i.estado)) : items
     if (filterProyecto !== 'all') result = result.filter(i => i.proyectoId === filterProyecto)
     if (filterEstado !== 'all') result = result.filter(i => i.estado === filterEstado)
     if (filterCondicionPago !== 'all') {
@@ -269,10 +229,11 @@ export default function ValorizacionesPage() {
   }, [items, filterProyecto, filterEstado, filterCondicionPago, searchTerm, filterPeriodPreset, filterPeriodDesde, filterPeriodHasta])
 
   const estadoCounts = useMemo(() => {
+    const base = esAdmin ? items.filter(i => ESTADOS_ADMIN.includes(i.estado)) : items
     const counts: Record<string, number> = {}
-    for (const i of items) counts[i.estado] = (counts[i.estado] || 0) + 1
+    for (const i of base) counts[i.estado] = (counts[i.estado] || 0) + 1
     return counts
-  }, [items])
+  }, [items, esAdmin])
 
   const totals = useMemo(() => {
     const activas = filtered.filter(i => i.estado !== 'anulada')
@@ -367,92 +328,6 @@ export default function ValorizacionesPage() {
     }
   }
 
-  const openEstadoTransition = (val: Valorizacion, nuevoEstado: string) => {
-    setEstadoTarget({ val, estado: nuevoEstado })
-    setShowEstadoDialog(true)
-  }
-
-  const handleEstadoChange = async () => {
-    if (!estadoTarget) return
-    setSaving(true)
-    try {
-      const body: any = { estado: estadoTarget.estado }
-      const res = await fetch(`/api/proyectos/${estadoTarget.val.proyectoId}/valorizaciones/${estadoTarget.val.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.error || 'Error al cambiar estado')
-      }
-      toast.success(`Estado cambiado a ${getEstadoLabel(estadoTarget.estado)}`)
-      setShowEstadoDialog(false)
-      setEstadoTarget(null)
-      loadData()
-    } catch (e: any) {
-      toast.error(e.message || 'Error al cambiar estado')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const openObservar = (val: Valorizacion) => {
-    setObservarTarget(val)
-    setMotivoObservacion('')
-    setShowObservarDialog(true)
-  }
-
-  const handleObservar = async () => {
-    if (!observarTarget) return
-    if (!motivoObservacion.trim()) {
-      toast.error('Ingresa el motivo de la observación')
-      return
-    }
-    setSaving(true)
-    try {
-      const res = await fetch(`/api/proyectos/${observarTarget.proyectoId}/valorizaciones/${observarTarget.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ estado: 'observada', motivoObservacion: motivoObservacion.trim() }),
-      })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.error || 'Error')
-      }
-      toast.success('Valorización marcada como observada')
-      setShowObservarDialog(false)
-      setObservarTarget(null)
-      loadData()
-    } catch (e: any) {
-      toast.error(e.message || 'Error al observar')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleDelete = async () => {
-    if (!deleteTarget) return
-    setSaving(true)
-    try {
-      const res = await fetch(`/api/proyectos/${deleteTarget.proyectoId}/valorizaciones/${deleteTarget.id}`, {
-        method: 'DELETE',
-      })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.error || 'Error al eliminar')
-      }
-      toast.success('Valorización eliminada')
-      setShowDeleteDialog(false)
-      setDeleteTarget(null)
-      loadData()
-    } catch (e: any) {
-      toast.error(e.message || 'Error al eliminar')
-    } finally {
-      setSaving(false)
-    }
-  }
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -519,8 +394,8 @@ export default function ValorizacionesPage() {
               <SelectValue placeholder="Estado" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos ({items.length})</SelectItem>
-              {ESTADOS.map(e => {
+              <SelectItem value="all">Todos ({esAdmin ? items.filter(i => ESTADOS_ADMIN.includes(i.estado)).length : items.length})</SelectItem>
+              {ESTADOS.filter(e => !esAdmin || ESTADOS_ADMIN.includes(e.value)).map(e => {
                 const cnt = estadoCounts[e.value] ?? 0
                 return (
                   <SelectItem key={e.value} value={e.value}>
@@ -624,68 +499,9 @@ export default function ValorizacionesPage() {
                       {formatCurrency(item.netoARecibir, item.moneda)}
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => router.push(`/gestion/valorizaciones/${item.id}?mode=view`)} title="Ver detalle">
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        {item.estado === 'borrador' && (
-                          <>
-                            <Button variant="ghost" size="icon" onClick={() => router.push(`/gestion/valorizaciones/${item.id}`)} title="Editar">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            {puede('borrador', 'enviada') && (
-                              <Button variant="ghost" size="icon" onClick={() => openEstadoTransition(item, 'enviada')} title="Enviar">
-                                <Send className="h-4 w-4 text-blue-600" />
-                              </Button>
-                            )}
-                          </>
-                        )}
-                        {(item.estado === 'enviada' || item.estado === 'corregida') && (
-                          <>
-                            {puede(item.estado, 'observada') && (
-                              <Button variant="ghost" size="icon" onClick={() => openObservar(item)} title="Marcar Observada">
-                                <AlertTriangle className="h-4 w-4 text-orange-500" />
-                              </Button>
-                            )}
-                            {puede(item.estado, 'aprobada_cliente') && (
-                              <Button variant="ghost" size="icon" onClick={() => openEstadoTransition(item, 'aprobada_cliente')} title="Aprobar">
-                                <CheckCircle className="h-4 w-4 text-emerald-600" />
-                              </Button>
-                            )}
-                          </>
-                        )}
-                        {item.estado === 'observada' && puede('observada', 'corregida') && (
-                          <Button variant="ghost" size="icon" onClick={() => openEstadoTransition(item, 'corregida')} title="Enviar Corrección">
-                            <RefreshCw className="h-4 w-4 text-violet-600" />
-                          </Button>
-                        )}
-                        {/* Backward transitions */}
-                        {item.estado === 'aprobada_cliente' && puede('aprobada_cliente', 'enviada') && (
-                          <Button variant="ghost" size="icon" onClick={() => openEstadoTransition(item, 'enviada')} title="Revertir aprobación">
-                            <Undo2 className="h-4 w-4 text-amber-600" />
-                          </Button>
-                        )}
-                        {(item.estado === 'enviada' || item.estado === 'corregida') && puede(item.estado, 'borrador') && (
-                          <Button variant="ghost" size="icon" onClick={() => openEstadoTransition(item, 'borrador')} title="Revertir a borrador">
-                            <Undo2 className="h-4 w-4 text-amber-600" />
-                          </Button>
-                        )}
-                        {item.estado === 'observada' && puede('observada', 'enviada') && (
-                          <Button variant="ghost" size="icon" onClick={() => openEstadoTransition(item, 'enviada')} title="Revertir a enviada">
-                            <Undo2 className="h-4 w-4 text-amber-600" />
-                          </Button>
-                        )}
-                        {item.estado !== 'anulada' && puede(item.estado, 'anulada') && (
-                          <Button variant="ghost" size="icon" onClick={() => openEstadoTransition(item, 'anulada')} title="Anular">
-                            <Ban className="h-3.5 w-3.5 text-red-500" />
-                          </Button>
-                        )}
-                        {['borrador', 'anulada'].includes(item.estado) && (
-                          <Button variant="ghost" size="icon" onClick={() => { setDeleteTarget(item); setShowDeleteDialog(true) }} title="Eliminar">
-                            <Trash2 className="h-3.5 w-3.5 text-red-500" />
-                          </Button>
-                        )}
-                      </div>
+                      <Button variant="ghost" size="icon" onClick={() => router.push(`/gestion/valorizaciones/${item.id}?mode=view`)} title="Ver detalle">
+                        <Eye className="h-4 w-4" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))
@@ -833,132 +649,6 @@ export default function ValorizacionesPage() {
             <Button onClick={handleCreate} disabled={saving}>
               {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Crear y agregar partidas
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Dialog cambio de estado */}
-      <Dialog open={showEstadoDialog} onOpenChange={open => { if (!open) { setShowEstadoDialog(false); setEstadoTarget(null) } }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className={estadoTarget?.estado === 'anulada' ? 'text-red-600' : ''}>
-              {estadoTarget?.estado === 'anulada' ? 'Anular Valorización' :
-               estadoTarget && ['borrador', 'enviada'].includes(estadoTarget.estado) &&
-               ['enviada', 'corregida', 'aprobada_cliente', 'observada'].includes(estadoTarget.val.estado)
-                 ? 'Revertir Estado' : 'Cambiar Estado'}
-            </DialogTitle>
-            <DialogDescription>
-              {estadoTarget && `${estadoTarget.val.codigo} — ${getEstadoLabel(estadoTarget.val.estado)} → ${getEstadoLabel(estadoTarget.estado)}`}
-            </DialogDescription>
-          </DialogHeader>
-          {estadoTarget && (
-            <div className="space-y-3">
-              {estadoTarget.estado === 'anulada' && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm space-y-1">
-                  <p className="font-medium text-red-700">Al anular esta valorización:</p>
-                  <ul className="list-disc pl-5 text-red-600 space-y-0.5">
-                    <li>La valorización pasará a estado <strong>Anulada</strong> de forma irreversible</li>
-                    <li>No se incluirá en el cálculo del acumulado</li>
-                    {['aprobada_cliente', 'facturada', 'pagada'].includes(estadoTarget.val.estado) && (
-                      <li>Se revertirá la amortización de adelanto</li>
-                    )}
-                    {['facturada', 'pagada'].includes(estadoTarget.val.estado) && (
-                      <li>Las CxC asociadas serán <strong>anuladas</strong></li>
-                    )}
-                  </ul>
-                </div>
-              )}
-              {estadoTarget.val.estado === 'aprobada_cliente' && estadoTarget.estado === 'enviada' && (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm space-y-1">
-                  <p className="font-medium text-amber-700">Al revertir la aprobación:</p>
-                  <ul className="list-disc pl-5 text-amber-600 space-y-0.5">
-                    <li>La valorización volverá a <strong>Enviada</strong></li>
-                    <li>Se revertirá la amortización de adelanto</li>
-                  </ul>
-                </div>
-              )}
-              {['enviada', 'corregida'].includes(estadoTarget.val.estado) && estadoTarget.estado === 'borrador' && (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm">
-                  <p className="text-amber-700">La valorización volverá a <strong>Borrador</strong> y podrá ser editada o eliminada.</p>
-                </div>
-              )}
-              {estadoTarget.val.estado === 'observada' && estadoTarget.estado === 'enviada' && (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm">
-                  <p className="text-amber-700">La valorización volverá a <strong>Enviada</strong>.</p>
-                </div>
-              )}
-              {!['anulada', 'borrador', 'enviada'].includes(estadoTarget.estado) && estadoTarget.estado !== 'anulada' && (
-                <p className="text-sm text-muted-foreground">
-                  ¿Confirmar cambio de estado a <strong>{getEstadoLabel(estadoTarget.estado)}</strong>?
-                </p>
-              )}
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowEstadoDialog(false); setEstadoTarget(null) }}>Cancelar</Button>
-            <Button
-              onClick={handleEstadoChange}
-              disabled={saving}
-              variant={estadoTarget?.estado === 'anulada' ? 'destructive' : 'default'}
-            >
-              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Confirmar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Dialog observar valorización */}
-      <Dialog open={showObservarDialog} onOpenChange={open => { if (!open) { setShowObservarDialog(false); setObservarTarget(null) } }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Marcar como Observada</DialogTitle>
-            <DialogDescription>
-              {observarTarget && `${observarTarget.codigo} — ${observarTarget.proyecto?.codigo}`}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-sm text-orange-800">
-              La valorización será devuelta para corrección. Ingresa el motivo de la observación del cliente.
-            </div>
-            <div>
-              <Label>Motivo de observación *</Label>
-              <Textarea
-                placeholder="Describe las observaciones del cliente..."
-                value={motivoObservacion}
-                onChange={e => setMotivoObservacion(e.target.value)}
-                rows={3}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowObservarDialog(false); setObservarTarget(null) }}>Cancelar</Button>
-            <Button onClick={handleObservar} disabled={saving} className="bg-orange-600 hover:bg-orange-700">
-              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Marcar Observada
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Dialog eliminar valorización */}
-      <Dialog open={showDeleteDialog} onOpenChange={open => { if (!open) { setShowDeleteDialog(false); setDeleteTarget(null) } }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Eliminar Valorización</DialogTitle>
-            <DialogDescription>
-              {deleteTarget && `${deleteTarget.codigo} — ${deleteTarget.proyecto?.codigo}`}
-            </DialogDescription>
-          </DialogHeader>
-          <p className="text-sm text-red-600">
-            Esta acción eliminará permanentemente la valorización, sus partidas y adjuntos. Esta acción no se puede deshacer.
-          </p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowDeleteDialog(false); setDeleteTarget(null) }}>Cancelar</Button>
-            <Button onClick={handleDelete} disabled={saving} variant="destructive">
-              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Eliminar
             </Button>
           </DialogFooter>
         </DialogContent>

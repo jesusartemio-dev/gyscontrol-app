@@ -9,7 +9,9 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ArrowLeft, Loader2, Save, Eye, Check, Upload, Trash2, Plus, Clock, DollarSign, FileText } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
+import { Textarea } from '@/components/ui/textarea'
+import { ArrowLeft, Loader2, Save, Eye, Check, Upload, Trash2, Plus, Clock, DollarSign, FileText, Send, CheckCircle, AlertTriangle, RefreshCw, Ban, Undo2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { CONDICIONES_PAGO, FORMAS_PAGO, DIAS_CREDITO_PRESETS, formatPago } from '@/lib/utils/formaPago'
 import TablaPartidas from '@/components/valorizacion/TablaPartidas'
@@ -254,6 +256,11 @@ export default function ValorizacionEditPage() {
   const [addingAbono, setAddingAbono] = useState(false)
   // State transition
   const [transitioning, setTransitioning] = useState(false)
+  // Dialogs de acciones
+  const [showObservarDialog, setShowObservarDialog] = useState(false)
+  const [motivoObservacion, setMotivoObservacion] = useState('')
+  const [showAnularDialog, setShowAnularDialog] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
   const loadVal = useCallback(async () => {
     try {
@@ -430,6 +437,53 @@ export default function ValorizacionEditPage() {
       toast.error(e.message || 'Error al cambiar estado')
     } finally {
       setTransitioning(false)
+    }
+  }
+
+  const handleObservar = async () => {
+    if (!val || !motivoObservacion.trim()) {
+      toast.error('Ingresa el motivo de la observación')
+      return
+    }
+    setTransitioning(true)
+    try {
+      const res = await fetch(`/api/proyectos/${val.proyectoId}/valorizaciones/${val.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estado: 'observada', motivoObservacion: motivoObservacion.trim() }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Error')
+      }
+      toast.success('Valorización marcada como observada')
+      setShowObservarDialog(false)
+      setMotivoObservacion('')
+      loadVal()
+    } catch (e: any) {
+      toast.error(e.message || 'Error al observar')
+    } finally {
+      setTransitioning(false)
+    }
+  }
+
+  const handleDeleteVal = async () => {
+    if (!val) return
+    setTransitioning(true)
+    try {
+      const res = await fetch(`/api/proyectos/${val.proyectoId}/valorizaciones/${val.id}`, {
+        method: 'DELETE',
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Error al eliminar')
+      }
+      toast.success('Valorización eliminada')
+      router.push('/gestion/valorizaciones')
+    } catch (e: any) {
+      toast.error(e.message || 'Error al eliminar')
+      setTransitioning(false)
+      setShowDeleteDialog(false)
     }
   }
 
@@ -631,6 +685,7 @@ export default function ValorizacionEditPage() {
   if (!val) return null
 
   return (
+    <>
     <div className="space-y-4 p-4 md:p-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -659,17 +714,6 @@ export default function ValorizacionEditPage() {
               Guardar cambios
             </Button>
           )}
-          {/* Workflow transition buttons */}
-          {val.estado === 'aprobada_cliente' && (
-            <Badge className="bg-amber-100 text-amber-700 text-xs px-3 py-1">
-              En espera de registro HES por Administración
-            </Badge>
-          )}
-          {val.estado === 'hes_pendiente' && (
-            <Badge className="bg-purple-100 text-purple-700 text-xs px-3 py-1">
-              HES registrado — en proceso de facturación
-            </Badge>
-          )}
         </div>
       </div>
 
@@ -688,6 +732,136 @@ export default function ValorizacionEditPage() {
           )}
         </div>
       )}
+
+      {/* Panel de acciones — visible siempre en modo vista, o cuando no es borrador editable */}
+      {(val.estado !== 'borrador' || viewMode) && (() => {
+        const tiene = (desde: string, hacia: string) => puedeTransicionar(desde, hacia)
+        const acciones: React.ReactNode[] = []
+
+        // Enviar
+        if (val.estado === 'borrador' && tiene('borrador', 'enviada'))
+          acciones.push(
+            <Button key="enviar" size="sm" onClick={() => handleTransicion('enviada')} disabled={transitioning}>
+              <Send className="h-4 w-4 mr-2" />
+              Enviar valorización al cliente
+            </Button>
+          )
+        // Aprobar
+        if (['enviada', 'corregida'].includes(val.estado) && tiene(val.estado, 'aprobada_cliente'))
+          acciones.push(
+            <Button key="aprobar" size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => handleTransicion('aprobada_cliente')} disabled={transitioning}>
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Aprobar valorización
+            </Button>
+          )
+        // Observar
+        if (['enviada', 'corregida'].includes(val.estado) && tiene(val.estado, 'observada'))
+          acciones.push(
+            <Button key="observar" size="sm" variant="outline" className="border-orange-300 text-orange-700 hover:bg-orange-50"
+              onClick={() => { setMotivoObservacion(''); setShowObservarDialog(true) }} disabled={transitioning}>
+              <AlertTriangle className="h-4 w-4 mr-2" />
+              Marcar como Observada
+            </Button>
+          )
+        // Enviar corrección
+        if (val.estado === 'observada' && tiene('observada', 'corregida'))
+          acciones.push(
+            <Button key="corregida" size="sm" className="bg-violet-600 hover:bg-violet-700" onClick={() => handleTransicion('corregida')} disabled={transitioning}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Enviar corrección al cliente
+            </Button>
+          )
+        // Facturar
+        if (val.estado === 'hes_pendiente' && tiene('hes_pendiente', 'facturada'))
+          acciones.push(
+            <Button key="facturar" size="sm" className="bg-purple-600 hover:bg-purple-700" onClick={() => handleTransicion('facturada')} disabled={transitioning}>
+              <DollarSign className="h-4 w-4 mr-2" />
+              Registrar factura
+            </Button>
+          )
+        // Marcar pagada
+        if (val.estado === 'facturada' && tiene('facturada', 'pagada'))
+          acciones.push(
+            <Button key="pagada" size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => handleTransicion('pagada')} disabled={transitioning}>
+              <Check className="h-4 w-4 mr-2" />
+              Marcar como pagada
+            </Button>
+          )
+        // Reversiones
+        if (val.estado === 'aprobada_cliente' && tiene('aprobada_cliente', 'enviada'))
+          acciones.push(
+            <Button key="rev-aprobada" size="sm" variant="outline" onClick={() => handleTransicion('enviada')} disabled={transitioning}>
+              <Undo2 className="h-4 w-4 mr-2" />
+              Revertir aprobación a Enviada
+            </Button>
+          )
+        if (['enviada', 'corregida'].includes(val.estado) && tiene(val.estado, 'borrador'))
+          acciones.push(
+            <Button key="rev-borrador" size="sm" variant="outline" onClick={() => handleTransicion('borrador')} disabled={transitioning}>
+              <Undo2 className="h-4 w-4 mr-2" />
+              Revertir a Borrador
+            </Button>
+          )
+        if (val.estado === 'observada' && tiene('observada', 'enviada'))
+          acciones.push(
+            <Button key="rev-obs" size="sm" variant="outline" onClick={() => handleTransicion('enviada')} disabled={transitioning}>
+              <Undo2 className="h-4 w-4 mr-2" />
+              Revertir a Enviada
+            </Button>
+          )
+        if (val.estado === 'hes_pendiente' && tiene('hes_pendiente', 'aprobada_cliente'))
+          acciones.push(
+            <Button key="rev-hes" size="sm" variant="outline" onClick={() => handleTransicion('aprobada_cliente')} disabled={transitioning}>
+              <Undo2 className="h-4 w-4 mr-2" />
+              Revertir a Aprobada
+            </Button>
+          )
+        if (val.estado === 'facturada' && tiene('facturada', 'hes_pendiente'))
+          acciones.push(
+            <Button key="rev-fact" size="sm" variant="outline" onClick={() => handleTransicion('hes_pendiente')} disabled={transitioning}>
+              <Undo2 className="h-4 w-4 mr-2" />
+              Revertir a HES
+            </Button>
+          )
+        if (val.estado === 'pagada' && tiene('pagada', 'facturada'))
+          acciones.push(
+            <Button key="rev-pag" size="sm" variant="outline" onClick={() => handleTransicion('facturada')} disabled={transitioning}>
+              <Undo2 className="h-4 w-4 mr-2" />
+              Revertir a Facturada
+            </Button>
+          )
+        // Anular
+        if (val.estado !== 'anulada' && tiene(val.estado, 'anulada'))
+          acciones.push(
+            <Button key="anular" size="sm" variant="outline" className="border-red-300 text-red-600 hover:bg-red-50"
+              onClick={() => setShowAnularDialog(true)} disabled={transitioning}>
+              <Ban className="h-4 w-4 mr-2" />
+              Anular valorización
+            </Button>
+          )
+        // Eliminar
+        if (['borrador', 'anulada'].includes(val.estado))
+          acciones.push(
+            <Button key="eliminar" size="sm" variant="outline" className="border-red-300 text-red-600 hover:bg-red-50"
+              onClick={() => setShowDeleteDialog(true)} disabled={transitioning}>
+              <Trash2 className="h-4 w-4 mr-2" />
+              Eliminar permanentemente
+            </Button>
+          )
+
+        if (acciones.length === 0) return null
+        return (
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Acciones disponibles</p>
+              <div className="flex flex-wrap gap-2">
+                {acciones}
+                {transitioning && <Loader2 className="h-4 w-4 animate-spin self-center text-muted-foreground" />}
+              </div>
+            </CardContent>
+          </Card>
+        )
+      })()}
 
       {/* Config financiera compacta */}
       <Card className={readOnly ? 'bg-muted/20' : 'bg-muted/30 border-dashed'}>
@@ -1138,6 +1312,88 @@ export default function ValorizacionEditPage() {
         </div>
       )}
     </div>
+
+    {/* Dialog: Marcar como Observada */}
+    <Dialog open={showObservarDialog} onOpenChange={open => { if (!open) setShowObservarDialog(false) }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Marcar como Observada</DialogTitle>
+          <DialogDescription>{val.codigo} — la valorización será devuelta para corrección</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-sm text-orange-800">
+            Ingresa el motivo de la observación del cliente para que el gestor pueda corregirla.
+          </div>
+          <div>
+            <Label>Motivo de observación *</Label>
+            <Textarea
+              placeholder="Describe las observaciones del cliente..."
+              value={motivoObservacion}
+              onChange={e => setMotivoObservacion(e.target.value)}
+              rows={3}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setShowObservarDialog(false)}>Cancelar</Button>
+          <Button onClick={handleObservar} disabled={transitioning} className="bg-orange-600 hover:bg-orange-700">
+            {transitioning && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            Marcar Observada
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    {/* Dialog: Anular */}
+    <Dialog open={showAnularDialog} onOpenChange={open => { if (!open) setShowAnularDialog(false) }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="text-red-600">Anular Valorización</DialogTitle>
+          <DialogDescription>{val.codigo} — {val.proyecto?.codigo}</DialogDescription>
+        </DialogHeader>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm space-y-1">
+          <p className="font-medium text-red-700">Al anular esta valorización:</p>
+          <ul className="list-disc pl-5 text-red-600 space-y-0.5">
+            <li>Pasará a estado <strong>Anulada</strong> de forma permanente</li>
+            <li>No se incluirá en el cálculo del acumulado del proyecto</li>
+            {['aprobada_cliente', 'facturada', 'pagada'].includes(val.estado) && (
+              <li>Se revertirá la amortización de adelanto</li>
+            )}
+            {['facturada', 'pagada'].includes(val.estado) && (
+              <li>Las cuentas por cobrar asociadas serán <strong>anuladas</strong></li>
+            )}
+          </ul>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setShowAnularDialog(false)}>Cancelar</Button>
+          <Button variant="destructive" onClick={() => { setShowAnularDialog(false); handleTransicion('anulada') }} disabled={transitioning}>
+            {transitioning && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            Confirmar Anulación
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    {/* Dialog: Eliminar */}
+    <Dialog open={showDeleteDialog} onOpenChange={open => { if (!open) setShowDeleteDialog(false) }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Eliminar Valorización</DialogTitle>
+          <DialogDescription>{val.codigo} — {val.proyecto?.codigo}</DialogDescription>
+        </DialogHeader>
+        <p className="text-sm text-red-600">
+          Esta acción eliminará permanentemente la valorización, sus partidas y adjuntos. No se puede deshacer.
+        </p>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>Cancelar</Button>
+          <Button variant="destructive" onClick={handleDeleteVal} disabled={transitioning}>
+            {transitioning && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            Eliminar permanentemente
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   )
 }
 
