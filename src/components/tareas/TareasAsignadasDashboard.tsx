@@ -482,44 +482,15 @@ export function TareasAsignadasDashboard({
                             )}
                           </TableCell>
                           <TableCell>
-                            {editandoProgreso === tarea.id ? (
-                              <div className="flex items-center gap-1">
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  max="100"
-                                  value={nuevoProgreso}
-                                  onChange={(e) => setNuevoProgreso(Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
-                                  className="h-6 w-14 text-xs px-1"
-                                  autoFocus
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') actualizarProgreso(tarea, nuevoProgreso)
-                                    if (e.key === 'Escape') setEditandoProgreso(null)
-                                  }}
+                            <div className="flex items-center gap-1">
+                              <div className="w-16 bg-gray-200 rounded-full h-2">
+                                <div
+                                  className={`h-2 rounded-full ${tarea.progreso === 100 ? 'bg-green-500' : 'bg-blue-500'}`}
+                                  style={{ width: `${tarea.progreso}%` }}
                                 />
-                                <button onClick={() => actualizarProgreso(tarea, nuevoProgreso)} disabled={actualizando} className="p-0.5 hover:bg-green-100 rounded">
-                                  <Check className="h-3.5 w-3.5 text-green-600" />
-                                </button>
-                                <button onClick={() => setEditandoProgreso(null)} className="p-0.5 hover:bg-gray-100 rounded">
-                                  <X className="h-3.5 w-3.5 text-gray-500" />
-                                </button>
                               </div>
-                            ) : (
-                              <button
-                                onClick={() => { setEditandoProgreso(tarea.id); setNuevoProgreso(tarea.progreso) }}
-                                className="flex items-center gap-1 hover:bg-gray-100 rounded px-1 group"
-                                title="Click para editar"
-                              >
-                                <div className="w-16 bg-gray-200 rounded-full h-2">
-                                  <div
-                                    className={`h-2 rounded-full ${tarea.progreso === 100 ? 'bg-green-500' : 'bg-blue-500'}`}
-                                    style={{ width: `${tarea.progreso}%` }}
-                                  />
-                                </div>
-                                <span className="text-xs w-8">{tarea.progreso}%</span>
-                                <Edit2 className="h-3 w-3 text-gray-400 opacity-0 group-hover:opacity-100" />
-                              </button>
-                            )}
+                              <span className="text-xs w-8">{tarea.progreso}%</span>
+                            </div>
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-1">
@@ -637,37 +608,7 @@ export function TareasAsignadasDashboard({
                     <div className="mb-3">
                       <div className="flex justify-between text-xs mb-1">
                         <span className="text-gray-500">Progreso</span>
-                        {editandoProgreso === tarea.id ? (
-                          <div className="flex items-center gap-1">
-                            <Input
-                              type="number"
-                              min="0"
-                              max="100"
-                              value={nuevoProgreso}
-                              onChange={(e) => setNuevoProgreso(Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
-                              className="h-5 w-12 text-xs px-1"
-                              autoFocus
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') actualizarProgreso(tarea, nuevoProgreso)
-                                if (e.key === 'Escape') setEditandoProgreso(null)
-                              }}
-                            />
-                            <button onClick={() => actualizarProgreso(tarea, nuevoProgreso)} disabled={actualizando} className="p-0.5 hover:bg-green-100 rounded">
-                              <Check className="h-3 w-3 text-green-600" />
-                            </button>
-                            <button onClick={() => setEditandoProgreso(null)} className="p-0.5 hover:bg-gray-100 rounded">
-                              <X className="h-3 w-3 text-gray-500" />
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => { setEditandoProgreso(tarea.id); setNuevoProgreso(tarea.progreso) }}
-                            className="flex items-center gap-1 hover:bg-gray-100 rounded px-1"
-                          >
-                            <span>{tarea.progreso}%</span>
-                            <Edit2 className="h-3 w-3 text-gray-400" />
-                          </button>
-                        )}
+                        <span className="font-medium">{tarea.progreso}%</span>
                       </div>
                       <Progress value={tarea.progreso} className="h-1.5" />
                     </div>

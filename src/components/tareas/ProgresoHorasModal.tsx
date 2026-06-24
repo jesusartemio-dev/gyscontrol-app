@@ -378,42 +378,40 @@ export function ProgresoHorasModal({ tarea, open, onClose, userId, onActualizado
                         Horas aproximadas — se guardan en el timesheet
                       </div>
                       {/* Calendario con días coloreados según horas ya registradas */}
-                      <div className="flex gap-3 items-start">
-                        <div className="shrink-0">
-                          <Calendar
-                            mode="single"
-                            selected={fechaSeleccionada}
-                            onSelect={(d) => {
-                              setFechaSeleccionada(d)
-                              setHorasDia(null)
-                            }}
-                            month={mesCalendario}
-                            onMonthChange={(m) => setMesCalendario(m)}
-                            disabled={{ after: new Date() }}
-                            modifiers={{
-                              partial: Object.entries(horasMes)
-                                .filter(([, h]) => h > 0 && h < horasPorDia)
-                                .map(([d]) => new Date(`${d}T12:00:00Z`)),
-                              full: Object.entries(horasMes)
-                                .filter(([, h]) => h >= horasPorDia)
-                                .map(([d]) => new Date(`${d}T12:00:00Z`)),
-                            }}
-                            modifiersClassNames={{
-                              partial: 'bg-amber-100 text-amber-800 font-semibold',
-                              full: 'bg-red-100 text-red-700 line-through opacity-60',
-                            }}
-                            className="rounded-md border p-1 text-xs"
-                          />
-                          {/* Leyenda */}
-                          <div className="flex gap-3 mt-1 px-1 text-[10px] text-gray-500">
-                            <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-sm bg-amber-100 border border-amber-300" />Parcial</span>
-                            <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-sm bg-red-100 border border-red-300" />Completo</span>
-                          </div>
+                      <div className="space-y-2">
+                        <Calendar
+                          mode="single"
+                          selected={fechaSeleccionada}
+                          onSelect={(d) => {
+                            setFechaSeleccionada(d)
+                            setHorasDia(null)
+                          }}
+                          month={mesCalendario}
+                          onMonthChange={(m) => setMesCalendario(m)}
+                          disabled={{ after: new Date() }}
+                          modifiers={{
+                            partial: Object.entries(horasMes)
+                              .filter(([, h]) => h > 0 && h < horasPorDia)
+                              .map(([d]) => new Date(`${d}T12:00:00Z`)),
+                            full: Object.entries(horasMes)
+                              .filter(([, h]) => h >= horasPorDia)
+                              .map(([d]) => new Date(`${d}T12:00:00Z`)),
+                          }}
+                          modifiersClassNames={{
+                            partial: 'bg-amber-100 text-amber-800 font-semibold',
+                            full: 'bg-red-100 text-red-700 line-through opacity-60',
+                          }}
+                          className="rounded-md border w-full"
+                        />
+                        {/* Leyenda */}
+                        <div className="flex gap-3 px-1 text-[10px] text-gray-500">
+                          <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-sm bg-amber-100 border border-amber-300" />Parcial</span>
+                          <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-sm bg-red-100 border border-red-300" />Completo</span>
                         </div>
 
-                        {/* Panel derecho: horas + indicador del día */}
-                        <div className="flex-1 space-y-3 pt-1">
-                          <div>
+                        {/* Fila: horas + indicador del día seleccionado */}
+                        <div className="flex gap-3 items-start">
+                          <div className="w-32 shrink-0">
                             <Label className="text-xs text-gray-600">
                               Horas
                               {horasDia && horasDia.horasDisponibles > 0 && (
@@ -433,34 +431,29 @@ export function ProgresoHorasModal({ tarea, open, onClose, userId, onActualizado
                             />
                           </div>
 
-                          {/* Indicador de horas del día seleccionado */}
-                          {loadingHorasDia ? (
-                            <p className="text-[10px] text-gray-400 flex items-center gap-1">
-                              <RefreshCw className="h-2.5 w-2.5 animate-spin" /> Consultando...
-                            </p>
-                          ) : horasDia ? (
-                            <div className={`rounded px-2 py-1.5 text-[10px] flex items-start gap-1 ${
-                              horasDia.horasDisponibles <= 0
-                                ? 'bg-red-100 text-red-700 border border-red-200'
-                                : horasDia.horasRegistradas > 0
-                                  ? 'bg-amber-100 text-amber-700 border border-amber-200'
-                                  : 'bg-green-100 text-green-700 border border-green-200'
-                            }`}>
-                              <Info className="h-2.5 w-2.5 shrink-0 mt-0.5" />
-                              <span>
-                                {horasDia.horasDisponibles <= 0
-                                  ? `Día completo — ${horasDia.horasRegistradas}h / ${horasDia.horasPorDia}h`
+                          <div className="flex-1 pt-5">
+                            {loadingHorasDia ? (
+                              <p className="text-[10px] text-gray-400 flex items-center gap-1">
+                                <RefreshCw className="h-2.5 w-2.5 animate-spin" /> Consultando...
+                              </p>
+                            ) : horasDia ? (
+                              <div className={`rounded px-2 py-1.5 text-[10px] flex items-center gap-1 ${
+                                horasDia.horasDisponibles <= 0
+                                  ? 'bg-red-100 text-red-700 border border-red-200'
                                   : horasDia.horasRegistradas > 0
-                                    ? `${horasDia.horasRegistradas}h registradas\nQuedan ${horasDia.horasDisponibles}h`
+                                    ? 'bg-amber-100 text-amber-700 border border-amber-200'
+                                    : 'bg-green-100 text-green-700 border border-green-200'
+                              }`}>
+                                <Info className="h-2.5 w-2.5 shrink-0" />
+                                {horasDia.horasDisponibles <= 0
+                                  ? `Día completo (${horasDia.horasRegistradas}h / ${horasDia.horasPorDia}h)`
+                                  : horasDia.horasRegistradas > 0
+                                    ? `${horasDia.horasRegistradas}h registradas — quedan ${horasDia.horasDisponibles}h`
                                     : `Día libre — hasta ${horasDia.horasPorDia}h`
                                 }
-                              </span>
-                            </div>
-                          ) : fechaSeleccionada ? (
-                            <p className="text-[10px] text-gray-400">
-                              {format(fechaSeleccionada, 'dd MMM yyyy', { locale: undefined })}
-                            </p>
-                          ) : null}
+                              </div>
+                            ) : null}
+                          </div>
                         </div>
                       </div>
                       <div>
