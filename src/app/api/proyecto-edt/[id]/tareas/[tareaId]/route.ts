@@ -222,12 +222,10 @@ export async function DELETE(
       )
     }
 
-    // Solo el creador o admin pueden eliminar
-    const esAdmin = permiso.role === 'admin'
-    const esCreador = tarea.creadoPorId === permiso.userId
-    if (!esAdmin && !esCreador) {
+    const rolesPermitidosEliminar = ['admin', 'gestor', 'coordinador']
+    if (!rolesPermitidosEliminar.includes(permiso.role)) {
       return NextResponse.json(
-        { error: 'Solo el creador de la tarea o un administrador puede eliminarla' },
+        { error: 'Solo administradores, gestores o coordinadores pueden eliminar tareas' },
         { status: 403 }
       )
     }

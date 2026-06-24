@@ -352,10 +352,26 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { getServerSession } = await import('next-auth')
+    const { authOptions } = await import('@/lib/auth')
+    const session = await getServerSession(authOptions)
+
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    const rolesPermitidosEliminar = ['admin', 'gestor', 'coordinador']
+    if (!rolesPermitidosEliminar.includes(session.user.role || '')) {
+      return NextResponse.json(
+        { error: 'Solo administradores, gestores o coordinadores pueden eliminar tareas' },
+        { status: 403 }
+      )
+    }
+
     // ✅ Validar parámetros
     const resolvedParams = await params
     const { id } = paramsSchema.parse(resolvedParams)
-    
+
     // 🔍 Verificar que la tarea existe
     const tareaExistente = await prisma.tarea.findUnique({
       where: { id },
