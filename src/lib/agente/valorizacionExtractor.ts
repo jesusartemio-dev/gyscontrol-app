@@ -98,7 +98,8 @@ interface SheetText {
 const MAX_CHARS = 60_000
 
 export function readValorizacionSheets(buffer: Buffer): SheetText[] {
-  const wb = XLSX.read(buffer, { type: 'buffer', cellDates: false })
+  // cellDates: true convierte serial dates a strings legibles en el CSV
+  const wb = XLSX.read(buffer, { type: 'buffer', cellDates: true, dateNF: 'yyyy-mm-dd' })
   const sheets: SheetText[] = []
 
   for (const name of wb.SheetNames) {
@@ -110,8 +111,16 @@ export function readValorizacionSheets(buffer: Buffer): SheetText[] {
     sheets.push({ name, csv: csv.substring(0, MAX_CHARS), rowCount })
   }
 
-  // Ordenar por filas (mayor primero) — la hoja principal suele ser la más grande
-  return sheets.sort((a, b) => b.rowCount - a.rowCount)
+  // Hoja de detalle conocida primero ("VAL", "VALORIZACION"), luego por cantidad de filas
+  const PRIORITY = ['val', 'valorizacion', 'resumen', 'detalle']
+  return sheets.sort((a, b) => {
+    const ai = PRIORITY.indexOf(a.name.toLowerCase())
+    const bi = PRIORITY.indexOf(b.name.toLowerCase())
+    if (ai !== -1 && bi === -1) return -1
+    if (bi !== -1 && ai === -1) return 1
+    if (ai !== -1 && bi !== -1) return ai - bi
+    return b.rowCount - a.rowCount
+  })
 }
 
 // ── JSON helpers (reutilizados del excelExtractor) ────────
@@ -164,36 +173,58 @@ function parseJsonRobust(raw: string): unknown {
 // ── Prompts ───────────────────────────────────────────────
 
 const SYSTEM_PROMPT = `You are a JSON extraction API for Peruvian engineering and construction project valuations ("valorizaciones").
-The documents are client-issued Excel files that certify work progress for billing purposes.
+The documents are client-issued Excel files (converted to CSV) that certify work progress for billing purposes.
 They are written in Spanish and use Peruvian accounting conventions (PEN or USD, IGV=18%).
 
-A valorización document has this financial structure (UNDERSTAND THIS CAREFULLY):
-1. GROSS AMOUNT (montoValorizacion): Sum of all work items × their advance %. BEFORE any deductions.
-2. DEDUCTIONS: commercial discount, advance amortization (amortización de adelanto), guarantee fund (fondo de garantía).
-   These appear as separate line items or percentages in a summary section.
-3. SUBTOTAL WITHOUT IGV (subtotalSinIGV): = gross - all deductions. This is what appears as "valorización neta",
-   "monto valorizado", "subtotal", "valorización a cobrar", or the main figure the client highlights.
-   THIS IS THE KEY METRIC. It does NOT include IGV.
-4. IGV (18% typically): Applied on subtotalSinIGV.
-5. NET WITH IGV (netoARecibir): = subtotalSinIGV + IGV. The final amount to be paid.
+═══ FINANCIAL STRUCTURE ═══
+A valorización has these calculation steps:
+1. GROSS (montoValorizacion): sum of each work item × its advance %. BEFORE any deductions.
+   In documents this often appears as "Valorización Neta", "Costo Directo", or the subtotal BEFORE discount rows.
+2. DEDUCTIONS: commercial discount ("Descuento Comercial"), advance amortization ("Adelanto Comercial"), guarantee fund ("Fondo Garantía").
+3. SUBTOTAL WITHOUT IGV (subtotalSinIGV): = gross - all deductions. KEY METRIC. Often labelled "Sub Total" or "Subtotal".
+4. IGV (18% typically): applied on subtotalSinIGV.
+5. NET WITH IGV (netoARecibir): = subtotalSinIGV + IGV. Often "Total a Facturar" or "Neto a Recibir".
 
-CRITICAL FIELD MAPPING RULES:
-- montoValorizacion = GROSS amount (step 1 above). If the document shows a "total valorización" before deductions, use that.
-  If only one total figure is visible, it's likely the subtotalSinIGV (step 3), NOT the gross.
-- subtotalSinIGV = the amount AFTER deductions but BEFORE IGV. Often the most prominent figure in the document.
-- netoARecibir = the FINAL amount INCLUDING IGV (subtotalSinIGV + IGV amount).
-- If you see two similar amounts and one ≈ the other × 1.18, the smaller is subtotalSinIGV and the larger is netoARecibir.
-- adelantoPorcentaje = the advance percentage deducted (if shown as %). If shown as a fixed amount, estimate % if possible.
-- descuentoComercialPorcentaje = ONLY the explicit commercial discount %, NOT advance amortization.
+═══ DOCUMENT FORMAT — NEXA / STANDARD PERUVIAN MULTI-SHEET FORMAT ═══
+This format has sheets: "Carátula" (cover), "RESUMEN" (summary), "VAL" (detail).
+READ FROM VAL FIRST if present — it has the most accurate per-partida data.
 
-OTHER RULES:
+VAL sheet column layout (right-to-left groups):
+  PRESUPUESTO BASE: UND | CANT(contractual) | (variation) | ACTUAL qty | PRECIO UNIT | TOTAL(contractual)
+  ACUMULADO ANTERIOR: % | TOTAL
+  VALORIZACION ACTUAL: % | TOTAL   ← THIS PERIOD'S WORK — USE THESE VALUES
+  ACUMULADO ACTUAL: % | TOTAL
+  SALDO: % | TOTAL
+
+For PARTIDAS (work items):
+- montoContractual = TOTAL in the PRESUPUESTO BASE group (the base budget for that line)
+- porcentajeAcumuladoAnterior = % in ACUMULADO ANTERIOR group
+- porcentajeAcumuladoActual = % in ACUMULADO ACTUAL group (or = anterior + actual period %)
+- porcentajeAvance = % in VALORIZACION ACTUAL group (the increment THIS period)
+- montoAvance = TOTAL in VALORIZACION ACTUAL group (NOT SALDO, NOT ACUMULADO)
+
+IMPORTANT: Only extract TOP-LEVEL items (e.g. "1 MATERIALES", "2 SERVICIO ASOCIADO", "3 GASTOS OPERATIVOS").
+Do NOT extract sub-items (01.01, 01.02, 01.01.01, etc.) — they are sub-components of the main item.
+If an item row shows 0 for VALORIZACION ACTUAL, include it anyway with montoAvance=0.
+
+RESUMEN sheet: Use only for header info (period, contract amount, discount, IGV, neto).
+Rows like "VALORIZACION NETA", "DESCUENTO COMERCIAL", "SUB TOTAL", "IMPUESTO", "TOTAL a facturar" are the summary.
+"CONTRATADO = X" is the contracted invoice value (gross before discount at contract level), NOT a partida.
+
+═══ FIELD MAPPING RULES ═══
+- montoValorizacion = gross before deductions (e.g. "VALORIZACION NETA" or "COSTO DIRECTO" row in the ACTUAL column)
+- subtotalSinIGV = "SUB TOTAL" or "Subtotal" in the ACTUAL column (after discount, before IGV)
+- netoARecibir = "TOTAL a facturar" or "Neto a Recibir" in the ACTUAL column
+- descuentoComercialPorcentaje = the discount rate (e.g. "DSCTO COMERCIAL_ = 0.0917677..." → 9.18%)
+- presupuestoContractual = total PRESUPUESTO BASE sum (e.g. "COSTO DIRECTO" or "VALORIZACION NETA" base column)
+
+═══ OTHER RULES ═══
 - Respond ONLY with raw JSON. No markdown, no code fences, no explanations.
-- Dates must be in YYYY-MM-DD format. If only month/year visible, use first/last day of month.
-- Percentages as numbers 0-100 (not 0-1).
+- Dates: YYYY-MM-DD format. Parse text like "Del 15-05-2026 al 23-06-2026" → periodoInicio=2026-05-15, periodoFin=2026-06-23.
+- Percentages as numbers 0-100 (NOT 0-1). If document shows 0.37 as %, convert to 37.
 - All monetary amounts as numbers without currency symbols.
 - If a field is not found, use null.
-- porcentajeAvance = porcentajeAcumuladoActual - porcentajeAcumuladoAnterior (the increment this period).
-- montoAvance = montoContractual * porcentajeAvance / 100`
+- porcentajeAvance = porcentajeAcumuladoActual - porcentajeAcumuladoAnterior.`
 
 function buildExtractionPrompt(sheets: SheetText[]): string {
   const sheetsText = sheets.map(s =>
