@@ -22,7 +22,11 @@ interface ValResumen {
   id: string
   numero: number
   estado: string
+  periodoInicio: string | null
   periodoFin: string | null
+  moneda: string | null
+  subtotal: number | null
+  netoARecibir: number | null
 }
 
 interface Props {
@@ -163,38 +167,82 @@ function PreviewCrear({
       </div>
 
       {/* Advertencia: valorizaciones existentes */}
-      {hayValsExistentes && (
-        <div className="rounded-md border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 p-3 space-y-2">
-          <p className="text-xs font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
-            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-            Este proyecto ya tiene {valsExistentes.length} valorización{valsExistentes.length > 1 ? 'es' : ''} registrada{valsExistentes.length > 1 ? 's' : ''}
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {valsExistentes.map(v => (
-              <span key={v.id} className="inline-flex items-center gap-1 text-[10px] bg-white dark:bg-black/20 border rounded px-1.5 py-0.5 text-amber-900 dark:text-amber-200">
-                Val. {v.numero} — {ESTADO_LABELS[v.estado] ?? v.estado}
-              </span>
-            ))}
-          </div>
-          {valsActivas.length > 0 && (
-            <p className="text-xs text-amber-700 dark:text-amber-400">
-              {valsActivas.length} de ellas ya fueron enviadas o aprobadas.
-              {ultimaVal && ` La última (Val. ${ultimaVal.numero}) está en estado "${ESTADO_LABELS[ultimaVal.estado] ?? ultimaVal.estado}".`}
+      {hayValsExistentes && (() => {
+        const docSubtotal = c.subtotalSinIGV ?? c.montoValorizacion
+        const docPeriodoFin = c.periodoFin
+        // Val que tiene exactamente el mismo subtotal o el mismo período → posible duplicado
+        const duplicadoCandidato = valsExistentes.find(v =>
+          (docSubtotal != null && v.subtotal != null && Math.abs(v.subtotal - docSubtotal) < 1) ||
+          (docPeriodoFin && v.periodoFin && v.periodoFin.slice(0, 10) === docPeriodoFin.slice(0, 10))
+        )
+        return (
+          <div className={`rounded-md border p-3 space-y-2 ${duplicadoCandidato ? 'border-red-400 dark:border-red-600 bg-red-50 dark:bg-red-950/30' : 'border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30'}`}>
+            <p className={`text-xs font-semibold flex items-center gap-1.5 ${duplicadoCandidato ? 'text-red-800 dark:text-red-300' : 'text-amber-800 dark:text-amber-300'}`}>
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+              {duplicadoCandidato
+                ? `¡Posible duplicado! Este proyecto ya tiene ${valsExistentes.length} valorización${valsExistentes.length > 1 ? 'es' : ''} — una podría coincidir con este documento`
+                : `Este proyecto ya tiene ${valsExistentes.length} valorización${valsExistentes.length > 1 ? 'es' : ''} registrada${valsExistentes.length > 1 ? 's' : ''}`}
             </p>
-          )}
-          <label className="flex items-start gap-2 cursor-pointer mt-1">
-            <input
-              type="checkbox"
-              checked={confirmado}
-              onChange={e => setConfirmado(e.target.checked)}
-              className="mt-0.5 accent-amber-600"
-            />
-            <span className="text-xs text-amber-800 dark:text-amber-300">
-              Confirmo que quiero crear una nueva valorización adicional
-            </span>
-          </label>
-        </div>
-      )}
+
+            {/* Tabla compacta con montos y períodos */}
+            <div className="rounded border overflow-hidden text-[11px]">
+              <table className="w-full">
+                <thead className="bg-black/5 dark:bg-white/5">
+                  <tr>
+                    <th className="text-left px-2 py-1 font-medium">Val.</th>
+                    <th className="text-left px-2 py-1 font-medium">Estado</th>
+                    <th className="text-left px-2 py-1 font-medium">Período hasta</th>
+                    <th className="text-right px-2 py-1 font-medium">Subtotal</th>
+                    <th className="px-2 py-1 w-5"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...valsExistentes].reverse().map(v => {
+                    const esCoincide =
+                      (docSubtotal != null && v.subtotal != null && Math.abs(v.subtotal - docSubtotal) < 1) ||
+                      (docPeriodoFin && v.periodoFin && v.periodoFin.slice(0, 10) === docPeriodoFin.slice(0, 10))
+                    return (
+                      <tr key={v.id} className={`border-t ${esCoincide ? 'bg-red-100 dark:bg-red-900/30 font-semibold' : ''}`}>
+                        <td className="px-2 py-1">#{v.numero}</td>
+                        <td className="px-2 py-1">{ESTADO_LABELS[v.estado] ?? v.estado}</td>
+                        <td className="px-2 py-1 text-muted-foreground">{v.periodoFin ? fmtDate(v.periodoFin) : '—'}</td>
+                        <td className="px-2 py-1 text-right">{v.subtotal != null ? `${v.moneda ?? 'USD'} ${fmtNum(v.subtotal)}` : '—'}</td>
+                        <td className="px-2 py-1 text-center">{esCoincide && <AlertTriangle className="h-3 w-3 text-red-500 inline" />}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+                {/* Fila "documento a crear" para comparar visualmente */}
+                {docSubtotal != null && (
+                  <tfoot>
+                    <tr className="border-t-2 border-teal-400 bg-teal-50 dark:bg-teal-950/30">
+                      <td className="px-2 py-1 text-teal-700 dark:text-teal-300 font-medium">Nuevo</td>
+                      <td className="px-2 py-1 text-teal-600 dark:text-teal-400">Este doc.</td>
+                      <td className="px-2 py-1 text-teal-600 dark:text-teal-400">{docPeriodoFin ? fmtDate(docPeriodoFin) : '—'}</td>
+                      <td className="px-2 py-1 text-right text-teal-700 dark:text-teal-300 font-semibold">{c.moneda} {fmtNum(docSubtotal)}</td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={confirmado}
+                onChange={e => setConfirmado(e.target.checked)}
+                className="mt-0.5 accent-amber-600"
+              />
+              <span className={`text-xs ${duplicadoCandidato ? 'text-red-800 dark:text-red-300' : 'text-amber-800 dark:text-amber-300'}`}>
+                {duplicadoCandidato
+                  ? 'Confirmo que NO es un duplicado y quiero crear esta valorización adicional'
+                  : 'Confirmo que quiero crear una nueva valorización adicional'}
+              </span>
+            </label>
+          </div>
+        )
+      })()}
 
       {/* Advertencias IA */}
       {advertencias.length > 0 && (
