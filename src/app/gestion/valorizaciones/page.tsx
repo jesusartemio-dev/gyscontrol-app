@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, FileSpreadsheet, Loader2, Search, Eye, Upload, Download, Clock, Info, CalendarDays, Sparkles } from 'lucide-react'
+import { Plus, FileSpreadsheet, Loader2, Search, Eye, Upload, Download, Clock, Info, CalendarDays, Sparkles, ChevronRight, ChevronDown, List, BarChart2, FolderOpen } from 'lucide-react'
 import toast from 'react-hot-toast'
 import ValorizacionImportExcelModal from '@/components/gestion/ValorizacionImportExcelModal'
 import { ValorizacionImportIAModal } from '@/components/gestion/ValorizacionImportIAModal'
@@ -148,6 +148,9 @@ export default function ValorizacionesPage() {
   const [showImportDialog, setShowImportDialog] = useState(false)
   const [showIAModal, setShowIAModal] = useState(false)
   const [iaEnabled, setIaEnabled] = useState(false)
+  const [viewMode, setViewMode] = useState<'lista' | 'meses' | 'proyectos'>('lista')
+  const [expandedMeses, setExpandedMeses] = useState<Set<string>>(new Set())
+  const [expandedProyectos, setExpandedProyectos] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     fetch('/api/agente/features')
@@ -255,6 +258,59 @@ export default function ValorizacionesPage() {
       byMoneda[m].neto += i.netoARecibir
     }
     return { byMoneda, total: filtered.length, activas: activas.length }
+  }, [filtered])
+
+  // ── Agrupación por mes ────────────────────────────────────
+  const mesesData = useMemo(() => {
+    type MesGroup = { mes: string; vals: Valorizacion[]; totalMonto: number; totalNeto: number }
+    const map = new Map<string, MesGroup>()
+    for (const v of filtered) {
+      const key = (v.periodoFin ?? v.periodoInicio ?? '').slice(0, 7)
+      if (!key || key.length < 7) continue
+      if (!map.has(key)) map.set(key, { mes: key, vals: [], totalMonto: 0, totalNeto: 0 })
+      const m = map.get(key)!
+      m.vals.push(v)
+      if (v.estado !== 'anulada') {
+        m.totalMonto += v.montoValorizacion ?? 0
+        m.totalNeto += v.netoARecibir ?? 0
+      }
+    }
+    return [...map.values()].sort((a, b) => b.mes.localeCompare(a.mes))
+  }, [filtered])
+
+  // ── Agrupación por proyecto ───────────────────────────────
+  const proyectosData = useMemo(() => {
+    type ProjGroup = {
+      proyectoId: string; codigo: string; nombre: string
+      vals: Valorizacion[]; presupuesto: number; acumulado: number; totalNeto: number
+    }
+    const map = new Map<string, ProjGroup>()
+    for (const v of filtered) {
+      const pid = v.proyectoId
+      if (!map.has(pid)) {
+        map.set(pid, {
+          proyectoId: pid,
+          codigo: v.proyecto?.codigo ?? '',
+          nombre: v.proyecto?.nombre ?? '',
+          vals: [],
+          presupuesto: 0,
+          acumulado: 0,
+          totalNeto: 0,
+        })
+      }
+      const p = map.get(pid)!
+      p.vals.push(v)
+      if (v.estado !== 'anulada') {
+        if ((v.acumuladoActual ?? 0) > p.acumulado) p.acumulado = v.acumuladoActual ?? 0
+        if ((v.presupuestoContractual ?? 0) > p.presupuesto) p.presupuesto = v.presupuestoContractual ?? 0
+        p.totalNeto += v.netoARecibir ?? 0
+      }
+    }
+    return [...map.values()].sort((a, b) => {
+      const pa = a.presupuesto > 0 ? a.acumulado / a.presupuesto : 0
+      const pb = b.presupuesto > 0 ? b.acumulado / b.presupuesto : 0
+      return pb - pa
+    })
   }, [filtered])
 
   // Preview info: qué número de valorización se creará y si hay partidas anteriores
@@ -463,98 +519,319 @@ export default function ValorizacionesPage() {
         )}
       </div>
 
-      {/* Tabla */}
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Código</TableHead>
-                <TableHead>Proyecto</TableHead>
-                <TableHead>Periodo</TableHead>
-                <TableHead className="text-right">Monto Val.</TableHead>
-                <TableHead className="text-right">Acumulado</TableHead>
-                <TableHead className="text-right">% Avance</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead className="text-right">Neto a Recibir</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.length === 0 ? (
+      {/* Selector de vista */}
+      <div className="flex items-center gap-1 p-1 bg-muted/40 rounded-lg w-fit border">
+        {([
+          { key: 'lista', icon: List, label: 'Lista' },
+          { key: 'meses', icon: BarChart2, label: 'Por mes' },
+          { key: 'proyectos', icon: FolderOpen, label: 'Por proyecto' },
+        ] as const).map(({ key, icon: Icon, label }) => (
+          <button
+            key={key}
+            onClick={() => setViewMode(key)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+              viewMode === key
+                ? 'bg-white dark:bg-zinc-800 shadow-sm text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Icon className="h-3.5 w-3.5" />
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── VISTA LISTA ── */}
+      {viewMode === 'lista' && (
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                    <FileSpreadsheet className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                    No hay valorizaciones registradas
-                  </TableCell>
+                  <TableHead>Código</TableHead>
+                  <TableHead>Proyecto</TableHead>
+                  <TableHead>Periodo</TableHead>
+                  <TableHead className="text-right">Monto Val.</TableHead>
+                  <TableHead className="text-right">Acumulado</TableHead>
+                  <TableHead className="text-right">% Avance</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead className="text-right">Neto a Recibir</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
-              ) : (
-                filtered.map(item => (
-                  <TableRow key={item.id} className={item.estado === 'anulada' ? 'opacity-50' : ''}>
-                    <TableCell className="font-mono text-sm font-medium">{item.codigo}</TableCell>
-                    <TableCell className="text-sm">
-                      <div className="font-medium">{item.proyecto?.codigo}</div>
-                      <div className="text-muted-foreground text-xs truncate max-w-[200px]">{item.proyecto?.nombre}</div>
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {formatPeriod(item.periodoInicio, item.periodoFin)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-sm">
-                      {formatCurrency(item.montoValorizacion, item.moneda)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-sm">
-                      {formatCurrency(item.acumuladoActual, item.moneda)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <div className="w-16 bg-gray-200 rounded-full h-2">
-                          <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${Math.min(item.porcentajeAvance, 100)}%` }} />
-                        </div>
-                        <span className="text-xs font-mono">{item.porcentajeAvance.toFixed(1)}%</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getEstadoColor(item.estado)}>{getEstadoLabel(item.estado)}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-sm font-semibold">
-                      {formatCurrency(item.netoARecibir, item.moneda)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => router.push(`/gestion/valorizaciones/${item.id}?mode=view`)} title="Ver detalle">
-                        <Eye className="h-4 w-4" />
-                      </Button>
+              </TableHeader>
+              <TableBody>
+                {filtered.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                      <FileSpreadsheet className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                      No hay valorizaciones registradas
                     </TableCell>
                   </TableRow>
-                ))
+                ) : (
+                  filtered.map(item => (
+                    <TableRow key={item.id} className={item.estado === 'anulada' ? 'opacity-50' : ''}>
+                      <TableCell className="font-mono text-sm font-medium">{item.codigo}</TableCell>
+                      <TableCell className="text-sm">
+                        <div className="font-medium">{item.proyecto?.codigo}</div>
+                        <div className="text-muted-foreground text-xs truncate max-w-[200px]">{item.proyecto?.nombre}</div>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {formatPeriod(item.periodoInicio, item.periodoFin)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm">
+                        {formatCurrency(item.montoValorizacion, item.moneda)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm">
+                        {formatCurrency(item.acumuladoActual, item.moneda)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <div className="w-16 bg-gray-200 rounded-full h-2">
+                            <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${Math.min(item.porcentajeAvance, 100)}%` }} />
+                          </div>
+                          <span className="text-xs font-mono">{item.porcentajeAvance.toFixed(1)}%</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getEstadoColor(item.estado)}>{getEstadoLabel(item.estado)}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm font-semibold">
+                        {formatCurrency(item.netoARecibir, item.moneda)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="icon" onClick={() => router.push(`/gestion/valorizaciones/${item.id}?mode=view`)} title="Ver detalle">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+              {filtered.length > 0 && (
+                <TableFooter>
+                  <TableRow>
+                    <TableCell colSpan={3} className="py-2 text-sm text-muted-foreground">
+                      {totals.activas} valorización{totals.activas !== 1 ? 'es' : ''} activa{totals.activas !== 1 ? 's' : ''}
+                      {totals.total !== totals.activas && ` · ${totals.total - totals.activas} anulada${totals.total - totals.activas !== 1 ? 's' : ''}`}
+                    </TableCell>
+                    <TableCell className="py-2 text-right font-mono text-sm">
+                      {Object.entries(totals.byMoneda).map(([m, t]) => (
+                        <div key={m}>{formatCurrency(t.montoVal, m)}</div>
+                      ))}
+                    </TableCell>
+                    <TableCell className="py-2" />
+                    <TableCell className="py-2" />
+                    <TableCell className="py-2" />
+                    <TableCell className="py-2 text-right font-mono text-sm font-semibold">
+                      {Object.entries(totals.byMoneda).map(([m, t]) => (
+                        <div key={m}>{formatCurrency(t.neto, m)}</div>
+                      ))}
+                    </TableCell>
+                    <TableCell className="py-2" />
+                  </TableRow>
+                </TableFooter>
               )}
-            </TableBody>
-            {filtered.length > 0 && (
-              <TableFooter>
-                <TableRow>
-                  <TableCell colSpan={3} className="py-2 text-sm text-muted-foreground">
-                    {totals.activas} valorización{totals.activas !== 1 ? 'es' : ''} activa{totals.activas !== 1 ? 's' : ''}
-                    {totals.total !== totals.activas && ` · ${totals.total - totals.activas} anulada${totals.total - totals.activas !== 1 ? 's' : ''}`}
-                  </TableCell>
-                  <TableCell className="py-2 text-right font-mono text-sm">
-                    {Object.entries(totals.byMoneda).map(([m, t]) => (
-                      <div key={m}>{formatCurrency(t.montoVal, m)}</div>
-                    ))}
-                  </TableCell>
-                  <TableCell className="py-2" />
-                  <TableCell className="py-2" />
-                  <TableCell className="py-2" />
-                  <TableCell className="py-2 text-right font-mono text-sm font-semibold">
-                    {Object.entries(totals.byMoneda).map(([m, t]) => (
-                      <div key={m}>{formatCurrency(t.neto, m)}</div>
-                    ))}
-                  </TableCell>
-                  <TableCell className="py-2" />
-                </TableRow>
-              </TableFooter>
-            )}
-          </Table>
-        </CardContent>
-      </Card>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── VISTA POR MES ── */}
+      {viewMode === 'meses' && (() => {
+        const maxMonto = Math.max(...mesesData.map(m => m.totalMonto), 1)
+        const toggleMes = (mes: string) => setExpandedMeses(prev => {
+          const s = new Set(prev); s.has(mes) ? s.delete(mes) : s.add(mes); return s
+        })
+        return (
+          <Card>
+            <CardContent className="p-0">
+              {mesesData.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <BarChart2 className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                  <p className="text-sm">No hay datos para mostrar</p>
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {mesesData.map(({ mes, vals, totalMonto, totalNeto }) => {
+                    const isOpen = expandedMeses.has(mes)
+                    const [yr, mo] = mes.split('-')
+                    const label = new Date(+yr, +mo - 1, 1).toLocaleDateString('es-PE', { month: 'long', year: 'numeric' })
+                    const pct = totalMonto / maxMonto * 100
+                    // Conteo de estados únicos en el mes
+                    const estadoCount: Record<string, number> = {}
+                    vals.forEach(v => { if (v.estado !== 'anulada') estadoCount[v.estado] = (estadoCount[v.estado] || 0) + 1 })
+
+                    return (
+                      <div key={mes}>
+                        <button
+                          className="w-full text-left px-5 py-4 hover:bg-muted/30 transition-colors"
+                          onClick={() => toggleMes(mes)}
+                        >
+                          <div className="flex items-center gap-3">
+                            {isOpen
+                              ? <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                              : <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-3 mb-2">
+                                <span className="font-semibold capitalize text-sm">{label}</span>
+                                <span className="text-xs text-muted-foreground">{vals.length} val{vals.length > 1 ? 'es' : ''}</span>
+                                <div className="flex gap-1 flex-wrap">
+                                  {Object.entries(estadoCount).map(([est, cnt]) => (
+                                    <span key={est} className={`text-[10px] px-1.5 py-0.5 rounded-full ${getEstadoColor(est)}`}>
+                                      {getEstadoLabel(est)} {cnt > 1 ? `×${cnt}` : ''}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 bg-muted rounded-full h-1.5">
+                                  <div className="bg-blue-500 h-1.5 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0 ml-4">
+                              <p className="text-sm font-semibold font-mono">{formatCurrency(totalMonto, 'USD')}</p>
+                              <p className="text-xs text-muted-foreground font-mono">Neto {formatCurrency(totalNeto, 'USD')}</p>
+                            </div>
+                          </div>
+                        </button>
+                        {isOpen && (
+                          <div className="bg-muted/20 border-t divide-y">
+                            {vals.map(v => (
+                              <div key={v.id} className="flex items-center gap-3 px-10 py-2.5 hover:bg-muted/30">
+                                <div className="flex-1 min-w-0">
+                                  <span className="text-xs font-mono font-medium text-muted-foreground">{v.codigo}</span>
+                                  <span className="text-xs text-muted-foreground ml-2 truncate">{v.proyecto?.codigo} · {v.proyecto?.nombre}</span>
+                                </div>
+                                <span className="text-xs text-muted-foreground">{formatPeriod(v.periodoInicio, v.periodoFin)}</span>
+                                <Badge className={`${getEstadoColor(v.estado)} text-[10px] py-0`}>{getEstadoLabel(v.estado)}</Badge>
+                                <span className="text-xs font-mono font-medium w-24 text-right">{formatCurrency(v.netoARecibir, v.moneda)}</span>
+                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => router.push(`/gestion/valorizaciones/${v.id}?mode=view`)}>
+                                  <Eye className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                  {/* Fila total */}
+                  <div className="px-5 py-3 bg-muted/30 flex items-center justify-between">
+                    <span className="text-sm font-medium text-muted-foreground">{filtered.length} valorizaciones · {mesesData.length} mes{mesesData.length > 1 ? 'es' : ''}</span>
+                    <div className="text-right">
+                      {Object.entries(totals.byMoneda).map(([m, t]) => (
+                        <p key={m} className="text-sm font-semibold font-mono">{formatCurrency(t.neto, m)} neto</p>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )
+      })()}
+
+      {/* ── VISTA POR PROYECTO ── */}
+      {viewMode === 'proyectos' && (() => {
+        const toggleProy = (id: string) => setExpandedProyectos(prev => {
+          const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s
+        })
+        return (
+          <Card>
+            <CardContent className="p-0">
+              {proyectosData.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <FolderOpen className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                  <p className="text-sm">No hay datos para mostrar</p>
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {proyectosData.map(({ proyectoId, codigo, nombre, vals, presupuesto, acumulado, totalNeto }) => {
+                    const isOpen = expandedProyectos.has(proyectoId)
+                    const pct = presupuesto > 0 ? Math.min(100, acumulado / presupuesto * 100) : 0
+                    const barColor = pct >= 100 ? 'bg-green-500' : pct >= 75 ? 'bg-blue-500' : pct >= 40 ? 'bg-blue-400' : 'bg-blue-300'
+                    const valsOrdenadas = [...vals].sort((a, b) => b.numero - a.numero)
+                    const ultimoEstado = valsOrdenadas[0]?.estado
+
+                    return (
+                      <div key={proyectoId}>
+                        <button
+                          className="w-full text-left px-5 py-4 hover:bg-muted/30 transition-colors"
+                          onClick={() => toggleProy(proyectoId)}
+                        >
+                          <div className="flex items-center gap-3">
+                            {isOpen
+                              ? <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                              : <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="font-semibold text-sm">{codigo}</span>
+                                {ultimoEstado && (
+                                  <Badge className={`${getEstadoColor(ultimoEstado)} text-[10px] py-0`}>{getEstadoLabel(ultimoEstado)}</Badge>
+                                )}
+                                <span className="text-xs text-muted-foreground truncate max-w-xs">{nombre}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 bg-muted rounded-full h-2">
+                                  <div className={`${barColor} h-2 rounded-full transition-all`} style={{ width: `${pct}%` }} />
+                                </div>
+                                <span className="text-xs font-mono font-semibold w-12 text-right">{pct.toFixed(1)}%</span>
+                              </div>
+                              {presupuesto > 0 && (
+                                <p className="text-[10px] text-muted-foreground mt-0.5">
+                                  {formatCurrency(acumulado, 'USD')} de {formatCurrency(presupuesto, 'USD')} acumulado
+                                </p>
+                              )}
+                            </div>
+                            <div className="text-right shrink-0 ml-4">
+                              <p className="text-xs text-muted-foreground">{vals.length} val{vals.length > 1 ? 'es' : ''}</p>
+                              <p className="text-sm font-semibold font-mono">{formatCurrency(totalNeto, 'USD')}</p>
+                              <p className="text-[10px] text-muted-foreground">neto acum.</p>
+                            </div>
+                          </div>
+                        </button>
+                        {isOpen && (
+                          <div className="bg-muted/20 border-t divide-y">
+                            {valsOrdenadas.map(v => (
+                              <div key={v.id} className="flex items-center gap-3 px-10 py-2.5 hover:bg-muted/30">
+                                <div className="flex-1 min-w-0">
+                                  <span className="text-xs font-mono font-medium">{v.codigo}</span>
+                                  <span className="text-xs text-muted-foreground ml-2">{formatPeriod(v.periodoInicio, v.periodoFin)}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-12 bg-muted rounded-full h-1.5">
+                                    <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${Math.min(v.porcentajeAvance, 100)}%` }} />
+                                  </div>
+                                  <span className="text-[10px] font-mono w-8">{v.porcentajeAvance.toFixed(0)}%</span>
+                                </div>
+                                <Badge className={`${getEstadoColor(v.estado)} text-[10px] py-0`}>{getEstadoLabel(v.estado)}</Badge>
+                                <span className="text-xs font-mono font-medium w-24 text-right">{formatCurrency(v.netoARecibir, v.moneda)}</span>
+                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => router.push(`/gestion/valorizaciones/${v.id}?mode=view`)}>
+                                  <Eye className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                  {/* Fila total */}
+                  <div className="px-5 py-3 bg-muted/30 flex items-center justify-between">
+                    <span className="text-sm font-medium text-muted-foreground">{proyectosData.length} proyecto{proyectosData.length > 1 ? 's' : ''} · {filtered.length} valorizaciones</span>
+                    <div className="text-right">
+                      {Object.entries(totals.byMoneda).map(([m, t]) => (
+                        <p key={m} className="text-sm font-semibold font-mono">{formatCurrency(t.neto, m)} neto acum.</p>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )
+      })()}
 
       {/* Dialog crear */}
       <Dialog open={showForm} onOpenChange={open => { if (!open) { setShowForm(false); resetForm() } }}>
