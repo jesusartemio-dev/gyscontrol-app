@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -154,11 +155,43 @@ const formatCurrency = (amount: number, moneda = 'PEN') =>
 const formatDate = (date: string) =>
   new Date(date).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })
 
+const ROLES_TRANSICION_CLIENT: Record<string, string[]> = {
+  'borrador→enviada':               ['gestor', 'coordinador', 'gerente', 'admin'],
+  'borrador→anulada':               ['gerente', 'admin'],
+  'enviada→observada':              ['gestor', 'coordinador', 'gerente', 'admin'],
+  'enviada→aprobada_cliente':       ['gestor', 'coordinador', 'gerente', 'admin'],
+  'enviada→borrador':               ['gestor', 'coordinador', 'gerente', 'admin'],
+  'enviada→anulada':                ['gerente', 'admin'],
+  'observada→corregida':            ['gestor', 'coordinador', 'gerente', 'admin'],
+  'observada→enviada':              ['gestor', 'coordinador', 'gerente', 'admin'],
+  'observada→anulada':              ['gerente', 'admin'],
+  'corregida→aprobada_cliente':     ['gestor', 'coordinador', 'gerente', 'admin'],
+  'corregida→observada':            ['gestor', 'coordinador', 'gerente', 'admin'],
+  'corregida→enviada':              ['gestor', 'coordinador', 'gerente', 'admin'],
+  'corregida→anulada':              ['gerente', 'admin'],
+  'aprobada_cliente→hes_pendiente': ['gestor', 'coordinador', 'gerente', 'administracion', 'admin'],
+  'aprobada_cliente→enviada':       ['gerente', 'admin'],
+  'aprobada_cliente→anulada':       ['gerente', 'admin'],
+  'hes_pendiente→facturada':        ['gerente', 'administracion', 'admin'],
+  'hes_pendiente→aprobada_cliente': ['gerente', 'administracion', 'admin'],
+  'hes_pendiente→anulada':          ['gerente', 'admin'],
+  'facturada→pagada':               ['gerente', 'administracion', 'admin'],
+  'facturada→hes_pendiente':        ['gerente', 'administracion', 'admin'],
+  'facturada→aprobada_cliente':     ['gerente', 'admin'],
+  'facturada→anulada':              ['gerente', 'admin'],
+  'pagada→facturada':               ['gerente', 'admin'],
+  'pagada→anulada':                 ['gerente', 'admin'],
+}
+
 export default function ValorizacionEditPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
   const searchParams = useSearchParams()
   const viewMode = searchParams.get('mode') === 'view'
+  const { data: session } = useSession()
+  const userRole = session?.user?.role ?? ''
+  const puedeTransicionar = (desde: string, hacia: string) =>
+    (ROLES_TRANSICION_CLIENT[`${desde}→${hacia}`] ?? []).includes(userRole)
 
   const [val, setVal] = useState<Valorizacion | null>(null)
   const [loading, setLoading] = useState(true)
@@ -341,8 +374,18 @@ export default function ValorizacionEditPage() {
 
   // Guardar Conformidad del cliente (independiente de los campos generales).
   // Editable cuando estado >= aprobada_cliente y antes de facturar.
+  const conformidadValida = (): string | null => {
+    if (!formTipoConformidad) return 'Selecciona el tipo de conformidad'
+    if (!formFechaConformidad) return 'Ingresa la fecha de conformidad'
+    if (formTipoConformidad === 'hes' && !formNumeroHES.trim()) return 'Ingresa el N° HES'
+    if (formTipoConformidad === 'guia_remision' && !formNumeroGuiaRemision.trim()) return 'Ingresa el N° Guía de Remisión'
+    return null
+  }
+
   const handleSaveConformidad = async () => {
     if (!val) return
+    const error = conformidadValida()
+    if (error) { toast.error(error); return }
     setSavingConformidad(true)
     try {
       const res = await fetch(`/api/proyectos/${val.proyectoId}/valorizaciones/${val.id}`, {
@@ -854,7 +897,13 @@ export default function ValorizacionEditPage() {
           Editable en aprobada_cliente, hes_pendiente y facturada (por si se completó después de facturar). */}
       {val && ['aprobada_cliente', 'hes_pendiente', 'facturada', 'pagada', 'anulada'].includes(val.estado) && (() => {
         const editable = ['aprobada_cliente', 'hes_pendiente', 'facturada'].includes(val.estado)
-        const tieneConformidad = !!(val.numeroHES || val.numeroGuiaRemision || val.fechaConformidad)
+        const tieneConformidad = !!(
+          val.tipoConformidad &&
+          val.fechaConformidad &&
+          (val.tipoConformidad === 'hes' ? val.numeroHES :
+           val.tipoConformidad === 'guia_remision' ? val.numeroGuiaRemision :
+           true)
+        )
         return (
           <Card className={editable && !tieneConformidad ? 'border-amber-300 bg-amber-50/30' : ''}>
             <CardContent className="p-4 space-y-3">
@@ -933,11 +982,22 @@ export default function ValorizacionEditPage() {
               </div>
 
               {editable && (
-                <div className="flex justify-end">
-                  <Button onClick={handleSaveConformidad} disabled={savingConformidad} size="sm">
+                <div className="flex items-center justify-end gap-2">
+                  <Button onClick={handleSaveConformidad} disabled={savingConformidad} size="sm" variant="outline">
                     {savingConformidad && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                     Guardar Conformidad
                   </Button>
+                  {val.estado === 'aprobada_cliente' && puedeTransicionar('aprobada_cliente', 'hes_pendiente') && (
+                    <Button
+                      size="sm"
+                      disabled={!tieneConformidad || transitioning}
+                      onClick={() => handleTransicion('hes_pendiente')}
+                      title={!tieneConformidad ? 'Guarda la conformidad primero' : 'Avanzar al estado HES'}
+                    >
+                      {transitioning && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      Registrar HES →
+                    </Button>
+                  )}
                 </div>
               )}
             </CardContent>

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -107,8 +108,40 @@ function getRangoFechas(preset: string, desde: string, hasta: string): { desde: 
   return { desde: null, hasta: null }
 }
 
+const ROLES_TRANSICION_VAL: Record<string, string[]> = {
+  'borrador→enviada':               ['gestor', 'coordinador', 'gerente', 'admin'],
+  'borrador→anulada':               ['gerente', 'admin'],
+  'enviada→observada':              ['gestor', 'coordinador', 'gerente', 'admin'],
+  'enviada→aprobada_cliente':       ['gestor', 'coordinador', 'gerente', 'admin'],
+  'enviada→borrador':               ['gestor', 'coordinador', 'gerente', 'admin'],
+  'enviada→anulada':                ['gerente', 'admin'],
+  'observada→corregida':            ['gestor', 'coordinador', 'gerente', 'admin'],
+  'observada→enviada':              ['gestor', 'coordinador', 'gerente', 'admin'],
+  'observada→anulada':              ['gerente', 'admin'],
+  'corregida→aprobada_cliente':     ['gestor', 'coordinador', 'gerente', 'admin'],
+  'corregida→observada':            ['gestor', 'coordinador', 'gerente', 'admin'],
+  'corregida→enviada':              ['gestor', 'coordinador', 'gerente', 'admin'],
+  'corregida→anulada':              ['gerente', 'admin'],
+  'aprobada_cliente→hes_pendiente': ['gestor', 'coordinador', 'gerente', 'administracion', 'admin'],
+  'aprobada_cliente→enviada':       ['gerente', 'admin'],
+  'aprobada_cliente→anulada':       ['gerente', 'admin'],
+  'hes_pendiente→facturada':        ['gerente', 'administracion', 'admin'],
+  'hes_pendiente→aprobada_cliente': ['gerente', 'administracion', 'admin'],
+  'hes_pendiente→anulada':          ['gerente', 'admin'],
+  'facturada→pagada':               ['gerente', 'administracion', 'admin'],
+  'facturada→hes_pendiente':        ['gerente', 'administracion', 'admin'],
+  'facturada→aprobada_cliente':     ['gerente', 'admin'],
+  'facturada→anulada':              ['gerente', 'admin'],
+  'pagada→facturada':               ['gerente', 'admin'],
+  'pagada→anulada':                 ['gerente', 'admin'],
+}
+
 export default function ValorizacionesPage() {
   const router = useRouter()
+  const { data: session } = useSession()
+  const userRole = session?.user?.role ?? ''
+  const puede = (desde: string, hacia: string) =>
+    (ROLES_TRANSICION_VAL[`${desde}→${hacia}`] ?? []).includes(userRole)
   const [items, setItems] = useState<Valorizacion[]>([])
   const [proyectos, setProyectos] = useState<Proyecto[]>([])
   const [loading, setLoading] = useState(true)
@@ -600,43 +633,49 @@ export default function ValorizacionesPage() {
                             <Button variant="ghost" size="icon" onClick={() => router.push(`/gestion/valorizaciones/${item.id}`)} title="Editar">
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" onClick={() => openEstadoTransition(item, 'enviada')} title="Enviar">
-                              <Send className="h-4 w-4 text-blue-600" />
-                            </Button>
+                            {puede('borrador', 'enviada') && (
+                              <Button variant="ghost" size="icon" onClick={() => openEstadoTransition(item, 'enviada')} title="Enviar">
+                                <Send className="h-4 w-4 text-blue-600" />
+                              </Button>
+                            )}
                           </>
                         )}
                         {(item.estado === 'enviada' || item.estado === 'corregida') && (
                           <>
-                            <Button variant="ghost" size="icon" onClick={() => openObservar(item)} title="Marcar Observada">
-                              <AlertTriangle className="h-4 w-4 text-orange-500" />
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => openEstadoTransition(item, 'aprobada_cliente')} title="Aprobar">
-                              <CheckCircle className="h-4 w-4 text-emerald-600" />
-                            </Button>
+                            {puede(item.estado, 'observada') && (
+                              <Button variant="ghost" size="icon" onClick={() => openObservar(item)} title="Marcar Observada">
+                                <AlertTriangle className="h-4 w-4 text-orange-500" />
+                              </Button>
+                            )}
+                            {puede(item.estado, 'aprobada_cliente') && (
+                              <Button variant="ghost" size="icon" onClick={() => openEstadoTransition(item, 'aprobada_cliente')} title="Aprobar">
+                                <CheckCircle className="h-4 w-4 text-emerald-600" />
+                              </Button>
+                            )}
                           </>
                         )}
-                        {item.estado === 'observada' && (
+                        {item.estado === 'observada' && puede('observada', 'corregida') && (
                           <Button variant="ghost" size="icon" onClick={() => openEstadoTransition(item, 'corregida')} title="Enviar Corrección">
                             <RefreshCw className="h-4 w-4 text-violet-600" />
                           </Button>
                         )}
                         {/* Backward transitions */}
-                        {item.estado === 'aprobada_cliente' && (
+                        {item.estado === 'aprobada_cliente' && puede('aprobada_cliente', 'enviada') && (
                           <Button variant="ghost" size="icon" onClick={() => openEstadoTransition(item, 'enviada')} title="Revertir aprobación">
                             <Undo2 className="h-4 w-4 text-amber-600" />
                           </Button>
                         )}
-                        {(item.estado === 'enviada' || item.estado === 'corregida') && (
+                        {(item.estado === 'enviada' || item.estado === 'corregida') && puede(item.estado, 'borrador') && (
                           <Button variant="ghost" size="icon" onClick={() => openEstadoTransition(item, 'borrador')} title="Revertir a borrador">
                             <Undo2 className="h-4 w-4 text-amber-600" />
                           </Button>
                         )}
-                        {item.estado === 'observada' && (
+                        {item.estado === 'observada' && puede('observada', 'enviada') && (
                           <Button variant="ghost" size="icon" onClick={() => openEstadoTransition(item, 'enviada')} title="Revertir a enviada">
                             <Undo2 className="h-4 w-4 text-amber-600" />
                           </Button>
                         )}
-                        {item.estado !== 'anulada' && (
+                        {item.estado !== 'anulada' && puede(item.estado, 'anulada') && (
                           <Button variant="ghost" size="icon" onClick={() => openEstadoTransition(item, 'anulada')} title="Anular">
                             <Ban className="h-3.5 w-3.5 text-red-500" />
                           </Button>

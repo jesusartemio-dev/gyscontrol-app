@@ -72,12 +72,49 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       anulada:          [],
     }
 
+    // Roles permitidos por transición específica
+    const ROLES_TRANSICION: Record<string, string[]> = {
+      'borrador→enviada':            ['gestor', 'coordinador', 'gerente', 'admin'],
+      'borrador→anulada':            ['gerente', 'admin'],
+      'enviada→observada':           ['gestor', 'coordinador', 'gerente', 'admin'],
+      'enviada→aprobada_cliente':    ['gestor', 'coordinador', 'gerente', 'admin'],
+      'enviada→borrador':            ['gestor', 'coordinador', 'gerente', 'admin'],
+      'enviada→anulada':             ['gerente', 'admin'],
+      'observada→corregida':         ['gestor', 'coordinador', 'gerente', 'admin'],
+      'observada→enviada':           ['gestor', 'coordinador', 'gerente', 'admin'],
+      'observada→anulada':           ['gerente', 'admin'],
+      'corregida→aprobada_cliente':  ['gestor', 'coordinador', 'gerente', 'admin'],
+      'corregida→observada':         ['gestor', 'coordinador', 'gerente', 'admin'],
+      'corregida→enviada':           ['gestor', 'coordinador', 'gerente', 'admin'],
+      'corregida→anulada':           ['gerente', 'admin'],
+      'aprobada_cliente→hes_pendiente': ['gestor', 'coordinador', 'gerente', 'administracion', 'admin'],
+      'aprobada_cliente→enviada':    ['gerente', 'admin'],
+      'aprobada_cliente→anulada':    ['gerente', 'admin'],
+      'hes_pendiente→facturada':     ['gerente', 'administracion', 'admin'],
+      'hes_pendiente→aprobada_cliente': ['gerente', 'administracion', 'admin'],
+      'hes_pendiente→anulada':       ['gerente', 'admin'],
+      'facturada→pagada':            ['gerente', 'administracion', 'admin'],
+      'facturada→hes_pendiente':     ['gerente', 'administracion', 'admin'],
+      'facturada→aprobada_cliente':  ['gerente', 'admin'],
+      'facturada→anulada':           ['gerente', 'admin'],
+      'pagada→facturada':            ['gerente', 'admin'],
+      'pagada→anulada':              ['gerente', 'admin'],
+    }
+
     if (body.estado && body.estado !== existing.estado) {
       const permitidas = TRANSICIONES[existing.estado] || []
       if (!permitidas.includes(body.estado)) {
         return NextResponse.json(
           { error: `Transición no permitida: ${existing.estado} → ${body.estado}` },
           { status: 400 }
+        )
+      }
+      const claveRol = `${existing.estado}→${body.estado}`
+      const rolesPermitidos = ROLES_TRANSICION[claveRol] || []
+      if (!rolesPermitidos.includes(session.user.role)) {
+        return NextResponse.json(
+          { error: `Tu rol no puede realizar la transición ${existing.estado} → ${body.estado}` },
+          { status: 403 }
         )
       }
     }
