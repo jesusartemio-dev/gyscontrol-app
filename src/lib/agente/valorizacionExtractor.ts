@@ -410,13 +410,25 @@ export function buildDiff(extraido: ValorizacionExtracted, sistema: SistemaVal):
   // Si la IA no pudo distinguirlo del montoValorizacion, usamos montoValorizacion como fallback.
   const docSubtotal = cab.subtotalSinIGV ?? cab.montoValorizacion
 
+  // El documento del cliente a menudo NO muestra el monto bruto separado del subtotal.
+  // Si la IA extrajo el mismo valor para ambos, significa que el bruto no es visible en el doc
+  // y la comparación vs sistema.montoValorizacion sería un falso positivo.
+  const docMuestraMontoDistinto =
+    cab.montoValorizacion != null &&
+    cab.subtotalSinIGV != null &&
+    Math.abs(cab.montoValorizacion - cab.subtotalSinIGV) > 1
+
+  // El descuento comercial % NO se verifica directamente si el subtotal ya coincide:
+  // el descuento puede estar implícito en el subtotal sin aparecer como % explícito en el doc.
+  const subtotalCoincide = numEq(sistema.subtotal, docSubtotal)
+
   const headerDiffs: CampoDiff[] = [
     {
       campo: 'subtotal',
       label: 'Subtotal sin IGV ★',
       valorSistema: sistema.subtotal,
       valorDocumento: docSubtotal,
-      coincide: numEq(sistema.subtotal, docSubtotal),
+      coincide: subtotalCoincide,
       unidad: cab.moneda,
     },
     {
@@ -427,14 +439,15 @@ export function buildDiff(extraido: ValorizacionExtracted, sistema: SistemaVal):
       coincide: numEq(sistema.netoARecibir, cab.netoARecibir),
       unidad: cab.moneda,
     },
-    {
+    // Monto bruto solo se muestra si el documento lo expone claramente por separado del subtotal
+    ...(docMuestraMontoDistinto ? [{
       campo: 'montoValorizacion',
       label: 'Monto bruto (antes deducciones)',
       valorSistema: sistema.montoValorizacion,
       valorDocumento: cab.montoValorizacion,
       coincide: numEq(sistema.montoValorizacion, cab.montoValorizacion),
       unidad: cab.moneda,
-    },
+    } as CampoDiff] : []),
     {
       campo: 'periodoInicio',
       label: 'Inicio período',
@@ -457,14 +470,16 @@ export function buildDiff(extraido: ValorizacionExtracted, sistema: SistemaVal):
       coincide: numEq(sistema.igvPorcentaje, cab.igvPorcentaje, 0.01),
       unidad: '%',
     },
-    {
+    // Descuento comercial % solo se verifica si el subtotal NO coincide o el doc muestra >0.
+    // Si subtotal ya coincide con descuento=0 en doc, el descuento está implícito: no es una diferencia real.
+    ...(!subtotalCoincide || cab.descuentoComercialPorcentaje > 0 ? [{
       campo: 'descuentoComercialPorcentaje',
       label: 'Descuento comercial %',
       valorSistema: sistema.descuentoComercialPorcentaje,
       valorDocumento: cab.descuentoComercialPorcentaje,
       coincide: numEq(sistema.descuentoComercialPorcentaje, cab.descuentoComercialPorcentaje, 0.01),
       unidad: '%',
-    },
+    } as CampoDiff] : []),
     {
       campo: 'adelantoPorcentaje',
       label: 'Amortización adelanto %',
