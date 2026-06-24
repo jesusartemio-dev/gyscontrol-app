@@ -43,7 +43,6 @@ import {
   Pencil,
   Check,
 } from 'lucide-react'
-import { Switch } from '@/components/ui/switch'
 import { toast } from 'sonner'
 import {
   getHojaDeGastosById,
@@ -128,8 +127,6 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
   const [editMotivo, setEditMotivo] = useState('')
   const [editObservaciones, setEditObservaciones] = useState('')
   const [editJustificacion, setEditJustificacion] = useState('')
-  const [editRequiereAnticipo, setEditRequiereAnticipo] = useState(false)
-  const [editMontoAnticipo, setEditMontoAnticipo] = useState('')
   const [savingInfo, setSavingInfo] = useState(false)
 
   const role = session?.user?.role
@@ -561,8 +558,6 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
     setEditMotivo(hoja.motivo)
     setEditObservaciones(hoja.observaciones || '')
     setEditJustificacion(hoja.justificacionMateriales || '')
-    setEditRequiereAnticipo(hoja.requiereAnticipo)
-    setEditMontoAnticipo(hoja.montoAnticipo > 0 ? String(hoja.montoAnticipo) : '')
     setEditingInfo(true)
   }
 
@@ -573,8 +568,6 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
       const body: Record<string, unknown> = {
         motivo: editMotivo.trim(),
         observaciones: editObservaciones.trim() || null,
-        requiereAnticipo: editRequiereAnticipo,
-        montoAnticipo: editRequiereAnticipo ? parseFloat(editMontoAnticipo) || 0 : 0,
       }
       if (hoja?.tipoPropósito === 'compra_materiales') {
         body.justificacionMateriales = editJustificacion.trim() || null
@@ -1225,6 +1218,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
                     onChange={e => setEditMotivo(e.target.value)}
                     placeholder="Descripción del requerimiento"
                     className="text-sm"
+                    autoFocus
                   />
                 </div>
                 <div>
@@ -1249,33 +1243,6 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
                     />
                   </div>
                 )}
-                <div className="flex items-center gap-4 flex-wrap">
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      id="edit-requiere-anticipo"
-                      checked={editRequiereAnticipo}
-                      onCheckedChange={setEditRequiereAnticipo}
-                    />
-                    <Label htmlFor="edit-requiere-anticipo" className="text-sm cursor-pointer">Requiere anticipo</Label>
-                  </div>
-                  {editRequiereAnticipo && (
-                    <div className="flex items-center gap-2">
-                      <Label className="text-xs text-muted-foreground whitespace-nowrap">Monto anticipo</Label>
-                      <div className="relative w-32">
-                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">S/</span>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={editMontoAnticipo}
-                          onChange={e => setEditMontoAnticipo(e.target.value)}
-                          className="pl-7 text-sm h-8"
-                          placeholder="0.00"
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
                 <div className="flex gap-2 pt-1">
                   <Button size="sm" onClick={handleSaveInfo} disabled={savingInfo}>
                     {savingInfo ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Check className="h-3.5 w-3.5 mr-1" />}
