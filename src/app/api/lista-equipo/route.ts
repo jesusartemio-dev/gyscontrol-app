@@ -64,14 +64,16 @@ export async function GET(req: NextRequest) {
     const dataWithMontos = data.map((lista: any) => {
       const items = lista.listaEquipoItem || []
       const montoEstimado = items.reduce((total: number, item: any) => {
-        // Use the best available price: cotización > precioElegido > presupuesto
+        // Precio elegido (cotización proveedor seleccionada) tiene prioridad.
+        // Si no hay precio elegido, usar el mínimo de cotizaciones disponibles.
+        // El campo 'presupuesto' viene de la cotización al cliente (precio genérico)
+        // y no refleja el detalle de la lista → no se usa.
+        const precioElegido = item.precioElegido || 0
         const cotizaciones = item.cotizacionProveedorItems || []
-        const mejorCotizacion = cotizaciones.length > 0
+        const minCotizacion = cotizaciones.length > 0
           ? Math.min(...cotizaciones.map((c: any) => c.precioUnitario || 0))
           : 0
-        const precioUnitario = mejorCotizacion > 0
-          ? mejorCotizacion
-          : (item.precioElegido || item.presupuesto || 0)
+        const precioUnitario = precioElegido > 0 ? precioElegido : minCotizacion
 
         return total + (precioUnitario * (item.cantidad || 0))
       }, 0)
