@@ -11,9 +11,10 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, FileSpreadsheet, Loader2, Search, Eye, Upload, Download, Clock, Info, CalendarDays } from 'lucide-react'
+import { Plus, FileSpreadsheet, Loader2, Search, Eye, Upload, Download, Clock, Info, CalendarDays, Sparkles } from 'lucide-react'
 import toast from 'react-hot-toast'
 import ValorizacionImportExcelModal from '@/components/gestion/ValorizacionImportExcelModal'
+import { ValorizacionImportIAModal } from '@/components/gestion/ValorizacionImportIAModal'
 import { exportarValAExcel } from '@/lib/utils/valorizacionExcel'
 
 interface Proyecto {
@@ -145,6 +146,15 @@ export default function ValorizacionesPage() {
   const [formObservaciones, setFormObservaciones] = useState('')
 
   const [showImportDialog, setShowImportDialog] = useState(false)
+  const [showIAModal, setShowIAModal] = useState(false)
+  const [iaEnabled, setIaEnabled] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/agente/features')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setIaEnabled(data.importarValorizacionIA !== false) })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => { loadData() }, [])
 
@@ -360,6 +370,17 @@ export default function ValorizacionesPage() {
             <Upload className="h-4 w-4 mr-1" />
             Importar
           </Button>
+          {iaEnabled && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowIAModal(true)}
+              className="border-teal-300 text-teal-700 hover:bg-teal-50 dark:border-teal-700 dark:text-teal-400 dark:hover:bg-teal-950/30"
+            >
+              <Sparkles className="h-4 w-4 mr-1" />
+              Importar con IA
+            </Button>
+          )}
           <Button variant="outline" onClick={() => router.push('/gestion/valorizaciones-hh/nueva')}>
             <Clock className="h-4 w-4 mr-2" />
             Nueva Val. HH
@@ -659,6 +680,13 @@ export default function ValorizacionesPage() {
         onClose={() => setShowImportDialog(false)}
         proyectos={proyectos}
         onImported={loadData}
+      />
+
+      <ValorizacionImportIAModal
+        open={showIAModal}
+        onClose={() => setShowIAModal(false)}
+        proyectos={proyectos.map(p => ({ id: p.id, codigo: p.codigo, nombre: p.nombre }))}
+        onSuccess={valId => { loadData(); if (valId) router.push(`/gestion/valorizaciones/${valId}`) }}
       />
     </div>
   )

@@ -11,12 +11,13 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
-import { ArrowLeft, Loader2, Save, Eye, Check, Upload, Trash2, Plus, Clock, DollarSign, FileText, Send, CheckCircle, AlertTriangle, RefreshCw, Ban, Undo2 } from 'lucide-react'
+import { ArrowLeft, Loader2, Save, Eye, Check, Upload, Trash2, Plus, Clock, DollarSign, FileText, Send, CheckCircle, AlertTriangle, RefreshCw, Ban, Undo2, Sparkles } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { CONDICIONES_PAGO, FORMAS_PAGO, DIAS_CREDITO_PRESETS, formatPago } from '@/lib/utils/formaPago'
 import TablaPartidas from '@/components/valorizacion/TablaPartidas'
 import DetalleHH from '@/components/valorizacion/DetalleHH'
 import { calcularAdelantoValorizacion } from '@/lib/utils/adelantoUtils'
+import { ValorizacionImportIAModal } from '@/components/gestion/ValorizacionImportIAModal'
 
 interface ValorizacionAdjunto {
   id: string
@@ -261,6 +262,9 @@ export default function ValorizacionEditPage() {
   const [motivoObservacion, setMotivoObservacion] = useState('')
   const [showAnularDialog, setShowAnularDialog] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  // IA Verificar modal
+  const [showIAVerificar, setShowIAVerificar] = useState(false)
+  const [iaEnabled, setIaEnabled] = useState(false)
 
   const loadVal = useCallback(async () => {
     try {
@@ -326,6 +330,13 @@ export default function ValorizacionEditPage() {
   }, [id, router])
 
   useEffect(() => { loadVal() }, [loadVal])
+
+  useEffect(() => {
+    fetch('/api/agente/features')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setIaEnabled(data.importarValorizacionIA !== false) })
+      .catch(() => {})
+  }, [])
 
   const readOnly = viewMode || (val?.estado !== 'borrador')
 
@@ -702,6 +713,17 @@ export default function ValorizacionEditPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {iaEnabled && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowIAVerificar(true)}
+              className="border-teal-300 text-teal-700 hover:bg-teal-50 dark:border-teal-700 dark:text-teal-400 dark:hover:bg-teal-950/30"
+            >
+              <Sparkles className="h-4 w-4 mr-1" />
+              Verificar con documento
+            </Button>
+          )}
           {viewMode && val.estado === 'borrador' && (
             <Button variant="outline" size="sm" onClick={() => router.replace(`/gestion/valorizaciones/${id}`)}>
               <Eye className="h-4 w-4 mr-1" />
@@ -1393,6 +1415,16 @@ export default function ValorizacionEditPage() {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {/* Modal: Verificar con documento IA */}
+    {iaEnabled && val && (
+      <ValorizacionImportIAModal
+        open={showIAVerificar}
+        onClose={() => setShowIAVerificar(false)}
+        proyectoId={val.proyectoId}
+        valorizacionId={val.id}
+      />
+    )}
     </>
   )
 }

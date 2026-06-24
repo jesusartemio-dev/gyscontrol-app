@@ -16,6 +16,7 @@ export interface IAFeatureFlags {
   iperc: boolean
   pets: boolean
   mpp: boolean
+  importarValorizacionIA: boolean
 }
 
 const DEFAULT_FLAGS: IAFeatureFlags = {
@@ -31,6 +32,7 @@ const DEFAULT_FLAGS: IAFeatureFlags = {
   iperc: true,
   pets: true,
   mpp: true,
+  importarValorizacionIA: true,
 }
 
 function parseFlags(raw: unknown): IAFeatureFlags {
@@ -49,6 +51,7 @@ function parseFlags(raw: unknown): IAFeatureFlags {
     iperc: typeof obj.iperc === 'boolean' ? obj.iperc : DEFAULT_FLAGS.iperc,
     pets: typeof obj.pets === 'boolean' ? obj.pets : DEFAULT_FLAGS.pets,
     mpp: typeof obj.mpp === 'boolean' ? obj.mpp : DEFAULT_FLAGS.mpp,
+    importarValorizacionIA: typeof obj.importarValorizacionIA === 'boolean' ? obj.importarValorizacionIA : DEFAULT_FLAGS.importarValorizacionIA,
   }
 }
 

@@ -42,6 +42,7 @@ export async function PUT(request: NextRequest) {
     'iperc',
     'pets',
     'mpp',
+    'importarValorizacionIA',
   ]
 
   // Only allow known boolean keys

@@ -42,6 +42,9 @@ export const TIPO_INFO: Record<string, TipoInfo> = {
   'pets.regenerar.paso':        { label: 'PETS — Regenerar paso',           color: '#14532d' }, // green-900
   // MPP
   'mpp.generar':                { label: 'MPP — Generar',                   color: '#7c3aed' }, // violet-700
+  // Valorizaciones IA
+  'valorizacion-import-ia':     { label: 'Importar Valorización con IA',    color: '#0d9488' }, // teal-600
+  'valorizacion-verificar-ia':  { label: 'Verificar Valorización con IA',   color: '#0f766e' }, // teal-700
 }
 
 // Prefix-based fallback rules for dynamic tipo codes like 'pets.etapa.A'
