@@ -40,7 +40,10 @@ import {
   FileText,
   ChevronDown,
   Package,
+  Pencil,
+  Check,
 } from 'lucide-react'
+import { Switch } from '@/components/ui/switch'
 import { toast } from 'sonner'
 import {
   getHojaDeGastosById,
@@ -119,6 +122,15 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
   const [uploadingReembolso, setUploadingReembolso] = useState(false)
 
   const [deletingDeposito, setDeletingDeposito] = useState<string | null>(null)
+
+  // Edición inline de info (motivo, observaciones, justificación, anticipo)
+  const [editingInfo, setEditingInfo] = useState(false)
+  const [editMotivo, setEditMotivo] = useState('')
+  const [editObservaciones, setEditObservaciones] = useState('')
+  const [editJustificacion, setEditJustificacion] = useState('')
+  const [editRequiereAnticipo, setEditRequiereAnticipo] = useState(false)
+  const [editMontoAnticipo, setEditMontoAnticipo] = useState('')
+  const [savingInfo, setSavingInfo] = useState(false)
 
   const role = session?.user?.role
 
@@ -544,6 +556,45 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
     }
   }
 
+  const startEditInfo = () => {
+    if (!hoja) return
+    setEditMotivo(hoja.motivo)
+    setEditObservaciones(hoja.observaciones || '')
+    setEditJustificacion(hoja.justificacionMateriales || '')
+    setEditRequiereAnticipo(hoja.requiereAnticipo)
+    setEditMontoAnticipo(hoja.montoAnticipo > 0 ? String(hoja.montoAnticipo) : '')
+    setEditingInfo(true)
+  }
+
+  const handleSaveInfo = async () => {
+    if (!editMotivo.trim()) { toast.error('El motivo es requerido'); return }
+    try {
+      setSavingInfo(true)
+      const body: Record<string, unknown> = {
+        motivo: editMotivo.trim(),
+        observaciones: editObservaciones.trim() || null,
+        requiereAnticipo: editRequiereAnticipo,
+        montoAnticipo: editRequiereAnticipo ? parseFloat(editMontoAnticipo) || 0 : 0,
+      }
+      if (hoja?.tipoPropósito === 'compra_materiales') {
+        body.justificacionMateriales = editJustificacion.trim() || null
+      }
+      const res = await fetch(`/api/hoja-de-gastos/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Error') }
+      toast.success('Cambios guardados')
+      setEditingInfo(false)
+      await loadData()
+    } catch (e: any) {
+      toast.error(e.message || 'Error al guardar')
+    } finally {
+      setSavingInfo(false)
+    }
+  }
+
   const handleRechazar = async () => {
     if (!comentarioRechazo.trim()) {
       toast.error('Ingrese un comentario de rechazo')
@@ -600,6 +651,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
   const canRetroceder = !['borrador', 'rechazado'].includes(hoja.estado) && ['admin', 'gerente', 'administracion'].includes(role || '')
   const canEliminar = hoja.estado === 'borrador' && role === 'admin'
   const canVolverABorrador = hoja.estado === 'rechazado' && (esEmpleado || ['admin', 'gerente', 'administracion'].includes(role || ''))
+  const canEditInfo = ['borrador', 'rechazado'].includes(hoja.estado) && (esEmpleado || ['admin', 'gerente', 'administracion'].includes(role || ''))
   const anticipos = (hoja.depositos || []).filter((d: any) => d.tipo === 'anticipo' || (!d.tipo || d.tipo === null))
   const reembolsos = (hoja.depositos || []).filter((d: any) => d.tipo === 'reembolso')
   const devoluciones = (hoja.depositos || []).filter((d: any) => d.tipo === 'devolucion')
@@ -1101,7 +1153,8 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
 
       {/* Info */}
       <Card>
-        <CardContent className="p-4 space-y-2">
+        <CardContent className="p-4 space-y-3">
+          {/* Fila fija: asignación, categoría, pedidos, empleado, fechas — nunca editable */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
             <div className="flex items-center gap-2">
               {hoja.tipoPropósito === 'compra_materiales'
@@ -1143,11 +1196,6 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
               ) : null
             })()}
             <div className="flex items-center gap-2">
-              <MessageSquare className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Motivo:</span>
-              <span className="font-medium">{hoja.motivo}</span>
-            </div>
-            <div className="flex items-center gap-2">
               <User className="h-4 w-4 text-muted-foreground" />
               <span className="text-muted-foreground">Empleado:</span>
               <span>{hoja.empleado?.name || '-'}</span>
@@ -1165,14 +1213,110 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
               </div>
             )}
           </div>
-          {hoja.observaciones && (
-            <p className="text-sm text-muted-foreground border-t pt-2 mt-2">{hoja.observaciones}</p>
-          )}
-          {hoja.justificacionMateriales && (
-            <p className="text-sm text-blue-800 dark:text-blue-300 border-t pt-2 mt-2">
-              <span className="font-medium">Justificación: </span>{hoja.justificacionMateriales}
-            </p>
-          )}
+
+          {/* Sección editable: motivo, observaciones, justificación, anticipo */}
+          <div className="border-t pt-3">
+            {editingInfo ? (
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1 block">Motivo <span className="text-red-500">*</span></Label>
+                  <Input
+                    value={editMotivo}
+                    onChange={e => setEditMotivo(e.target.value)}
+                    placeholder="Descripción del requerimiento"
+                    className="text-sm"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1 block">Observaciones</Label>
+                  <Textarea
+                    value={editObservaciones}
+                    onChange={e => setEditObservaciones(e.target.value)}
+                    placeholder="Notas adicionales (opcional)"
+                    className="text-sm min-h-[60px]"
+                    rows={2}
+                  />
+                </div>
+                {hoja.tipoPropósito === 'compra_materiales' && (
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">Justificación de materiales</Label>
+                    <Textarea
+                      value={editJustificacion}
+                      onChange={e => setEditJustificacion(e.target.value)}
+                      placeholder="¿Por qué se necesitan estos materiales?"
+                      className="text-sm min-h-[60px]"
+                      rows={2}
+                    />
+                  </div>
+                )}
+                <div className="flex items-center gap-4 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      id="edit-requiere-anticipo"
+                      checked={editRequiereAnticipo}
+                      onCheckedChange={setEditRequiereAnticipo}
+                    />
+                    <Label htmlFor="edit-requiere-anticipo" className="text-sm cursor-pointer">Requiere anticipo</Label>
+                  </div>
+                  {editRequiereAnticipo && (
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs text-muted-foreground whitespace-nowrap">Monto anticipo</Label>
+                      <div className="relative w-32">
+                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">S/</span>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={editMontoAnticipo}
+                          onChange={e => setEditMontoAnticipo(e.target.value)}
+                          className="pl-7 text-sm h-8"
+                          placeholder="0.00"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <Button size="sm" onClick={handleSaveInfo} disabled={savingInfo}>
+                    {savingInfo ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Check className="h-3.5 w-3.5 mr-1" />}
+                    Guardar
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setEditingInfo(false)} disabled={savingInfo}>
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-2 text-sm flex-1 min-w-0">
+                    <MessageSquare className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                      <span className="text-muted-foreground">Motivo: </span>
+                      <span className="font-medium">{hoja.motivo}</span>
+                    </div>
+                  </div>
+                  {canEditInfo && (
+                    <Button size="sm" variant="ghost" className="h-7 px-2 text-xs text-muted-foreground shrink-0" onClick={startEditInfo}>
+                      <Pencil className="h-3.5 w-3.5 mr-1" />
+                      Editar
+                    </Button>
+                  )}
+                </div>
+                {hoja.observaciones && (
+                  <p className="text-sm text-muted-foreground pl-6">{hoja.observaciones}</p>
+                )}
+                {hoja.justificacionMateriales && (
+                  <p className="text-sm text-blue-800 dark:text-blue-300 pl-6">
+                    <span className="font-medium">Justificación: </span>{hoja.justificacionMateriales}
+                  </p>
+                )}
+                {!hoja.observaciones && !hoja.justificacionMateriales && canEditInfo && (
+                  <p className="text-xs text-muted-foreground/60 pl-6 italic">Sin observaciones — haz clic en Editar para agregar</p>
+                )}
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 

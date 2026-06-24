@@ -131,7 +131,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     }
 
     if (payload.motivo !== undefined) updateData.motivo = payload.motivo.trim()
-    if (payload.observaciones !== undefined) updateData.observaciones = payload.observaciones
+    if (payload.observaciones !== undefined) updateData.observaciones = payload.observaciones || null
+    if (payload.justificacionMateriales !== undefined) updateData.justificacionMateriales = payload.justificacionMateriales || null
     if (payload.requiereAnticipo !== undefined) {
       updateData.requiereAnticipo = payload.requiereAnticipo
       if (!payload.requiereAnticipo) {
