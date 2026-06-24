@@ -703,9 +703,15 @@ export default function ValorizacionesPage() {
                                   <span className="text-xs font-mono font-medium text-muted-foreground">{v.codigo}</span>
                                   <span className="text-xs text-muted-foreground ml-2 truncate">{v.proyecto?.codigo} · {v.proyecto?.nombre}</span>
                                 </div>
-                                <span className="text-xs text-muted-foreground">{formatPeriod(v.periodoInicio, v.periodoFin)}</span>
+                                <span className="text-xs text-muted-foreground shrink-0">{formatPeriod(v.periodoInicio, v.periodoFin)}</span>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <div className="w-14 bg-muted rounded-full h-1.5">
+                                    <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${Math.min(v.porcentajeAvance, 100)}%` }} />
+                                  </div>
+                                  <span className="text-[10px] font-mono w-8">{v.porcentajeAvance.toFixed(1)}%</span>
+                                </div>
                                 <Badge className={`${getEstadoColor(v.estado)} text-[10px] py-0`}>{getEstadoLabel(v.estado)}</Badge>
-                                <span className="text-xs font-mono font-medium w-24 text-right">{formatCurrency(v.netoARecibir, v.moneda)}</span>
+                                <span className="text-xs font-mono font-medium w-24 text-right shrink-0">{formatCurrency(v.netoARecibir, v.moneda)}</span>
                                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => router.push(`/gestion/valorizaciones/${v.id}?mode=view`)}>
                                   <Eye className="h-3 w-3" />
                                 </Button>
