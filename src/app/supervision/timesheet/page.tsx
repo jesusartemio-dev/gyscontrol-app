@@ -49,7 +49,7 @@ import {
   MessageSquare,
   Check,
 } from 'lucide-react'
-import { format } from 'date-fns'
+import { format, getISOWeek, getISOWeekYear } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { useToast } from '@/components/ui/use-toast'
 import { cn } from '@/lib/utils'
@@ -178,11 +178,15 @@ export default function SupervisionTimesheetPage() {
   const [motivoRechazo, setMotivoRechazo] = useState('')
   const [processing, setProcessing] = useState(false)
 
-  // Agrupación global de sin_enviar por usuario (todas las semanas)
+  // Agrupación global de sin_enviar por usuario, excluyendo la semana actual
+  // (la semana en curso no se considera pendiente hasta el viernes)
   const sinEnviarGlobal = useMemo(() => {
+    const now = new Date()
+    const semanaActual = `${getISOWeekYear(now)}-W${String(getISOWeek(now)).padStart(2, '0')}`
     const map = new Map<string, { nombre: string; semanas: { semana: string; horas: number }[] }>()
     for (const a of aprobaciones) {
       if (a.estado !== 'sin_enviar') continue
+      if (a.semana >= semanaActual) continue
       if (!map.has(a.usuario.id)) map.set(a.usuario.id, { nombre: a.usuario.name, semanas: [] })
       map.get(a.usuario.id)!.semanas.push({ semana: a.semana, horas: a.totalHoras })
     }
