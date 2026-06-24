@@ -22,6 +22,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Select,
   SelectContent,
@@ -74,6 +75,7 @@ import { useSearchParams } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
 import { format, differenceInDays } from 'date-fns'
 import { es } from 'date-fns/locale'
+import CargaPersonalTab from './_components/CargaPersonalTab'
 
 interface Tarea {
   id: string
@@ -209,6 +211,8 @@ function SupervisionTareasContent() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [metricas, setMetricas] = useState<Metricas | null>(null)
   const [loading, setLoading] = useState(true)
+
+  const [activeTab, setActiveTab] = useState<string>('tareas')
 
   // Filtros (inicializados desde localStorage)
   const [filtroProyecto, setFiltroProyecto] = useState<string>('')
@@ -925,6 +929,14 @@ function SupervisionTareasContent() {
         </div>
       </div>
 
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="tareas">Tareas</TabsTrigger>
+          <TabsTrigger value="carga">Carga de Personal</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="tareas" className="space-y-4 mt-4">
+
       {/* Metricas - Minimalista */}
       {metricas && (
         <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -1358,6 +1370,20 @@ function SupervisionTareasContent() {
           )}
         </CardContent>
       </Card>
+
+        </TabsContent>
+
+        <TabsContent value="carga" className="mt-4">
+          <CargaPersonalTab
+            proyectos={proyectos}
+            proyectosInternos={proyectosInternos}
+            onVerTareas={(usuarioId) => {
+              setFiltroResponsable(usuarioId || '')
+              setActiveTab('tareas')
+            }}
+          />
+        </TabsContent>
+      </Tabs>
 
       {/* Modal de asignacion */}
       <Dialog open={showAsignarModal} onOpenChange={setShowAsignarModal}>
