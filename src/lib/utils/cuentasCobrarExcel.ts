@@ -1307,6 +1307,17 @@ export async function exportarCxCFinanciero(items: CxCRichRow[]): Promise<void> 
   const wb = new ExcelJS.Workbook()
   const ws = wb.addWorksheet('CxC Financiero')
 
+  // ── Layout: 25 columnas ──────────────────────────────────────────────────────
+  // A(1)  N° Documento    B(2)  Cliente         C(3)  RUC
+  // D(4)  Proyecto        E(5)  Valorización     F(6)  Monto Factura
+  // G(7)  Monto Neto      H(8)  Fecha Emisión    I(9)  Fecha Estimada de Pago
+  // J(10) Fecha Pago      K(11) Días por Vencer  L(12) Negociado
+  // M(13) Entidad Fin.    N(14) Nro. Negociación O(15) Banco (Desembolso)
+  // P(16) Nro. Operación
+  // Grupo Adelanto:  Q(17) Monto | R(18) Fecha
+  // Grupo Saldo:     S(19) Monto | T(20) Fecha
+  // Grupo Retenido:  U(21) Monto | V(22) Fecha
+  // Grupo Costos:    W(23) Tasa  | X(24) Interés | Y(25) Comisión/Gastos
   const colWidths = [
     16,  // A  N° Documento
     35,  // B  Cliente
@@ -1327,27 +1338,22 @@ export async function exportarCxCFinanciero(items: CxCRichRow[]): Promise<void> 
     14,  // Q  Adelanto – Monto
     12,  // R  Adelanto – Fecha
     14,  // S  Saldo – Monto
-    12,  // T  Saldo – Fecha (sin campo en BD)
+    12,  // T  Saldo – Fecha
     14,  // U  Retenido – Monto
-    12,  // V  Retenido – Fecha (sin campo en BD)
+    12,  // V  Retenido – Fecha
     10,  // W  Costos – Tasa
     14,  // X  Costos – Interés
-    16,  // Y  Costos – Nro. Factura Interés (TODO)
-    14,  // Z  Costos – Comisión
-    14,  // AA Costos – Gastos
-    16,  // AB Costos – Nro. Factura Gastos (TODO)
-    30,  // AC Observaciones
+    16,  // Y  Costos – Comisión/Gastos
   ]
   ws.columns = colWidths.map(w => ({ width: w }))
 
   // ── Cabecera ──────────────────────────────────────────────────────────────────
-  const SOLO_COLS_FIN = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','AC']
+  const SOLO_COLS_FIN = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P']
   const soloHeadersFin = [
     'N° Documento','Cliente','RUC','Proyecto','Valorización',
     'Monto\nFactura','Monto\nNeto','Fecha\nEmisión','Fecha Estimada\nde Pago','Fecha\nPago',
     'Días\npor Vencer','Negociado','Entidad\nFinanciera','Nro.\nNegociación',
     'Banco\n(Desembolso)','Nro.\nOperación',
-    'Observaciones',
   ]
   for (let i = 0; i < SOLO_COLS_FIN.length; i++) {
     ws.getCell(`${SOLO_COLS_FIN[i]}1`).value = soloHeadersFin[i]
@@ -1364,15 +1370,10 @@ export async function exportarCxCFinanciero(items: CxCRichRow[]): Promise<void> 
   ws.mergeCells('U1:V1'); ws.getCell('U1').value = 'Retenido'
   ws.getCell('U2').value = 'Monto'; ws.getCell('V2').value = 'Fecha'
 
-  ws.mergeCells('W1:AB1'); ws.getCell('W1').value = 'Costos del Financiamiento'
+  ws.mergeCells('W1:Y1'); ws.getCell('W1').value = 'Costos del Financiamiento'
   ws.getCell('W2').value = 'Tasa'
   ws.getCell('X2').value = 'Interés'
-  // TODO: agregar numeroFacturaInteres a CobroValorizacion si admin lo requiere
-  ws.getCell('Y2').value = 'Nro. Factura'
-  ws.getCell('Z2').value = 'Comisión'
-  ws.getCell('AA2').value = 'Gastos'
-  // TODO: agregar numeroFacturaGastos a CobroValorizacion si admin lo requiere
-  ws.getCell('AB2').value = 'Nro. Factura'
+  ws.getCell('Y2').value = 'Comisión/Gastos'
 
   applyHeaderStyle(ws, 2, ['Q1', 'S1', 'U1', 'W1'])
   ws.getRow(1).height = 28
@@ -1382,11 +1383,10 @@ export async function exportarCxCFinanciero(items: CxCRichRow[]): Promise<void> 
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const DATA_START = 3
 
-  const COL_MONTO_F   = 6   // F  Monto Factura
-  const COL_NETO_F    = 7   // G  Monto Neto
-  const COL_INTERES   = 24  // X  Interés
-  const COL_COMISION  = 26  // Z  Comisión
-  const COL_GASTOS    = 27  // AA Gastos
+  const COL_MONTO_F    = 6   // F  Monto Factura
+  const COL_NETO_F     = 7   // G  Monto Neto
+  const COL_INTERES    = 24  // X  Interés
+  const COL_COM_GASTOS = 25  // Y  Comisión/Gastos
 
   for (let i = 0; i < items.length; i++) {
     const cxc = items[i]
@@ -1394,21 +1394,22 @@ export async function exportarCxCFinanciero(items: CxCRichRow[]): Promise<void> 
     const row = ws.getRow(rowNum)
 
     const cobro = cxc.valorizacion?.cobro ?? null
-    const fechaEmision   = cxc.fechaEmision ? new Date(cxc.fechaEmision) : null
-    const fechaEstimada  = calcularFechaEstimadaPago(cxc)
+    const fechaEmision    = cxc.fechaEmision ? new Date(cxc.fechaEmision) : null
+    const fechaEstimada   = calcularFechaEstimadaPago(cxc)
     const fechaUltimoPago = obtenerFechaUltimoPago(cxc)
-    const negociado      = calcularNegociado(cxc)
-    const diasTxt        = calcularDiasPorVencer(cxc, today)
-    const entidadFin     = obtenerEntidadFinanciera(cxc)
-
-    // Monto Neto Financiero = CobroValorizacion.montoADesembolsar (vacío si no hay cobro)
-    const montoNetoFin   = cobro?.montoADesembolsar ?? null
+    const negociado       = calcularNegociado(cxc)
+    const diasTxt         = calcularDiasPorVencer(cxc, today)
+    const entidadFin      = obtenerEntidadFinanciera(cxc)
+    const montoNeto       = calcularMontoNetoContable(cxc)
 
     // Banco desembolso = primer pago neto (cuentaBancaria) o vacío
     const pagoNeto = cxc.pagos?.find(p => !p.esDetraccion && !p.esRetencion) ?? null
 
     // Tasa: almacenada como 1.38 (= 1.38%); para Excel % dividir /100
     const tasaPct = cobro?.tasaDescuentoPct != null ? cobro.tasaDescuentoPct / 100 : null
+
+    // Comisión + Gastos en un solo campo
+    const comGastos = (cobro?.comisionEstructuracion ?? 0) + (cobro?.gastosAdicionales ?? 0)
 
     const cells: [number, any, string?][] = [
       [1,  cxc.numeroDocumento ?? ''],
@@ -1417,7 +1418,7 @@ export async function exportarCxCFinanciero(items: CxCRichRow[]): Promise<void> 
       [4,  cxc.proyecto?.codigo ?? ''],
       [5,  cxc.valorizacion?.codigo ?? ''],
       [6,  cxc.monto,            FMT_MONEY],
-      [7,  montoNetoFin,         FMT_MONEY],    // null si no tiene factoring
+      [7,  montoNeto,            FMT_MONEY],
       [8,  fechaEmision,         FMT_DATE],
       [9,  fechaEstimada,        FMT_DATE],
       [10, fechaUltimoPago,      FMT_DATE],
@@ -1432,18 +1433,14 @@ export async function exportarCxCFinanciero(items: CxCRichRow[]): Promise<void> 
       [18, cobro?.fechaDesembolso ? new Date(cobro.fechaDesembolso as string) : null, FMT_DATE],
       // Saldo
       [19, cobro?.saldoAGirar ?? null,          FMT_MONEY],
-      [20, null],   // sin campo Fecha Saldo en BD
+      [20, null],
       // Retenido
       [21, cobro?.excedenteMonto != null ? Number(cobro.excedenteMonto) : null, FMT_MONEY],
-      [22, null],   // sin campo Fecha Retenido en BD
+      [22, null],
       // Costos
-      [23, tasaPct,             FMT_RATE],
-      [24, cobro?.interesMonto ?? null,               FMT_MONEY],
-      [25, cobro?.numeroFacturaInteres ?? ''],
-      [26, cobro?.comisionEstructuracion ?? null,     FMT_MONEY],
-      [27, cobro?.gastosAdicionales ?? null,          FMT_MONEY],
-      [28, cobro?.numeroFacturaGastos ?? ''],
-      [29, cxc.observaciones ?? ''],
+      [23, tasaPct,                             FMT_RATE],
+      [24, cobro?.interesMonto ?? null,         FMT_MONEY],
+      [25, comGastos > 0 ? comGastos : null,   FMT_MONEY],
     ]
 
     for (const [col, val, fmt] of cells) {
@@ -1453,7 +1450,7 @@ export async function exportarCxCFinanciero(items: CxCRichRow[]): Promise<void> 
       setBorderData(cell)
     }
 
-    for (const col of [1, 2, 3, 4, 5, 7, 11, 12, 13, 14, 15, 16, 25, 28, 29]) {
+    for (const col of [1, 2, 3, 4, 5, 11, 12, 13, 14, 15, 16]) {
       row.getCell(col).alignment = ALIGN_LEFT
     }
   }
@@ -1472,7 +1469,7 @@ export async function exportarCxCFinanciero(items: CxCRichRow[]): Promise<void> 
       : ''
     tr.getCell(2).font = { italic: true, color: { argb: 'FF6B7280' }, size: 9 }
 
-    for (const col of [COL_MONTO_F, COL_NETO_F, COL_INTERES, COL_COMISION, COL_GASTOS]) {
+    for (const col of [COL_MONTO_F, COL_NETO_F, COL_INTERES, COL_COM_GASTOS]) {
       const colLetter = ws.getColumn(col).letter
       const cell = tr.getCell(col)
       cell.value = { formula: `SUM(${colLetter}${DATA_START}:${colLetter}${lastData})` }
@@ -1484,7 +1481,7 @@ export async function exportarCxCFinanciero(items: CxCRichRow[]): Promise<void> 
 
   // ── Freeze y autoFilter ────────────────────────────────────────────────────────
   ws.views = [{ state: 'frozen', ySplit: 2 }]
-  ws.autoFilter = { from: { row: 2, column: 1 }, to: { row: 2, column: 29 } }
+  ws.autoFilter = { from: { row: 2, column: 1 }, to: { row: 2, column: 25 } }
 
   const today2 = new Date()
   const dateStr = `${today2.getFullYear()}-${String(today2.getMonth()+1).padStart(2,'0')}-${String(today2.getDate()).padStart(2,'0')}`

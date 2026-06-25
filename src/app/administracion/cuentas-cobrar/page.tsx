@@ -14,7 +14,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Loader2, Search, ArrowDownCircle, AlertTriangle, DollarSign, Clock, CheckCircle, Plus, Ban, Download, Upload, Trash2, ChevronDown, Pencil, CalendarDays, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import CxCImportExcelModal from '@/components/administracion/CxCImportExcelModal'
-import { exportarCxCAExcel, exportarCxCFormatoAdmin, exportarCxCContable, exportarCxCFinanciero } from '@/lib/utils/cuentasCobrarExcel'
+import { exportarCxCContable, exportarCxCFinanciero } from '@/lib/utils/cuentasCobrarExcel'
 
 interface CuentaBancaria {
   id: string
@@ -732,12 +732,6 @@ export default function CuentasCobrarPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => exportarCxCAExcel(filtered)}>
-                Formato estándar
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => exportarCxCFormatoAdmin(filtered)}>
-                Formato administración
-              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => exportarCxCContable(filtered)}>
                 Formato contable
               </DropdownMenuItem>
