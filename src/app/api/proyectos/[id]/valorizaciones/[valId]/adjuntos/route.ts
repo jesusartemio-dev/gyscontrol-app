@@ -30,11 +30,14 @@ export async function POST(request: NextRequest, { params }: Ctx) {
 
     // Enrutar a subcarpeta del Admin Drive según categoría
     const adminDriveId = getAdminDriveId()
-    const hesCategories = ['hes', 'guia_almacen']
-    const folderName = hesCategories.includes(categoria) ? 'HES' : 'Valorizaciones'
-    const envFolderId = hesCategories.includes(categoria)
-      ? process.env.GOOGLE_HES_FOLDER_ID
-      : process.env.GOOGLE_VALORIZACIONES_FOLDER_ID
+    const folderName =
+      ['hes', 'guia_almacen'].includes(categoria) ? 'HES' :
+      categoria === 'oc'                           ? 'OCs' :
+                                                     'Valorizaciones'
+    const envFolderId =
+      ['hes', 'guia_almacen'].includes(categoria) ? process.env.GOOGLE_HES_FOLDER_ID :
+      categoria === 'oc'                           ? process.env.GOOGLE_OC_FOLDER_ID :
+                                                     process.env.GOOGLE_VALORIZACIONES_FOLDER_ID
     const folderId = envFolderId ?? await getOrCreateFolder(adminDriveId, folderName, adminDriveId)
 
     const driveFile = await uploadFile({
