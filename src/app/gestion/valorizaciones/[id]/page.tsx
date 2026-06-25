@@ -1201,9 +1201,58 @@ export default function ValorizacionEditPage() {
         )
       })()}
 
-      {/* HES Adjuntos card — visible in hes_pendiente state */}
-      {val.estado === 'hes_pendiente' && (
-        <Card className="border-amber-300">
+      {/* Documentos adjuntos — siempre visibles en todos los estados */}
+      <div className="space-y-3">
+
+        {/* Documento de Valorización */}
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <h3 className="font-semibold text-sm flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-blue-600" />
+                  Documento de Valorización
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">Excel o PDF de la valorización enviada al cliente</p>
+              </div>
+              {!['borrador', 'anulada'].includes(val.estado) && (
+                <label className="cursor-pointer shrink-0">
+                  <input type="file" className="sr-only" accept=".pdf,.xlsx,.xls,.docx"
+                    onChange={e => handleUploadAdjunto(e, 'valorizacion')} disabled={uploadingHES} />
+                  <Button size="sm" variant="outline" asChild disabled={uploadingHES}>
+                    <span>
+                      {uploadingHES ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />}
+                      Subir documento
+                    </span>
+                  </Button>
+                </label>
+              )}
+            </div>
+            {val.adjuntos && val.adjuntos.filter(a => a.categoria === 'valorizacion').length > 0 ? (
+              <div className="space-y-1.5">
+                {val.adjuntos.filter(a => a.categoria === 'valorizacion').map(adj => (
+                  <div key={adj.id} className="flex items-center gap-2 text-sm bg-emerald-50 border border-emerald-200 rounded px-3 py-1.5">
+                    <FileText className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                    <a href={adj.urlArchivo ?? '#'} target="_blank" rel="noopener noreferrer" className="flex-1 truncate hover:underline">
+                      {adj.nombreArchivo}
+                    </a>
+                    <Badge className="text-[10px] bg-blue-100 text-blue-700 shrink-0">Valorización</Badge>
+                    <button onClick={() => handleDeleteAdjunto(adj.id)} className="text-red-400 hover:text-red-600 ml-1">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground bg-muted/30 border rounded px-3 py-2">
+                No se ha adjuntado el documento de valorización aún.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* HES / Guía de Almacén — upload habilitado solo en hes_pendiente */}
+        <Card className={val.estado === 'hes_pendiente' ? 'border-amber-300' : ''}>
           <CardContent className="p-4 space-y-3">
             <div className="flex items-center justify-between gap-2">
               <div>
@@ -1218,24 +1267,25 @@ export default function ValorizacionEditPage() {
                   </p>
                 )}
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <label className="cursor-pointer">
-                  <input type="file" className="sr-only" accept=".pdf,.jpg,.jpeg,.png,.docx"
-                    onChange={e => handleUploadAdjunto(e, 'hes')} disabled={uploadingHES} />
-                  <Button size="sm" variant="outline" asChild disabled={uploadingHES}>
-                    <span>{uploadingHES ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />}HES</span>
-                  </Button>
-                </label>
-                <label className="cursor-pointer">
-                  <input type="file" className="sr-only" accept=".pdf,.jpg,.jpeg,.png,.docx"
-                    onChange={e => handleUploadAdjunto(e, 'guia_almacen')} disabled={uploadingHES} />
-                  <Button size="sm" variant="outline" asChild disabled={uploadingHES}>
-                    <span><Upload className="h-4 w-4 mr-1" />Guía Almacén</span>
-                  </Button>
-                </label>
-              </div>
+              {val.estado === 'hes_pendiente' && (
+                <div className="flex items-center gap-2 shrink-0">
+                  <label className="cursor-pointer">
+                    <input type="file" className="sr-only" accept=".pdf,.jpg,.jpeg,.png,.docx"
+                      onChange={e => handleUploadAdjunto(e, 'hes')} disabled={uploadingHES} />
+                    <Button size="sm" variant="outline" asChild disabled={uploadingHES}>
+                      <span>{uploadingHES ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />}HES</span>
+                    </Button>
+                  </label>
+                  <label className="cursor-pointer">
+                    <input type="file" className="sr-only" accept=".pdf,.jpg,.jpeg,.png,.docx"
+                      onChange={e => handleUploadAdjunto(e, 'guia_almacen')} disabled={uploadingHES} />
+                    <Button size="sm" variant="outline" asChild disabled={uploadingHES}>
+                      <span><Upload className="h-4 w-4 mr-1" />Guía Almacén</span>
+                    </Button>
+                  </label>
+                </div>
+              )}
             </div>
-
             {val.adjuntos && val.adjuntos.filter(a => ['hes', 'guia_almacen'].includes(a.categoria ?? '')).length > 0 ? (
               <div className="space-y-1.5">
                 {val.adjuntos.filter(a => ['hes', 'guia_almacen'].includes(a.categoria ?? '')).map(adj => (
@@ -1254,13 +1304,16 @@ export default function ValorizacionEditPage() {
                 ))}
               </div>
             ) : (
-              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
-                Sin documentos adjuntos. Se requiere HES o Guía de Almacén para poder facturar.
+              <p className={`text-xs rounded px-3 py-2 border ${val.estado === 'hes_pendiente' ? 'text-amber-700 bg-amber-50 border-amber-200' : 'text-muted-foreground bg-muted/30'}`}>
+                {val.estado === 'hes_pendiente'
+                  ? 'Sin documentos adjuntos. Se requiere HES o Guía de Almacén para poder facturar.'
+                  : 'No hay documentos HES adjuntos aún.'}
               </p>
             )}
           </CardContent>
         </Card>
-      )}
+
+      </div>
 
 
       {/* HH detail OR partidas table */}
