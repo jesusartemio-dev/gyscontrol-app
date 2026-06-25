@@ -17,7 +17,7 @@ const formatCurrency = (amount: number) =>
   new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' }).format(amount)
 
 const formatDate = (date?: string | null) =>
-  date ? new Date(date).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
+  date ? new Date(date).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' }) : '—'
 
 export default function PendientesPage() {
   const router = useRouter()

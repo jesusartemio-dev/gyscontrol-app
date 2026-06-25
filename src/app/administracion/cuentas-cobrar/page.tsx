@@ -135,7 +135,7 @@ const formatCurrency = (amount: number, moneda = 'PEN') =>
   new Intl.NumberFormat('es-PE', { style: 'currency', currency: moneda }).format(amount)
 
 const formatDate = (date: string) =>
-  new Date(date).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })
+  new Date(date).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })
 
 function getRangoFechas(preset: string, desde: string, hasta: string): { desde: Date | null; hasta: Date | null } {
   const now = new Date()

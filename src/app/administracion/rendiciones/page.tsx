@@ -30,7 +30,7 @@ const formatCurrency = (amount: number) =>
   new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' }).format(amount)
 
 const formatDate = (date: string) =>
-  new Date(date).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })
+  new Date(date).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })
 
 export default function RendicionesPage() {
   const router = useRouter()
