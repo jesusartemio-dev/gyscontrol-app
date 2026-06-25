@@ -793,24 +793,14 @@ export default function ValorizacionEditPage() {
               Enviar corrección al cliente
             </Button>
           )
-        // Facturar — requiere al menos un documento HES o Guía subido
-        if (val.estado === 'hes_pendiente' && tiene('hes_pendiente', 'facturada')) {
-          const tieneDocHES = val.adjuntos?.some(a => ['hes', 'guia_almacen'].includes(a.categoria ?? '')) ?? false
+        // Facturar
+        if (val.estado === 'hes_pendiente' && tiene('hes_pendiente', 'facturada'))
           acciones.push(
-            <div key="facturar" className="flex flex-col items-end gap-1">
-              <Button size="sm" className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50"
-                onClick={() => handleTransicion('facturada')}
-                disabled={transitioning || !tieneDocHES}
-                title={!tieneDocHES ? 'Debe subir el documento HES o Guía de Almacén antes de facturar' : undefined}>
-                <DollarSign className="h-4 w-4 mr-2" />
-                Registrar factura
-              </Button>
-              {!tieneDocHES && (
-                <p className="text-[11px] text-amber-600 text-right">Sube el HES o Guía de Almacén primero</p>
-              )}
-            </div>
+            <Button key="facturar" size="sm" className="bg-purple-600 hover:bg-purple-700" onClick={() => handleTransicion('facturada')} disabled={transitioning}>
+              <DollarSign className="h-4 w-4 mr-2" />
+              Registrar factura
+            </Button>
           )
-        }
         // Marcar pagada
         if (val.estado === 'facturada' && tiene('facturada', 'pagada'))
           acciones.push(
@@ -1193,17 +1183,26 @@ export default function ValorizacionEditPage() {
                     {savingConformidad && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                     Guardar Conformidad
                   </Button>
-                  {val.estado === 'aprobada_cliente' && puedeTransicionar('aprobada_cliente', 'hes_pendiente') && (
-                    <Button
-                      size="sm"
-                      disabled={!tieneConformidad || transitioning}
-                      onClick={() => handleTransicion('hes_pendiente')}
-                      title={!tieneConformidad ? 'Guarda la conformidad primero' : 'Avanzar al estado HES'}
-                    >
-                      {transitioning && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                      Registrar HES →
-                    </Button>
-                  )}
+                  {val.estado === 'aprobada_cliente' && puedeTransicionar('aprobada_cliente', 'hes_pendiente') && (() => {
+                    const tieneDocHES = val.adjuntos?.some(a => ['hes', 'guia_almacen'].includes(a.categoria ?? '')) ?? false
+                    const bloqueado = !tieneConformidad || !tieneDocHES || transitioning
+                    const titulo = !tieneConformidad
+                      ? 'Guarda la conformidad primero'
+                      : !tieneDocHES
+                        ? 'Sube el documento HES o Guía de Almacén primero'
+                        : 'Avanzar al estado HES'
+                    return (
+                      <div className="flex flex-col items-end gap-1">
+                        <Button size="sm" disabled={bloqueado} onClick={() => handleTransicion('hes_pendiente')} title={titulo}>
+                          {transitioning && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                          Registrar HES →
+                        </Button>
+                        {!tieneDocHES && (
+                          <p className="text-[11px] text-amber-600 text-right">Sube el HES o Guía de Almacén primero</p>
+                        )}
+                      </div>
+                    )
+                  })()}
                 </div>
               )}
             </CardContent>
@@ -1277,7 +1276,7 @@ export default function ValorizacionEditPage() {
                   </p>
                 )}
               </div>
-              {val.estado === 'hes_pendiente' && (
+              {['aprobada_cliente', 'hes_pendiente'].includes(val.estado) && (
                 <div className="flex items-center gap-2 shrink-0">
                   <label className="cursor-pointer">
                     <input type="file" className="sr-only" accept=".pdf,.jpg,.jpeg,.png,.docx"
@@ -1314,10 +1313,12 @@ export default function ValorizacionEditPage() {
                 ))}
               </div>
             ) : (
-              <p className={`text-xs rounded px-3 py-2 border ${val.estado === 'hes_pendiente' ? 'text-amber-700 bg-amber-50 border-amber-200' : 'text-muted-foreground bg-muted/30'}`}>
-                {val.estado === 'hes_pendiente'
-                  ? 'Sin documentos adjuntos. Se requiere HES o Guía de Almacén para poder facturar.'
-                  : 'No hay documentos HES adjuntos aún.'}
+              <p className={`text-xs rounded px-3 py-2 border ${['aprobada_cliente', 'hes_pendiente'].includes(val.estado) ? 'text-amber-700 bg-amber-50 border-amber-200' : 'text-muted-foreground bg-muted/30'}`}>
+                {val.estado === 'aprobada_cliente'
+                  ? 'Sube el documento HES o Guía de Almacén para poder pasar al estado HES.'
+                  : val.estado === 'hes_pendiente'
+                    ? 'Sin documentos adjuntos. Se requiere HES o Guía de Almacén para poder facturar.'
+                    : 'No hay documentos HES adjuntos aún.'}
               </p>
             )}
           </CardContent>
