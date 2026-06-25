@@ -1385,7 +1385,7 @@ export default function CuentasCobrarPage() {
               const total = parseFloat(pagoMonto) || 0
               const detPct = conDetraccion ? parseFloat(detraccionPorcentaje) || 0 : 0
               const retPct = conRetencion ? parseFloat(retencionPorcentaje) || 0 : 0
-              const detMonto = Math.round(total * detPct / 100 * 100) / 100
+              const detMonto = Math.round(total * detPct / 100) // SUNAT RS 183-2004: sin decimales
               const retMonto = Math.round(total * retPct / 100 * 100) / 100
               const neto = Math.round((total - detMonto - retMonto) * 100) / 100
               return (

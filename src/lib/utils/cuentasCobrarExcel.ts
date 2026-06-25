@@ -662,7 +662,9 @@ export async function exportarCxCFormatoAdmin(items: CxCAdminExportRow[]) {
     // Detracción
     row.getCell(16).value = detraccion?.detraccionFechaPago ? new Date(detraccion.detraccionFechaPago) : null  // P
     row.getCell(17).value = detraccion?.numeroConstanciaBN ?? ''                      // Q
-    row.getCell(18).value = detraccion?.detraccionMonto ?? detraccion?.monto ?? null  // R
+    // SUNAT RS 183-2004: detracción sin decimales — se redondea también para registros históricos
+    const rawDetMonto = detraccion?.detraccionMonto ?? detraccion?.monto ?? null
+    row.getCell(18).value = rawDetMonto != null ? Math.round(rawDetMonto) : null  // R
     row.getCell(19).value = detraccion?.detraccionPorcentaje != null ? detraccion.detraccionPorcentaje / 100 : null // S (formato %)
 
     // Retención
@@ -707,11 +709,15 @@ export async function exportarCxCFormatoAdmin(items: CxCAdminExportRow[]) {
         ws.getCell(`${col}${r}`).numFmt = 'dd-mm-yy'
       }
     }
-    // Montos con 2 decimales (L, M, N, R, V, X, Y)
-    for (const col of ['L', 'M', 'N', 'R', 'V', 'X', 'Y']) {
+    // Montos con 2 decimales (L, M, N, V, X, Y)
+    for (const col of ['L', 'M', 'N', 'V', 'X', 'Y']) {
       for (let r = 5; r <= lastRow; r++) {
         ws.getCell(`${col}${r}`).numFmt = '#,##0.00'
       }
+    }
+    // Detracción (R): entero sin decimales — SUNAT RS 183-2004
+    for (let r = 5; r <= lastRow; r++) {
+      ws.getCell(`R${r}`).numFmt = '#,##0'
     }
     // Tipo de cambio (O) — 3 decimales
     for (let r = 5; r <= lastRow; r++) {

@@ -40,8 +40,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     // Calcular splits — la retención y la detracción se calculan sobre el monto bruto del documento (monto recibido)
     // y el resto va al pago neto.
+    // SUNAT RS 183-2004 (Quinta Disp. Final): depósito de detracciones sin decimales
     const detraccionMonto = (conDetraccion && detraccionPorcentaje > 0)
-      ? round2(monto * detraccionPorcentaje / 100)
+      ? Math.round(monto * detraccionPorcentaje / 100)
       : 0
     const retencionMonto = (conRetencion && retencionPorcentaje > 0)
       ? round2(monto * retencionPorcentaje / 100)
