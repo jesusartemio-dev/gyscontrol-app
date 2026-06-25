@@ -793,14 +793,24 @@ export default function ValorizacionEditPage() {
               Enviar corrección al cliente
             </Button>
           )
-        // Facturar
-        if (val.estado === 'hes_pendiente' && tiene('hes_pendiente', 'facturada'))
+        // Facturar — requiere al menos un documento HES o Guía subido
+        if (val.estado === 'hes_pendiente' && tiene('hes_pendiente', 'facturada')) {
+          const tieneDocHES = val.adjuntos?.some(a => ['hes', 'guia_almacen'].includes(a.categoria ?? '')) ?? false
           acciones.push(
-            <Button key="facturar" size="sm" className="bg-purple-600 hover:bg-purple-700" onClick={() => handleTransicion('facturada')} disabled={transitioning}>
-              <DollarSign className="h-4 w-4 mr-2" />
-              Registrar factura
-            </Button>
+            <div key="facturar" className="flex flex-col items-end gap-1">
+              <Button size="sm" className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50"
+                onClick={() => handleTransicion('facturada')}
+                disabled={transitioning || !tieneDocHES}
+                title={!tieneDocHES ? 'Debe subir el documento HES o Guía de Almacén antes de facturar' : undefined}>
+                <DollarSign className="h-4 w-4 mr-2" />
+                Registrar factura
+              </Button>
+              {!tieneDocHES && (
+                <p className="text-[11px] text-amber-600 text-right">Sube el HES o Guía de Almacén primero</p>
+              )}
+            </div>
           )
+        }
         // Marcar pagada
         if (val.estado === 'facturada' && tiene('facturada', 'pagada'))
           acciones.push(
