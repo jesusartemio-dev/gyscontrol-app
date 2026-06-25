@@ -283,6 +283,7 @@ export default function ValorizacionesPage() {
     type ProjGroup = {
       proyectoId: string; codigo: string; nombre: string
       vals: Valorizacion[]; presupuesto: number; acumulado: number; totalNeto: number
+      ultimaFecha: string
     }
     const map = new Map<string, ProjGroup>()
     for (const v of filtered) {
@@ -296,6 +297,7 @@ export default function ValorizacionesPage() {
           presupuesto: 0,
           acumulado: 0,
           totalNeto: 0,
+          ultimaFecha: '',
         })
       }
       const p = map.get(pid)!
@@ -305,12 +307,11 @@ export default function ValorizacionesPage() {
         if ((v.presupuestoContractual ?? 0) > p.presupuesto) p.presupuesto = v.presupuestoContractual ?? 0
         p.totalNeto += v.netoARecibir ?? 0
       }
+      const fecha = v.periodoFin ?? v.periodoInicio ?? ''
+      if (fecha > p.ultimaFecha) p.ultimaFecha = fecha
     }
-    return [...map.values()].sort((a, b) => {
-      const pa = a.presupuesto > 0 ? a.acumulado / a.presupuesto : 0
-      const pb = b.presupuesto > 0 ? b.acumulado / b.presupuesto : 0
-      return pb - pa
-    })
+    // Proyecto con val más reciente primero (igual que vista por mes)
+    return [...map.values()].sort((a, b) => b.ultimaFecha.localeCompare(a.ultimaFecha))
   }, [filtered])
 
   // Preview info: qué número de valorización se creará y si hay partidas anteriores
