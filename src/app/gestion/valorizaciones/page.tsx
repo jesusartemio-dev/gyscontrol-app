@@ -255,7 +255,7 @@ export default function ValorizacionesPage() {
       const m = i.moneda || 'PEN'
       if (!byMoneda[m]) byMoneda[m] = { montoVal: 0, neto: 0 }
       byMoneda[m].montoVal += i.montoValorizacion
-      byMoneda[m].neto += i.netoARecibir
+      byMoneda[m].neto += i.subtotal   // subtotal sin IGV (el IGV es impuesto, no ingreso)
     }
     return { byMoneda, total: filtered.length, activas: activas.length }
   }, [filtered])
@@ -272,7 +272,7 @@ export default function ValorizacionesPage() {
       m.vals.push(v)
       if (v.estado !== 'anulada') {
         m.totalMonto += v.montoValorizacion ?? 0
-        m.totalNeto += v.netoARecibir ?? 0
+        m.totalNeto += v.subtotal ?? 0
       }
     }
     return [...map.values()].sort((a, b) => b.mes.localeCompare(a.mes))
@@ -305,7 +305,7 @@ export default function ValorizacionesPage() {
       if (v.estado !== 'anulada') {
         if ((v.acumuladoActual ?? 0) > p.acumulado) p.acumulado = v.acumuladoActual ?? 0
         if ((v.presupuestoContractual ?? 0) > p.presupuesto) p.presupuesto = v.presupuestoContractual ?? 0
-        p.totalNeto += v.netoARecibir ?? 0
+        p.totalNeto += v.subtotal ?? 0
       }
       const fecha = v.periodoFin ?? v.periodoInicio ?? ''
       if (fecha > p.ultimaFecha) p.ultimaFecha = fecha
@@ -556,7 +556,7 @@ export default function ValorizacionesPage() {
                   <TableHead className="text-right">Acumulado</TableHead>
                   <TableHead className="text-right">% Avance</TableHead>
                   <TableHead>Estado</TableHead>
-                  <TableHead className="text-right">Neto a Recibir</TableHead>
+                  <TableHead className="text-right">Subtotal sin IGV</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -597,7 +597,7 @@ export default function ValorizacionesPage() {
                         <Badge className={getEstadoColor(item.estado)}>{getEstadoLabel(item.estado)}</Badge>
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm font-semibold">
-                        {formatCurrency(item.netoARecibir, item.moneda)}
+                        {formatCurrency(item.subtotal, item.moneda)}
                       </TableCell>
                       <TableCell className="text-right">
                         <Button variant="ghost" size="icon" onClick={() => router.push(`/gestion/valorizaciones/${item.id}?mode=view`)} title="Ver detalle">
@@ -692,7 +692,7 @@ export default function ValorizacionesPage() {
                             </div>
                             <div className="text-right shrink-0 ml-4">
                               <p className="text-sm font-semibold font-mono">{formatCurrency(totalMonto, 'USD')}</p>
-                              <p className="text-xs text-muted-foreground font-mono">Neto {formatCurrency(totalNeto, 'USD')}</p>
+                              <p className="text-xs text-muted-foreground font-mono">Subtotal {formatCurrency(totalNeto, 'USD')}</p>
                             </div>
                           </div>
                         </button>
@@ -712,7 +712,7 @@ export default function ValorizacionesPage() {
                                   <span className="text-[10px] font-mono w-8">{v.porcentajeAvance.toFixed(1)}%</span>
                                 </div>
                                 <Badge className={`${getEstadoColor(v.estado)} text-[10px] py-0`}>{getEstadoLabel(v.estado)}</Badge>
-                                <span className="text-xs font-mono font-medium w-24 text-right shrink-0">{formatCurrency(v.netoARecibir, v.moneda)}</span>
+                                <span className="text-xs font-mono font-medium w-24 text-right shrink-0">{formatCurrency(v.subtotal, v.moneda)}</span>
                                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => router.push(`/gestion/valorizaciones/${v.id}?mode=view`)}>
                                   <Eye className="h-3 w-3" />
                                 </Button>
@@ -794,7 +794,7 @@ export default function ValorizacionesPage() {
                             <div className="text-right shrink-0 ml-4">
                               <p className="text-xs text-muted-foreground">{vals.length} val{vals.length > 1 ? 'es' : ''}</p>
                               <p className="text-sm font-semibold font-mono">{formatCurrency(totalNeto, 'USD')}</p>
-                              <p className="text-[10px] text-muted-foreground">neto acum.</p>
+                              <p className="text-[10px] text-muted-foreground">subtotal acum.</p>
                             </div>
                           </div>
                         </button>
@@ -813,7 +813,7 @@ export default function ValorizacionesPage() {
                                   <span className="text-[10px] font-mono w-8">{v.porcentajeAvance.toFixed(0)}%</span>
                                 </div>
                                 <Badge className={`${getEstadoColor(v.estado)} text-[10px] py-0`}>{getEstadoLabel(v.estado)}</Badge>
-                                <span className="text-xs font-mono font-medium w-24 text-right">{formatCurrency(v.netoARecibir, v.moneda)}</span>
+                                <span className="text-xs font-mono font-medium w-24 text-right">{formatCurrency(v.subtotal, v.moneda)}</span>
                                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => router.push(`/gestion/valorizaciones/${v.id}?mode=view`)}>
                                   <Eye className="h-3 w-3" />
                                 </Button>

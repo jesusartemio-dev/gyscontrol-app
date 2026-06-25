@@ -1301,13 +1301,13 @@ export default function ValorizacionEditPage() {
                   <span className="font-mono">-{formatCurrency(preview.adelanto, formMoneda)}</span>
                 </div>
               )}
-              <div className="text-center">
-                <span className="text-xs text-muted-foreground block">Subtotal</span>
-                <span className="font-mono">{formatCurrency(preview.subtotal, formMoneda)}</span>
+              <div className="text-center bg-teal-50 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-700 rounded-lg p-2">
+                <span className="text-xs font-semibold text-teal-700 dark:text-teal-400 block">Subtotal sin IGV</span>
+                <span className="font-mono font-bold text-lg text-teal-700 dark:text-teal-300">{formatCurrency(preview.subtotal, formMoneda)}</span>
               </div>
               <div className="text-center">
-                <span className="text-xs text-muted-foreground block">(+) IGV</span>
-                <span className="font-mono">+{formatCurrency(preview.igv, formMoneda)}</span>
+                <span className="text-xs text-muted-foreground block">(+) IGV {formIgv}%</span>
+                <span className="font-mono text-muted-foreground">+{formatCurrency(preview.igv, formMoneda)}</span>
               </div>
               {preview.fondoGarantia > 0 && (
                 <div className="text-center text-orange-600">
@@ -1315,9 +1315,9 @@ export default function ValorizacionEditPage() {
                   <span className="font-mono">-{formatCurrency(preview.fondoGarantia, formMoneda)}</span>
                 </div>
               )}
-              <div className="text-center bg-primary/5 rounded-lg p-2">
-                <span className="text-xs font-medium block">Neto a Recibir</span>
-                <span className="font-mono font-bold text-base text-primary">{formatCurrency(preview.netoARecibir, formMoneda)}</span>
+              <div className="text-center rounded-lg p-2">
+                <span className="text-xs text-muted-foreground block">Neto c/ IGV</span>
+                <span className="font-mono font-semibold text-sm">{formatCurrency(preview.netoARecibir, formMoneda)}</span>
               </div>
             </div>
           </CardContent>
