@@ -6,6 +6,42 @@ import { canDelete } from '@/lib/utils/deleteValidation'
 
 const ROLES_ALLOWED = ['admin', 'gerente', 'administracion']
 
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    if (!ROLES_ALLOWED.includes(session.user.role)) return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
+
+    const { id } = await params
+    const cxc = await prisma.cuentaPorCobrar.findUnique({
+      where: { id },
+      include: {
+        proyecto: { select: { id: true, codigo: true, nombre: true } },
+        cliente: { select: { id: true, nombre: true, ruc: true } },
+        valorizacion: {
+          select: {
+            id: true, codigo: true, numero: true, proyectoId: true,
+            cobro: {
+              include: { abonos: { orderBy: { fecha: 'asc' } } },
+            },
+          },
+        },
+        pagos: {
+          include: { cuentaBancaria: { select: { id: true, nombreBanco: true, numeroCuenta: true } } },
+          orderBy: { fechaPago: 'desc' },
+        },
+        adjuntos: { orderBy: { createdAt: 'desc' } },
+      },
+    })
+
+    if (!cxc) return NextResponse.json({ error: 'CxC no encontrada' }, { status: 404 })
+    return NextResponse.json(cxc)
+  } catch (error) {
+    console.error('Error al obtener CxC:', error)
+    return NextResponse.json({ error: 'Error del servidor' }, { status: 500 })
+  }
+}
+
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)

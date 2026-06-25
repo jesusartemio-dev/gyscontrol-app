@@ -225,36 +225,6 @@ export default function ValorizacionEditPage() {
   const [savingConformidad, setSavingConformidad] = useState(false)
   // HES upload
   const [uploadingHES, setUploadingHES] = useState(false)
-  // Cobro form
-  const [cobroTipo, setCobroTipo] = useState<'factoring' | 'directo'>('directo')
-  const [cobroFinanciera, setCobroFinanciera] = useState('')
-  const [cobroTasa, setCobroTasa] = useState('')
-  const [cobroFechaDesembolso, setCobroFechaDesembolso] = useState('')
-  const [cobroFechaVencimiento, setCobroFechaVencimiento] = useState('')
-  const [cobroNumeroOperacion, setCobroNumeroOperacion] = useState('')
-  const [cobroConfirmacion, setCobroConfirmacion] = useState('')
-  const [cobroFechaVencimientoPago, setCobroFechaVencimientoPago] = useState('')
-  const [cobroObservaciones, setCobroObservaciones] = useState('')
-  // Factoring — liquidación detallada
-  const [cobroNumDocumentos, setCobroNumDocumentos] = useState('')
-  const [cobroDias, setCobroDias] = useState('')
-  const [cobroDetraccionPct, setCobroDetraccionPct] = useState('12')
-  const [cobroDetraccionMonto, setCobroDetraccionMonto] = useState('')
-  const [cobroExcedentePct, setCobroExcedentePct] = useState('1')
-  const [cobroExcedenteMonto, setCobroExcedenteMonto] = useState('')
-  const [cobroValorAFinanciar, setCobroValorAFinanciar] = useState('')
-  const [cobroInteres, setCobroInteres] = useState('')
-  const [cobroComision, setCobroComision] = useState('')
-  const [cobroGastos, setCobroGastos] = useState('')
-  const [cobroIgvGastos, setCobroIgvGastos] = useState('')
-  const [cobroAdelantoBanpro, setCobroAdelantoBanpro] = useState('')
-  const [savingCobro, setSavingCobro] = useState(false)
-  // Abono form
-  const [showAbonoForm, setShowAbonoForm] = useState(false)
-  const [abonoMonto, setAbonoMonto] = useState('')
-  const [abonoFecha, setAbonoFecha] = useState(new Date().toISOString().split('T')[0])
-  const [abonoObs, setAbonoObs] = useState('')
-  const [addingAbono, setAddingAbono] = useState(false)
   // State transition
   const [transitioning, setTransitioning] = useState(false)
   // Dialogs de acciones
@@ -297,30 +267,6 @@ export default function ValorizacionEditPage() {
       setFormNumeroHES(data.numeroHES || '')
       setFormNumeroGuiaRemision(data.numeroGuiaRemision || '')
       setFormFechaConformidad(data.fechaConformidad ? data.fechaConformidad.split('T')[0] : '')
-      if (data.cobro) {
-        const c = data.cobro
-        setCobroTipo((c.tipo as 'factoring' | 'directo') || 'directo')
-        setCobroFinanciera(c.financiera || '')
-        setCobroTasa(c.tasaDescuentoPct?.toString() || '')
-        setCobroFechaDesembolso(c.fechaDesembolso ? c.fechaDesembolso.split('T')[0] : '')
-        setCobroFechaVencimiento(c.fechaVencimiento ? c.fechaVencimiento.split('T')[0] : '')
-        setCobroNumeroOperacion(c.numeroOperacion || '')
-        setCobroNumDocumentos(c.numeroDocumentos?.toString() || '')
-        setCobroDias(c.diasFinanciamiento?.toString() || '')
-        setCobroDetraccionPct(c.detraccionPct?.toString() || '12')
-        setCobroDetraccionMonto(c.detraccionMonto?.toString() || '')
-        setCobroExcedentePct(c.excedentePct?.toString() || '1')
-        setCobroExcedenteMonto(c.excedenteMonto?.toString() || '')
-        setCobroValorAFinanciar(c.valorAFinanciar?.toString() || '')
-        setCobroInteres(c.interesMonto?.toString() || '')
-        setCobroComision(c.comisionEstructuracion?.toString() || '')
-        setCobroGastos(c.gastosAdicionales?.toString() || '')
-        setCobroIgvGastos(c.igvGastos?.toString() || '')
-        setCobroAdelantoBanpro(c.adelantoBanpro?.toString() || '')
-        setCobroConfirmacion(c.confirmacionCliente || '')
-        setCobroFechaVencimientoPago(c.fechaVencimientoPago ? c.fechaVencimientoPago.split('T')[0] : '')
-        setCobroObservaciones(c.observaciones || '')
-      }
     } catch {
       toast.error('Error al cargar valorización')
       router.push('/gestion/valorizaciones')
@@ -536,127 +482,6 @@ export default function ValorizacionEditPage() {
       toast.error('Error al eliminar adjunto')
     }
   }
-
-  const handleSaveCobro = async () => {
-    if (!val) return
-    setSavingCobro(true)
-    try {
-      const body: Record<string, any> = { tipo: cobroTipo }
-      if (cobroTipo === 'factoring') {
-        const liq = liquidacion
-        body.financiera = cobroFinanciera || null
-        body.tasaDescuentoPct = cobroTasa ? parseFloat(cobroTasa) : null
-        body.fechaDesembolso = cobroFechaDesembolso || null
-        body.fechaVencimiento = cobroFechaVencimiento || null
-        body.numeroOperacion = cobroNumeroOperacion || null
-        body.numeroDocumentos = cobroNumDocumentos ? parseInt(cobroNumDocumentos) : null
-        body.diasFinanciamiento = cobroDias ? parseInt(cobroDias) : null
-        body.detraccionPct = cobroDetraccionPct ? parseFloat(cobroDetraccionPct) : null
-        body.detraccionMonto = liq.detMonto
-        body.excedentePct = cobroExcedentePct ? parseFloat(cobroExcedentePct) : null
-        body.excedenteMonto = liq.excMonto
-        body.valorAFinanciar = liq.aFinanciar
-        body.interesMonto = cobroInteres ? parseFloat(cobroInteres) : null
-        body.comisionEstructuracion = cobroComision ? parseFloat(cobroComision) : null
-        body.gastosAdicionales = cobroGastos ? parseFloat(cobroGastos) : null
-        body.igvGastos = cobroIgvGastos ? parseFloat(cobroIgvGastos) : null
-        body.montoADesembolsar = liq.aDesembolsar
-        body.adelantoBanpro = cobroAdelantoBanpro ? parseFloat(cobroAdelantoBanpro) : null
-        body.saldoAGirar = liq.saldo
-        body.montoDescontado = liq.totalCostos
-        body.montoNeto = liq.aDesembolsar
-      } else {
-        body.confirmacionCliente = cobroConfirmacion || null
-        body.fechaVencimientoPago = cobroFechaVencimientoPago || null
-        body.observaciones = cobroObservaciones || null
-      }
-      const res = await fetch(`/api/proyectos/${val.proyectoId}/valorizaciones/${val.id}/cobro`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error || 'Error')
-      }
-      toast.success('Cobro guardado')
-      loadVal()
-    } catch (e: any) {
-      toast.error(e.message || 'Error al guardar cobro')
-    } finally {
-      setSavingCobro(false)
-    }
-  }
-
-  const handleAddAbono = async () => {
-    if (!val || !abonoMonto || !abonoFecha) return
-    setAddingAbono(true)
-    try {
-      const res = await fetch(`/api/proyectos/${val.proyectoId}/valorizaciones/${val.id}/cobro/abonos`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ monto: parseFloat(abonoMonto), fecha: abonoFecha, observaciones: abonoObs || null }),
-      })
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error || 'Error')
-      }
-      toast.success('Abono registrado')
-      setAbonoMonto('')
-      setAbonoFecha(new Date().toISOString().split('T')[0])
-      setAbonoObs('')
-      setShowAbonoForm(false)
-      loadVal()
-    } catch (e: any) {
-      toast.error(e.message || 'Error al registrar abono')
-    } finally {
-      setAddingAbono(false)
-    }
-  }
-
-  const handleDeleteAbono = async (abonoId: string) => {
-    if (!val) return
-    if (!window.confirm('¿Eliminar este abono?')) return
-    try {
-      const res = await fetch(`/api/proyectos/${val.proyectoId}/valorizaciones/${val.id}/cobro/abonos?abonoId=${abonoId}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error('Error')
-      toast.success('Abono eliminado')
-      loadVal()
-    } catch {
-      toast.error('Error al eliminar abono')
-    }
-  }
-
-  // Factoring liquidation calculations
-  const liquidacion = useMemo(() => {
-    const base = val?.netoARecibir ?? 0
-    const detPct = parseFloat(cobroDetraccionPct) || 0
-    const detMonto = parseFloat(cobroDetraccionMonto) || (base * detPct / 100)
-    const valorNeto = base - detMonto
-
-    const excPct = parseFloat(cobroExcedentePct) || 0
-    const excMonto = parseFloat(cobroExcedenteMonto) || (valorNeto * excPct / 100)
-    const aFinanciar = parseFloat(cobroValorAFinanciar) || (valorNeto - excMonto)
-
-    const interes = parseFloat(cobroInteres) || 0
-    const comision = parseFloat(cobroComision) || 0
-    const gastos = parseFloat(cobroGastos) || 0
-    const igv = parseFloat(cobroIgvGastos) || 0
-    const totalCostos = interes + comision + gastos + igv
-
-    const aDesembolsar = aFinanciar - totalCostos
-    const adelanto = parseFloat(cobroAdelantoBanpro) || 0
-    const saldo = aDesembolsar - adelanto
-
-    // Reference interest: aFinanciar × (tasa%/30) × días
-    const tasa = parseFloat(cobroTasa) || 0
-    const dias = parseInt(cobroDias) || 0
-    const refInteres = tasa > 0 && dias > 0 ? aFinanciar * (tasa / 100 / 30) * dias : 0
-
-    return { base, detMonto, valorNeto, excMonto, aFinanciar, totalCostos, aDesembolsar, saldo, refInteres }
-  }, [val, cobroDetraccionPct, cobroDetraccionMonto, cobroExcedentePct, cobroExcedenteMonto,
-      cobroValorAFinanciar, cobroInteres, cobroComision, cobroGastos, cobroIgvGastos,
-      cobroAdelantoBanpro, cobroTasa, cobroDias])
 
   // Preview calculation
   const preview = useMemo(() => {

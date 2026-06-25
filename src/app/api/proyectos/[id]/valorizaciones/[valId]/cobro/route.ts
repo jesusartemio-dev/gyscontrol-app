@@ -6,7 +6,7 @@ import { z } from 'zod'
 
 type Ctx = { params: Promise<{ id: string; valId: string }> }
 
-const ROLES_ALLOWED = ['admin', 'gerente', 'gestor', 'coordinador', 'administracion']
+const ROLES_ALLOWED = ['admin', 'gerente', 'administracion']
 
 const CobroSchema = z.object({
   tipo: z.enum(['factoring', 'directo']),

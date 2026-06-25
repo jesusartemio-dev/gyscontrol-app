@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Loader2, Search, ArrowDownCircle, AlertTriangle, DollarSign, Clock, CheckCircle, Plus, Ban, Download, Upload, Trash2, ChevronDown, Pencil, CalendarDays, X } from 'lucide-react'
+import Link from 'next/link'
 import toast from 'react-hot-toast'
 import CxCImportExcelModal from '@/components/administracion/CxCImportExcelModal'
 import { exportarCxCContable, exportarCxCFinanciero } from '@/lib/utils/cuentasCobrarExcel'
@@ -227,9 +228,6 @@ export default function CuentasCobrarPage() {
   const [retencionPorcentaje, setRetencionPorcentaje] = useState('3')
   const [retencionFecha, setRetencionFecha] = useState('')
   const [retencionNumeroConstancia, setRetencionNumeroConstancia] = useState('')
-
-  // Detail dialog
-  const [showDetail, setShowDetail] = useState<CuentaPorCobrar | null>(null)
 
   // Edit dialog
   const [editCuenta, setEditCuenta] = useState<CuentaPorCobrar | null>(null)
@@ -583,7 +581,7 @@ export default function CuentasCobrarPage() {
         throw new Error(err.error || 'Error')
       }
       toast.success('Cuenta anulada')
-      setShowDetail(null)
+
       loadData()
     } catch (e: any) {
       toast.error(e.message || 'Error al anular')
@@ -608,7 +606,7 @@ export default function CuentasCobrarPage() {
         throw new Error(err.error || 'Error al eliminar')
       }
       toast.success('Cuenta eliminada')
-      setShowDetail(null)
+
       loadData()
     } catch (e: any) {
       toast.error(e.message || 'Error al eliminar')
@@ -994,8 +992,8 @@ export default function CuentasCobrarPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <Button variant="ghost" size="sm" onClick={() => setShowDetail(item)}>
-                            Ver
+                          <Button variant="ghost" size="sm" asChild>
+                            <Link href={`/administracion/cuentas-cobrar/${item.id}`}>Ver</Link>
                           </Button>
                           {item.estado !== 'anulada' && (
                             <Button variant="ghost" size="sm" onClick={() => openEdit(item)} title="Editar">
@@ -1429,186 +1427,6 @@ export default function CuentasCobrarPage() {
         proyectos={proyectos}
         onImported={loadData}
       />
-
-      {/* Dialog detalle */}
-      <Dialog open={!!showDetail} onOpenChange={open => { if (!open) setShowDetail(null) }}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Detalle CxC</DialogTitle>
-            <DialogDescription>
-              {showDetail?.numeroDocumento || 'Sin documento'} — {showDetail?.cliente?.nombre}
-            </DialogDescription>
-          </DialogHeader>
-          {showDetail && (
-            <div className="space-y-4 text-sm max-h-[60vh] overflow-y-auto">
-              <div className="flex items-center gap-2">
-                <Badge className={getEstadoColor(showDetail.estado)}>
-                  {ESTADOS_CXC.find(e => e.value === showDetail.estado)?.label || showDetail.estado}
-                </Badge>
-                {isVencida(showDetail.fechaVencimiento, showDetail.estado) && (
-                  <Badge className="bg-red-100 text-red-700">Vencida</Badge>
-                )}
-              </div>
-              <Card>
-                <CardContent className="p-3 space-y-1">
-                  <div className="flex justify-between"><span>Cliente</span><span className="font-medium">{showDetail.cliente?.nombre}</span></div>
-                  <div className="flex justify-between"><span>Proyecto</span><span className="font-mono">{showDetail.proyecto?.codigo}</span></div>
-                  {showDetail.valorizacion && (
-                    <div className="flex justify-between">
-                      <span>Valorización</span>
-                      <a
-                        href={`/gestion/valorizaciones/${showDetail.valorizacion.id}?mode=view`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-mono text-blue-600 hover:underline"
-                      >
-                        {showDetail.valorizacion.codigo} ↗
-                      </a>
-                    </div>
-                  )}
-                  <div className="flex justify-between"><span>OC Cliente</span><span className="font-mono">{showDetail.ordenCompraCliente || <span className="text-muted-foreground">—</span>}</span></div>
-                  <div className="flex justify-between"><span>N° HES</span><span className="font-mono">{showDetail.numeroHES || <span className="text-muted-foreground">—</span>}</span></div>
-                  <div className="flex justify-between"><span>N° Guía Remisión</span><span className="font-mono">{showDetail.numeroGuiaRemision || <span className="text-muted-foreground">—</span>}</span></div>
-                  {showDetail.descripcion && <div className="flex justify-between"><span>Descripción</span><span className="text-right max-w-[200px] truncate">{showDetail.descripcion}</span></div>}
-                  <div className="flex justify-between"><span>Emisión</span><span>{formatDate(showDetail.fechaEmision)}</span></div>
-                  {showDetail.fechaRecepcion && <div className="flex justify-between"><span>Recepción</span><span>{formatDate(showDetail.fechaRecepcion)}</span></div>}
-                  <div className="flex justify-between"><span>Vencimiento</span><span className={isVencida(showDetail.fechaVencimiento, showDetail.estado) ? 'text-red-600 font-bold' : ''}>{formatDate(showDetail.fechaVencimiento)}</span></div>
-                  {showDetail.diasCredito != null && <div className="flex justify-between"><span>Días Crédito</span><span>{showDetail.diasCredito}</span></div>}
-                  {showDetail.tipoCambio && <div className="flex justify-between"><span>Tipo Cambio</span><span className="font-mono">{showDetail.tipoCambio.toFixed(3)}</span></div>}
-                  {showDetail.bancoFinanciera && <div className="flex justify-between"><span>Banco / Financiera</span><span>{showDetail.bancoFinanciera}</span></div>}
-                  {showDetail.numeroNegociacion && <div className="flex justify-between"><span>N° Negociación</span><span className="font-mono">{showDetail.numeroNegociacion}</span></div>}
-                  <div className="flex justify-between border-t pt-1"><span>Monto Total</span><span className="font-mono font-bold">{formatCurrency(showDetail.monto, showDetail.moneda)}</span></div>
-                  <div className="flex justify-between text-green-600"><span>Pagado</span><span className="font-mono">{formatCurrency(showDetail.montoPagado, showDetail.moneda)}</span></div>
-                  <div className="flex justify-between font-bold border-t pt-1"><span>Saldo Pendiente</span><span className="font-mono">{formatCurrency(showDetail.saldoPendiente, showDetail.moneda)}</span></div>
-                </CardContent>
-              </Card>
-
-              {showDetail.pagos && showDetail.pagos.length > 0 && (
-                <div>
-                  <div className="font-medium mb-2">Historial de Pagos</div>
-                  <div className="space-y-2">
-                    {showDetail.pagos.map(p => (
-                      <Card key={p.id}>
-                        <CardContent className="p-3">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <div className="font-mono font-medium">{formatCurrency(p.monto, showDetail.moneda)}</div>
-                              <div className="text-xs text-muted-foreground">{formatDate(p.fechaPago)} · {p.medioPago}</div>
-                              {p.numeroOperacion && <div className="text-xs text-muted-foreground">Op: {p.numeroOperacion}</div>}
-                              {p.cuentaBancaria && <div className="text-xs text-muted-foreground">{p.cuentaBancaria.nombreBanco}</div>}
-                              {p.esDetraccion && p.numeroConstanciaBN && <div className="text-xs text-amber-700 font-medium">N° Constancia BN: {p.numeroConstanciaBN}</div>}
-                              {p.esRetencion && (
-                                <div className="text-xs text-purple-700 font-medium">
-                                  Retención {p.retencionPorcentaje ?? ''}%
-                                  {p.retencionNumeroConstancia ? ` · Constancia ${p.retencionNumeroConstancia}` : ''}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Documentos de respaldo */}
-              <div>
-                <div className="font-medium mb-2">Documentos de Respaldo</div>
-                {showDetail.adjuntos && showDetail.adjuntos.length > 0 ? (
-                  <div className="space-y-1">
-                    {showDetail.adjuntos.map((adj) => (
-                      <div key={adj.id} className="flex items-center justify-between text-xs border rounded p-2">
-                        <a href={adj.urlArchivo} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline truncate max-w-[250px]">{adj.nombreArchivo}</a>
-                        <Badge variant="outline" className="text-[10px] shrink-0 ml-2">{adj.tipoArchivo || 'otro'}</Badge>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground">Sin documentos adjuntos</p>
-                )}
-                {(showDetail.estado === 'pendiente' || showDetail.estado === 'parcial') && (
-                  <div className="mt-2 space-y-2">
-                    <div className="flex items-center gap-2">
-                      <select
-                        id="adjuntoTipoCxC"
-                        defaultValue="factura"
-                        className="h-8 rounded-md border border-input bg-background px-2 text-xs"
-                      >
-                        <option value="factura">Factura emitida</option>
-                        <option value="voucher">Voucher de pago</option>
-                        <option value="valorizacion">Valorización</option>
-                        <option value="otro">Otro</option>
-                      </select>
-                      <label className="flex items-center gap-1.5 cursor-pointer text-xs text-blue-600 hover:text-blue-800">
-                        <Upload className="h-3.5 w-3.5" />
-                        Adjuntar
-                        <input
-                          type="file"
-                          accept=".pdf,.png,.jpg,.jpeg,.webp"
-                          className="hidden"
-                          onChange={async (e) => {
-                            const file = e.target.files?.[0]
-                            if (!file || !showDetail) return
-                            const tipoSelect = document.getElementById('adjuntoTipoCxC') as HTMLSelectElement
-                            const tipoArchivo = tipoSelect?.value || 'otro'
-                            const fd = new FormData()
-                            fd.append('file', file)
-                            fd.append('cuentaPorCobrarId', showDetail.id)
-                            fd.append('tipoArchivo', tipoArchivo)
-                            try {
-                              const res = await fetch('/api/cxc-adjunto', { method: 'POST', credentials: 'include', body: fd })
-                              if (!res.ok) throw new Error('Error al subir')
-                              toast.success('Documento adjuntado')
-                              loadData()
-                              const updated = await res.json()
-                              setShowDetail(prev => prev ? {
-                                ...prev,
-                                adjuntos: [...(prev.adjuntos || []), updated],
-                              } : null)
-                            } catch {
-                              toast.error('Error al adjuntar documento')
-                            }
-                            e.target.value = ''
-                          }}
-                        />
-                      </label>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            {showDetail && showDetail.estado !== 'anulada' && (
-              <Button variant="outline" size="sm" onClick={() => { const c = showDetail; setShowDetail(null); openEdit(c) }} disabled={saving}>
-                <Pencil className="h-4 w-4 mr-1" />
-                Editar
-              </Button>
-            )}
-            {showDetail && showDetail.estado !== 'anulada' && (
-              <Button variant="destructive" size="sm" onClick={() => handleAnular(showDetail)} disabled={saving}>
-                <Ban className="h-4 w-4 mr-1" />
-                Anular
-              </Button>
-            )}
-            {showDetail && (showDetail.estado === 'anulada' || (showDetail.montoPagado === 0 && showDetail.estado !== 'pagada')) && (
-              <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => handleEliminar(showDetail)} disabled={saving}>
-                <Trash2 className="h-4 w-4 mr-1" />
-                Eliminar
-              </Button>
-            )}
-            <div className="flex-1" />
-            <Button variant="outline" onClick={() => setShowDetail(null)}>Cerrar</Button>
-            {showDetail && (showDetail.estado === 'pendiente' || showDetail.estado === 'parcial') && (
-              <Button onClick={() => { setShowDetail(null); openPago(showDetail) }}>
-                <ArrowDownCircle className="h-4 w-4 mr-2" />
-                Registrar Cobro
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Dialog editar CxC */}
       <Dialog open={!!editCuenta} onOpenChange={open => { if (!open) setEditCuenta(null) }}>
