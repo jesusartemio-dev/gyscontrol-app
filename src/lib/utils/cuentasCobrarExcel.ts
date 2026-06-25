@@ -1023,16 +1023,15 @@ export async function exportarCxCContable(items: CxCRichRow[]): Promise<void> {
   const wb = new ExcelJS.Workbook()
   const ws = wb.addWorksheet('CxC Contable')
 
-  // ── Layout: 25 columnas ───────────────────────────────────────────────────────
+  // ── Layout: 24 columnas ───────────────────────────────────────────────────────
   // A(1)  N° Documento    B(2)  Cliente         C(3)  RUC
   // D(4)  Proyecto        E(5)  Valorización     F(6)  Monto Factura
-  // G(7)  Moneda          H(8)  Monto Neto       I(9)  Cobrado [NEW]
+  // G(7)  Moneda          H(8)  Monto Neto       I(9)  Cobrado
   // J(10) Pagado          K(11) Saldo            L(12) Fecha Emisión
   // M(13) Fecha Venc.     N(14) Fecha Est. Pago  O(15) Fecha de Pago
   // P(16) Estado          Q(17) Descripción      R(18) Clasificación
   // Grupo Detracción: S(19) Nro. Constancia | T(20) Monto (S/) | U(21) Fecha
   // Grupo Retención:  V(22) Nro. Retención  | W(23) Monto (S/) | X(24) Fecha
-  // Y(25) Observaciones
   const colWidths = [
     16, // A  N° Documento
     35, // B  Cliente
@@ -1058,18 +1057,16 @@ export async function exportarCxCContable(items: CxCRichRow[]): Promise<void> {
     16, // V  Retención – Nro. Retención
     14, // W  Retención – Monto (S/)
     12, // X  Retención – Fecha
-    30, // Y  Observaciones
   ]
   ws.columns = colWidths.map(w => ({ width: w }))
 
   // ── Cabecera (2 filas) ────────────────────────────────────────────────────────
-  const SOLO_COLS = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','Y']
+  const SOLO_COLS = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R']
   const SOLO_HDRS = [
     'N° Documento','Cliente','RUC','Proyecto','Valorización',
     'Monto\nFactura','Moneda','Monto\nNeto','Cobrado','Pagado','Saldo',
     'Fecha\nEmisión','Fecha\nVencimiento','Fecha Estimada\nde Pago','Fecha\nde Pago',
     'Estado','Descripción','Clasificación',
-    'Observaciones',
   ]
   for (let i = 0; i < SOLO_COLS.length; i++) {
     ws.getCell(`${SOLO_COLS[i]}1`).value = SOLO_HDRS[i]
@@ -1154,8 +1151,6 @@ export async function exportarCxCContable(items: CxCRichRow[]): Promise<void> {
       [22, retencion?.retencionNumeroConstancia ?? ''],
       [23, retSoles,             FMT_MONEY],  // Siempre en S/
       [24, retencion?.fechaPago ? new Date(retencion.fechaPago) : null, FMT_DATE],
-      // Observaciones
-      [25, cxc.observaciones ?? ''],
     ]
 
     for (const [col, val, fmt] of cells) {
@@ -1165,7 +1160,7 @@ export async function exportarCxCContable(items: CxCRichRow[]): Promise<void> {
       setBorderData(cell)
     }
 
-    for (const col of [1, 2, 3, 4, 5, 7, 16, 17, 18, 19, 22, 25]) {
+    for (const col of [1, 2, 3, 4, 5, 7, 16, 17, 18, 19, 22]) {
       row.getCell(col).alignment = ALIGN_LEFT
     }
   }
@@ -1195,7 +1190,7 @@ export async function exportarCxCContable(items: CxCRichRow[]): Promise<void> {
   }
 
   ws.views = [{ state: 'frozen', ySplit: 2 }]
-  ws.autoFilter = { from: { row: 2, column: 1 }, to: { row: 2, column: 25 } }
+  ws.autoFilter = { from: { row: 2, column: 1 }, to: { row: 2, column: 24 } }
 
   // ── Hoja 2: Detalle de Pagos ─────────────────────────────────────────────────
   const wsDet = wb.addWorksheet('Detalle de Pagos')
