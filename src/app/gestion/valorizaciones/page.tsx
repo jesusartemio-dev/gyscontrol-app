@@ -639,7 +639,7 @@ export default function ValorizacionesPage() {
 
       {/* ── VISTA POR MES ── */}
       {viewMode === 'meses' && (() => {
-        const maxMonto = Math.max(...mesesData.map(m => m.totalMonto), 1)
+        const maxMonto = Math.max(...mesesData.map(m => m.totalNeto), 1)
         const toggleMes = (mes: string) => setExpandedMeses(prev => {
           const s = new Set(prev); s.has(mes) ? s.delete(mes) : s.add(mes); return s
         })
@@ -653,11 +653,11 @@ export default function ValorizacionesPage() {
                 </div>
               ) : (
                 <div className="divide-y">
-                  {mesesData.map(({ mes, vals, totalMonto, totalNeto }) => {
+                  {mesesData.map(({ mes, vals, totalNeto }) => {
                     const isOpen = expandedMeses.has(mes)
                     const [yr, mo] = mes.split('-')
                     const label = new Date(+yr, +mo - 1, 1).toLocaleDateString('es-PE', { month: 'long', year: 'numeric' })
-                    const pct = totalMonto / maxMonto * 100
+                    const pct = totalNeto / maxMonto * 100
                     // Conteo de estados únicos en el mes
                     const estadoCount: Record<string, number> = {}
                     vals.forEach(v => { if (v.estado !== 'anulada') estadoCount[v.estado] = (estadoCount[v.estado] || 0) + 1 })
@@ -691,8 +691,8 @@ export default function ValorizacionesPage() {
                               </div>
                             </div>
                             <div className="text-right shrink-0 ml-4">
-                              <p className="text-sm font-semibold font-mono">{formatCurrency(totalMonto, 'USD')}</p>
-                              <p className="text-xs text-muted-foreground font-mono">Subtotal {formatCurrency(totalNeto, 'USD')}</p>
+                              <p className="text-sm font-semibold font-mono">{formatCurrency(totalNeto, 'USD')}</p>
+                              <p className="text-xs text-muted-foreground">sin IGV</p>
                             </div>
                           </div>
                         </button>
@@ -794,7 +794,7 @@ export default function ValorizacionesPage() {
                             <div className="text-right shrink-0 ml-4">
                               <p className="text-xs text-muted-foreground">{vals.length} val{vals.length > 1 ? 'es' : ''}</p>
                               <p className="text-sm font-semibold font-mono">{formatCurrency(totalNeto, 'USD')}</p>
-                              <p className="text-[10px] text-muted-foreground">subtotal acum.</p>
+                              <p className="text-[10px] text-muted-foreground">sin IGV</p>
                             </div>
                           </div>
                         </button>
@@ -829,7 +829,7 @@ export default function ValorizacionesPage() {
                     <span className="text-sm font-medium text-muted-foreground">{proyectosData.length} proyecto{proyectosData.length > 1 ? 's' : ''} · {filtered.length} valorizaciones</span>
                     <div className="text-right">
                       {Object.entries(totals.byMoneda).map(([m, t]) => (
-                        <p key={m} className="text-sm font-semibold font-mono">{formatCurrency(t.neto, m)} neto acum.</p>
+                        <p key={m} className="text-sm font-semibold font-mono">{formatCurrency(t.neto, m)} <span className="text-xs font-normal text-muted-foreground">subtotal sin IGV</span></p>
                       ))}
                     </div>
                   </div>
