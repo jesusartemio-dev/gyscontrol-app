@@ -1210,168 +1210,119 @@ export default function ValorizacionEditPage() {
         )
       })()}
 
-      {/* Documentos adjuntos — siempre visibles en todos los estados */}
-      <div className="space-y-3">
+      {/* Documentos adjuntos — panel compacto */}
+      <Card className={['aprobada_cliente', 'hes_pendiente'].includes(val.estado) ? 'border-amber-300' : ''}>
+        <CardContent className="p-0 divide-y">
 
-        {/* Orden de Compra (OC) */}
-        <Card>
-          <CardContent className="p-4 space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <h3 className="font-semibold text-sm flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-violet-600" />
-                  Orden de Compra (OC)
-                </h3>
-                <p className="text-xs text-muted-foreground mt-0.5">Documento OC emitido por el cliente</p>
-              </div>
-              {val.estado !== 'anulada' && (
-                <label className="cursor-pointer shrink-0">
-                  <input type="file" className="sr-only" accept=".pdf,.xlsx,.xls,.docx"
-                    onChange={e => handleUploadAdjunto(e, 'oc')} disabled={uploadingHES} />
-                  <Button size="sm" variant="outline" asChild disabled={uploadingHES}>
-                    <span>
-                      {uploadingHES ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />}
-                      Subir OC
+          {/* Fila OC */}
+          {(() => {
+            const docs = val.adjuntos?.filter(a => a.categoria === 'oc') ?? []
+            return (
+              <div className="flex items-center gap-3 px-4 py-2.5">
+                <FileText className="h-3.5 w-3.5 text-violet-500 shrink-0" />
+                <span className="text-xs font-medium w-28 shrink-0">OC</span>
+                <div className="flex-1 flex flex-wrap gap-1.5 min-w-0">
+                  {docs.length > 0 ? docs.map(adj => (
+                    <span key={adj.id} className="inline-flex items-center gap-1 text-xs bg-emerald-50 border border-emerald-200 rounded px-2 py-0.5 max-w-[200px]">
+                      <a href={adj.urlArchivo ?? '#'} target="_blank" rel="noopener noreferrer" className="truncate hover:underline">{adj.nombreArchivo}</a>
+                      <button onClick={() => handleDeleteAdjunto(adj.id)} className="text-red-400 hover:text-red-600 shrink-0"><Trash2 className="h-3 w-3" /></button>
                     </span>
-                  </Button>
-                </label>
-              )}
-            </div>
-            {val.adjuntos && val.adjuntos.filter(a => a.categoria === 'oc').length > 0 ? (
-              <div className="space-y-1.5">
-                {val.adjuntos.filter(a => a.categoria === 'oc').map(adj => (
-                  <div key={adj.id} className="flex items-center gap-2 text-sm bg-emerald-50 border border-emerald-200 rounded px-3 py-1.5">
-                    <FileText className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                    <a href={adj.urlArchivo ?? '#'} target="_blank" rel="noopener noreferrer" className="flex-1 truncate hover:underline">
-                      {adj.nombreArchivo}
-                    </a>
-                    <Badge className="text-[10px] bg-violet-100 text-violet-700 shrink-0">OC</Badge>
-                    <button onClick={() => handleDeleteAdjunto(adj.id)} className="text-red-400 hover:text-red-600 ml-1">
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground bg-muted/30 border rounded px-3 py-2">
-                No se ha adjuntado la Orden de Compra aún.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Documento de Valorización */}
-        <Card>
-          <CardContent className="p-4 space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <h3 className="font-semibold text-sm flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-blue-600" />
-                  Documento de Valorización
-                </h3>
-                <p className="text-xs text-muted-foreground mt-0.5">Excel o PDF de la valorización enviada al cliente</p>
-              </div>
-              {!['borrador', 'anulada'].includes(val.estado) && (
-                <label className="cursor-pointer shrink-0">
-                  <input type="file" className="sr-only" accept=".pdf,.xlsx,.xls,.docx"
-                    onChange={e => handleUploadAdjunto(e, 'valorizacion')} disabled={uploadingHES} />
-                  <Button size="sm" variant="outline" asChild disabled={uploadingHES}>
-                    <span>
-                      {uploadingHES ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />}
-                      Subir documento
-                    </span>
-                  </Button>
-                </label>
-              )}
-            </div>
-            {val.adjuntos && val.adjuntos.filter(a => a.categoria === 'valorizacion').length > 0 ? (
-              <div className="space-y-1.5">
-                {val.adjuntos.filter(a => a.categoria === 'valorizacion').map(adj => (
-                  <div key={adj.id} className="flex items-center gap-2 text-sm bg-emerald-50 border border-emerald-200 rounded px-3 py-1.5">
-                    <FileText className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                    <a href={adj.urlArchivo ?? '#'} target="_blank" rel="noopener noreferrer" className="flex-1 truncate hover:underline">
-                      {adj.nombreArchivo}
-                    </a>
-                    <Badge className="text-[10px] bg-blue-100 text-blue-700 shrink-0">Valorización</Badge>
-                    <button onClick={() => handleDeleteAdjunto(adj.id)} className="text-red-400 hover:text-red-600 ml-1">
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground bg-muted/30 border rounded px-3 py-2">
-                No se ha adjuntado el documento de valorización aún.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* HES / Guía de Almacén — upload habilitado solo en hes_pendiente */}
-        <Card className={val.estado === 'hes_pendiente' ? 'border-amber-300' : ''}>
-          <CardContent className="p-4 space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <h3 className="font-semibold text-sm flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-amber-600" />
-                  Documentos HES / Guía de Almacén
-                </h3>
-                {val.fechaSolicitudHES && (
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Solicitada el {formatDate(val.fechaSolicitudHES)}
-                    {' · '}{Math.floor((Date.now() - new Date(val.fechaSolicitudHES).getTime()) / 86_400_000)} días
-                  </p>
+                  )) : (
+                    <span className="text-xs text-muted-foreground italic">Sin adjuntos</span>
+                  )}
+                </div>
+                {val.estado !== 'anulada' && (
+                  <label className="cursor-pointer shrink-0">
+                    <input type="file" className="sr-only" accept=".pdf,.xlsx,.xls,.docx" onChange={e => handleUploadAdjunto(e, 'oc')} disabled={uploadingHES} />
+                    <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" asChild disabled={uploadingHES}>
+                      <span><Upload className="h-3 w-3 mr-1" />Subir</span>
+                    </Button>
+                  </label>
                 )}
               </div>
-              {['aprobada_cliente', 'hes_pendiente'].includes(val.estado) && (
-                <div className="flex items-center gap-2 shrink-0">
-                  <label className="cursor-pointer">
-                    <input type="file" className="sr-only" accept=".pdf,.jpg,.jpeg,.png,.docx"
-                      onChange={e => handleUploadAdjunto(e, 'hes')} disabled={uploadingHES} />
-                    <Button size="sm" variant="outline" asChild disabled={uploadingHES}>
-                      <span>{uploadingHES ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />}HES</span>
-                    </Button>
-                  </label>
-                  <label className="cursor-pointer">
-                    <input type="file" className="sr-only" accept=".pdf,.jpg,.jpeg,.png,.docx"
-                      onChange={e => handleUploadAdjunto(e, 'guia_almacen')} disabled={uploadingHES} />
-                    <Button size="sm" variant="outline" asChild disabled={uploadingHES}>
-                      <span><Upload className="h-4 w-4 mr-1" />Guía Almacén</span>
-                    </Button>
-                  </label>
-                </div>
-              )}
-            </div>
-            {val.adjuntos && val.adjuntos.filter(a => ['hes', 'guia_almacen'].includes(a.categoria ?? '')).length > 0 ? (
-              <div className="space-y-1.5">
-                {val.adjuntos.filter(a => ['hes', 'guia_almacen'].includes(a.categoria ?? '')).map(adj => (
-                  <div key={adj.id} className="flex items-center gap-2 text-sm bg-emerald-50 border border-emerald-200 rounded px-3 py-1.5">
-                    <FileText className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                    <a href={adj.urlArchivo ?? '#'} target="_blank" rel="noopener noreferrer" className="flex-1 truncate hover:underline">
-                      {adj.nombreArchivo}
-                    </a>
-                    <Badge className="text-[10px] bg-amber-100 text-amber-700 shrink-0">
-                      {adj.categoria === 'hes' ? 'HES' : 'Guía Almacén'}
-                    </Badge>
-                    <button onClick={() => handleDeleteAdjunto(adj.id)} className="text-red-400 hover:text-red-600 ml-1">
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className={`text-xs rounded px-3 py-2 border ${['aprobada_cliente', 'hes_pendiente'].includes(val.estado) ? 'text-amber-700 bg-amber-50 border-amber-200' : 'text-muted-foreground bg-muted/30'}`}>
-                {val.estado === 'aprobada_cliente'
-                  ? 'Sube el documento HES o Guía de Almacén para poder pasar al estado HES.'
-                  : val.estado === 'hes_pendiente'
-                    ? 'Sin documentos adjuntos. Se requiere HES o Guía de Almacén para poder facturar.'
-                    : 'No hay documentos HES adjuntos aún.'}
-              </p>
-            )}
-          </CardContent>
-        </Card>
+            )
+          })()}
 
-      </div>
+          {/* Fila Valorización */}
+          {(() => {
+            const docs = val.adjuntos?.filter(a => a.categoria === 'valorizacion') ?? []
+            return (
+              <div className="flex items-center gap-3 px-4 py-2.5">
+                <FileText className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                <span className="text-xs font-medium w-28 shrink-0">Valorización</span>
+                <div className="flex-1 flex flex-wrap gap-1.5 min-w-0">
+                  {docs.length > 0 ? docs.map(adj => (
+                    <span key={adj.id} className="inline-flex items-center gap-1 text-xs bg-emerald-50 border border-emerald-200 rounded px-2 py-0.5 max-w-[200px]">
+                      <a href={adj.urlArchivo ?? '#'} target="_blank" rel="noopener noreferrer" className="truncate hover:underline">{adj.nombreArchivo}</a>
+                      <button onClick={() => handleDeleteAdjunto(adj.id)} className="text-red-400 hover:text-red-600 shrink-0"><Trash2 className="h-3 w-3" /></button>
+                    </span>
+                  )) : (
+                    <span className="text-xs text-muted-foreground italic">Sin adjuntos</span>
+                  )}
+                </div>
+                {!['borrador', 'anulada'].includes(val.estado) && (
+                  <label className="cursor-pointer shrink-0">
+                    <input type="file" className="sr-only" accept=".pdf,.xlsx,.xls,.docx" onChange={e => handleUploadAdjunto(e, 'valorizacion')} disabled={uploadingHES} />
+                    <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" asChild disabled={uploadingHES}>
+                      <span><Upload className="h-3 w-3 mr-1" />Subir</span>
+                    </Button>
+                  </label>
+                )}
+              </div>
+            )
+          })()}
+
+          {/* Fila HES / Guía */}
+          {(() => {
+            const docs = val.adjuntos?.filter(a => ['hes', 'guia_almacen'].includes(a.categoria ?? '')) ?? []
+            const canUpload = ['aprobada_cliente', 'hes_pendiente'].includes(val.estado)
+            const needsHES = ['aprobada_cliente', 'hes_pendiente'].includes(val.estado) && docs.length === 0
+            return (
+              <div className={`flex items-center gap-3 px-4 py-2.5 ${needsHES ? 'bg-amber-50/50' : ''}`}>
+                <Clock className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                <span className="text-xs font-medium w-28 shrink-0">
+                  HES / Guía
+                  {val.fechaSolicitudHES && (
+                    <span className="block text-[10px] font-normal text-muted-foreground">
+                      {Math.floor((Date.now() - new Date(val.fechaSolicitudHES).getTime()) / 86_400_000)}d
+                    </span>
+                  )}
+                </span>
+                <div className="flex-1 flex flex-wrap gap-1.5 min-w-0">
+                  {docs.length > 0 ? docs.map(adj => (
+                    <span key={adj.id} className="inline-flex items-center gap-1 text-xs bg-emerald-50 border border-emerald-200 rounded px-2 py-0.5 max-w-[200px]">
+                      <a href={adj.urlArchivo ?? '#'} target="_blank" rel="noopener noreferrer" className="truncate hover:underline">{adj.nombreArchivo}</a>
+                      <Badge className="text-[9px] px-1 bg-amber-100 text-amber-700 shrink-0">{adj.categoria === 'hes' ? 'HES' : 'Guía'}</Badge>
+                      <button onClick={() => handleDeleteAdjunto(adj.id)} className="text-red-400 hover:text-red-600 shrink-0"><Trash2 className="h-3 w-3" /></button>
+                    </span>
+                  )) : (
+                    <span className={`text-xs italic ${needsHES ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                      {needsHES ? 'Requerido para avanzar' : 'Sin adjuntos'}
+                    </span>
+                  )}
+                </div>
+                {canUpload && (
+                  <div className="flex gap-1 shrink-0">
+                    <label className="cursor-pointer">
+                      <input type="file" className="sr-only" accept=".pdf,.jpg,.jpeg,.png,.docx" onChange={e => handleUploadAdjunto(e, 'hes')} disabled={uploadingHES} />
+                      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" asChild disabled={uploadingHES}>
+                        <span><Upload className="h-3 w-3 mr-1" />HES</span>
+                      </Button>
+                    </label>
+                    <label className="cursor-pointer">
+                      <input type="file" className="sr-only" accept=".pdf,.jpg,.jpeg,.png,.docx" onChange={e => handleUploadAdjunto(e, 'guia_almacen')} disabled={uploadingHES} />
+                      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" asChild disabled={uploadingHES}>
+                        <span><Upload className="h-3 w-3 mr-1" />Guía</span>
+                      </Button>
+                    </label>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+
+        </CardContent>
+      </Card>
 
 
       {/* HH detail OR partidas table */}
