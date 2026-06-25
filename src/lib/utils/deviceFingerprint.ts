@@ -38,6 +38,19 @@ function detectarModelo(ua: string, plataforma: string): string | null {
   return null
 }
 
+// Recupera el fingerprint del dispositivo aprobado del usuario desde la DB.
+// Se usa como fallback cuando localStorage se pierde (limpieza de caché, reinstalación).
+async function recuperarFingerprintAprobado(): Promise<string | null> {
+  try {
+    const res = await fetch('/api/asistencia/dispositivos/mi-fingerprint')
+    if (!res.ok) return null
+    const data = await res.json()
+    return data.fingerprint ?? null
+  } catch {
+    return null
+  }
+}
+
 export async function getDeviceInfo(): Promise<DeviceInfo> {
   const ua = navigator.userAgent
   const plataforma = detectarPlataforma(ua)
@@ -57,12 +70,18 @@ export async function getDeviceInfo(): Promise<DeviceInfo> {
   const modelo = modeloUaCh || detectarModelo(ua, plataforma)
   const resolucion = `${screen.width}x${screen.height}`
 
-  // ID estable generado una vez y persistido en localStorage.
-  // A diferencia del fingerprint basado en UA/resolución, sobrevive actualizaciones
-  // del browser y rotaciones de pantalla. Solo cambia si el usuario borra datos del browser.
   let fingerprint = localStorage.getItem(STORAGE_KEY)
+
   if (!fingerprint) {
-    fingerprint = crypto.randomUUID()
+    // Intentar recuperar el fingerprint aprobado desde la DB antes de generar uno nuevo.
+    // Esto evita que limpiar el caché del navegador registre el mismo teléfono como
+    // un dispositivo diferente cada vez.
+    const recuperado = await recuperarFingerprintAprobado()
+    if (recuperado) {
+      fingerprint = recuperado
+    } else {
+      fingerprint = crypto.randomUUID()
+    }
     localStorage.setItem(STORAGE_KEY, fingerprint)
   }
 

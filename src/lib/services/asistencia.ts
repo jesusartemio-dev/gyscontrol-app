@@ -115,7 +115,7 @@ export async function upsertDispositivo(params: {
       where: { id: existente.id },
       data: { ultimaVez: new Date() },
     })
-    return { dispositivoId: existente.id, eraNuevo: !existente.aprobado }
+    return { dispositivoId: existente.id, eraNuevo: false }
   }
   const creado = await prisma.dispositivo.create({
     data: {

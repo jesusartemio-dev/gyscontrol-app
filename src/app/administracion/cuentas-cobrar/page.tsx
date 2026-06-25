@@ -236,6 +236,7 @@ export default function CuentasCobrarPage() {
   const [editForm, setEditForm] = useState({
     numeroDocumento: '',
     descripcion: '',
+    fechaEmision: '',
     fechaRecepcion: '',
     diasCredito: '',
     tipoCambio: '',
@@ -505,6 +506,7 @@ export default function CuentasCobrarPage() {
     setEditForm({
       numeroDocumento: cuenta.numeroDocumento ?? '',
       descripcion: cuenta.descripcion ?? '',
+      fechaEmision: cuenta.fechaEmision ? cuenta.fechaEmision.split('T')[0] : '',
       fechaRecepcion: cuenta.fechaRecepcion ? cuenta.fechaRecepcion.split('T')[0] : '',
       diasCredito: cuenta.diasCredito != null ? String(cuenta.diasCredito) : '',
       tipoCambio: cuenta.tipoCambio != null ? String(cuenta.tipoCambio) : '',
@@ -537,6 +539,7 @@ export default function CuentasCobrarPage() {
         body: JSON.stringify({
           numeroDocumento: editForm.numeroDocumento || null,
           descripcion: editForm.descripcion || null,
+          fechaEmision: editForm.fechaEmision || null,
           fechaRecepcion: editForm.fechaRecepcion || null,
           diasCredito,
           tipoCambio,
@@ -1627,8 +1630,8 @@ export default function CuentasCobrarPage() {
               <div className="flex justify-between"><span className="text-muted-foreground">Cliente</span><span>{editCuenta?.cliente?.nombre}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Proyecto</span><span className="font-mono">{editCuenta?.proyecto?.codigo}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Monto</span><span className="font-mono">{editCuenta && formatCurrency(editCuenta.monto, editCuenta.moneda)}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Emisión / Vencimiento</span><span>{editCuenta && `${formatDate(editCuenta.fechaEmision)} → ${formatDate(editCuenta.fechaVencimiento)}`}</span></div>
-              <div className="text-muted-foreground italic pt-1">Cliente, proyecto, monto y fechas base no son editables. Para cambiarlos, anula y crea una nueva.</div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Vencimiento</span><span>{editCuenta && formatDate(editCuenta.fechaVencimiento)}</span></div>
+              <div className="text-muted-foreground italic pt-1">Cliente, proyecto, monto y fecha de vencimiento no son editables. Para cambiarlos, anula y crea una nueva.</div>
             </div>
 
             <div>
@@ -1637,23 +1640,27 @@ export default function CuentasCobrarPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Fecha Recepción</Label>
-                <Input type="date" value={editForm.fechaRecepcion} onChange={e => setEditForm(f => ({ ...f, fechaRecepcion: e.target.value }))} />
+                <Label>Fecha de Emisión</Label>
+                <Input type="date" value={editForm.fechaEmision} onChange={e => setEditForm(f => ({ ...f, fechaEmision: e.target.value }))} />
               </div>
               <div>
-                <Label>Días Crédito</Label>
-                <Input type="number" placeholder="30" value={editForm.diasCredito} onChange={e => setEditForm(f => ({ ...f, diasCredito: e.target.value }))} />
+                <Label>Fecha Recepción</Label>
+                <Input type="date" value={editForm.fechaRecepcion} onChange={e => setEditForm(f => ({ ...f, fechaRecepcion: e.target.value }))} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
+                <Label>Días Crédito</Label>
+                <Input type="number" placeholder="30" value={editForm.diasCredito} onChange={e => setEditForm(f => ({ ...f, diasCredito: e.target.value }))} />
+              </div>
+              <div>
                 <Label>Tipo Cambio</Label>
                 <Input type="number" step="0.001" placeholder="3.800" value={editForm.tipoCambio} onChange={e => setEditForm(f => ({ ...f, tipoCambio: e.target.value }))} />
               </div>
-              <div>
-                <Label>Orden de Compra (cliente)</Label>
-                <Input placeholder="8070008797" value={editForm.ordenCompraCliente} onChange={e => setEditForm(f => ({ ...f, ordenCompraCliente: e.target.value }))} />
-              </div>
+            </div>
+            <div>
+              <Label>Orden de Compra (cliente)</Label>
+              <Input placeholder="8070008797" value={editForm.ordenCompraCliente} onChange={e => setEditForm(f => ({ ...f, ordenCompraCliente: e.target.value }))} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
