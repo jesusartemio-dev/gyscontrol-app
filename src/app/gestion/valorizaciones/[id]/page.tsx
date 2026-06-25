@@ -173,7 +173,7 @@ const ROLES_TRANSICION_CLIENT: Record<string, string[]> = {
   'corregida→enviada':              ['gestor', 'coordinador', 'gerente', 'admin'],
   'corregida→anulada':              ['gerente', 'admin'],
   'aprobada_cliente→hes_pendiente': ['gestor', 'coordinador', 'gerente', 'administracion', 'admin'],
-  'aprobada_cliente→enviada':       ['gerente', 'admin'],
+  'aprobada_cliente→enviada':       ['gestor', 'coordinador', 'gerente', 'admin'],
   'aprobada_cliente→anulada':       ['gerente', 'admin'],
   'hes_pendiente→facturada':        ['gerente', 'administracion', 'admin'],
   'hes_pendiente→aprobada_cliente': ['gerente', 'administracion', 'admin'],
