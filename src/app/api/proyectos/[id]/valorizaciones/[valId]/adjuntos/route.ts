@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { prisma } from '@/lib/prisma'
 import { authOptions } from '@/lib/auth'
-import { uploadFile, getSharedDriveId } from '@/lib/services/googleDrive'
+import { uploadFile, getAdminDriveId, getOrCreateFolder } from '@/lib/services/googleDrive'
 
 type Ctx = { params: Promise<{ id: string; valId: string }> }
 
@@ -27,7 +27,15 @@ export async function POST(request: NextRequest, { params }: Ctx) {
     if (file.size > 20 * 1024 * 1024) return NextResponse.json({ error: 'El archivo supera el límite de 20 MB' }, { status: 400 })
 
     const buffer = Buffer.from(await file.arrayBuffer())
-    const folderId = process.env.GOOGLE_VALORIZACIONES_FOLDER_ID ?? getSharedDriveId()
+
+    // Enrutar a subcarpeta del Admin Drive según categoría
+    const adminDriveId = getAdminDriveId()
+    const hesCategories = ['hes', 'guia_almacen']
+    const folderName = hesCategories.includes(categoria) ? 'HES' : 'Valorizaciones'
+    const envFolderId = hesCategories.includes(categoria)
+      ? process.env.GOOGLE_HES_FOLDER_ID
+      : process.env.GOOGLE_VALORIZACIONES_FOLDER_ID
+    const folderId = envFolderId ?? await getOrCreateFolder(adminDriveId, folderName, adminDriveId)
 
     const driveFile = await uploadFile({
       folderId,

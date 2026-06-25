@@ -204,3 +204,56 @@ export async function createFolder(options: {
 
   return res.data
 }
+
+/**
+ * Busca una subcarpeta por nombre exacto dentro de parentId.
+ * Si no existe, la crea. Devuelve el ID de la carpeta.
+ * driveId debe ser el ID del Shared Drive que contiene parentId.
+ */
+export async function getOrCreateFolder(parentId: string, folderName: string, driveId: string): Promise<string> {
+  const drive = getDriveClient()
+
+  const res = await drive.files.list({
+    q: `'${parentId}' in parents and name = '${folderName.replace(/'/g, "\\'")}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
+    fields: 'files(id, name)',
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
+    driveId,
+    corpora: 'drive',
+    pageSize: 1,
+  })
+
+  if (res.data.files && res.data.files.length > 0) {
+    return res.data.files[0].id!
+  }
+
+  const folder = await createFolder({ parentId, folderName })
+  return folder.id!
+}
+
+/**
+ * Copia un archivo a una carpeta destino (funciona entre Shared Drives).
+ * Devuelve el ID y webViewLink del archivo copiado.
+ */
+export async function copyFile(
+  fileId: string,
+  targetFolderId: string,
+  newName?: string,
+): Promise<{ id: string; webViewLink: string }> {
+  const drive = getDriveClient()
+
+  const res = await drive.files.copy({
+    fileId,
+    supportsAllDrives: true,
+    requestBody: {
+      parents: [targetFolderId],
+      ...(newName ? { name: newName } : {}),
+    },
+    fields: 'id, webViewLink',
+  })
+
+  return {
+    id: res.data.id!,
+    webViewLink: res.data.webViewLink!,
+  }
+}
