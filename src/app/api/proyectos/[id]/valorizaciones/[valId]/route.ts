@@ -234,7 +234,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
               moneda: existing.moneda,
               tipoCambio: existing.tipoCambio,
               saldoPendiente: existing.netoARecibir,
-              fechaEmision: new Date(),
+              fechaEmision: body.fechaEmision ? new Date(body.fechaEmision) : new Date(),
               fechaVencimiento: body.fechaVencimiento
                 ? new Date(body.fechaVencimiento)
                 : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // +30 días default
@@ -298,12 +298,13 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       calculados.adelantoMonto = adelantoMontoOverride
     }
 
-    // Bloqueo: condiciones de pago no editables si la valorización está en estado final
-    // (ya facturada, pagada, aprobada_cliente o anulada). Solo editables en borrador/enviada/observada/corregida.
+    // Bloqueo: condiciones de pago no editables si la valorización está en estado final.
+    // No aplica cuando hay transición de estado (ej: al facturar se envían condicionPago para la CxC).
     const ESTADOS_PAGO_BLOQUEADOS = ['aprobada_cliente', 'hes_pendiente', 'facturada', 'pagada', 'anulada']
     const tocaPago = body.condicionPago !== undefined || body.formaPago !== undefined
                   || body.diasCredito !== undefined || body.notasPago !== undefined
-    if (tocaPago && ESTADOS_PAGO_BLOQUEADOS.includes(existing.estado)) {
+    const hayTransicion = body.estado && body.estado !== existing.estado
+    if (tocaPago && !hayTransicion && ESTADOS_PAGO_BLOQUEADOS.includes(existing.estado)) {
       const cambiaCampoPago =
         (body.condicionPago !== undefined && body.condicionPago !== existing.condicionPago) ||
         (body.formaPago !== undefined && body.formaPago !== existing.formaPago) ||

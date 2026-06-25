@@ -49,6 +49,8 @@ interface Valorizacion {
   fechaEnvio: string | null
   fechaAprobacion: string | null
   observaciones: string | null
+  numeroHES: string | null
+  numeroGuiaRemision: string | null
   createdAt: string
   updatedAt: string
   proyecto?: Proyecto
@@ -165,11 +167,10 @@ export default function FacturacionPage() {
   const [showFacturarDialog, setShowFacturarDialog] = useState(false)
   const [facturarTarget, setFacturarTarget] = useState<Valorizacion | null>(null)
   const [numFactura, setNumFactura] = useState('')
+  const [fechaEmisionFactura, setFechaEmisionFactura] = useState('')
   const [fechaVencimiento, setFechaVencimiento] = useState('')
   const [factCondicionPago, setFactCondicionPago] = useState('contado')
   const [factDiasCredito, setFactDiasCredito] = useState<number | ''>('')
-  const [factMetodoPago, setFactMetodoPago] = useState('')
-  const [factBancoFinanciera, setFactBancoFinanciera] = useState('')
 
   // Registrar HES dialog
   const [showHESDialog, setShowHESDialog] = useState(false)
@@ -325,9 +326,12 @@ export default function FacturacionPage() {
   const openFacturar = (val: Valorizacion) => {
     setFacturarTarget(val)
     setNumFactura('')
+    setFechaEmisionFactura(new Date().toISOString().split('T')[0])
     const venc = new Date()
     venc.setDate(venc.getDate() + 30)
     setFechaVencimiento(venc.toISOString().split('T')[0])
+    setFactCondicionPago('contado')
+    setFactDiasCredito('')
     setShowFacturarDialog(true)
   }
 
@@ -347,11 +351,10 @@ export default function FacturacionPage() {
           estado: 'facturada',
           crearCuentaCobrar: true,
           numeroDocumento: numFactura.trim(),
+          fechaEmision: fechaEmisionFactura || undefined,
           fechaVencimiento,
           condicionPago: factCondicionPago,
           diasCredito: factCondicionPago === 'credito' && factDiasCredito ? Number(factDiasCredito) : undefined,
-          metodoPago: factMetodoPago || undefined,
-          bancoFinanciera: factBancoFinanciera || undefined,
         }),
       })
       if (!res.ok) throw new Error()
@@ -763,18 +766,34 @@ export default function FacturacionPage() {
             <div className="space-y-4">
               <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-sm">
                 <div className="flex justify-between mb-1">
-                  <span className="text-muted-foreground">Monto Neto a Recibir</span>
-                  <span className="font-mono font-bold text-purple-700">{formatCurrency(facturarTarget.netoARecibir, facturarTarget.moneda)}</span>
+                  <span className="text-muted-foreground">Subtotal sin IGV</span>
+                  <span className="font-mono font-bold text-purple-700">{formatCurrency(facturarTarget.subtotal, facturarTarget.moneda)}</span>
                 </div>
-                <p className="text-xs text-muted-foreground">Se creará automáticamente una Cuenta por Cobrar por este monto.</p>
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Neto a Recibir (con IGV)</span>
+                  <span className="font-mono">{formatCurrency(facturarTarget.netoARecibir, facturarTarget.moneda)}</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Se creará automáticamente una Cuenta por Cobrar por el monto neto.</p>
               </div>
+              {(facturarTarget.numeroHES || facturarTarget.numeroGuiaRemision) && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-sm flex justify-between items-center">
+                  <span className="text-amber-700 font-medium">HES / Conformidad</span>
+                  <span className="font-mono text-amber-800">{facturarTarget.numeroHES || facturarTarget.numeroGuiaRemision}</span>
+                </div>
+              )}
               <div>
                 <Label>N° Factura *</Label>
                 <Input placeholder="F001-00123" value={numFactura} onChange={e => setNumFactura(e.target.value)} />
               </div>
-              <div>
-                <Label>Fecha Vencimiento CxC</Label>
-                <Input type="date" value={fechaVencimiento} onChange={e => setFechaVencimiento(e.target.value)} />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Fecha de Emisión</Label>
+                  <Input type="date" value={fechaEmisionFactura} onChange={e => setFechaEmisionFactura(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Fecha Vencimiento CxC</Label>
+                  <Input type="date" value={fechaVencimiento} onChange={e => setFechaVencimiento(e.target.value)} />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -793,24 +812,6 @@ export default function FacturacionPage() {
                     <Input type="number" min={1} placeholder="30" value={factDiasCredito} onChange={e => setFactDiasCredito(e.target.value ? Number(e.target.value) : '')} />
                   </div>
                 )}
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>Método de Pago</Label>
-                  <Select value={factMetodoPago} onValueChange={setFactMetodoPago}>
-                    <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="transferencia">Transferencia</SelectItem>
-                      <SelectItem value="cheque">Cheque</SelectItem>
-                      <SelectItem value="letra">Letra</SelectItem>
-                      <SelectItem value="factura_negociable">Factura Negociable</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Banco / Financiera</Label>
-                  <Input placeholder="Ej: BCP, BBVA..." value={factBancoFinanciera} onChange={e => setFactBancoFinanciera(e.target.value)} />
-                </div>
               </div>
             </div>
           )}
