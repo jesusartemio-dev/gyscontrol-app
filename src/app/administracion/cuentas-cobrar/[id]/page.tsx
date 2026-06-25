@@ -615,102 +615,6 @@ export default function CxCDetallePage() {
             </CardHeader>
             <CardContent className="space-y-4">
 
-              {/* Formulario de pago */}
-              {showPagoForm && (
-                <div className="border rounded-lg p-4 bg-gray-50 space-y-4">
-                  <p className="text-sm font-semibold">Nuevo Pago</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label>Monto ({cxc.moneda})</Label>
-                      <Input type="number" step="0.01" placeholder="0.00"
-                        value={pagoMonto} onChange={e => setPagoMonto(e.target.value)} />
-                    </div>
-                    <div>
-                      <Label>Fecha de Pago</Label>
-                      <Input type="date" value={pagoFecha} onChange={e => setPagoFecha(e.target.value)} />
-                    </div>
-                    <div>
-                      <Label>Medio de Pago</Label>
-                      <Select value={pagoMedio} onValueChange={setPagoMedio}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {MEDIO_PAGO_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>N° Operación</Label>
-                      <Input placeholder="Op-00123" value={pagoOperacion} onChange={e => setPagoOperacion(e.target.value)} />
-                    </div>
-                    <div>
-                      <Label>Cuenta Bancaria</Label>
-                      <Select value={pagoBancoId} onValueChange={setPagoBancoId}>
-                        <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">— Sin cuenta —</SelectItem>
-                          {bancos.map(b => <SelectItem key={b.id} value={b.id}>{b.nombreBanco} {b.numeroCuenta}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>Observaciones</Label>
-                      <Input placeholder="Opcional" value={pagoObs} onChange={e => setPagoObs(e.target.value)} />
-                    </div>
-                  </div>
-
-                  {/* Detracción */}
-                  <div className="flex items-center gap-2">
-                    <Checkbox id="det" checked={conDetraccion} onCheckedChange={v => {
-                      setConDetraccion(!!v)
-                      if (!!v && detBancoId === 'none') {
-                        const bn = bancos.find(b => b.nombreBanco.toLowerCase().includes('nacion') || b.nombreBanco.toLowerCase().includes('nación'))
-                        if (bn) setDetBancoId(bn.id)
-                      }
-                    }} />
-                    <Label htmlFor="det" className="cursor-pointer">Incluye Detracción</Label>
-                  </div>
-                  {conDetraccion && (
-                    <div className="grid grid-cols-2 gap-3 pl-6">
-                      <div><Label>% Detracción</Label><Input type="number" value={detPct} onChange={e => setDetPct(e.target.value)} /></div>
-                      <div><Label>Código</Label><Input placeholder="011" value={detCodigo} onChange={e => setDetCodigo(e.target.value)} /></div>
-                      <div><Label>Fecha Depósito</Label><Input type="date" value={detFecha} onChange={e => setDetFecha(e.target.value)} /></div>
-                      <div><Label>Nro. Constancia BN</Label><Input value={detConstancia} onChange={e => setDetConstancia(e.target.value)} /></div>
-                      <div className="col-span-2">
-                        <Label>Cuenta BN</Label>
-                        <Select value={detBancoId} onValueChange={setDetBancoId}>
-                          <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">— Sin cuenta —</SelectItem>
-                            {bancos.map(b => <SelectItem key={b.id} value={b.id}>{b.nombreBanco} {b.numeroCuenta}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Retención */}
-                  <div className="flex items-center gap-2">
-                    <Checkbox id="ret" checked={conRetencion} onCheckedChange={v => setConRetencion(!!v)} />
-                    <Label htmlFor="ret" className="cursor-pointer">Incluye Retención</Label>
-                  </div>
-                  {conRetencion && (
-                    <div className="grid grid-cols-2 gap-3 pl-6">
-                      <div><Label>% Retención</Label><Input type="number" value={retPct} onChange={e => setRetPct(e.target.value)} /></div>
-                      <div><Label>Fecha</Label><Input type="date" value={retFecha} onChange={e => setRetFecha(e.target.value)} /></div>
-                      <div className="col-span-2"><Label>Nro. Constancia</Label><Input value={retConstancia} onChange={e => setRetConstancia(e.target.value)} /></div>
-                    </div>
-                  )}
-
-                  <div className="flex gap-2 justify-end">
-                    <Button variant="outline" onClick={() => setShowPagoForm(false)}>Cancelar</Button>
-                    <Button onClick={handlePago} disabled={savingPago}>
-                      {savingPago ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
-                      Guardar Pago
-                    </Button>
-                  </div>
-                </div>
-              )}
-
               {/* Lista de pagos */}
               {cxc.pagos.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4">Sin pagos registrados</p>
@@ -1055,6 +959,114 @@ export default function CxCDetallePage() {
           )}
         </div>
       </div>
+
+      {/* ── Dialog Registrar Pago ── */}
+      <Dialog open={showPagoForm} onOpenChange={open => {
+        if (!open) { setShowPagoForm(false); setConDetraccion(false); setConRetencion(false) }
+      }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Registrar Pago</DialogTitle>
+            <DialogDescription>
+              {cxc.numeroDocumento} · Saldo: {formatCurrency(cxc.saldoPendiente, cxc.moneda)}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Monto ({cxc.moneda})</Label>
+                <Input type="number" step="0.01" placeholder="0.00"
+                  value={pagoMonto} onChange={e => setPagoMonto(e.target.value)} />
+              </div>
+              <div>
+                <Label>Fecha de Pago</Label>
+                <Input type="date" value={pagoFecha} onChange={e => setPagoFecha(e.target.value)} />
+              </div>
+              <div>
+                <Label>Medio de Pago</Label>
+                <Select value={pagoMedio} onValueChange={setPagoMedio}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {MEDIO_PAGO_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>N° Operación</Label>
+                <Input placeholder="Op-00123" value={pagoOperacion} onChange={e => setPagoOperacion(e.target.value)} />
+              </div>
+              <div className="col-span-2">
+                <Label>Cuenta Bancaria</Label>
+                <Select value={pagoBancoId} onValueChange={setPagoBancoId}>
+                  <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— Sin cuenta —</SelectItem>
+                    {bancos.map(b => <SelectItem key={b.id} value={b.id}>{b.nombreBanco} · {b.numeroCuenta}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="col-span-2">
+                <Label>Observaciones</Label>
+                <Input placeholder="Opcional" value={pagoObs} onChange={e => setPagoObs(e.target.value)} />
+              </div>
+            </div>
+
+            {/* Detracción */}
+            <div className="border-t pt-3 space-y-3">
+              <div className="flex items-center gap-2">
+                <Checkbox id="det-dlg" checked={conDetraccion} onCheckedChange={v => {
+                  setConDetraccion(!!v)
+                  if (!!v && detBancoId === 'none') {
+                    const bn = bancos.find(b => b.nombreBanco.toLowerCase().includes('nacion') || b.nombreBanco.toLowerCase().includes('nación'))
+                    if (bn) setDetBancoId(bn.id)
+                  }
+                }} />
+                <Label htmlFor="det-dlg" className="cursor-pointer font-medium">¿Incluye Detracción?</Label>
+              </div>
+              {conDetraccion && (
+                <div className="grid grid-cols-2 gap-3 pl-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div><Label className="text-xs">% Detracción</Label><Input type="number" value={detPct} onChange={e => setDetPct(e.target.value)} /></div>
+                  <div><Label className="text-xs">Código SUNAT</Label><Input placeholder="011" value={detCodigo} onChange={e => setDetCodigo(e.target.value)} /></div>
+                  <div><Label className="text-xs">Fecha Depósito BN</Label><Input type="date" value={detFecha} onChange={e => setDetFecha(e.target.value)} /></div>
+                  <div><Label className="text-xs">N° Constancia BN</Label><Input value={detConstancia} onChange={e => setDetConstancia(e.target.value)} /></div>
+                  <div className="col-span-2">
+                    <Label className="text-xs">Cuenta Banco de la Nación</Label>
+                    <Select value={detBancoId} onValueChange={setDetBancoId}>
+                      <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">— Sin cuenta —</SelectItem>
+                        {bancos.map(b => <SelectItem key={b.id} value={b.id}>{b.nombreBanco} · {b.numeroCuenta}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Retención */}
+            <div className="border-t pt-3 space-y-3">
+              <div className="flex items-center gap-2">
+                <Checkbox id="ret-dlg" checked={conRetencion} onCheckedChange={v => setConRetencion(!!v)} />
+                <Label htmlFor="ret-dlg" className="cursor-pointer font-medium">¿Incluye Retención?</Label>
+              </div>
+              {conRetencion && (
+                <div className="grid grid-cols-2 gap-3 pl-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                  <div><Label className="text-xs">% Retención</Label><Input type="number" value={retPct} onChange={e => setRetPct(e.target.value)} /></div>
+                  <div><Label className="text-xs">Fecha</Label><Input type="date" value={retFecha} onChange={e => setRetFecha(e.target.value)} /></div>
+                  <div className="col-span-2"><Label className="text-xs">N° Constancia</Label><Input value={retConstancia} onChange={e => setRetConstancia(e.target.value)} /></div>
+                </div>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPagoForm(false)}>Cancelar</Button>
+            <Button onClick={handlePago} disabled={savingPago}>
+              {savingPago ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
+              Guardar Pago
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Dialog Editar ── */}
       <Dialog open={showEditForm} onOpenChange={setShowEditForm}>
