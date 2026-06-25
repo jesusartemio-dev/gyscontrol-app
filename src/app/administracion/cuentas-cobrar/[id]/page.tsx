@@ -11,7 +11,8 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Loader2, ArrowLeft, Pencil, Save, Plus, Trash2, ExternalLink, DollarSign, Building2, ChevronDown, ChevronUp } from 'lucide-react'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Loader2, ArrowLeft, Pencil, Save, Plus, Trash2, ExternalLink, DollarSign, Building2, ChevronDown, ChevronUp, Ban, AlertTriangle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
 
@@ -165,6 +166,19 @@ export default function CxCDetallePage() {
   const [retConstancia, setRetConstancia]   = useState('')
   const [savingPago, setSavingPago]         = useState(false)
 
+  // ── Editar datos ─────────────────────────────────────────────────────────
+  const [showEditForm, setShowEditForm] = useState(false)
+  const [editForm, setEditForm] = useState({
+    numeroDocumento: '', descripcion: '', fechaEmision: '', fechaRecepcion: '',
+    diasCredito: '', tipoCambio: '', ordenCompraCliente: '', numeroHES: '',
+    numeroGuiaRemision: '', bancoFinanciera: '', numeroNegociacion: '', observaciones: '',
+  })
+  const [savingEdit, setSavingEdit] = useState(false)
+
+  // ── Anular / Eliminar ────────────────────────────────────────────────────
+  const [confirmAction, setConfirmAction] = useState<'anular' | 'eliminar' | null>(null)
+  const [savingAction, setSavingAction] = useState(false)
+
   // ── Cobro / Factoring ────────────────────────────────────────────────────
   const [showCobroForm, setShowCobroForm]   = useState(false)
   const [cobroTipo, setCobroTipo]           = useState<'factoring' | 'directo'>('factoring')
@@ -212,6 +226,21 @@ export default function CxCDetallePage() {
         const b = await bancosRes.json()
         setBancos(b.filter((x: any) => x.activa))
       }
+      // Populate edit form
+      setEditForm({
+        numeroDocumento: data.numeroDocumento ?? '',
+        descripcion: data.descripcion ?? '',
+        fechaEmision: data.fechaEmision ? data.fechaEmision.split('T')[0] : '',
+        fechaRecepcion: data.fechaRecepcion ? data.fechaRecepcion.split('T')[0] : '',
+        diasCredito: data.diasCredito != null ? String(data.diasCredito) : '',
+        tipoCambio: data.tipoCambio != null ? String(data.tipoCambio) : '',
+        ordenCompraCliente: data.ordenCompraCliente ?? '',
+        numeroHES: data.numeroHES ?? '',
+        numeroGuiaRemision: data.numeroGuiaRemision ?? '',
+        bancoFinanciera: data.bancoFinanciera ?? '',
+        numeroNegociacion: data.numeroNegociacion ?? '',
+        observaciones: data.observaciones ?? '',
+      })
       // Populate cobro form if exists
       const cobro = data.valorizacion?.cobro
       if (cobro) {
@@ -395,6 +424,75 @@ export default function CxCDetallePage() {
     }
   }
 
+  const handleSaveEdit = async () => {
+    if (!cxc) return
+    const tipoCambio = editForm.tipoCambio ? parseFloat(editForm.tipoCambio) : null
+    if (editForm.tipoCambio && (isNaN(tipoCambio!) || tipoCambio! <= 0)) { toast.error('Tipo de cambio inválido'); return }
+    const diasCredito = editForm.diasCredito ? parseInt(editForm.diasCredito, 10) : null
+    if (editForm.diasCredito && (isNaN(diasCredito!) || diasCredito! < 0)) { toast.error('Días de crédito inválidos'); return }
+    setSavingEdit(true)
+    try {
+      const res = await fetch(`/api/administracion/cuentas-cobrar/${cxc.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          numeroDocumento: editForm.numeroDocumento || null,
+          descripcion: editForm.descripcion || null,
+          fechaEmision: editForm.fechaEmision || null,
+          fechaRecepcion: editForm.fechaRecepcion || null,
+          diasCredito, tipoCambio,
+          ordenCompraCliente: editForm.ordenCompraCliente || null,
+          numeroHES: editForm.numeroHES || null,
+          numeroGuiaRemision: editForm.numeroGuiaRemision || null,
+          bancoFinanciera: editForm.bancoFinanciera || null,
+          numeroNegociacion: editForm.numeroNegociacion || null,
+          observaciones: editForm.observaciones || null,
+        }),
+      })
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Error') }
+      toast.success('CxC actualizada')
+      setShowEditForm(false)
+      load()
+    } catch (e: any) {
+      toast.error(e.message || 'Error al actualizar')
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
+  const handleAnular = async () => {
+    if (!cxc) return
+    setSavingAction(true)
+    try {
+      const res = await fetch(`/api/administracion/cuentas-cobrar/${cxc.id}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estado: 'anulada' }),
+      })
+      if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Error') }
+      toast.success('CxC anulada')
+      setConfirmAction(null)
+      load()
+    } catch (e: any) {
+      toast.error(e.message || 'Error al anular')
+    } finally {
+      setSavingAction(false)
+    }
+  }
+
+  const handleEliminar = async () => {
+    if (!cxc) return
+    setSavingAction(true)
+    try {
+      const res = await fetch(`/api/administracion/cuentas-cobrar/${cxc.id}`, { method: 'DELETE' })
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Error') }
+      toast.success('CxC eliminada')
+      router.push('/administracion/cuentas-cobrar')
+    } catch (e: any) {
+      toast.error(e.message || 'Error al eliminar')
+      setSavingAction(false)
+    }
+  }
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   if (loading) {
@@ -425,7 +523,7 @@ export default function CxCDetallePage() {
     <div className="space-y-6 p-6 max-w-6xl mx-auto">
 
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between flex-wrap gap-3">
         <div className="flex items-start gap-3">
           <Button variant="ghost" size="sm" onClick={() => router.push('/administracion/cuentas-cobrar')}>
             <ArrowLeft className="h-4 w-4 mr-1" /> Volver
@@ -435,9 +533,33 @@ export default function CxCDetallePage() {
             <p className="text-muted-foreground">{cxc.cliente.nombre} · {cxc.proyecto.codigo}</p>
           </div>
         </div>
-        <Badge className={`${ESTADO_COLORS[cxc.estado] ?? 'bg-gray-100 text-gray-700'} text-sm px-3 py-1`}>
-          {cxc.estado.charAt(0).toUpperCase() + cxc.estado.slice(1)}
-        </Badge>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge className={`${ESTADO_COLORS[cxc.estado] ?? 'bg-gray-100 text-gray-700'} text-sm px-3 py-1`}>
+            {cxc.estado.charAt(0).toUpperCase() + cxc.estado.slice(1)}
+          </Badge>
+          {cxc.estado !== 'anulada' && (
+            <Button variant="outline" size="sm" onClick={() => setShowEditForm(v => !v)}>
+              <Pencil className="h-4 w-4 mr-1" /> Editar
+            </Button>
+          )}
+          {(cxc.estado === 'pendiente' || cxc.estado === 'parcial' || cxc.estado === 'vencida') && (
+            <Button size="sm" onClick={() => setShowPagoForm(v => !v)}>
+              <Plus className="h-4 w-4 mr-1" /> Registrar Pago
+            </Button>
+          )}
+          {cxc.estado !== 'anulada' && (
+            <Button variant="outline" size="sm" className="text-amber-700 border-amber-300 hover:bg-amber-50"
+              onClick={() => setConfirmAction('anular')}>
+              <Ban className="h-4 w-4 mr-1" /> Anular
+            </Button>
+          )}
+          {(cxc.estado === 'anulada' || (cxc.montoPagado === 0 && cxc.estado !== 'pagada')) && (
+            <Button variant="outline" size="sm" className="text-red-600 border-red-300 hover:bg-red-50"
+              onClick={() => setConfirmAction('eliminar')}>
+              <Trash2 className="h-4 w-4 mr-1" /> Eliminar
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -487,16 +609,9 @@ export default function CxCDetallePage() {
           {/* Historial de Pagos */}
           <Card>
             <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <DollarSign className="h-4 w-4 text-muted-foreground" /> Historial de Pagos
-                </CardTitle>
-                {cxc.estado !== 'pagada' && cxc.estado !== 'anulada' && (
-                  <Button size="sm" onClick={() => setShowPagoForm(v => !v)}>
-                    <Plus className="h-4 w-4 mr-1" /> Registrar Pago
-                  </Button>
-                )}
-              </div>
+              <CardTitle className="text-base flex items-center gap-2">
+                <DollarSign className="h-4 w-4 text-muted-foreground" /> Historial de Pagos
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
 
@@ -940,6 +1055,91 @@ export default function CxCDetallePage() {
           )}
         </div>
       </div>
+
+      {/* ── Dialog Editar ── */}
+      <Dialog open={showEditForm} onOpenChange={setShowEditForm}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar Datos</DialogTitle>
+            <DialogDescription>{cxc.numeroDocumento || 'Sin documento'} — {cxc.cliente.nombre}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 text-sm">
+            <div className="p-3 bg-muted/50 border rounded text-xs space-y-0.5">
+              <div className="flex justify-between"><span className="text-muted-foreground">Monto</span><span className="font-mono font-bold">{formatCurrency(cxc.monto, cxc.moneda)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Vencimiento</span><span>{formatDate(cxc.fechaVencimiento)}</span></div>
+              <p className="text-muted-foreground italic pt-1">Monto, moneda y vencimiento no son editables. Para cambiarlos, anula y crea una nueva.</p>
+            </div>
+            <div>
+              <Label>N° Documento</Label>
+              <Input placeholder="F001-00123" value={editForm.numeroDocumento} onChange={e => setEditForm(f => ({ ...f, numeroDocumento: e.target.value }))} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label>Fecha Emisión</Label><Input type="date" value={editForm.fechaEmision} onChange={e => setEditForm(f => ({ ...f, fechaEmision: e.target.value }))} /></div>
+              <div><Label>Fecha Recepción</Label><Input type="date" value={editForm.fechaRecepcion} onChange={e => setEditForm(f => ({ ...f, fechaRecepcion: e.target.value }))} /></div>
+              <div><Label>Días Crédito</Label><Input type="number" placeholder="30" value={editForm.diasCredito} onChange={e => setEditForm(f => ({ ...f, diasCredito: e.target.value }))} /></div>
+              <div><Label>Tipo Cambio</Label><Input type="number" step="0.001" placeholder="3.800" value={editForm.tipoCambio} onChange={e => setEditForm(f => ({ ...f, tipoCambio: e.target.value }))} /></div>
+            </div>
+            <div><Label>OC Cliente</Label><Input placeholder="8070008797" value={editForm.ordenCompraCliente} onChange={e => setEditForm(f => ({ ...f, ordenCompraCliente: e.target.value }))} /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label>N° HES</Label><Input placeholder="HES-1000123" value={editForm.numeroHES} onChange={e => setEditForm(f => ({ ...f, numeroHES: e.target.value }))} /></div>
+              <div><Label>N° Guía Remisión</Label><Input placeholder="T001-12345" value={editForm.numeroGuiaRemision} onChange={e => setEditForm(f => ({ ...f, numeroGuiaRemision: e.target.value }))} /></div>
+              <div><Label>Banco / Financiera</Label><Input placeholder="BANPRO..." value={editForm.bancoFinanciera} onChange={e => setEditForm(f => ({ ...f, bancoFinanciera: e.target.value }))} /></div>
+              <div><Label>N° Negociación</Label><Input placeholder="12237" value={editForm.numeroNegociacion} onChange={e => setEditForm(f => ({ ...f, numeroNegociacion: e.target.value }))} /></div>
+            </div>
+            <div><Label>Descripción</Label><Input placeholder="Servicio eléctrico..." value={editForm.descripcion} onChange={e => setEditForm(f => ({ ...f, descripcion: e.target.value }))} /></div>
+            <div><Label>Observaciones</Label><Input placeholder="Notas adicionales" value={editForm.observaciones} onChange={e => setEditForm(f => ({ ...f, observaciones: e.target.value }))} /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditForm(false)}>Cancelar</Button>
+            <Button onClick={handleSaveEdit} disabled={savingEdit}>
+              {savingEdit ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
+              Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Dialog Confirmar Anular / Eliminar ── */}
+      <Dialog open={!!confirmAction} onOpenChange={open => { if (!open) setConfirmAction(null) }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className={`h-5 w-5 ${confirmAction === 'eliminar' ? 'text-red-600' : 'text-amber-600'}`} />
+              {confirmAction === 'anular' ? 'Anular CxC' : 'Eliminar CxC'}
+            </DialogTitle>
+            <DialogDescription>{cxc.numeroDocumento || 'Sin documento'} — {cxc.cliente.nombre}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <div className="p-3 bg-muted/50 border rounded space-y-1">
+              <div className="flex justify-between"><span>Monto</span><span className="font-mono font-bold">{formatCurrency(cxc.monto, cxc.moneda)}</span></div>
+              {cxc.montoPagado > 0 && <div className="flex justify-between text-green-600"><span>Pagado</span><span className="font-mono">{formatCurrency(cxc.montoPagado, cxc.moneda)}</span></div>}
+            </div>
+            {confirmAction === 'anular' ? (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded text-amber-800">
+                <p className="font-medium">La cuenta pasará a estado &quot;Anulada&quot;.</p>
+                <p className="text-xs mt-1">No se podrán registrar más cobros. Los pagos existentes se mantienen.</p>
+              </div>
+            ) : (
+              <div className="p-3 bg-red-50 border border-red-200 rounded text-red-800">
+                <p className="font-medium">Esta acción es irreversible.</p>
+                <p className="text-xs mt-1">Se eliminará la CxC y todos sus registros asociados.</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmAction(null)}>Cancelar</Button>
+            <Button
+              variant={confirmAction === 'eliminar' ? 'destructive' : 'default'}
+              className={confirmAction === 'anular' ? 'bg-amber-600 hover:bg-amber-700 text-white' : ''}
+              onClick={confirmAction === 'anular' ? handleAnular : handleEliminar}
+              disabled={savingAction}
+            >
+              {savingAction ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+              {confirmAction === 'anular' ? 'Anular' : 'Eliminar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

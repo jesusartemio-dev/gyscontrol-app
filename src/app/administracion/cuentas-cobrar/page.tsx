@@ -991,32 +991,9 @@ export default function CuentasCobrarPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button variant="ghost" size="sm" asChild>
-                            <Link href={`/administracion/cuentas-cobrar/${item.id}`}>Ver</Link>
-                          </Button>
-                          {item.estado !== 'anulada' && (
-                            <Button variant="ghost" size="sm" onClick={() => openEdit(item)} title="Editar">
-                              <Pencil className="h-3 w-3" />
-                            </Button>
-                          )}
-                          {(item.estado === 'pendiente' || item.estado === 'parcial') && (
-                            <Button variant="outline" size="sm" onClick={() => openPago(item)}>
-                              <ArrowDownCircle className="h-3 w-3 mr-1" />
-                              Pago
-                            </Button>
-                          )}
-                          {item.estado !== 'anulada' && (
-                            <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700" onClick={() => handleAnular(item)} title="Anular">
-                              <Ban className="h-3 w-3" />
-                            </Button>
-                          )}
-                          {(item.estado === 'anulada' || (item.montoPagado === 0 && item.estado !== 'pagada')) && (
-                            <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700" onClick={() => handleEliminar(item)} title="Eliminar">
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          )}
-                        </div>
+                        <Button variant="ghost" size="sm" asChild>
+                          <Link href={`/administracion/cuentas-cobrar/${item.id}`}>Ver →</Link>
+                        </Button>
                       </TableCell>
                     </TableRow>
                   )
