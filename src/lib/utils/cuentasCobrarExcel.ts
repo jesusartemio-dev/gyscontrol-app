@@ -921,11 +921,12 @@ export function detraccionEnSoles(cxc: CxCRichRow): number | null {
   const pago = cxc.pagos?.find(p => p.esDetraccion) ?? null
   if (!pago) return null
   const monto = pago.detraccionMonto ?? pago.monto
-  if (cxc.moneda === 'PEN') return monto
+  // SUNAT RS 183-2004: depósito de detracciones siempre en enteros (sin decimales)
+  if (cxc.moneda === 'PEN') return Math.round(monto)
   if (cxc.moneda === 'USD' && cxc.tipoCambio) {
-    return Math.round(monto * cxc.tipoCambio * 100) / 100
+    return Math.round(monto * cxc.tipoCambio)
   }
-  return monto // fallback: sin tipo de cambio disponible
+  return Math.round(monto) // fallback
 }
 
 /**
@@ -1147,7 +1148,7 @@ export async function exportarCxCContable(items: CxCRichRow[]): Promise<void> {
       [18, clasificac],
       // Detracción
       [19, detraccion?.numeroConstanciaBN ?? ''],
-      [20, detSoles,             FMT_MONEY],  // Siempre en S/
+      [20, detSoles,             FMT_INT],    // SUNAT: detracción sin decimales (S/)
       [21, detraccion?.detraccionFechaPago ? new Date(detraccion.detraccionFechaPago) : null, FMT_DATE],
       // Retención
       [22, retencion?.retencionNumeroConstancia ?? ''],
