@@ -1310,7 +1310,13 @@ export default function CuentasCobrarPage() {
 
             {/* Detracción */}
             <div className="flex items-center space-x-2 pt-2 border-t">
-              <Checkbox id="conDetraccion" checked={conDetraccion} onCheckedChange={(v) => setConDetraccion(!!v)} />
+              <Checkbox id="conDetraccion" checked={conDetraccion} onCheckedChange={(v) => {
+                setConDetraccion(!!v)
+                if (!!v && cuentaBNId === 'none') {
+                  const bn = cuentasBancarias.find(b => b.nombreBanco.toLowerCase().includes('nacion') || b.nombreBanco.toLowerCase().includes('nación'))
+                  if (bn) setCuentaBNId(bn.id)
+                }
+              }} />
               <Label htmlFor="conDetraccion" className="text-sm font-medium cursor-pointer">¿Incluye detracción?</Label>
             </div>
             {conDetraccion && (

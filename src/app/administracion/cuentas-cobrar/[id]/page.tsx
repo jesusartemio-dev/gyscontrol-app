@@ -545,7 +545,13 @@ export default function CxCDetallePage() {
 
                   {/* Detracción */}
                   <div className="flex items-center gap-2">
-                    <Checkbox id="det" checked={conDetraccion} onCheckedChange={v => setConDetraccion(!!v)} />
+                    <Checkbox id="det" checked={conDetraccion} onCheckedChange={v => {
+                      setConDetraccion(!!v)
+                      if (!!v && detBancoId === 'none') {
+                        const bn = bancos.find(b => b.nombreBanco.toLowerCase().includes('nacion') || b.nombreBanco.toLowerCase().includes('nación'))
+                        if (bn) setDetBancoId(bn.id)
+                      }
+                    }} />
                     <Label htmlFor="det" className="cursor-pointer">Incluye Detracción</Label>
                   </div>
                   {conDetraccion && (
