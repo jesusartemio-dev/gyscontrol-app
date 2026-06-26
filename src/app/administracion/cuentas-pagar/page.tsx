@@ -1068,8 +1068,8 @@ export default function CuentasPagarPage() {
                       </TableCell>
                       <TableCell>
                         <Select
-                          value={item.registroContador ?? ''}
-                          onValueChange={v => handleRegistroContador(item.id, v || null)}
+                          value={item.registroContador ?? '_none_'}
+                          onValueChange={v => handleRegistroContador(item.id, v === '_none_' ? null : v)}
                         >
                           <SelectTrigger className={`h-7 w-20 text-xs border-0 shadow-none focus:ring-1 ${
                             item.registroContador === '1ro' ? 'text-blue-700 bg-blue-50' :
@@ -1080,7 +1080,7 @@ export default function CuentasPagarPage() {
                             <SelectValue placeholder="—" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">—</SelectItem>
+                            <SelectItem value="_none_">—</SelectItem>
                             <SelectItem value="1ro">1ro</SelectItem>
                             <SelectItem value="2do">2do</SelectItem>
                             <SelectItem value="3ro">3ro</SelectItem>
