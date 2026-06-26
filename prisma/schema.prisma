@@ -4408,6 +4408,7 @@ model CuentaPorPagar {
   // Nros. de cheque/letra vinculados a esta CxP (para control interno)
   numeroCheque       String?
   numeroLetra        String?
+  tipoDocumento      String            @default("factura") // 'factura' | 'nota_credito'
   registroContador   String?           // '1ro' | '2do' | '3ro' | null
   createdAt          DateTime          @default(now())
   updatedAt          DateTime

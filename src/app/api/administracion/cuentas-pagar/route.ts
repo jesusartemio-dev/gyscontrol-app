@@ -74,7 +74,7 @@ export async function POST(req: Request) {
     const body = await req.json()
     const {
       proveedorId, proyectoId, ordenCompraId, pedidoEquipoId, pedidoEquipoItemId,
-      tipoOrigen, numeroFactura, descripcion, monto, moneda, tipoCambio,
+      tipoOrigen, tipoDocumento, numeroFactura, descripcion, monto, moneda, tipoCambio,
       fechaRecepcion, fechaVencimiento, condicionPago, formaPago, diasCredito,
       detraccionPorcentaje, guardarDetraccionDefault, observaciones,
       numeroCheque, numeroLetra,
@@ -96,6 +96,7 @@ export async function POST(req: Request) {
         pedidoEquipoId: pedidoEquipoId || null,
         pedidoEquipoItemId: pedidoEquipoItemId || null,
         tipoOrigen: tipoOrigen || null,
+        tipoDocumento: tipoDocumento || 'factura',
         numeroFactura: numeroFactura || null,
         descripcion: descripcion || null,
         monto,

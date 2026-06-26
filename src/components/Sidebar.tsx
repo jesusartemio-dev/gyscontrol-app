@@ -386,6 +386,7 @@ export default function Sidebar() {
         { href: '/administracion/facturacion', label: 'Facturación', icon: FileSpreadsheet },
         { href: '/administracion/cuentas-cobrar', label: 'Cuentas por Cobrar', icon: ArrowDownCircle },
         { href: '/administracion/cuentas-pagar', label: 'Cuentas por Pagar', icon: ArrowUpCircle },
+        { href: '/administracion/compras-mes', label: 'Compras del Mes', icon: ShoppingCart },
         { href: '/administracion/cuentas-bancarias', label: 'Cuentas Bancarias', icon: Landmark },
         { href: '/administracion/proyectos-internos', label: 'Proyectos Internos', icon: Building2 },
         { href: '/administracion/saldos-ausencia', label: 'Saldos de Ausencia', icon: CalendarOff },

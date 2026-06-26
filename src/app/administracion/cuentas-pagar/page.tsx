@@ -97,6 +97,7 @@ interface CuentaPorPagar {
   pedidoEquipoItem?: { id: string; codigo: string; descripcion: string } | null
   numeroCheque?: string | null
   numeroLetra?: string | null
+  tipoDocumento?: string
   registroContador?: string | null
   pagos?: PagoPagar[]
   adjuntos?: Array<{
@@ -161,6 +162,7 @@ export default function CuentasPagarPage() {
   const [createErrors, setCreateErrors] = useState<Set<string>>(new Set())
   const [createForm, setCreateForm] = useState({
     proveedorId: '',
+    tipoDocumento: 'factura',
     numeroFactura: '',
     monto: '',
     moneda: 'PEN',
@@ -351,6 +353,7 @@ export default function CuentasPagarPage() {
   const resetCreateForm = () => {
     setCreateForm({
       proveedorId: '',
+      tipoDocumento: 'factura',
       numeroFactura: '',
       monto: '',
       moneda: 'PEN',
@@ -453,6 +456,7 @@ export default function CuentasPagarPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           proveedorId: createForm.proveedorId,
+          tipoDocumento: createForm.tipoDocumento,
           numeroFactura: createForm.numeroFactura || null,
           monto,
           moneda: createForm.moneda,
@@ -1243,9 +1247,19 @@ export default function CuentasPagarPage() {
               </>
             )}
             <div>
-              <Label>N° Factura {createForm.ordenCompraId && <span className="text-red-500">*</span>}</Label>
+              <Label>Tipo de Documento</Label>
+              <Select value={createForm.tipoDocumento} onValueChange={v => updateCreateField('tipoDocumento', v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="factura">Factura</SelectItem>
+                  <SelectItem value="nota_credito">Nota de Crédito</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>{createForm.tipoDocumento === 'nota_credito' ? 'N° Nota de Crédito' : 'N° Factura'} {createForm.ordenCompraId && <span className="text-red-500">*</span>}</Label>
               <Input
-                placeholder="F001-00123"
+                placeholder={createForm.tipoDocumento === 'nota_credito' ? 'NC01-00001' : 'F001-00123'}
                 value={createForm.numeroFactura}
                 onChange={e => updateCreateField('numeroFactura', e.target.value)}
                 className={createErrors.has('numeroFactura') ? 'border-red-500 ring-1 ring-red-500' : ''}
