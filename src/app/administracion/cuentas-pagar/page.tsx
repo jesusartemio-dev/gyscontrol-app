@@ -228,6 +228,7 @@ export default function CuentasPagarPage() {
   const [filterProyectoId, setFilterProyectoId] = useState<string>('all')
   const [filterFechaDesde, setFilterFechaDesde] = useState<string>('')
   const [filterFechaHasta, setFilterFechaHasta] = useState<string>('')
+  const [filterTipoFecha, setFilterTipoFecha] = useState<'emision' | 'vencimiento'>('emision')
   const [sortField, setSortField] = useState<string>('fechaVencimiento')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
@@ -307,8 +308,9 @@ export default function CuentasPagarPage() {
     let result = items
     if (filterEstados.length > 0) result = result.filter(i => filterEstados.includes(i.estado))
     if (filterProyectoId !== 'all') result = result.filter(i => i.proyectoId === filterProyectoId)
-    if (filterFechaDesde) result = result.filter(i => i.fechaRecepcion >= filterFechaDesde)
-    if (filterFechaHasta) result = result.filter(i => i.fechaRecepcion <= filterFechaHasta + 'T23:59:59')
+    const campoFecha = filterTipoFecha === 'vencimiento' ? 'fechaVencimiento' : 'fechaRecepcion'
+    if (filterFechaDesde) result = result.filter(i => (i[campoFecha] as string) >= filterFechaDesde)
+    if (filterFechaHasta) result = result.filter(i => (i[campoFecha] as string) <= filterFechaHasta + 'T23:59:59')
     if (searchTerm) {
       const term = searchTerm.toLowerCase()
       result = result.filter(i =>
@@ -333,7 +335,7 @@ export default function CuentasPagarPage() {
       return 0
     })
     return result
-  }, [items, filterEstados, filterProyectoId, filterFechaDesde, filterFechaHasta, searchTerm, sortField, sortDir])
+  }, [items, filterEstados, filterProyectoId, filterFechaDesde, filterFechaHasta, filterTipoFecha, searchTerm, sortField, sortDir])
 
   const filteredTotals = useMemo(() => {
     const active = filtered.filter(i => i.estado !== 'anulada')
@@ -987,9 +989,18 @@ export default function CuentasPagarPage() {
             </SelectContent>
           </Select>
           <div className="flex items-center gap-1">
-            <Input type="date" className="w-36 h-9" value={filterFechaDesde} onChange={e => setFilterFechaDesde(e.target.value)} title="Emisión desde" />
+            <Select value={filterTipoFecha} onValueChange={v => setFilterTipoFecha(v as 'emision' | 'vencimiento')}>
+              <SelectTrigger className="w-36 h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="emision">F. Emisión</SelectItem>
+                <SelectItem value="vencimiento">F. Vencimiento</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input type="date" className="w-36 h-9" value={filterFechaDesde} onChange={e => setFilterFechaDesde(e.target.value)} />
             <span className="text-muted-foreground text-xs">—</span>
-            <Input type="date" className="w-36 h-9" value={filterFechaHasta} onChange={e => setFilterFechaHasta(e.target.value)} title="Emisión hasta" />
+            <Input type="date" className="w-36 h-9" value={filterFechaHasta} onChange={e => setFilterFechaHasta(e.target.value)} />
           </div>
           {(filterEstados.length > 0 || filterProyectoId !== 'all' || filterFechaDesde || filterFechaHasta || searchTerm) && (
             <Button variant="ghost" size="sm" className="text-muted-foreground h-9" onClick={() => { setFilterEstados([]); setFilterProyectoId('all'); setFilterFechaDesde(''); setFilterFechaHasta(''); setSearchTerm('') }}>
