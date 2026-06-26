@@ -503,7 +503,7 @@ export async function exportarCxPFormatoAdmin(items: CxPAdminExportRow[]) {
   const FILL_AZUL  = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FF93C5FD' } }
   const FONT_HEADER = { bold: true, color: { argb: 'FF000000' }, size: 11 }
   const FONT_HEADER_RED = { bold: true, color: { argb: 'FFDC2626' }, size: 11 }
-  const NCOLS = 24  // A-X
+  const NCOLS = 22  // A-V
 
   // Anchos de columna
   ws.columns = [
@@ -525,12 +525,10 @@ export async function exportarCxPFormatoAdmin(items: CxPAdminExportRow[]) {
     { width: 13 },  // P  Nro. Cheque
     { width: 13 },  // Q  Nro. Letra
     { width: 14 },  // R  Nro. Único
-    { width: 14 },  // S  Banco
-    { width: 13 },  // T  Detracción pendiente
-    { width: 13 },  // U  Fecha pago detracción
-    { width: 14 },  // V  Monto pagado detracción (S/)
-    { width: 16 },  // W  Nro. Constancia
-    { width: 32 },  // X  Observación
+    { width: 14 },  // S  Monto Detracción
+    { width: 13 },  // T  Fecha pago detracción
+    { width: 16 },  // U  Nro. Constancia
+    { width: 32 },  // V  Observación
   ]
 
   // ===== Cabecera (fila 1) =====
@@ -553,12 +551,10 @@ export async function exportarCxPFormatoAdmin(items: CxPAdminExportRow[]) {
     'Nro. Cheque',                    // P 16
     'Nro. Letra',                     // Q 17
     'Nro. Único',                     // R 18
-    'Banco',                          // S 19
-    'Detracción\npendiente',          // T 20
-    'Fecha pago\ndetracción',         // U 21
-    'Monto detrac.\n(S/)',            // V 22
-    'Nro. Constancia\nDetracción',    // W 23
-    'Observación',                    // X 24
+    'Monto\nDetracción',              // S 19
+    'Fecha pago\ndetracción',         // T 20
+    'Nro. Constancia\nDetracción',    // U 21
+    'Observación',                    // V 22
   ]
   for (let i = 0; i < headers.length; i++) {
     ws.getCell(1, i + 1).value = headers[i]
@@ -655,12 +651,10 @@ export async function exportarCxPFormatoAdmin(items: CxPAdminExportRow[]) {
     row.getCell(16).value = item.numeroCheque ?? ''                                 // P
     row.getCell(17).value = item.numeroLetra ?? ''                                  // Q
     row.getCell(18).value = pagoTransferencia?.numeroOperacion ?? ''                // R
-    row.getCell(19).value = pagoNoDetraccion?.cuentaBancaria?.nombreBanco ?? ''     // S
-    row.getCell(20).value = detraccionPendiente                                     // T
-    row.getCell(21).value = detraccion?.detraccionFechaPago ? new Date(detraccion.detraccionFechaPago) : null  // U
-    row.getCell(22).value = montoDetraccionPEN                                      // V
-    row.getCell(23).value = detraccion?.numeroConstanciaBN ?? ''                    // W
-    row.getCell(24).value = item.observaciones ?? ''                                // X
+    row.getCell(19).value = detraccionPendiente                                     // S  Monto Detracción
+    row.getCell(20).value = detraccion?.detraccionFechaPago ? new Date(detraccion.detraccionFechaPago) : null  // T
+    row.getCell(21).value = detraccion?.numeroConstanciaBN ?? ''                    // U
+    row.getCell(22).value = item.observaciones ?? ''                                // V
 
     // Acumular totales
     totalMonto += item.monto
