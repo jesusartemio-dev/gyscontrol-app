@@ -52,7 +52,7 @@ export async function GET(req: Request) {
     const cuentas = await prisma.cuentaPorPagar.findMany({
       where,
       include: includeRelations,
-      orderBy: { fechaVencimiento: 'asc' },
+      orderBy: { fechaRecepcion: 'desc' },
     })
 
     return NextResponse.json(cuentas)
