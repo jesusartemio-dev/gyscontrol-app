@@ -26,6 +26,11 @@ const protectedRoutes = withAuth(
     // Obtener sectionAccess del token (inyectado en auth.ts)
     const sectionAccess = token.sectionAccess as string[] | undefined
 
+    // Páginas con restricción de rol específica (más granular que secciones)
+    if (path.startsWith('/admin/uso-ia') && role !== 'admin') {
+      return NextResponse.redirect(new URL('/denied', req.url))
+    }
+
     // Verificar acceso a sección por ruta
     for (const [prefix, sectionKey] of ROUTE_PREFIXES) {
       if (path.startsWith(prefix)) {
