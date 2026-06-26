@@ -97,10 +97,7 @@ interface CuentaPorPagar {
   pedidoEquipoItem?: { id: string; codigo: string; descripcion: string } | null
   numeroCheque?: string | null
   numeroLetra?: string | null
-  enviadaContador?: boolean
-  fechaEnvioContador?: string | null
-  enviadaPorId?: string | null
-  enviadaPor?: { id: string; name: string | null } | null
+  registroContador?: string | null
   pagos?: PagoPagar[]
   adjuntos?: Array<{
     id: string
@@ -586,50 +583,18 @@ export default function CuentasPagarPage() {
     }
   }
 
-  // --- Acciones en lote: enviar / desmarcar al contador ---
-  const handleBulkMarcarContador = async () => {
-    if (selectedIds.size === 0) return
-    setBulkLoading(true)
+  const handleRegistroContador = async (id: string, valor: string | null) => {
+    setItems(prev => prev.map(i => i.id === id ? { ...i, registroContador: valor } : i))
     try {
-      const res = await fetch('/api/administracion/cuentas-pagar/enviar-contador', {
-        method: 'POST',
+      const res = await fetch(`/api/administracion/cuentas-pagar/${id}`, {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+        body: JSON.stringify({ registroContador: valor }),
       })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.error || 'Error')
-      }
-      toast.success(`${selectedIds.size} CxP marcada${selectedIds.size > 1 ? 's' : ''} como enviada${selectedIds.size > 1 ? 's' : ''} al contador`)
-      setSelectedIds(new Set())
+      if (!res.ok) throw new Error('Error al guardar')
+    } catch {
+      toast.error('Error al guardar registro contador')
       loadData()
-    } catch (e: any) {
-      toast.error(e.message || 'Error al marcar')
-    } finally {
-      setBulkLoading(false)
-    }
-  }
-
-  const handleBulkDesmarcarContador = async () => {
-    if (selectedIds.size === 0) return
-    setBulkLoading(true)
-    try {
-      const res = await fetch('/api/administracion/cuentas-pagar/enviar-contador', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: Array.from(selectedIds) }),
-      })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.error || 'Error')
-      }
-      toast.success(`${selectedIds.size} CxP desmarcada${selectedIds.size > 1 ? 's' : ''}`)
-      setSelectedIds(new Set())
-      loadData()
-    } catch (e: any) {
-      toast.error(e.message || 'Error al desmarcar')
-    } finally {
-      setBulkLoading(false)
     }
   }
 
@@ -1011,39 +976,6 @@ export default function CuentasPagarPage() {
         <div className="text-xs text-muted-foreground">{filtered.length} resultado{filtered.length !== 1 ? 's' : ''}</div>
       </div>
 
-      {/* Barra de acciones en lote */}
-      {selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-lg">
-          <span className="text-sm font-medium text-blue-800">{selectedIds.size} seleccionada{selectedIds.size > 1 ? 's' : ''}</span>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-8 text-xs border-blue-300 text-blue-700 hover:bg-blue-100"
-            onClick={handleBulkMarcarContador}
-            disabled={bulkLoading}
-          >
-            {bulkLoading ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <ClipboardCheck className="h-3.5 w-3.5 mr-1.5" />}
-            Marcar como enviadas al contador
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-8 text-xs text-muted-foreground hover:text-foreground"
-            onClick={handleBulkDesmarcarContador}
-            disabled={bulkLoading}
-          >
-            Desmarcar enviadas
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-8 w-8 p-0 ml-auto"
-            onClick={() => setSelectedIds(new Set())}
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
 
       {/* Tabla */}
       <Card>
@@ -1051,15 +983,6 @@ export default function CuentasPagarPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-10 px-4">
-                  <Checkbox
-                    checked={filtered.length > 0 && filtered.every(i => selectedIds.has(i.id))}
-                    onCheckedChange={(checked) => {
-                      if (checked) setSelectedIds(new Set(filtered.map(i => i.id)))
-                      else setSelectedIds(new Set())
-                    }}
-                  />
-                </TableHead>
                 <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('numeroFactura')}>Factura</TableHead>
                 <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('proveedor')}>
                   Proveedor {sortField === 'proveedor' && (sortDir === 'asc' ? '↑' : '↓')}
@@ -1077,6 +1000,7 @@ export default function CuentasPagarPage() {
                 <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('estado')}>
                   Estado {sortField === 'estado' && (sortDir === 'asc' ? '↑' : '↓')}
                 </TableHead>
+                <TableHead className="w-28">Reg. Contador</TableHead>
                 <TableHead className="text-right w-10"></TableHead>
               </TableRow>
             </TableHeader>
@@ -1092,20 +1016,7 @@ export default function CuentasPagarPage() {
                 filtered.map(item => {
                   const vencida = isVencida(item.fechaVencimiento, item.estado)
                   return (
-                    <TableRow key={item.id} className={`${item.estado === 'anulada' ? 'opacity-50' : ''} ${vencida ? 'bg-red-50/50' : ''} ${selectedIds.has(item.id) ? 'bg-blue-50/60' : ''}`}>
-                      <TableCell className="px-4 w-10">
-                        <Checkbox
-                          checked={selectedIds.has(item.id)}
-                          onCheckedChange={(checked) => {
-                            setSelectedIds(prev => {
-                              const next = new Set(prev)
-                              if (checked) next.add(item.id)
-                              else next.delete(item.id)
-                              return next
-                            })
-                          }}
-                        />
-                      </TableCell>
+                    <TableRow key={item.id} className={`${item.estado === 'anulada' ? 'opacity-50' : ''} ${vencida ? 'bg-red-50/50' : ''}`}>
                       <TableCell className="font-mono text-sm">
                         <div>{item.numeroFactura || <span className="text-muted-foreground italic text-xs">Sin factura</span>}</div>
                         {item.proyecto && <div className="text-xs text-muted-foreground font-sans">{item.proyecto.codigo}</div>}
@@ -1151,17 +1062,30 @@ export default function CuentasPagarPage() {
                         })()}
                       </TableCell>
                       <TableCell>
-                        <div className="flex flex-col gap-1">
-                          <Badge className={`${getEstadoColor(item.estado)} text-xs w-fit`}>
-                            {ESTADOS_CXP.find(e => e.value === item.estado)?.label || item.estado}
-                          </Badge>
-                          {item.enviadaContador && (
-                            <span className="flex items-center gap-1 text-[10px] text-green-700 font-medium">
-                              <ClipboardCheck className="h-3 w-3" />
-                              Env. contador
-                            </span>
-                          )}
-                        </div>
+                        <Badge className={`${getEstadoColor(item.estado)} text-xs w-fit`}>
+                          {ESTADOS_CXP.find(e => e.value === item.estado)?.label || item.estado}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={item.registroContador ?? ''}
+                          onValueChange={v => handleRegistroContador(item.id, v || null)}
+                        >
+                          <SelectTrigger className={`h-7 w-20 text-xs border-0 shadow-none focus:ring-1 ${
+                            item.registroContador === '1ro' ? 'text-blue-700 bg-blue-50' :
+                            item.registroContador === '2do' ? 'text-orange-700 bg-orange-50' :
+                            item.registroContador === '3ro' ? 'text-green-700 bg-green-50' :
+                            'text-muted-foreground'
+                          }`}>
+                            <SelectValue placeholder="—" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="">—</SelectItem>
+                            <SelectItem value="1ro">1ro</SelectItem>
+                            <SelectItem value="2do">2do</SelectItem>
+                            <SelectItem value="3ro">3ro</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>

@@ -26,7 +26,6 @@ const includeRelations = {
     include: { subidoPor: { select: { id: true, name: true } } },
     orderBy: { createdAt: 'desc' as const },
   },
-  enviadaPor: { select: { id: true, name: true } },
 }
 
 export async function GET(req: Request) {

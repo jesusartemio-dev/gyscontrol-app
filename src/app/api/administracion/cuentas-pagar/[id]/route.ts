@@ -49,7 +49,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const editableFields = [
       'numeroFactura', 'descripcion', 'observaciones',
       'tipoCambio', 'diasCredito', 'condicionPago', 'formaPago',
-      'detraccionPorcentaje', 'numeroCheque', 'numeroLetra',
+      'detraccionPorcentaje', 'numeroCheque', 'numeroLetra', 'registroContador',
     ] as const
 
     const data: Record<string, any> = {}

@@ -81,9 +81,7 @@ export interface CxPAdminExportRow extends CxPExportRow {
   descripcion?: string | null
   numeroCheque?: string | null
   numeroLetra?: string | null
-  enviadaContador?: boolean
-  fechaEnvioContador?: string | null
-  enviadaPor?: { id: string; name: string | null } | null
+  registroContador?: string | null
   pagos?: CxPAdminPagoRow[]
 }
 
@@ -545,7 +543,7 @@ export async function exportarCxPFormatoAdmin(items: CxPAdminExportRow[]) {
     'A pagar',                        // J 10
     'Moneda',                         // K 11
     'Estado',                         // L 12
-    'Enviada al\ncontador',           // M 13
+    'Registrado\nContador',           // M 13
     'Forma de pago',                  // N 14
     'Fecha de pago',                  // O 15
     'Nro. Cheque',                    // P 16
@@ -602,13 +600,6 @@ export async function exportarCxPFormatoAdmin(items: CxPAdminExportRow[]) {
     const pagoNoDetraccion  = pagosOrdinarios[0]  // último pago ordinario para Banco y Fecha
     const detraccion        = (item.pagos ?? []).find(p => p.esDetraccion)
 
-    // M: Enviada al contador — texto compuesto
-    let enviadaLabel = ''
-    if (item.enviadaContador) {
-      const fechaEnvio = item.fechaEnvioContador ? formatDateShort(item.fechaEnvioContador) : ''
-      const por = item.enviadaPor?.name ?? ''
-      enviadaLabel = ['Sí', fechaEnvio, por ? `(${por})` : ''].filter(Boolean).join(' ')
-    }
 
     // T: Detracción pendiente
     let detraccionPendiente: number | null = null
@@ -645,7 +636,7 @@ export async function exportarCxPFormatoAdmin(items: CxPAdminExportRow[]) {
     row.getCell(10).value = item.saldoPendiente                                     // J
     row.getCell(11).value = item.moneda                                             // K
     row.getCell(12).value = ESTADO_LABEL_CXP[item.estado] ?? item.estado            // L
-    row.getCell(13).value = enviadaLabel                                            // M
+    row.getCell(13).value = item.registroContador ?? ''                             // M
     row.getCell(14).value = formaPagoLabel(item.formaPago, item.diasCredito)        // N
     row.getCell(15).value = pagoNoDetraccion?.fechaPago ? new Date(pagoNoDetraccion.fechaPago) : null  // O
     row.getCell(16).value = item.numeroCheque ?? ''                                 // P
