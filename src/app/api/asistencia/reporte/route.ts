@@ -19,6 +19,7 @@ export async function GET(req: Request) {
   const departamentoId = url.searchParams.get('departamentoId')
   const estado = url.searchParams.get('estado')
   const metodoMarcaje = url.searchParams.get('metodoMarcaje')
+  const q = url.searchParams.get('q')?.trim()
 
   const where: any = {}
   if (desde || hasta) {
@@ -43,25 +44,37 @@ export async function GET(req: Request) {
   if (estado) where.estado = estado
   if (metodoMarcaje) where.metodoMarcaje = metodoMarcaje
   if (departamentoId) where.empleado = { departamentoId }
+  if (q) {
+    where.OR = [
+      { user: { name: { contains: q, mode: 'insensitive' } } },
+      { user: { email: { contains: q, mode: 'insensitive' } } },
+      { empleado: { departamento: { nombre: { contains: q, mode: 'insensitive' } } } },
+      { ubicacion: { nombre: { contains: q, mode: 'insensitive' } } },
+    ]
+  }
 
-  const data = await prisma.asistencia.findMany({
-    where,
-    orderBy: { fechaHora: 'desc' },
-    include: {
-      user: { select: { id: true, name: true, email: true, role: true } },
-      empleado: {
-        include: {
-          departamento: { select: { id: true, nombre: true } },
-          cargo: { select: { id: true, nombre: true } },
+  const TAKE = 1000
+  const [data, total] = await Promise.all([
+    prisma.asistencia.findMany({
+      where,
+      orderBy: { fechaHora: 'desc' },
+      include: {
+        user: { select: { id: true, name: true, email: true, role: true } },
+        empleado: {
+          include: {
+            departamento: { select: { id: true, nombre: true } },
+            cargo: { select: { id: true, nombre: true } },
+          },
         },
+        ubicacion: { select: { id: true, nombre: true, tipo: true } },
+        jornadaAsistencia: {
+          select: { proyecto: { select: { codigo: true, nombre: true } } },
+        },
+        dispositivo: { select: { nombre: true, modelo: true, plataforma: true, aprobado: true } },
       },
-      ubicacion: { select: { id: true, nombre: true, tipo: true } },
-      jornadaAsistencia: {
-        select: { proyecto: { select: { codigo: true, nombre: true } } },
-      },
-      dispositivo: { select: { nombre: true, modelo: true, plataforma: true, aprobado: true } },
-    },
-    take: 500,
-  })
-  return NextResponse.json(data)
+      take: TAKE,
+    }),
+    prisma.asistencia.count({ where }),
+  ])
+  return NextResponse.json({ data, total, truncated: total > data.length })
 }
