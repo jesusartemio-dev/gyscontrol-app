@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import {
-  Loader2, GitBranch, Plus, Trash2, Save, Lock, Download, FileText,
+  Loader2, GitBranch, Plus, Trash2, Save, Download, FileText,
   X, Eye, Pencil, Users, Building2, Phone, Hash, RefreshCw,
   ChevronUp, ChevronDown, AlertTriangle,
 } from 'lucide-react'
@@ -353,17 +353,16 @@ export default function OrganigramaProyectoPage() {
       const HDR = 34
       for (const n of nodes) {
         const { x, y, nodo } = n
-        const isGys = nodo.esFijoGys
         const isVacant = !nodo.user
 
         // Shadow
         ctx.shadowColor = 'rgba(0,0,0,0.08)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2
-        ctx.fillStyle = isGys ? '#2E4057' : '#FFFFFF'
+        ctx.fillStyle = '#FFFFFF'
         rr(x, y, NODE_W, NODE_H, 8); ctx.fill()
         ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0
 
         // Border
-        ctx.strokeStyle = isGys ? '#1e2d3d' : isVacant ? '#FCA5A5' : '#E5E7EB'
+        ctx.strokeStyle = isVacant ? '#FCA5A5' : '#E5E7EB'
         ctx.lineWidth = isVacant ? 1.5 : 2
         if (isVacant) ctx.setLineDash([6, 3])
         rr(x, y, NODE_W, NODE_H, 8); ctx.stroke()
@@ -372,17 +371,17 @@ export default function OrganigramaProyectoPage() {
         // Header strip (clipped to top rounded corners)
         ctx.save()
         rr(x, y, NODE_W, NODE_H, 8); ctx.clip()
-        ctx.fillStyle = isGys ? '#243347' : isVacant ? '#FEF2F2' : '#F8FAFC'
+        ctx.fillStyle = isVacant ? '#FEF2F2' : '#F8FAFC'
         ctx.fillRect(x, y, NODE_W, HDR)
         ctx.restore()
 
         // Separator
-        ctx.strokeStyle = isGys ? '#1e2d3d' : isVacant ? '#FCA5A5' : '#E5E7EB'
+        ctx.strokeStyle = isVacant ? '#FCA5A5' : '#E5E7EB'
         ctx.lineWidth = 1; ctx.setLineDash([])
         ctx.beginPath(); ctx.moveTo(x, y + HDR); ctx.lineTo(x + NODE_W, y + HDR); ctx.stroke()
 
         // Cargo
-        ctx.fillStyle = isGys ? '#C7D2FE' : isVacant ? '#F87171' : '#4F46E5'
+        ctx.fillStyle = isVacant ? '#F87171' : '#4F46E5'
         ctx.font = 'bold 9px system-ui, sans-serif'
         ctx.textAlign = 'center'
         ctx.fillText(nodo.cargoLabel, x + NODE_W / 2, y + 21, NODE_W - 12)
@@ -393,17 +392,17 @@ export default function OrganigramaProyectoPage() {
           ctx.font = 'bold italic 11px system-ui, sans-serif'
           ctx.fillText('VACANTE', x + NODE_W / 2, y + HDR + (NODE_H - HDR) / 2 + 4)
         } else {
-          ctx.fillStyle = isGys ? '#FFFFFF' : '#1F2937'
+          ctx.fillStyle = '#1F2937'
           ctx.font = 'bold 13px system-ui, sans-serif'
           ctx.fillText(nodo.user!.name, x + NODE_W / 2, y + 58, NODE_W - 12)
 
-          ctx.fillStyle = isGys ? '#A5B4FC' : '#9CA3AF'
+          ctx.fillStyle = '#9CA3AF'
           ctx.font = '10px system-ui, sans-serif'
           ctx.textAlign = 'left'
           let dy = y + 74
           if (nodo._telefono) { ctx.fillText(`Tel: ${nodo._telefono}`, x + 8, dy, NODE_W - 16); dy += 13 }
           if (nodo._cip) { ctx.fillText(`CIP ${nodo._cip}`, x + 8, dy, NODE_W - 16); dy += 13 }
-          ctx.fillStyle = isGys ? '#A5B4FC' : '#D1D5DB'
+          ctx.fillStyle = '#D1D5DB'
           ctx.fillText(nodo.user!.email, x + 8, dy, NODE_W - 16)
         }
       }
@@ -539,27 +538,22 @@ export default function OrganigramaProyectoPage() {
       for (const n of nodes) {
         const nx = px(n.x)
         const ny_ = py(n.y)
-        const isGys = n.nodo.esFijoGys
         const isVacant = !n.nodo.user
 
         // Full node fill
-        if (isGys) pdf.setFillColor(46, 64, 87)
-        else pdf.setFillColor(255, 255, 255)
-        if (isGys) pdf.setDrawColor(30, 45, 61)
-        else if (isVacant) pdf.setDrawColor(252, 165, 165)
+        pdf.setFillColor(255, 255, 255)
+        if (isVacant) pdf.setDrawColor(252, 165, 165)
         else pdf.setDrawColor(229, 231, 235)
         pdf.setLineWidth(0.35)
         pdf.roundedRect(nx, ny_, nW, nH, 1, 1, 'FD')
 
         // Header fill (1mm inset from sides avoids corner overflow)
-        if (isGys) pdf.setFillColor(36, 51, 71)
-        else if (isVacant) pdf.setFillColor(254, 242, 242)
+        if (isVacant) pdf.setFillColor(254, 242, 242)
         else pdf.setFillColor(248, 250, 252)
         pdf.rect(nx + 1, ny_ + 1, nW - 2, hdrH - 1, 'F')
 
         // Re-draw border on top of header fill
-        if (isGys) pdf.setDrawColor(30, 45, 61)
-        else if (isVacant) pdf.setDrawColor(252, 165, 165)
+        if (isVacant) pdf.setDrawColor(252, 165, 165)
         else pdf.setDrawColor(229, 231, 235)
         pdf.setLineWidth(0.35)
         if (isVacant) pdf.setLineDashPattern([1.2, 0.8], 0)
@@ -573,8 +567,7 @@ export default function OrganigramaProyectoPage() {
         // Cargo label
         pdf.setFont('helvetica', 'bold')
         pdf.setFontSize(fz(10, 8))
-        if (isGys) pdf.setTextColor(199, 210, 254)
-        else if (isVacant) pdf.setTextColor(248, 113, 113)
+        if (isVacant) pdf.setTextColor(248, 113, 113)
         else pdf.setTextColor(79, 70, 229)
         const cargoLines = pdf.splitTextToSize(n.nodo.cargoLabel, nW - sm(8))
         pdf.text(cargoLines, nx + nW / 2, ny_ + hdrH / 2, { align: 'center', baseline: 'middle' })
@@ -588,15 +581,13 @@ export default function OrganigramaProyectoPage() {
         } else {
           pdf.setFont('helvetica', 'bold')
           pdf.setFontSize(fz(13, 11))
-          if (isGys) pdf.setTextColor(255, 255, 255)
-          else pdf.setTextColor(31, 41, 55)
+          pdf.setTextColor(31, 41, 55)
           const nameLines = pdf.splitTextToSize(n.nodo.user!.name, nW - sm(8))
           pdf.text(nameLines, nx + nW / 2, ny_ + hdrH + sm(14), { align: 'center', baseline: 'middle' })
 
           pdf.setFont('helvetica', 'normal')
           pdf.setFontSize(fz(10, 7))
-          if (isGys) pdf.setTextColor(165, 180, 252)
-          else pdf.setTextColor(156, 163, 175)
+          pdf.setTextColor(156, 163, 175)
           let dy = ny_ + hdrH + sm(28)
           if (n.nodo._telefono) {
             pdf.text(`Tel: ${n.nodo._telefono}`, nx + sm(5), dy)
@@ -698,7 +689,7 @@ export default function OrganigramaProyectoPage() {
               {generating
                 ? <Loader2 className="h-4 w-4 animate-spin mr-2" />
                 : <Plus className="h-4 w-4 mr-2" />}
-              Crear desde cero (solo nodos GYS)
+              Crear solo nodos corporativos
             </Button>
           </div>
         </div>
@@ -818,31 +809,19 @@ export default function OrganigramaProyectoPage() {
             {panelNodo && (
               <div className="w-72 border-l bg-white flex flex-col flex-shrink-0 overflow-y-auto">
                 {/* Panel header */}
-                <div className={`px-4 py-3 border-b flex items-center justify-between ${panelNodo.esFijoGys ? 'bg-[#2E4057]' : 'bg-white'}`}>
-                  <div className={`text-sm font-semibold ${panelNodo.esFijoGys ? 'text-white' : 'text-gray-800'}`}>
-                    {panelNodo.esFijoGys ? '🔒 Nodo GYS' : 'Editar nodo'}
-                  </div>
-                  <button
-                    onClick={() => setPanelNodo(null)}
-                    className={`${panelNodo.esFijoGys ? 'text-white/60 hover:text-white' : 'text-gray-400 hover:text-gray-700'}`}
-                  >
+                <div className="px-4 py-3 border-b flex items-center justify-between bg-white">
+                  <div className="text-sm font-semibold text-gray-800">Editar nodo</div>
+                  <button onClick={() => setPanelNodo(null)} className="text-gray-400 hover:text-gray-700">
                     <X className="h-4 w-4" />
                   </button>
                 </div>
 
                 <div className="p-4 space-y-4 flex-1">
-                  {panelNodo.esFijoGys && (
-                    <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
-                      Cargo no editable. Solo puedes cambiar la persona asignada y datos de contacto.
-                    </p>
-                  )}
-
                   <div className="space-y-1.5">
                     <Label className="text-xs text-muted-foreground">Cargo</Label>
                     <Input
                       value={panelCargo}
                       onChange={e => setPanelCargo(e.target.value)}
-                      disabled={panelNodo.esFijoGys}
                       className="h-8 text-sm"
                     />
                   </div>
@@ -975,26 +954,19 @@ export default function OrganigramaProyectoPage() {
                   return (
                     <TableRow
                       key={nodo.id}
-                      className={isEditing ? 'bg-indigo-50/70' : nodo.esFijoGys ? 'bg-slate-50/50' : ''}
+                      className={isEditing ? 'bg-indigo-50/70' : ''}
                     >
-                      <TableCell className="pl-4 py-2">
-                        {nodo.esFijoGys && (
-                          <Lock className="h-3.5 w-3.5 text-amber-400" aria-label="Nodo corporativo GYS" />
-                        )}
-                      </TableCell>
+                      <TableCell className="pl-4 py-2" />
                       <TableCell className="py-2 font-medium text-sm">
                         <div style={{ paddingLeft: `${depth * 16}px` }}>
                         {isEditing ? (
                           <Input
                             value={rowCargo}
                             onChange={e => setRowCargo(e.target.value)}
-                            disabled={nodo.esFijoGys}
                             className="h-7 text-xs w-44"
                           />
                         ) : (
-                          <span className={nodo.esFijoGys ? 'text-[#2E4057] font-semibold text-xs uppercase tracking-wide' : 'text-sm'}>
-                            {nodo.cargoLabel}
-                          </span>
+                          <span className="text-sm">{nodo.cargoLabel}</span>
                         )}
                         </div>
                       </TableCell>
@@ -1076,40 +1048,34 @@ export default function OrganigramaProyectoPage() {
                             </>
                           ) : (
                             <>
-                              {!nodo.esFijoGys && (
-                                <>
-                                  <Button
-                                    size="sm" variant="ghost"
-                                    className="h-7 w-7 p-0 text-gray-400 hover:text-gray-700"
-                                    disabled={pos?.isFirst}
-                                    onClick={() => handleMoveNodo(nodo.id, 'up')}
-                                    title="Mover arriba"
-                                  >
-                                    <ChevronUp className="h-3.5 w-3.5" />
-                                  </Button>
-                                  <Button
-                                    size="sm" variant="ghost"
-                                    className="h-7 w-7 p-0 text-gray-400 hover:text-gray-700"
-                                    disabled={pos?.isLast}
-                                    onClick={() => handleMoveNodo(nodo.id, 'down')}
-                                    title="Mover abajo"
-                                  >
-                                    <ChevronDown className="h-3.5 w-3.5" />
-                                  </Button>
-                                </>
-                              )}
+                              <Button
+                                size="sm" variant="ghost"
+                                className="h-7 w-7 p-0 text-gray-400 hover:text-gray-700"
+                                disabled={pos?.isFirst}
+                                onClick={() => handleMoveNodo(nodo.id, 'up')}
+                                title="Mover arriba"
+                              >
+                                <ChevronUp className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                size="sm" variant="ghost"
+                                className="h-7 w-7 p-0 text-gray-400 hover:text-gray-700"
+                                disabled={pos?.isLast}
+                                onClick={() => handleMoveNodo(nodo.id, 'down')}
+                                title="Mover abajo"
+                              >
+                                <ChevronDown className="h-3.5 w-3.5" />
+                              </Button>
                               <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => startEditRow(nodo)}>
                                 <Pencil className="h-3.5 w-3.5" />
                               </Button>
-                              {!nodo.esFijoGys && (
-                                <Button
-                                  size="sm" variant="ghost"
-                                  className="h-7 w-7 p-0 text-red-400 hover:text-red-600 hover:bg-red-50"
-                                  onClick={() => handleDeleteNodo(nodo.id)}
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </Button>
-                              )}
+                              <Button
+                                size="sm" variant="ghost"
+                                className="h-7 w-7 p-0 text-red-400 hover:text-red-600 hover:bg-red-50"
+                                onClick={() => handleDeleteNodo(nodo.id)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
                             </>
                           )}
                         </div>

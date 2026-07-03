@@ -2042,6 +2042,7 @@ model User {
   // Ventas de equipos
   ventasEquipoComercial                    VentaEquipo[]            @relation("VentaEquipoComercial")
   avancesTareaRegistrados                  ProyectoTareaAvance[]
+  plantillaOrgNodos                        PlantillaOrgNodo[]
 
   @@map("user")
 }
@@ -5323,6 +5324,7 @@ model PlantillaOrganigrama {
   nombre      String
   descripcion String?
   activo      Boolean  @default(true)
+  esBase      Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -5332,14 +5334,15 @@ model PlantillaOrganigrama {
 }
 
 model PlantillaOrgNodo {
-  id           String   @id @default(cuid())
-  plantillaId  String
-  parentId     String?
-  orden        Int      @default(0)
-  cargoLabel   String
-  recursoId    String?
+  id             String   @id @default(cuid())
+  plantillaId    String
+  parentId       String?
+  orden          Int      @default(0)
+  cargoLabel     String
+  recursoId      String?
+  userId         String?
   esObligatorio  Boolean  @default(true)
-  gysParentLabel String?
+  gysParentLabel  String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -5347,6 +5350,7 @@ model PlantillaOrgNodo {
   parent    PlantillaOrgNodo?    @relation("PlantillaJerarquia", fields: [parentId], references: [id])
   hijos     PlantillaOrgNodo[]   @relation("PlantillaJerarquia")
   recurso   Recurso?             @relation(fields: [recursoId], references: [id])
+  user      User?                @relation(fields: [userId], references: [id])
 
   @@index([plantillaId])
   @@map("plantilla_org_nodo")

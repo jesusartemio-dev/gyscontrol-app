@@ -148,7 +148,6 @@ function NodoCard({ node, onClick }: { node: LayoutNode; onClick?: (n: OrgNodoCo
   const { nodo, x, y, dims } = node
   const { NODE_W, NODE_H } = dims
   const isVacante = !nodo.user
-  const isGys = nodo.esFijoGys
   const isCompact = NODE_W < 180
 
   return (
@@ -165,25 +164,23 @@ function NodoCard({ node, onClick }: { node: LayoutNode; onClick?: (n: OrgNodoCo
         className={[
           'rounded-lg border-2 shadow-sm cursor-pointer transition-all duration-150 flex flex-col',
           'hover:shadow-md hover:scale-[1.02]',
-          isGys
-            ? 'bg-[#2E4057] border-[#1e2d3d] text-white'
-            : isVacante
-              ? 'bg-white border-dashed border-red-300 text-gray-600'
-              : 'bg-white border-gray-200 text-gray-800',
+          isVacante
+            ? 'bg-white border-dashed border-red-300 text-gray-600'
+            : 'bg-white border-gray-200 text-gray-800',
         ].join(' ')}
       >
         {/* Franja superior — cargo */}
         <div
           className={[
             isCompact ? 'px-2 pt-1.5 pb-1 rounded-t-md' : 'px-3 pt-2.5 pb-1.5 rounded-t-[10px]',
-            isGys ? 'bg-[#243347]' : isVacante ? 'bg-red-50' : 'bg-slate-50',
+            isVacante ? 'bg-red-50' : 'bg-slate-50',
           ].join(' ')}
         >
           <div
             className={[
               'font-bold uppercase tracking-widest leading-tight truncate',
               isCompact ? 'text-[8px]' : 'text-[10px]',
-              isGys ? 'text-indigo-200' : isVacante ? 'text-red-400' : 'text-indigo-600',
+              isVacante ? 'text-red-400' : 'text-indigo-600',
             ].join(' ')}
           >
             {nodo.cargoLabel}
@@ -201,26 +198,22 @@ function NodoCard({ node, onClick }: { node: LayoutNode; onClick?: (n: OrgNodoCo
             </div>
           ) : (
             <div className="space-y-0.5">
-              <div
-                className={`font-semibold truncate leading-tight ${isCompact ? 'text-[10px]' : 'text-[13px]'} ${
-                  isGys ? 'text-white' : 'text-gray-800'
-                }`}
-              >
+              <div className={`font-semibold truncate leading-tight text-gray-800 ${isCompact ? 'text-[10px]' : 'text-[13px]'}`}>
                 {nodo.user!.name}
               </div>
               {!isCompact && (
                 <>
                   {nodo._telefono && (
-                    <div className={`text-[10px] truncate ${isGys ? 'text-indigo-300' : 'text-gray-400'}`}>
+                    <div className="text-[10px] truncate text-gray-400">
                       Tel: {nodo._telefono}
                     </div>
                   )}
                   {nodo._cip && (
-                    <div className={`text-[10px] truncate ${isGys ? 'text-indigo-300' : 'text-gray-400'}`}>
+                    <div className="text-[10px] truncate text-gray-400">
                       CIP {nodo._cip}
                     </div>
                   )}
-                  <div className={`text-[10px] truncate ${isGys ? 'text-indigo-300' : 'text-gray-400'}`}>
+                  <div className="text-[10px] truncate text-gray-400">
                     {nodo.user!.email}
                   </div>
                 </>
@@ -229,7 +222,7 @@ function NodoCard({ node, onClick }: { node: LayoutNode; onClick?: (n: OrgNodoCo
           )}
 
           {/* Empresa — solo en modo normal */}
-          {!isCompact && !isGys && (
+          {!isCompact && (
             <div className="text-[9px] text-gray-300 truncate mt-1 uppercase tracking-wide">
               {nodo._empresa}
             </div>

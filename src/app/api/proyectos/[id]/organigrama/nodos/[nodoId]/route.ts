@@ -61,12 +61,8 @@ export async function DELETE(req: Request, { params }: Ctx) {
 
     const { nodoId } = await params
 
-    // No se puede eliminar nodos fijos GYS
     const nodo = await prisma.proyectoOrgNodo.findUnique({ where: { id: nodoId } })
     if (!nodo) return NextResponse.json({ error: 'Nodo no encontrado' }, { status: 404 })
-    if (nodo.esFijoGys) {
-      return NextResponse.json({ error: 'Los nodos corporativos GYS no se pueden eliminar' }, { status: 400 })
-    }
 
     await prisma.proyectoOrgNodo.delete({ where: { id: nodoId } })
 
