@@ -34,10 +34,11 @@ interface ChartDims {
   NODE_H: number
   H_GAP: number
   V_GAP: number
+  MAX_COLS: number  // max children per row before wrapping
 }
 
-export const NORMAL_DIMS: ChartDims = { NODE_W: 190, NODE_H: 112, H_GAP: 20, V_GAP: 28 }
-const COMPACT_DIMS: ChartDims = { NODE_W: 148, NODE_H: 64, H_GAP: 6, V_GAP: 28 }
+export const NORMAL_DIMS: ChartDims = { NODE_W: 175, NODE_H: 112, H_GAP: 10, V_GAP: 28, MAX_COLS: 3 }
+const COMPACT_DIMS: ChartDims = { NODE_W: 148, NODE_H: 64, H_GAP: 6, V_GAP: 28, MAX_COLS: 999 }
 
 export interface LayoutNode {
   nodo: OrgNodoCompleto
@@ -53,7 +54,7 @@ export function buildLayout(nodos: OrgNodoCompleto[], dims: ChartDims): {
   svgHeight: number
   edges: { x1: number; y1: number; x2: number; y2: number }[]
 } {
-  const { NODE_W, NODE_H, H_GAP, V_GAP } = dims
+  const { NODE_W, NODE_H, H_GAP, V_GAP, MAX_COLS } = dims
   if (nodos.length === 0) return { nodes: [], svgWidth: 0, svgHeight: 0, edges: [] }
 
   const byId = Object.fromEntries(nodos.map(n => [n.id, n]))
@@ -70,29 +71,43 @@ export function buildLayout(nodos: OrgNodoCompleto[], dims: ChartDims): {
   const positions: Record<string, { x: number; y: number }> = {}
   const widths: Record<string, number> = {}
 
+  // Compute subtree width respecting MAX_COLS wrapping
   function subtreeWidth(id: string): number {
     const kids = children[id] ?? []
     if (kids.length === 0) { widths[id] = NODE_W; return NODE_W }
-    const total = kids.reduce((s, k) => s + subtreeWidth(k) + H_GAP, -H_GAP)
-    widths[id] = Math.max(NODE_W, total)
+    kids.forEach(k => subtreeWidth(k))
+    const cols = Math.min(kids.length, MAX_COLS)
+    const rows = Math.ceil(kids.length / cols)
+    let maxRowW = 0
+    for (let r = 0; r < rows; r++) {
+      const rowKids = kids.slice(r * cols, (r + 1) * cols)
+      const rowW = rowKids.reduce((s, k) => s + widths[k] + H_GAP, -H_GAP)
+      maxRowW = Math.max(maxRowW, rowW)
+    }
+    widths[id] = Math.max(NODE_W, maxRowW)
     return widths[id]
   }
 
   const roots = nodos.filter(n => !n.parentId).sort((a, b) => a.orden - b.orden)
-  let totalRootWidth = roots.reduce((s, r) => s + subtreeWidth(r.id) + H_GAP, -H_GAP)
-  if (roots.length === 0) totalRootWidth = 0
-  void totalRootWidth
+  roots.forEach(r => subtreeWidth(r.id))
 
-  function assignPositions(id: string, centerX: number, depth: number) {
-    positions[id] = { x: centerX - NODE_W / 2, y: depth * (NODE_H + V_GAP) }
+  // Place nodes using absolute Y (startY) so wrapped rows stack below each other
+  function assignPositions(id: string, centerX: number, startY: number) {
+    positions[id] = { x: centerX - NODE_W / 2, y: startY }
     const kids = children[id] ?? []
     if (kids.length === 0) return
-    const totalKidsWidth = kids.reduce((s, k) => s + widths[k] + H_GAP, -H_GAP)
-    let curX = centerX - totalKidsWidth / 2
-    for (const kid of kids) {
-      const kidCenter = curX + widths[kid] / 2
-      assignPositions(kid, kidCenter, depth + 1)
-      curX += widths[kid] + H_GAP
+    const cols = Math.min(kids.length, MAX_COLS)
+    const rows = Math.ceil(kids.length / cols)
+    const childBaseY = startY + NODE_H + V_GAP
+    for (let r = 0; r < rows; r++) {
+      const rowKids = kids.slice(r * cols, (r + 1) * cols)
+      const rowW = rowKids.reduce((s, k) => s + widths[k] + H_GAP, -H_GAP)
+      const rowY = childBaseY + r * (NODE_H + V_GAP)
+      let curX = centerX - rowW / 2
+      for (const kid of rowKids) {
+        assignPositions(kid, curX + widths[kid] / 2, rowY)
+        curX += widths[kid] + H_GAP
+      }
     }
   }
 
@@ -144,7 +159,7 @@ function NodoCard({ node, onClick }: { node: LayoutNode; onClick?: (n: OrgNodoCo
   const { nodo, x, y, dims } = node
   const { NODE_W, NODE_H } = dims
   const isVacante = !nodo.user
-  const isCompact = NODE_W < 180
+  const isCompact = NODE_W < 160
 
   return (
     <foreignObject
