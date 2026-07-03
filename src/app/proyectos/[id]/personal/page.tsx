@@ -95,7 +95,7 @@ const rolesFijosConfig: Record<string, { icon: any; className: string; label: st
   comercial: { icon: Briefcase, className: 'bg-emerald-100 text-emerald-700', label: 'Comercial' },
   gestor: { icon: UserCog, className: 'bg-blue-100 text-blue-700', label: 'Gestor' },
   supervisor: { icon: HardHat, className: 'bg-orange-100 text-orange-700', label: 'Supervisor' },
-  lider: { icon: Settings, className: 'bg-purple-100 text-purple-700', label: 'Líder Técnico' }
+  lider: { icon: Settings, className: 'bg-purple-100 text-purple-700', label: 'Residente' }
 }
 
 const roleDescriptions: Record<string, string> = {
