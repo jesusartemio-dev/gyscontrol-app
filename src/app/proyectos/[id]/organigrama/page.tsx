@@ -800,8 +800,8 @@ export default function OrganigramaProyectoPage() {
         {/* ── TAB VISTA ──────────────────────────────────────────────────── */}
         <TabsContent value="vista" className="flex-1 flex min-h-0 m-0">
           <div className="flex flex-1 min-h-0 overflow-hidden">
-            {/* Chart area */}
-            <div className="flex-1 min-w-0 overflow-auto bg-slate-50">
+            {/* Chart area — overflow handled by OrgChart internally (pan & zoom) */}
+            <div className="flex-1 min-w-0 overflow-hidden">
               <OrgChart nodos={nodos} onNodoClick={openPanel} />
             </div>
 

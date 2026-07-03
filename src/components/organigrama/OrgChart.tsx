@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useRef, useEffect, useState } from 'react'
+import React, { useRef, useEffect, useState, useCallback } from 'react'
+import { ZoomIn, ZoomOut, Maximize2 } from 'lucide-react'
 
 export interface OrgNodoCompleto {
   id: string
@@ -62,7 +63,6 @@ export function buildLayout(nodos: OrgNodoCompleto[], dims: ChartDims): {
     if (!children[pid]) children[pid] = []
     children[pid].push(n.id)
   }
-
   for (const key of Object.keys(children)) {
     children[key].sort((a, b) => (byId[a]?.orden ?? 0) - (byId[b]?.orden ?? 0))
   }
@@ -72,17 +72,13 @@ export function buildLayout(nodos: OrgNodoCompleto[], dims: ChartDims): {
 
   function subtreeWidth(id: string): number {
     const kids = children[id] ?? []
-    if (kids.length === 0) {
-      widths[id] = NODE_W
-      return NODE_W
-    }
+    if (kids.length === 0) { widths[id] = NODE_W; return NODE_W }
     const total = kids.reduce((s, k) => s + subtreeWidth(k) + H_GAP, -H_GAP)
     widths[id] = Math.max(NODE_W, total)
     return widths[id]
   }
 
   const roots = nodos.filter(n => !n.parentId).sort((a, b) => a.orden - b.orden)
-
   let totalRootWidth = roots.reduce((s, r) => s + subtreeWidth(r.id) + H_GAP, -H_GAP)
   if (roots.length === 0) totalRootWidth = 0
   void totalRootWidth
@@ -169,7 +165,6 @@ function NodoCard({ node, onClick }: { node: LayoutNode; onClick?: (n: OrgNodoCo
             : 'bg-white border-gray-200 text-gray-800',
         ].join(' ')}
       >
-        {/* Franja superior — cargo */}
         <div
           className={[
             isCompact ? 'px-2 pt-1.5 pb-1 rounded-t-md' : 'px-3 pt-2.5 pb-1.5 rounded-t-[10px]',
@@ -187,7 +182,6 @@ function NodoCard({ node, onClick }: { node: LayoutNode; onClick?: (n: OrgNodoCo
           </div>
         </div>
 
-        {/* Cuerpo */}
         <div className={`${isCompact ? 'px-2 py-1' : 'px-3 py-2'} flex-1 flex flex-col justify-center`}>
           {isVacante ? (
             <div className="flex items-center gap-1">
@@ -220,8 +214,6 @@ function NodoCard({ node, onClick }: { node: LayoutNode; onClick?: (n: OrgNodoCo
               )}
             </div>
           )}
-
-          {/* Empresa — solo en modo normal */}
           {!isCompact && (
             <div className="text-[9px] text-gray-300 truncate mt-1 uppercase tracking-wide">
               {nodo._empresa}
@@ -233,25 +225,187 @@ function NodoCard({ node, onClick }: { node: LayoutNode; onClick?: (n: OrgNodoCo
   )
 }
 
+function SvgContent({ nodes, edges, svgWidth, svgHeight, onNodoClick }: {
+  nodes: LayoutNode[]
+  edges: { x1: number; y1: number; x2: number; y2: number }[]
+  svgWidth: number
+  svgHeight: number
+  onNodoClick?: (n: OrgNodoCompleto) => void
+}) {
+  return (
+    <>
+      <defs>
+        <pattern id="dotgrid" x="0" y="0" width="24" height="24" patternUnits="userSpaceOnUse">
+          <circle cx="1" cy="1" r="1" fill="#CBD5E1" opacity="0.5" />
+        </pattern>
+      </defs>
+      <rect width={svgWidth} height={svgHeight} fill="url(#dotgrid)" />
+      {edges.map((e, i) => {
+        const midY = (e.y1 + e.y2) / 2
+        return (
+          <path
+            key={i}
+            d={`M ${e.x1} ${e.y1} C ${e.x1} ${midY}, ${e.x2} ${midY}, ${e.x2} ${e.y2}`}
+            stroke="#94A3B8"
+            strokeWidth={1.5}
+            fill="none"
+          />
+        )
+      })}
+      {nodes.map(n => (
+        <NodoCard key={n.nodo.id} node={n} onClick={onNodoClick} />
+      ))}
+    </>
+  )
+}
+
 export default function OrgChart({ nodos, onNodoClick, compact }: OrgChartProps) {
   const dims = compact ? COMPACT_DIMS : NORMAL_DIMS
   const { nodes, svgWidth, svgHeight, edges } = buildLayout(nodos, dims)
   const containerRef = useRef<HTMLDivElement>(null)
-  const [scale, setScale] = useState(1)
 
+  // ── Compact mode: auto-scale to fit width ────────────────────────────────
+  const [compactScale, setCompactScale] = useState(1)
   useEffect(() => {
     if (!compact) return
     const el = containerRef.current
     if (!el) return
     const update = () => {
       const w = el.clientWidth
-      setScale(w > 0 && svgWidth > w ? w / svgWidth : 1)
+      setCompactScale(w > 0 && svgWidth > w ? w / svgWidth : 1)
     }
     update()
     const obs = new ResizeObserver(update)
     obs.observe(el)
     return () => obs.disconnect()
   }, [svgWidth, compact])
+
+  // ── Normal mode: pan & zoom state ────────────────────────────────────────
+  const [transform, setTransform] = useState({ zoom: 1, panX: 0, panY: 0 })
+  const transformRef = useRef(transform)
+  transformRef.current = transform
+
+  const [dragging, setDragging] = useState(false)
+
+  // Refs for values needed in non-React callbacks
+  const containerSizeRef = useRef({ w: 0, h: 0 })
+  const svgDimsRef = useRef({ w: svgWidth, h: svgHeight })
+  svgDimsRef.current = { w: svgWidth, h: svgHeight }
+
+  const dragDistRef = useRef(0)
+  const justDraggedRef = useRef(false)
+  const prevSvgRef = useRef({ w: 0, h: 0 })
+
+  // Track container size
+  useEffect(() => {
+    if (compact) return
+    const el = containerRef.current
+    if (!el) return
+    const update = () => {
+      containerSizeRef.current = { w: el.clientWidth, h: el.clientHeight }
+    }
+    update()
+    const obs = new ResizeObserver(update)
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [compact])
+
+  // Fit all nodes into the visible area
+  const fitToScreen = useCallback(() => {
+    const { w, h } = containerSizeRef.current
+    const { w: sw, h: sh } = svgDimsRef.current
+    if (!w || !h || !sw || !sh) return
+    const margin = 48
+    const newZoom = Math.min((w - margin) / sw, (h - margin) / sh, 1)
+    setTransform({
+      zoom: newZoom,
+      panX: (w - sw * newZoom) / 2,
+      panY: (h - sh * newZoom) / 2,
+    })
+  }, [])
+
+  // Auto-fit when the diagram changes
+  useEffect(() => {
+    if (compact) return
+    if (svgWidth !== prevSvgRef.current.w || svgHeight !== prevSvgRef.current.h) {
+      prevSvgRef.current = { w: svgWidth, h: svgHeight }
+      const t = setTimeout(fitToScreen, 60)
+      return () => clearTimeout(t)
+    }
+  }, [svgWidth, svgHeight, compact, fitToScreen])
+
+  // Zoom with mouse wheel, centered on cursor
+  useEffect(() => {
+    if (compact) return
+    const el = containerRef.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault()
+      const rect = el.getBoundingClientRect()
+      const cx = e.clientX - rect.left
+      const cy = e.clientY - rect.top
+      const { zoom, panX, panY } = transformRef.current
+      const factor = e.deltaY < 0 ? 1.1 : 0.9
+      const newZoom = Math.min(3, Math.max(0.15, zoom * factor))
+      setTransform({
+        zoom: newZoom,
+        panX: cx - (cx - panX) * (newZoom / zoom),
+        panY: cy - (cy - panY) * (newZoom / zoom),
+      })
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [compact])
+
+  // Drag-to-pan with global mouse tracking so drag works outside SVG
+  const handleSvgMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (compact || e.button !== 0) return
+    e.preventDefault()
+    dragDistRef.current = 0
+    setDragging(true)
+    let lastX = e.clientX
+    let lastY = e.clientY
+
+    const onMove = (ev: MouseEvent) => {
+      const dx = ev.clientX - lastX
+      const dy = ev.clientY - lastY
+      dragDistRef.current += Math.abs(dx) + Math.abs(dy)
+      lastX = ev.clientX
+      lastY = ev.clientY
+      setTransform(prev => ({ ...prev, panX: prev.panX + dx, panY: prev.panY + dy }))
+    }
+
+    const onUp = () => {
+      justDraggedRef.current = dragDistRef.current > 5
+      setDragging(false)
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
+
+  // Suppress node click after a drag
+  const handleClickCapture = (e: React.MouseEvent) => {
+    if (justDraggedRef.current) {
+      e.stopPropagation()
+      justDraggedRef.current = false
+    }
+  }
+
+  // Zoom button: zoom centered on the container
+  const zoomAtCenter = (factor: number) => {
+    const { w, h } = containerSizeRef.current
+    setTransform(prev => {
+      const newZoom = Math.min(3, Math.max(0.15, prev.zoom * factor))
+      return {
+        zoom: newZoom,
+        panX: w / 2 - (w / 2 - prev.panX) * (newZoom / prev.zoom),
+        panY: h / 2 - (h / 2 - prev.panY) * (newZoom / prev.zoom),
+      }
+    })
+  }
 
   if (nodos.length === 0) {
     return (
@@ -261,57 +415,85 @@ export default function OrgChart({ nodos, onNodoClick, compact }: OrgChartProps)
     )
   }
 
-  const scaledH = Math.ceil(svgHeight * scale)
+  // ── Compact mode ──────────────────────────────────────────────────────────
+  if (compact) {
+    const scaledH = Math.ceil(svgHeight * compactScale)
+    return (
+      <div
+        ref={containerRef}
+        id="org-chart-container"
+        className="bg-slate-50"
+        style={{ minHeight: 200, height: scaledH, overflow: 'hidden' }}
+      >
+        <svg
+          width={svgWidth}
+          height={svgHeight}
+          style={{
+            display: 'block',
+            transform: compactScale < 1 ? `scale(${compactScale})` : undefined,
+            transformOrigin: 'top left',
+          }}
+        >
+          <SvgContent nodes={nodes} edges={edges} svgWidth={svgWidth} svgHeight={svgHeight} onNodoClick={onNodoClick} />
+        </svg>
+      </div>
+    )
+  }
+
+  // ── Normal mode with pan & zoom ───────────────────────────────────────────
+  const { zoom, panX, panY } = transform
 
   return (
     <div
       ref={containerRef}
       id="org-chart-container"
-      className="bg-slate-50 rounded-none"
-      style={{
-        minHeight: compact ? 200 : 400,
-        height: compact ? scaledH : undefined,
-        overflow: compact ? 'hidden' : 'auto',
-      }}
+      className="relative bg-slate-50 select-none"
+      style={{ minHeight: 400, height: '100%', overflow: 'hidden' }}
     >
-      {/* Dot grid background */}
       <svg
         width={svgWidth}
         height={svgHeight}
         style={{
           display: 'block',
-          minWidth: compact ? undefined : svgWidth,
-          transform: compact && scale < 1 ? `scale(${scale})` : undefined,
+          transform: `translate(${panX}px, ${panY}px) scale(${zoom})`,
           transformOrigin: 'top left',
+          cursor: dragging ? 'grabbing' : 'grab',
+          willChange: 'transform',
         }}
+        onMouseDown={handleSvgMouseDown}
+        onClickCapture={handleClickCapture}
       >
-        <defs>
-          <pattern id="dotgrid" x="0" y="0" width="24" height="24" patternUnits="userSpaceOnUse">
-            <circle cx="1" cy="1" r="1" fill="#CBD5E1" opacity="0.5" />
-          </pattern>
-        </defs>
-        <rect width={svgWidth} height={svgHeight} fill="url(#dotgrid)" />
-
-        {/* Connector lines */}
-        {edges.map((e, i) => {
-          const midY = (e.y1 + e.y2) / 2
-          return (
-            <path
-              key={i}
-              d={`M ${e.x1} ${e.y1} C ${e.x1} ${midY}, ${e.x2} ${midY}, ${e.x2} ${e.y2}`}
-              stroke="#94A3B8"
-              strokeWidth={1.5}
-              strokeDasharray="0"
-              fill="none"
-            />
-          )
-        })}
-
-        {/* Nodes */}
-        {nodes.map(n => (
-          <NodoCard key={n.nodo.id} node={n} onClick={onNodoClick} />
-        ))}
+        <SvgContent nodes={nodes} edges={edges} svgWidth={svgWidth} svgHeight={svgHeight} onNodoClick={onNodoClick} />
       </svg>
+
+      {/* Zoom controls */}
+      <div className="absolute bottom-4 right-4 flex items-center gap-0.5 bg-white rounded-lg shadow-md border border-gray-200 p-1">
+        <button
+          className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-800 transition-colors"
+          title="Alejar (también con rueda del ratón)"
+          onClick={() => zoomAtCenter(0.8)}
+        >
+          <ZoomOut className="h-3.5 w-3.5" />
+        </button>
+        <span className="text-[11px] text-gray-400 font-mono w-10 text-center select-none tabular-nums">
+          {Math.round(zoom * 100)}%
+        </span>
+        <button
+          className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-800 transition-colors"
+          title="Acercar (también con rueda del ratón)"
+          onClick={() => zoomAtCenter(1.25)}
+        >
+          <ZoomIn className="h-3.5 w-3.5" />
+        </button>
+        <div className="w-px h-4 bg-gray-200 mx-0.5" />
+        <button
+          className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-800 transition-colors"
+          title="Ajustar a pantalla"
+          onClick={fitToScreen}
+        >
+          <Maximize2 className="h-3.5 w-3.5" />
+        </button>
+      </div>
     </div>
   )
 }
