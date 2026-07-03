@@ -56,7 +56,7 @@ function buildPreviewNodos(nodos: NodoPlantilla[]): OrgNodoCompleto[] {
     cipOverride: null,
     telefonoOverride: null,
     empresaOverride: null,
-    user: null,
+    user: n.user ? { id: n.user.id, name: n.user.name, email: n.user.email, empleado: null } : null,
     _telefono: null,
     _cip: null,
     _empresa: 'GYS CONTROL INDUSTRIAL SAC',
