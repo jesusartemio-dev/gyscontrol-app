@@ -340,7 +340,8 @@ export default function CuentasCobrarPage() {
         i.cliente?.nombre.toLowerCase().includes(term) ||
         i.proyecto?.codigo.toLowerCase().includes(term) ||
         i.proyecto?.nombre.toLowerCase().includes(term) ||
-        i.descripcion?.toLowerCase().includes(term)
+        i.descripcion?.toLowerCase().includes(term) ||
+        i.ordenCompraCliente?.toLowerCase().includes(term)
       )
     }
     if (filterOrdenCompra) {
@@ -849,7 +850,7 @@ export default function CuentasCobrarPage() {
         <div className="flex gap-2 items-center flex-wrap">
           <div className="relative flex-1 min-w-[180px] max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar cliente, proyecto, factura..." className="pl-9" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+            <Input placeholder="Buscar cliente, proyecto, factura, OC..." className="pl-9" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
           </div>
           <Select value={filterCliente} onValueChange={v => { setFilterCliente(v); setFilterProyecto('all') }}>
             <SelectTrigger className="w-44">
