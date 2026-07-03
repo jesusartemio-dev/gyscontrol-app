@@ -18,6 +18,7 @@ interface Proyecto {
   nombre: string
   totalCliente: number | null
   clienteId: string | null
+  ordenCompraCliente: string | null
 }
 
 interface Valorizacion {
@@ -227,7 +228,8 @@ export default function FacturacionPage() {
       result = result.filter(i =>
         i.codigo.toLowerCase().includes(term) ||
         i.proyecto?.nombre.toLowerCase().includes(term) ||
-        i.proyecto?.codigo.toLowerCase().includes(term)
+        i.proyecto?.codigo.toLowerCase().includes(term) ||
+        i.proyecto?.ordenCompraCliente?.toLowerCase().includes(term)
       )
     }
     if (filterPeriodPreset !== 'all') {
@@ -481,7 +483,7 @@ export default function FacturacionPage() {
         <div className="flex gap-3 items-center flex-wrap">
           <div className="relative flex-1 min-w-[200px] max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar código, proyecto..." className="pl-9" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+            <Input placeholder="Buscar código, proyecto, OC..." className="pl-9" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
           </div>
           <Select value={filterMoneda} onValueChange={setFilterMoneda}>
             <SelectTrigger className="w-36">
@@ -544,6 +546,7 @@ export default function FacturacionPage() {
               <TableRow>
                 <TableHead>Código</TableHead>
                 <TableHead>Proyecto</TableHead>
+                <TableHead>OC</TableHead>
                 <TableHead>Periodo</TableHead>
                 <TableHead className="text-right">Monto Val.</TableHead>
                 <TableHead className="text-right">Neto a Recibir</TableHead>
@@ -554,7 +557,7 @@ export default function FacturacionPage() {
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     <FileSpreadsheet className="h-8 w-8 mx-auto mb-2 opacity-40" />
                     No hay valorizaciones en esta categoría
                   </TableCell>
@@ -567,6 +570,7 @@ export default function FacturacionPage() {
                       <div className="font-medium">{item.proyecto?.codigo}</div>
                       <div className="text-muted-foreground text-xs truncate max-w-[200px]">{item.proyecto?.nombre}</div>
                     </TableCell>
+                    <TableCell className="font-mono text-sm">{item.proyecto?.ordenCompraCliente || '—'}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {formatPeriod(item.periodoInicio, item.periodoFin)}
                     </TableCell>
@@ -623,7 +627,7 @@ export default function FacturacionPage() {
             {filtered.length > 0 && (
               <TableFooter>
                 <TableRow>
-                  <TableCell colSpan={3} className="py-2 text-sm text-muted-foreground">
+                  <TableCell colSpan={4} className="py-2 text-sm text-muted-foreground">
                     {totals.activas} valorización{totals.activas !== 1 ? 'es' : ''}
                     {totals.total !== totals.activas && ` · ${totals.total - totals.activas} anulada${totals.total - totals.activas !== 1 ? 's' : ''}`}
                   </TableCell>

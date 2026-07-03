@@ -940,6 +940,7 @@ export default function CuentasCobrarPage() {
                 <TableHead>Documento</TableHead>
                 <TableHead>Cliente</TableHead>
                 <TableHead>Proyecto</TableHead>
+                <TableHead>OC</TableHead>
                 <TableHead>Valorización</TableHead>
                 <TableHead className="text-right">Monto</TableHead>
                 <TableHead className="text-right">Pagado</TableHead>
@@ -952,7 +953,7 @@ export default function CuentasCobrarPage() {
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                     <DollarSign className="h-8 w-8 mx-auto mb-2 opacity-40" />
                     No hay cuentas por cobrar
                   </TableCell>
@@ -968,6 +969,7 @@ export default function CuentasCobrarPage() {
                       <TableCell className="text-sm">
                         <div className="font-mono">{item.proyecto?.codigo}</div>
                       </TableCell>
+                      <TableCell className="font-mono text-sm">{item.ordenCompraCliente || '—'}</TableCell>
                       <TableCell className="text-sm font-mono text-muted-foreground">
                         {item.valorizacion?.codigo || '—'}
                       </TableCell>
@@ -1003,7 +1005,7 @@ export default function CuentasCobrarPage() {
             {filtered.length > 0 && (
               <TableFooter>
                 <TableRow>
-                  <TableCell colSpan={4} className="py-2 text-sm text-muted-foreground">
+                  <TableCell colSpan={5} className="py-2 text-sm text-muted-foreground">
                     {totals.activas} cuenta{totals.activas !== 1 ? 's' : ''}
                     {totals.total !== totals.activas && ` · ${totals.total - totals.activas} anulada${totals.total - totals.activas !== 1 ? 's' : ''}`}
                   </TableCell>
