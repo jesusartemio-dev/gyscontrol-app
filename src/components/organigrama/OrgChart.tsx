@@ -36,7 +36,7 @@ interface ChartDims {
   V_GAP: number
 }
 
-export const NORMAL_DIMS: ChartDims = { NODE_W: 190, NODE_H: 112, H_GAP: 20, V_GAP: 56 }
+export const NORMAL_DIMS: ChartDims = { NODE_W: 190, NODE_H: 112, H_GAP: 20, V_GAP: 28 }
 const COMPACT_DIMS: ChartDims = { NODE_W: 148, NODE_H: 64, H_GAP: 6, V_GAP: 28 }
 
 export interface LayoutNode {
@@ -245,7 +245,7 @@ function SvgContent({ nodes, edges, svgWidth, svgHeight, onNodoClick }: {
         return (
           <path
             key={i}
-            d={`M ${e.x1} ${e.y1} C ${e.x1} ${midY}, ${e.x2} ${midY}, ${e.x2} ${e.y2}`}
+            d={`M ${e.x1} ${e.y1} L ${e.x1} ${midY} L ${e.x2} ${midY} L ${e.x2} ${e.y2}`}
             stroke="#94A3B8"
             strokeWidth={1.5}
             fill="none"

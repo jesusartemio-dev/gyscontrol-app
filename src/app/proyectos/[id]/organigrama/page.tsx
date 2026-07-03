@@ -338,14 +338,16 @@ export default function OrganigramaProyectoPage() {
         ctx.closePath()
       }
 
-      // Edges
+      // Edges (right-angle connectors)
       ctx.strokeStyle = '#94A3B8'
       ctx.lineWidth = 1.5
       for (const e of edges) {
         const midY = (e.y1 + e.y2) / 2
         ctx.beginPath()
         ctx.moveTo(e.x1, e.y1)
-        ctx.bezierCurveTo(e.x1, midY, e.x2, midY, e.x2, e.y2)
+        ctx.lineTo(e.x1, midY)
+        ctx.lineTo(e.x2, midY)
+        ctx.lineTo(e.x2, e.y2)
         ctx.stroke()
       }
 
@@ -517,7 +519,7 @@ export default function OrganigramaProyectoPage() {
       const sm = (v: number) => v * sc
       const fz = (v: number, cap = 12) => Math.max(4, Math.min(cap, sm(v) * 2.835))
 
-      // Connector lines (cubic bezier)
+      // Connector lines (right-angle)
       pdf.setDrawColor(148, 163, 184)
       pdf.setLineWidth(0.25)
       for (const e of edges) {
@@ -525,7 +527,7 @@ export default function OrganigramaProyectoPage() {
         const ex2 = px(e.x2), ey2 = py(e.y2)
         const emy = (ey1 + ey2) / 2
         pdf.lines(
-          [[0, emy - ey1, ex2 - ex1, emy - ey1, ex2 - ex1, ey2 - ey1]],
+          [[0, emy - ey1], [ex2 - ex1, 0], [0, ey2 - emy]],
           ex1, ey1, [1, 1], 'S'
         )
       }
