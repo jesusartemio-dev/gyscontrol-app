@@ -174,8 +174,8 @@ export async function POST(req: Request, { params }: Ctx) {
             resolvedParentId = plantillaIdMap[pNodo.parentId] ?? anclaId
           }
 
-          // Auto-asignar userId según rol del proyecto
-          let userId: string | null = null
+          // Auto-asignar userId según rol del proyecto (fallback: userId pre-configurado en plantilla)
+          let userId: string | null = pNodo.userId ?? null
           if (matchCargoConRolProyecto(pNodo.cargoLabel, 'gestor') && proyecto.gestorId) {
             userId = proyecto.gestorId
           } else if (matchCargoConRolProyecto(pNodo.cargoLabel, 'supervisor') && proyecto.supervisorId) {

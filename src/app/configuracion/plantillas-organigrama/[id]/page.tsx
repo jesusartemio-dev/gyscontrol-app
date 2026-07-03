@@ -20,6 +20,7 @@ import Link from 'next/link'
 import OrgChart, { OrgNodoCompleto } from '@/components/organigrama/OrgChart'
 
 interface Recurso { id: string; nombre: string; tipo: string }
+interface UsuarioItem { id: string; name: string; email: string }
 interface NodoPlantilla {
   id: string
   plantillaId: string
@@ -27,9 +28,11 @@ interface NodoPlantilla {
   orden: number
   cargoLabel: string
   recursoId: string | null
+  userId: string | null
   esObligatorio: boolean
   gysParentLabel: string | null
   recurso: Recurso | null
+  user: UsuarioItem | null
 }
 
 interface Plantilla {
@@ -67,6 +70,7 @@ export default function PlantillaEditorPage() {
 
   const [plantilla, setPlantilla] = useState<Plantilla | null>(null)
   const [recursos, setRecursos] = useState<Recurso[]>([])
+  const [usuarios, setUsuarios] = useState<UsuarioItem[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedNodoId, setSelectedNodoId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -77,18 +81,22 @@ export default function PlantillaEditorPage() {
 
   const [formLabel, setFormLabel] = useState('')
   const [formRecursoId, setFormRecursoId] = useState('')
+  const [formUserId, setFormUserId] = useState('')
   const [formObligatorio, setFormObligatorio] = useState(true)
 
   const loadData = useCallback(async () => {
     try {
-      const [pRes, rRes] = await Promise.all([
+      const [pRes, rRes, uRes] = await Promise.all([
         fetch(`/api/configuracion/plantillas-organigrama/${plantillaId}`),
         fetch('/api/recurso?activos=true'),
+        fetch('/api/admin/usuarios'),
       ])
       if (!pRes.ok) { router.push('/configuracion/plantillas-organigrama'); return }
-      const [p, r] = await Promise.all([pRes.json(), rRes.json()])
+      const [p, r, u] = await Promise.all([pRes.json(), rRes.json(), uRes.json()])
       setPlantilla(p)
       setRecursos(Array.isArray(r) ? r.filter((x: Recurso) => x.tipo === 'individual') : [])
+      const rawUsuarios = Array.isArray(u) ? u : (u.users ?? [])
+      setUsuarios(rawUsuarios.map((x: any) => ({ id: x.id, name: x.name ?? x.nombre ?? '', email: x.email ?? '' })))
     } catch {
       toast.error('Error al cargar datos')
     } finally {
@@ -104,6 +112,7 @@ export default function PlantillaEditorPage() {
     if (selectedNodo) {
       setFormLabel(selectedNodo.cargoLabel)
       setFormRecursoId(selectedNodo.recursoId ?? '')
+      setFormUserId(selectedNodo.userId ?? '')
       setFormObligatorio(selectedNodo.esObligatorio)
     }
   }, [selectedNodoId])
@@ -120,6 +129,7 @@ export default function PlantillaEditorPage() {
           body: JSON.stringify({
             cargoLabel: formLabel.trim(),
             recursoId: formRecursoId || null,
+            userId: formUserId || null,
             esObligatorio: formObligatorio,
           }),
         }
@@ -265,6 +275,11 @@ export default function PlantillaEditorPage() {
         >
           <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
           <span className="text-sm flex-1 truncate font-medium">{nodo.cargoLabel}</span>
+          {nodo.user && (
+            <Badge className="text-[10px] px-1.5 py-0 bg-green-100 text-green-700 border-green-200 shrink-0 max-w-[90px] truncate">
+              {nodo.user.name || nodo.user.email}
+            </Badge>
+          )}
           {nodo.recurso && (
             <Badge variant="secondary" className="text-[10px] px-1.5 py-0 hidden group-hover:flex">
               {nodo.recurso.nombre}
@@ -458,6 +473,24 @@ export default function PlantillaEditorPage() {
                     </Select>
                     <p className="text-xs text-muted-foreground">
                       Qué tipo de recurso ocupa este cargo (referencial)
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Persona asignada</Label>
+                    <Select value={formUserId || '__none__'} onValueChange={v => setFormUserId(v === '__none__' ? '' : v)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sin persona asignada" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Sin persona asignada</SelectItem>
+                        {usuarios.map(u => (
+                          <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Se pre-asignará al generar el organigrama de un proyecto
                     </p>
                   </div>
 
