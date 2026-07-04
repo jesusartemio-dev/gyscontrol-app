@@ -39,7 +39,7 @@ interface ChartDims {
   isCompact: boolean
 }
 
-export const NORMAL_DIMS: ChartDims = { NODE_W: 145, NODE_H: 112, H_GAP: 6, V_GAP: 22, MAX_COLS: 2, WRAP_FROM_DEPTH: 1, isCompact: false }
+export const NORMAL_DIMS: ChartDims = { NODE_W: 130, NODE_H: 112, H_GAP: 5, V_GAP: 22, MAX_COLS: 999, WRAP_FROM_DEPTH: 1, isCompact: false }
 const COMPACT_DIMS: ChartDims = { NODE_W: 130, NODE_H: 64, H_GAP: 6, V_GAP: 24, MAX_COLS: 999, WRAP_FROM_DEPTH: 0, isCompact: true }
 
 export interface LayoutNode {
