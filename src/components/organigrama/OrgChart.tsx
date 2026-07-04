@@ -39,7 +39,7 @@ interface ChartDims {
   isCompact: boolean
 }
 
-export const NORMAL_DIMS: ChartDims = { NODE_W: 130, NODE_H: 112, H_GAP: 5, V_GAP: 22, MAX_COLS: 999, WRAP_FROM_DEPTH: 1, isCompact: false }
+export const NORMAL_DIMS: ChartDims = { NODE_W: 140, NODE_H: 112, H_GAP: 5, V_GAP: 22, MAX_COLS: 999, WRAP_FROM_DEPTH: 1, isCompact: false }
 const COMPACT_DIMS: ChartDims = { NODE_W: 130, NODE_H: 64, H_GAP: 6, V_GAP: 24, MAX_COLS: 999, WRAP_FROM_DEPTH: 0, isCompact: true }
 
 export interface LayoutNode {
@@ -197,7 +197,7 @@ function NodoCard({ node, onClick }: { node: LayoutNode; onClick?: (n: OrgNodoCo
       >
         <div
           className={[
-            isCompact ? 'px-2 pt-1.5 pb-1 rounded-t-md' : 'px-3 pt-2.5 pb-1.5 rounded-t-[10px]',
+            isCompact ? 'px-2 pt-1.5 pb-1 rounded-t-md' : 'px-2 pt-2.5 pb-1.5 rounded-t-[10px]',
             isVacante ? 'bg-red-50' : 'bg-slate-50',
           ].join(' ')}
         >
@@ -212,7 +212,7 @@ function NodoCard({ node, onClick }: { node: LayoutNode; onClick?: (n: OrgNodoCo
           </div>
         </div>
 
-        <div className={`${isCompact ? 'px-2 py-1' : 'px-3 py-2'} flex-1 flex flex-col justify-center`}>
+        <div className={`${isCompact ? 'px-2 py-1' : 'px-2 py-2'} flex-1 flex flex-col justify-center`}>
           {isVacante ? (
             <div className="flex items-center gap-1">
               <div className={`rounded-full bg-red-400 animate-pulse ${isCompact ? 'h-1 w-1' : 'h-1.5 w-1.5'}`} />
