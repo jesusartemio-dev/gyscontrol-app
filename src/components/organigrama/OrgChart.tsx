@@ -54,7 +54,7 @@ export function buildLayout(nodos: OrgNodoCompleto[], dims: ChartDims): {
   nodes: LayoutNode[]
   svgWidth: number
   svgHeight: number
-  edges: { x1: number; y1: number; x2: number; y2: number }[]
+  edges: { x1: number; y1: number; x2: number; y2: number; midY: number }[]
 } {
   const { NODE_W, NODE_H, H_GAP, V_GAP, MAX_COLS, WRAP_FROM_DEPTH } = dims
   if (nodos.length === 0) return { nodes: [], svgWidth: 0, svgHeight: 0, edges: [] }
@@ -94,22 +94,26 @@ export function buildLayout(nodos: OrgNodoCompleto[], dims: ChartDims): {
   const roots = nodos.filter(n => !n.parentId).sort((a, b) => a.orden - b.orden)
   roots.forEach(r => subtreeWidth(r.id, 0))
 
-  // Place nodes using absolute Y (startY) so wrapped rows stack below each other
-  function assignPositions(id: string, centerX: number, startY: number, depth: number) {
+  // Place nodes. minChildY prevents a node's children from starting above a sibling-wrap row,
+  // which would cause overlapping nodes (e.g. CADISTA wrap-row vs SUPERVISOR's children).
+  function assignPositions(id: string, centerX: number, startY: number, depth: number, minChildY = 0) {
     positions[id] = { x: centerX - NODE_W / 2, y: startY }
     const kids = children[id] ?? []
     if (kids.length === 0) return
     const effectiveCols = depth < WRAP_FROM_DEPTH ? 9999 : MAX_COLS
     const cols = Math.min(kids.length, effectiveCols)
     const rows = Math.ceil(kids.length / cols)
-    const childBaseY = startY + NODE_H + V_GAP
+    const childBaseY = Math.max(startY + NODE_H + V_GAP, minChildY)
+    // Bottom of the last sibling row — grandchildren must start below this
+    const lastRowY = childBaseY + (rows - 1) * (NODE_H + V_GAP)
+    const kidMinChildY = lastRowY + NODE_H + V_GAP
     for (let r = 0; r < rows; r++) {
       const rowKids = kids.slice(r * cols, (r + 1) * cols)
       const rowW = rowKids.reduce((s, k) => s + widths[k] + H_GAP, -H_GAP)
       const rowY = childBaseY + r * (NODE_H + V_GAP)
       let curX = centerX - rowW / 2
       for (const kid of rowKids) {
-        assignPositions(kid, curX + widths[kid] / 2, rowY, depth + 1)
+        assignPositions(kid, curX + widths[kid] / 2, rowY, depth + 1, kidMinChildY)
         curX += widths[kid] + H_GAP
       }
     }
@@ -117,7 +121,7 @@ export function buildLayout(nodos: OrgNodoCompleto[], dims: ChartDims): {
 
   let curX = 0
   for (const root of roots) {
-    assignPositions(root.id, curX + widths[root.id] / 2, 0, 0)
+    assignPositions(root.id, curX + widths[root.id] / 2, 0, 0, 0)
     curX += widths[root.id] + H_GAP
   }
 
@@ -142,17 +146,21 @@ export function buildLayout(nodos: OrgNodoCompleto[], dims: ChartDims): {
     dims,
   }))
 
-  const edges: { x1: number; y1: number; x2: number; y2: number }[] = []
+  const edges: { x1: number; y1: number; x2: number; y2: number; midY: number }[] = []
   for (const n of nodos) {
     if (!n.parentId) continue
     const parent = positions[n.parentId]
     const child = positions[n.id]
     if (!parent || !child) continue
+    const y2 = child.y
     edges.push({
       x1: parent.x + NODE_W / 2,
       y1: parent.y + NODE_H,
       x2: child.x + NODE_W / 2,
-      y2: child.y,
+      y2,
+      // Connector turns just above the child node (inside the V_GAP space)
+      // so it never passes through sibling wrap-row nodes at intermediate Y levels
+      midY: y2 - V_GAP / 2,
     })
   }
 
@@ -246,7 +254,7 @@ function NodoCard({ node, onClick }: { node: LayoutNode; onClick?: (n: OrgNodoCo
 
 function SvgContent({ nodes, edges, svgWidth, svgHeight, onNodoClick }: {
   nodes: LayoutNode[]
-  edges: { x1: number; y1: number; x2: number; y2: number }[]
+  edges: { x1: number; y1: number; x2: number; y2: number; midY: number }[]
   svgWidth: number
   svgHeight: number
   onNodoClick?: (n: OrgNodoCompleto) => void
@@ -260,11 +268,10 @@ function SvgContent({ nodes, edges, svgWidth, svgHeight, onNodoClick }: {
       </defs>
       <rect width={svgWidth} height={svgHeight} fill="url(#dotgrid)" />
       {edges.map((e, i) => {
-        const midY = (e.y1 + e.y2) / 2
         return (
           <path
             key={i}
-            d={`M ${e.x1} ${e.y1} L ${e.x1} ${midY} L ${e.x2} ${midY} L ${e.x2} ${e.y2}`}
+            d={`M ${e.x1} ${e.y1} L ${e.x1} ${e.midY} L ${e.x2} ${e.midY} L ${e.x2} ${e.y2}`}
             stroke="#94A3B8"
             strokeWidth={1.5}
             fill="none"

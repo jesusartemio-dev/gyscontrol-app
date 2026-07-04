@@ -342,11 +342,10 @@ export default function OrganigramaProyectoPage() {
       ctx.strokeStyle = '#94A3B8'
       ctx.lineWidth = 1.5
       for (const e of edges) {
-        const midY = (e.y1 + e.y2) / 2
         ctx.beginPath()
         ctx.moveTo(e.x1, e.y1)
-        ctx.lineTo(e.x1, midY)
-        ctx.lineTo(e.x2, midY)
+        ctx.lineTo(e.x1, e.midY)
+        ctx.lineTo(e.x2, e.midY)
         ctx.lineTo(e.x2, e.y2)
         ctx.stroke()
       }
@@ -525,7 +524,7 @@ export default function OrganigramaProyectoPage() {
       for (const e of edges) {
         const ex1 = px(e.x1), ey1 = py(e.y1)
         const ex2 = px(e.x2), ey2 = py(e.y2)
-        const emy = (ey1 + ey2) / 2
+        const emy = py(e.midY)
         pdf.lines(
           [[0, emy - ey1], [ex2 - ex1, 0], [0, ey2 - emy]],
           ex1, ey1, [1, 1], 'S'

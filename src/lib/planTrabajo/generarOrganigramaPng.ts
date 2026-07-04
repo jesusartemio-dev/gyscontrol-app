@@ -64,10 +64,11 @@ export async function generarOrganigramaPng(nodos: OrgNodoContexto[]): Promise<s
   ctx.strokeStyle = '#94A3B8'
   ctx.lineWidth = 1.5
   for (const e of edges) {
-    const midY = (e.y1 + e.y2) / 2
     ctx.beginPath()
     ctx.moveTo(e.x1, e.y1)
-    ctx.bezierCurveTo(e.x1, midY, e.x2, midY, e.x2, e.y2)
+    ctx.lineTo(e.x1, e.midY)
+    ctx.lineTo(e.x2, e.midY)
+    ctx.lineTo(e.x2, e.y2)
     ctx.stroke()
   }
 
