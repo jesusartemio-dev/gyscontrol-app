@@ -73,12 +73,14 @@ export function buildLayout(nodos: OrgNodoCompleto[], dims: ChartDims): {
   const positions: Record<string, { x: number; y: number }> = {}
   const widths: Record<string, number> = {}
 
-  // Compute subtree width; nodes shallower than WRAP_FROM_DEPTH never wrap their children
+  // Compute subtree width. Wrapping only happens when ALL children are leaf nodes — if any
+  // child has its own children, siblings stay in one row to preserve the org hierarchy.
   function subtreeWidth(id: string, depth: number): number {
     const kids = children[id] ?? []
     if (kids.length === 0) { widths[id] = NODE_W; return NODE_W }
     kids.forEach(k => subtreeWidth(k, depth + 1))
-    const effectiveCols = depth < WRAP_FROM_DEPTH ? 9999 : MAX_COLS
+    const anyKidHasChildren = kids.some(k => (children[k] ?? []).length > 0)
+    const effectiveCols = (depth < WRAP_FROM_DEPTH || anyKidHasChildren) ? 9999 : MAX_COLS
     const cols = Math.min(kids.length, effectiveCols)
     const rows = Math.ceil(kids.length / cols)
     let maxRowW = 0
@@ -100,7 +102,8 @@ export function buildLayout(nodos: OrgNodoCompleto[], dims: ChartDims): {
     positions[id] = { x: centerX - NODE_W / 2, y: startY }
     const kids = children[id] ?? []
     if (kids.length === 0) return
-    const effectiveCols = depth < WRAP_FROM_DEPTH ? 9999 : MAX_COLS
+    const anyKidHasChildren = kids.some(k => (children[k] ?? []).length > 0)
+    const effectiveCols = (depth < WRAP_FROM_DEPTH || anyKidHasChildren) ? 9999 : MAX_COLS
     const cols = Math.min(kids.length, effectiveCols)
     const rows = Math.ceil(kids.length / cols)
     const childBaseY = Math.max(startY + NODE_H + V_GAP, minChildY)
