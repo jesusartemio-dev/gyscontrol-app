@@ -34,11 +34,13 @@ interface ChartDims {
   NODE_H: number
   H_GAP: number
   V_GAP: number
-  MAX_COLS: number  // max children per row before wrapping
+  MAX_COLS: number       // max children per row before wrapping
+  WRAP_FROM_DEPTH: number // apply MAX_COLS only at depth >= this (0 = always)
+  isCompact: boolean
 }
 
-export const NORMAL_DIMS: ChartDims = { NODE_W: 175, NODE_H: 112, H_GAP: 10, V_GAP: 28, MAX_COLS: 3 }
-const COMPACT_DIMS: ChartDims = { NODE_W: 148, NODE_H: 64, H_GAP: 6, V_GAP: 28, MAX_COLS: 999 }
+export const NORMAL_DIMS: ChartDims = { NODE_W: 145, NODE_H: 112, H_GAP: 6, V_GAP: 22, MAX_COLS: 2, WRAP_FROM_DEPTH: 1, isCompact: false }
+const COMPACT_DIMS: ChartDims = { NODE_W: 130, NODE_H: 64, H_GAP: 6, V_GAP: 24, MAX_COLS: 999, WRAP_FROM_DEPTH: 0, isCompact: true }
 
 export interface LayoutNode {
   nodo: OrgNodoCompleto
@@ -54,7 +56,7 @@ export function buildLayout(nodos: OrgNodoCompleto[], dims: ChartDims): {
   svgHeight: number
   edges: { x1: number; y1: number; x2: number; y2: number }[]
 } {
-  const { NODE_W, NODE_H, H_GAP, V_GAP, MAX_COLS } = dims
+  const { NODE_W, NODE_H, H_GAP, V_GAP, MAX_COLS, WRAP_FROM_DEPTH } = dims
   if (nodos.length === 0) return { nodes: [], svgWidth: 0, svgHeight: 0, edges: [] }
 
   const byId = Object.fromEntries(nodos.map(n => [n.id, n]))
@@ -71,12 +73,13 @@ export function buildLayout(nodos: OrgNodoCompleto[], dims: ChartDims): {
   const positions: Record<string, { x: number; y: number }> = {}
   const widths: Record<string, number> = {}
 
-  // Compute subtree width respecting MAX_COLS wrapping
-  function subtreeWidth(id: string): number {
+  // Compute subtree width; nodes shallower than WRAP_FROM_DEPTH never wrap their children
+  function subtreeWidth(id: string, depth: number): number {
     const kids = children[id] ?? []
     if (kids.length === 0) { widths[id] = NODE_W; return NODE_W }
-    kids.forEach(k => subtreeWidth(k))
-    const cols = Math.min(kids.length, MAX_COLS)
+    kids.forEach(k => subtreeWidth(k, depth + 1))
+    const effectiveCols = depth < WRAP_FROM_DEPTH ? 9999 : MAX_COLS
+    const cols = Math.min(kids.length, effectiveCols)
     const rows = Math.ceil(kids.length / cols)
     let maxRowW = 0
     for (let r = 0; r < rows; r++) {
@@ -89,14 +92,15 @@ export function buildLayout(nodos: OrgNodoCompleto[], dims: ChartDims): {
   }
 
   const roots = nodos.filter(n => !n.parentId).sort((a, b) => a.orden - b.orden)
-  roots.forEach(r => subtreeWidth(r.id))
+  roots.forEach(r => subtreeWidth(r.id, 0))
 
   // Place nodes using absolute Y (startY) so wrapped rows stack below each other
-  function assignPositions(id: string, centerX: number, startY: number) {
+  function assignPositions(id: string, centerX: number, startY: number, depth: number) {
     positions[id] = { x: centerX - NODE_W / 2, y: startY }
     const kids = children[id] ?? []
     if (kids.length === 0) return
-    const cols = Math.min(kids.length, MAX_COLS)
+    const effectiveCols = depth < WRAP_FROM_DEPTH ? 9999 : MAX_COLS
+    const cols = Math.min(kids.length, effectiveCols)
     const rows = Math.ceil(kids.length / cols)
     const childBaseY = startY + NODE_H + V_GAP
     for (let r = 0; r < rows; r++) {
@@ -105,7 +109,7 @@ export function buildLayout(nodos: OrgNodoCompleto[], dims: ChartDims): {
       const rowY = childBaseY + r * (NODE_H + V_GAP)
       let curX = centerX - rowW / 2
       for (const kid of rowKids) {
-        assignPositions(kid, curX + widths[kid] / 2, rowY)
+        assignPositions(kid, curX + widths[kid] / 2, rowY, depth + 1)
         curX += widths[kid] + H_GAP
       }
     }
@@ -113,7 +117,7 @@ export function buildLayout(nodos: OrgNodoCompleto[], dims: ChartDims): {
 
   let curX = 0
   for (const root of roots) {
-    assignPositions(root.id, curX + widths[root.id] / 2, 0)
+    assignPositions(root.id, curX + widths[root.id] / 2, 0, 0)
     curX += widths[root.id] + H_GAP
   }
 
@@ -159,7 +163,7 @@ function NodoCard({ node, onClick }: { node: LayoutNode; onClick?: (n: OrgNodoCo
   const { nodo, x, y, dims } = node
   const { NODE_W, NODE_H } = dims
   const isVacante = !nodo.user
-  const isCompact = NODE_W < 160
+  const isCompact = dims.isCompact
 
   return (
     <foreignObject
