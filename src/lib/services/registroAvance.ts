@@ -67,22 +67,26 @@ export async function listarJornadasActivasDelDia(opts: ListarJornadasActivasOpt
       where.proyectoId = { in: proyectoIds.length > 0 ? proyectoIds : ['__none__'] }
     }
   } else {
-    // Roles de campo (proyectos/coordinador) y cualquier no-bypass: SIEMPRE limitado a
-    // PersonalProyecto.activo, ignorando soloAsignadas=false (no puede ampliar su alcance).
-    // Sin userId no ven nada. Si pasan un proyectoId fuera de sus asignaciones, no ven nada ([]).
-    const proyectoIds = opts.userId
-      ? (
-          await prisma.personalProyecto.findMany({
-            where: { userId: opts.userId, activo: true },
-            select: { proyectoId: true },
-          })
-        ).map((a) => a.proyectoId)
-      : []
+    // Roles de campo (proyectos/coordinador): si soloAsignadas=false ven todas las jornadas
+    // (igual que bypass con soloAsignadas=false). Si soloAsignadas=true, solo sus proyectos.
+    // Sin userId y soloAsignadas=true no ven nada.
+    if (opts.soloAsignadas !== false) {
+      const proyectoIds = opts.userId
+        ? (
+            await prisma.personalProyecto.findMany({
+              where: { userId: opts.userId, activo: true },
+              select: { proyectoId: true },
+            })
+          ).map((a) => a.proyectoId)
+        : []
 
-    if (opts.proyectoId) {
-      where.proyectoId = proyectoIds.includes(opts.proyectoId) ? opts.proyectoId : '__none__'
-    } else {
-      where.proyectoId = { in: proyectoIds.length > 0 ? proyectoIds : ['__none__'] }
+      if (opts.proyectoId) {
+        where.proyectoId = proyectoIds.includes(opts.proyectoId) ? opts.proyectoId : '__none__'
+      } else {
+        where.proyectoId = { in: proyectoIds.length > 0 ? proyectoIds : ['__none__'] }
+      }
+    } else if (opts.proyectoId) {
+      where.proyectoId = opts.proyectoId
     }
   }
 
