@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { matchCargoConRolProyecto } from '@/lib/organigrama/nodosGys'
+import { matchCargoConRolProyecto, matchCargoConRolPersonal } from '@/lib/organigrama/nodosGys'
 
 interface Ctx { params: Promise<{ id: string }> }
 
@@ -112,7 +112,7 @@ export async function POST(req: Request, { params }: Ctx) {
 
     const proyecto = await prisma.proyecto.findUnique({
       where: { id: proyectoId },
-      select: { id: true, gestorId: true, supervisorId: true, liderId: true },
+      select: { id: true, gestorId: true, supervisorId: true, liderId: true, comercialId: true },
     })
     if (!proyecto) return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 })
 
@@ -153,6 +153,21 @@ export async function POST(req: Request, { params }: Ctx) {
     // Nodo de anclaje por defecto para los nodos de plantilla de proyecto
     const anclaId = baseIdMap['GERENCIA DE PROYECTOS'] ?? null
 
+    // ── Cargar equipo dinámico del proyecto para auto-asignación ─────────────
+    const equipoDinamico = await prisma.personalProyecto.findMany({
+      where: { proyectoId, activo: true },
+      select: { userId: true, rol: true },
+      orderBy: { createdAt: 'asc' },
+    })
+    // Mapa rol → lista de userIds (en orden de incorporación)
+    const rolPersonalMap: Record<string, string[]> = {}
+    for (const miembro of equipoDinamico) {
+      if (!rolPersonalMap[miembro.rol]) rolPersonalMap[miembro.rol] = []
+      rolPersonalMap[miembro.rol].push(miembro.userId)
+    }
+    // Puntero por rol: avanza cada vez que se asigna un slot de ese rol
+    const rolPersonalPointer: Record<string, number> = {}
+
     // ── Crear nodos desde plantilla de proyecto (si se proporcionó) ───────────
     if (plantillaId) {
       const plantilla = await prisma.plantillaOrganigrama.findUnique({
@@ -174,7 +189,7 @@ export async function POST(req: Request, { params }: Ctx) {
             resolvedParentId = plantillaIdMap[pNodo.parentId] ?? anclaId
           }
 
-          // Auto-asignar userId según rol del proyecto (fallback: userId pre-configurado en plantilla)
+          // Auto-asignar userId: roles principales primero, luego equipo dinámico por posición
           let userId: string | null = pNodo.userId ?? null
           if (matchCargoConRolProyecto(pNodo.cargoLabel, 'gestor') && proyecto.gestorId) {
             userId = proyecto.gestorId
@@ -182,6 +197,18 @@ export async function POST(req: Request, { params }: Ctx) {
             userId = proyecto.supervisorId
           } else if (matchCargoConRolProyecto(pNodo.cargoLabel, 'lider') && proyecto.liderId) {
             userId = proyecto.liderId
+          } else if (matchCargoConRolProyecto(pNodo.cargoLabel, 'comercial') && proyecto.comercialId) {
+            userId = proyecto.comercialId
+          } else {
+            const rolPersonal = matchCargoConRolPersonal(pNodo.cargoLabel)
+            if (rolPersonal) {
+              const lista = rolPersonalMap[rolPersonal] ?? []
+              const idx = rolPersonalPointer[rolPersonal] ?? 0
+              if (idx < lista.length) {
+                userId = lista[idx]
+                rolPersonalPointer[rolPersonal] = idx + 1
+              }
+            }
           }
 
           const creado = await prisma.proyectoOrgNodo.create({
