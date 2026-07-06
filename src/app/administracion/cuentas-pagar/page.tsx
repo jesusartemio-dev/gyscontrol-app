@@ -217,10 +217,6 @@ export default function CuentasPagarPage() {
     numeroLetra: '',
   })
 
-  // Selección múltiple para acciones en lote
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [bulkLoading, setBulkLoading] = useState(false)
-
   // OCs sin factura panel
   const [ocsSinFacturaExpanded, setOcsSinFacturaExpanded] = useState(false)
 
