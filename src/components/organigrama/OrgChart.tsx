@@ -39,7 +39,7 @@ interface ChartDims {
   isCompact: boolean
 }
 
-export const NORMAL_DIMS: ChartDims = { NODE_W: 140, NODE_H: 112, H_GAP: 5, V_GAP: 22, MAX_COLS: 999, WRAP_FROM_DEPTH: 1, isCompact: false }
+export const NORMAL_DIMS: ChartDims = { NODE_W: 160, NODE_H: 120, H_GAP: 5, V_GAP: 22, MAX_COLS: 999, WRAP_FROM_DEPTH: 1, isCompact: false }
 const COMPACT_DIMS: ChartDims = { NODE_W: 130, NODE_H: 64, H_GAP: 6, V_GAP: 24, MAX_COLS: 999, WRAP_FROM_DEPTH: 0, isCompact: true }
 
 export interface LayoutNode {
@@ -203,8 +203,8 @@ function NodoCard({ node, onClick }: { node: LayoutNode; onClick?: (n: OrgNodoCo
         >
           <div
             className={[
-              'font-bold uppercase tracking-widest leading-tight truncate',
-              isCompact ? 'text-[8px]' : 'text-[10px]',
+              'font-bold uppercase tracking-widest leading-tight',
+              isCompact ? 'text-[8px] truncate' : 'text-[10px] line-clamp-2',
               isVacante ? 'text-red-400' : 'text-indigo-600',
             ].join(' ')}
           >
@@ -244,9 +244,9 @@ function NodoCard({ node, onClick }: { node: LayoutNode; onClick?: (n: OrgNodoCo
               )}
             </div>
           )}
-          {!isCompact && (
+          {!isCompact && nodo.empresaOverride && (
             <div className="text-[9px] text-gray-300 truncate mt-1 uppercase tracking-wide">
-              {nodo._empresa}
+              {nodo.empresaOverride}
             </div>
           )}
         </div>
