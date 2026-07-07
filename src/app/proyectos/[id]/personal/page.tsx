@@ -44,8 +44,10 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  Info
+  Info,
+  Building2,
 } from 'lucide-react'
+import { ROLES_CONTACTO_CLIENTE, ROL_CONTACTO_CLIENTE_LABELS } from '@/lib/config/rolesContactoCliente'
 import { toast } from 'sonner'
 import Link from 'next/link'
 import { useProyectoContext } from '../ProyectoContext'
@@ -81,6 +83,28 @@ interface PersonalData {
   personalDinamico: PersonalProyecto[]
 }
 
+interface CrmContactoInfo {
+  id: string
+  nombre: string
+  cargo: string | null
+  email: string | null
+  telefono: string | null
+  celular: string | null
+}
+
+interface ContactoClienteProyecto {
+  id: string
+  crmContactoId: string
+  rolEnProyecto: string
+  crmContacto: CrmContactoInfo
+}
+
+const rolesContactoClienteConfig: Record<string, { label: string; className: string }> = {
+  administrador_contrato: { label: 'Administrador de Contrato', className: 'bg-red-100 text-red-700' },
+  jefe_proyecto_cliente:  { label: 'Jefe de Proyecto del Cliente', className: 'bg-indigo-100 text-indigo-700' },
+  inspector_supervisor:   { label: 'Inspector / Supervisor', className: 'bg-orange-100 text-orange-700' },
+}
+
 const rolesConfig: Record<string, { icon: any; className: string; label: string }> = {
   programador: { icon: Code, className: 'bg-purple-100 text-purple-700', label: 'Programador' },
   cadista: { icon: Pencil, className: 'bg-blue-100 text-blue-700', label: 'Cadista' },
@@ -103,6 +127,79 @@ const roleDescriptions: Record<string, string> = {
   supervisor: 'El supervisor verifica la calidad del trabajo y valida los entregables del proyecto.',
   lider: 'El líder técnico dirige la ejecución técnica y toma decisiones de ingeniería.'
 }
+
+const ContactosClienteTable = memo(function ContactosClienteTable({
+  contactos,
+  onRemove,
+}: {
+  contactos: ContactoClienteProyecto[]
+  onRemove: (id: string) => void
+}) {
+  return (
+    <div className="border rounded-lg overflow-hidden">
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-muted/50 hover:bg-muted/50">
+            <TableHead className="text-xs font-medium">Nombre</TableHead>
+            <TableHead className="text-xs font-medium">Email</TableHead>
+            <TableHead className="text-xs font-medium w-[220px]">Rol en Proyecto</TableHead>
+            <TableHead className="text-xs font-medium w-[140px]">Celular</TableHead>
+            <TableHead className="w-[52px]" />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {contactos.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={5} className="text-center py-8 text-muted-foreground text-sm">
+                Sin contactos del cliente asignados
+              </TableCell>
+            </TableRow>
+          ) : (
+            contactos.map((cc) => {
+              const rolConfig = rolesContactoClienteConfig[cc.rolEnProyecto]
+              return (
+                <TableRow key={cc.id} className="group">
+                  <TableCell className="py-2">
+                    <div>
+                      <span className="text-sm font-medium">{cc.crmContacto.nombre}</span>
+                      {cc.crmContacto.cargo && (
+                        <span className="text-xs text-muted-foreground block">{cc.crmContacto.cargo}</span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="py-2">
+                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Mail className="h-3 w-3 shrink-0" />
+                      {cc.crmContacto.email ?? '—'}
+                    </span>
+                  </TableCell>
+                  <TableCell className="py-2">
+                    <Badge className={`${rolConfig?.className ?? 'bg-gray-100 text-gray-700'} text-xs font-normal`}>
+                      {rolConfig?.label ?? cc.rolEnProyecto}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="py-2 text-xs text-muted-foreground">
+                    {cc.crmContacto.celular ?? cc.crmContacto.telefono ?? '—'}
+                  </TableCell>
+                  <TableCell className="py-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-red-600 hover:text-red-700 hover:bg-red-50"
+                      onClick={() => onRemove(cc.id)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              )
+            })
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  )
+})
 
 // Skeleton minimalista
 function LoadingSkeleton() {
@@ -390,10 +487,19 @@ export default function PersonalPage({ params: _params }: PageProps) {
   const [selectedRolFijoUserId, setSelectedRolFijoUserId] = useState('')
   const [savingRolFijo, setSavingRolFijo] = useState(false)
 
+  // Estado para contactos del cliente
+  const [contactosCliente, setContactosCliente] = useState<ContactoClienteProyecto[]>([])
+  const [showAddContactoModal, setShowAddContactoModal] = useState(false)
+  const [crmContactosDisponibles, setCrmContactosDisponibles] = useState<CrmContactoInfo[]>([])
+  const [selectedCrmContactoId, setSelectedCrmContactoId] = useState('')
+  const [selectedRolContacto, setSelectedRolContacto] = useState('')
+  const [addingContacto, setAddingContacto] = useState(false)
+
   useEffect(() => {
     if (proyecto?.id) {
       loadPersonal()
       loadUsuarios()
+      loadContactosCliente()
     }
   }, [proyecto?.id])
 
@@ -471,6 +577,56 @@ export default function PersonalPage({ params: _params }: PageProps) {
       loadPersonal()
     } catch (error) {
       toast.error('Error al remover personal')
+    }
+  }
+
+  const loadContactosCliente = async () => {
+    if (!proyecto?.id) return
+    try {
+      const res = await fetch(`/api/proyecto/${proyecto.id}/contactos-cliente`)
+      if (res.ok) { const d = await res.json(); setContactosCliente(d.data ?? []) }
+    } catch { /* silent */ }
+  }
+
+  const loadCrmContactosDisponibles = async () => {
+    if (!proyecto?.clienteId) return
+    try {
+      const res = await fetch(`/api/crm/clientes/${proyecto.clienteId}/contactos`)
+      if (res.ok) { const d = await res.json(); setCrmContactosDisponibles(Array.isArray(d) ? d : []) }
+    } catch { /* silent */ }
+  }
+
+  const handleAddContacto = async () => {
+    if (!selectedCrmContactoId || !selectedRolContacto || !proyecto?.id) return
+    try {
+      setAddingContacto(true)
+      const res = await fetch(`/api/proyecto/${proyecto.id}/contactos-cliente`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ crmContactoId: selectedCrmContactoId, rolEnProyecto: selectedRolContacto }),
+      })
+      if (!res.ok) { const err = await res.json(); throw new Error(err.error ?? 'Error') }
+      toast.success('Contacto asignado')
+      setShowAddContactoModal(false)
+      setSelectedCrmContactoId('')
+      setSelectedRolContacto('')
+      loadContactosCliente()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Error al asignar contacto')
+    } finally {
+      setAddingContacto(false)
+    }
+  }
+
+  const handleRemoveContacto = async (contactoId: string) => {
+    if (!proyecto?.id || !confirm('¿Remover este contacto del proyecto?')) return
+    try {
+      const res = await fetch(`/api/proyecto/${proyecto.id}/contactos-cliente?contactoId=${contactoId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error()
+      toast.success('Contacto removido')
+      loadContactosCliente()
+    } catch {
+      toast.error('Error al remover contacto')
     }
   }
 
@@ -746,6 +902,107 @@ export default function PersonalPage({ params: _params }: PageProps) {
         personal={personalDinamico}
         onRemove={handleRemovePersonal}
       />
+
+      {/* ── Contactos del Cliente ─────────────────────────────────────────── */}
+      <div className="space-y-3 pt-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Building2 className="h-4 w-4 text-rose-600" />
+            <h2 className="text-sm font-semibold">Contactos del Cliente</h2>
+            <span className="text-xs text-muted-foreground">({contactosCliente.length})</span>
+          </div>
+
+          {proyecto?.clienteId && (
+            <Dialog
+              open={showAddContactoModal}
+              onOpenChange={(open) => {
+                setShowAddContactoModal(open)
+                if (open) loadCrmContactosDisponibles()
+              }}
+            >
+              <DialogTrigger asChild>
+                <Button size="sm" variant="outline" className="h-8">
+                  <UserPlus className="h-3.5 w-3.5 mr-1.5" />
+                  Agregar contacto
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Agregar Contacto del Cliente</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 pt-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Contacto CRM</label>
+                    <Select value={selectedCrmContactoId} onValueChange={setSelectedCrmContactoId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar contacto..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {crmContactosDisponibles
+                          .filter(c => !contactosCliente.some(cc => cc.crmContactoId === c.id))
+                          .map(c => (
+                            <SelectItem key={c.id} value={c.id}>
+                              <div className="flex flex-col">
+                                <span>{c.nombre}</span>
+                                {c.cargo && <span className="text-xs text-muted-foreground">{c.cargo}</span>}
+                              </div>
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                    {crmContactosDisponibles.length === 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        No hay contactos CRM para este cliente.{' '}
+                        <a href={`/comercial/crm/clientes/${proyecto.clienteId}/contactos`} className="underline" target="_blank" rel="noreferrer">
+                          Crear contacto
+                        </a>
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Rol en el Proyecto</label>
+                    <Select value={selectedRolContacto} onValueChange={setSelectedRolContacto}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar rol..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ROLES_CONTACTO_CLIENTE.map(r => (
+                          <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-4">
+                    <Button variant="outline" onClick={() => setShowAddContactoModal(false)}>Cancelar</Button>
+                    <Button
+                      onClick={handleAddContacto}
+                      disabled={!selectedCrmContactoId || !selectedRolContacto || addingContacto}
+                    >
+                      {addingContacto
+                        ? <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        : <Check className="h-4 w-4 mr-2" />}
+                      Asignar
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
+        </div>
+
+        {!proyecto?.clienteId ? (
+          <p className="text-xs text-muted-foreground py-2">
+            Este proyecto no tiene cliente asignado. Asigna un cliente para gestionar los contactos.
+          </p>
+        ) : (
+          <ContactosClienteTable
+            contactos={contactosCliente}
+            onRemove={handleRemoveContacto}
+          />
+        )}
+      </div>
     </div>
   )
 }

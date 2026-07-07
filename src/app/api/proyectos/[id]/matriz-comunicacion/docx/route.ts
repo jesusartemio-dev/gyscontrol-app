@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { generarDocxMatriz } from '@/lib/matrizComunicacion/exportDocx'
 import { generarSiglas } from '@/lib/matrizComunicacion/utils'
+import { ROL_CONTACTO_CLIENTE_LABELS } from '@/lib/config/rolesContactoCliente'
 
 function parseCeldas(json: string): { siglas: string; valor: string }[] {
   try {
@@ -82,6 +83,25 @@ export async function GET(
           correo: n.user!.email,
         }
       })
+
+    // Agregar contactos del cliente como participantes adicionales
+    const contactosCliente = await prisma.proyectoContactoCliente.findMany({
+      where: { proyectoId },
+      include: { crmContacto: { select: { nombre: true, email: true, celular: true, telefono: true } } },
+      orderBy: { createdAt: 'asc' },
+    })
+    for (const cc of contactosCliente) {
+      const siglas = generarSiglas(cc.crmContacto.nombre, usadas)
+      usadas.add(siglas)
+      personal.push({
+        siglas,
+        nombre: cc.crmContacto.nombre,
+        cargo: ROL_CONTACTO_CLIENTE_LABELS[cc.rolEnProyecto] ?? cc.rolEnProyecto,
+        empresa: proyecto.cliente?.nombre ?? 'Cliente',
+        celular: cc.crmContacto.celular ?? cc.crmContacto.telefono ?? '',
+        correo: cc.crmContacto.email ?? '',
+      })
+    }
 
     const filas = matriz.filas.map(f => ({
       orden: f.orden,

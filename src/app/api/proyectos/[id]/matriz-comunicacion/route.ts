@@ -6,6 +6,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { buildPromptMatriz, type MatrizFilaIA } from '@/lib/matrizComunicacion/prompt'
 import { getModelForTask } from '@/lib/agente/models'
 import { generarSiglas } from '@/lib/matrizComunicacion/utils'
+import { ROL_CONTACTO_CLIENTE_LABELS } from '@/lib/config/rolesContactoCliente'
 import { trackUsage, trackUsageError } from '@/lib/agente/usageTracker'
 import { isIAFeatureEnabled } from '@/lib/agente/featureFlags'
 
@@ -117,6 +118,25 @@ export async function POST(
           correo: n.user!.email,
         }
       })
+
+      // Agregar contactos del cliente como participantes adicionales
+      const contactosClienteDB = await prisma.proyectoContactoCliente.findMany({
+        where: { proyectoId },
+        include: { crmContacto: { select: { nombre: true, email: true, celular: true, telefono: true } } },
+        orderBy: { createdAt: 'asc' },
+      })
+      for (const cc of contactosClienteDB) {
+        const siglas = generarSiglas(cc.crmContacto.nombre, usadas)
+        usadas.add(siglas)
+        personal.push({
+          siglas,
+          nombre: cc.crmContacto.nombre,
+          cargo: ROL_CONTACTO_CLIENTE_LABELS[cc.rolEnProyecto] ?? cc.rolEnProyecto,
+          empresa: proyecto.cliente?.nombre ?? 'Cliente',
+          celular: cc.crmContacto.celular ?? cc.crmContacto.telefono ?? '',
+          correo: cc.crmContacto.email ?? '',
+        })
+      }
 
       // Query all EDTs for this project — no cronograma type filter so we get all
       const proyectoEdtsRaw = await prisma.proyectoEdt.findMany({

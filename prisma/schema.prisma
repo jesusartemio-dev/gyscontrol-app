@@ -1137,6 +1137,7 @@ model Proyecto {
   avancesTarea               ProyectoTareaAvance[]
   hitos                      ProyectoHito[]              @relation("HitosProyecto")
   orgNodos                   ProyectoOrgNodo[]
+  contactosCliente           ProyectoContactoCliente[]
   matrizComunicacion         MatrizComunicacion?
   tdrAnalisis                ProyectoTdrAnalisis?
   planTrabajo                PlanTrabajo?
@@ -1174,6 +1175,23 @@ model PersonalProyecto {
   @@index([proyectoId, activo])
   @@index([userId, activo])
   @@map("personal_proyecto")
+}
+
+// Contactos del cliente vinculados a un proyecto (para Matriz de Comunicación)
+model ProyectoContactoCliente {
+  id            String   @id @default(cuid())
+  proyectoId    String
+  crmContactoId String
+  rolEnProyecto String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime
+
+  proyecto    Proyecto           @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  crmContacto CrmContactoCliente @relation(fields: [crmContactoId], references: [id], onDelete: Cascade)
+
+  @@unique([proyectoId, crmContactoId])
+  @@index([proyectoId])
+  @@map("proyecto_contacto_cliente")
 }
 
 enum RolPersonalProyecto {
@@ -2732,7 +2750,8 @@ model CrmContactoCliente {
   notas               String?
   createdAt           DateTime  @default(now())
   updatedAt           DateTime
-  cliente             Cliente   @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  cliente             Cliente                   @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  proyectos           ProyectoContactoCliente[]
 
   @@index([clienteId, esDecisionMaker])
   @@map("crm_contacto_cliente")

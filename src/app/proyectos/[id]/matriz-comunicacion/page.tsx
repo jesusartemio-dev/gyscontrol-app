@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { ROL_CONTACTO_CLIENTE_LABELS } from '@/lib/config/rolesContactoCliente'
 import { useParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -39,6 +40,12 @@ interface PersonalInfo {
   empresa: string
   celular: string
   correo: string
+}
+
+interface ContactoClienteProyecto {
+  id: string
+  rolEnProyecto: string
+  crmContacto: { nombre: string; email: string | null; celular: string | null; telefono: string | null }
 }
 
 interface OrgNodo {
@@ -83,28 +90,53 @@ export default function MatrizComunicacionPage() {
 
   useEffect(() => {
     const init = async () => {
-      const [mRes, oRes, pRes] = await Promise.all([
+      const [mRes, oRes, pRes, ccRes] = await Promise.all([
         fetch(`/api/proyectos/${proyectoId}/matriz-comunicacion`),
         fetch(`/api/proyectos/${proyectoId}/organigrama`),
         fetch(`/api/proyectos/${proyectoId}`),
+        fetch(`/api/proyecto/${proyectoId}/contactos-cliente`),
       ])
 
       if (mRes.ok) { const d = await mRes.json(); setMatriz(d) }
 
+      let allPersonal: PersonalInfo[] = []
       if (oRes.ok) {
         const nodos: OrgNodo[] = await oRes.json()
-        setPersonal(buildPersonal(nodos))
+        allPersonal = buildPersonal(nodos)
       }
 
+      let clienteNombre = ''
       if (pRes.ok) {
         const p = await pRes.json()
+        clienteNombre = p.cliente?.nombre ?? ''
         setProyectoInfo({
           nombre: p.nombre ?? '',
           codigo: p.codigo ?? '',
-          cliente: p.cliente?.nombre ?? '',
+          cliente: clienteNombre,
         })
       }
 
+      if (ccRes.ok) {
+        const ccData = await ccRes.json()
+        const contactos: ContactoClienteProyecto[] = ccData.data ?? []
+        if (contactos.length > 0) {
+          const usadas = new Set(allPersonal.map(p => p.siglas))
+          for (const cc of contactos) {
+            const siglas = generarSiglas(cc.crmContacto.nombre, usadas)
+            usadas.add(siglas)
+            allPersonal.push({
+              siglas,
+              nombre: cc.crmContacto.nombre,
+              cargo: ROL_CONTACTO_CLIENTE_LABELS[cc.rolEnProyecto] ?? cc.rolEnProyecto,
+              empresa: clienteNombre || 'Cliente',
+              celular: cc.crmContacto.celular ?? cc.crmContacto.telefono ?? '',
+              correo: cc.crmContacto.email ?? '',
+            })
+          }
+        }
+      }
+
+      setPersonal(allPersonal)
       setLoading(false)
     }
     init()
