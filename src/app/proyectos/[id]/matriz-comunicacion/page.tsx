@@ -40,6 +40,7 @@ interface PersonalInfo {
   empresa: string
   celular: string
   correo: string
+  esCliente?: boolean
 }
 
 interface ContactoClienteProyecto {
@@ -131,6 +132,7 @@ export default function MatrizComunicacionPage() {
               empresa: clienteNombre || 'Cliente',
               celular: cc.crmContacto.celular ?? cc.crmContacto.telefono ?? '',
               correo: cc.crmContacto.email ?? '',
+              esCliente: true,
             })
           }
         }
@@ -339,43 +341,79 @@ export default function MatrizComunicacionPage() {
       </div>
 
       {/* Personal leyenda */}
-      {personal.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 px-4 py-2 border-b bg-slate-50 shrink-0">
-          <span className="text-[10px] text-muted-foreground self-center mr-1">Personal:</span>
-          {personal.map(p => (
-            <span
-              key={p.siglas}
-              title={`${p.nombre} — ${p.cargo}`}
-              className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-mono font-semibold cursor-default"
-            >
-              {p.siglas} <span className="font-normal">{p.nombre.split(' ')[0]}</span>
-            </span>
-          ))}
-        </div>
-      )}
+      {personal.length > 0 && (() => {
+        const gys = personal.filter(p => !p.esCliente)
+        const clientes = personal.filter(p => p.esCliente)
+        return (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2 border-b bg-slate-50 shrink-0">
+            {gys.length > 0 && (
+              <>
+                <span className="text-[10px] font-medium text-indigo-500 shrink-0">GYS:</span>
+                {gys.map(p => (
+                  <span key={p.siglas} title={`${p.nombre} — ${p.cargo}`}
+                    className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-mono font-semibold cursor-default">
+                    {p.siglas} <span className="font-normal">{p.nombre.split(' ')[0]}</span>
+                  </span>
+                ))}
+              </>
+            )}
+            {clientes.length > 0 && (
+              <>
+                {gys.length > 0 && <span className="w-px h-4 bg-slate-300 shrink-0" />}
+                <span className="text-[10px] font-medium text-rose-500 shrink-0">
+                  Cliente{proyectoInfo?.cliente ? ` (${proyectoInfo.cliente})` : ''}:
+                </span>
+                {clientes.map(p => (
+                  <span key={p.siglas} title={`${p.nombre} — ${p.cargo} · ${p.empresa}`}
+                    className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[10px] font-mono font-semibold cursor-default">
+                    {p.siglas} <span className="font-normal">{p.nombre.split(' ')[0]}</span>
+                  </span>
+                ))}
+              </>
+            )}
+          </div>
+        )
+      })()}
 
       {/* Matrix table */}
       <div className="flex-1 overflow-auto">
         <table className="w-full text-xs border-collapse min-w-max">
           <thead className="sticky top-0 z-10">
-            {/* Row 1: fixed headers + RESPONSABILIDAD span */}
-            <tr className="bg-[#2E4057] text-white">
-              <th className="border border-slate-600 px-2 py-1.5 text-center font-semibold w-8" rowSpan={2}>#</th>
-              <th className="border border-slate-600 px-3 py-1.5 text-left font-semibold min-w-[160px]" rowSpan={2}>ACTIVIDAD</th>
-              <th className="border border-slate-600 px-2 py-1.5 text-center font-semibold w-14" rowSpan={2}>FREC.</th>
-              <th className="border border-slate-600 px-2 py-1.5 text-center font-semibold w-14" rowSpan={2}>MEDIO</th>
-              {personal.length > 0 && (
-                <th className="border border-slate-600 px-2 py-1.5 text-center font-semibold" colSpan={personal.length}>
-                  RESPONSABILIDAD
-                </th>
-              )}
-              <th className="border border-slate-600 w-14" rowSpan={2} />
+            {/* Row 1: fixed headers + grupos de responsabilidad */}
+            <tr className="text-white text-[11px]">
+              <th className="border border-slate-600 px-2 py-1.5 text-center font-semibold w-8 bg-[#2E4057]" rowSpan={2}>#</th>
+              <th className="border border-slate-600 px-3 py-1.5 text-left font-semibold min-w-[160px] bg-[#2E4057]" rowSpan={2}>ACTIVIDAD</th>
+              <th className="border border-slate-600 px-2 py-1.5 text-center font-semibold w-14 bg-[#2E4057]" rowSpan={2}>FREC.</th>
+              <th className="border border-slate-600 px-2 py-1.5 text-center font-semibold w-14 bg-[#2E4057]" rowSpan={2}>MEDIO</th>
+              {(() => {
+                const gysCount = personal.filter(p => !p.esCliente).length
+                const cliCount = personal.filter(p => p.esCliente).length
+                return (
+                  <>
+                    {gysCount > 0 && (
+                      <th className="border border-slate-600 px-2 py-1.5 text-center font-semibold bg-[#2E4057]" colSpan={gysCount}>
+                        RESPONSABILIDAD — EQUIPO GYS
+                      </th>
+                    )}
+                    {cliCount > 0 && (
+                      <th className="border border-rose-400 px-2 py-1.5 text-center font-semibold bg-rose-700" colSpan={cliCount}>
+                        CLIENTE{proyectoInfo?.cliente ? `: ${proyectoInfo.cliente}` : ''}
+                      </th>
+                    )}
+                  </>
+                )
+              })()}
+              <th className="border border-slate-600 w-14 bg-[#2E4057]" rowSpan={2} />
             </tr>
             {/* Row 2: siglas */}
-            <tr className="bg-[#2E4057] text-white">
+            <tr>
               {personal.map(p => (
-                <th key={p.siglas} title={`${p.nombre} — ${p.cargo}`}
-                  className="border border-slate-600 px-1 py-1 text-center font-mono text-[10px] w-10">
+                <th key={p.siglas} title={`${p.nombre} — ${p.cargo}${p.esCliente ? ` · ${p.empresa}` : ''}`}
+                  className={`border px-1 py-1 text-center font-mono text-[10px] w-10 text-white ${
+                    p.esCliente
+                      ? 'bg-rose-600 border-rose-400'
+                      : 'bg-[#2E4057] border-slate-600'
+                  }`}>
                   {p.siglas}
                 </th>
               ))}
@@ -421,7 +459,11 @@ export default function MatrizComunicacionPage() {
                     const c = celdas.find(x => x.siglas === p.siglas)
                     const valor = c?.valor ?? ''
                     return (
-                      <td key={p.siglas} className="border border-slate-200 px-1 py-1 text-center font-mono font-semibold">
+                      <td key={p.siglas} className={`border px-1 py-1 text-center font-mono font-semibold ${
+                        p.esCliente
+                          ? 'border-rose-200 bg-rose-50/40'
+                          : 'border-slate-200'
+                      }`}>
                         {isEditing
                           ? <input
                               value={editCeldas[p.siglas] ?? 'D'}
