@@ -326,6 +326,7 @@ export interface CronogramaContexto {
       prioridad: string
       descripcion: string | null
       proyectoFaseId: string | null
+      responsableId: string | null
       actividades: {
         id: string
         nombre: string
@@ -361,6 +362,7 @@ export interface OrgNodoContexto {
   empresaOverride: string | null
   telefonoOverride: string | null
   cipOverride: string | null
+  createdAt: Date
   user: {
     id: string
     name: string | null

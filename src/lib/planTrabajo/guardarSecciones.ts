@@ -119,6 +119,44 @@ export async function recalcularCompletitud(proyectoId: string): Promise<void> {
 }
 
 /**
+ * Persiste las secciones de Etapa 1 (calculadas por servidor, sin IA).
+ * A diferencia de guardarSecciones(), NO marca `generadoConIA`/`fechaGeneracionIA`
+ * — esos campos describen contenido redactado por IA (Etapa 2), no cálculo determinista.
+ */
+export async function guardarSeccionesCalculadas(
+  proyectoId: string,
+  secciones: Record<string, unknown>
+): Promise<void> {
+  const planActual = await prisma.planTrabajo.findUnique({ where: { proyectoId } })
+  if (!planActual) {
+    throw new Error(
+      'PlanTrabajo no existe para este proyecto — crearlo primero con POST /plan-trabajo'
+    )
+  }
+
+  const merged: Record<string, unknown> = { ...planActual }
+  for (const campo of CAMPOS_JSON) {
+    if (secciones[campo] !== undefined) merged[campo] = secciones[campo]
+  }
+  const bloques = calcularCompletitud(merged as PlanTrabajo)
+
+  const jsonUpdate: Record<string, ReturnType<typeof toPrismaJsonNullable>> = {}
+  for (const campo of CAMPOS_JSON) {
+    if (secciones[campo] !== undefined) {
+      jsonUpdate[campo] = toPrismaJsonNullable(secciones[campo])
+    }
+  }
+
+  await prisma.planTrabajo.update({
+    where: { proyectoId },
+    data: {
+      bloquesCompletitud: bloques as Parameters<typeof prisma.planTrabajo.update>[0]['data']['bloquesCompletitud'],
+      ...(jsonUpdate as Parameters<typeof prisma.planTrabajo.update>[0]['data']),
+    },
+  })
+}
+
+/**
  * Persiste una única sección regenerada del Plan de Trabajo.
  * Actualiza `ultimaSeccionRegenerada` y recalcula `bloquesCompletitud`.
  */

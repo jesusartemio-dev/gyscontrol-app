@@ -149,6 +149,7 @@ export async function cargarContextoPlanTrabajo(
                 prioridad: true,
                 descripcion: true,
                 proyectoFaseId: true,
+                responsableId: true,
                 proyectoActividad: {
                   select: {
                     id: true,
@@ -202,6 +203,7 @@ export async function cargarContextoPlanTrabajo(
         empresaOverride: true,
         telefonoOverride: true,
         cipOverride: true,
+        createdAt: true,
         user: {
           select: {
             id: true,
@@ -321,6 +323,7 @@ export async function cargarContextoPlanTrabajo(
             prioridad: e.prioridad,
             descripcion: e.descripcion,
             proyectoFaseId: e.proyectoFaseId,
+            responsableId: e.responsableId,
             actividades: e.proyectoActividad.map(a => ({
               id: a.id,
               nombre: a.nombre,
