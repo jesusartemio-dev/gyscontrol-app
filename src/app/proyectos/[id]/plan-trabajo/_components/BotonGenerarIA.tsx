@@ -13,9 +13,13 @@ interface Props {
   onGenerar: () => Promise<void>
   onCancelar?: () => void
   destacar?: boolean
+  motivoBloqueo?: string
 }
 
-export function BotonGenerarIA({ puedeGenerar, iaHabilitada, generando, iaOcupada, mensajeProgreso, progreso = 0, onGenerar, onCancelar, destacar }: Props) {
+// Etapa 2 del flujo: "Redactar con IA" — objetivo, alcance general/detallado,
+// EPP, herramientas y restricciones. Solo se habilita cuando la Etapa 1
+// (Generar datos) ya completó personalAsignado/matrizRaci/histogramas/etc.
+export function BotonGenerarIA({ puedeGenerar, iaHabilitada, generando, iaOcupada, mensajeProgreso, progreso = 0, onGenerar, onCancelar, destacar, motivoBloqueo }: Props) {
   if (!iaHabilitada) {
     return (
       <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 p-4 text-center">
@@ -28,12 +32,12 @@ export function BotonGenerarIA({ puedeGenerar, iaHabilitada, generando, iaOcupad
     <div className={`flex items-center gap-3 rounded-lg border bg-white p-4 transition-all flex-1 ${destacar ? 'border-indigo-300 ring-2 ring-indigo-200 ring-offset-1' : ''}`}>
       <Button
         onClick={onGenerar}
-        disabled={generando || iaOcupada}
+        disabled={generando || iaOcupada || !puedeGenerar}
         className={`bg-indigo-600 hover:bg-indigo-700 text-white shrink-0 ${destacar && !generando ? 'animate-pulse' : ''}`}
       >
         {generando
-          ? <><Loader2 className="animate-spin mr-2" size={14} />Generando...</>
-          : <><Sparkles size={14} className="mr-2" />Generar con IA</>}
+          ? <><Loader2 className="animate-spin mr-2" size={14} />Redactando...</>
+          : <><Sparkles size={14} className="mr-2" />2. Redactar con IA</>}
       </Button>
 
       {generando ? (
@@ -67,8 +71,8 @@ export function BotonGenerarIA({ puedeGenerar, iaHabilitada, generando, iaOcupad
       ) : (
         <span className="text-xs text-muted-foreground">
           {puedeGenerar
-            ? 'Genera o regenera todas las secciones del plan con Sonnet.'
-            : 'Completá los prerrequisitos para generar con IA.'}
+            ? 'Redacta objetivo, alcance, EPP, herramientas y restricciones con Sonnet.'
+            : motivoBloqueo ?? 'Completá los prerrequisitos para generar con IA.'}
         </span>
       )}
     </div>

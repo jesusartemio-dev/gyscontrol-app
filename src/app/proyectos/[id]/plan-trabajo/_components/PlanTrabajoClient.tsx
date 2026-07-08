@@ -19,11 +19,13 @@ import type { PlanTrabajo } from '@prisma/client'
 import { PreRequisitosPanel } from './PreRequisitosPanel'
 import { CabeceraEditor } from './CabeceraEditor'
 import { TogglesPanel } from './TogglesPanel'
+import { BotonCalcularDatos } from './BotonCalcularDatos'
 import { BotonGenerarIA } from './BotonGenerarIA'
 import { BotonExportarDocx } from './BotonExportarDocx'
 import { BotonEliminarPlan } from './BotonEliminarPlan'
 import { HistorialGeneraciones } from './HistorialGeneraciones'
 import { SeccionContainer } from './SeccionContainer'
+import { SECCIONES_ETAPA_1, esSeccionEtapa1, etapa1Completa, algunaSeccionEtapa2Completa } from '@/lib/planTrabajo/etapas'
 
 import { ObjetivoView } from './secciones/ObjetivoView'
 import { AlcanceGeneralView } from './secciones/AlcanceGeneralView'
@@ -156,7 +158,9 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
   const [contexto, setContexto] = useState<PlanTrabajoContexto | null>(null)
   const [loading, setLoading] = useState(true)
   const [creando, setCreando] = useState(false)
+  const [calculando, setCalculando] = useState(false)
   const [generando, setGenerando] = useState(false)
+  const [generandoTodo, setGenerandoTodo] = useState(false)
   const [mensajeGenerar, setMensajeGenerar] = useState('')
   const [regenerando, setRegenerando] = useState<SeccionRegenerable | null>(null)
   const [mensajeRegen, setMensajeRegen] = useState('')
@@ -206,6 +210,45 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
 
   const handleCancelar = () => {
     abortRef.current?.abort()
+  }
+
+  // Etapa 1: calcula personalAsignado/matrizRaci/histogramas/cronogramaResumen/
+  // referencias directo de BD, sin IA. Devuelve true si terminó sin error.
+  const handleCalcularDatos = async (): Promise<boolean> => {
+    if (!contexto?.prerrequisitos.puedeGenerar) {
+      const faltantes = contexto?.prerrequisitos.bloqueantesFaltantes ?? []
+      toast.error(
+        faltantes.length > 0
+          ? `Faltan prerrequisitos: ${faltantes.join(' · ')}`
+          : 'Completá los prerrequisitos antes de calcular',
+        { duration: 6000 }
+      )
+      return false
+    }
+    setCalculando(true)
+    try {
+      const res = await fetch(`/api/proyectos/${proyectoId}/plan-trabajo/calcular-datos`, { method: 'POST' })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error((body as { error?: string }).error ?? 'Error al calcular los datos')
+      }
+      await fetchContexto()
+      const advertencias = (body.advertencias as string[] | undefined) ?? []
+      if (advertencias.length > 0) {
+        toast.warning(
+          `Datos calculados con ${advertencias.length} advertencia(s): ${advertencias.slice(0, 2).join(' · ')}${advertencias.length > 2 ? '…' : ''}`,
+          { duration: 8000 }
+        )
+      } else {
+        toast.success('Datos calculados: personal, RACI, histogramas, cronograma y referencias')
+      }
+      return true
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al calcular los datos')
+      return false
+    } finally {
+      setCalculando(false)
+    }
   }
 
   const iniciarGeneracion = async () => {
@@ -274,14 +317,29 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
       )
       return
     }
-    // Si ya hay secciones generadas, pedir confirmación antes de sobreescribir
     const bloquesActuales = (contexto?.planTrabajo as Record<string, unknown>)?.bloquesCompletitud as Record<string, boolean> | undefined
-    const seccionesCompletas = Object.values(bloquesActuales ?? {}).filter(Boolean).length
-    if (seccionesCompletas > 0) {
+    if (!etapa1Completa(bloquesActuales)) {
+      toast.error('Completá primero "1. Generar datos" — el prompt de IA necesita el personal y las horas ya calculados.', { duration: 6000 })
+      return
+    }
+    // Si ya hay secciones de Etapa 2 redactadas, pedir confirmación antes de sobreescribir
+    if (algunaSeccionEtapa2Completa(bloquesActuales)) {
       setConfirmandoRegenerar(true)
       return
     }
     await iniciarGeneracion()
+  }
+
+  // "Generar todo": Etapa 1 → Etapa 2 encadenado.
+  const handleGenerarTodo = async () => {
+    setGenerandoTodo(true)
+    try {
+      const ok = await handleCalcularDatos()
+      if (!ok) return
+      await iniciarGeneracion()
+    } finally {
+      setGenerandoTodo(false)
+    }
   }
 
   const handleRegen = async (seccion: SeccionRegenerable, instruccionesAdicionales?: string) => {
@@ -300,9 +358,18 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
       await readSSEStream(
         res,
         (msg) => setMensajeRegen(msg),
-        async () => {
+        async (data) => {
           await fetchContexto()
-          toast.success(`Sección "${seccion}" regenerada`)
+          const advertencias = (data.advertencias as string[] | undefined) ?? []
+          const calculado = data.calculado === true
+          if (advertencias.length > 0) {
+            toast.warning(
+              `Sección "${seccion}" recalculada con advertencias: ${advertencias.slice(0, 2).join(' · ')}${advertencias.length > 2 ? '…' : ''}`,
+              { duration: 8000 }
+            )
+          } else {
+            toast.success(`Sección "${seccion}" ${calculado ? 'recalculada' : 'regenerada'}`)
+          }
         }
       )
     } catch (err) {
@@ -381,7 +448,7 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
     return Math.round((Date.now() - new Date(fecha).getTime()) / 60000)
   }
 
-  const seccionesCompletas = Object.values(bloques).filter(Boolean).length
+  const seccionesEtapa2Completas = Object.entries(bloques).filter(([k, v]) => v && !esSeccionEtapa1(k as SeccionRegenerable) && k !== 'responsabilidades').length
 
   return (
     <div className="space-y-4 p-4">
@@ -391,11 +458,11 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-amber-600">
                 <AlertTriangle size={18} />
-                ¿Regenerar todo el plan?
+                ¿Redactar todo de nuevo con IA?
               </DialogTitle>
               <DialogDescription className="text-sm leading-relaxed pt-1">
-                Ya tenés <strong>{seccionesCompletas} sección{seccionesCompletas !== 1 ? 'es' : ''} generada{seccionesCompletas !== 1 ? 's' : ''}</strong>.
-                Si regenerás todo, el contenido existente será sobreescrito.
+                Ya tenés <strong>{seccionesEtapa2Completas} sección{seccionesEtapa2Completas !== 1 ? 'es' : ''} redactada{seccionesEtapa2Completas !== 1 ? 's' : ''}</strong> con IA.
+                Si redactás todo de nuevo, el contenido existente será sobreescrito.
                 <br /><br />
                 Para actualizar solo una sección usá el botón <span className="font-mono">↻</span> en cada sección individualmente.
               </DialogDescription>
@@ -461,31 +528,57 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
         </div>
       )}
 
-      <div className="flex items-center gap-2">
-        <BotonGenerarIA
-          puedeGenerar={prerrequisitos.puedeGenerar}
-          iaHabilitada={iaPlanTrabajoHabilitada}
-          generando={generando}
-          iaOcupada={iaOcupada}
-          mensajeProgreso={mensajeGenerar}
-          progreso={progresoGenerar}
-          onGenerar={handleGenerar}
-          onCancelar={handleCancelar}
-          destacar={recienCreado}
-        />
-        <BotonExportarDocx
-          proyectoId={proyectoId}
-          orgNodos={contexto.organigrama}
-          incluirOrganigrama={plan.incluirOrganigrama}
-          disabled={generando}
-        />
-        <HistorialGeneraciones proyectoId={proyectoId} />
-        <div className="ml-auto">
-          <BotonEliminarPlan
-            proyectoId={proyectoId}
-            onEliminado={() => window.location.reload()}
-            disabled={generando || !!iaOcupada}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <BotonCalcularDatos
+            puedeGenerar={prerrequisitos.puedeGenerar}
+            calculando={calculando}
+            disabled={generando || generandoTodo || !!iaOcupada}
+            destacar={recienCreado}
+            onCalcular={async () => { await handleCalcularDatos() }}
           />
+          <BotonGenerarIA
+            puedeGenerar={prerrequisitos.puedeGenerar && etapa1Completa(bloques)}
+            iaHabilitada={iaPlanTrabajoHabilitada}
+            generando={generando}
+            iaOcupada={!!iaOcupada || calculando || generandoTodo}
+            mensajeProgreso={mensajeGenerar}
+            progreso={progresoGenerar}
+            onGenerar={handleGenerar}
+            onCancelar={handleCancelar}
+            motivoBloqueo={
+              !etapa1Completa(bloques)
+                ? 'Completá "1. Generar datos" primero.'
+                : 'Completá los prerrequisitos para generar con IA.'
+            }
+          />
+          <Button
+            variant="outline"
+            onClick={handleGenerarTodo}
+            disabled={calculando || generando || generandoTodo || !!iaOcupada || !prerrequisitos.puedeGenerar}
+            className="shrink-0"
+            title="Ejecuta '1. Generar datos' y luego '2. Redactar con IA' en secuencia"
+          >
+            {generandoTodo
+              ? <><Loader2 className="animate-spin mr-2" size={14} />Generando todo...</>
+              : 'Generar todo'}
+          </Button>
+        </div>
+        <div className="flex items-center gap-2">
+          <BotonExportarDocx
+            proyectoId={proyectoId}
+            orgNodos={contexto.organigrama}
+            incluirOrganigrama={plan.incluirOrganigrama}
+            disabled={generando}
+          />
+          <HistorialGeneraciones proyectoId={proyectoId} />
+          <div className="ml-auto">
+            <BotonEliminarPlan
+              proyectoId={proyectoId}
+              onEliminado={() => window.location.reload()}
+              disabled={generando || !!iaOcupada}
+            />
+          </div>
         </div>
       </div>
 
@@ -597,9 +690,9 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
       <div className="space-y-3">
         <SeccionContainer
           seccion="objetivo"
-          titulo="Objetivo del Proyecto"
+          titulo="Objetivo del Proyecto (Etapa 2 — IA)"
           completa={bloques.objetivo}
-          iaHabilitada={iaPlanTrabajoHabilitada && prerrequisitos.puedeGenerar}
+          iaHabilitada={iaPlanTrabajoHabilitada && prerrequisitos.puedeGenerar && etapa1Completa(bloques)}
           iaOcupada={iaOcupada}
           onRegen={handleRegen}
           regenerando={regenerando}
@@ -611,9 +704,9 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
 
         <SeccionContainer
           seccion="alcanceGeneral"
-          titulo="Alcance General"
+          titulo="Alcance General (Etapa 2 — IA)"
           completa={bloques.alcanceGeneral}
-          iaHabilitada={iaPlanTrabajoHabilitada && prerrequisitos.puedeGenerar}
+          iaHabilitada={iaPlanTrabajoHabilitada && prerrequisitos.puedeGenerar && etapa1Completa(bloques)}
           iaOcupada={iaOcupada}
           onRegen={handleRegen}
           regenerando={regenerando}
@@ -625,9 +718,9 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
 
         <SeccionContainer
           seccion="alcanceDetallado"
-          titulo="Alcance Detallado"
+          titulo="Alcance Detallado (Etapa 2 — IA)"
           completa={bloques.alcanceDetallado}
-          iaHabilitada={iaPlanTrabajoHabilitada && prerrequisitos.puedeGenerar}
+          iaHabilitada={iaPlanTrabajoHabilitada && prerrequisitos.puedeGenerar && etapa1Completa(bloques)}
           iaOcupada={iaOcupada}
           onRegen={handleRegen}
           regenerando={regenerando}
@@ -639,9 +732,9 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
 
         <SeccionContainer
           seccion="eppRequeridos"
-          titulo="EPP Requeridos"
+          titulo="EPP Requeridos (Etapa 2 — IA)"
           completa={bloques.eppRequeridos}
-          iaHabilitada={iaPlanTrabajoHabilitada && prerrequisitos.puedeGenerar}
+          iaHabilitada={iaPlanTrabajoHabilitada && prerrequisitos.puedeGenerar && etapa1Completa(bloques)}
           iaOcupada={iaOcupada}
           onRegen={handleRegen}
           regenerando={regenerando}
@@ -653,9 +746,9 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
 
         <SeccionContainer
           seccion="herramientasYEquipos"
-          titulo="Herramientas y Equipos"
+          titulo="Herramientas y Equipos (Etapa 2 — IA)"
           completa={bloques.herramientasYEquipos}
-          iaHabilitada={iaPlanTrabajoHabilitada && prerrequisitos.puedeGenerar}
+          iaHabilitada={iaPlanTrabajoHabilitada && prerrequisitos.puedeGenerar && etapa1Completa(bloques)}
           iaOcupada={iaOcupada}
           onRegen={handleRegen}
           regenerando={regenerando}
@@ -667,9 +760,9 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
 
         <SeccionContainer
           seccion="restricciones"
-          titulo="Restricciones"
+          titulo="Restricciones (Etapa 2 — IA)"
           completa={bloques.restricciones}
-          iaHabilitada={iaPlanTrabajoHabilitada && prerrequisitos.puedeGenerar}
+          iaHabilitada={iaPlanTrabajoHabilitada && prerrequisitos.puedeGenerar && etapa1Completa(bloques)}
           iaOcupada={iaOcupada}
           onRegen={handleRegen}
           regenerando={regenerando}
@@ -681,9 +774,9 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
 
         <SeccionContainer
           seccion="personalAsignado"
-          titulo="Personal Asignado"
+          titulo="Personal Asignado (Etapa 1 — calculado, sin IA)"
           completa={bloques.personalAsignado}
-          iaHabilitada={iaPlanTrabajoHabilitada && prerrequisitos.puedeGenerar}
+          iaHabilitada={prerrequisitos.puedeGenerar}
           iaOcupada={iaOcupada}
           onRegen={handleRegen}
           regenerando={regenerando}
@@ -695,9 +788,9 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
 
         <SeccionContainer
           seccion="matrizRaci"
-          titulo="Matriz RACI"
+          titulo="Matriz RACI (Etapa 1 — calculada, sin IA)"
           completa={bloques.matrizRaci}
-          iaHabilitada={iaPlanTrabajoHabilitada && prerrequisitos.puedeGenerar}
+          iaHabilitada={prerrequisitos.puedeGenerar}
           iaOcupada={iaOcupada}
           onRegen={handleRegen}
           regenerando={regenerando}
@@ -709,9 +802,9 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
 
         <SeccionContainer
           seccion="histogramas"
-          titulo="Histogramas"
+          titulo="Histogramas (Etapa 1 — calculados, sin IA)"
           completa={bloques.histogramas}
-          iaHabilitada={iaPlanTrabajoHabilitada && prerrequisitos.puedeGenerar}
+          iaHabilitada={prerrequisitos.puedeGenerar}
           iaOcupada={iaOcupada}
           onRegen={handleRegen}
           regenerando={regenerando}
@@ -723,9 +816,9 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
 
         <SeccionContainer
           seccion="cronogramaResumen"
-          titulo="Cronograma Resumen"
+          titulo="Cronograma Resumen (Etapa 1 — calculado, sin IA)"
           completa={bloques.cronogramaResumen}
-          iaHabilitada={iaPlanTrabajoHabilitada && prerrequisitos.puedeGenerar}
+          iaHabilitada={prerrequisitos.puedeGenerar}
           iaOcupada={iaOcupada}
           onRegen={handleRegen}
           regenerando={regenerando}
@@ -751,9 +844,9 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
 
         <SeccionContainer
           seccion="referencias"
-          titulo="Referencias"
+          titulo="Referencias (Etapa 1 — calculadas, sin IA)"
           completa={bloques.referencias}
-          iaHabilitada={iaPlanTrabajoHabilitada && prerrequisitos.puedeGenerar}
+          iaHabilitada={prerrequisitos.puedeGenerar}
           iaOcupada={iaOcupada}
           onRegen={handleRegen}
           regenerando={regenerando}
