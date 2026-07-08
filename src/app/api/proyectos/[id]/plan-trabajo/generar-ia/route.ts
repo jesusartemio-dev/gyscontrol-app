@@ -8,17 +8,17 @@ import { trackUsage } from '@/lib/agente/usageTracker'
 import { isIAFeatureEnabled } from '@/lib/agente/featureFlags'
 import { cargarContextoPlanTrabajo } from '@/lib/planTrabajo/cargarContexto'
 import { adquirirLockIA, liberarLockIA } from '@/lib/planTrabajo/mutex'
-import { serializarContextoParaIA, buildDirectivaCronograma } from '@/lib/planTrabajo/contextoIA'
+import { serializarContextoParaIA, buildDirectivaCronograma, construirBloqueHechosEtapa1 } from '@/lib/planTrabajo/contextoIA'
 import { validarSeccionesPlan } from '@/lib/planTrabajo/validarSecciones'
 import { guardarSeccionParalela, recalcularCompletitud } from '@/lib/planTrabajo/guardarSecciones'
 import { RESUMEN_PROYECTO_PROMPT } from '@/lib/planTrabajo/prompts/resumirProyecto'
 import { parseJsonIA } from '@/lib/planTrabajo/parseJsonIA'
-import { deduplicarSiglas } from '@/lib/planTrabajo/siglas'
+import { etapa1Completa } from '@/lib/planTrabajo/etapas'
 import {
   PLAN_TRABAJO_SYSTEM_INSTRUCCIONES,
   SECCIONES_CONFIG,
 } from '@/lib/planTrabajo/prompts/generarPlan'
-import type { PlanTrabajoContexto, PlanPersonal } from '@/types/planTrabajo'
+import type { PlanTrabajoContexto } from '@/types/planTrabajo'
 
 export const maxDuration = 300
 export const dynamic = 'force-dynamic'
@@ -71,9 +71,9 @@ async function generarSeccion(
   schema: string,
   label: string,
   resumenProyecto: string,
+  hechosEtapa1: string,
   contexto: PlanTrabajoContexto,
   userId: string,
-  prevResultados: Record<string, unknown>,
   signal?: AbortSignal,
   maxTokens = 8192,
   modeloConfig: 'haiku' | 'sonnet' = 'sonnet'
@@ -85,9 +85,7 @@ async function generarSeccion(
   const contextoPrevio =
     seccionId === 'alcanceDetallado' && contexto.cronograma.cronogramaSeleccionado
       ? buildDirectivaCronograma(contexto.cronograma.cronogramaSeleccionado)
-      : seccionId === 'matrizRaci' && prevResultados.personalAsignado
-        ? `\n\nPERSONAL YA GENERADO (usá las mismas siglas en la matriz):\n${JSON.stringify(prevResultados.personalAsignado, null, 2)}`
-        : ''
+      : ''
 
   // Reintenta 1 vez con un presupuesto de tokens mayor si la salida se trunca —
   // nunca se persiste el JSON reparado de una respuesta truncada (informe §4.4).
@@ -109,7 +107,7 @@ async function generarSeccion(
       messages: [
         {
           role: 'user',
-          content: `RESUMEN EJECUTIVO DEL PROYECTO:\n\n${resumenProyecto}${contextoPrevio}\n\nGenera SOLO la sección "${label}". Devolvé ÚNICAMENTE este JSON sin markdown:\n\n${schema}`,
+          content: `RESUMEN EJECUTIVO DEL PROYECTO:\n\n${resumenProyecto}${hechosEtapa1}${contextoPrevio}\n\nGenera SOLO la sección "${label}". Devolvé ÚNICAMENTE este JSON sin markdown:\n\n${schema}`,
         },
       ],
     }, { signal })
@@ -156,6 +154,11 @@ async function generarSeccion(
 
 // ─── Endpoint ───────────────────────────────────────────────────────────────
 
+// POST /api/proyectos/[id]/plan-trabajo/generar-ia
+// Etapa 2 ("Redactar con IA"): genera SOLO las secciones narrativas —
+// objetivo, alcanceGeneral, alcanceDetallado, eppRequeridos, herramientasYEquipos,
+// restricciones. Requiere que la Etapa 1 (calcular-datos) ya esté completa,
+// porque el prompt recibe sus resultados como hechos inmutables.
 export async function POST(req: NextRequest, { params }: Ctx) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) {
@@ -220,7 +223,17 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     )
   }
 
-  const planId = contexto.planTrabajo.id
+  if (!etapa1Completa(contexto.planTrabajo.bloquesCompletitud as Record<string, boolean> | null)) {
+    return Response.json(
+      {
+        error: 'Falta calcular la Etapa 1 (Generar datos) antes de redactar con IA — el prompt necesita el personal real, las horas totales y el cronograma resumen ya calculados.',
+      },
+      { status: 409 }
+    )
+  }
+
+  const planTrabajo = contexto.planTrabajo
+  const planId = planTrabajo.id
   const lock = await adquirirLockIA(planId, 'generar')
   if (!lock.ok) {
     const segs = Math.round((Date.now() - lock.conflicto!.iniciadaEn.getTime()) / 1000)
@@ -247,34 +260,23 @@ export async function POST(req: NextRequest, { params }: Ctx) {
         const resumenProyecto = await ejecutarFaseA(contexto, userId, signal)
         console.log(`[generar-ia] FaseA: resumen generado — ${resumenProyecto.length} chars`)
 
-        // Fase B: Sonnet genera secciones EN PARALELO (reduce ~300s → ~60s)
-        const planParcial: Record<string, unknown> = {}
+        // Hechos de Etapa 1 (personal real, totalHH real) — se le inyectan a
+        // cada sección como datos inmutables (informe §6).
+        const hechosEtapa1 = construirBloqueHechosEtapa1(planTrabajo)
+
+        // Fase B: Sonnet/Haiku genera las secciones narrativas EN PARALELO
         const seccionesGuardadas: string[] = []
         const seccionesConError: string[] = []
 
-        // matrizRaci necesita personalAsignado — se ejecuta al final
-        const seccionesParalelas = SECCIONES_CONFIG.filter(s => s.id !== 'matrizRaci')
-        const matrizConfig = SECCIONES_CONFIG.find(s => s.id === 'matrizRaci')!
-
-        const generarYGuardar = async (
-          config: (typeof SECCIONES_CONFIG)[number],
-          prevResultados: Record<string, unknown> = {}
-        ) => {
+        const generarYGuardar = async (config: (typeof SECCIONES_CONFIG)[number]) => {
           const { id, label, schema, maxTokens, modelo } = config
           if (signal.aborted) return
           send('status', { fase: `seccion-${id}`, mensaje: `Generando ${label}...` })
           try {
-            const valor = await generarSeccion(id, schema, label, resumenProyecto, contexto, userId, prevResultados, signal, maxTokens, modelo)
-            planParcial[id] = valor
+            const valor = await generarSeccion(id, schema, label, resumenProyecto, hechosEtapa1, contexto, userId, signal, maxTokens, modelo)
 
             const { secciones: seccionValidada, errores: erroresValidacion } = validarSeccionesPlan({ [id]: valor })
             if (Object.keys(seccionValidada).length > 0) {
-              // Dedup de siglas server-side antes de persistir — matrizRaci reutiliza
-              // este mismo resultado deduplicado vía planParcial (informe §4.4).
-              if (id === 'personalAsignado' && Array.isArray(seccionValidada.personalAsignado)) {
-                seccionValidada.personalAsignado = deduplicarSiglas(seccionValidada.personalAsignado as PlanPersonal[])
-                planParcial.personalAsignado = seccionValidada.personalAsignado
-              }
               await guardarSeccionParalela(proyectoId, seccionValidada)
               seccionesGuardadas.push(id)
               send('seccion', { id })
@@ -294,13 +296,8 @@ export async function POST(req: NextRequest, { params }: Ctx) {
           }
         }
 
-        send('status', { fase: 'paralelo', mensaje: 'Generando secciones del plan...', progreso: 10 })
-        await Promise.allSettled(seccionesParalelas.map(config => generarYGuardar(config)))
-
-        // matrizRaci: secuencial después del paralelo para tener personalAsignado
-        if (!signal.aborted) {
-          await generarYGuardar(matrizConfig, { personalAsignado: planParcial.personalAsignado })
-        }
+        send('status', { fase: 'paralelo', mensaje: 'Redactando secciones del plan...', progreso: 10 })
+        await Promise.allSettled(SECCIONES_CONFIG.map(config => generarYGuardar(config)))
 
         // Recalcular bloquesCompletitud una sola vez al final (evita race condition)
         if (seccionesGuardadas.length > 0) {

@@ -14,6 +14,7 @@ import type {
 import { deduplicarSiglas, calcularSiglasBase } from './siglas'
 import { getSnapshotPlan } from './snapshotHelpers'
 import { REFERENCIAS_BASE } from './referenciasBase'
+import { calcularTotalHH } from './calcularDatos'
 
 type ProyectoConCliente = Proyecto & { cliente: Cliente | null }
 
@@ -136,7 +137,7 @@ export function construirDataBag({
 
   const ubicacionProyecto = proyecto.cliente?.direccion?.trim() || ubicacionDetectadaTdr?.trim() || ''
 
-  const totalHH = histogramas.horasHombre.reduce((sum, f) => sum + (f.total || 0), 0)
+  const totalHH = calcularTotalHH(histogramas)
 
   return {
     // ─── Cabecera y carátula (BD, sin IA) ───

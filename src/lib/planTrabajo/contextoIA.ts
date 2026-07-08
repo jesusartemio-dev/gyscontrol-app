@@ -1,5 +1,37 @@
-import type { PlanTrabajoContexto, OrgNodoContexto, SeccionRegenerable } from '@/types/planTrabajo'
+import type { PlanTrabajoContexto, OrgNodoContexto, SeccionRegenerable, PlanPersonal, PlanHistogramas } from '@/types/planTrabajo'
 import type { PlanTrabajo } from '@prisma/client'
+import { calcularTotalHH } from './calcularDatos'
+
+/**
+ * Bloque de "hechos" de Etapa 1 que se inyecta en el prompt de Etapa 2
+ * (personalAsignado real, totalHH real, ver también la línea "UBICACIÓN DEL
+ * PROYECTO" ya incluida en serializarContextoParaIA). El modelo debe redactar
+ * sobre estos datos, no recalcularlos ni contradecirlos — informe §6.
+ */
+export function construirBloqueHechosEtapa1(plan: Pick<PlanTrabajo, 'personalAsignado' | 'histogramas'>): string {
+  const personal = (plan.personalAsignado as PlanPersonal[] | null) ?? []
+  const histogramas = (plan.histogramas as PlanHistogramas | null) ?? { meses: [], equipoTrabajo: [], horasHombre: [] }
+  const totalHH = calcularTotalHH(histogramas)
+
+  const partes: string[] = []
+  partes.push('')
+  partes.push('=== HECHOS YA RESUELTOS (ETAPA 1 — INMUTABLES) ===')
+  partes.push('Estos datos ya están resueltos y son inmutables; redacta sobre ellos, no los recalcules ni los contradigas.')
+  partes.push(`Si citás horas totales, usá exactamente el valor ${totalHH}.`)
+  partes.push('')
+  partes.push('PERSONAL ASIGNADO (real, calculado del organigrama del proyecto):')
+  if (personal.length > 0) {
+    for (const p of personal) {
+      partes.push(`- ${p.nombre} — ${p.cargo} (siglas: ${p.siglas ?? '?'})`)
+    }
+  } else {
+    partes.push('(sin personal calculado — ejecutá la Etapa 1 primero)')
+  }
+  partes.push('')
+  partes.push(`TOTAL HH: ${totalHH}`)
+
+  return partes.join('\n')
+}
 
 /**
  * Construye la directiva JSON del cronograma (Fase → EDT → Actividad → Tarea)
