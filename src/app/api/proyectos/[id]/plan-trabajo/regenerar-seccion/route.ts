@@ -59,7 +59,6 @@ async function ejecutarSonnetRegeneracion(
 ): Promise<unknown> {
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const inicio = Date.now()
-  const maxTokens = MAX_TOKENS_POR_SECCION[seccion] ?? 8192
 
   // Contexto del proyecto + instrucciones de sección en el user message.
   // El system (PLAN_TRABAJO_SYSTEM_INSTRUCCIONES) es constante → cache hits entre llamadas.
@@ -74,42 +73,61 @@ async function ejecutarSonnetRegeneracion(
     estadoRelevante,
   ].join('\n')
 
-  const response = await anthropic.messages.create({
-    model: MODELS.sonnet,
-    max_tokens: maxTokens,
-    system: [
-      {
-        type: 'text',
-        text: PLAN_TRABAJO_SYSTEM_INSTRUCCIONES,
-        cache_control: { type: 'ephemeral' },
-      },
-    ],
-    messages: [{ role: 'user', content: promptUsuario }],
-  })
+  // Reintenta 1 vez con un presupuesto de tokens mayor si la salida se trunca —
+  // nunca se persiste el JSON reparado de una respuesta truncada (informe §4.4).
+  const MAX_REINTENTOS_TRUNCADO = 1
+  let maxTokens = MAX_TOKENS_POR_SECCION[seccion] ?? 8192
+  let ultimoStopReason: string | null | undefined = null
 
-  if (response.stop_reason === 'max_tokens') {
-    throw new Error(`Sección "${seccion}" excede el límite de tokens (${maxTokens})`)
+  for (let intento = 0; intento <= MAX_REINTENTOS_TRUNCADO; intento++) {
+    const response = await anthropic.messages.create({
+      model: MODELS.sonnet,
+      max_tokens: maxTokens,
+      system: [
+        {
+          type: 'text',
+          text: PLAN_TRABAJO_SYSTEM_INSTRUCCIONES,
+          cache_control: { type: 'ephemeral' },
+        },
+      ],
+      messages: [{ role: 'user', content: promptUsuario }],
+    })
+
+    const usageRaw = response.usage as unknown as Record<string, number>
+    trackUsage({
+      userId,
+      tipo: 'plan-trabajo.regenerar-seccion',
+      modelo: MODELS.sonnet,
+      tokensInput: response.usage.input_tokens,
+      tokensOutput: response.usage.output_tokens,
+      tokensCacheCreation: usageRaw.cache_creation_input_tokens ?? 0,
+      tokensCacheRead: usageRaw.cache_read_input_tokens ?? 0,
+      duracionMs: Date.now() - inicio,
+      metadata: { proyectoId, seccion, intento },
+    })
+
+    ultimoStopReason = response.stop_reason
+
+    if (response.stop_reason === 'max_tokens') {
+      if (intento < MAX_REINTENTOS_TRUNCADO) {
+        maxTokens = Math.min(maxTokens * 2, 16000)
+        console.warn(`[regenerar-seccion] ${seccion}: truncada por max_tokens, reintentando con max_tokens=${maxTokens}`)
+        continue
+      }
+      break
+    }
+
+    const texto = response.content
+      .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+      .map(b => b.text)
+      .join('')
+
+    return parseJsonIA(texto)
   }
 
-  const usageRaw = response.usage as unknown as Record<string, number>
-  trackUsage({
-    userId,
-    tipo: 'plan-trabajo.regenerar-seccion',
-    modelo: MODELS.sonnet,
-    tokensInput: response.usage.input_tokens,
-    tokensOutput: response.usage.output_tokens,
-    tokensCacheCreation: usageRaw.cache_creation_input_tokens ?? 0,
-    tokensCacheRead: usageRaw.cache_read_input_tokens ?? 0,
-    duracionMs: Date.now() - inicio,
-    metadata: { proyectoId, seccion },
-  })
-
-  const texto = response.content
-    .filter((b): b is Anthropic.TextBlock => b.type === 'text')
-    .map(b => b.text)
-    .join('')
-
-  return parseJsonIA(texto)
+  throw new Error(
+    `Sección "${seccion}" excede el límite de tokens incluso tras reintentar (stop_reason=${ultimoStopReason}, max_tokens=${maxTokens})`
+  )
 }
 
 // ─── Endpoint ───────────────────────────────────────────────────────────────

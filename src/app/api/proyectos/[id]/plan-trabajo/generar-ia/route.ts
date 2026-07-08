@@ -88,50 +88,69 @@ async function generarSeccion(
         ? `\n\nPERSONAL YA GENERADO (usá las mismas siglas en la matriz):\n${JSON.stringify(prevResultados.personalAsignado, null, 2)}`
         : ''
 
-  const response = await anthropic.messages.create({
-    model: modelo,
-    max_tokens: maxTokens,
-    system: [
-      {
-        type: 'text',
-        text: PLAN_TRABAJO_SYSTEM_INSTRUCCIONES,
-        cache_control: { type: 'ephemeral' },
-      },
-    ],
-    messages: [
-      {
-        role: 'user',
-        content: `RESUMEN EJECUTIVO DEL PROYECTO:\n\n${resumenProyecto}${contextoPrevio}\n\nGenera SOLO la sección "${label}". Devolvé ÚNICAMENTE este JSON sin markdown:\n\n${schema}`,
-      },
-    ],
-  }, { signal })
+  // Reintenta 1 vez con un presupuesto de tokens mayor si la salida se trunca —
+  // nunca se persiste el JSON reparado de una respuesta truncada (informe §4.4).
+  const MAX_REINTENTOS_TRUNCADO = 1
+  let tokensParaIntento = maxTokens
+  let ultimoStopReason: string | null | undefined = null
 
-  const usageRaw = response.usage as unknown as Record<string, number>
-  console.log(`[generar-ia] ${seccionId}: stop_reason=${response.stop_reason} in=${response.usage.input_tokens} out=${response.usage.output_tokens} cache_create=${usageRaw.cache_creation_input_tokens ?? 0} cache_read=${usageRaw.cache_read_input_tokens ?? 0} ms=${Date.now()-inicio}`)
+  for (let intento = 0; intento <= MAX_REINTENTOS_TRUNCADO; intento++) {
+    const response = await anthropic.messages.create({
+      model: modelo,
+      max_tokens: tokensParaIntento,
+      system: [
+        {
+          type: 'text',
+          text: PLAN_TRABAJO_SYSTEM_INSTRUCCIONES,
+          cache_control: { type: 'ephemeral' },
+        },
+      ],
+      messages: [
+        {
+          role: 'user',
+          content: `RESUMEN EJECUTIVO DEL PROYECTO:\n\n${resumenProyecto}${contextoPrevio}\n\nGenera SOLO la sección "${label}". Devolvé ÚNICAMENTE este JSON sin markdown:\n\n${schema}`,
+        },
+      ],
+    }, { signal })
 
-  trackUsage({
-    userId,
-    tipo: `plan-trabajo.seccion.${seccionId}`,
-    modelo,
-    tokensInput: response.usage.input_tokens,
-    tokensOutput: response.usage.output_tokens,
-    tokensCacheCreation: usageRaw.cache_creation_input_tokens ?? 0,
-    tokensCacheRead: usageRaw.cache_read_input_tokens ?? 0,
-    duracionMs: Date.now() - inicio,
-    metadata: { proyectoId: contexto.proyecto.id },
-  })
+    const usageRaw = response.usage as unknown as Record<string, number>
+    console.log(`[generar-ia] ${seccionId}: intento=${intento} max_tokens=${tokensParaIntento} stop_reason=${response.stop_reason} in=${response.usage.input_tokens} out=${response.usage.output_tokens} cache_create=${usageRaw.cache_creation_input_tokens ?? 0} cache_read=${usageRaw.cache_read_input_tokens ?? 0} ms=${Date.now()-inicio}`)
 
-  if (response.stop_reason === 'max_tokens') {
-    throw new Error(`Sección "${label}" excede el límite de tokens`)
+    trackUsage({
+      userId,
+      tipo: `plan-trabajo.seccion.${seccionId}`,
+      modelo,
+      tokensInput: response.usage.input_tokens,
+      tokensOutput: response.usage.output_tokens,
+      tokensCacheCreation: usageRaw.cache_creation_input_tokens ?? 0,
+      tokensCacheRead: usageRaw.cache_read_input_tokens ?? 0,
+      duracionMs: Date.now() - inicio,
+      metadata: { proyectoId: contexto.proyecto.id, intento },
+    })
+
+    ultimoStopReason = response.stop_reason
+
+    if (response.stop_reason === 'max_tokens') {
+      if (intento < MAX_REINTENTOS_TRUNCADO) {
+        tokensParaIntento = Math.min(tokensParaIntento * 2, 16000)
+        console.warn(`[generar-ia] ${seccionId}: truncada por max_tokens, reintentando con max_tokens=${tokensParaIntento}`)
+        continue
+      }
+      break
+    }
+
+    const texto = response.content
+      .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+      .map(b => b.text)
+      .join('')
+
+    const parsed = parseJsonIA(texto) as Record<string, unknown>
+    return parsed[seccionId]
   }
 
-  const texto = response.content
-    .filter((b): b is Anthropic.TextBlock => b.type === 'text')
-    .map(b => b.text)
-    .join('')
-
-  const parsed = parseJsonIA(texto) as Record<string, unknown>
-  return parsed[seccionId]
+  throw new Error(
+    `Sección "${label}" excede el límite de tokens incluso tras reintentar (stop_reason=${ultimoStopReason}, max_tokens=${tokensParaIntento})`
+  )
 }
 
 // ─── Endpoint ───────────────────────────────────────────────────────────────
