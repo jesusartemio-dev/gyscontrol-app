@@ -187,6 +187,7 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
     'mpp': 'MPP',
     'pets': 'PETS',
     'personal-planificado': 'Personal Planificado',
+    'personal': 'Personal',
   }
 
   // Build breadcrumb trail from path segments (e.g. listas/[id] → Listas > Detalle)
