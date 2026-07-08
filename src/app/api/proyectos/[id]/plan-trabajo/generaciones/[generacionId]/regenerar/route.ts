@@ -30,7 +30,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
 
   const generacion = await prisma.planTrabajoGeneracion.findUnique({
     where: { id: generacionId },
-    select: { planTrabajoId: true, snapshotData: true, archivoNombre: true },
+    select: { planTrabajoId: true, snapshotData: true, archivoNombre: true, generadoEn: true },
   })
 
   if (!generacion || generacion.planTrabajoId !== plan.id) {
@@ -47,15 +47,29 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
 
   const organigramaPngBase64 = getSnapshotPng(generacion.snapshotData)
 
-  const proyecto = await prisma.proyecto.findUnique({
-    where: { id: proyectoId },
-    include: { cliente: true },
-  })
+  const [proyecto, generacionesPrevias, tdr] = await Promise.all([
+    prisma.proyecto.findUnique({ where: { id: proyectoId }, include: { cliente: true } }),
+    prisma.planTrabajoGeneracion.findMany({
+      where: { planTrabajoId: plan.id, generadoEn: { lte: generacion.generadoEn } },
+      select: { numeroRevision: true, generadoEn: true, snapshotData: true },
+      orderBy: { generadoEn: 'asc' },
+    }),
+    prisma.proyectoTdrAnalisis.findUnique({
+      where: { proyectoId },
+      select: { ubicacionDetectada: true },
+    }),
+  ])
   if (!proyecto) {
     return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 })
   }
 
-  const dataBag = construirDataBag(snapshotPlan, proyecto, organigramaPngBase64)
+  const dataBag = construirDataBag({
+    plan: snapshotPlan,
+    proyecto,
+    organigramaPngBase64,
+    generaciones: generacionesPrevias,
+    ubicacionDetectadaTdr: tdr?.ubicacionDetectada ?? null,
+  })
 
   let docxBuffer: Buffer
   try {

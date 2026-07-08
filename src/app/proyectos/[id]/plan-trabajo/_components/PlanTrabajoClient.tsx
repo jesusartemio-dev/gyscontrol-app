@@ -737,9 +737,9 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
 
         <SeccionContainer
           seccion="responsabilidades"
-          titulo="Responsabilidades"
+          titulo="Responsabilidades (texto fijo de plantilla — no se exporta)"
           completa={bloques.responsabilidades}
-          iaHabilitada={iaPlanTrabajoHabilitada && prerrequisitos.puedeGenerar}
+          iaHabilitada={false}
           iaOcupada={iaOcupada}
           onRegen={handleRegen}
           regenerando={regenerando}

@@ -61,8 +61,26 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   // Respetar toggle incluirOrganigrama
   const pngParaDocx = planDb.incluirOrganigrama !== false ? organigramaPngBase64 : ''
 
+  const [generaciones, tdr] = await Promise.all([
+    prisma.planTrabajoGeneracion.findMany({
+      where: { planTrabajoId: planDb.id },
+      select: { numeroRevision: true, generadoEn: true, snapshotData: true },
+      orderBy: { generadoEn: 'asc' },
+    }),
+    prisma.proyectoTdrAnalisis.findUnique({
+      where: { proyectoId },
+      select: { ubicacionDetectada: true },
+    }),
+  ])
+
   // Construir dataBag
-  const dataBag = construirDataBag(planDb, proyecto, pngParaDocx)
+  const dataBag = construirDataBag({
+    plan: planDb,
+    proyecto,
+    organigramaPngBase64: pngParaDocx,
+    generaciones,
+    ubicacionDetectadaTdr: tdr?.ubicacionDetectada ?? null,
+  })
 
   // Renderizar DOCX
   let docxBuffer: Buffer

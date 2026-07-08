@@ -426,19 +426,8 @@ export const SECCIONES_CONFIG: SeccionConfig[] = [
   }
 }`,
   },
-  {
-    id: 'responsabilidades',
-    label: 'Responsabilidades',
-    modelo: 'haiku',
-    schema: `{
-  "responsabilidades": {
-    "gerenteGeneral": ["string"],
-    "supervisor": ["string"],
-    "operario": ["string"],
-    "supervisorSeguridad": ["string"]
-  }
-}`,
-  },
+  // 'responsabilidades' ya no se genera con IA — es texto fijo de la plantilla
+  // (informe §6: "Responsabilidades completas" vive dentro del docx, sin dataBag ni IA).
   {
     id: 'referencias',
     label: 'Referencias',
