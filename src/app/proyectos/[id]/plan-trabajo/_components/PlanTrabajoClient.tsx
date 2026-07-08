@@ -235,8 +235,9 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
       await fetchContexto()
       const advertencias = (body.advertencias as string[] | undefined) ?? []
       if (advertencias.length > 0) {
+        console.warn('[plan-trabajo] Advertencias de "1. Generar datos":', advertencias)
         toast.warning(
-          `Datos calculados con ${advertencias.length} advertencia(s): ${advertencias.slice(0, 2).join(' · ')}${advertencias.length > 2 ? '…' : ''}`,
+          `Datos calculados con ${advertencias.length} advertencia(s) — ver detalle completo en la consola del navegador: ${advertencias.slice(0, 2).join(' · ')}${advertencias.length > 2 ? '…' : ''}`,
           { duration: 8000 }
         )
       } else {
@@ -363,8 +364,9 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
           const advertencias = (data.advertencias as string[] | undefined) ?? []
           const calculado = data.calculado === true
           if (advertencias.length > 0) {
+            console.warn(`[plan-trabajo] Advertencias al recalcular "${seccion}":`, advertencias)
             toast.warning(
-              `Sección "${seccion}" recalculada con advertencias: ${advertencias.slice(0, 2).join(' · ')}${advertencias.length > 2 ? '…' : ''}`,
+              `Sección "${seccion}" recalculada con advertencias — ver detalle completo en la consola: ${advertencias.slice(0, 2).join(' · ')}${advertencias.length > 2 ? '…' : ''}`,
               { duration: 8000 }
             )
           } else {
