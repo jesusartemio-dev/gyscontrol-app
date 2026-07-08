@@ -15,7 +15,8 @@ import { guardarSeccionIndividual } from '@/lib/planTrabajo/guardarSecciones'
 import { PLAN_TRABAJO_SYSTEM_INSTRUCCIONES } from '@/lib/planTrabajo/prompts/generarPlan'
 import { buildPromptRegeneracion } from '@/lib/planTrabajo/prompts/regenerarSeccion'
 import { parseJsonIA } from '@/lib/planTrabajo/parseJsonIA'
-import type { SeccionRegenerable } from '@/types/planTrabajo'
+import { deduplicarSiglas } from '@/lib/planTrabajo/siglas'
+import type { SeccionRegenerable, PlanPersonal } from '@/types/planTrabajo'
 
 export const maxDuration = 300
 export const dynamic = 'force-dynamic'
@@ -264,8 +265,15 @@ export async function POST(req: NextRequest, { params }: Ctx) {
           return
         }
 
+        // Dedup de siglas server-side — misma función usada en generar-ia y en
+        // construirDataBag (informe §4.4).
+        const dataFinal =
+          seccion === 'personalAsignado' && Array.isArray(data)
+            ? deduplicarSiglas(data as PlanPersonal[])
+            : data
+
         send('status', { fase: 'persistencia', mensaje: 'Guardando sección validada...' })
-        await guardarSeccionIndividual(proyectoId, seccion, data)
+        await guardarSeccionIndividual(proyectoId, seccion, dataFinal)
 
         send('done', { seccionGuardada: seccion })
       } catch (error: unknown) {

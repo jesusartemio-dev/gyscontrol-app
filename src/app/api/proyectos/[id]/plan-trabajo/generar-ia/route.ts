@@ -13,11 +13,12 @@ import { validarSeccionesPlan } from '@/lib/planTrabajo/validarSecciones'
 import { guardarSeccionParalela, recalcularCompletitud } from '@/lib/planTrabajo/guardarSecciones'
 import { RESUMEN_PROYECTO_PROMPT } from '@/lib/planTrabajo/prompts/resumirProyecto'
 import { parseJsonIA } from '@/lib/planTrabajo/parseJsonIA'
+import { deduplicarSiglas } from '@/lib/planTrabajo/siglas'
 import {
   PLAN_TRABAJO_SYSTEM_INSTRUCCIONES,
   SECCIONES_CONFIG,
 } from '@/lib/planTrabajo/prompts/generarPlan'
-import type { PlanTrabajoContexto } from '@/types/planTrabajo'
+import type { PlanTrabajoContexto, PlanPersonal } from '@/types/planTrabajo'
 
 export const maxDuration = 300
 export const dynamic = 'force-dynamic'
@@ -268,6 +269,12 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
             const { secciones: seccionValidada, errores: erroresValidacion } = validarSeccionesPlan({ [id]: valor })
             if (Object.keys(seccionValidada).length > 0) {
+              // Dedup de siglas server-side antes de persistir — matrizRaci reutiliza
+              // este mismo resultado deduplicado vía planParcial (informe §4.4).
+              if (id === 'personalAsignado' && Array.isArray(seccionValidada.personalAsignado)) {
+                seccionValidada.personalAsignado = deduplicarSiglas(seccionValidada.personalAsignado as PlanPersonal[])
+                planParcial.personalAsignado = seccionValidada.personalAsignado
+              }
               await guardarSeccionParalela(proyectoId, seccionValidada)
               seccionesGuardadas.push(id)
               send('seccion', { id })
