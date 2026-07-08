@@ -11,17 +11,17 @@ import * as XLSX from 'xlsx'
 import { CatalogoServicio } from '@/types'
 
 export async function exportarServiciosAExcel(servicios: CatalogoServicio[]) {
-  // Ordenar por categoría y luego por orden
+  // Ordenar por EDT y luego por orden
   const serviciosOrdenados = servicios.sort((a, b) => {
-    const categoriaA = a.categoria?.nombre || ''
-    const categoriaB = b.categoria?.nombre || ''
+    const edtA = a.edt?.nombre || ''
+    const edtB = b.edt?.nombre || ''
 
-    // Primero ordenar por categoría
-    if (categoriaA !== categoriaB) {
-      return categoriaA.localeCompare(categoriaB)
+    // Primero ordenar por EDT
+    if (edtA !== edtB) {
+      return edtA.localeCompare(edtB)
     }
 
-    // Luego ordenar por orden dentro de la categoría
+    // Luego ordenar por orden dentro del EDT
     return (a.orden || 0) - (b.orden || 0)
   })
 
@@ -44,7 +44,7 @@ export async function exportarServiciosAExcel(servicios: CatalogoServicio[]) {
     return {
       Servicio: servicio.nombre,
       Descripción: servicio.descripcion || '',
-      EDT: servicio.categoria?.nombre || '',
+      EDT: servicio.edt?.nombre || '',
       Orden: servicio.orden || 0,
       Recurso: servicio.recurso?.nombre || '',
       Unidad: servicio.unidadServicio?.nombre || '',
