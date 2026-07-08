@@ -42,21 +42,30 @@ interface ReglaRaci {
 /**
  * Tabla de mapeo cargoLabel → rol RACI, configurable en código.
  * Se evalúa en orden — el primer patrón que matchee gana.
- * Semilla (informe §6 / cambio #13):
- *   Gerente*                          → A en todo
- *   Gestor/Supervisor de Proyecto*     → R en EDTs de gestión, C en EDTs de campo
- *   Supervisor de campo/Construcción*  → R en EDTs de campo, I en EDTs de gestión
- *   Técnico*                          → R en el EDT del que es responsable, I en el resto
- *   *Seguridad*                       → C en todo
- *   Comercial* / Logístic*            → I en todo
+ *
+ * Los patrones cubren el vocabulario REAL del organigrama estándar de GYS
+ * (verificado contra PlantillaOrganigrama / ProyectoOrgNodo en BD): usa
+ * sustantivos de área ("GERENCIA GENERAL", "HSEQ") en vez de títulos de
+ * persona ("Gerente", "Seguridad") — los patrones originales basados solo en
+ * el prompt de IA no cubrían esto y dejaban casi todo en "I" por defecto.
+ *
+ * Semilla (informe §6 / cambio #13, ajustada a cargos reales):
+ *   Gerencia* / Gerente*                        → A en todo
+ *   Gestor/Supervisor de Proyecto*               → R en EDTs de gestión, C en EDTs de campo
+ *   Residente / Supervisor de campo/Construcción* → R en EDTs de campo, I en EDTs de gestión
+ *   Técnico*                                     → R en el EDT del que es responsable o en
+ *                                                   cualquier EDT de campo (fallback si el
+ *                                                   cronograma no tiene responsableId cargado), I en el resto
+ *   Seguridad* / HSEQ                            → C en todo
+ *   Comercial* / Logístic*                       → I en todo
  * Cargos que no matchean ninguna regla → I en todo + advertencia (ver calcularDatos.ts).
  */
 export const REGLAS_RACI_CARGO: ReglaRaci[] = [
-  { patron: /gerente/i, calcular: () => 'A' },
+  { patron: /gerenc|gerente/i, calcular: () => 'A' },
   { patron: /(gestor|supervisor\s+de\s+proyecto)/i, calcular: ctx => (ctx.tipoEdt === 'gestion' ? 'R' : 'C') },
-  { patron: /(supervisor\s+de\s+campo|construcci[oó]n)/i, calcular: ctx => (ctx.tipoEdt === 'campo' ? 'R' : 'I') },
-  { patron: /t[eé]cnico/i, calcular: ctx => (ctx.esResponsableDelEdt ? 'R' : 'I') },
-  { patron: /seguridad/i, calcular: () => 'C' },
+  { patron: /(residente|supervisor\s+de\s+campo|construcci[oó]n)/i, calcular: ctx => (ctx.tipoEdt === 'campo' ? 'R' : 'I') },
+  { patron: /t[eé]cnico/i, calcular: ctx => (ctx.esResponsableDelEdt || ctx.tipoEdt === 'campo' ? 'R' : 'I') },
+  { patron: /seguridad|hseq/i, calcular: () => 'C' },
   { patron: /(comercial|log[ií]stic)/i, calcular: () => 'I' },
 ]
 
