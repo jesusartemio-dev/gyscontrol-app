@@ -87,22 +87,22 @@ export async function leerRecursosDesdeExcel(file: File): Promise<RecursoImporta
 }
 
 /**
- * Valida los recursos importados
- * Ya no omite duplicados - el API los actualizará
+ * Valida los recursos importados.
+ * La importación solo ACTUALIZA recursos existentes: si el nombre no coincide
+ * (comparación insensible a acentos/mayúsculas) con ningún recurso del catálogo,
+ * la fila se rechaza como error en vez de crear un recurso nuevo por error de tipeo.
  */
 export function validarRecursos(
   recursos: RecursoImportado[],
-  nombresExistentes: string[]
+  recursosExistentes: { id: string; nombre: string }[]
 ): {
   validos: RecursoImportado[]
-  nuevos: number
   actualizaciones: number
   errores: string[]
 } {
   const validos: RecursoImportado[] = []
   const errores: string[] = []
   const nombresVistos = new Set<string>()
-  let nuevos = 0
   let actualizaciones = 0
 
   for (const r of recursos) {
@@ -111,27 +111,27 @@ export function validarRecursos(
       continue
     }
 
-    const nombreNorm = r.nombre.toLowerCase()
+    const nombreNorm = normalizeStr(r.nombre)
 
     // Check for duplicates in import file
     if (nombresVistos.has(nombreNorm)) {
       errores.push(`Nombre duplicado en archivo: ${r.nombre}`)
       continue
     }
-
     nombresVistos.add(nombreNorm)
 
-    // Count if it's new or update
-    if (nombresExistentes.map(n => n.toLowerCase()).includes(nombreNorm)) {
-      actualizaciones++
-    } else {
-      nuevos++
+    const existente = recursosExistentes.find(e => normalizeStr(e.nombre) === nombreNorm)
+    if (!existente) {
+      errores.push(`Recurso "${r.nombre}" no existe en el catálogo. Usa exactamente un nombre de la hoja "Recursos Existentes" de la plantilla — no se crean recursos nuevos por importación.`)
+      continue
     }
 
-    validos.push(r)
+    actualizaciones++
+    // Preservar el nombre canónico ya guardado para no alterarlo por diferencias de formato/acentos
+    validos.push({ ...r, nombre: existente.nombre })
   }
 
-  return { validos, nuevos, actualizaciones, errores }
+  return { validos, actualizaciones, errores }
 }
 
 /**
@@ -139,7 +139,6 @@ export function validarRecursos(
  */
 export async function importarRecursosEnBD(recursos: RecursoImportado[]): Promise<{
   message: string
-  creados: number
   actualizados: number
   total: number
   errores?: string[]

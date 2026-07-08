@@ -64,7 +64,6 @@ export default function RecursosPage() {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [importPreviewData, setImportPreviewData] = useState<{
     validos: RecursoImportado[]
-    nuevos: number
     actualizaciones: number
     errores: string[]
   } | null>(null)
@@ -157,8 +156,7 @@ export default function RecursosPage() {
 
     try {
       const datos = await leerRecursosDesdeExcel(file)
-      const nombresExistentes = recursos.map(r => r.nombre)
-      const validacionResult = validarRecursos(datos, nombresExistentes)
+      const validacionResult = validarRecursos(datos, recursos.map(r => ({ id: r.id, nombre: r.nombre })))
 
       // Show preview modal instead of direct import
       setImportPreviewData(validacionResult)
@@ -196,7 +194,7 @@ export default function RecursosPage() {
 
   const handleDescargarPlantilla = () => {
     try {
-      generarPlantillaRecursos()
+      generarPlantillaRecursos(recursos)
       toast.success('Plantilla descargada')
     } catch {
       toast.error('Error al generar plantilla')

@@ -37,7 +37,6 @@ interface RecursoImportPreviewModalProps {
   onConfirm: () => Promise<void>
   datos: {
     validos: RecursoImportado[]
-    nuevos: number
     actualizaciones: number
     errores: string[]
   }
@@ -51,7 +50,7 @@ export function RecursoImportPreviewModal({
   datos,
   isLoading = false
 }: RecursoImportPreviewModalProps) {
-  const { validos, nuevos, actualizaciones, errores } = datos
+  const { validos, actualizaciones, errores } = datos
 
   const hayValidos = validos.length > 0
 
@@ -61,27 +60,20 @@ export function RecursoImportPreviewModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Upload className="h-5 w-5" />
-            Vista Previa de Importación de Recursos
+            Vista Previa de Actualización de Recursos
           </DialogTitle>
           <DialogDescription>
-            Revisa los datos antes de importar. Puedes cancelar y modificar el Excel si es necesario.
+            Solo se actualizan recursos existentes del catálogo — la importación no crea recursos nuevos. Revisa los datos antes de continuar.
           </DialogDescription>
         </DialogHeader>
 
         {/* Resumen */}
-        <div className="grid grid-cols-4 gap-3 py-3">
+        <div className="grid grid-cols-3 gap-3 py-3">
           <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg">
             <CheckCircle className="h-5 w-5 text-blue-600" />
             <div>
               <p className="text-lg font-bold text-blue-700">{validos.length}</p>
               <p className="text-xs text-blue-600">Válidos</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 p-3 bg-green-50 rounded-lg">
-            <CheckCircle className="h-5 w-5 text-green-600" />
-            <div>
-              <p className="text-lg font-bold text-green-700">{nuevos}</p>
-              <p className="text-xs text-green-600">Nuevos</p>
             </div>
           </div>
           <div className="flex items-center gap-2 p-3 bg-amber-50 rounded-lg">
@@ -106,7 +98,7 @@ export function RecursoImportPreviewModal({
             <div className="mb-4">
               <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
                 <CheckCircle className="h-4 w-4 text-green-600" />
-                Recursos a Procesar ({validos.length})
+                Recursos a Actualizar ({validos.length})
               </h4>
               <div className="border rounded-lg overflow-hidden">
                 <Table>
@@ -118,59 +110,41 @@ export function RecursoImportPreviewModal({
                       <TableHead className="text-xs py-2 text-right">Costo/Hora</TableHead>
                       <TableHead className="text-xs py-2 text-right">Costo Proy.</TableHead>
                       <TableHead className="text-xs py-2">Descripción</TableHead>
-                      <TableHead className="text-xs py-2 text-center">Acción</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {validos.slice(0, 10).map((rec, idx) => {
-                      // Determinar si es nuevo o actualización basándose en la posición
-                      const esNuevo = idx < nuevos
-                      return (
-                        <TableRow key={`${rec.nombre}-${idx}`} className="text-xs">
-                          <TableCell className="py-1.5 font-medium">{rec.nombre}</TableCell>
-                          <TableCell className="py-1.5">
-                            <Badge variant="outline" className="text-[10px]">
-                              {rec.tipo === 'cuadrilla' ? 'Cuadrilla' : 'Individual'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="py-1.5">
-                            <Badge
-                              variant="outline"
-                              className={cn(
-                                "text-[10px]",
-                                rec.origen === 'externo'
-                                  ? "border-orange-200 bg-orange-50 text-orange-700"
-                                  : "border-sky-200 bg-sky-50 text-sky-700"
-                              )}
-                            >
-                              {rec.origen === 'externo' ? 'Externo' : 'GYS'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="py-1.5 text-right font-mono">
-                            $ {rec.costoHora.toFixed(2)}
-                          </TableCell>
-                          <TableCell className="py-1.5 text-right font-mono">
-                            {rec.costoHoraProyecto != null ? `$ ${rec.costoHoraProyecto.toFixed(2)}` : '–'}
-                          </TableCell>
-                          <TableCell className="py-1.5 truncate max-w-[150px]">
-                            {rec.descripcion || '-'}
-                          </TableCell>
-                          <TableCell className="py-1.5 text-center">
-                            <Badge
-                              variant="outline"
-                              className={cn(
-                                "text-[10px]",
-                                esNuevo
-                                  ? "border-green-200 bg-green-50 text-green-700"
-                                  : "border-amber-200 bg-amber-50 text-amber-700"
-                              )}
-                            >
-                              {esNuevo ? 'Crear' : 'Actualizar'}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })}
+                    {validos.slice(0, 10).map((rec, idx) => (
+                      <TableRow key={`${rec.nombre}-${idx}`} className="text-xs">
+                        <TableCell className="py-1.5 font-medium">{rec.nombre}</TableCell>
+                        <TableCell className="py-1.5">
+                          <Badge variant="outline" className="text-[10px]">
+                            {rec.tipo === 'cuadrilla' ? 'Cuadrilla' : 'Individual'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="py-1.5">
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "text-[10px]",
+                              rec.origen === 'externo'
+                                ? "border-orange-200 bg-orange-50 text-orange-700"
+                                : "border-sky-200 bg-sky-50 text-sky-700"
+                            )}
+                          >
+                            {rec.origen === 'externo' ? 'Externo' : 'GYS'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="py-1.5 text-right font-mono">
+                          $ {rec.costoHora.toFixed(2)}
+                        </TableCell>
+                        <TableCell className="py-1.5 text-right font-mono">
+                          {rec.costoHoraProyecto != null ? `$ ${rec.costoHoraProyecto.toFixed(2)}` : '–'}
+                        </TableCell>
+                        <TableCell className="py-1.5 truncate max-w-[150px]">
+                          {rec.descripcion || '-'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
                 {validos.length > 10 && (
@@ -225,12 +199,12 @@ export function RecursoImportPreviewModal({
             {isLoading ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Importando...
+                Actualizando...
               </>
             ) : (
               <>
                 <Upload className="h-4 w-4" />
-                Importar {validos.length} Recurso(s)
+                Actualizar {validos.length} Recurso(s)
               </>
             )}
           </Button>

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { randomUUID } from 'crypto'
+import { normalizeStr } from '@/lib/utils'
 
 interface RecursoImportado {
   nombre: string
@@ -28,11 +28,11 @@ export async function POST(request: Request) {
     })
 
     const resultados = {
-      creados: 0,
       actualizados: 0,
       errores: [] as string[]
     }
 
+    // La importación solo actualiza recursos existentes: no crea recursos nuevos.
     for (const rec of recursos) {
       try {
         // Validar nombre requerido
@@ -47,13 +47,18 @@ export async function POST(request: Request) {
           continue
         }
 
-        // Buscar recurso existente por nombre (case insensitive)
+        // Buscar recurso existente por nombre (insensible a acentos/mayúsculas)
+        const nombreNorm = normalizeStr(rec.nombre.trim())
         const recursoExistente = recursosExistentes.find(r =>
-          r.nombre.toLowerCase() === rec.nombre.toLowerCase().trim()
+          normalizeStr(r.nombre) === nombreNorm
         )
 
+        if (!recursoExistente) {
+          resultados.errores.push(`Recurso "${rec.nombre}" no existe en el catálogo — no se crean recursos nuevos por importación`)
+          continue
+        }
+
         const dataRecurso = {
-          nombre: rec.nombre.trim(),
           tipo: rec.tipo || 'individual',
           origen: rec.origen || 'propio',
           costoHora: rec.costoHora,
@@ -62,37 +67,21 @@ export async function POST(request: Request) {
           updatedAt: new Date()
         }
 
-        if (recursoExistente) {
-          // Actualizar recurso existente
-          await prisma.recurso.update({
-            where: { id: recursoExistente.id },
-            data: dataRecurso
-          })
-          resultados.actualizados++
-        } else {
-          // Crear nuevo recurso
-          await prisma.recurso.create({
-            data: {
-              id: randomUUID(),
-              ...dataRecurso
-            }
-          })
-          resultados.creados++
-        }
+        await prisma.recurso.update({
+          where: { id: recursoExistente.id },
+          data: dataRecurso
+        })
+        resultados.actualizados++
       } catch (error) {
         console.error(`Error al procesar recurso ${rec.nombre}:`, error)
         resultados.errores.push(`Error al procesar recurso: ${rec.nombre}`)
       }
     }
 
-    const mensaje = [
-      resultados.creados > 0 ? `${resultados.creados} creados` : null,
-      resultados.actualizados > 0 ? `${resultados.actualizados} actualizados` : null
-    ].filter(Boolean).join(', ')
-
     return NextResponse.json({
-      message: `Importación completada: ${mensaje || 'sin cambios'}`,
-      creados: resultados.creados,
+      message: resultados.actualizados > 0
+        ? `Importación completada: ${resultados.actualizados} actualizado(s)`
+        : 'Importación completada: sin cambios',
       actualizados: resultados.actualizados,
       total: recursos.length,
       errores: resultados.errores.length > 0 ? resultados.errores : undefined

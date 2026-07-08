@@ -45,9 +45,12 @@ export function exportarRecursosAExcel(recursos: Recurso[]) {
 }
 
 /**
- * Genera una plantilla Excel para importar recursos
+ * Genera una plantilla Excel para importar recursos.
+ * Incluye una segunda hoja de solo lectura con los recursos existentes,
+ * para que el nombre usado en la importación coincida exactamente
+ * (la importación solo actualiza recursos existentes, no crea nuevos).
  */
-export function generarPlantillaRecursos() {
+export function generarPlantillaRecursos(recursosExistentes: Recurso[] = []) {
   const ejemplos = [
     {
       Nombre: 'Técnico Senior',
@@ -84,6 +87,20 @@ export function generarPlantillaRecursos() {
 
   const workbook = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Recursos')
+
+  const existentesOrdenados = [...recursosExistentes].sort((a, b) => a.nombre.localeCompare(b.nombre))
+  const dataExistentes = existentesOrdenados.map((r) => ({
+    Nombre: r.nombre,
+    Tipo: r.tipo === 'cuadrilla' ? 'Cuadrilla' : 'Individual',
+    Origen: r.origen === 'externo' ? 'Externo' : 'GYS',
+    'Costo Hora': r.costoHora,
+    Estado: r.activo ? 'Activo' : 'Inactivo',
+  }))
+  const worksheetExistentes = XLSX.utils.json_to_sheet(dataExistentes)
+  worksheetExistentes['!cols'] = [
+    { wch: 30 }, { wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 10 },
+  ]
+  XLSX.utils.book_append_sheet(workbook, worksheetExistentes, 'Recursos Existentes')
 
   XLSX.writeFile(workbook, 'plantilla_recursos.xlsx')
 }
