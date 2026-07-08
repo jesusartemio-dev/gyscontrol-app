@@ -43,6 +43,9 @@ export function CabeceraEditor({ proyectoId, plan, onUpdated }: Props) {
   const p = plan as unknown as Record<string, string>
 
   const startEdit = async () => {
+    // Solo "preparadoPor" tiene un default legítimo (el usuario logueado, dato real).
+    // Revisado/Aprobado no tienen una fuente confiable — deben completarse a mano
+    // en vez de sugerir nombres de personas hardcodeados en el código.
     const userName = session?.user?.name ?? session?.user?.email ?? ''
     const defaultForm: FormState = {
       codigoDocumento: plan.codigoDocumento ?? '',
@@ -50,26 +53,26 @@ export function CabeceraEditor({ proyectoId, plan, onUpdated }: Props) {
       tipoEmision: plan.tipoEmision ?? 'B - Para Revisión',
       preparadoPor:    p.preparadoPor    || userName,
       preparadoCargo:  p.preparadoCargo  || 'Ing. de Proyectos',
-      revisadoPor:     p.revisadoPor     || 'Heber Conza',
-      revisadoCargo:   p.revisadoCargo   || 'Coordinador Ingeniería',
-      aprobadoPor:     p.aprobadoPor     || 'Jesus Mamani',
-      aprobadoCargo:   p.aprobadoCargo   || 'Gerente de Proyecto',
+      revisadoPor:     p.revisadoPor     || '',
+      revisadoCargo:   p.revisadoCargo   || '',
+      aprobadoPor:     p.aprobadoPor     || '',
+      aprobadoCargo:   p.aprobadoCargo   || '',
     }
     setForm(defaultForm)
     setEditing(true)
 
-    // Si algún firmante estaba vacío en la DB, guardar los defaults automáticamente
-    const firmantesFaltantes = !p.preparadoPor || !p.revisadoPor || !p.aprobadoPor
-    if (firmantesFaltantes) {
+    // Si "preparadoPor" estaba vacío en la DB, guardar el default automáticamente
+    // (es el único campo con una fuente de datos real: el usuario logueado).
+    if (!p.preparadoPor && userName) {
       try {
         const res = await fetch(`/api/proyectos/${proyectoId}/plan-trabajo`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(defaultForm),
+          body: JSON.stringify({ preparadoPor: userName, preparadoCargo: defaultForm.preparadoCargo }),
         })
         if (res.ok) {
           await onUpdated()
-          toast.success('Firmantes guardados por defecto — podés editarlos')
+          toast.success('"Preparado por" completado con tu usuario — podés editarlo')
         }
       } catch {
         // silencioso: el usuario puede guardar manualmente
