@@ -13,6 +13,7 @@ import type {
 } from '@/types/planTrabajo'
 import { deduplicarSiglas, calcularSiglasBase } from './siglas'
 import { getSnapshotPlan } from './snapshotHelpers'
+import { REFERENCIAS_BASE } from './referenciasBase'
 
 type ProyectoConCliente = Proyecto & { cliente: Cliente | null }
 
@@ -173,12 +174,23 @@ export function construirDataBag({
     tieneUbicacion: Boolean(ubicacionProyecto),
     ubicacionProyecto,
 
-    // ─── Referencias (BD/IA — la constante de normas base se agrega en cambio #5) ───
-    referencias: referencias.map(r => ({
-      codigo: r.codigoDocumento ?? '',
-      descripcion: r.titulo,
-      origen: r.origen, // alias retrocompatible
-    })),
+    // ─── Referencias: normativa base (código, siempre) + BD/IA — dedup por código ───
+    referencias: (() => {
+      const combinadas = [...REFERENCIAS_BASE, ...referencias]
+      const vistos = new Set<string>()
+      return combinadas
+        .filter(r => {
+          const clave = (r.codigoDocumento ?? r.titulo).trim().toLowerCase()
+          if (vistos.has(clave)) return false
+          vistos.add(clave)
+          return true
+        })
+        .map(r => ({
+          codigo: r.codigoDocumento ?? '',
+          descripcion: r.titulo,
+          origen: r.origen, // alias retrocompatible
+        }))
+    })(),
 
     // Definiciones específicas por proyecto — NO ENCONTRADO en el modelo de datos
     // (no hay campo que las respalde hoy); se envía vacío en vez de inventarlas.

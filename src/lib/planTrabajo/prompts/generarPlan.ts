@@ -153,8 +153,9 @@ CRITERIOS DE CALIDAD:
 
 11. REFERENCIAS:
     - Documentos del TDR si existe.
-    - Normativa peruana SSOMA: Ley 29783, DS-005-2012-TR, RM 050-2013-TR.
     - Si el TDR menciona normas específicas, incluilas.
+    - NO incluyas Ley 29783, DS-005-2012-TR ni RM 050-2013-TR — el sistema las agrega
+      automáticamente a todos los planes, no las repitas.
 
 ANTI-ALUCINACIÓN:
 - Si un dato no está en el contexto, NO LO INVENTES. Es preferible

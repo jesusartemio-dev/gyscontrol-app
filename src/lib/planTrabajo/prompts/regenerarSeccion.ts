@@ -157,8 +157,9 @@ Si los datos son insuficientes, devolvé { meses: [], equipoTrabajo: [], horasHo
     instruccion: `Generá la lista de documentos y normas de referencia aplicables al proyecto:
 - Si existe TDR, incluí los documentos contractuales mencionados en él (orden de compra, contrato,
   especificaciones técnicas del cliente).
-- Siempre incluí la normativa peruana SSOMA: Ley N° 29783, DS-005-2012-TR, RM 050-2013-TR.
 - Si el TDR menciona normas técnicas específicas (IEC, NTP, IEEE, NFPA, OSHA), incluilas.
+- NO incluyas Ley N° 29783, DS-005-2012-TR ni RM 050-2013-TR — el sistema las agrega
+  automáticamente a todos los planes, no las repitas.
 - origen: "TDR" para documentos del TDR, "NORMATIVA" para leyes/normas técnicas,
   "COTIZACION" si viene de la cotización, "MANUAL" para manuales de fabricantes.`,
     schema: `{ "referencias": [{ "codigoDocumento": "string opcional", "titulo": "string", "origen": "NORMATIVA" }] }`,
