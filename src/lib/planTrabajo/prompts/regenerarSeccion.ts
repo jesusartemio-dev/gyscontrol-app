@@ -47,7 +47,9 @@ CAMPOS:
 - descripcion: oración técnica de 20-30 palabras que describa el flujo del EDT. NO bullets.
 - subItems.actividadNombre: nombre descriptivo; listá los códigos técnicos al agrupar (E013, E062...)
 - subItems.descripcion: oración técnica de 15-20 palabras describiendo la actividad o grupo`,
-    schema: `{ "alcanceDetallado": [{ "numeracion": "11.1", "edtNombre": "Construcción", "edtCodigo": "CON", "faseNombre": "EJECUCIÓN", "faseAbreviatura": "EJECUCIÓN", "ubicacion": "Site cliente (opcional)", "descripcion": "Párrafo narrativo 80-120 palabras...", "subItems": [{ "numeracion": "11.1.1", "actividadNombre": "Instalación de Sistemas de Extractor (E013, E062, E503, E2013, E3003)", "descripcion": "Párrafo narrativo agrupando instalaciones similares..." }], "edtRefId": "ID del EDT del cronograma" }] }`,
+    // "ubicacion": "" — dejar vacío si el contexto no trae un dato real (informe §4.1);
+    // no usar un ejemplo plausible como valor de muestra.
+    schema: `{ "alcanceDetallado": [{ "numeracion": "11.1", "edtNombre": "Construcción", "edtCodigo": "CON", "faseNombre": "EJECUCIÓN", "faseAbreviatura": "EJECUCIÓN", "ubicacion": "", "descripcion": "Párrafo narrativo 80-120 palabras...", "subItems": [{ "numeracion": "11.1.1", "actividadNombre": "Instalación de Sistemas de Extractor (E013, E062, E503, E2013, E3003)", "descripcion": "Párrafo narrativo agrupando instalaciones similares..." }], "edtRefId": "ID del EDT del cronograma" }] }`,
   },
 
   eppRequeridos: {

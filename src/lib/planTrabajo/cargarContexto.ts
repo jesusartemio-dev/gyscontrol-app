@@ -249,6 +249,7 @@ export async function cargarContextoPlanTrabajo(
         cronogramaEstimado: true,
         riesgosCriticos: true,
         bloquesCompletitud: true,
+        ubicacionDetectada: true,
       },
     }),
 

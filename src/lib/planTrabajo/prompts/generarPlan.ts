@@ -174,6 +174,9 @@ REGLAS GENERALES:
 - Lenguaje técnico de ingeniería peruana, formal pero claro.
 `.trim()
 
+// "ubicacion": "" — omitir/dejar vacío si el contexto no trae un dato real de ubicación.
+// No usar un ejemplo plausible (p.ej. una dirección concreta): el modelo tiende a "recordar"
+// el patrón del ejemplo en vez de omitir el campo cuando no hay dato (informe §4.1).
 export const PLAN_TRABAJO_OUTPUT_SCHEMA_LOTE_A = `
 ESQUEMA JSON DE OUTPUT — LOTE A (devolvé EXACTAMENTE este JSON con SOLO estas 6 secciones, sin markdown):
 
@@ -187,7 +190,7 @@ ESQUEMA JSON DE OUTPUT — LOTE A (devolvé EXACTAMENTE este JSON con SOLO estas
       "edtCodigo": "CON",
       "faseNombre": "EJECUCIÓN",
       "faseAbreviatura": "EJECUCIÓN",
-      "ubicacion": "Site cliente / Sección 50 (opcional, omitir si no aplica)",
+      "ubicacion": "",
       "descripcion": "Párrafo narrativo de 80-120 palabras...",
       "subItems": [
         {
@@ -303,6 +306,8 @@ export const SECCIONES_CONFIG: SeccionConfig[] = [
     id: 'alcanceDetallado',
     label: 'Alcance Detallado',
     maxTokens: 4096,
+    // "ubicacion": "" — dejar vacío si el contexto no trae un dato real (informe §4.1).
+    // No usar un ejemplo plausible: el modelo tiende a "recordar" el patrón del ejemplo.
     schema: `{
   "alcanceDetallado": [
     {
@@ -311,7 +316,7 @@ export const SECCIONES_CONFIG: SeccionConfig[] = [
       "edtCodigo": "CON",
       "faseNombre": "EJECUCIÓN",
       "faseAbreviatura": "EJECUCIÓN",
-      "ubicacion": "Site cliente (opcional)",
+      "ubicacion": "",
       "descripcion": "Instalación y montaje de sistemas mecánicos en planta cliente.",
       "subItems": [
         {
@@ -457,7 +462,7 @@ ESQUEMA JSON DE OUTPUT (devolvé EXACTAMENTE este JSON sin markdown):
       "edtCodigo": "CON",
       "faseNombre": "EJECUCIÓN",
       "faseAbreviatura": "EJECUCIÓN",
-      "ubicacion": "Site cliente / Sección 50 (opcional)",
+      "ubicacion": "",
       "descripcion": "Párrafo narrativo de 80-120 palabras...",
       "subItems": [{ "numeracion": "11.1.1", "actividadNombre": "Instalación de Sistemas de Extractor (E013, E062)", "descripcion": "string" }],
       "edtRefId": "ID del EDT del cronograma"

@@ -47,6 +47,8 @@ export function serializarContextoParaIA(contexto: PlanTrabajoContexto): string 
   partes.push('# DATOS DEL CLIENTE Y PROYECTO')
   partes.push(`- Cliente: ${contexto.proyecto.cliente?.nombre ?? 'N/A'}`)
   partes.push(`- RUC: ${contexto.proyecto.cliente?.ruc ?? 'N/A'}`)
+  const ubicacion = contexto.proyecto.cliente?.direccion?.trim() || contexto.tdr?.ubicacionDetectada?.trim() || null
+  partes.push(`- UBICACIÓN DEL PROYECTO: ${ubicacion ?? 'N/A — no inventes una ubicación, dejá el campo vacío si se pide'}`)
   partes.push(`- Código del proyecto: ${contexto.proyecto.codigo}`)
   partes.push(`- Nombre: ${contexto.proyecto.nombre}`)
   partes.push(`- Descripción: ${contexto.proyecto.descripcion ?? 'N/A'}`)

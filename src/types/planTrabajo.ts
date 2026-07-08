@@ -396,6 +396,7 @@ export interface TdrContexto {
   cronogramaEstimado: unknown
   riesgosCriticos: unknown
   bloquesCompletitud: unknown
+  ubicacionDetectada: string | null
 }
 
 // Re-exports
