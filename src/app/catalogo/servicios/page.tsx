@@ -13,7 +13,7 @@ import {
 import { getEdts } from '@/lib/services/edt'
 import { getUnidadesServicio } from '@/lib/services/unidadServicio'
 import { getRecursos } from '@/lib/services/recurso'
-import { exportarServiciosAExcel } from '@/lib/utils/serviciosExcel'
+import { exportarServiciosAExcel, generarPlantillaServicios } from '@/lib/utils/serviciosExcel'
 import {
   leerServiciosDesdeExcel,
   importarServiciosDesdeExcelValidado,
@@ -103,6 +103,21 @@ export default function CatalogoServicioPage() {
     } catch (err) {
       console.error('Error al exportar servicios:', err)
       toast.error('Error al exportar servicios.')
+    }
+  }
+
+  const handleDescargarPlantilla = async () => {
+    try {
+      const [edts, unidades, recursos] = await Promise.all([
+        getEdts(),
+        getUnidadesServicio(),
+        getRecursos(),
+      ])
+      await generarPlantillaServicios(edts, unidades, recursos)
+      toast.success('Plantilla descargada')
+    } catch (err) {
+      console.error('Error al generar plantilla:', err)
+      toast.error('Error al generar plantilla')
     }
   }
 
@@ -239,7 +254,11 @@ export default function CatalogoServicioPage() {
               <CatalogoServicioForm onCreated={handleCreated} />
             </DialogContent>
           </Dialog>
-          <BotonesImportExport onExportar={handleExportar} onImportar={handleImportar} />
+          <BotonesImportExport
+            onDescargarPlantilla={handleDescargarPlantilla}
+            onExportar={handleExportar}
+            onImportar={handleImportar}
+          />
         </div>
       </div>
 

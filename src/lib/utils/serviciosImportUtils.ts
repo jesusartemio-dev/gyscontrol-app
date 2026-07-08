@@ -9,6 +9,7 @@
 import * as xlsx from 'xlsx'
 import type { CatalogoServicioPayload } from '@/types'
 import type { Edt, UnidadServicio, Recurso } from '@/types'
+import { normalizeStr } from '@/lib/utils'
 
 // 📄 Leer servicios desde Excel
 export async function leerServiciosDesdeExcel(file: File): Promise<any[]> {
@@ -65,9 +66,9 @@ export async function importarServiciosDesdeExcelValidado(
     // Columnas opcionales para compatibilidad con archivos antiguos
     // HorasTotales y Total USD se ignoran en importación (se recalculan)
 
-    const categoria = categorias.find(c => c.nombre.toLowerCase() === categoriaNombre?.toLowerCase())
-    const unidad = unidades.find(u => u.nombre.toLowerCase() === unidadNombre?.toLowerCase())
-    const recurso = recursos.find(r => r.nombre.toLowerCase() === recursoNombre?.toLowerCase())
+    const categoria = categorias.find(c => normalizeStr(c.nombre) === normalizeStr(categoriaNombre))
+    const unidad = unidades.find(u => normalizeStr(u.nombre) === normalizeStr(unidadNombre))
+    const recurso = recursos.find(r => normalizeStr(r.nombre) === normalizeStr(recursoNombre))
 
     // --- Validaciones Base ---
     if (!nombre || !categoria || !unidad || !recurso) {
@@ -107,7 +108,7 @@ export async function importarServiciosDesdeExcelValidado(
     }
 
     // --- Detectar duplicados ---
-    const servicioExistente = serviciosExistentes.find(s => s.nombre.toLowerCase() === nombre.toLowerCase())
+    const servicioExistente = serviciosExistentes.find(s => normalizeStr(s.nombre) === normalizeStr(nombre))
 
     if (servicioExistente) {
       serviciosDuplicados.push({ ...payload, id: servicioExistente.id })
