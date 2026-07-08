@@ -9,14 +9,15 @@ import { trackUsage } from '@/lib/agente/usageTracker'
 import { isIAFeatureEnabled } from '@/lib/agente/featureFlags'
 import { cargarContextoPlanTrabajo } from '@/lib/planTrabajo/cargarContexto'
 import { adquirirLockIA, liberarLockIA } from '@/lib/planTrabajo/mutex'
-import { serializarContextoParaIA, serializarEstadoActualPlan, buildDirectivaCronograma } from '@/lib/planTrabajo/contextoIA'
+import { serializarContextoParaIA, serializarEstadoActualPlan, buildDirectivaCronograma, construirBloqueHechosEtapa1 } from '@/lib/planTrabajo/contextoIA'
 import { validarSeccionIndividual } from '@/lib/planTrabajo/validarSecciones'
-import { guardarSeccionIndividual } from '@/lib/planTrabajo/guardarSecciones'
+import { guardarSeccionIndividual, guardarSeccionesCalculadas } from '@/lib/planTrabajo/guardarSecciones'
 import { PLAN_TRABAJO_SYSTEM_INSTRUCCIONES } from '@/lib/planTrabajo/prompts/generarPlan'
 import { buildPromptRegeneracion } from '@/lib/planTrabajo/prompts/regenerarSeccion'
 import { parseJsonIA } from '@/lib/planTrabajo/parseJsonIA'
-import { deduplicarSiglas } from '@/lib/planTrabajo/siglas'
-import type { SeccionRegenerable, PlanPersonal } from '@/types/planTrabajo'
+import { calcularDatosEtapa1 } from '@/lib/planTrabajo/calcularDatos'
+import { esSeccionEtapa1, etapa1Completa } from '@/lib/planTrabajo/etapas'
+import type { SeccionRegenerable } from '@/types/planTrabajo'
 
 export const maxDuration = 300
 export const dynamic = 'force-dynamic'
@@ -43,7 +44,7 @@ const bodySchema = z.object({
   instruccionesAdicionales: z.string().max(2000).optional(),
 })
 
-// ─── Helper ─────────────────────────────────────────────────────────────────
+// ─── Helper — Etapa 2 (redacción IA) ───────────────────────────────────────
 
 const MAX_TOKENS_POR_SECCION: Partial<Record<SeccionRegenerable, number>> = {
   alcanceDetallado: 16000,
@@ -52,6 +53,7 @@ const MAX_TOKENS_POR_SECCION: Partial<Record<SeccionRegenerable, number>> = {
 async function ejecutarSonnetRegeneracion(
   contextoSerializado: string,
   estadoRelevante: string,
+  hechosEtapa1: string,
   seccion: SeccionRegenerable,
   instruccionesAdicionales: string | undefined,
   proyectoId: string,
@@ -68,6 +70,7 @@ async function ejecutarSonnetRegeneracion(
     '',
     '=== CONTEXTO DEL PROYECTO ===',
     contextoSerializado,
+    hechosEtapa1,
     ...(directivaExtra ? ['', directivaExtra] : []),
     '',
     '=== SECCIONES RELEVANTES DEL PLAN ACTUAL ===',
@@ -133,6 +136,11 @@ async function ejecutarSonnetRegeneracion(
 
 // ─── Endpoint ───────────────────────────────────────────────────────────────
 
+// POST /api/proyectos/[id]/plan-trabajo/regenerar-seccion
+// Punto de entrada único para el botón "↻" de cada sección: si la sección es
+// de Etapa 1 (personalAsignado/matrizRaci/histogramas/cronogramaResumen/referencias)
+// se RECALCULA sin IA (mismo cálculo determinista de calcular-datos); si es de
+// Etapa 2 se REGENERA con IA, recibiendo los hechos de Etapa 1 como inmutables.
 export async function POST(req: NextRequest, { params }: Ctx) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) {
@@ -150,6 +158,14 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   }
 
   const { seccion, instruccionesAdicionales } = body
+
+  if (seccion === 'responsabilidades') {
+    return Response.json(
+      { error: '"responsabilidades" es texto fijo de la plantilla — ya no se genera ni se recalcula.' },
+      { status: 400 }
+    )
+  }
+
   const { id: proyectoId } = await params
   const userId = session.user.id
 
@@ -180,12 +196,17 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     return Response.json({ error: 'Sin acceso a este proyecto' }, { status: 403 })
   }
 
-  const enabled = await isIAFeatureEnabled('planTrabajo')
-  if (!enabled) {
-    return Response.json(
-      { error: 'La funcionalidad de IA para Plan de Trabajo está deshabilitada' },
-      { status: 403 }
-    )
+  const esEtapa1 = esSeccionEtapa1(seccion)
+
+  // La Etapa 1 es cálculo determinista — no depende del feature flag de IA.
+  if (!esEtapa1) {
+    const enabled = await isIAFeatureEnabled('planTrabajo')
+    if (!enabled) {
+      return Response.json(
+        { error: 'La funcionalidad de IA para Plan de Trabajo está deshabilitada' },
+        { status: 403 }
+      )
+    }
   }
 
   const contexto = await cargarContextoPlanTrabajo(proyectoId)
@@ -212,18 +233,24 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     )
   }
 
-  // Mutex: prevenir operaciones IA paralelas en el mismo plan
+  if (!esEtapa1 && !etapa1Completa(contexto.planTrabajo.bloquesCompletitud as Record<string, boolean> | null)) {
+    return Response.json(
+      { error: 'Falta calcular la Etapa 1 (Generar datos) antes de redactar con IA.' },
+      { status: 409 }
+    )
+  }
+
   const planId = contexto.planTrabajo.id
-  const lock = await adquirirLockIA(planId, `regenerar:${seccion}`)
+  const planActual = contexto.planTrabajo
+  const lock = await adquirirLockIA(planId, `${esEtapa1 ? 'recalcular' : 'regenerar'}:${seccion}`)
   if (!lock.ok) {
     return Response.json(
-      { error: `Ya hay una operación IA en curso: ${lock.conflicto?.operacion}` },
+      { error: `Ya hay una operación en curso: ${lock.conflicto?.operacion}` },
       { status: 409 }
     )
   }
 
   const encoder = new TextEncoder()
-  const planActual = contexto.planTrabajo
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -234,8 +261,23 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       }
 
       try {
+        if (esEtapa1) {
+          send('status', { fase: 'calculando', mensaje: `Recalculando "${seccion}" (sin IA)...` })
+          const { data, advertencias } = calcularDatosEtapa1(contexto)
+          await guardarSeccionesCalculadas(proyectoId, {
+            personalAsignado: data.personalAsignado,
+            matrizRaci: data.matrizRaci,
+            histogramas: data.histogramas,
+            cronogramaResumen: data.cronogramaResumen,
+            referencias: data.referencias,
+          })
+          send('done', { seccionGuardada: seccion, calculado: true, advertencias })
+          return
+        }
+
         const contextoSerializado = serializarContextoParaIA(contexto)
         const estadoRelevante = serializarEstadoActualPlan(planActual, seccion)
+        const hechosEtapa1 = construirBloqueHechosEtapa1(planActual)
 
         // Para alcanceDetallado: inyectar la directiva estructurada del cronograma
         const directivaCronograma =
@@ -250,6 +292,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
         const seccionJson = await ejecutarSonnetRegeneracion(
           contextoSerializado,
           estadoRelevante,
+          hechosEtapa1,
           seccion,
           instruccionesAdicionales,
           proyectoId,
@@ -265,15 +308,8 @@ export async function POST(req: NextRequest, { params }: Ctx) {
           return
         }
 
-        // Dedup de siglas server-side — misma función usada en generar-ia y en
-        // construirDataBag (informe §4.4).
-        const dataFinal =
-          seccion === 'personalAsignado' && Array.isArray(data)
-            ? deduplicarSiglas(data as PlanPersonal[])
-            : data
-
         send('status', { fase: 'persistencia', mensaje: 'Guardando sección validada...' })
-        await guardarSeccionIndividual(proyectoId, seccion, dataFinal)
+        await guardarSeccionIndividual(proyectoId, seccion, data)
 
         send('done', { seccionGuardada: seccion })
       } catch (error: unknown) {
