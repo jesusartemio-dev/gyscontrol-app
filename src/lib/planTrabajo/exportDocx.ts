@@ -37,9 +37,21 @@ export async function renderizarPlanTrabajoDocx({ dataBag }: RenderInput): Promi
 
   const zip = new PizZip(plantillaBuffer)
 
+  // En dev, una clave faltante en el dataBag debe romper el render (detectarla temprano).
+  // En prod, preferimos un documento con un campo vacío antes que una exportación caída.
+  const nullGetter = (part: { module?: string; value?: string }): string => {
+    const clave = part.value ?? '?'
+    if (process.env.NODE_ENV !== 'production') {
+      throw new Error(`[plan-trabajo] Clave faltante en el dataBag de exportación: "${clave}"`)
+    }
+    console.error(`[plan-trabajo] Clave faltante en el dataBag de exportación: "${clave}" — se reemplaza por texto vacío`)
+    return ''
+  }
+
   const doc = new Docxtemplater(zip, {
     paragraphLoop: true,
     linebreaks: true,
+    nullGetter,
     modules: [new ImageModule(imageOpts)],
   })
 

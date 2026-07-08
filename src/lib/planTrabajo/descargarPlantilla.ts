@@ -1,8 +1,16 @@
+import { readFile } from 'fs/promises'
+import path from 'path'
 import { getFileContent } from '@/lib/services/googleDrive'
 
 const TTL_MS = 30 * 60 * 1000
 const MIME_DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 const MIME_GOOGLE_DOC = 'application/vnd.google-apps.document'
+
+// Plantilla versionada en el repo — fuente de verdad (informe §4.5: gobernanza de plantilla).
+const TEMPLATE_LOCAL_PATH = path.join(
+  process.cwd(),
+  'src/lib/services/planTrabajo/templates/plan-trabajo-nexa-template.docx'
+)
 
 let cache: { buffer: Buffer; cargadoEn: number } | null = null
 
@@ -11,9 +19,27 @@ export async function descargarPlantillaPlanTrabajo(): Promise<Buffer> {
     return cache.buffer
   }
 
+  try {
+    const buffer = await readFile(TEMPLATE_LOCAL_PATH)
+    cache = { buffer, cargadoEn: Date.now() }
+    return buffer
+  } catch (e) {
+    console.warn(
+      `[plan-trabajo] No se pudo leer la plantilla local (${TEMPLATE_LOCAL_PATH}). Usando fallback de Google Drive — retirar este fallback una vez validada la plantilla local en todos los ambientes.`,
+      e instanceof Error ? e.message : e
+    )
+  }
+
+  return descargarPlantillaDrive()
+}
+
+// Fallback temporal a Google Drive — retirar tras validar la plantilla local (informe §4.5).
+async function descargarPlantillaDrive(): Promise<Buffer> {
   const fileId = process.env.GOOGLE_DRIVE_PLAN_TEMPLATE_FILE_ID
   if (!fileId) {
-    throw new Error('GOOGLE_DRIVE_PLAN_TEMPLATE_FILE_ID no está configurado')
+    throw new Error(
+      'Plantilla local no encontrada y GOOGLE_DRIVE_PLAN_TEMPLATE_FILE_ID no está configurado'
+    )
   }
 
   let result: { data: Buffer; mimeType: string }
