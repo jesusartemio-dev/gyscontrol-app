@@ -117,31 +117,39 @@ export function RecursoImportPreviewModal({
                       <TableRow key={`${rec.nombre}-${idx}`} className="text-xs">
                         <TableCell className="py-1.5 font-medium">{rec.nombre}</TableCell>
                         <TableCell className="py-1.5">
-                          <Badge variant="outline" className="text-[10px]">
-                            {rec.tipo === 'cuadrilla' ? 'Cuadrilla' : 'Individual'}
-                          </Badge>
+                          {rec.tipo ? (
+                            <Badge variant="outline" className="text-[10px]">
+                              {rec.tipo === 'cuadrilla' ? 'Cuadrilla' : 'Individual'}
+                            </Badge>
+                          ) : (
+                            <span className="text-[10px] text-gray-400 italic">sin cambio</span>
+                          )}
                         </TableCell>
                         <TableCell className="py-1.5">
-                          <Badge
-                            variant="outline"
-                            className={cn(
-                              "text-[10px]",
-                              rec.origen === 'externo'
-                                ? "border-orange-200 bg-orange-50 text-orange-700"
-                                : "border-sky-200 bg-sky-50 text-sky-700"
-                            )}
-                          >
-                            {rec.origen === 'externo' ? 'Externo' : 'GYS'}
-                          </Badge>
+                          {rec.origen ? (
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                "text-[10px]",
+                                rec.origen === 'externo'
+                                  ? "border-orange-200 bg-orange-50 text-orange-700"
+                                  : "border-sky-200 bg-sky-50 text-sky-700"
+                              )}
+                            >
+                              {rec.origen === 'externo' ? 'Externo' : 'GYS'}
+                            </Badge>
+                          ) : (
+                            <span className="text-[10px] text-gray-400 italic">sin cambio</span>
+                          )}
                         </TableCell>
                         <TableCell className="py-1.5 text-right font-mono">
-                          $ {rec.costoHora.toFixed(2)}
+                          {rec.costoHora != null ? `$ ${rec.costoHora.toFixed(2)}` : <span className="text-gray-400 italic">sin cambio</span>}
                         </TableCell>
                         <TableCell className="py-1.5 text-right font-mono">
-                          {rec.costoHoraProyecto != null ? `$ ${rec.costoHoraProyecto.toFixed(2)}` : '–'}
+                          {rec.costoHoraProyecto != null ? `$ ${rec.costoHoraProyecto.toFixed(2)}` : <span className="text-gray-400 italic">sin cambio</span>}
                         </TableCell>
                         <TableCell className="py-1.5 truncate max-w-[150px]">
-                          {rec.descripcion || '-'}
+                          {rec.descripcion || <span className="text-gray-400 italic">sin cambio</span>}
                         </TableCell>
                       </TableRow>
                     ))}

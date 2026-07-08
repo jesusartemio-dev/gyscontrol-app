@@ -4,9 +4,9 @@ import { normalizeStr } from '@/lib/utils'
 
 interface RecursoImportado {
   nombre: string
-  tipo: 'individual' | 'cuadrilla'
-  origen: 'propio' | 'externo'
-  costoHora: number
+  tipo?: 'individual' | 'cuadrilla'
+  origen?: 'propio' | 'externo'
+  costoHora?: number
   costoHoraProyecto?: number | null
   descripcion?: string
 }
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
 
     // Obtener todos los recursos existentes para comparar por nombre
     const recursosExistentes = await prisma.recurso.findMany({
-      select: { id: true, nombre: true }
+      select: { id: true, nombre: true, activo: true }
     })
 
     const resultados = {
@@ -32,18 +32,14 @@ export async function POST(request: Request) {
       errores: [] as string[]
     }
 
-    // La importación solo actualiza recursos existentes: no crea recursos nuevos.
+    // La importación solo actualiza recursos HABILITADOS existentes: no crea
+    // recursos nuevos, y solo se actualizan los campos provistos (los campos
+    // omitidos conservan su valor actual).
     for (const rec of recursos) {
       try {
         // Validar nombre requerido
         if (!rec.nombre || rec.nombre.trim() === '') {
           resultados.errores.push('Recurso sin nombre')
-          continue
-        }
-
-        // Validar costoHora
-        if (!rec.costoHora || rec.costoHora <= 0) {
-          resultados.errores.push(`Recurso "${rec.nombre}" sin costo por hora válido`)
           continue
         }
 
@@ -57,15 +53,18 @@ export async function POST(request: Request) {
           resultados.errores.push(`Recurso "${rec.nombre}" no existe en el catálogo — no se crean recursos nuevos por importación`)
           continue
         }
-
-        const dataRecurso = {
-          tipo: rec.tipo || 'individual',
-          origen: rec.origen || 'propio',
-          costoHora: rec.costoHora,
-          costoHoraProyecto: rec.costoHoraProyecto ?? null,
-          descripcion: rec.descripcion?.trim() || null,
-          updatedAt: new Date()
+        if (!recursoExistente.activo) {
+          resultados.errores.push(`Recurso "${rec.nombre}" está inhabilitado — actívalo primero para poder actualizarlo`)
+          continue
         }
+
+        // Update parcial: solo se incluyen los campos provistos en el Excel
+        const dataRecurso: Record<string, unknown> = { updatedAt: new Date() }
+        if (rec.tipo !== undefined) dataRecurso.tipo = rec.tipo
+        if (rec.origen !== undefined) dataRecurso.origen = rec.origen
+        if (rec.costoHora !== undefined) dataRecurso.costoHora = rec.costoHora
+        if (rec.costoHoraProyecto !== undefined) dataRecurso.costoHoraProyecto = rec.costoHoraProyecto
+        if (rec.descripcion !== undefined) dataRecurso.descripcion = rec.descripcion.trim() || null
 
         await prisma.recurso.update({
           where: { id: recursoExistente.id },

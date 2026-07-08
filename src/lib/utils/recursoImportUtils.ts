@@ -7,9 +7,10 @@ import * as XLSX from 'xlsx'
 
 export interface RecursoImportado {
   nombre: string
-  tipo: 'individual' | 'cuadrilla'
-  origen: 'propio' | 'externo'
-  costoHora: number
+  // Todos opcionales: si no se especifican, se conserva el valor actual del recurso.
+  tipo?: 'individual' | 'cuadrilla'
+  origen?: 'propio' | 'externo'
+  costoHora?: number
   costoHoraProyecto?: number | null
   descripcion?: string
 }
@@ -45,34 +46,49 @@ export async function leerRecursosDesdeExcel(file: File): Promise<RecursoImporta
       throw new Error(`Fila ${index + 2}: El nombre es obligatorio`)
     }
 
-    // Tipo
+    // Tipo - opcional: si no se especifica, se conserva el valor actual
     const tipoRaw = getColumn(row, 'Tipo', 'tipo', 'TIPO', 'Type', 'type')
-    const tipoStr = typeof tipoRaw === 'string' ? normalizeStr(tipoRaw) : 'individual'
-    const tipo: 'individual' | 'cuadrilla' =
-      tipoStr === 'cuadrilla' || tipoStr === 'crew' || tipoStr === 'equipo' || tipoStr === 'grupo'
+    let tipo: 'individual' | 'cuadrilla' | undefined
+    if (typeof tipoRaw === 'string' && tipoRaw.trim() !== '') {
+      const tipoStr = normalizeStr(tipoRaw)
+      tipo = (tipoStr === 'cuadrilla' || tipoStr === 'crew' || tipoStr === 'equipo' || tipoStr === 'grupo')
         ? 'cuadrilla'
         : 'individual'
-
-    // Origen
-    const origenRaw = getColumn(row, 'Origen', 'origen', 'ORIGEN', 'Origin', 'origin')
-    const origenStr = typeof origenRaw === 'string' ? normalizeStr(origenRaw) : 'propio'
-    const origen: 'propio' | 'externo' =
-      origenStr === 'externo' || origenStr === 'external' || origenStr === 'tercero'
-        ? 'externo'
-        : 'propio'
-
-    // Costo Hora - requerido
-    const costoRaw = getColumn(row, 'Costo Hora', 'CostoHora', 'costo_hora', 'Costo', 'costo', 'Cost', 'cost', 'Precio', 'precio')
-    const costoHora = parseFloat(String(costoRaw)) || 0
-    if (costoHora <= 0) {
-      throw new Error(`Fila ${index + 2}: El costo por hora debe ser mayor a 0`)
     }
 
-    // Costo Hora Proyecto - opcional
-    const costoProyRaw = getColumn(row, 'Costo Hora Proyecto', 'CostoHoraProyecto', 'costo_hora_proyecto', 'Costo Proyecto', 'Project Cost')
-    const costoHoraProyecto = costoProyRaw ? (parseFloat(String(costoProyRaw)) || null) : null
+    // Origen - opcional: si no se especifica, se conserva el valor actual
+    const origenRaw = getColumn(row, 'Origen', 'origen', 'ORIGEN', 'Origin', 'origin')
+    let origen: 'propio' | 'externo' | undefined
+    if (typeof origenRaw === 'string' && origenRaw.trim() !== '') {
+      const origenStr = normalizeStr(origenRaw)
+      origen = (origenStr === 'externo' || origenStr === 'external' || origenStr === 'tercero')
+        ? 'externo'
+        : 'propio'
+    }
 
-    // Descripción - opcional
+    // Costo Hora - opcional: si no se especifica, se conserva el valor actual
+    const costoRaw = getColumn(row, 'Costo Hora', 'CostoHora', 'costo_hora', 'Costo', 'costo', 'Cost', 'cost', 'Precio', 'precio')
+    let costoHora: number | undefined
+    if (costoRaw !== undefined && String(costoRaw).trim() !== '') {
+      const parsed = parseFloat(String(costoRaw))
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        throw new Error(`Fila ${index + 2}: El costo por hora debe ser un número ≥ 0`)
+      }
+      costoHora = parsed
+    }
+
+    // Costo Hora Proyecto - opcional: si no se especifica, se conserva el valor actual
+    const costoProyRaw = getColumn(row, 'Costo Hora Proyecto', 'CostoHoraProyecto', 'costo_hora_proyecto', 'Costo Proyecto', 'Project Cost')
+    let costoHoraProyecto: number | undefined
+    if (costoProyRaw !== undefined && String(costoProyRaw).trim() !== '') {
+      const parsed = parseFloat(String(costoProyRaw))
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        throw new Error(`Fila ${index + 2}: El costo por hora de proyecto debe ser un número ≥ 0`)
+      }
+      costoHoraProyecto = parsed
+    }
+
+    // Descripción - opcional: si no se especifica, se conserva el valor actual
     const descripcion = getColumn(row, 'Descripción', 'Descripcion', 'descripcion', 'DESCRIPCION', 'Description', 'description')
 
     return {
@@ -88,13 +104,14 @@ export async function leerRecursosDesdeExcel(file: File): Promise<RecursoImporta
 
 /**
  * Valida los recursos importados.
- * La importación solo ACTUALIZA recursos existentes: si el nombre no coincide
- * (comparación insensible a acentos/mayúsculas) con ningún recurso del catálogo,
- * la fila se rechaza como error en vez de crear un recurso nuevo por error de tipeo.
+ * La importación solo ACTUALIZA recursos HABILITADOS existentes: si el nombre
+ * no coincide (comparación insensible a acentos/mayúsculas) con ningún recurso
+ * activo del catálogo, la fila se rechaza como error en vez de crear un
+ * recurso nuevo por error de tipeo.
  */
 export function validarRecursos(
   recursos: RecursoImportado[],
-  recursosExistentes: { id: string; nombre: string }[]
+  recursosExistentes: { id: string; nombre: string; activo: boolean }[]
 ): {
   validos: RecursoImportado[]
   actualizaciones: number
@@ -123,6 +140,10 @@ export function validarRecursos(
     const existente = recursosExistentes.find(e => normalizeStr(e.nombre) === nombreNorm)
     if (!existente) {
       errores.push(`Recurso "${r.nombre}" no existe en el catálogo. Usa exactamente un nombre de la hoja "Recursos Existentes" de la plantilla — no se crean recursos nuevos por importación.`)
+      continue
+    }
+    if (!existente.activo) {
+      errores.push(`Recurso "${r.nombre}" está inhabilitado. Actívalo primero para poder actualizarlo por importación.`)
       continue
     }
 

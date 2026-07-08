@@ -44,63 +44,140 @@ export function exportarRecursosAExcel(recursos: Recurso[]) {
   XLSX.writeFile(workbook, `recursos_${timestamp}.xlsx`)
 }
 
+const TIPO_OPCIONES = ['Individual', 'Cuadrilla'] as const
+const ORIGEN_OPCIONES = ['GYS', 'Externo'] as const
+
 /**
- * Genera una plantilla Excel para importar recursos.
- * Incluye una segunda hoja de solo lectura con los recursos existentes,
- * para que el nombre usado en la importación coincida exactamente
- * (la importación solo actualiza recursos existentes, no crea nuevos).
+ * Genera una plantilla Excel para importar recursos, usando exceljs para
+ * dropdowns estrictos (data validation):
+ * - "Nombre" solo permite elegir un recurso HABILITADO existente (no se
+ *   pueden crear recursos nuevos por importación).
+ * - "Tipo" y "Origen" son listas cerradas.
+ * - Todos los campos salvo Nombre son opcionales: si se dejan en blanco,
+ *   se conserva el valor actual del recurso (no se sobreescribe con un
+ *   valor por defecto).
  */
-export function generarPlantillaRecursos(recursosExistentes: Recurso[] = []) {
-  const ejemplos = [
-    {
-      Nombre: 'Técnico Senior',
-      Tipo: 'Individual',
-      Origen: 'GYS',
-      'Costo Hora': 25.00,
-      'Costo Hora Proyecto': 18.00,
-      Descripción: 'Técnico con experiencia',
-      Personal: '(se ignora en importación)'
-    },
-    {
-      Nombre: 'Cuadrilla Instalación',
-      Tipo: 'Cuadrilla',
-      Origen: 'Externo',
-      'Costo Hora': 75.00,
-      'Costo Hora Proyecto': 55.00,
-      Descripción: 'Equipo de instalación',
-      Personal: '(se ignora en importación)'
+export async function generarPlantillaRecursos(recursosExistentes: Recurso[] = []) {
+  const ExcelJS = (await import('exceljs')).default
+  const activos = [...recursosExistentes]
+    .filter(r => r.activo)
+    .sort((a, b) => a.nombre.localeCompare(b.nombre))
+
+  const wb = new ExcelJS.Workbook()
+
+  // --- Hoja 1: Recursos (editable) ---
+  const ws = wb.addWorksheet('Recursos')
+  ws.columns = [
+    { header: 'Nombre *', key: 'nombre', width: 30 },
+    { header: 'Tipo', key: 'tipo', width: 12 },
+    { header: 'Origen', key: 'origen', width: 10 },
+    { header: 'Costo Hora', key: 'costoHora', width: 12 },
+    { header: 'Costo Hora Proyecto', key: 'costoHoraProyecto', width: 18 },
+    { header: 'Descripción', key: 'descripcion', width: 40 },
+  ]
+  ws.getRow(1).font = { bold: true }
+  ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFED7AA' } }
+
+  ws.addRow({
+    nombre: activos[0]?.nombre ?? '(elige un recurso de la lista)',
+    tipo: '', origen: '', costoHora: '', costoHoraProyecto: '',
+    descripcion: '(deja en blanco lo que no quieras cambiar)'
+  })
+
+  // --- Hoja 2: Recursos Existentes (referencia visible + fuente del dropdown) ---
+  const wsRef = wb.addWorksheet('Recursos Existentes')
+  wsRef.columns = [
+    { header: 'Nombre', key: 'nombre', width: 30 },
+    { header: 'Tipo', key: 'tipo', width: 12 },
+    { header: 'Origen', key: 'origen', width: 10 },
+    { header: 'Costo Hora', key: 'costoHora', width: 12 },
+  ]
+  wsRef.getRow(1).font = { bold: true }
+  wsRef.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } }
+  for (const r of activos) {
+    wsRef.addRow({
+      nombre: r.nombre,
+      tipo: r.tipo === 'cuadrilla' ? 'Cuadrilla' : 'Individual',
+      origen: r.origen === 'externo' ? 'Externo' : 'GYS',
+      costoHora: r.costoHora,
+    })
+  }
+
+  // --- Hojas ocultas: opciones de Tipo/Origen ---
+  const wsTipo = wb.addWorksheet('TipoOpciones')
+  wsTipo.columns = [{ header: 'Tipo', key: 'v', width: 12 }]
+  for (const v of TIPO_OPCIONES) wsTipo.addRow({ v })
+  wsTipo.state = 'hidden'
+
+  const wsOrigen = wb.addWorksheet('OrigenOpciones')
+  wsOrigen.columns = [{ header: 'Origen', key: 'v', width: 10 }]
+  for (const v of ORIGEN_OPCIONES) wsOrigen.addRow({ v })
+  wsOrigen.state = 'hidden'
+
+  // --- Data validations ---
+  const SELECTOR_FILL = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFEFF6FF' } }
+  const ROWS_VALIDADAS = 500
+  for (let row = 2; row <= ROWS_VALIDADAS; row++) {
+    // A: Nombre — solo recursos habilitados existentes
+    if (activos.length > 0) {
+      ws.getCell(`A${row}`).dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: [`'Recursos Existentes'!$A$2:$A$${activos.length + 1}`],
+        showErrorMessage: true,
+        errorTitle: 'Recurso inválido',
+        error: 'Selecciona un recurso habilitado de la lista. No se crean recursos nuevos por importación.',
+      }
+      ws.getCell(`A${row}`).fill = SELECTOR_FILL
     }
-  ]
+    // B: Tipo
+    ws.getCell(`B${row}`).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: [`TipoOpciones!$A$2:$A$${TIPO_OPCIONES.length + 1}`],
+      showErrorMessage: true,
+      errorTitle: 'Tipo inválido',
+      error: 'Solo se permite Individual o Cuadrilla. Déjalo en blanco para no cambiarlo.',
+    }
+    ws.getCell(`B${row}`).fill = SELECTOR_FILL
+    // C: Origen
+    ws.getCell(`C${row}`).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: [`OrigenOpciones!$A$2:$A$${ORIGEN_OPCIONES.length + 1}`],
+      showErrorMessage: true,
+      errorTitle: 'Origen inválido',
+      error: 'Solo se permite GYS o Externo. Déjalo en blanco para no cambiarlo.',
+    }
+    ws.getCell(`C${row}`).fill = SELECTOR_FILL
+    // D: Costo Hora — decimal >= 0, opcional
+    ws.getCell(`D${row}`).dataValidation = {
+      type: 'decimal',
+      operator: 'greaterThanOrEqual',
+      allowBlank: true,
+      formulae: [0],
+      showErrorMessage: true,
+      errorTitle: 'Costo inválido',
+      error: 'Costo Hora debe ser ≥ 0. Déjalo en blanco para no cambiarlo.',
+    }
+    // E: Costo Hora Proyecto — decimal >= 0, opcional
+    ws.getCell(`E${row}`).dataValidation = {
+      type: 'decimal',
+      operator: 'greaterThanOrEqual',
+      allowBlank: true,
+      formulae: [0],
+      showErrorMessage: true,
+      errorTitle: 'Costo inválido',
+      error: 'Costo Hora Proyecto debe ser ≥ 0. Déjalo en blanco para no cambiarlo.',
+    }
+  }
 
-  const worksheet = XLSX.utils.json_to_sheet(ejemplos)
-
-  const columnWidths = [
-    { wch: 30 },
-    { wch: 12 },
-    { wch: 10 },
-    { wch: 12 },
-    { wch: 18 },
-    { wch: 40 },
-    { wch: 40 },
-  ]
-  worksheet['!cols'] = columnWidths
-
-  const workbook = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Recursos')
-
-  const existentesOrdenados = [...recursosExistentes].sort((a, b) => a.nombre.localeCompare(b.nombre))
-  const dataExistentes = existentesOrdenados.map((r) => ({
-    Nombre: r.nombre,
-    Tipo: r.tipo === 'cuadrilla' ? 'Cuadrilla' : 'Individual',
-    Origen: r.origen === 'externo' ? 'Externo' : 'GYS',
-    'Costo Hora': r.costoHora,
-    Estado: r.activo ? 'Activo' : 'Inactivo',
-  }))
-  const worksheetExistentes = XLSX.utils.json_to_sheet(dataExistentes)
-  worksheetExistentes['!cols'] = [
-    { wch: 30 }, { wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 10 },
-  ]
-  XLSX.utils.book_append_sheet(workbook, worksheetExistentes, 'Recursos Existentes')
-
-  XLSX.writeFile(workbook, 'plantilla_recursos.xlsx')
+  const buffer = await wb.xlsx.writeBuffer()
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'plantilla_recursos.xlsx'
+  a.click()
+  URL.revokeObjectURL(url)
 }

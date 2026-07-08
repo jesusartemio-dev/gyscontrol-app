@@ -156,7 +156,7 @@ export default function RecursosPage() {
 
     try {
       const datos = await leerRecursosDesdeExcel(file)
-      const validacionResult = validarRecursos(datos, recursos.map(r => ({ id: r.id, nombre: r.nombre })))
+      const validacionResult = validarRecursos(datos, recursos.map(r => ({ id: r.id, nombre: r.nombre, activo: r.activo })))
 
       // Show preview modal instead of direct import
       setImportPreviewData(validacionResult)
@@ -192,9 +192,9 @@ export default function RecursosPage() {
     }
   }
 
-  const handleDescargarPlantilla = () => {
+  const handleDescargarPlantilla = async () => {
     try {
-      generarPlantillaRecursos(recursos)
+      await generarPlantillaRecursos(recursos)
       toast.success('Plantilla descargada')
     } catch {
       toast.error('Error al generar plantilla')
