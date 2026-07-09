@@ -1,4 +1,4 @@
-import { validarPropuestaGrupos, validarSugerenciasCantidad } from '@/lib/cronogramaIA/validarPropuestasIA'
+import { validarPropuestaGrupos, validarSugerenciasCantidad, validarPrellenadoPaso1 } from '@/lib/cronogramaIA/validarPropuestasIA'
 import type { CatalogoServicioParaWizard, ConfiguracionWizardPaso1 } from '@/types/cronogramaIA'
 
 function servicio(overrides: Partial<CatalogoServicioParaWizard> & { id: string; nombre: string }): CatalogoServicioParaWizard {
@@ -115,5 +115,50 @@ describe('validarSugerenciasCantidad', () => {
   it('clampa cantidades absurdamente altas (anti-alucinación)', () => {
     const r = validarSugerenciasCantidad([{ catalogoServicioId: 's1', cantidad: 999999 }], idsPermitidos)
     expect(r.cantidades.get('s1')).toBe(500)
+  })
+})
+
+describe('validarPrellenadoPaso1', () => {
+  const edtsPermitidos = new Set(['edt-ges', 'edt-con'])
+
+  it('acepta EDTs reales y descarta ids inventados', () => {
+    const r = validarPrellenadoPaso1(
+      { edtsSeleccionados: ['edt-ges', 'edt-inventado'], brownfield: true },
+      edtsPermitidos
+    )
+    expect(r.sugerencia.edtsSeleccionados).toEqual(['edt-ges'])
+    expect(r.advertencias.length).toBeGreaterThan(0)
+  })
+
+  it('booleans no-true se normalizan a false (nunca undefined)', () => {
+    const r = validarPrellenadoPaso1({}, edtsPermitidos)
+    expect(r.sugerencia.brownfield).toBe(false)
+    expect(r.sugerencia.ingenieriaDetalle).toBe(false)
+    expect(r.sugerencia.scada).toBe(false)
+  })
+
+  it('limpia nombres de tablero/PLC vacíos y duplicados', () => {
+    const r = validarPrellenadoPaso1(
+      { tableros: [{ nombre: 'TCO-1' }, { nombre: '  ' }, { nombre: 'TCO-1' }] },
+      edtsPermitidos
+    )
+    expect(r.sugerencia.tableros).toEqual([{ nombre: 'TCO-1' }])
+  })
+
+  it('hmiCantidad negativa o no numérica cae a 0', () => {
+    expect(validarPrellenadoPaso1({ hmiCantidad: -3 }, edtsPermitidos).sugerencia.hmiCantidad).toBe(0)
+    expect(validarPrellenadoPaso1({ hmiCantidad: NaN }, edtsPermitidos).sugerencia.hmiCantidad).toBe(0)
+  })
+
+  it('hmiCantidad absurdamente alta se clampa (anti-alucinación)', () => {
+    const r = validarPrellenadoPaso1({ hmiCantidad: 99999 }, edtsPermitidos)
+    expect(r.sugerencia.hmiCantidad).toBe(50)
+  })
+
+  it('respuesta totalmente vacía nunca lanza — devuelve sugerencia neutra', () => {
+    const r = validarPrellenadoPaso1({}, edtsPermitidos)
+    expect(r.sugerencia.edtsSeleccionados).toEqual([])
+    expect(r.sugerencia.tableros).toEqual([])
+    expect(r.sugerencia.plcs).toEqual([])
   })
 })

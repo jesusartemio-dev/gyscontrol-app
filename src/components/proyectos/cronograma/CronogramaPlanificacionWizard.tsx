@@ -37,6 +37,16 @@ interface EdtPendienteIA {
   nombre: string
 }
 
+interface PrellenadoPaso1 {
+  edtsSeleccionados: string[]
+  brownfield: boolean
+  ingenieriaDetalle: boolean
+  tableros: { nombre: string }[]
+  plcs: { nombre: string }[]
+  hmiCantidad: number
+  scada: boolean
+}
+
 interface Props {
   proyectoId: string
   open: boolean
@@ -51,8 +61,10 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
   const [pasoActual, setPasoActual] = useState(1)
 
   const [cargandoContexto, setCargandoContexto] = useState(false)
+  const [cargandoPrellenado, setCargandoPrellenado] = useState(false)
   const [edts, setEdts] = useState<EdtWizardInfo[]>([])
   const [cotizacionResumen, setCotizacionResumen] = useState<CotizacionResumen | null>(null)
+  const [advertenciasPrellenado, setAdvertenciasPrellenado] = useState<string[]>([])
 
   const [edtsSeleccionados, setEdtsSeleccionados] = useState<Set<string>>(new Set())
   const [brownfield, setBrownfield] = useState(false)
@@ -83,6 +95,7 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
     setGeneracionId(null)
     setActividades([])
     setAdvertencias([])
+    setAdvertenciasPrellenado([])
     setEdtsPendientesIA([])
     setCargandoContexto(true)
 
@@ -91,18 +104,39 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
         if (!res.ok) throw new Error('No se pudo cargar el contexto del wizard')
         return res.json()
       })
-      .then((data: { edts: EdtWizardInfo[]; cotizacionResumen: CotizacionResumen | null }) => {
+      .then((data: { edts: EdtWizardInfo[]; cotizacionResumen: CotizacionResumen | null; tieneCotizacionDocumento: boolean }) => {
         setEdts(data.edts)
         setCotizacionResumen(data.cotizacionResumen)
         setEdtsSeleccionados(new Set(data.edts.filter(e => e.totalServicios > 0).map(e => e.id)))
         if (data.cotizacionResumen?.resumenAlcance?.length) {
           setAlcanceLibre(data.cotizacionResumen.resumenAlcance.join('\n'))
         }
+        setCargandoContexto(false)
+
+        if (!data.tieneCotizacionDocumento) return
+
+        setCargandoPrellenado(true)
+        return fetch(`/api/proyectos/${proyectoId}/cronograma/planificacion/wizard/prellenado-ia`, { method: 'POST' })
+          .then(async res => (res.ok ? res.json() : null))
+          .then((prellenado: { sugerencia: PrellenadoPaso1; advertencias: string[] } | null) => {
+            if (!prellenado) return
+            const s = prellenado.sugerencia
+            if (s.edtsSeleccionados.length > 0) setEdtsSeleccionados(new Set(s.edtsSeleccionados))
+            setBrownfield(s.brownfield)
+            setIngenieriaDetalle(s.ingenieriaDetalle)
+            if (s.tableros.length > 0) setTableros(s.tableros)
+            if (s.plcs.length > 0) setPlcs(s.plcs)
+            if (s.hmiCantidad > 0) setHmiCantidad(s.hmiCantidad)
+            setScada(s.scada)
+            setAdvertenciasPrellenado(prellenado.advertencias ?? [])
+          })
+          .finally(() => setCargandoPrellenado(false))
       })
       .catch(() => {
         toast({ title: 'Error cargando el contexto del wizard', variant: 'destructive' })
+        setCargandoContexto(false)
+        setCargandoPrellenado(false)
       })
-      .finally(() => setCargandoContexto(false))
     // toast (useToast) no está memoizado: cambia de referencia en cada render, así que
     // incluirlo aquí reintroduce el loop infinito (efecto -> setState -> re-render -> nuevo
     // toast -> efecto de nuevo) que rompió producción — no agregarlo a este array.
@@ -141,6 +175,9 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
     if (pasoActual === 1) return edtsSeleccionados.size > 0 && !generandoPaso1
     if (pasoActual === 2) return actividades.length > 0 && !guardandoPaso2 && !generandoIA && !aplicandoCronograma
     return false
+  }
+  function puedeAplicarCronograma() {
+    return puedeAvanzar() && edtsPendientesIA.length === 0
   }
   function puedeRetroceder() {
     return pasoActual > 1 && !generandoPaso1 && !guardandoPaso2 && !generandoIA && !aplicandoCronograma
@@ -303,9 +340,23 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
               <FileCheck2 className="h-4 w-4" />
               <AlertDescription>
                 Se encontró una cotización extraída para este proyecto
-                {cotizacionResumen.numeroPropuesta ? ` (${cotizacionResumen.numeroPropuesta})` : ''} — su alcance se
-                usó para prellenar el texto de abajo. La IA la usará como contexto adicional al proponer zonas de
-                construcción y familias de procura.
+                {cotizacionResumen.numeroPropuesta ? ` (${cotizacionResumen.numeroPropuesta})` : ''}.{' '}
+                {cargandoPrellenado ? (
+                  <span className="inline-flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" />La IA está sugiriendo los EDTs y parámetros del Paso 1 a partir de su alcance real...</span>
+                ) : (
+                  'La IA sugirió los EDTs y parámetros de abajo a partir de su alcance real — revisa y edita lo que necesites.'
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {advertenciasPrellenado.length > 0 && (
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                <ul className="list-disc pl-4 space-y-0.5">
+                  {advertenciasPrellenado.map((a, i) => <li key={i}>{a}</li>)}
+                </ul>
               </AlertDescription>
             </Alert>
           )}
@@ -464,6 +515,18 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
           </Alert>
         )}
 
+        {edtsPendientesIA.length > 0 && (
+          <div className="space-y-2">
+            {edtsPendientesIA.map(edt => (
+              <div key={edt.id} className="flex items-center gap-2 py-2 px-3 border border-dashed rounded-lg text-sm text-muted-foreground">
+                <Badge variant="outline" className="text-xs">{edt.nombre}</Badge>
+                <Sparkles className="h-3.5 w-3.5" />
+                <span className="flex-1">Pendiente de generar con IA — usa el botón &quot;Generar con IA&quot; de arriba</span>
+              </div>
+            ))}
+          </div>
+        )}
+
         <Accordion type="multiple" className="space-y-2">
           {actividades.map((actividad, index) => (
             <AccordionItem key={index} value={String(index)} className="border rounded-lg px-3">
@@ -549,7 +612,13 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
                 <>Guardar borrador</>
               )}
             </Button>
-            <Button size="sm" onClick={aplicarCronograma} disabled={!puedeAvanzar()} className="bg-green-600 hover:bg-green-700">
+            <Button
+              size="sm"
+              onClick={aplicarCronograma}
+              disabled={!puedeAplicarCronograma()}
+              className="bg-green-600 hover:bg-green-700"
+              title={edtsPendientesIA.length > 0 ? 'Genera primero las zonas/familias con IA para los EDTs pendientes' : undefined}
+            >
               {aplicandoCronograma ? (
                 <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Aplicando...</>
               ) : (

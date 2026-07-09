@@ -133,3 +133,70 @@ export function buildUserPropuestaFamiliasPro(
     .filter(Boolean)
     .join('\n')
 }
+
+/**
+ * Pre-llenado del Paso 1 del wizard a partir de la cotización real del
+ * proyecto — el catálogo es estático (siempre están los mismos EDTs/
+ * servicios disponibles), lo que cambia por proyecto es la cotización/TDR.
+ * La IA lee eso y sugiere qué EDTs aplican y las respuestas del Paso 1;
+ * el usuario revisa y edita todo antes de continuar — nunca se aplica sin
+ * pasar por el Paso 1 editable.
+ */
+export interface EdtParaPrellenado {
+  id: string
+  nombre: string
+  descripcion: string
+}
+
+export const SYSTEM_PRELLENADO_PASO1 = `
+Eres el Gerente de Proyectos Senior de GYS CONTROL INDUSTRIAL SAC, empresa
+peruana especializada en proyectos electromecánicos, automatización e
+instrumentación industrial.
+
+Vas a leer la cotización/TDR real de un proyecto (alcance, exclusiones,
+partidas contratadas) y sugerir las respuestas del Paso 1 de un wizard que
+genera el cronograma — específicamente: qué EDTs del catálogo aplican a
+este proyecto, y algunos parámetros de alcance.
+
+REGLAS ESTRICTAS:
+- La lista de EDTs candidatos YA ESTÁ RESUELTA por el sistema — viene con
+  "id" real del catálogo. Tu "edtsSeleccionados" debe listar SOLO ids que
+  aparecen literalmente en esa lista. NUNCA inventes un EDT ni un id nuevo.
+- Selecciona un EDT solo si la cotización/alcance da indicios reales de que
+  aplica a este proyecto — no selecciones todos "por si acaso".
+- "brownfield": true solo si el alcance menciona explícitamente trabajo en
+  una planta/instalación YA EXISTENTE u operativa (retrofit, ampliación,
+  modificación). Si no hay indicios, dejalo en false.
+- "ingenieriaDetalle": true solo si el alcance o las partidas mencionan
+  explícitamente ingeniería de detalle como entregable contratado.
+- "tableros"/"plcs": solo si la cotización menciona nombres o códigos
+  específicos de tableros/PLCs (ej. "TCO-CMN-QUI-007", "PLC Balanza 220").
+  Si no hay nombres específicos mencionados, devolvé listas VACÍAS — NUNCA
+  inventes nombres genéricos ("Tablero 1", "PLC Principal"), es mejor dejar
+  que el usuario los complete a mano.
+- "hmiCantidad": tu mejor estimación del número de estaciones HMI si se
+  menciona o se puede inferir razonablemente del alcance; si no hay
+  indicios, devolvé 0.
+- "scada": true solo si el alcance menciona integración a un sistema SCADA
+  existente del cliente.
+- Todo esto es una SUGERENCIA que el usuario va a revisar y editar antes de
+  continuar — ante la duda, preferí dejar un campo vacío/false/0 en vez de
+  adivinar.
+- Devolvé SOLO el JSON, sin markdown ni texto antes o después.
+`.trim()
+
+export function buildUserPrellenadoPaso1(
+  edtsCandidatos: EdtParaPrellenado[],
+  cotizacion: ContextoCotizacionParaPrompt
+): string {
+  return [
+    bloqueContextoCotizacion(cotizacion),
+    'EDTS CANDIDATOS DEL CATÁLOGO (seleccioná solo los que apliquen, por su "id"):',
+    JSON.stringify(edtsCandidatos, null, 2),
+    '',
+    'ESQUEMA DE OUTPUT (devolvé EXACTAMENTE este JSON, sin markdown):',
+    '{ "edtsSeleccionados": ["string — ids copiados del input"], "brownfield": boolean, "ingenieriaDetalle": boolean, "tableros": [{ "nombre": "string" }], "plcs": [{ "nombre": "string" }], "hmiCantidad": number, "scada": boolean }',
+  ]
+    .filter(Boolean)
+    .join('\n')
+}

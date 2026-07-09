@@ -116,3 +116,61 @@ export function validarSugerenciasCantidad(
 
   return { cantidades, advertencias }
 }
+
+export interface PrellenadoPaso1IA {
+  edtsSeleccionados: string[]
+  brownfield: boolean
+  ingenieriaDetalle: boolean
+  tableros: { nombre: string }[]
+  plcs: { nombre: string }[]
+  hmiCantidad: number
+  scada: boolean
+}
+
+export interface ResultadoValidacionPrellenado {
+  sugerencia: PrellenadoPaso1IA
+  advertencias: string[]
+}
+
+const HMI_CANTIDAD_MAXIMA_ANTIALUCINACION = 50
+
+/**
+ * Sin retry — es una sugerencia de conveniencia para prellenar el Paso 1,
+ * el usuario revisa y edita todo antes de continuar. Ids de EDT inventados
+ * se descartan; nombres de tablero/PLC vacíos o duplicados se limpian.
+ */
+export function validarPrellenadoPaso1(
+  raw: Partial<PrellenadoPaso1IA> & Record<string, unknown>,
+  edtsPermitidos: Set<string>
+): ResultadoValidacionPrellenado {
+  const advertencias: string[] = []
+
+  const edtsCrudos = Array.isArray(raw.edtsSeleccionados) ? (raw.edtsSeleccionados as unknown[]) : []
+  const edtsSeleccionados = edtsCrudos.filter((id): id is string => typeof id === 'string' && edtsPermitidos.has(id))
+  if (edtsCrudos.length > edtsSeleccionados.length) {
+    advertencias.push(`La IA sugirió ${edtsCrudos.length - edtsSeleccionados.length} EDT(s) que no existen en el catálogo — se descartaron.`)
+  }
+
+  function limpiarNombres(valor: unknown): { nombre: string }[] {
+    if (!Array.isArray(valor)) return []
+    const nombres = valor
+      .map(v => (v && typeof v === 'object' && 'nombre' in v ? String((v as { nombre: unknown }).nombre ?? '').trim() : ''))
+      .filter(n => n.length > 0)
+    return Array.from(new Set(nombres)).map(nombre => ({ nombre }))
+  }
+
+  const hmiCruda = typeof raw.hmiCantidad === 'number' ? raw.hmiCantidad : 0
+  const hmiCantidad = Number.isFinite(hmiCruda) && hmiCruda > 0 ? Math.min(Math.round(hmiCruda), HMI_CANTIDAD_MAXIMA_ANTIALUCINACION) : 0
+
+  const sugerencia: PrellenadoPaso1IA = {
+    edtsSeleccionados,
+    brownfield: raw.brownfield === true,
+    ingenieriaDetalle: raw.ingenieriaDetalle === true,
+    tableros: limpiarNombres(raw.tableros),
+    plcs: limpiarNombres(raw.plcs),
+    hmiCantidad,
+    scada: raw.scada === true,
+  }
+
+  return { sugerencia, advertencias }
+}
