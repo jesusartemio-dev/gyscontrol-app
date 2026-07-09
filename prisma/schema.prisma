@@ -81,6 +81,14 @@ model CatalogoServicio {
   orden                              Int?                                 @default(0)
   cantidad                           Float?
   nivelDificultad                    Int?                                 @default(1)
+  // Campos estructurados para el generador de cronograma con IA (Bloque A) —
+  // poblados por scripts/backfill-catalogo-servicio-estructura.ts a partir de
+  // `descripcion`; el generador solo lee estos campos, nunca vuelve a parsear
+  // texto libre en runtime.
+  actividadTag                       String[]                             @default([])
+  filtroAlcance                      FiltroAlcanceServicio                @default(general)
+  notaCantidad                       String?
+  reglasDificultad                   Json?
   edt                                Edt                                  @relation(fields: [categoriaId], references: [id])
   recurso                            Recurso                              @relation(fields: [recursoId], references: [id])
   unidadServicio                     UnidadServicio                       @relation(fields: [unidadServicioId], references: [id])
@@ -90,6 +98,16 @@ model CatalogoServicio {
   plantillaServicioItemIndependiente PlantillaServicioItemIndependiente[]
 
   @@map("catalogo_servicio")
+}
+
+/// Condición de alcance que determina si un servicio del catálogo se incluye
+/// en el cronograma generado por IA (Bloque A) — general = siempre incluido,
+/// brownfield = solo en plantas/instalaciones existentes, detalle = solo en
+/// contratos que incluyen ingeniería de detalle como entregable.
+enum FiltroAlcanceServicio {
+  general
+  brownfield
+  detalle
 }
 
 model CategoriaEquipo {
