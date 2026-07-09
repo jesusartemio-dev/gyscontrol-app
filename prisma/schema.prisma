@@ -2065,6 +2065,7 @@ model User {
   orgNodos                                 ProyectoOrgNodo[]
   planTrabajoGeneraciones                  PlanTrabajoGeneracion[]
   planTrabajoImagenes                      PlanTrabajoImagen[]
+  proyectoCronogramaGeneracionesIA         ProyectoCronogramaGeneracionIA[]
   // Módulo Ausencias
   solicitudesAusencia                      SolicitudAusencia[]      @relation("AusenciaSolicitante")
   ausenciasComoAprobador1                  SolicitudAusencia[]      @relation("AusenciaAprobador1")
@@ -3298,16 +3299,45 @@ model ProyectoCronograma {
   bloqueado                Boolean             @default(false)
   createdAt                DateTime            @default(now())
   updatedAt                DateTime
+  // Lock de concurrencia para el generador de cronograma con IA (mismo patrón
+  // que PlanTrabajo.operacionIAEnCurso — ver src/lib/cronogramaIA/mutex.ts).
+  operacionIAEnCurso       String?
+  operacionIAIniciadaEn    DateTime?
   proyectoActividad        ProyectoActividad[]
   proyecto                 Proyecto            @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
   proyectoEdt              ProyectoEdt[]
   proyectoFase             ProyectoFase[]
   proyectoTarea            ProyectoTarea[]
   avanceSnapshots          ProyectoAvanceSnapshot[]
+  generacionesIA           ProyectoCronogramaGeneracionIA[]
 
   @@unique([proyectoId, tipo])
   @@index([proyectoId, tipo])
   @@map("proyecto_cronograma")
+}
+
+/// Historial/auditoría del wizard de generación de cronograma con IA (Bloque
+/// B) — una fila por intento de generación, guarda las respuestas del Paso 1
+/// y snapshots de las propuestas de Paso 2/3 para poder auditar o reanudar.
+model ProyectoCronogramaGeneracionIA {
+  id                   String             @id @default(cuid())
+  proyectoCronogramaId String
+  proyectoCronograma   ProyectoCronograma @relation(fields: [proyectoCronogramaId], references: [id], onDelete: Cascade)
+
+  configuracion        Json
+  propuestaActividades Json?
+  propuestaTareas      Json?
+  resultado            Json?
+  advertencias         Json?
+  estado               String   @default("borrador")
+
+  generadoPorId String
+  generadoPor   User      @relation(fields: [generadoPorId], references: [id])
+  generadoEn    DateTime  @default(now())
+  aplicadoEn    DateTime?
+
+  @@index([proyectoCronogramaId, generadoEn(sort: Desc)])
+  @@map("proyecto_cronograma_generacion_ia")
 }
 
 model ProyectoDependenciasTarea {
