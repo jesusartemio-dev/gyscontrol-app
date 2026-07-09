@@ -1,4 +1,4 @@
-import type { PlanTrabajo, Cliente, Proyecto, PlanTrabajoGeneracion } from '@prisma/client'
+import type { PlanTrabajo, Cliente, Proyecto, PlanTrabajoGeneracion, PlanTrabajoImagen } from '@prisma/client'
 import type {
   PlanAlcanceDetalladoEdt,
   PlanAlcanceItem,
@@ -15,6 +15,7 @@ import { deduplicarSiglas, calcularSiglasBase } from './siglas'
 import { getSnapshotPlan } from './snapshotHelpers'
 import { REFERENCIAS_BASE } from './referenciasBase'
 import { calcularTotalHH } from './calcularDatos'
+import type { ImagenResueltaTag } from './exportDocx'
 
 type ProyectoConCliente = Proyecto & { cliente: Cliente | null }
 
@@ -29,6 +30,25 @@ export interface ConstruirDataBagOpciones {
   generaciones?: Pick<PlanTrabajoGeneracion, 'numeroRevision' | 'generadoEn' | 'snapshotData'>[]
   /** Fallback de ubicación cuando cliente.direccion no está cargado. */
   ubicacionDetectadaTdr?: string | null
+  /** Imágenes de alcanceDetallado (Bloque 4, Tarea 4) — vacío en planes sin imágenes. */
+  imagenesAlcance?: PlanTrabajoImagen[]
+  /** {data,width,height} ya resueltas por imagen (ver resolverImagenesAlcance.ts) — null = imagen inaccesible → placeholder. */
+  imagenesResueltas?: Map<string, ImagenResueltaTag | null>
+}
+
+function construirImagenesDeNodo(
+  edtRef: string,
+  subItemRef: string | undefined,
+  imagenesAlcance: PlanTrabajoImagen[],
+  imagenesResueltas: Map<string, ImagenResueltaTag | null>
+): { img: ImagenResueltaTag | null; caption: string }[] {
+  return imagenesAlcance
+    .filter(img => img.edtRef === edtRef && (img.subItemRef ?? undefined) === subItemRef)
+    .sort((a, b) => a.orden - b.orden)
+    .map(img => ({
+      img: imagenesResueltas.get(img.id) ?? null,
+      caption: img.caption ?? '',
+    }))
 }
 
 function fmtDate(d: Date | string | null | undefined): string {
@@ -184,6 +204,8 @@ export function construirDataBag({
   organigramaPngBase64,
   generaciones = [],
   ubicacionDetectadaTdr = null,
+  imagenesAlcance = [],
+  imagenesResueltas = new Map(),
 }: ConstruirDataBagOpciones): Record<string, unknown> {
   const personal = (plan.personalAsignado as PlanPersonal[] | null) ?? []
   const raci = (plan.matrizRaci as PlanRaci | null) ?? { filas: [] }
@@ -291,7 +313,7 @@ export function construirDataBag({
     // ─── Restricciones ───
     restricciones: restricciones.map(r => ({ texto: r.texto, categoria: r.categoria ?? '' })),
 
-    // ─── Alcance detallado — formato v3 con loop anidado {#subItems} ───
+    // ─── Alcance detallado — formato v3 con loop anidado {#subItems}/{#imagenes} ───
     // Compatible con formato legacy (PlanAlcanceItem) y nuevo (PlanAlcanceDetalladoEdt)
     alcanceDetallado: alcanceDetallado.map(a => {
       if ('edtNombre' in a && a.edtNombre) {
@@ -306,11 +328,16 @@ export function construirDataBag({
           codigo: n.edtCodigo ?? '',
           descripcion: n.descripcion,
           ubicacion: n.ubicacion ?? '',
-          personalRequerido: [], // NO ENCONTRADO — sin mapeo por EDT en el modelo actual
+          // personalRequerido/imagenes solo existen en EDTs 'detallado' (Bloque 4, Tarea 1/4)
+          personalRequerido: n.personalRequerido ?? [],
+          imagenes: n.edtRefId ? construirImagenesDeNodo(n.edtRefId, undefined, imagenesAlcance, imagenesResueltas) : [],
           subItems: (n.subItems ?? []).map(s => ({
             subnumero: s.numeracion,
             subnombre: s.actividadNombre,
             subdescripcion: s.descripcion,
+            imagenes: n.edtRefId && s.actividadRefId
+              ? construirImagenesDeNodo(n.edtRefId, s.actividadRefId, imagenesAlcance, imagenesResueltas)
+              : [],
           })),
         }
       }
@@ -326,6 +353,7 @@ export function construirDataBag({
         descripcion: l.descripcion ?? '',
         ubicacion: l.ubicacion ?? '',
         personalRequerido: [],
+        imagenes: [],
         subItems: [],
       }
     }),

@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { getSnapshotPlan, getSnapshotPng } from '@/lib/planTrabajo/snapshotHelpers'
 import { construirDataBag } from '@/lib/planTrabajo/construirDataBag'
 import { renderizarPlanTrabajoDocx } from '@/lib/planTrabajo/exportDocx'
+import { resolverImagenesAlcance } from '@/lib/planTrabajo/resolverImagenesAlcance'
 
 type Ctx = { params: Promise<{ id: string; generacionId: string }> }
 
@@ -47,7 +48,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
 
   const organigramaPngBase64 = getSnapshotPng(generacion.snapshotData)
 
-  const [proyecto, generacionesPrevias, tdr] = await Promise.all([
+  const [proyecto, generacionesPrevias, tdr, imagenesAlcance] = await Promise.all([
     prisma.proyecto.findUnique({ where: { id: proyectoId }, include: { cliente: true } }),
     prisma.planTrabajoGeneracion.findMany({
       where: { planTrabajoId: plan.id, generadoEn: { lte: generacion.generadoEn } },
@@ -58,10 +59,19 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
       where: { proyectoId },
       select: { ubicacionDetectada: true },
     }),
+    // Las imágenes no forman parte del snapshot versionado — se usan las
+    // vigentes actualmente para este plan (mismo criterio que el organigrama
+    // no tiene, ya que ese sí viene guardado en el snapshot).
+    prisma.planTrabajoImagen.findMany({
+      where: { planTrabajoId: plan.id },
+      orderBy: { orden: 'asc' },
+    }),
   ])
   if (!proyecto) {
     return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 })
   }
+
+  const imagenesResueltas = await resolverImagenesAlcance(imagenesAlcance)
 
   const dataBag = construirDataBag({
     plan: snapshotPlan,
@@ -69,6 +79,8 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     organigramaPngBase64,
     generaciones: generacionesPrevias,
     ubicacionDetectadaTdr: tdr?.ubicacionDetectada ?? null,
+    imagenesAlcance,
+    imagenesResueltas,
   })
 
   let docxBuffer: Buffer

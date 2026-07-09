@@ -7,10 +7,25 @@ interface RenderInput {
   dataBag: Record<string, unknown>
 }
 
+/** Imagen ya resuelta (base64 + dimensiones reales) — ver construirDataBag.ts (Bloque 4, Tarea 4). */
+export interface ImagenResueltaTag {
+  data: string
+  width: number
+  height: number
+}
+
+const ANCHO_MAXIMO_PX = 566 // ~15cm a 96dpi (Tarea 4 — imágenes de alcance detallado)
+const ANCHO_ORGANIGRAMA_PX = 600
+const ALTO_ORGANIGRAMA_PX = 400
+
+function esImagenResuelta(v: unknown): v is ImagenResueltaTag {
+  return typeof v === 'object' && v !== null && 'data' in v && typeof (v as { data: unknown }).data === 'string'
+}
+
 export async function renderizarPlanTrabajoDocx({ dataBag }: RenderInput): Promise<Buffer> {
   const plantillaBuffer = await descargarPlantillaPlanTrabajo()
 
-  // 1×1 transparent PNG — placeholder cuando no hay organigrama
+  // 1×1 transparent PNG — placeholder cuando no hay imagen (organigrama u otra)
   const PNG_1X1 = Buffer.from(
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQI12NgAAIABQAABjE+ibYAAAAASUVORK5CYII=',
     'base64'
@@ -23,6 +38,10 @@ export async function renderizarPlanTrabajoDocx({ dataBag }: RenderInput): Promi
       if (Buffer.isBuffer(tagValue)) {
         return tagValue.length > 0 ? tagValue : PNG_1X1
       }
+      if (esImagenResuelta(tagValue)) {
+        if (!tagValue.data) return PNG_1X1
+        return Buffer.from(tagValue.data.replace(/^data:image\/[^;]+;base64,/, ''), 'base64')
+      }
       if (typeof tagValue === 'string') {
         if (!tagValue) return PNG_1X1
         return Buffer.from(tagValue.replace(/^data:image\/[^;]+;base64,/, ''), 'base64')
@@ -30,8 +49,16 @@ export async function renderizarPlanTrabajoDocx({ dataBag }: RenderInput): Promi
       return PNG_1X1
     },
     getSize: (_img: Buffer, tagValue: unknown): [number, number] => {
+      // {%img} de alcanceDetallado (Tarea 4) — límite ~15cm de ancho, aspecto real preservado.
+      if (esImagenResuelta(tagValue)) {
+        if (!tagValue.data || !tagValue.width || !tagValue.height) return [1, 1]
+        const ancho = Math.min(tagValue.width, ANCHO_MAXIMO_PX)
+        const alto = Math.round(ancho * (tagValue.height / tagValue.width))
+        return [ancho, alto]
+      }
+      // {%organigramaPng} — tamaño fijo histórico, sin datos de aspecto disponibles.
       const isEmpty = !tagValue || (typeof tagValue === 'string' && !tagValue)
-      return isEmpty ? [1, 1] : [600, 400]
+      return isEmpty ? [1, 1] : [ANCHO_ORGANIGRAMA_PX, ALTO_ORGANIGRAMA_PX]
     },
   }
 

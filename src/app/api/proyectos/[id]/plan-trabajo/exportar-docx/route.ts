@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { construirDataBag } from '@/lib/planTrabajo/construirDataBag'
 import { renderizarPlanTrabajoDocx } from '@/lib/planTrabajo/exportDocx'
 import { validarParaExportar } from '@/lib/planTrabajo/validarParaExportar'
+import { resolverImagenesAlcance } from '@/lib/planTrabajo/resolverImagenesAlcance'
 import { uploadFile } from '@/lib/services/googleDrive'
 import { getOrCreatePlanTrabajoFolder } from '@/lib/planTrabajo/getOrCreatePlanTrabajoFolder'
 
@@ -61,7 +62,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   // Respetar toggle incluirOrganigrama
   const pngParaDocx = planDb.incluirOrganigrama !== false ? organigramaPngBase64 : ''
 
-  const [generaciones, tdr] = await Promise.all([
+  const [generaciones, tdr, imagenesAlcance] = await Promise.all([
     prisma.planTrabajoGeneracion.findMany({
       where: { planTrabajoId: planDb.id },
       select: { numeroRevision: true, generadoEn: true, snapshotData: true },
@@ -71,7 +72,15 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       where: { proyectoId },
       select: { ubicacionDetectada: true },
     }),
+    prisma.planTrabajoImagen.findMany({
+      where: { planTrabajoId: planDb.id },
+      orderBy: { orden: 'asc' },
+    }),
   ])
+
+  // Resolver imágenes de Drive a base64+dimensiones ANTES del render (Tarea 4
+  // — docxtemplater-image-module-free exige getImage/getSize síncronos).
+  const imagenesResueltas = await resolverImagenesAlcance(imagenesAlcance)
 
   // Construir dataBag
   const dataBag = construirDataBag({
@@ -80,6 +89,8 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     organigramaPngBase64: pngParaDocx,
     generaciones,
     ubicacionDetectadaTdr: tdr?.ubicacionDetectada ?? null,
+    imagenesAlcance,
+    imagenesResueltas,
   })
 
   // Renderizar DOCX
