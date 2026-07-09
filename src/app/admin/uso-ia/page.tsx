@@ -26,6 +26,7 @@ import {
   FileUp,
   Download,
   FileCheck,
+  Calendar,
 } from 'lucide-react'
 import {
   BarChart,
@@ -101,6 +102,7 @@ interface IAFeatureFlags {
   mpp: boolean
   importarValorizacionIA: boolean
   verificarCotizacionProyecto: boolean
+  cronogramaPlanificacionIA: boolean
 }
 
 const FEATURE_DEFS: { key: keyof IAFeatureFlags; label: string; desc: string; icon: React.ElementType }[] = [
@@ -118,6 +120,7 @@ const FEATURE_DEFS: { key: keyof IAFeatureFlags; label: string; desc: string; ic
   { key: 'mpp', label: 'MPP', desc: 'Generacion de la Matriz de Proteccion Personal (MPP) con IA usando el IPERC', icon: FileSpreadsheet },
   { key: 'importarValorizacionIA', label: 'Importar Valorización con IA', desc: 'Interpretación automática de documentos de valorización del cliente para crear o verificar valorizaciones', icon: FileSpreadsheet },
   { key: 'verificarCotizacionProyecto', label: 'Verificar Cotización de Proyecto', desc: 'Extracción y verificación de totales de la Propuesta Económica origen contra costos reales del proyecto', icon: FileCheck },
+  { key: 'cronogramaPlanificacionIA', label: 'Cronograma — Planificación IA', desc: 'Generación de cronograma con IA desde el catálogo de servicios (zonas de CON, familias de PRO)', icon: Calendar },
 ]
 
 const MONTH_NAMES = [
