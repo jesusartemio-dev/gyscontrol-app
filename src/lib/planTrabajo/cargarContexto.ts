@@ -49,7 +49,10 @@ export async function cargarContextoPlanTrabajo(
 
     prisma.planTrabajo.findUnique({
       where: { proyectoId },
-      include: { generaciones: { orderBy: { generadoEn: 'desc' } } },
+      include: {
+        generaciones: { orderBy: { generadoEn: 'desc' } },
+        imagenes: { orderBy: { orden: 'asc' } },
+      },
     }),
 
     prisma.proyectoEquipoCotizado.findMany({

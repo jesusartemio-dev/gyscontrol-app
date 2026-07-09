@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/dialog'
 
 import type { PlanTrabajoContexto, SeccionRegenerable } from '@/types/planTrabajo'
-import type { PlanTrabajo } from '@prisma/client'
+import type { PlanTrabajo, PlanTrabajoImagen } from '@prisma/client'
 
 import { PreRequisitosPanel } from './PreRequisitosPanel'
 import { CabeceraEditor } from './CabeceraEditor'
@@ -439,7 +439,7 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
     )
   }
 
-  const plan = planTrabajo as PlanTrabajo & { generaciones: unknown[]; operacionIAEnCurso?: string | null; operacionIAIniciadaEn?: Date | null }
+  const plan = planTrabajo as PlanTrabajo & { generaciones: unknown[]; imagenes: PlanTrabajoImagen[]; operacionIAEnCurso?: string | null; operacionIAIniciadaEn?: Date | null }
   const bloques = (plan.bloquesCompletitud ?? {}) as Record<string, boolean>
   const LOCK_EXPIRY_MS = 10 * 60 * 1000
   const lockAge = plan.operacionIAIniciadaEn ? Date.now() - new Date(plan.operacionIAIniciadaEn).getTime() : Infinity
@@ -609,7 +609,10 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
       )}
       {editandoSeccion === 'alcanceDetallado' && (
         <AlcanceDetalladoEditor
+          proyectoId={proyectoId}
           valor={(plan.alcanceDetallado as PlanAlcanceDetalladoEdt[] | null) ?? []}
+          imagenes={plan.imagenes}
+          onImagenesChanged={fetchContexto}
           onSave={(v) => handleSaveSeccion('alcanceDetallado', v)}
           onCancel={() => setEditandoSeccion(null)}
         />

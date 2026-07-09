@@ -1,4 +1,4 @@
-import type { PlanTrabajo, PlanTrabajoGeneracion } from '@prisma/client'
+import type { PlanTrabajo, PlanTrabajoGeneracion, PlanTrabajoImagen } from '@prisma/client'
 
 // ============================================
 // SECCIONES ESTRUCTURADAS (campos Json)
@@ -253,6 +253,7 @@ export interface PlanTrabajoContexto {
 
   planTrabajo: (PlanTrabajo & {
     generaciones: PlanTrabajoGeneracion[]
+    imagenes: PlanTrabajoImagen[]
   }) | null
 
   cotizacion: {
@@ -430,4 +431,4 @@ export interface TdrContexto {
 }
 
 // Re-exports
-export type { PlanTrabajo, PlanTrabajoGeneracion }
+export type { PlanTrabajo, PlanTrabajoGeneracion, PlanTrabajoImagen }

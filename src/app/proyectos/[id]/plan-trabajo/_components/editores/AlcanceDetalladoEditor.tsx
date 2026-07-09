@@ -9,9 +9,14 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Plus, Trash2, PlusCircle } from 'lucide-react'
+import { GaleriaImagenesAlcance } from './GaleriaImagenesAlcance'
+import type { PlanTrabajoImagen } from '@prisma/client'
 
 interface Props {
+  proyectoId: string
   valor: PlanAlcanceDetalladoEdt[]
+  imagenes: PlanTrabajoImagen[]
+  onImagenesChanged: () => Promise<void>
   onSave: (v: PlanAlcanceDetalladoEdt[]) => Promise<void>
   onCancel: () => void
 }
@@ -34,7 +39,7 @@ const subItemVacio = (numeracionPadre: string, idx: number): PlanAlcanceDetallad
   descripcion: '',
 })
 
-export function AlcanceDetalladoEditor({ valor, onSave, onCancel }: Props) {
+export function AlcanceDetalladoEditor({ proyectoId, valor, imagenes, onImagenesChanged, onSave, onCancel }: Props) {
   const [items, setItems] = useState<PlanAlcanceDetalladoEdt[]>(
     valor.length > 0 ? valor : [edtVacio()]
   )
@@ -118,14 +123,36 @@ export function AlcanceDetalladoEditor({ valor, onSave, onCancel }: Props) {
                       <Input value={item.faseNombre} onChange={e => updateItem(edtIdx, { faseNombre: e.target.value })} className="h-8 text-sm" placeholder="EJECUCIÓN" />
                     </div>
                   </div>
-                  <div>
-                    <Label className="text-xs">Ubicación (opcional)</Label>
-                    <Input value={item.ubicacion ?? ''} onChange={e => updateItem(edtIdx, { ubicacion: e.target.value })} className="h-8 text-sm" placeholder="Site cliente / Sección 50" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-xs">Ubicación (opcional)</Label>
+                      <Input value={item.ubicacion ?? ''} onChange={e => updateItem(edtIdx, { ubicacion: e.target.value })} className="h-8 text-sm" placeholder="Site cliente / Sección 50" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Nivel de detalle</Label>
+                      <select
+                        value={item.tipoDetalle}
+                        onChange={e => updateItem(edtIdx, { tipoDetalle: e.target.value as 'detallado' | 'resumido' })}
+                        className="w-full h-8 text-xs border rounded-md px-2 bg-white"
+                      >
+                        <option value="resumido">Resumido (Planificación/Ingeniería/Procura/Cierre)</option>
+                        <option value="detallado">Detallado (Ejecución — admite imágenes)</option>
+                      </select>
+                    </div>
                   </div>
                   <div>
                     <Label className="text-xs">Descripción narrativa</Label>
                     <Textarea value={item.descripcion} onChange={e => updateItem(edtIdx, { descripcion: e.target.value })} rows={4} className="text-sm resize-none" placeholder="Párrafo narrativo de 80-150 palabras describiendo el flujo de trabajo..." />
                   </div>
+
+                  {item.tipoDetalle === 'detallado' && item.edtRefId && (
+                    <GaleriaImagenesAlcance
+                      proyectoId={proyectoId}
+                      edtRef={item.edtRefId}
+                      imagenes={imagenes}
+                      onChanged={onImagenesChanged}
+                    />
+                  )}
 
                   {/* SubItems */}
                   {(item.subItems ?? []).length > 0 && (
@@ -141,6 +168,15 @@ export function AlcanceDetalladoEditor({ valor, onSave, onCancel }: Props) {
                             </Button>
                           </div>
                           <Textarea value={sub.descripcion} onChange={e => updateSubItem(edtIdx, subIdx, { descripcion: e.target.value })} rows={3} className="text-xs resize-none" placeholder="Descripción narrativa de la actividad..." />
+                          {item.tipoDetalle === 'detallado' && sub.actividadRefId && (
+                            <GaleriaImagenesAlcance
+                              proyectoId={proyectoId}
+                              edtRef={item.edtRefId ?? ''}
+                              subItemRef={sub.actividadRefId}
+                              imagenes={imagenes}
+                              onChanged={onImagenesChanged}
+                            />
+                          )}
                         </div>
                       ))}
                     </div>
