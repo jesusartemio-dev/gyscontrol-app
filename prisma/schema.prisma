@@ -2046,6 +2046,7 @@ model User {
   avanceSnapshotsTomados                   ProyectoAvanceSnapshot[]    @relation("AvanceSnapshotsTomadoPor")
   orgNodos                                 ProyectoOrgNodo[]
   planTrabajoGeneraciones                  PlanTrabajoGeneracion[]
+  planTrabajoImagenes                      PlanTrabajoImagen[]
   // Módulo Ausencias
   solicitudesAusencia                      SolicitudAusencia[]      @relation("AusenciaSolicitante")
   ausenciasComoAprobador1                  SolicitudAusencia[]      @relation("AusenciaAprobador1")
@@ -5547,6 +5548,7 @@ model PlanTrabajo {
   bloquesCompletitud Json?
 
   generaciones PlanTrabajoGeneracion[]
+  imagenes     PlanTrabajoImagen[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -5574,6 +5576,34 @@ model PlanTrabajoGeneracion {
 
   @@index([planTrabajoId, generadoEn(sort: Desc)])
   @@map("plan_trabajo_generacion")
+}
+
+// ─── Imágenes por EDT/subItem del alcance detallado (Bloque 4, Tarea 2) ─────
+// Solo EDTs/subItems de fase EJECUCIÓN (tipoDetalle='detallado') admiten
+// imágenes en la UI — nunca pasan por IA. Almacenamiento en Google Drive,
+// mismo patrón que RegistroAvanceFoto/RegistroSeguridadFoto.
+model PlanTrabajoImagen {
+  id            String      @id @default(cuid())
+  planTrabajoId String
+  planTrabajo   PlanTrabajo @relation(fields: [planTrabajoId], references: [id], onDelete: Cascade)
+
+  edtRef     String // edtRefId del EDT de alcanceDetallado al que pertenece
+  subItemRef String? // actividadRefId del subItem — null si la imagen es a nivel EDT
+
+  nombreArchivo String
+  urlArchivo    String
+  driveFileId   String?
+  tipoArchivo   String?
+  tamano        Int?
+  caption       String?
+  orden         Int     @default(0)
+
+  createdAt   DateTime @default(now())
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id])
+
+  @@index([planTrabajoId, edtRef])
+  @@map("plan_trabajo_imagen")
 }
 
 // ─── IPERC (Identificación de Peligros, Evaluación de Riesgos y Controles) ──
