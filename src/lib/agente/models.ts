@@ -13,20 +13,24 @@ export type AITask =
   | 'chat-simple'       // Simple chat: greetings, short questions, catalog lookups
   | 'excel-extraction'  // Excel CSV → JSON structured data
   | 'pdf-extraction'    // PDF proposal → JSON structured data
+  | 'pdf-extraction-cotizacion' // Propuesta económica → JSON clasificado por categoría (requiere juicio semántico)
   | 'ocr'               // Receipt/invoice OCR → JSON
   | 'ssoma-iperc'       // SSOMA: matriz de riesgos IPERC (50 filas, razonamiento complejo)
   | 'ssoma-document'    // SSOMA: PETS, PAR, PLAN_EMERGENCIA (procedimientos técnicos)
   | 'ssoma-epp'         // SSOMA: MATRIZ_EPP (listas de EPP por rol, formulaico)
+  | 'cronograma-planificacion-ia' // Cronograma: propuesta de zonas CON / familias PRO / cantidades sugeridas
 
 const TASK_DEFAULTS: Record<AITask, string> = {
   'chat': MODELS.sonnet,
   'chat-simple': MODELS.haiku,
   'excel-extraction': MODELS.haiku,
   'pdf-extraction': MODELS.haiku,
+  'pdf-extraction-cotizacion': MODELS.sonnet, // clasificación semántica de líneas equipos/servicios/gastos
   'ocr': MODELS.haiku,
   'ssoma-iperc': MODELS.sonnet,    // IPERC alto riesgo (EJECUCIÓN): Sonnet + paralelismo 3 → ~140s (override: AI_SSOMA_IPERC_MODEL)
   'ssoma-document': MODELS.sonnet, // Procedimientos técnicos de seguridad → Sonnet
   'ssoma-epp': MODELS.haiku,       // Listas de EPP por rol (referencia estándar) → Haiku
+  'cronograma-planificacion-ia': MODELS.sonnet, // Agrupación de zonas/familias → razonamiento, no solo extracción
 }
 
 // Environment variable overrides (change model without redeploying)
@@ -35,10 +39,12 @@ const ENV_OVERRIDES: Record<AITask, string | undefined> = {
   'chat-simple': process.env.AI_CHAT_SIMPLE_MODEL,
   'excel-extraction': process.env.AI_EXTRACT_MODEL,
   'pdf-extraction': process.env.AI_EXTRACT_MODEL,
+  'pdf-extraction-cotizacion': process.env.AI_PDF_COTIZACION_MODEL,
   'ocr': process.env.AI_OCR_MODEL,
   'ssoma-iperc': process.env.AI_SSOMA_IPERC_MODEL,
   'ssoma-document': process.env.AI_SSOMA_DOCUMENT_MODEL,
   'ssoma-epp': process.env.AI_SSOMA_EPP_MODEL,
+  'cronograma-planificacion-ia': process.env.AI_CRONOGRAMA_MODEL,
 }
 
 /**

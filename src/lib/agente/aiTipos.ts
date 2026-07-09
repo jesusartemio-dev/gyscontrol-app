@@ -54,6 +54,7 @@ const TIPO_PREFIX_RULES: Array<{ prefix: string; info: TipoInfo }> = [
   { prefix: 'iperc.',           info: { label: 'IPERC',                   color: '#dc2626' } },
   { prefix: 'pets.',            info: { label: 'PETS',                    color: '#16a34a' } },
   { prefix: 'mpp.',             info: { label: 'MPP',                     color: '#7c3aed' } },
+  { prefix: 'cronograma-planificacion.', info: { label: 'Cronograma — Generación IA', color: '#0891b2' } }, // cyan-600
 ]
 
 export function getTipoInfo(tipo: string): TipoInfo {

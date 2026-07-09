@@ -17,6 +17,8 @@ export interface IAFeatureFlags {
   pets: boolean
   mpp: boolean
   importarValorizacionIA: boolean
+  verificarCotizacionProyecto: boolean
+  cronogramaPlanificacionIA: boolean
 }
 
 const DEFAULT_FLAGS: IAFeatureFlags = {
@@ -33,6 +35,8 @@ const DEFAULT_FLAGS: IAFeatureFlags = {
   pets: true,
   mpp: true,
   importarValorizacionIA: true,
+  verificarCotizacionProyecto: true,
+  cronogramaPlanificacionIA: true,
 }
 
 function parseFlags(raw: unknown): IAFeatureFlags {
@@ -52,6 +56,8 @@ function parseFlags(raw: unknown): IAFeatureFlags {
     pets: typeof obj.pets === 'boolean' ? obj.pets : DEFAULT_FLAGS.pets,
     mpp: typeof obj.mpp === 'boolean' ? obj.mpp : DEFAULT_FLAGS.mpp,
     importarValorizacionIA: typeof obj.importarValorizacionIA === 'boolean' ? obj.importarValorizacionIA : DEFAULT_FLAGS.importarValorizacionIA,
+    verificarCotizacionProyecto: typeof obj.verificarCotizacionProyecto === 'boolean' ? obj.verificarCotizacionProyecto : DEFAULT_FLAGS.verificarCotizacionProyecto,
+    cronogramaPlanificacionIA: typeof obj.cronogramaPlanificacionIA === 'boolean' ? obj.cronogramaPlanificacionIA : DEFAULT_FLAGS.cronogramaPlanificacionIA,
   }
 }
 
