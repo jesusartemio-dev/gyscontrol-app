@@ -29,6 +29,13 @@ export function construirBloqueHechosEtapa1(plan: Pick<PlanTrabajo, 'personalAsi
   }
   partes.push('')
   partes.push(`TOTAL HH: ${totalHH}`)
+  partes.push('')
+  partes.push('HORAS-HOMBRE POR FASE (si mencionás horas por fase, usá EXACTAMENTE estos valores; no inventes ninguna otra distribución):')
+  if (histogramas.porFase && histogramas.porFase.length > 0) {
+    for (const f of histogramas.porFase) partes.push(`- ${f.fase}: ${f.total} HH`)
+  } else {
+    partes.push('(sin desglose por fase disponible — no menciones horas por fase)')
+  }
 
   return partes.join('\n')
 }

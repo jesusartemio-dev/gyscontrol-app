@@ -3,6 +3,7 @@ import type {
   PlanTrabajoContexto,
   PlanPersonal,
   PlanRaci,
+  PlanRaciRol,
   PlanHistogramas,
   PlanCronograma,
   PlanReferencia,
@@ -10,7 +11,7 @@ import type {
   CronogramaContexto,
 } from '@/types/planTrabajo'
 import { deduplicarSiglas, calcularSiglasBase } from './siglas'
-import { calcularRolRaci, clasificarTipoEdt } from './raciReglas'
+import { calcularRolRaci, clasificarTipoEdt, esEdtDeSeguridad, prioridadAprobador } from './raciReglas'
 import { REFERENCIAS_BASE } from './referenciasBase'
 
 /**
@@ -127,6 +128,9 @@ interface EdtParaRaci {
 /**
  * matrizRaci — ProyectoEdt × personal, usando REGLAS_RACI_CARGO (raciReglas.ts).
  * Una fila por EDT; rolesTexto se compone en construirDataBag, no acá.
+ * Post-procesa cada fila para que haya máximo UN Aprobador (A) — si 2+ cargos
+ * de gerencia matchean en el mismo EDT, prioridadAprobador() decide cuál queda
+ * A y el resto baja a C (addendum D.2 — antes salían dos "A" por fila).
  */
 export function calcularMatrizRaci(
   edts: EdtParaRaci[],
@@ -137,19 +141,37 @@ export function calcularMatrizRaci(
 
   const filas = edts.map(edt => {
     const tipoEdt = clasificarTipoEdt(edt.nombre)
-    const asignaciones = personal.map(p => {
+    const esSeguridad = esEdtDeSeguridad(edt.nombre)
+
+    const asignacionesConCargo = personal.map(p => {
       const rol = calcularRolRaci({
         cargoLabel: p.cargo,
         tipoEdt,
         esResponsableDelEdt: edt.responsableId === p.userId,
+        esEdtDeSeguridad: esSeguridad,
       })
       if (rol === null) {
         cargosNoMapeados.add(p.cargo)
-        return { siglas: p.siglas ?? '', rol: 'I' as const }
+        return { siglas: p.siglas ?? '', cargo: p.cargo, rol: 'I' as PlanRaciRol }
       }
-      return { siglas: p.siglas ?? '', rol }
+      return { siglas: p.siglas ?? '', cargo: p.cargo, rol }
     })
-    return { edt: edt.nombre, asignaciones }
+
+    // Máximo un Aprobador por EDT — prioridad Gerencia de Proyectos > Gerencia General.
+    const aprobadores = asignacionesConCargo.filter(a => a.rol === 'A')
+    if (aprobadores.length > 1) {
+      const ganador = [...aprobadores].sort(
+        (a, b) => prioridadAprobador(b.cargo) - prioridadAprobador(a.cargo)
+      )[0]
+      for (const a of asignacionesConCargo) {
+        if (a.rol === 'A' && a !== ganador) a.rol = 'C'
+      }
+    }
+
+    return {
+      edt: edt.nombre,
+      asignaciones: asignacionesConCargo.map(({ siglas, rol }) => ({ siglas, rol })),
+    }
   })
 
   for (const cargo of cargosNoMapeados) {
@@ -166,6 +188,14 @@ interface EdtParaCronograma {
   fechaInicioPlan: Date | null
   fechaFinPlan: Date | null
   horasPlan: number | null
+  actividades: { nombre: string }[]
+}
+
+/** "" si no hay actividades, el nombre si hay 1, "{n} actividades" si hay varias (nunca vacío — addendum E). */
+function resumenActividades(actividades: { nombre: string }[]): string {
+  if (actividades.length === 0) return ''
+  if (actividades.length === 1) return actividades[0].nombre
+  return `${actividades.length} actividades`
 }
 
 function mesKey(d: Date): string {
@@ -205,6 +235,7 @@ export function calcularHistogramasYCronograma(
       fechaInicioPlan: e.fechaInicioPlan,
       fechaFinPlan: e.fechaFinPlan,
       horasPlan: e.horasPlan,
+      actividades: e.actividades.map(a => ({ nombre: a.nombre })),
     }))
   )
 
@@ -248,14 +279,25 @@ export function calcularHistogramasYCronograma(
   const cronogramaFilas = edtsConFecha.map(e => ({
     fase: e.faseNombre,
     edt: e.nombre,
+    actividad: resumenActividades(e.actividades),
     fechaInicio: e.fechaInicioPlan.toISOString().slice(0, 10),
     fechaFin: e.fechaFinPlan.toISOString().slice(0, 10),
     horasPlan: e.horasPlan ?? 0,
   }))
 
+  // HH por fase — misma fuente (edtsConFecha) que totalHH, para que el bloque
+  // de HECHOS de Etapa 2 pueda citar horas por fase sin que la IA las invente
+  // (addendum B — el docx auditado mostró una distribución de HH por fase
+  // completamente distinta a la real aunque el total coincidía).
+  const porFaseMap = new Map<string, number>()
+  for (const e of edtsConFecha) {
+    porFaseMap.set(e.faseNombre, (porFaseMap.get(e.faseNombre) ?? 0) + (e.horasPlan ?? 0))
+  }
+  const porFase = Array.from(porFaseMap.entries()).map(([fase, total]) => ({ fase, total }))
+
   return {
     data: {
-      histogramas: { meses, equipoTrabajo, horasHombre },
+      histogramas: { meses, equipoTrabajo, horasHombre, porFase },
       cronogramaResumen: { filas: cronogramaFilas },
       totalHH,
     },

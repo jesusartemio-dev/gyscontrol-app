@@ -99,10 +99,16 @@ export const planHistogramaFilaSchema = z.object({
   total: z.number(),
 })
 
+export const planHistogramaFaseSchema = z.object({
+  fase: z.string().min(1),
+  total: z.number(),
+})
+
 export const planHistogramasSchema = z.object({
   meses: z.array(z.string()),
   equipoTrabajo: z.array(planHistogramaFilaSchema),
   horasHombre: z.array(planHistogramaFilaSchema),
+  porFase: z.array(planHistogramaFaseSchema).optional(),
 })
 
 export const planCronogramaFilaSchema = z.object({

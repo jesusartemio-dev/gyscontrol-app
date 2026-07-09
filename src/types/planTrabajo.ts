@@ -107,10 +107,17 @@ export interface PlanHistogramaFila {
   total: number
 }
 
+export interface PlanHistogramaFase {
+  fase: string
+  total: number
+}
+
 export interface PlanHistogramas {
   meses: string[]
   equipoTrabajo: PlanHistogramaFila[]
   horasHombre: PlanHistogramaFila[]
+  /** HH por fase, misma fuente que totalHH — usado en el bloque de HECHOS de Etapa 2 (addendum B). */
+  porFase?: PlanHistogramaFase[]
 }
 
 // ─── Cronograma resumen ───
