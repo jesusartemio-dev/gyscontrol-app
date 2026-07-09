@@ -52,10 +52,10 @@ Leyenda de estado: ✅ ya existe en `construirDataBag.ts` (según informe) · �
 | `{ordenCompra}` | string | ✅/🆕 verificar | `Proyecto` / cabecera del plan |
 | `{nombreProyecto}` | string | ✅ | `Proyecto.nombre` |
 | `{codigoDocumento}` | string | ✅ | Cabecera (migrar a derivación por regla, cambio #9) |
-| `{numeroConsultor}` | string | 🆕 | Nuevo campo de cabecera (constante GYS: `1092538` o por cliente) |
+| `{numeroConsultor}` | string | ✅ implementado | `PlanTrabajo.numeroConsultor` (editable en `CabeceraEditor`), fallback a `PLAN_TRABAJO_NUMERO_CONSULTOR_DEFAULT` (Bloque 4, Tarea 5.2) |
 | `{revision}` | string | ✅ | Cabecera |
-| `{#revisiones}` → `{rev} {te} {descripcion} {des} {ver} {apr} {aut} {fecha}` | array | 🔧 | Hoy 1 elemento; poblar histórico desde `PlanTrabajoGeneracion` (cambio #7) |
-| `{#firmantes}` → `{siglas} {nombre}` | array | 🆕 | Derivar de des/ver/apr/aut únicos de `revisiones` |
+| `{#revisiones}` → `{rev} {te} {descripcion} {des} {ver} {apr} {aut} {fecha}` | array | ✅ implementado | Histórico real desde `PlanTrabajoGeneracion` (cambio #7). **`des`/`ver`/`apr`/`aut` muestran SIGLAS, no nombres completos** — `aut` sin dato renderiza `"-"`, nunca vacío (Bloque 4, Tarea 5.2) |
+| `{#firmantes}` → `{siglas} {nombre}` | array | ✅ implementado | Únicos de des/ver/apr/aut de `revisiones`, deduplicados por nombre normalizado (trim + minúsculas + sin tildes, así "JESÚS MAMANI" y "Jesus Mamani" no salen duplicados) y renderizados en Title Case si venían en mayúsculas (Bloque 4, Tarea 5.2) |
 
 ### Secciones con texto fijo (CERO IA — ya embebidas en la plantilla)
 Objetivo-bullets, Definiciones generales, **Responsabilidades completas (§5)**, **Capacidad y Experiencia (§7)**, intro EPP con códigos GYS-SST-P-006/007/008/009, **Consideraciones SSOMA (§10)** con GYS-SST-PL-001/002/004, leyenda RACI, textos de Organigrama/Cronograma/Anexos.
@@ -84,7 +84,7 @@ Objetivo-bullets, Definiciones generales, **Responsabilidades completas (§5)**,
 | `{objetivo}` | Texto multipárrafo (requiere `linebreaks: true`) |
 | `{alcanceGeneral}` | Ídem. Inyectar **`cliente.direccion`** al contexto (quick win #1) — la dirección correcta ya existe en BD (`/comercial/clientes/cli-import-1769535277176-...`) |
 | `{#tieneUbicacion}` + `{ubicacionProyecto}` | 🆕 flag + string desde `cliente.direccion` o `ProyectoTdrAnalisis.ubicacionDetectada`. Dato mostrado explícito, no solo dentro de la prosa de IA |
-| `{#alcanceDetallado}` → `{numeracion} {edtNombre} {faseNombre} {descripcion}` + `{#subItems}` (anidado) + `{#personalRequerido}` → `{cantidad} {cargo}` | Estructura/numeración por código (cambio #17); IA solo `descripcion` |
+| `{#alcanceDetallado}` → `{numeracion} {edtNombre} {faseNombre} {descripcion} {codigo} {ubicacion}` + `{#subItems}` → `{subnumero} {subnombre} {subdescripcion}` (anidado) + `{#personalRequerido}` → `{cantidad} {cargo}` + `{#imagenes}` → `{%img} {caption}` (EDT y subItem) | ✅ implementado (Bloque 4, Tarea 1/4). Estructura/numeración/`personalRequerido`/`imagenes` **100% servidor, cero IA**; IA solo redacta `descripcion`. `numeracion` es incremental real (`11.1`, `11.1.1`, `11.1.2`, `11.2`, ...), nunca repetida entre subItems consecutivos. `personalRequerido`/`imagenes` solo existen en EDTs de fase EJECUCIÓN con EDT CON/CMN (ver `{tipoDetalle}` más abajo); en el resto llegan como array vacío |
 | `{#eppBasico}` / `{#eppRiesgoEspecifico}` / `{#eppBioseguridad}` → `{nombre} {norma}` | Catálogo + selección IA. `{#hayEppBioseguridad}` 🆕 boolean = `eppBioseguridad.length > 0` (resuelve el "título vacío" §4.4) |
 | `{#equipos}` / `{#herramientas}` / `{#materiales}` → `{nombre} {cantidad}` | Mixto cotización + IA |
 | `{#restricciones}` → `{categoria} {texto}` | Catálogo + selección IA |
@@ -92,7 +92,13 @@ Objetivo-bullets, Definiciones generales, **Responsabilidades completas (§5)**,
 ### Imagen
 | Tag | Notas |
 |---|---|
-| `{%organigramaPng}` | Va en **Anexo A** (como los manuales). Mantener `generarOrganigramaPng.ts` + ImageModule; agregar try/catch visible en `BotonExportarDocx.tsx` (§4.6) |
+| `{%organigramaPng}` | Va en **Anexo A** (como los manuales). Mantiene `generarOrganigramaPng.ts` + ImageModule; tamaño fijo 600×400px, string base64 plano |
+| `{#imagenes}` → `{%img} {caption}` (dentro de `{#alcanceDetallado}` y de `{#subItems}`) | ✅ implementado (Bloque 4, Tarea 4). Imágenes adjuntas por el usuario en la UI del editor (`GaleriaImagenesAlcance.tsx`), **nunca pasan por IA**. Solo EDTs/subItems de fase EJECUCIÓN pueden tener imágenes (hasta 10 por nodo). Cada imagen: `{%img}` es un objeto `{data, width, height}` ya resuelto server-side (base64 + dimensiones reales leídas con `sharp`, ver `resolverImagenesAlcance.ts`) — se limita a **~15cm de ancho (566px)** preservando el aspecto real. `{caption}` es texto editable, default = nombre de la actividad. Imagen inaccesible en Drive → placeholder 1×1 transparente + warning en consola, **nunca rompe el export**. Array vacío en EDTs/subItems sin imágenes o de otras fases |
+
+### Notas de implementación — Bloque 4
+
+- **`tipoDetalle`** (`'detallado' | 'resumido'`) es un campo interno de `PlanAlcanceDetalladoEdt` que controla la profundidad de redacción de la IA (1 frase por EDT `resumido` vs. 2-4 frases + `subItems`/`personalRequerido`/`imagenes` en EDTs `detallado` = fase EJECUCIÓN con EDT CON/CMN). **No se expone como tag en la plantilla** — es editable desde la UI (`AlcanceDetalladoEditor.tsx`) para casos borde donde la clasificación automática no aplica.
+- Las **horas-hombre por fase** que cita `{alcanceGeneral}` (redactado por IA) se inyectan como hecho inmutable en el bloque `HECHOS YA RESUELTOS (ETAPA 1)` que recibe el prompt — no es un tag de la plantilla, pero garantiza que la cifra que menciona la prosa coincida con `{#histogramaHH}`/`{totalHH}` (cambio #4 del checklist).
 
 ---
 
@@ -108,3 +114,6 @@ Objetivo-bullets, Definiciones generales, **Responsabilidades completas (§5)**,
 2. Abrir en Word → aceptar "Actualizar campos" → índice poblado.
 3. `hayEppBioseguridad=false` → el bloque completo (título incluido) desaparece.
 4. Sumar `{totalHH}` vs. suma de filas de `{#histogramaHH}` vs. suma de `{horasPlan}` del cronograma: deben coincidir (test automatizable).
+5. (Bloque 4) Ningún par de `subItems` consecutivos dentro de un mismo `{#alcanceDetallado}` tiene la misma `{subnumero}` ni la misma `{subdescripcion}` — regresión cubierta por `alcanceEstructura.test.ts`.
+6. (Bloque 4) Un EDT de fase EJECUCIÓN con 2+ imágenes subidas exporta ambas dentro de `{#imagenes}` con su `{caption}`, y una imagen con `driveFileId` inválido no rompe el export (placeholder + warning en logs).
+7. (Bloque 4) Las columnas `{des}`/`{ver}`/`{apr}`/`{aut}` de `{#revisiones}` muestran siglas (no nombres completos); `{aut}` sin dato muestra `"-"`; la leyenda `{#firmantes}` no repite la misma persona por diferencias de mayúsculas/tildes.
