@@ -180,6 +180,7 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
     'comparacion': 'Comparación',
     'recursos': 'Recursos',
     'organigrama': 'Organigrama',
+    'cotizacion': 'Cotización',
     'matriz-comunicacion': 'Matriz de Comunicaciones',
     'tdr': 'Análisis TDR',
     'plan-trabajo': 'Plan de Trabajo',
