@@ -39,7 +39,8 @@ import {
   Lock,
   Unlock,
   Table2,
-  Wrench
+  Wrench,
+  Sparkles
 } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import { useToast } from '@/hooks/use-toast'
@@ -60,6 +61,7 @@ import ImportExcelCronogramaModal from './ImportExcelCronogramaModal'
 import { CronogramaVarianza } from './CronogramaVarianza'
 import { CronogramaTableView } from './CronogramaTableView'
 import { AsignarRecursoPorEdt } from './AsignarRecursoPorEdt'
+import { CronogramaPlanificacionWizard } from './CronogramaPlanificacionWizard'
 import type { ProyectoCronograma } from '@/types/modelos'
 
 interface CronogramaStats {
@@ -92,6 +94,7 @@ export function ProyectoCronogramaTab({
   const [showDeleteCronogramaModal, setShowDeleteCronogramaModal] = useState(false)
   const [showDeleteCronogramaCompletoModal, setShowDeleteCronogramaCompletoModal] = useState(false)
   const [showGenerarCronogramaModal, setShowGenerarCronogramaModal] = useState(false)
+  const [showGenerarIAModal, setShowGenerarIAModal] = useState(false)
   const [showImportExcelModal, setShowImportExcelModal] = useState(false)
   const [showAsignarRecursoModal, setShowAsignarRecursoModal] = useState(false)
 
@@ -677,6 +680,7 @@ export function ProyectoCronogramaTab({
   const puedeCrearLineaBase = !tieneLineaBase
   const puedeIniciarEjecucion = tieneBaseline && !tieneEjecucion
   const esComercial = selectedCronograma?.tipo === 'comercial'
+  const esPlanificacion = selectedCronograma?.tipo === 'planificacion'
   const esBloqueado = selectedCronograma?.bloqueado === true || selectedCronograma?.tipo === 'comercial'
 
   return (
@@ -885,6 +889,15 @@ export function ProyectoCronogramaTab({
                     <Wand2 className="h-4 w-4 mr-2" />
                     Generar Cronograma
                   </DropdownMenuItem>
+                  {esPlanificacion && (
+                    <DropdownMenuItem onSelect={() => {
+                      setDropdownOpen(false)
+                      setTimeout(() => setShowGenerarIAModal(true), 100)
+                    }} disabled={esBloqueado}>
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Generar con IA (desde catálogo)
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem onSelect={() => {
                     setDropdownOpen(false)
                     setTimeout(() => setShowImportExcelModal(true), 100)
@@ -1139,6 +1152,13 @@ export function ProyectoCronogramaTab({
         open={showAsignarRecursoModal}
         onOpenChange={setShowAsignarRecursoModal}
         cronogramaId={selectedCronograma?.id || ''}
+        onSuccess={handleRefresh}
+      />
+
+      <CronogramaPlanificacionWizard
+        proyectoId={proyectoId}
+        open={showGenerarIAModal}
+        onOpenChange={setShowGenerarIAModal}
         onSuccess={handleRefresh}
       />
 
