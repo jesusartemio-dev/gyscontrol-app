@@ -26,70 +26,30 @@ CRITERIOS DE CALIDAD:
    - objetivo: 1-2 párrafos que describan el propósito del trabajo.
    - alcanceGeneral: 2-4 párrafos con el alcance técnico, ubicación, cliente y
      compromisos contractuales. Usá la ubicación real del bloque de hechos —
-     si no hay ubicación real, no menciones ninguna.
+     si no hay ubicación real, no menciones ninguna. Si mencionás horas por
+     fase, usá EXACTAMENTE los valores de "HORAS-HOMBRE POR FASE" del bloque
+     de hechos — no inventes otra distribución.
 
-2. ALCANCE DETALLADO:
-   CONTEXTO: El mensaje incluye la ESTRUCTURA COMPLETA DEL CRONOGRAMA con fases,
-   EDTs, actividades y tareas. Usá esa información como base técnica.
+NOTA: "alcanceDetallado" NO se genera con este prompt — el servidor arma su
+estructura completa (numeración, EDTs, subItems, personalRequerido) y la IA
+solo redacta descripciones en un flujo separado, ver
+src/lib/planTrabajo/generarAlcanceDetallado.ts y
+src/lib/planTrabajo/prompts/alcanceDetallado.ts.
 
-   NUMERACIÓN DEL DOCUMENTO:
-   - Numeración propia del plan: 11.1, 11.2, 11.3… (EDTs o grupos principales)
-   - SubItems: 11.X.Y
-   - NO copiés la numeración del cronograma (4.2, 4.4, etc.) — esos índices son
-     del cronograma de planificación, no del documento del plan de trabajo.
-
-   ESTRUCTURA:
-   - Organizá por Fase → EDT. Podés crear una entrada por EDT o una por grupo
-     lógico a tu criterio. No es obligatorio replicar la estructura del cronograma.
-
-   AGRUPACIÓN INTELIGENTE DE ACTIVIDADES (OBLIGATORIO):
-   - MÁXIMO 5 subItems por EDT. Si el EDT tiene más de 5 actividades, DEBÉS agrupar.
-   - Agrupá actividades similares o repetitivas en UN solo subItem.
-   - Ejemplo CORRECTO: en vez de 7+ subItems individuales para extractores,
-     usar UN subItem "Instalación de Sistemas de Extractor (E013, E062, E503, E2013, E3003)".
-   - Actividades técnicamente muy distintas sí pueden ir en subItems separados.
-   - Si el EDT tiene ≤ 5 actividades distintas, podés dejarlas individuales.
-
-   CÓDIGOS TÉCNICOS (OBLIGATORIO):
-   - Preservá los códigos de equipos, instrumentos y sistemas del cronograma.
-   - Ejemplos: E013, E062, 440 VAC, ATEX, H2, PLC, SCADA, etc.
-   - Cuando agrupes elementos similares, listá los códigos entre paréntesis.
-   - Estos códigos son trazables con el proyecto real y no deben omitirse ni inventarse.
-
-   CAMPOS POR ENTRADA (EDT):
-   - numeracion: secuencial del documento (ej: "11.1", "11.2") — no del cronograma
-   - edtNombre: nombre descriptivo del EDT (puede ser el del cronograma)
-   - faseNombre: nombre completo de la fase (PLANIFICACIÓN, EJECUCIÓN, etc.)
-   - faseAbreviatura: igual a faseNombre (NO uses abreviaturas como EJEC/PROC)
-   - edtCodigo: código del EDT si aplica (CON, COM, ING, etc.), sino ""
-   - edtRefId: ID del EDT del cronograma (campo edtId de la estructura)
-   - descripcion: UNA oración técnica de ≤ 12 palabras describiendo el flujo del EDT
-
-   SUBITEMS:
-   - actividadNombre: nombre del grupo o actividad (puede ser agrupado con sus códigos)
-   - numeracion: 11.X.Y secuencial
-   - descripcion: UNA frase técnica de ≤ 10 palabras describiendo la actividad o grupo
-
-   PRESUPUESTO DE TOKENS (CRÍTICO):
-   - El JSON completo de alcanceDetallado NO debe superar 3500 palabras totales.
-   - Si superás ese límite, agrupá más EDTs o acortá descripciones.
-   - MÁXIMO 3 subItems por EDT. Solo 4-5 si son técnicamente muy distintos.
-   - Descripciones: NO párrafos. UNA oración corta y técnica.
-
-3. EPP:
+2. EPP:
    - basico: casco ANSI Z89.1-2014, lentes Z87+, zapatos dieléctricos, guantes, chaleco.
    - bioseguridad: mascarilla KN95, guantes nitrilo, alcohol gel — solo si aplica.
    - riesgoEspecifico: arnés + línea de vida si hay altura; traje contra arco si hay
      trabajo eléctrico de alta tensión; respirador si hay productos químicos.
    - Incluí norma cuando sea conocida.
 
-4. HERRAMIENTAS Y EQUIPOS:
+3. HERRAMIENTAS Y EQUIPOS:
    - equipos: maquinaria mayor (manlift, esmeril angular, taladro, roscadora, compresor).
    - herramientas: manuales (destornilladores, llaves, alicates, wincha, nivel).
    - materiales: consumibles (cintillos, cinta aislante, conduit, cable, pernos).
    - Usá cantidades cuando se infieren de la cotización.
 
-5. RESTRICCIONES:
+4. RESTRICCIONES:
    - 8-15 restricciones aplicables al tipo de trabajo.
    - Categorías: AUTORIZACION, EPP, ALTURA, ELECTRICO, ALCOHOL_DROGAS, GENERAL, CAPACITACION.
 
@@ -132,34 +92,6 @@ export const SECCIONES_CONFIG: SeccionConfig[] = [
     id: 'alcanceGeneral',
     label: 'Alcance General',
     schema: `{ "alcanceGeneral": "string — 2-4 párrafos con el alcance técnico, ubicación, cliente y compromisos contractuales" }`,
-  },
-  {
-    id: 'alcanceDetallado',
-    label: 'Alcance Detallado',
-    maxTokens: 4096,
-    // "ubicacion": "" — dejar vacío si el contexto no trae un dato real (informe §4.1).
-    // No usar un ejemplo plausible: el modelo tiende a "recordar" el patrón del ejemplo.
-    schema: `{
-  "alcanceDetallado": [
-    {
-      "numeracion": "11.1",
-      "edtNombre": "Construcción Mecánica",
-      "edtCodigo": "CON",
-      "faseNombre": "EJECUCIÓN",
-      "faseAbreviatura": "EJECUCIÓN",
-      "ubicacion": "",
-      "descripcion": "Instalación y montaje de sistemas mecánicos en planta cliente.",
-      "subItems": [
-        {
-          "numeracion": "11.1.1",
-          "actividadNombre": "Instalación de Sistemas de Extractor (E013, E062, E503, E2013, E3003)",
-          "descripcion": "Montaje e interconexión de extractores en zonas ATEX."
-        }
-      ],
-      "edtRefId": "ID del EDT del cronograma"
-    }
-  ]
-}`,
   },
   {
     id: 'eppRequeridos',

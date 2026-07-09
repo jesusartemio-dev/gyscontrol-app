@@ -8,17 +8,18 @@ import { trackUsage } from '@/lib/agente/usageTracker'
 import { isIAFeatureEnabled } from '@/lib/agente/featureFlags'
 import { cargarContextoPlanTrabajo } from '@/lib/planTrabajo/cargarContexto'
 import { adquirirLockIA, liberarLockIA } from '@/lib/planTrabajo/mutex'
-import { serializarContextoParaIA, buildDirectivaCronograma, construirBloqueHechosEtapa1 } from '@/lib/planTrabajo/contextoIA'
+import { serializarContextoParaIA, construirBloqueHechosEtapa1 } from '@/lib/planTrabajo/contextoIA'
 import { validarSeccionesPlan } from '@/lib/planTrabajo/validarSecciones'
 import { guardarSeccionParalela, recalcularCompletitud } from '@/lib/planTrabajo/guardarSecciones'
 import { RESUMEN_PROYECTO_PROMPT } from '@/lib/planTrabajo/prompts/resumirProyecto'
 import { parseJsonIA } from '@/lib/planTrabajo/parseJsonIA'
 import { etapa1Completa } from '@/lib/planTrabajo/etapas'
+import { generarAlcanceDetallado } from '@/lib/planTrabajo/generarAlcanceDetallado'
 import {
   PLAN_TRABAJO_SYSTEM_INSTRUCCIONES,
   SECCIONES_CONFIG,
 } from '@/lib/planTrabajo/prompts/generarPlan'
-import type { PlanTrabajoContexto } from '@/types/planTrabajo'
+import type { PlanTrabajoContexto, PlanPersonal } from '@/types/planTrabajo'
 
 export const maxDuration = 300
 export const dynamic = 'force-dynamic'
@@ -82,11 +83,6 @@ async function generarSeccion(
   const inicio = Date.now()
   const modelo = modeloConfig === 'haiku' ? MODELS.haiku : MODELS.sonnet
 
-  const contextoPrevio =
-    seccionId === 'alcanceDetallado' && contexto.cronograma.cronogramaSeleccionado
-      ? buildDirectivaCronograma(contexto.cronograma.cronogramaSeleccionado)
-      : ''
-
   // Reintenta 1 vez con un presupuesto de tokens mayor si la salida se trunca —
   // nunca se persiste el JSON reparado de una respuesta truncada (informe §4.4).
   const MAX_REINTENTOS_TRUNCADO = 1
@@ -107,7 +103,7 @@ async function generarSeccion(
       messages: [
         {
           role: 'user',
-          content: `RESUMEN EJECUTIVO DEL PROYECTO:\n\n${resumenProyecto}${hechosEtapa1}${contextoPrevio}\n\nGenera SOLO la sección "${label}". Devolvé ÚNICAMENTE este JSON sin markdown:\n\n${schema}`,
+          content: `RESUMEN EJECUTIVO DEL PROYECTO:\n\n${resumenProyecto}${hechosEtapa1}\n\nGenera SOLO la sección "${label}". Devolvé ÚNICAMENTE este JSON sin markdown:\n\n${schema}`,
         },
       ],
     }, { signal })
@@ -296,8 +292,52 @@ export async function POST(req: NextRequest, { params }: Ctx) {
           }
         }
 
+        // alcanceDetallado: estructura del servidor + IA solo redacta descripcion
+        // (Bloque 4 — ver generarAlcanceDetallado.ts). No usa SECCIONES_CONFIG
+        // porque su prompt y su forma de llamar a la IA son distintos (batch +
+        // individual por EDT, no un único JSON monolítico).
+        const generarYGuardarAlcanceDetallado = async () => {
+          const id = 'alcanceDetallado'
+          if (signal.aborted) return
+          send('status', { fase: `seccion-${id}`, mensaje: 'Generando Alcance Detallado...' })
+          try {
+            const personalCalculado = (planTrabajo.personalAsignado as PlanPersonal[] | null) ?? []
+            const { data: valor, advertencias: advAlcance } = await generarAlcanceDetallado(
+              contexto.cronograma.cronogramaSeleccionado,
+              personalCalculado,
+              hechosEtapa1,
+              userId,
+              proyectoId,
+              signal
+            )
+            for (const adv of advAlcance) console.warn(`[generar-ia] alcanceDetallado: ${adv}`)
+
+            const { secciones: seccionValidada, errores: erroresValidacion } = validarSeccionesPlan({ [id]: valor })
+            if (Object.keys(seccionValidada).length > 0) {
+              await guardarSeccionParalela(proyectoId, seccionValidada)
+              seccionesGuardadas.push(id)
+              send('seccion', { id, advertencias: advAlcance })
+              console.log(`[generar-ia] ${id}: guardado OK`)
+            } else {
+              const motivo = erroresValidacion[id] ?? 'validación falló'
+              seccionesConError.push(id)
+              send('seccion-error', { id, motivo })
+              console.warn(`[generar-ia] ${id}: ${motivo}`)
+            }
+          } catch (err) {
+            if (signal.aborted) return
+            const motivo = err instanceof Error ? err.message : String(err)
+            console.error(`[generar-ia] alcanceDetallado: FALLÓ — ${motivo}`)
+            seccionesConError.push(id)
+            send('seccion-error', { id, motivo })
+          }
+        }
+
         send('status', { fase: 'paralelo', mensaje: 'Redactando secciones del plan...', progreso: 10 })
-        await Promise.allSettled(SECCIONES_CONFIG.map(config => generarYGuardar(config)))
+        await Promise.allSettled([
+          ...SECCIONES_CONFIG.map(config => generarYGuardar(config)),
+          generarYGuardarAlcanceDetallado(),
+        ])
 
         // Recalcular bloquesCompletitud una sola vez al final (evita race condition)
         if (seccionesGuardadas.length > 0) {

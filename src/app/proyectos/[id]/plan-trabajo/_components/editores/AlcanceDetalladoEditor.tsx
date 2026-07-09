@@ -24,6 +24,7 @@ const edtVacio = (): PlanAlcanceDetalladoEdt => ({
   faseAbreviatura: '',
   ubicacion: '',
   descripcion: '',
+  tipoDetalle: 'resumido',
   subItems: [],
 })
 

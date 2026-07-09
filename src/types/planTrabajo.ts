@@ -10,17 +10,38 @@ export interface PlanAlcanceDetalladoSubItem {
   actividadNombre: string
   descripcion: string
   actividadRefId?: string
+  /** Imágenes adjuntas (solo EDTs/subItems de fase EJECUCIÓN) — nunca generadas por IA. */
+  imagenes?: PlanAlcanceImagen[]
+}
+
+/** {cantidad, cargo} inferido de personasEstimadas del cronograma + cargos del organigrama — nunca por IA. */
+export interface PlanPersonalRequerido {
+  cantidad: number
+  cargo: string
+}
+
+export interface PlanAlcanceImagen {
+  id: string
+  url: string
+  caption: string
+  orden: number
 }
 
 export interface PlanAlcanceDetalladoEdt {
   numeracion: string       // "11.1"
   edtNombre: string
-  edtCodigo: string        // "CON", "ING", "PLAN", etc.
+  edtCodigo: string        // "CON", "CMN", "ING", "PLAN", etc. — derivado por regla, no por IA
   faseNombre: string       // "EJECUCIÓN"
   faseAbreviatura: string  // "EJEC"
   ubicacion?: string
   descripcion: string
+  /** 'detallado' = fase EJECUCIÓN con EDT CON/CMN (máximo detalle); 'resumido' = resto (mínimo detalle). */
+  tipoDetalle: 'detallado' | 'resumido'
   subItems?: PlanAlcanceDetalladoSubItem[]
+  /** Solo en EDTs 'detallado' — nunca generado por IA. */
+  personalRequerido?: PlanPersonalRequerido[]
+  /** Imágenes adjuntas a nivel EDT (solo 'detallado') — nunca generadas por IA. */
+  imagenes?: PlanAlcanceImagen[]
   edtRefId?: string
 }
 

@@ -9,15 +9,16 @@ import { trackUsage } from '@/lib/agente/usageTracker'
 import { isIAFeatureEnabled } from '@/lib/agente/featureFlags'
 import { cargarContextoPlanTrabajo } from '@/lib/planTrabajo/cargarContexto'
 import { adquirirLockIA, liberarLockIA } from '@/lib/planTrabajo/mutex'
-import { serializarContextoParaIA, serializarEstadoActualPlan, buildDirectivaCronograma, construirBloqueHechosEtapa1 } from '@/lib/planTrabajo/contextoIA'
+import { serializarContextoParaIA, serializarEstadoActualPlan, construirBloqueHechosEtapa1 } from '@/lib/planTrabajo/contextoIA'
 import { validarSeccionIndividual } from '@/lib/planTrabajo/validarSecciones'
 import { guardarSeccionIndividual, guardarSeccionesCalculadas } from '@/lib/planTrabajo/guardarSecciones'
 import { PLAN_TRABAJO_SYSTEM_INSTRUCCIONES } from '@/lib/planTrabajo/prompts/generarPlan'
 import { buildPromptRegeneracion } from '@/lib/planTrabajo/prompts/regenerarSeccion'
 import { parseJsonIA } from '@/lib/planTrabajo/parseJsonIA'
 import { calcularDatosEtapa1 } from '@/lib/planTrabajo/calcularDatos'
+import { generarAlcanceDetallado } from '@/lib/planTrabajo/generarAlcanceDetallado'
 import { esSeccionEtapa1, etapa1Completa } from '@/lib/planTrabajo/etapas'
-import type { SeccionRegenerable } from '@/types/planTrabajo'
+import type { SeccionRegenerable, PlanPersonal } from '@/types/planTrabajo'
 
 export const maxDuration = 300
 export const dynamic = 'force-dynamic'
@@ -46,9 +47,8 @@ const bodySchema = z.object({
 
 // ─── Helper — Etapa 2 (redacción IA) ───────────────────────────────────────
 
-const MAX_TOKENS_POR_SECCION: Partial<Record<SeccionRegenerable, number>> = {
-  alcanceDetallado: 16000,
-}
+// alcanceDetallado no usa este mapa — tiene su propio flujo (ver generarAlcanceDetallado.ts).
+const MAX_TOKENS_POR_SECCION: Partial<Record<SeccionRegenerable, number>> = {}
 
 async function ejecutarSonnetRegeneracion(
   contextoSerializado: string,
@@ -57,8 +57,7 @@ async function ejecutarSonnetRegeneracion(
   seccion: SeccionRegenerable,
   instruccionesAdicionales: string | undefined,
   proyectoId: string,
-  userId: string,
-  directivaExtra = ''
+  userId: string
 ): Promise<unknown> {
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const inicio = Date.now()
@@ -71,7 +70,6 @@ async function ejecutarSonnetRegeneracion(
     '=== CONTEXTO DEL PROYECTO ===',
     contextoSerializado,
     hechosEtapa1,
-    ...(directivaExtra ? ['', directivaExtra] : []),
     '',
     '=== SECCIONES RELEVANTES DEL PLAN ACTUAL ===',
     estadoRelevante,
@@ -275,15 +273,36 @@ export async function POST(req: NextRequest, { params }: Ctx) {
           return
         }
 
-        const contextoSerializado = serializarContextoParaIA(contexto)
-        const estadoRelevante = serializarEstadoActualPlan(planActual, seccion)
         const hechosEtapa1 = construirBloqueHechosEtapa1(planActual)
 
-        // Para alcanceDetallado: inyectar la directiva estructurada del cronograma
-        const directivaCronograma =
-          seccion === 'alcanceDetallado' && contexto.cronograma.cronogramaSeleccionado
-            ? buildDirectivaCronograma(contexto.cronograma.cronogramaSeleccionado)
-            : ''
+        // alcanceDetallado: estructura del servidor + IA solo redacta descripcion
+        // (Bloque 4 — mismo flujo que generar-ia, ver generarAlcanceDetallado.ts).
+        if (seccion === 'alcanceDetallado') {
+          send('status', { fase: 'generando', mensaje: 'Generando Alcance Detallado...' })
+          const personalCalculado = (planActual.personalAsignado as PlanPersonal[] | null) ?? []
+          const { data, advertencias } = await generarAlcanceDetallado(
+            contexto.cronograma.cronogramaSeleccionado,
+            personalCalculado,
+            hechosEtapa1,
+            userId,
+            proyectoId
+          )
+
+          send('status', { fase: 'validacion', mensaje: 'Validando estructura del resultado...' })
+          const { data: validado, error } = validarSeccionIndividual(seccion, { alcanceDetallado: data })
+          if (error) {
+            send('error', { mensaje: `Validación fallida para "${seccion}": ${error}` })
+            return
+          }
+
+          send('status', { fase: 'persistencia', mensaje: 'Guardando sección validada...' })
+          await guardarSeccionIndividual(proyectoId, seccion, validado)
+          send('done', { seccionGuardada: seccion, advertencias })
+          return
+        }
+
+        const contextoSerializado = serializarContextoParaIA(contexto)
+        const estadoRelevante = serializarEstadoActualPlan(planActual, seccion)
 
         send('status', {
           fase: 'generando',
@@ -296,8 +315,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
           seccion,
           instruccionesAdicionales,
           proyectoId,
-          userId,
-          directivaCronograma
+          userId
         )
 
         send('status', { fase: 'validacion', mensaje: 'Validando estructura del resultado...' })

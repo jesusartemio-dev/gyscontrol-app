@@ -16,12 +16,26 @@ export const planAlcanceItemSchema = z.object({
   edtRefId: z.string().optional(),
 })
 
+// ─── Imágenes por EDT/subItem (Bloque 4 — nunca generadas por IA) ───
+export const planAlcanceImagenSchema = z.object({
+  id: z.string().min(1),
+  url: z.string().min(1),
+  caption: z.string().default(''),
+  orden: z.number().default(0),
+})
+
+export const planPersonalRequeridoSchema = z.object({
+  cantidad: z.number().min(0),
+  cargo: z.string().min(1),
+})
+
 // ─── Nuevo formato (basado en EDTs del cronograma de planificación) ───
 export const planAlcanceDetalladoSubItemSchema = z.object({
   numeracion: z.string().min(1),
   actividadNombre: z.string().min(1),
   descripcion: z.string().min(60),
   actividadRefId: z.string().optional(),
+  imagenes: z.array(planAlcanceImagenSchema).optional(),
 })
 
 export const planAlcanceDetalladoEdtSchema = z.object({
@@ -32,7 +46,10 @@ export const planAlcanceDetalladoEdtSchema = z.object({
   faseAbreviatura: z.string().min(1),
   ubicacion: z.string().optional(),
   descripcion: z.string().min(60),
+  tipoDetalle: z.enum(['detallado', 'resumido']).default('resumido'),
   subItems: z.array(planAlcanceDetalladoSubItemSchema).optional(),
+  personalRequerido: z.array(planPersonalRequeridoSchema).optional(),
+  imagenes: z.array(planAlcanceImagenSchema).optional(),
   edtRefId: z.string().optional(),
 })
 
