@@ -18,6 +18,9 @@ import { calcularTotalHH } from './calcularDatos'
 
 type ProyectoConCliente = Proyecto & { cliente: Cliente | null }
 
+/** Default configurable (addendum C.3) — se usa solo si el plan no tiene numeroConsultor propio. */
+const NUMERO_CONSULTOR_DEFAULT = process.env.PLAN_TRABAJO_NUMERO_CONSULTOR_DEFAULT ?? ''
+
 export interface ConstruirDataBagOpciones {
   plan: PlanTrabajo
   proyecto: ProyectoConCliente
@@ -45,6 +48,27 @@ function derivarCodigo(codigoDocumento: string, prefijo: 'OR-' | 'CR-'): string 
 
 function construirDetalleMeses(meses: string[], valoresPorMes: number[]): string {
   return meses.map((mes, i) => `${mes}: ${valoresPorMes[i] ?? 0}`).join(' · ')
+}
+
+/** trim + minúsculas + sin tildes — para comparar nombres sin que mayúsculas/acentos los dupliquen (addendum C.1). */
+function normalizarNombre(nombre: string): string {
+  return nombre
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+}
+
+/** Si el nombre viene todo en mayúsculas (o sin ninguna minúscula), lo convierte a Title Case (addendum C — typo de origen no se corrige, solo se normaliza el render). */
+function toTitleCase(nombre: string): string {
+  if (!/[a-záéíóúñ]/.test(nombre)) {
+    return nombre
+      .toLowerCase()
+      .split(/\s+/)
+      .map(palabra => (palabra ? palabra[0].toUpperCase() + palabra.slice(1) : palabra))
+      .join(' ')
+  }
+  return nombre
 }
 
 interface FilaRevision {
@@ -100,14 +124,58 @@ function construirRevisiones(
   return historicas
 }
 
-function construirFirmantes(revisiones: FilaRevision[]): { siglas: string; nombre: string }[] {
-  const nombres = new Set<string>()
+interface Firmante {
+  nombre: string
+  siglas: string
+}
+
+/**
+ * Firmantes únicos para la leyenda de la carátula, deduplicados por nombre
+ * normalizado (trim + minúsculas + sin tildes) — antes "JESUS MAMANI" y
+ * "Jesus Mamani" salían como dos firmantes distintos (addendum C.1).
+ * Se queda con la PRIMERA forma vista, renderizada en Title Case si venía
+ * toda en mayúsculas (addendum C.4 — no corrige typos de origen, solo el render).
+ */
+function construirFirmantes(revisiones: FilaRevision[]): Firmante[] {
+  const porClaveNormalizada = new Map<string, string>()
   for (const r of revisiones) {
-    for (const nombre of [r.des, r.ver, r.apr, r.aut]) {
-      if (nombre && nombre.trim()) nombres.add(nombre.trim())
+    for (const nombreCrudo of [r.des, r.ver, r.apr, r.aut]) {
+      if (!nombreCrudo || !nombreCrudo.trim()) continue
+      const clave = normalizarNombre(nombreCrudo)
+      if (!porClaveNormalizada.has(clave)) {
+        porClaveNormalizada.set(clave, toTitleCase(nombreCrudo.trim()))
+      }
     }
   }
-  return Array.from(nombres).map(nombre => ({ nombre, siglas: calcularSiglasBase(nombre) }))
+  const crudos: Firmante[] = Array.from(porClaveNormalizada.values()).map(nombre => ({
+    nombre,
+    siglas: calcularSiglasBase(nombre),
+  }))
+  return deduplicarSiglas(crudos)
+}
+
+/** Sigla del firmante deduplicado que corresponde a un nombre crudo (comparación normalizada). */
+function siglaDeNombre(nombreCrudo: string, firmantes: Firmante[]): string {
+  if (!nombreCrudo || !nombreCrudo.trim()) return ''
+  const clave = normalizarNombre(nombreCrudo)
+  const encontrado = firmantes.find(f => normalizarNombre(f.nombre) === clave)
+  return encontrado?.siglas ?? calcularSiglasBase(nombreCrudo)
+}
+
+/**
+ * Las columnas Des./Ver./Apr./Aut. de la tabla de revisiones de la carátula
+ * muestran SIGLAS (formato Nexa), no nombres completos — los nombres completos
+ * van solo en la leyenda de firmantes (addendum C.2). Aut. sin dato → "-",
+ * nunca vacía (addendum C.4).
+ */
+function revisionesConSiglas(revisiones: FilaRevision[], firmantes: Firmante[]): FilaRevision[] {
+  return revisiones.map(r => ({
+    ...r,
+    des: siglaDeNombre(r.des, firmantes) || '-',
+    ver: siglaDeNombre(r.ver, firmantes) || '-',
+    apr: siglaDeNombre(r.apr, firmantes) || '-',
+    aut: siglaDeNombre(r.aut, firmantes) || '-',
+  }))
 }
 
 export function construirDataBag({
@@ -130,6 +198,7 @@ export function construirDataBag({
   const codigoDocumento = plan.codigoDocumento ?? ''
   const revisiones = construirRevisiones(plan, generaciones)
   const firmantes = construirFirmantes(revisiones)
+  const revisionesParaTemplate = revisionesConSiglas(revisiones, firmantes)
 
   const personalMapeado = deduplicarSiglas(
     personal.map(p => ({ nombre: p.nombre, siglas: p.siglas, empresa: p.empresa ?? '', cargo: p.cargo }))
@@ -147,14 +216,15 @@ export function construirDataBag({
     nombreProyecto: proyecto.nombre,
     proyectoNombre: proyecto.nombre, // alias retrocompatible
     codigoDocumento,
-    numeroConsultor: plan.numeroConsultor ?? '',
+    numeroConsultor: plan.numeroConsultor ?? NUMERO_CONSULTOR_DEFAULT,
     revision: plan.numeroRevision ?? 'A',
     numeroRevision: plan.numeroRevision ?? 'A', // alias retrocompatible
     tipoEmision: plan.tipoEmision ?? '',
     fechaEmision: fmtDate(plan.fechaEmision ?? new Date()),
     etapa: proyecto.estado ?? '',
 
-    revisiones,
+    // {#revisiones}: Des./Ver./Apr./Aut. en siglas (formato Nexa) — nombres completos van en {firmantes}
+    revisiones: revisionesParaTemplate,
     firmantes,
 
     // Firmantes individuales (retrocompat con la cabecera actual)

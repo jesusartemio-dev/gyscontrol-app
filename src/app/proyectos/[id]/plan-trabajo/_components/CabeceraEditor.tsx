@@ -26,6 +26,7 @@ type FormState = {
   codigoDocumento: string
   numeroRevision: string
   tipoEmision: string
+  numeroConsultor: string
   preparadoPor: string
   preparadoCargo: string
   revisadoPor: string
@@ -51,6 +52,7 @@ export function CabeceraEditor({ proyectoId, plan, onUpdated }: Props) {
       codigoDocumento: plan.codigoDocumento ?? '',
       numeroRevision: plan.numeroRevision ?? 'A',
       tipoEmision: plan.tipoEmision ?? 'B - Para Revisión',
+      numeroConsultor: p.numeroConsultor ?? '',
       preparadoPor:    p.preparadoPor    || userName,
       preparadoCargo:  p.preparadoCargo  || 'Ing. de Proyectos',
       revisadoPor:     p.revisadoPor     || '',
@@ -151,6 +153,10 @@ export function CabeceraEditor({ proyectoId, plan, onUpdated }: Props) {
                 </select>
               </div>
             </div>
+            <div>
+              <Label className="text-xs">N° Consultor</Label>
+              <Input value={form.numeroConsultor} onChange={set('numeroConsultor')} className="h-8 text-sm" placeholder="Ej: 1092538" />
+            </div>
           </div>
 
           {/* Firmantes */}
@@ -181,6 +187,7 @@ export function CabeceraEditor({ proyectoId, plan, onUpdated }: Props) {
             <Row label="Código" value={plan.codigoDocumento} />
             <Row label="Revisión" value={plan.numeroRevision} mono />
             <Row label="Tipo emisión" value={plan.tipoEmision} />
+            <Row label="N° Consultor" value={p.numeroConsultor} />
           </div>
 
           {/* Firmantes — vista */}
