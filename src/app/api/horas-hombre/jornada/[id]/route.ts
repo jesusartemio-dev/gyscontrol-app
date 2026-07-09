@@ -197,7 +197,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       select: {
         id: true,
         estado: true,
-        supervisorId: true
+        supervisorId: true,
+        proyectoId: true
       }
     })
 
@@ -232,6 +233,35 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       if (body[field] !== undefined) {
         updateData[field] = body[field]
       }
+    }
+
+    // proyectoEdtId: solo si la jornada aún no tiene uno asignado (evita que se
+    // reasigne un EDT ya usado por tareas ya agregadas), y validando que el EDT
+    // pertenezca al mismo proyecto de la jornada.
+    if (body.proyectoEdtId !== undefined) {
+      const jornadaConEdt = await prisma.registroHorasCampo.findUnique({
+        where: { id: jornadaId },
+        select: { proyectoEdtId: true }
+      })
+      if (jornadaConEdt?.proyectoEdtId) {
+        return NextResponse.json(
+          { error: 'Esta jornada ya tiene un EDT asignado' },
+          { status: 400 }
+        )
+      }
+      if (body.proyectoEdtId) {
+        const edt = await prisma.proyectoEdt.findUnique({
+          where: { id: body.proyectoEdtId },
+          select: { id: true, proyectoId: true }
+        })
+        if (!edt || edt.proyectoId !== jornada.proyectoId) {
+          return NextResponse.json(
+            { error: 'EDT no válido para el proyecto de esta jornada' },
+            { status: 400 }
+          )
+        }
+      }
+      updateData.proyectoEdtId = body.proyectoEdtId || null
     }
 
     // Fecha de trabajo: parsear como fecha local (sin desfase UTC)

@@ -134,6 +134,7 @@ export function AgregarTareaModal({
       setExtraResponsableId('')
       setMiembrosSeleccionados([])
       setEdtLocal('')
+      setErrorEdts(null)
       setActividades([])
       setActividadId('')
       // Si la jornada no tiene EDT, cargar los EDT del proyecto para elegir uno.
@@ -176,11 +177,37 @@ export function AgregarTareaModal({
     }
   }
 
+  const [errorEdts, setErrorEdts] = useState<string | null>(null)
+
+  // Persiste el EDT elegido en la jornada de inmediato (no depende de llegar a
+  // enviar una tarea): así, si el usuario tiene que elegirlo manualmente porque
+  // la auto-selección falló, queda guardado igual.
+  const persistirEdt = async (edtId: string) => {
+    try {
+      await fetch(`/api/horas-hombre/jornada/${jornadaId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ proyectoEdtId: edtId })
+      })
+    } catch (error) {
+      console.error('Error guardando EDT en la jornada:', error)
+    }
+  }
+
+  const seleccionarEdtLocal = (edtId: string) => {
+    setEdtLocal(edtId)
+    if (edtId) persistirEdt(edtId)
+  }
+
   // EDTs de ejecución del proyecto (para elegir cuando la jornada no tiene uno).
   const cargarEdts = async () => {
     try {
+      setErrorEdts(null)
       const response = await fetch(`/api/proyecto-edt?proyectoId=${proyectoId}&tipoCronograma=ejecucion`)
-      if (!response.ok) return
+      if (!response.ok) {
+        setErrorEdts('No se pudo cargar la lista de EDT. Intenta recargar la página.')
+        return
+      }
       const data = await response.json()
       const lista: EdtOpcion[] = Array.isArray(data) ? data : []
       // Dedupe por nombre, igual que el formulario manual de jornada.
@@ -191,11 +218,16 @@ export function AgregarTareaModal({
         return true
       })
       setEdts(unicos)
+      if (unicos.length === 0) {
+        setErrorEdts('Este proyecto no tiene EDT de ejecución configurados.')
+        return
+      }
       // Preseleccionar el EDT de Construcción ("CON…") si existe, como el manual.
       const con = unicos.find((e) => e.edt?.nombre?.toUpperCase().startsWith('CON'))
-      if (con) setEdtLocal(con.id)
+      if (con) seleccionarEdtLocal(con.id)
     } catch (error) {
       console.error('Error cargando EDTs:', error)
+      setErrorEdts('No se pudo cargar la lista de EDT. Intenta recargar la página.')
     }
   }
 
@@ -353,7 +385,7 @@ export function AgregarTareaModal({
                 edts.length > 0 ? (
                   <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2">
                     <Label className="text-xs text-gray-600 shrink-0 sm:w-16">EDT</Label>
-                    <Select value={edtLocal} onValueChange={setEdtLocal}>
+                    <Select value={edtLocal} onValueChange={seleccionarEdtLocal}>
                       <SelectTrigger className="h-auto min-h-8 py-1 !whitespace-normal [&_[data-slot=select-value]]:!line-clamp-2 text-sm flex-1">
                         <SelectValue placeholder="Seleccionar EDT" />
                       </SelectTrigger>
@@ -365,6 +397,10 @@ export function AgregarTareaModal({
                         ))}
                       </SelectContent>
                     </Select>
+                  </div>
+                ) : errorEdts ? (
+                  <div className="text-center text-amber-600 text-xs py-3">
+                    {errorEdts}
                   </div>
                 ) : (
                   <div className="text-center text-gray-500 text-xs py-3">
