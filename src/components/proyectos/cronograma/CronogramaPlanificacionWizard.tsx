@@ -103,7 +103,10 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
         toast({ title: 'Error cargando el contexto del wizard', variant: 'destructive' })
       })
       .finally(() => setCargandoContexto(false))
-  }, [open, proyectoId, toast])
+    // toast (useToast) no está memoizado: cambia de referencia en cada render, así que
+    // incluirlo aquí reintroduce el loop infinito (efecto -> setState -> re-render -> nuevo
+    // toast -> efecto de nuevo) que rompió producción — no agregarlo a este array.
+  }, [open, proyectoId])
 
   function toggleEdt(id: string) {
     setEdtsSeleccionados(prev => {
