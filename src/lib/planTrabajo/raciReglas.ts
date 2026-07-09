@@ -33,11 +33,17 @@ export function esEdtDeSeguridad(nombreEdt: string): boolean {
   return /segur/i.test(nombreEdt)
 }
 
+/** El EDT cuyo nombre refiere a planos/dibujo/documentación — usado para darle R (no solo I) al Cadista ahí. */
+export function esEdtDeDocumentacion(nombreEdt: string): boolean {
+  return /plano|dibujo|documentaci/i.test(nombreEdt)
+}
+
 export interface ContextoRolRaci {
   cargoLabel: string
   tipoEdt: TipoEdt
   esResponsableDelEdt: boolean
   esEdtDeSeguridad: boolean
+  esEdtDeDocumentacion: boolean
 }
 
 interface ReglaRaci {
@@ -71,6 +77,7 @@ export function prioridadAprobador(cargoLabel: string): number {
  *   Técnico*                                 → R en el EDT del que es responsable o en
  *                                              cualquier EDT de campo (fallback si el
  *                                              cronograma no tiene responsableId cargado), I en el resto
+ *   Cadista* / Dibujante* / CAD              → R en EDTs de planos/dibujo/documentación, I en el resto
  *   Comercial* / Logístic*                   → I en todo
  * Cargos que no matchean ninguna regla → I en todo + advertencia (ver calcularDatos.ts).
  *
@@ -87,6 +94,7 @@ export const REGLAS_RACI_CARGO: ReglaRaci[] = [
   { patron: /residente/i, calcular: ctx => (ctx.tipoEdt === 'campo' ? 'R' : 'C') },
   { patron: /(supervisor|construcci[oó]n)/i, calcular: ctx => (ctx.tipoEdt === 'campo' ? 'R' : 'I') },
   { patron: /t[eé]cnico/i, calcular: ctx => (ctx.esResponsableDelEdt || ctx.tipoEdt === 'campo' ? 'R' : 'I') },
+  { patron: /cadista|dibujante|cad\b/i, calcular: ctx => (ctx.esEdtDeDocumentacion ? 'R' : 'I') },
   { patron: /(comercial|log[ií]stic)/i, calcular: () => 'I' },
 ]
 

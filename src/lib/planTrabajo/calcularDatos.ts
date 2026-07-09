@@ -11,7 +11,7 @@ import type {
   CronogramaContexto,
 } from '@/types/planTrabajo'
 import { deduplicarSiglas, calcularSiglasBase } from './siglas'
-import { calcularRolRaci, clasificarTipoEdt, esEdtDeSeguridad, prioridadAprobador } from './raciReglas'
+import { calcularRolRaci, clasificarTipoEdt, esEdtDeSeguridad, esEdtDeDocumentacion, prioridadAprobador } from './raciReglas'
 import { REFERENCIAS_BASE } from './referenciasBase'
 
 /**
@@ -142,6 +142,7 @@ export function calcularMatrizRaci(
   const filas = edts.map(edt => {
     const tipoEdt = clasificarTipoEdt(edt.nombre)
     const esSeguridad = esEdtDeSeguridad(edt.nombre)
+    const esDocumentacion = esEdtDeDocumentacion(edt.nombre)
 
     const asignacionesConCargo = personal.map(p => {
       const rol = calcularRolRaci({
@@ -149,6 +150,7 @@ export function calcularMatrizRaci(
         tipoEdt,
         esResponsableDelEdt: edt.responsableId === p.userId,
         esEdtDeSeguridad: esSeguridad,
+        esEdtDeDocumentacion: esDocumentacion,
       })
       if (rol === null) {
         cargosNoMapeados.add(p.cargo)
