@@ -67,10 +67,18 @@ export default function CatalogoServicioTable({ data, onUpdate, onDelete }: Prop
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const [filtroCategoria, setFiltroCategoria] = useState('__ALL__')
-  const [filtroUnidad, setFiltroUnidad] = useState('__ALL__')
-  const [filtroRecurso, setFiltroRecurso] = useState('__ALL__')
-  const [filtroTexto, setFiltroTexto] = useState('')
+  const [savedFiltros] = useState<Record<string, string>>(() => {
+    try {
+      const s = localStorage.getItem('gyscontrol:catalogo-servicios:filtros')
+      return s ? JSON.parse(s) : {}
+    } catch {
+      return {}
+    }
+  })
+  const [filtroCategoria, setFiltroCategoria] = useState(savedFiltros.filtroCategoria ?? '__ALL__')
+  const [filtroUnidad, setFiltroUnidad] = useState(savedFiltros.filtroUnidad ?? '__ALL__')
+  const [filtroRecurso, setFiltroRecurso] = useState(savedFiltros.filtroRecurso ?? '__ALL__')
+  const [filtroTexto, setFiltroTexto] = useState(savedFiltros.filtroTexto ?? '')
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editData, setEditData] = useState<Partial<CatalogoServicio>>({})
@@ -82,6 +90,16 @@ export default function CatalogoServicioTable({ data, onUpdate, onDelete }: Prop
   useEffect(() => {
     setServicios(data)
   }, [data])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('gyscontrol:catalogo-servicios:filtros', JSON.stringify({
+        filtroCategoria, filtroUnidad, filtroRecurso, filtroTexto,
+      }))
+    } catch {
+      // localStorage no disponible (modo privado, etc.) - se ignora
+    }
+  }, [filtroCategoria, filtroUnidad, filtroRecurso, filtroTexto])
 
   useEffect(() => {
     const loadData = async () => {
