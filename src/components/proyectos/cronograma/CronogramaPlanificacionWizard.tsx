@@ -70,6 +70,7 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
   const [generandoPaso1, setGenerandoPaso1] = useState(false)
   const [guardandoPaso2, setGuardandoPaso2] = useState(false)
   const [generandoIA, setGenerandoIA] = useState(false)
+  const [aplicandoCronograma, setAplicandoCronograma] = useState(false)
   const [generacionId, setGeneracionId] = useState<string | null>(null)
   const [actividades, setActividades] = useState<ActividadPropuesta[]>([])
   const [advertencias, setAdvertencias] = useState<string[]>([])
@@ -135,11 +136,11 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
 
   function puedeAvanzar() {
     if (pasoActual === 1) return edtsSeleccionados.size > 0 && !generandoPaso1
-    if (pasoActual === 2) return actividades.length > 0 && !guardandoPaso2 && !generandoIA
+    if (pasoActual === 2) return actividades.length > 0 && !guardandoPaso2 && !generandoIA && !aplicandoCronograma
     return false
   }
   function puedeRetroceder() {
-    return pasoActual > 1 && !generandoPaso1 && !guardandoPaso2 && !generandoIA
+    return pasoActual > 1 && !generandoPaso1 && !guardandoPaso2 && !generandoIA && !aplicandoCronograma
   }
 
   async function generarPropuesta() {
@@ -180,26 +181,57 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
     }
   }
 
+  async function guardarActividades(): Promise<boolean> {
+    if (!generacionId) return false
+    const res = await fetch(`/api/proyectos/${proyectoId}/cronograma/planificacion/wizard/${generacionId}/actividades`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(actividades),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.error || 'Error guardando el borrador')
+    }
+    return true
+  }
+
   async function guardarBorrador() {
-    if (!generacionId) return
     setGuardandoPaso2(true)
     try {
-      const res = await fetch(`/api/proyectos/${proyectoId}/cronograma/planificacion/wizard/${generacionId}/actividades`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(actividades),
-      })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.error || 'Error guardando el borrador')
-      }
-      toast({ title: 'Borrador guardado', description: 'La generación del cronograma real estará disponible próximamente.' })
+      await guardarActividades()
+      toast({ title: 'Borrador guardado', description: 'Podrás retomarlo y aplicarlo al cronograma más tarde.' })
       onSuccess?.()
       onOpenChange(false)
     } catch (e) {
       toast({ title: e instanceof Error ? e.message : 'Error inesperado', variant: 'destructive' })
     } finally {
       setGuardandoPaso2(false)
+    }
+  }
+
+  async function aplicarCronograma() {
+    if (!generacionId) return
+    setAplicandoCronograma(true)
+    try {
+      await guardarActividades()
+      const res = await fetch(`/api/proyectos/${proyectoId}/cronograma/planificacion/wizard/${generacionId}/generar`, {
+        method: 'POST',
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Error aplicando el cronograma')
+      }
+      const data = await res.json()
+      toast({
+        title: 'Cronograma generado',
+        description: `${data.resultado.fasesCreadas} fases, ${data.resultado.edtsCreados} EDTs, ${data.resultado.actividadesCreadas} actividades, ${data.resultado.tareasCreadas} tareas.`,
+      })
+      onSuccess?.()
+      onOpenChange(false)
+    } catch (e) {
+      toast({ title: e instanceof Error ? e.message : 'Error inesperado', variant: 'destructive' })
+    } finally {
+      setAplicandoCronograma(false)
     }
   }
 
@@ -218,7 +250,7 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
       setActividades(data.propuestaActividades)
       setAdvertencias(data.advertencias ?? [])
       setEdtsPendientesIA([])
-      toast({ title: 'Propuesta de IA generada', description: 'Revisa y edita las zonas/familias antes de guardar.' })
+      toast({ title: 'Propuesta de IA generada', description: 'Revisa y edita las zonas/familias antes de aplicar.' })
     } catch (e) {
       toast({ title: e instanceof Error ? e.message : 'Error inesperado', variant: 'destructive' })
     } finally {
@@ -229,10 +261,6 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
   function avanzarPaso() {
     if (pasoActual === 1) {
       generarPropuesta()
-      return
-    }
-    if (pasoActual === 2) {
-      guardarBorrador()
     }
   }
 
@@ -510,13 +538,22 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
             )}
           </Button>
         ) : (
-          <Button size="sm" onClick={avanzarPaso} disabled={!puedeAvanzar()} className="bg-green-600 hover:bg-green-700">
-            {guardandoPaso2 ? (
-              <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Guardando...</>
-            ) : (
-              <>Guardar borrador</>
-            )}
-          </Button>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={guardarBorrador} disabled={!puedeAvanzar()}>
+              {guardandoPaso2 ? (
+                <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Guardando...</>
+              ) : (
+                <>Guardar borrador</>
+              )}
+            </Button>
+            <Button size="sm" onClick={aplicarCronograma} disabled={!puedeAvanzar()} className="bg-green-600 hover:bg-green-700">
+              {aplicandoCronograma ? (
+                <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Aplicando...</>
+              ) : (
+                <>Aplicar al Cronograma</>
+              )}
+            </Button>
+          </div>
         )}
       </div>
     </div>
