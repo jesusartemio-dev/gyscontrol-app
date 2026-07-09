@@ -69,6 +69,7 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
 
   const [generandoPaso1, setGenerandoPaso1] = useState(false)
   const [guardandoPaso2, setGuardandoPaso2] = useState(false)
+  const [generandoIA, setGenerandoIA] = useState(false)
   const [generacionId, setGeneracionId] = useState<string | null>(null)
   const [actividades, setActividades] = useState<ActividadPropuesta[]>([])
   const [advertencias, setAdvertencias] = useState<string[]>([])
@@ -134,11 +135,11 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
 
   function puedeAvanzar() {
     if (pasoActual === 1) return edtsSeleccionados.size > 0 && !generandoPaso1
-    if (pasoActual === 2) return actividades.length > 0 && !guardandoPaso2
+    if (pasoActual === 2) return actividades.length > 0 && !guardandoPaso2 && !generandoIA
     return false
   }
   function puedeRetroceder() {
-    return pasoActual > 1 && !generandoPaso1 && !guardandoPaso2
+    return pasoActual > 1 && !generandoPaso1 && !guardandoPaso2 && !generandoIA
   }
 
   async function generarPropuesta() {
@@ -199,6 +200,29 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
       toast({ title: e instanceof Error ? e.message : 'Error inesperado', variant: 'destructive' })
     } finally {
       setGuardandoPaso2(false)
+    }
+  }
+
+  async function generarConIA() {
+    if (!generacionId) return
+    setGenerandoIA(true)
+    try {
+      const res = await fetch(`/api/proyectos/${proyectoId}/cronograma/planificacion/wizard/${generacionId}/proponer-actividades-ia`, {
+        method: 'POST',
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Error generando la propuesta de IA')
+      }
+      const data = await res.json()
+      setActividades(data.propuestaActividades)
+      setAdvertencias(data.advertencias ?? [])
+      setEdtsPendientesIA([])
+      toast({ title: 'Propuesta de IA generada', description: 'Revisa y edita las zonas/familias antes de guardar.' })
+    } catch (e) {
+      toast({ title: e instanceof Error ? e.message : 'Error inesperado', variant: 'destructive' })
+    } finally {
+      setGenerandoIA(false)
     }
   }
 
@@ -382,9 +406,18 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
         {edtsPendientesIA.length > 0 && (
           <Alert>
             <Sparkles className="h-4 w-4" />
-            <AlertDescription>
-              {edtsPendientesIA.map(e => e.nombre).join(', ')} requiere{edtsPendientesIA.length > 1 ? 'n' : ''} propuesta
-              de IA (zonas / familias) — disponible próximamente.
+            <AlertDescription className="flex items-center justify-between gap-3">
+              <span>
+                {edtsPendientesIA.map(e => e.nombre).join(', ')} requiere{edtsPendientesIA.length > 1 ? 'n' : ''} una
+                propuesta de zonas/familias con IA antes de guardar.
+              </span>
+              <Button size="sm" onClick={generarConIA} disabled={generandoIA} className="shrink-0">
+                {generandoIA ? (
+                  <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Generando...</>
+                ) : (
+                  <><Sparkles className="h-4 w-4 mr-1" />Generar con IA</>
+                )}
+              </Button>
             </AlertDescription>
           </Alert>
         )}
