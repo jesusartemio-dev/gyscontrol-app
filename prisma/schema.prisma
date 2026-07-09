@@ -1158,6 +1158,7 @@ model Proyecto {
   contactosCliente           ProyectoContactoCliente[]
   matrizComunicacion         MatrizComunicacion?
   tdrAnalisis                ProyectoTdrAnalisis?
+  cotizacionDocumento        ProyectoCotizacionDocumento?
   planTrabajo                PlanTrabajo?
   iperc                      Iperc?
   mpp                        Mpp?
@@ -5536,6 +5537,50 @@ model ProyectoTdrAnalisis {
   updatedAt DateTime @updatedAt
 
   @@map("proyecto_tdr_analisis")
+}
+
+model ProyectoCotizacionDocumento {
+  id         String   @id @default(cuid())
+  proyectoId String   @unique
+  proyecto   Proyecto @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+
+  // Metadata de archivo (Google Drive)
+  nombreArchivo String
+  driveFileId   String?
+  urlArchivo    String
+  tamanoBytes   Int?
+  paginasPdf    Int?
+
+  // Extracción IA — cabecera
+  numeroPropuesta     String?
+  clienteDetectado    String?
+  moneda              String?   @default("USD")
+  fechaPropuesta      DateTime?
+  confianzaExtraccion String?
+
+  // Extracción IA — totales (montos "cliente", comparables contra lo cobrado al cliente)
+  totalEquiposExtraido       Float?
+  totalServiciosExtraido     Float?
+  totalGastosExtraido        Float?
+  descuentoExtraido          Float?
+  grandTotalExtraido         Float?
+  grandTotalIncluyeImpuestos Boolean?
+
+  // Extracción IA — cualitativo
+  resumenAlcance         Json? // string[]
+  exclusiones            Json? // string[]
+  lineasClasificadas     Json? // [{descripcion, monto, categoria, seccionOriginalDocumento}]
+  advertenciasExtraccion Json? // string[]
+
+  // Última verificación (snapshot persistido)
+  diffSnapshot       Json?
+  estadoVerificacion String? // 'coincide' | 'no_coincide' | 'sin_verificar'
+  fechaVerificacion  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("proyecto_cotizacion_documento")
 }
 
 // ============================================

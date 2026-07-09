@@ -25,6 +25,7 @@ import {
   Settings2,
   FileUp,
   Download,
+  FileCheck,
 } from 'lucide-react'
 import {
   BarChart,
@@ -99,6 +100,7 @@ interface IAFeatureFlags {
   pets: boolean
   mpp: boolean
   importarValorizacionIA: boolean
+  verificarCotizacionProyecto: boolean
 }
 
 const FEATURE_DEFS: { key: keyof IAFeatureFlags; label: string; desc: string; icon: React.ElementType }[] = [
@@ -115,6 +117,7 @@ const FEATURE_DEFS: { key: keyof IAFeatureFlags; label: string; desc: string; ic
   { key: 'pets', label: 'PETS', desc: 'Generacion y regeneracion granular de etapas y pasos del PETS con IA', icon: ShieldCheck },
   { key: 'mpp', label: 'MPP', desc: 'Generacion de la Matriz de Proteccion Personal (MPP) con IA usando el IPERC', icon: FileSpreadsheet },
   { key: 'importarValorizacionIA', label: 'Importar Valorización con IA', desc: 'Interpretación automática de documentos de valorización del cliente para crear o verificar valorizaciones', icon: FileSpreadsheet },
+  { key: 'verificarCotizacionProyecto', label: 'Verificar Cotización de Proyecto', desc: 'Extracción y verificación de totales de la Propuesta Económica origen contra costos reales del proyecto', icon: FileCheck },
 ]
 
 const MONTH_NAMES = [

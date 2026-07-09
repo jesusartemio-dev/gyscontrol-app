@@ -43,6 +43,7 @@ export async function PUT(request: NextRequest) {
     'pets',
     'mpp',
     'importarValorizacionIA',
+    'verificarCotizacionProyecto',
   ]
 
   // Only allow known boolean keys

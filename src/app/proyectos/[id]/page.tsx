@@ -32,6 +32,7 @@ import {
   MessageSquare,
   FileText,
   BookOpen,
+  FileCheck,
 } from 'lucide-react'
 
 import { Card, CardContent } from '@/components/ui/card'
@@ -213,6 +214,17 @@ export default function ProyectoHubPage() {
     fetch(`/api/proyectos/${proyecto.id}/condiciones-exclusiones`)
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data) setCondExcl(data) })
+      .catch(() => {})
+  }, [proyecto?.id])
+
+  // Estado de verificación de la cotización origen (para el badge del card)
+  const [cotizacionDoc, setCotizacionDoc] = useState<{ estadoVerificacion: string | null } | null>(null)
+
+  useEffect(() => {
+    if (!proyecto?.id) return
+    fetch(`/api/proyecto/${proyecto.id}/cotizacion-documento`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setCotizacionDoc(data) })
       .catch(() => {})
   }, [proyecto?.id])
 
@@ -538,6 +550,23 @@ export default function ProyectoHubPage() {
       href: `${baseUrl}/recursos`,
       stats: [],
       badge: 'Ejecución'
+    },
+    {
+      id: 'cotizacion',
+      title: 'Cotización',
+      description: 'Propuesta económica origen y verificación de totales',
+      icon: FileCheck,
+      color: 'text-teal-600',
+      bgColor: 'bg-teal-50',
+      hoverBg: 'hover:bg-teal-50',
+      borderColor: 'border-teal-200',
+      href: `${baseUrl}/cotizacion`,
+      stats: [],
+      badge: cotizacionDoc?.estadoVerificacion === 'coincide'
+        ? 'Coincide'
+        : cotizacionDoc?.estadoVerificacion === 'no_coincide'
+          ? '⚠ No coincide'
+          : 'Cotización',
     },
     {
       id: 'organigrama',
