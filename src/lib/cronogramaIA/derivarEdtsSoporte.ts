@@ -11,10 +11,17 @@
  * ese tipo de trabajo termina en energización/pruebas, tenga o no tableros
  * nuevos o control programable.
  *
- * Reglas duras en código — nunca vía LLM. Cada EDT derivado sigue siendo
- * editable por el usuario en el Paso 1 (esto solo decide la preselección y
- * el motivo mostrado, no bloquea nada).
+ * Este módulo también decide, dentro de CMM, qué tareas se preseleccionan
+ * según el sub-alcance real (evaluarSubalcanceCMM/aplicarSubalcanceCMM) —
+ * CMM tiene solo 12 tareas estables, así que basta una tabla estática por
+ * nombre en vez de campos nuevos en el catálogo o una llamada a IA.
+ *
+ * Reglas duras en código — nunca vía LLM. Cada EDT/tarea derivada sigue
+ * siendo editable por el usuario (Paso 1 para EDTs, Paso 2/3 para tareas) —
+ * esto solo decide la preselección y el motivo mostrado, no bloquea nada.
  */
+
+import type { CatalogoServicioParaWizard, TareaPropuesta } from '@/types/cronogramaIA'
 
 export type OrigenEdtSugerido = 'cotizacion' | 'regla-siempre' | 'regla-derivada' | 'regla-sugerencia'
 
@@ -97,4 +104,74 @@ export function derivarEdtsSoporte(
   }
 
   return resultado
+}
+
+// --- Sub-alcance de CMM: qué tareas del comisionamiento se preseleccionan ---
+
+export interface SubalcanceCMM {
+  instrumentacion: boolean
+  plcOHmi: boolean
+  neumatica: boolean
+  proceso: boolean
+}
+
+/**
+ * Tabla estática por nombre real de tarea (las 12 de CMM en el catálogo).
+ * Una tarea sin entrada acá (protocolos, pruebas eléctricas, energización,
+ * informe — o cualquier tarea nueva que se agregue a futuro) queda SIEMPRE
+ * incluida: sin condición = sin riesgo de excluir algo por error.
+ */
+const REGLA_TAREA_CMM: Record<string, keyof SubalcanceCMM | undefined> = {
+  'Calibración de Instrumentos': 'instrumentacion',
+  'Pruebas de Lazo (Loop Check)': 'instrumentacion',
+  'Comisionamiento de Comunicaciones': 'plcOHmi',
+  'Pruebas de Enclavamientos': 'plcOHmi',
+  'Pruebas Neumáticas': 'neumatica',
+  'Comisionamiento en Frío': 'proceso',
+  'Comisionamiento en Caliente': 'proceso',
+  'Puesta en Marcha del Sistema': 'proceso',
+}
+
+const MOTIVO_EXCLUSION_CMM: Record<keyof SubalcanceCMM, string> = {
+  instrumentacion: 'No se detectó instrumentación en el alcance (tag "Instrumentacion" en ING/PLA) — confirma si aplica.',
+  plcOHmi: 'No hay PLC ni HMI en el alcance seleccionado — confirma si aplica.',
+  neumatica: 'No se detectó alcance neumático en la descripción libre del Paso 1 — confirma si aplica.',
+  proceso: 'No se detectó arranque de proceso/equipos en la descripción libre del Paso 1 — confirma si aplica.',
+}
+
+const RX_NEUMATICA = /neum[aá]tic/i
+const RX_PROCESO = /proceso|arranque de (equipo|planta|l[ií]nea)|puesta en marcha de (planta|producci[oó]n)/i
+
+/**
+ * Evalúa el sub-alcance a partir de los servicios/EDTs YA seleccionados en
+ * el Paso 1 (nunca de CMM mismo — si se buscara en el propio catálogo de
+ * CMM, "proceso"/"neumática" siempre darían true por el texto de sus
+ * propias tareas) y de la descripción libre del alcance.
+ */
+export function evaluarSubalcanceCMM(
+  serviciosSeleccionadosSinCmm: Pick<CatalogoServicioParaWizard, 'actividadTag'>[],
+  edtsNombresSeleccionados: string[],
+  alcanceLibre: string
+): SubalcanceCMM {
+  return {
+    instrumentacion: serviciosSeleccionadosSinCmm.some(s => s.actividadTag.includes('Instrumentacion')),
+    plcOHmi: edtsNombresSeleccionados.includes('PLC') || edtsNombresSeleccionados.includes('HMI'),
+    neumatica: RX_NEUMATICA.test(alcanceLibre),
+    proceso: RX_PROCESO.test(alcanceLibre),
+  }
+}
+
+/**
+ * Marca incluida=false (con motivoExclusion) las tareas de CMM cuyo
+ * sub-alcance no se detectó — nunca pisa una exclusión previa (ej.
+ * filtroAlcance). Todo sigue editable en el Paso 2/3: esto solo decide qué
+ * checkbox arranca pre-marcado.
+ */
+export function aplicarSubalcanceCMM(tareas: TareaPropuesta[], subalcance: SubalcanceCMM): TareaPropuesta[] {
+  return tareas.map(t => {
+    if (!t.incluida) return t
+    const clave = REGLA_TAREA_CMM[t.nombre]
+    if (!clave || subalcance[clave]) return t
+    return { ...t, incluida: false, motivoExclusion: MOTIVO_EXCLUSION_CMM[clave] }
+  })
 }

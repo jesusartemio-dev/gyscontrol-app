@@ -1,4 +1,5 @@
-import { derivarEdtsSoporte } from '@/lib/cronogramaIA/derivarEdtsSoporte'
+import { derivarEdtsSoporte, evaluarSubalcanceCMM, aplicarSubalcanceCMM } from '@/lib/cronogramaIA/derivarEdtsSoporte'
+import type { TareaPropuesta } from '@/types/cronogramaIA'
 
 const CATALOGO = [
   { id: 'e-ges', nombre: 'GES' },
@@ -89,5 +90,104 @@ describe('derivarEdtsSoporte', () => {
     const r = derivarEdtsSoporte(['e-con'], catalogoIncompleto)
     expect(r.find(e => e.nombre === 'SEG')).toBeUndefined()
     expect(r.find(e => e.nombre === 'PRO')).toBeTruthy()
+  })
+})
+
+function tareaCmm(nombre: string): TareaPropuesta {
+  return { catalogoServicioId: nombre, nombre, cantidad: 1, nivelDificultad: 1, horaBase: 4, horaRepetido: 0, horasEstimadas: 4, incluida: true, orden: 0 }
+}
+
+const LAS_12_TAREAS_CMM = [
+  'Protocolos de Comisionamiento',
+  'Pruebas Eléctricas de Precomisionamiento',
+  'Pruebas Neumáticas',
+  'Calibración de Instrumentos',
+  'Energización de Tableros',
+  'Pruebas de Lazo (Loop Check)',
+  'Comisionamiento de Comunicaciones',
+  'Pruebas de Enclavamientos',
+  'Comisionamiento en Frío',
+  'Comisionamiento en Caliente',
+  'Puesta en Marcha del Sistema',
+  'Informe de Comisionamiento',
+]
+
+describe('evaluarSubalcanceCMM', () => {
+  it('instrumentacion=true si algún servicio ya seleccionado (fuera de CMM) tiene el tag Instrumentacion', () => {
+    const s = evaluarSubalcanceCMM([{ actividadTag: ['Instrumentacion'] }], ['ING'], '')
+    expect(s.instrumentacion).toBe(true)
+  })
+
+  it('plcOHmi=true si PLC o HMI están entre los EDTs ya seleccionados', () => {
+    expect(evaluarSubalcanceCMM([], ['PLC'], '').plcOHmi).toBe(true)
+    expect(evaluarSubalcanceCMM([], ['HMI'], '').plcOHmi).toBe(true)
+    expect(evaluarSubalcanceCMM([], ['CON'], '').plcOHmi).toBe(false)
+  })
+
+  it('neumatica/proceso se detectan por texto en la descripción libre del Paso 1', () => {
+    expect(evaluarSubalcanceCMM([], [], 'Incluye líneas neumáticas para el actuador').neumatica).toBe(true)
+    expect(evaluarSubalcanceCMM([], [], 'Arranque de equipos y puesta en marcha de planta').proceso).toBe(true)
+    expect(evaluarSubalcanceCMM([], [], 'Solo cableado y tendido de bandejas').neumatica).toBe(false)
+    expect(evaluarSubalcanceCMM([], [], 'Solo cableado y tendido de bandejas').proceso).toBe(false)
+  })
+
+  it('sin ninguna señal, todo el sub-alcance queda en false', () => {
+    expect(evaluarSubalcanceCMM([], [], '')).toEqual({ instrumentacion: false, plcOHmi: false, neumatica: false, proceso: false })
+  })
+})
+
+describe('aplicarSubalcanceCMM', () => {
+  const SUBALCANCE_VACIO = { instrumentacion: false, plcOHmi: false, neumatica: false, proceso: false }
+
+  it('con sub-alcance vacío, solo quedan incluidas las 4 tareas "siempre" (protocolos/pruebas eléctricas/energización/informe)', () => {
+    const r = aplicarSubalcanceCMM(LAS_12_TAREAS_CMM.map(tareaCmm), SUBALCANCE_VACIO)
+    const incluidas = r.filter(t => t.incluida).map(t => t.nombre).sort()
+    expect(incluidas).toEqual(
+      ['Protocolos de Comisionamiento', 'Pruebas Eléctricas de Precomisionamiento', 'Energización de Tableros', 'Informe de Comisionamiento'].sort()
+    )
+    const excluida = r.find(t => t.nombre === 'Pruebas Neumáticas')!
+    expect(excluida.motivoExclusion).toBeTruthy()
+  })
+
+  it('caso G300 (solo CON): sin instrumentación/PLC-HMI/neumática/proceso detectados, solo las 4 "siempre" — nunca revienta ni deja CMM vacío', () => {
+    const subalcanceG300 = evaluarSubalcanceCMM([], ['CON'], '')
+    const r = aplicarSubalcanceCMM(LAS_12_TAREAS_CMM.map(tareaCmm), subalcanceG300)
+    expect(r.some(t => t.incluida)).toBe(true)
+    expect(r.find(t => t.nombre === 'Energización de Tableros')!.incluida).toBe(true)
+  })
+
+  it('con instrumentación detectada, se incluyen loop check y calibración', () => {
+    const subalcance = { ...SUBALCANCE_VACIO, instrumentacion: true }
+    const r = aplicarSubalcanceCMM(LAS_12_TAREAS_CMM.map(tareaCmm), subalcance)
+    expect(r.find(t => t.nombre === 'Calibración de Instrumentos')!.incluida).toBe(true)
+    expect(r.find(t => t.nombre === 'Pruebas de Lazo (Loop Check)')!.incluida).toBe(true)
+    expect(r.find(t => t.nombre === 'Comisionamiento de Comunicaciones')!.incluida).toBe(false)
+  })
+
+  it('con PLC/HMI detectados, se incluyen comunicaciones y enclavamientos', () => {
+    const subalcance = { ...SUBALCANCE_VACIO, plcOHmi: true }
+    const r = aplicarSubalcanceCMM(LAS_12_TAREAS_CMM.map(tareaCmm), subalcance)
+    expect(r.find(t => t.nombre === 'Comisionamiento de Comunicaciones')!.incluida).toBe(true)
+    expect(r.find(t => t.nombre === 'Pruebas de Enclavamientos')!.incluida).toBe(true)
+    expect(r.find(t => t.nombre === 'Calibración de Instrumentos')!.incluida).toBe(false)
+  })
+
+  it('con proceso detectado, se incluyen frío/caliente/puesta en marcha', () => {
+    const subalcance = { ...SUBALCANCE_VACIO, proceso: true }
+    const r = aplicarSubalcanceCMM(LAS_12_TAREAS_CMM.map(tareaCmm), subalcance)
+    expect(r.find(t => t.nombre === 'Comisionamiento en Frío')!.incluida).toBe(true)
+    expect(r.find(t => t.nombre === 'Comisionamiento en Caliente')!.incluida).toBe(true)
+    expect(r.find(t => t.nombre === 'Puesta en Marcha del Sistema')!.incluida).toBe(true)
+  })
+
+  it('una tarea ya excluida por otra regla (ej. filtroAlcance) no se reincluye ni se le pisa el motivo', () => {
+    const yaExcluida: TareaPropuesta = { ...tareaCmm('Pruebas Neumáticas'), incluida: false, motivoExclusion: 'Otro motivo previo' }
+    const r = aplicarSubalcanceCMM([yaExcluida], { ...SUBALCANCE_VACIO, neumatica: true })
+    expect(r[0].motivoExclusion).toBe('Otro motivo previo')
+  })
+
+  it('una tarea con nombre no contemplado en la tabla (ej. catálogo cambió) queda siempre incluida, no revienta', () => {
+    const r = aplicarSubalcanceCMM([tareaCmm('Tarea Nueva No Contemplada')], SUBALCANCE_VACIO)
+    expect(r[0].incluida).toBe(true)
   })
 })

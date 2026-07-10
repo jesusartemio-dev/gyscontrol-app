@@ -5,6 +5,7 @@ import type {
   ResultadoActividadesDeterministas,
   TareaPropuesta,
 } from '@/types/cronogramaIA'
+import { evaluarSubalcanceCMM, aplicarSubalcanceCMM, type SubalcanceCMM } from './derivarEdtsSoporte'
 
 /**
  * EDTs cuya agrupación en Actividades depende de IA (zonas de CON, familias
@@ -122,8 +123,15 @@ function generarSEG(servicios: CatalogoServicioParaWizard[], config: Configuraci
   return [{ edtNombre: 'SEG', actividadNombre: 'Documentos de Seguridad', tareas, origen: 'determinista' }]
 }
 
-function generarCMM(servicios: CatalogoServicioParaWizard[], config: ConfiguracionWizardPaso1): ActividadPropuesta[] {
-  const tareas = servicios.map(s => construirTareaPropuesta(s, config))
+function generarCMM(
+  servicios: CatalogoServicioParaWizard[],
+  config: ConfiguracionWizardPaso1,
+  subalcance: SubalcanceCMM
+): ActividadPropuesta[] {
+  const tareas = aplicarSubalcanceCMM(
+    servicios.map(s => construirTareaPropuesta(s, config)),
+    subalcance
+  )
   if (!tieneAlMenosUnaTareaIncluida(tareas)) return []
   return [{ edtNombre: 'CMM', actividadNombre: 'Comisionamiento', tareas, origen: 'determinista' }]
 }
@@ -220,6 +228,14 @@ export function generarActividadesDeterministas(
   const advertencias: string[] = []
   const actividades: ActividadPropuesta[] = []
 
+  // Sub-alcance de CMM: se evalúa una sola vez, sobre todo lo YA seleccionado
+  // salvo CMM mismo (evitar que su propio texto dispare sus propios triggers).
+  const subalcanceCMM = evaluarSubalcanceCMM(
+    edts.filter(e => e.nombre !== 'CMM').flatMap(e => e.servicios),
+    edts.map(e => e.nombre),
+    config.alcanceLibre
+  )
+
   for (const edt of edts) {
     if ((EDTS_AGRUPACION_IA as readonly string[]).includes(edt.nombre)) {
       continue
@@ -238,7 +254,7 @@ export function generarActividadesDeterministas(
         actividades.push(...generarSEG(edt.servicios, config))
         break
       case 'CMM':
-        actividades.push(...generarCMM(edt.servicios, config))
+        actividades.push(...generarCMM(edt.servicios, config, subalcanceCMM))
         break
       case 'PLA':
         actividades.push(...generarPLA(edt.servicios, config, advertencias))
