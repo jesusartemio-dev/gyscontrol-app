@@ -11,6 +11,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { calcularNivelesOrgNodos, NIVELES_PARTICIPANTES_MATRIZ } from '@/lib/matrizComunicacion/utils'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -50,6 +51,8 @@ interface ContactoClienteProyecto {
 }
 
 interface OrgNodo {
+  id: string
+  parentId: string | null
   userId: string | null
   cargoLabel: string
   empresaOverride: string | null
@@ -570,11 +573,15 @@ function valorColor(v: string): string {
 }
 
 function buildPersonal(nodos: OrgNodo[]): PersonalInfo[] {
+  // Solo participan los niveles de gestión/ejecución del organigrama
+  // (no la Gerencia General de nivel 1, ni los técnicos de campo del último nivel)
+  const niveles = calcularNivelesOrgNodos(nodos)
   const usadas = new Set<string>()
   const seenUserIds = new Set<string>()
   return nodos
     .filter(n => {
       if (!n.user) return false
+      if (!NIVELES_PARTICIPANTES_MATRIZ.includes(niveles.get(n.id) as 2 | 3 | 4)) return false
       if (n.userId) {
         if (seenUserIds.has(n.userId)) return false
         seenUserIds.add(n.userId)

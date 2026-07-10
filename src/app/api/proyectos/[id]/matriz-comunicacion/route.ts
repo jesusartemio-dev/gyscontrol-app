@@ -5,7 +5,7 @@ import { authOptions } from '@/lib/auth'
 import Anthropic from '@anthropic-ai/sdk'
 import { buildPromptMatriz, type MatrizFilaIA } from '@/lib/matrizComunicacion/prompt'
 import { getModelForTask } from '@/lib/agente/models'
-import { generarSiglas } from '@/lib/matrizComunicacion/utils'
+import { generarSiglas, calcularNivelesOrgNodos, NIVELES_PARTICIPANTES_MATRIZ } from '@/lib/matrizComunicacion/utils'
 import { ROL_CONTACTO_CLIENTE_LABELS } from '@/lib/config/rolesContactoCliente'
 import { trackUsage, trackUsageError } from '@/lib/agente/usageTracker'
 import { isIAFeatureEnabled } from '@/lib/agente/featureFlags'
@@ -58,9 +58,12 @@ export async function POST(
         codigo: true,
         cliente: { select: { nombre: true } },
         orgNodos: {
-          where: { userId: { not: null } },
+          // Se traen TODOS los nodos (no solo los que tienen usuario) para poder
+          // calcular el nivel de cada uno recorriendo la cadena de padres completa.
           orderBy: { orden: 'asc' },
           select: {
+            id: true,
+            parentId: true,
             userId: true,
             cargoLabel: true,
             empresaOverride: true,
@@ -95,11 +98,16 @@ export async function POST(
     if (generarConIA) {
       const iaEnabled = await isIAFeatureEnabled('matrizComunicacion')
       if (!iaEnabled) return NextResponse.json({ error: 'La generación con IA de Matriz de Comunicaciones está deshabilitada' }, { status: 403 })
+      // Solo participan en la matriz los niveles de gestión/ejecución del organigrama
+      // (no la Gerencia General de nivel 1, ni los técnicos de campo del último nivel)
+      const niveles = calcularNivelesOrgNodos(proyecto.orgNodos)
+
       // Deduplicar por userId: si la misma persona aparece en varios nodos
       // (ej. nodo fijo GYS + nodo de proyecto), tomar solo la primera aparición
       const seenUserIds = new Set<string>()
       const orgNodos = proyecto.orgNodos.filter(n => {
         if (!n.user?.name || !n.userId) return false
+        if (!NIVELES_PARTICIPANTES_MATRIZ.includes(niveles.get(n.id) as 2 | 3 | 4)) return false
         if (seenUserIds.has(n.userId)) return false
         seenUserIds.add(n.userId)
         return true

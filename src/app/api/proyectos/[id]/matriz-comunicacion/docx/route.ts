@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { generarDocxMatriz } from '@/lib/matrizComunicacion/exportDocx'
-import { generarSiglas } from '@/lib/matrizComunicacion/utils'
+import { generarSiglas, calcularNivelesOrgNodos, NIVELES_PARTICIPANTES_MATRIZ } from '@/lib/matrizComunicacion/utils'
 import { ROL_CONTACTO_CLIENTE_LABELS } from '@/lib/config/rolesContactoCliente'
 
 function parseCeldas(json: string): { siglas: string; valor: string }[] {
@@ -39,9 +39,12 @@ export async function GET(
           codigo: true,
           cliente: { select: { nombre: true } },
           orgNodos: {
-            where: { userId: { not: null } },
+            // Se traen TODOS los nodos (no solo los que tienen usuario) para poder
+            // calcular el nivel de cada uno recorriendo la cadena de padres completa.
             orderBy: { orden: 'asc' },
             select: {
+              id: true,
+              parentId: true,
               userId: true,
               cargoLabel: true,
               empresaOverride: true,
@@ -62,11 +65,13 @@ export async function GET(
     if (!matriz) return NextResponse.json({ error: 'Matriz no encontrada' }, { status: 404 })
     if (!proyecto) return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 })
 
+    const niveles = calcularNivelesOrgNodos(proyecto.orgNodos)
     const seenUserIds = new Set<string>()
     const usadas = new Set<string>()
     const personal = proyecto.orgNodos
       .filter(n => {
         if (!n.user?.name || !n.userId) return false
+        if (!NIVELES_PARTICIPANTES_MATRIZ.includes(niveles.get(n.id) as 2 | 3 | 4)) return false
         if (seenUserIds.has(n.userId)) return false
         seenUserIds.add(n.userId)
         return true

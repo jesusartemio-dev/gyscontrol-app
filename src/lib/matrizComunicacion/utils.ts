@@ -1,3 +1,32 @@
+// Solo los niveles de gestión y ejecución del organigrama participan en la matriz
+// (nivel 1 = Gerencia General, no gestiona el día a día del proyecto;
+//  el último nivel son técnicos de campo, no son emisores/receptores de comunicaciones formales)
+export const NIVELES_PARTICIPANTES_MATRIZ = [2, 3, 4] as const
+
+/**
+ * Calcula el nivel (profundidad) de cada nodo del organigrama, donde el/los nodo(s)
+ * raíz (sin parentId) son nivel 1. Requiere TODOS los nodos del proyecto, no solo
+ * los que tienen usuario asignado, para poder recorrer la cadena de padres completa.
+ */
+export function calcularNivelesOrgNodos(
+  nodos: { id: string; parentId: string | null }[]
+): Map<string, number> {
+  const porId = new Map(nodos.map(n => [n.id, n]))
+  const niveles = new Map<string, number>()
+
+  function nivelDe(id: string): number {
+    const cacheado = niveles.get(id)
+    if (cacheado !== undefined) return cacheado
+    const nodo = porId.get(id)
+    const nivel = !nodo?.parentId ? 1 : nivelDe(nodo.parentId) + 1
+    niveles.set(id, nivel)
+    return nivel
+  }
+
+  for (const n of nodos) nivelDe(n.id)
+  return niveles
+}
+
 export function generarSiglas(nombre: string, usadas: Set<string>): string {
   const partes = nombre.trim().split(/\s+/).filter(Boolean)
   const base = partes.map(p => p[0].toUpperCase()).join('')
