@@ -23,7 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { ChevronLeft, ChevronRight, Loader2, Plus, Trash2, Sparkles, AlertCircle, FileCheck2, History } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, Plus, Trash2, Sparkles, AlertCircle, FileCheck2, History, Pin, PinOff } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import type { ActividadPropuesta, ConfiguracionWizardPaso1 } from '@/types/cronogramaIA'
 import type { EdtSugeridoConOrigen } from '@/lib/cronogramaIA/derivarEdtsSoporte'
@@ -56,6 +56,15 @@ interface PrellenadoPaso1 {
   plcs: { nombre: string }[]
   hmiCantidad: number
   scada: boolean
+}
+
+interface CorreccionEdt {
+  id: string
+  edtId: string
+  edtNombre: string
+  edtDescripcion: string | null
+  motivo: string | null
+  creadoEn: string
 }
 
 interface BorradorGeneracion {
@@ -136,6 +145,8 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
   const [edtsPendientesIA, setEdtsPendientesIA] = useState<EdtPendienteIA[]>([])
   const [fuenteEdtsSugeridos, setFuenteEdtsSugeridos] = useState<'comercial' | 'ia' | 'manual' | 'restaurado'>('manual')
   const [edtsOrigen, setEdtsOrigen] = useState<Map<string, EdtSugeridoConOrigen>>(new Map())
+  const [correccionesEdt, setCorreccionesEdt] = useState<CorreccionEdt[]>([])
+  const [guardandoCorreccion, setGuardandoCorreccion] = useState<string | null>(null)
 
   // Persistencia del wizard (evita perder Paso 1/Paso 2/propuestas de IA por un cierre accidental).
   const [datosContexto, setDatosContexto] = useState<DatosContextoWizard | null>(null)
@@ -285,10 +296,12 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
           tieneCotizacionDocumento: boolean
           edtsSugeridosComercial: string[] | null
           edtsSugeridosConOrigen: EdtSugeridoConOrigen[] | null
+          correccionesEdt: CorreccionEdt[]
           borrador: BorradorGeneracion | null
         }) => {
           setEdts(data.edts)
           setCotizacionResumen(data.cotizacionResumen)
+          setCorreccionesEdt(data.correccionesEdt)
           setCargandoContexto(false)
 
           const contexto: DatosContextoWizard = {
@@ -410,6 +423,52 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
       else next.add(id)
       return next
     })
+  }
+
+  /**
+   * Corrección manual a nivel PROYECTO (nunca toca la cotización real) para
+   * casos como una partida mal clasificada al armar la cotización — ej.
+   * "DESARROLLO DE PLANOS" cargado bajo ING en vez de PLA. Marca el EDT
+   * como seleccionado y persiste el ajuste para que se recuerde la próxima
+   * vez que se abra el wizard en este proyecto.
+   */
+  async function agregarCorreccion(edtId: string) {
+    setGuardandoCorreccion(edtId)
+    try {
+      const res = await fetch(`/api/proyectos/${proyectoId}/cronograma/planificacion/edt-correcciones`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ edtId, motivo: 'Agregado manualmente en el wizard de cronograma' }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Error guardando la corrección')
+      }
+      const data = await res.json()
+      setCorreccionesEdt(prev => [...prev.filter(c => c.edtId !== edtId), data.correccion])
+      setEdtsSeleccionados(prev => new Set(prev).add(edtId))
+      toast({ title: 'Corrección guardada', description: 'Este EDT se va a sugerir siempre para este proyecto, sin tocar la cotización.' })
+    } catch (e) {
+      toast({ title: e instanceof Error ? e.message : 'Error inesperado', variant: 'destructive' })
+    } finally {
+      setGuardandoCorreccion(null)
+    }
+  }
+
+  async function quitarCorreccion(correccionId: string, edtId: string) {
+    setGuardandoCorreccion(edtId)
+    try {
+      const res = await fetch(`/api/proyectos/${proyectoId}/cronograma/planificacion/edt-correcciones/${correccionId}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Error quitando la corrección')
+      }
+      setCorreccionesEdt(prev => prev.filter(c => c.id !== correccionId))
+    } catch (e) {
+      toast({ title: e instanceof Error ? e.message : 'Error inesperado', variant: 'destructive' })
+    } finally {
+      setGuardandoCorreccion(null)
+    }
   }
 
   function agregarTablero() {
@@ -681,6 +740,11 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
               <CardContent className="p-2 max-h-[220px] overflow-y-auto space-y-1">
                 {edts.map(edt => {
                   const origen = edtsOrigen.get(edt.id)
+                  const correccion = correccionesEdt.find(c => c.edtId === edt.id)
+                  // Ofrecer "recordar" solo si el usuario lo marcó a mano sin ninguna
+                  // señal (ni cotización ni regla) — es exactamente el caso de una
+                  // partida mal clasificada en la cotización (ej. G300: PLA).
+                  const puedeMarcarCorreccion = !origen && !correccion && edtsSeleccionados.has(edt.id)
                   return (
                     <div
                       key={edt.id}
@@ -701,7 +765,38 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
                           {origen.origen === 'regla-siempre' && 'Siempre aplica'}
                           {origen.origen === 'regla-derivada' && 'Derivado del alcance'}
                           {origen.origen === 'regla-sugerencia' && 'Sugerido — confirma'}
+                          {origen.origen === 'correccion-proyecto' && 'Corrección de este proyecto'}
                         </Badge>
+                      )}
+                      {correccion && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 shrink-0"
+                          title="Quitar corrección de este proyecto (no afecta la cotización)"
+                          disabled={guardandoCorreccion === edt.id}
+                          onClick={e => {
+                            e.stopPropagation()
+                            quitarCorreccion(correccion.id, edt.id)
+                          }}
+                        >
+                          <PinOff className="h-3 w-3" />
+                        </Button>
+                      )}
+                      {puedeMarcarCorreccion && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 shrink-0 text-muted-foreground"
+                          title="Recordar este EDT para este proyecto (no toca la cotización comercial)"
+                          disabled={guardandoCorreccion === edt.id}
+                          onClick={e => {
+                            e.stopPropagation()
+                            agregarCorreccion(edt.id)
+                          }}
+                        >
+                          <Pin className="h-3 w-3" />
+                        </Button>
                       )}
                       <Badge variant={edt.totalServicios > 0 ? 'secondary' : 'outline'} className="text-xs">
                         {edt.totalServicios} servicios

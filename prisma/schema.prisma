@@ -1166,6 +1166,7 @@ model Proyecto {
   pets                       Pets?
   planificacionesDia         PlanificacionDia[]
   cronogramaIATareaDecision  CronogramaIATareaDecision[]
+  cronogramaEdtCorreccion    ProyectoCronogramaEdtCorreccion[]
 
   @@index([clienteId, estado, createdAt(sort: Desc)], map: "idx_proyecto_cliente_estado_fecha")
   @@index([comercialId, estado, fechaInicio], map: "idx_proyecto_comercial_estado_inicio")
@@ -2070,6 +2071,7 @@ model User {
   planTrabajoImagenes                      PlanTrabajoImagen[]
   proyectoCronogramaGeneracionesIA         ProyectoCronogramaGeneracionIA[]
   cronogramaIATareaDecisiones              CronogramaIATareaDecision[]
+  cronogramaEdtCorreccionesCreadas         ProyectoCronogramaEdtCorreccion[]
   // Módulo Ausencias
   solicitudesAusencia                      SolicitudAusencia[]      @relation("AusenciaSolicitante")
   ausenciasComoAprobador1                  SolicitudAusencia[]      @relation("AusenciaAprobador1")
@@ -2923,6 +2925,7 @@ model Edt {
   proyectoServicioCotizadoItem       ProyectoServicioCotizadoItem[]       @relation("ProyectoServicioCotizadoItemEdt")
   plantillaServicioIndependiente     PlantillaServicioIndependiente[]     @relation("PlantillaServicioIndependienteEdt")
   plantillaServicioItemIndependiente PlantillaServicioItemIndependiente[] @relation("PlantillaServicioItemIndependienteEdt")
+  cronogramaEdtCorreccion            ProyectoCronogramaEdtCorreccion[]
 
   @@map("edt")
 }
@@ -3382,6 +3385,30 @@ model CronogramaIATareaDecision {
   @@index([catalogoServicioId, reglaClave])
   @@index([proyectoId])
   @@map("cronograma_ia_tarea_decision")
+}
+
+/// Corrección manual de EDTs sugeridos para el wizard de cronograma, a nivel
+/// PROYECTO — nunca toca la cotización comercial (esa es el registro real de
+/// lo que se vendió, no se edita). Para casos como una partida mal
+/// clasificada al armar la cotización (ej. "DESARROLLO DE PLANOS" cargado
+/// bajo ING en vez de PLA): en vez de reescribir la cotización, se agrega acá
+/// una corrección puramente aditiva que el wizard combina con lo que venga
+/// de la cotización real antes de aplicar las reglas de EDTs de soporte
+/// (derivarEdtsSoporte.ts).
+model ProyectoCronogramaEdtCorreccion {
+  id         String   @id @default(cuid())
+  proyectoId String
+  proyecto   Proyecto @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  edtId      String
+  edt        Edt      @relation(fields: [edtId], references: [id], onDelete: Cascade)
+  motivo     String?
+
+  creadoPorId String
+  creadoPor   User     @relation(fields: [creadoPorId], references: [id])
+  creadoEn    DateTime @default(now())
+
+  @@unique([proyectoId, edtId])
+  @@map("proyecto_cronograma_edt_correccion")
 }
 
 model ProyectoDependenciasTarea {

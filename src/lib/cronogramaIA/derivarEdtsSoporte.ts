@@ -23,7 +23,7 @@
 
 import type { CatalogoServicioParaWizard, TareaPropuesta } from '@/types/cronogramaIA'
 
-export type OrigenEdtSugerido = 'cotizacion' | 'regla-siempre' | 'regla-derivada' | 'regla-sugerencia'
+export type OrigenEdtSugerido = 'cotizacion' | 'correccion-proyecto' | 'regla-siempre' | 'regla-derivada' | 'regla-sugerencia'
 
 export interface EdtSugeridoConOrigen {
   id: string
@@ -60,21 +60,37 @@ function motivoCmmSugerencia(triggers: string[]): string {
 
 /**
  * Deriva los EDTs de soporte a partir de los EDTs de entregables ya
- * resueltos desde la cotización (edtsBaseIds). Devuelve la lista completa
- * (entregables + soporte) con su origen, en el mismo orden en que deben
- * mostrarse: primero los de cotización, luego los derivados por regla.
+ * resueltos desde la cotización (edtsBaseIds) MÁS las correcciones manuales
+ * a nivel proyecto (correccionesIds — ver ProyectoCronogramaEdtCorreccion:
+ * nunca reescribe la cotización real, es un agregado puramente aditivo para
+ * casos como una partida mal clasificada al armarla). Las correcciones
+ * participan en las mismas reglas de soporte que los EDTs de cotización
+ * (ej. si la corrección agrega CON, también dispara SEG/PRO). Devuelve la
+ * lista completa con su origen, en el orden en que deben mostrarse:
+ * cotización, luego correcciones de proyecto, luego derivados por regla.
  */
 export function derivarEdtsSoporte(
   edtsBaseIds: string[],
-  edtsCatalogo: { id: string; nombre: string }[]
+  edtsCatalogo: { id: string; nombre: string }[],
+  correccionesIds: string[] = []
 ): EdtSugeridoConOrigen[] {
   const idPorNombre = new Map(edtsCatalogo.map(e => [e.nombre, e.id]))
   const nombrePorId = new Map(edtsCatalogo.map(e => [e.id, e.nombre]))
-  const nombresPresentes = new Set(edtsBaseIds.map(id => nombrePorId.get(id)).filter((n): n is string => !!n))
+  const idsBase = new Set(edtsBaseIds)
+  const nombresPresentes = new Set(
+    [...edtsBaseIds, ...correccionesIds].map(id => nombrePorId.get(id)).filter((n): n is string => !!n)
+  )
 
   const resultado: EdtSugeridoConOrigen[] = edtsBaseIds
     .map(id => ({ id, nombre: nombrePorId.get(id) ?? '', origen: 'cotizacion' as const }))
     .filter(e => e.nombre)
+
+  for (const id of correccionesIds) {
+    if (idsBase.has(id)) continue // ya viene de cotización, no duplicar
+    const nombre = nombrePorId.get(id)
+    if (!nombre) continue
+    resultado.push({ id, nombre, origen: 'correccion-proyecto' })
+  }
 
   function agregarSiFalta(nombre: string, origen: OrigenEdtSugerido, motivo?: string) {
     if (nombresPresentes.has(nombre)) return

@@ -91,6 +91,25 @@ describe('derivarEdtsSoporte', () => {
     expect(r.find(e => e.nombre === 'SEG')).toBeUndefined()
     expect(r.find(e => e.nombre === 'PRO')).toBeTruthy()
   })
+
+  it('una corrección de proyecto (ej. G300: PLA mal tageado como ING en la cotización) se agrega con origen "correccion-proyecto", sin tocar la cotización', () => {
+    const r = derivarEdtsSoporte(['e-ing', 'e-con'], CATALOGO, ['e-pla'])
+    const pla = r.find(e => e.nombre === 'PLA')!
+    expect(pla.origen).toBe('correccion-proyecto')
+    expect(r.find(e => e.nombre === 'ING')!.origen).toBe('cotizacion')
+  })
+
+  it('una corrección que coincide con un EDT ya presente en la cotización no lo duplica ni le cambia el origen', () => {
+    const r = derivarEdtsSoporte(['e-con'], CATALOGO, ['e-con'])
+    expect(r.filter(e => e.nombre === 'CON')).toHaveLength(1)
+    expect(r.find(e => e.nombre === 'CON')!.origen).toBe('cotizacion')
+  })
+
+  it('una corrección participa en las reglas de soporte igual que un EDT de cotización (ej. agregar CON por corrección también dispara SEG/PRO)', () => {
+    const r = derivarEdtsSoporte(['e-ing'], CATALOGO, ['e-con'])
+    expect(r.find(e => e.nombre === 'SEG')).toBeTruthy()
+    expect(r.find(e => e.nombre === 'PRO')).toBeTruthy()
+  })
 })
 
 function tareaCmm(nombre: string): TareaPropuesta {

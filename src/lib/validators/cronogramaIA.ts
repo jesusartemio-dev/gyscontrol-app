@@ -25,6 +25,13 @@ export const tareaPropuestaSchema = z.object({
   horasEstimadas: z.number().min(0),
   incluida: z.boolean(),
   motivoExclusion: z.string().optional(),
+  // Sin estos dos campos, el PATCH de autoguardado del Paso 2 los descarta
+  // silenciosamente (z.object sin .passthrough() elimina claves no
+  // declaradas) — y con eso se pierde la trazabilidad que necesita
+  // CronogramaIATareaDecision (qué decidió la regla vs qué quedó final) al
+  // llegar a "Aplicar al Cronograma".
+  reglaClave: z.string().optional(),
+  incluidaPorRegla: z.boolean().optional(),
 })
 
 export const actividadPropuestaSchema = z.object({
@@ -35,3 +42,8 @@ export const actividadPropuestaSchema = z.object({
 })
 
 export const propuestaActividadesSchema = z.array(actividadPropuestaSchema)
+
+export const edtCorreccionSchema = z.object({
+  edtId: z.string().min(1),
+  motivo: z.string().max(500).optional(),
+})

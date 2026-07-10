@@ -43,7 +43,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: 'Sin acceso a este proyecto' }, { status: 403 })
   }
 
-  const [edts, cronogramaPlanificacion, cotizacionDocumento, edtsComerciales] = await Promise.all([
+  const [edts, cronogramaPlanificacion, cotizacionDocumento, edtsComerciales, correcciones] = await Promise.all([
     prisma.edt.findMany({
       include: { faseDefault: true, _count: { select: { catalogoServicio: true } } },
       orderBy: [{ faseDefault: { orden: 'asc' } }, { nombre: 'asc' }],
@@ -57,6 +57,14 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
       select: { resumenAlcance: true, exclusiones: true, numeroPropuesta: true, clienteDetectado: true },
     }),
     obtenerEdtsComercialesProyecto(proyectoId),
+    // Correcciones manuales a nivel proyecto (ver ProyectoCronogramaEdtCorreccion)
+    // — nunca tocan la cotización real, es un agregado puramente aditivo para
+    // casos como una partida mal clasificada al armar la cotización.
+    prisma.proyectoCronogramaEdtCorreccion.findMany({
+      where: { proyectoId },
+      select: { id: true, edtId: true, motivo: true, creadoEn: true, edt: { select: { nombre: true, descripcion: true } } },
+      orderBy: { creadoEn: 'asc' },
+    }),
   ])
 
   let borrador: {
@@ -93,17 +101,24 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     }
   }
 
+  const correccionesIds = correcciones.map(c => c.edtId)
+
   // La cotización solo resuelve EDTs de ENTREGABLES (lo que se vendió). Los
   // EDTs de SOPORTE (GES/CIE siempre, SEG/PRO por alcance, CMM sugerido) casi
   // nunca son una partida propia — se derivan acá por reglas duras, nunca
-  // por IA. Cada uno sigue siendo editable en el Paso 1; solo cambia la
-  // preselección y el motivo mostrado al usuario.
-  const edtsSugeridosConOrigen = edtsComerciales
-    ? derivarEdtsSoporte(
-        edtsComerciales,
-        edts.map(e => ({ id: e.id, nombre: e.nombre }))
-      )
-    : null
+  // por IA. Las correcciones manuales del proyecto (edt-correcciones) se
+  // suman a lo que vino de la cotización ANTES de derivar soporte — así una
+  // corrección como agregar PLA también puede disparar sus propias reglas
+  // aguas abajo si correspondiera. Cada EDT sigue siendo editable en el
+  // Paso 1; esto solo decide la preselección y el motivo mostrado.
+  const edtsSugeridosConOrigen =
+    edtsComerciales || correccionesIds.length > 0
+      ? derivarEdtsSoporte(
+          edtsComerciales ?? [],
+          edts.map(e => ({ id: e.id, nombre: e.nombre })),
+          correccionesIds
+        )
+      : null
 
   return NextResponse.json({
     edts: edts.map(e => ({
@@ -126,6 +141,17 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     // 'regla-sugerencia') — el wizard lo usa para mostrar de dónde salió
     // cada preselección. null si no hay cotización comercial.
     edtsSugeridosConOrigen,
+    // Correcciones manuales guardadas para este proyecto (ver
+    // ProyectoCronogramaEdtCorreccion) — el wizard las muestra gestionables
+    // (agregar/quitar) junto a la lista de EDTs.
+    correccionesEdt: correcciones.map(c => ({
+      id: c.id,
+      edtId: c.edtId,
+      edtNombre: c.edt.nombre,
+      edtDescripcion: c.edt.descripcion,
+      motivo: c.motivo,
+      creadoEn: c.creadoEn,
+    })),
     tieneCotizacionDocumento: !!cotizacionDocumento,
     cotizacionResumen: cotizacionDocumento
       ? {
