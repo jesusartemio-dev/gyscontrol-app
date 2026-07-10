@@ -3,8 +3,9 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { ROLES_CRONOGRAMA } from '@/lib/services/cronogramaPermisos'
-import { obtenerEdtsComercialesProyecto } from '@/lib/cronogramaIA/obtenerEdtsComerciales'
+import { obtenerEdtsComercialesProyecto, obtenerEvidenciasCotizacion } from '@/lib/cronogramaIA/obtenerEdtsComerciales'
 import { derivarEdtsSoporte } from '@/lib/cronogramaIA/derivarEdtsSoporte'
+import type { EvidenciaTexto } from '@/lib/cronogramaIA/detectarEdtsPosibles'
 import { calcularEdtsPendientesIA } from '@/lib/cronogramaIA/reglasActividades'
 import type { ActividadPropuesta, ConfiguracionWizardPaso1 } from '@/types/cronogramaIA'
 
@@ -43,7 +44,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: 'Sin acceso a este proyecto' }, { status: 403 })
   }
 
-  const [edts, cronogramaPlanificacion, cotizacionDocumento, edtsComerciales, correcciones] = await Promise.all([
+  const [edts, cronogramaPlanificacion, cotizacionDocumento, edtsComerciales, correcciones, evidenciasCotizacion] = await Promise.all([
     prisma.edt.findMany({
       include: { faseDefault: true, _count: { select: { catalogoServicio: true } } },
       orderBy: [{ faseDefault: { orden: 'asc' } }, { nombre: 'asc' }],
@@ -65,6 +66,10 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
       select: { id: true, edtId: true, motivo: true, creadoEn: true, edt: { select: { nombre: true, descripcion: true } } },
       orderBy: { creadoEn: 'asc' },
     }),
+    // Evidencia textual de las partidas de la cotización real (nombre real de
+    // cada línea + a qué EDT está tageada) para detectarEdtsPosibles — ver
+    // abajo. Nunca modifica la cotización, solo la lee.
+    obtenerEvidenciasCotizacion(proyectoId),
   ])
 
   let borrador: {
@@ -120,6 +125,19 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
         )
       : null
 
+  // Evidencia textual para la detección proactiva de posible mal-tageo de
+  // EDT (heurística por keywords, sin LLM — ver detectarEdtsPosibles.ts) —
+  // ej. una partida "DESARROLLO DE PLANOS" tageada como ING en vez de PLA.
+  // Se manda la evidencia cruda (partidas de la cotización + resumen de
+  // alcance del PDF) para que el wizard corra la detección en el cliente y
+  // la pueda re-evaluar en vivo a medida que el usuario edita la
+  // descripción libre del alcance del Paso 1 — una sola fuente de verdad
+  // para la heurística, no una copia server-side que se desactualiza.
+  const resumenAlcanceEvidencias: EvidenciaTexto[] = (
+    (cotizacionDocumento?.resumenAlcance as string[] | null) ?? []
+  ).map(bullet => ({ texto: bullet, origen: 'Resumen de alcance de la cotización' }))
+  const todasLasEvidencias = [...evidenciasCotizacion, ...resumenAlcanceEvidencias]
+
   return NextResponse.json({
     edts: edts.map(e => ({
       id: e.id,
@@ -152,6 +170,12 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
       motivo: c.motivo,
       creadoEn: c.creadoEn,
     })),
+    // Evidencia cruda (partidas de la cotización + resumen de alcance) para
+    // que el wizard corra detectarEdtsPosibles en el cliente y la reevalúe
+    // en vivo con la descripción libre del alcance del Paso 1. El wizard
+    // muestra los EDTs detectados con badge "Posible según cotización —
+    // confirma", sin marcarlos automáticamente.
+    evidenciasCotizacion: todasLasEvidencias,
     tieneCotizacionDocumento: !!cotizacionDocumento,
     cotizacionResumen: cotizacionDocumento
       ? {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -28,6 +28,7 @@ import { ChevronLeft, ChevronRight, Loader2, Plus, Trash2, Sparkles, AlertCircle
 import { useToast } from '@/hooks/use-toast'
 import type { ActividadPropuesta, ConfiguracionWizardPaso1 } from '@/types/cronogramaIA'
 import type { EdtSugeridoConOrigen } from '@/lib/cronogramaIA/derivarEdtsSoporte'
+import { detectarEdtsPosibles, type EvidenciaTexto } from '@/lib/cronogramaIA/detectarEdtsPosibles'
 
 interface EdtWizardInfo {
   id: string
@@ -148,6 +149,7 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
   const [edtsOrigen, setEdtsOrigen] = useState<Map<string, EdtSugeridoConOrigen>>(new Map())
   const [correccionesEdt, setCorreccionesEdt] = useState<CorreccionEdt[]>([])
   const [guardandoCorreccion, setGuardandoCorreccion] = useState<string | null>(null)
+  const [evidenciasCotizacion, setEvidenciasCotizacion] = useState<EvidenciaTexto[]>([])
 
   // Persistencia del wizard (evita perder Paso 1/Paso 2/propuestas de IA por un cierre accidental).
   const [datosContexto, setDatosContexto] = useState<DatosContextoWizard | null>(null)
@@ -298,11 +300,13 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
           edtsSugeridosComercial: string[] | null
           edtsSugeridosConOrigen: EdtSugeridoConOrigen[] | null
           correccionesEdt: CorreccionEdt[]
+          evidenciasCotizacion: EvidenciaTexto[]
           borrador: BorradorGeneracion | null
         }) => {
           setEdts(data.edts)
           setCotizacionResumen(data.cotizacionResumen)
           setCorreccionesEdt(data.correccionesEdt)
+          setEvidenciasCotizacion(data.evidenciasCotizacion)
           setCargandoContexto(false)
 
           const contexto: DatosContextoWizard = {
@@ -471,6 +475,24 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
       setGuardandoCorreccion(null)
     }
   }
+
+  /**
+   * Detección proactiva de posible mal-tageo de EDT (heurística por
+   * keywords, sin LLM) — se recalcula en vivo con la evidencia de la
+   * cotización real MÁS lo que el usuario vaya escribiendo en la
+   * descripción libre del alcance, y descarta cualquier EDT que ya esté
+   * marcado (nada que confirmar ahí). Si el usuario lo marca a mano, el
+   * botón de pin ya existente se encarga de guardarlo como corrección.
+   */
+  const edtsPosiblesDetectados = useMemo(() => {
+    const evidencias: EvidenciaTexto[] = [...evidenciasCotizacion, { texto: alcanceLibre, origen: 'Descripción libre del alcance' }]
+    return detectarEdtsPosibles(evidencias).filter(d => {
+      const edt = edts.find(e => e.nombre === d.edtNombre)
+      // Nada que confirmar si ya está marcado, o si ya hay un origen que lo
+      // explica (cotización/regla/corrección) — evita un doble badge confuso.
+      return edt && !edtsSeleccionados.has(edt.id) && !edtsOrigen.has(edt.id)
+    })
+  }, [evidenciasCotizacion, alcanceLibre, edts, edtsSeleccionados, edtsOrigen])
 
   function agregarTablero() {
     setTableros(prev => [...prev, { nombre: '' }])
@@ -769,6 +791,7 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
                 {edts.map(edt => {
                   const origen = edtsOrigen.get(edt.id)
                   const correccion = correccionesEdt.find(c => c.edtId === edt.id)
+                  const posible = edtsPosiblesDetectados.find(d => d.edtNombre === edt.nombre)
                   // Ofrecer "recordar" solo si el usuario lo marcó a mano sin ninguna
                   // señal (ni cotización ni regla) — es exactamente el caso de una
                   // partida mal clasificada en la cotización (ej. G300: PLA).
@@ -794,6 +817,11 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
                           {origen.origen === 'regla-derivada' && 'Derivado del alcance'}
                           {origen.origen === 'regla-sugerencia' && 'Sugerido — confirma'}
                           {origen.origen === 'correccion-proyecto' && 'Corrección de este proyecto'}
+                        </Badge>
+                      )}
+                      {posible && (
+                        <Badge variant="outline" className="text-[10px] shrink-0 border-amber-500 text-amber-600" title={posible.motivo}>
+                          Posible según cotización — confirma
                         </Badge>
                       )}
                       {correccion && (
