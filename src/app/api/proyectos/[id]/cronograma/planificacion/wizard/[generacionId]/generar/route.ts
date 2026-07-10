@@ -56,6 +56,23 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: 'Cronograma no encontrado' }, { status: 404 })
   }
 
+  // Este endpoint siempre inserta una estructura COMPLETA nueva (Fases con
+  // nombres fijos de FaseDefault) — nunca agrega incrementalmente. Si el
+  // cronograma ya tiene Fases (de una aplicación anterior, exitosa), un
+  // segundo "Aplicar al Cronograma" chocaría con la constraint única
+  // (proyectoId, proyectoCronogramaId, nombre) y tiraba un 500 crudo de
+  // Prisma sin explicación. Se corta acá con un mensaje claro.
+  const yaTieneEstructura = await prisma.proyectoFase.findFirst({
+    where: { proyectoCronogramaId: cronograma.id },
+    select: { id: true },
+  })
+  if (yaTieneEstructura) {
+    return NextResponse.json(
+      { error: 'Este cronograma ya tiene una estructura generada (Fases/EDTs/Tareas). No se puede aplicar otra propuesta sobre el mismo cronograma — elimina el cronograma actual primero si querés regenerar desde cero.' },
+      { status: 409 }
+    )
+  }
+
   let calendarioLaboral = cronograma.proyecto.cotizacion?.calendarioLaboral ?? null
   if (!calendarioLaboral) {
     calendarioLaboral = await obtenerCalendarioLaboral('empresa', 'default')
@@ -165,20 +182,28 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     },
   ]
 
-  await prisma.$transaction([
-    prisma.proyectoFase.createMany({ data: estructura.fases }),
-    prisma.proyectoEdt.createMany({ data: estructura.edts }),
-    prisma.proyectoActividad.createMany({ data: estructura.actividades }),
-    prisma.proyectoTarea.createMany({ data: estructura.tareas }),
-    ...(dependenciasSugeridas.length > 0
-      ? [
-          prisma.proyectoDependenciasTarea.createMany({
-            data: dependenciasSugeridas.map(d => ({ id: randomUUID(), ...d })),
-          }),
-        ]
-      : []),
-    prisma.proyectoHito.createMany({ data: hitos }),
-  ])
+  try {
+    await prisma.$transaction([
+      prisma.proyectoFase.createMany({ data: estructura.fases }),
+      prisma.proyectoEdt.createMany({ data: estructura.edts }),
+      prisma.proyectoActividad.createMany({ data: estructura.actividades }),
+      prisma.proyectoTarea.createMany({ data: estructura.tareas }),
+      ...(dependenciasSugeridas.length > 0
+        ? [
+            prisma.proyectoDependenciasTarea.createMany({
+              data: dependenciasSugeridas.map(d => ({ id: randomUUID(), ...d })),
+            }),
+          ]
+        : []),
+      prisma.proyectoHito.createMany({ data: hitos }),
+    ])
+  } catch (e) {
+    console.error('Error aplicando la estructura del cronograma:', e)
+    return NextResponse.json(
+      { error: 'No se pudo aplicar el cronograma — puede que ya exista contenido en conflicto. Refresca la página y verifica antes de reintentar.' },
+      { status: 409 }
+    )
+  }
 
   const resultado = {
     fasesCreadas: estructura.fases.length,
