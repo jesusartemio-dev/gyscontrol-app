@@ -12,11 +12,9 @@ import {
   Calendar,
   DollarSign,
   FileText,
-  Users,
   TrendingUp,
   Edit3,
   Trash2,
-  Plus,
   BarChart3,
   ImageIcon,
   Upload,
@@ -31,6 +29,9 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { getClienteById } from '@/lib/services/cliente'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import ClienteForm from '@/components/clientes/ClienteForm'
+import ContactoList from '@/components/crm/contactos/ContactoList'
+import ContactoForm from '@/components/crm/contactos/ContactoForm'
+import { getContactosByCliente, type CrmContactoCliente } from '@/lib/services/crm'
 import type { Cliente } from '@/types'
 
 interface ProyectoResumen {
@@ -77,6 +78,11 @@ export default function ClienteDetailPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [editOpen, setEditOpen] = useState(false)
 
+  const [contactos, setContactos] = useState<CrmContactoCliente[]>([])
+  const [contactosLoading, setContactosLoading] = useState(true)
+  const [showContactoForm, setShowContactoForm] = useState(false)
+  const [editingContacto, setEditingContacto] = useState<CrmContactoCliente | null>(null)
+
   const loadCliente = async () => {
     try {
       setLoading(true)
@@ -91,12 +97,49 @@ export default function ClienteDetailPage() {
     }
   }
 
+  const loadContactos = async () => {
+    try {
+      setContactosLoading(true)
+      const data = await getContactosByCliente(clienteId)
+      setContactos(data)
+    } catch (err) {
+      console.error('Error loading contactos:', err)
+      setContactos([])
+    } finally {
+      setContactosLoading(false)
+    }
+  }
+
   useEffect(() => {
     if (clienteId) {
       loadCliente()
+      loadContactos()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clienteId])
+
+  const handleCreateContacto = () => {
+    setEditingContacto(null)
+    setShowContactoForm(true)
+  }
+
+  const handleEditContacto = (contacto: CrmContactoCliente) => {
+    setEditingContacto(contacto)
+    setShowContactoForm(true)
+  }
+
+  const handleSaveContacto = (contacto: CrmContactoCliente) => {
+    setContactos(prev => {
+      const existe = prev.some(c => c.id === contacto.id)
+      return existe ? prev.map(c => (c.id === contacto.id ? contacto : c)) : [contacto, ...prev]
+    })
+    setShowContactoForm(false)
+    setEditingContacto(null)
+  }
+
+  const handleDeleteContacto = (contactoId: string) => {
+    setContactos(prev => prev.filter(c => c.id !== contactoId))
+  }
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -488,38 +531,14 @@ export default function ClienteDetailPage() {
 
           {/* Contactos */}
           <TabsContent value="contactos" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <Users className="h-5 w-5" />
-                      Contactos del Cliente
-                    </CardTitle>
-                    <CardDescription>
-                      Gestiona los contactos asociados a este cliente
-                    </CardDescription>
-                  </div>
-                  <Button>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Agregar Contacto
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8">
-                  <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No hay contactos registrados</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Agrega contactos para gestionar mejor la relación con este cliente.
-                  </p>
-                  <Button variant="outline">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Agregar Primer Contacto
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            <ContactoList
+              contactos={contactos}
+              clienteId={clienteId}
+              onEdit={handleEditContacto}
+              onDelete={handleDeleteContacto}
+              onCreate={handleCreateContacto}
+              loading={contactosLoading}
+            />
           </TabsContent>
 
           {/* Proyectos */}
@@ -662,6 +681,16 @@ export default function ClienteDetailPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Modal de creación/edición de contacto */}
+      <ContactoForm
+        isOpen={showContactoForm}
+        onClose={() => { setShowContactoForm(false); setEditingContacto(null) }}
+        onSave={handleSaveContacto}
+        contacto={editingContacto}
+        clienteId={clienteId}
+        mode={editingContacto ? 'edit' : 'create'}
+      />
     </motion.div>
   )
 }
