@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { esCodigoClienteAutomatico } from '@/lib/utils/clienteCodeGenerator'
 
 export async function GET() {
   try {
@@ -66,7 +67,7 @@ export async function POST(req: Request) {
       // Auto-generar código desde el cliente
       const cliente = await prisma.cliente.findUnique({
         where: { id: data.clienteId },
-        select: { codigo: true, numeroSecuencia: true }
+        select: { codigo: true, numeroSecuencia: true, nombre: true }
       })
 
       if (!cliente) {
@@ -74,6 +75,15 @@ export async function POST(req: Request) {
           { error: 'Cliente no encontrado' },
           { status: 404 }
         )
+      }
+
+      // ⚠️ Si el cliente aún tiene el código automático (CLI-XXXX-YY), el
+      // proyecto saldría con un código largo sin sentido. Se bloquea para que
+      // primero le asignen un código propio al cliente.
+      if (esCodigoClienteAutomatico(cliente.codigo)) {
+        return NextResponse.json({
+          error: `El cliente "${cliente.nombre}" todavía tiene un código automático (${cliente.codigo}). Asígnale un código propio en Comercial > Clientes antes de crear el proyecto.`
+        }, { status: 400 })
       }
 
       const nuevoNumero = (cliente.numeroSecuencia || 0) + 1

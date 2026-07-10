@@ -1,15 +1,22 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
-import { FolderPlus } from 'lucide-react'
+import { FolderPlus, AlertTriangle } from 'lucide-react'
 import { crearProyectoDesdeCotizacion } from '@/lib/services/proyecto'
 import type { Cotizacion } from '@/types'
+
+interface PreviewCodigo {
+  clienteNombre: string
+  clienteCodigo: string
+  esAutomatico: boolean
+  codigoGenerado: string | null
+}
 
 interface Props {
   cotizacion: Cotizacion
@@ -30,6 +37,8 @@ export default function CrearProyectoDesdeCotizacionModal({
   const [open, setOpen] = useState(false)
   const [fechaInicio, setFechaInicio] = useState('')
   const [loading, setLoading] = useState(false)
+  const [preview, setPreview] = useState<PreviewCodigo | null>(null)
+  const [loadingPreview, setLoadingPreview] = useState(false)
 
   // ✅ Validaciones de negocio (re-evaluadas en cada render)
   const cotizacionAprobada = cotizacion.estado === 'aprobada'
@@ -37,8 +46,20 @@ export default function CrearProyectoDesdeCotizacionModal({
   const tieneComercial = !!cotizacion.comercial?.id
   const puedeCrearProyecto = cotizacionAprobada && tieneCliente && tieneComercial
 
-  // ✅ Validación: fecha requerida + condiciones de negocio + no loading
-  const puedeCrear = puedeCrearProyecto && fechaInicio && !loading
+  // Previsualizar el código de proyecto al abrir el modal, para advertir si
+  // el cliente todavía tiene un código automático (CLI-XXXX-YY) sin asignar.
+  useEffect(() => {
+    if (!open || !cotizacion.cliente?.id) return
+    setLoadingPreview(true)
+    fetch(`/api/proyecto/from-cotizacion/preview-codigo?clienteId=${cotizacion.cliente.id}`)
+      .then(res => res.json())
+      .then(setPreview)
+      .catch(() => setPreview(null))
+      .finally(() => setLoadingPreview(false))
+  }, [open, cotizacion.cliente?.id])
+
+  // ✅ Validación: fecha requerida + condiciones de negocio + no loading + cliente con código propio
+  const puedeCrear = puedeCrearProyecto && fechaInicio && !loading && !loadingPreview && !preview?.esAutomatico
 
   const handleCrear = async () => {
     if (!puedeCrear) return
@@ -159,6 +180,27 @@ export default function CrearProyectoDesdeCotizacionModal({
             </div>
           )}
 
+          {/* Advertencia: cliente sin código propio */}
+          {puedeCrearProyecto && preview?.esAutomatico && (
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-amber-100 rounded-lg">
+                  <AlertTriangle className="h-5 w-5 text-amber-600" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-amber-900">
+                    El cliente "{preview.clienteNombre}" no tiene un código propio
+                  </p>
+                  <p className="text-xs text-amber-700 mt-1">
+                    Todavía tiene el código automático <strong>{preview.clienteCodigo}</strong>.
+                    Asígnale un código propio (ej. "FMK") en Comercial &gt; Clientes antes de crear el proyecto,
+                    o el código del proyecto saldrá largo y sin sentido.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Información del proyecto */}
           <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
             <div className="flex items-center gap-3">
@@ -171,6 +213,11 @@ export default function CrearProyectoDesdeCotizacionModal({
                 <p className="text-xs text-blue-600 mt-1">
                   Basado en la cotización: {cotizacion.codigo}
                 </p>
+                {preview?.codigoGenerado && (
+                  <p className="text-xs text-blue-600 mt-1">
+                    Código de proyecto que se generará: <strong>{preview.codigoGenerado}</strong>
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -192,13 +239,14 @@ export default function CrearProyectoDesdeCotizacionModal({
             onClick={handleCrear}
             disabled={!puedeCrear || loading}
             className={`${
-              puedeCrearProyecto
+              puedeCrear
                 ? 'bg-purple-600 hover:bg-purple-700 text-white'
                 : 'bg-gray-400 cursor-not-allowed text-gray-200'
             }`}
           >
             {loading ? 'Creando...' :
              !puedeCrearProyecto ? 'Cotización no válida' :
+             preview?.esAutomatico ? 'Asigna código al cliente primero' :
              'Crear Proyecto'}
           </Button>
         </div>

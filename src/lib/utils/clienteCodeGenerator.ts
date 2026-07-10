@@ -119,6 +119,32 @@ export function validateClienteCode(codigo: string): boolean {
 }
 
 /**
+ * Un código de cliente "automático" (CLI-XXXX-YY) es el que el sistema asigna
+ * cuando no se le puso un código propio al crear el cliente. Generar un
+ * proyecto a partir de este código produce códigos largos y sin sentido
+ * (p. ej. "CLI-0014-2614") — por eso se usa para bloquear/advertir antes
+ * de crear el proyecto.
+ */
+export function esCodigoClienteAutomatico(codigo: string): boolean {
+  return validateClienteCode(codigo)
+}
+
+/**
+ * Calcula el código que tendría el próximo proyecto de este cliente, con el
+ * mismo formato usado en `POST /api/proyecto/from-cotizacion` (código del
+ * cliente + secuencial de 2 o 3 dígitos). Solo lectura: no incrementa
+ * `numeroSecuencia`, así que sirve tanto para previsualizar como base del
+ * cálculo real al crear el proyecto.
+ */
+export function generarCodigoProyectoDesdeCliente(cliente: { codigo: string; numeroSecuencia: number | null }): string {
+  const currentSequence = cliente.numeroSecuencia || 1
+  const formattedSequence = currentSequence < 100
+    ? currentSequence.toString().padStart(2, '0')
+    : currentSequence.toString().padStart(3, '0')
+  return `${cliente.codigo}${formattedSequence}`
+}
+
+/**
  * Parse client code into components
  * @param codigo Client code to parse
  * @returns Object with parsed components or null if invalid

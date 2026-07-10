@@ -11,6 +11,7 @@ import { Prisma, EstadoFase, EstadoTarea, EstadoActividad, EstadoEdt } from '@pr
 import { randomUUID } from 'crypto'
 import { calcularCompletitudGeneral } from '@/lib/tdr/completitud'
 import type { TdrAnalisisCore } from '@/types/tdr'
+import { esCodigoClienteAutomatico, generarCodigoProyectoDesdeCliente } from '@/lib/utils/clienteCodeGenerator'
 
 // ✅ Tipo explícito para cotización con includes (5 niveles sin zonas)
 type CotizacionConIncludes = Prisma.CotizacionGetPayload<{
@@ -195,14 +196,18 @@ export async function POST(request: NextRequest) {
 
     // 🔁 Auto-generate project code using cliente.codigo + formatted numeroSecuencia
     const cliente = cotizacion.cliente
+
+    // ⚠️ Si el cliente aún tiene el código automático (CLI-XXXX-YY), el proyecto
+    // saldría con un código largo sin sentido (p. ej. "CLI-0014-2614"). Se
+    // bloquea para que primero le asignen un código propio al cliente.
+    if (esCodigoClienteAutomatico(cliente.codigo)) {
+      return NextResponse.json({
+        error: `El cliente "${cliente.nombre}" todavía tiene un código automático (${cliente.codigo}). Asígnale un código propio en Comercial > Clientes antes de crear el proyecto.`
+      }, { status: 400 })
+    }
+
     const currentSequence = cliente.numeroSecuencia || 1
-    
-    // 📡 Format sequence number: 2 digits if < 100, 3 digits if >= 100
-    const formattedSequence = currentSequence < 100 
-      ? currentSequence.toString().padStart(2, '0')
-      : currentSequence.toString().padStart(3, '0')
-    
-    const generatedCodigo = `${cliente.codigo}${formattedSequence}`
+    const generatedCodigo = generarCodigoProyectoDesdeCliente(cliente)
 
     // 🔁 Update client's sequence number for next project
     await prisma.cliente.update({
