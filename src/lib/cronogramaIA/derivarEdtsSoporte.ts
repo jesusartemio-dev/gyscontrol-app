@@ -169,14 +169,21 @@ export function evaluarSubalcanceCMM(
 /**
  * Marca incluida=false (con motivoExclusion) las tareas de CMM cuyo
  * sub-alcance no se detectó — nunca pisa una exclusión previa (ej.
- * filtroAlcance). Todo sigue editable en el Paso 2/3: esto solo decide qué
- * checkbox arranca pre-marcado.
+ * filtroAlcance: si la tarea ya llega excluida, esta regla ni participa en
+ * la decisión, así que no se le atribuye `reglaClave`). Todo sigue editable
+ * en el Paso 2/3: esto solo decide qué checkbox arranca pre-marcado. Toda
+ * tarea que SÍ fue decidida por esta regla queda taggeada con `reglaClave` +
+ * `incluidaPorRegla` (snapshot inmutable) para poder auditar después si el
+ * usuario forzó la decisión (ver CronogramaIATareaDecision).
  */
 export function aplicarSubalcanceCMM(tareas: TareaPropuesta[], subalcance: SubalcanceCMM): TareaPropuesta[] {
   return tareas.map(t => {
     if (!t.incluida) return t
     const clave = REGLA_TAREA_CMM[t.nombre]
-    if (!clave || subalcance[clave]) return t
-    return { ...t, incluida: false, motivoExclusion: MOTIVO_EXCLUSION_CMM[clave] }
+    if (!clave) return t
+    const reglaClave = `cmm.${clave}`
+    const incluidaPorRegla = subalcance[clave]
+    if (incluidaPorRegla) return { ...t, reglaClave, incluidaPorRegla }
+    return { ...t, incluida: false, motivoExclusion: MOTIVO_EXCLUSION_CMM[clave], reglaClave, incluidaPorRegla }
   })
 }

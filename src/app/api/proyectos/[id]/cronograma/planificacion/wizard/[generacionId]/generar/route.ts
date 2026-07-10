@@ -179,5 +179,34 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     },
   })
 
+  // Auditoría de decisiones (Fase 2, punto f): una fila por tarea regida por
+  // una regla de sub-alcance (CMM hoy, ING/PLA más adelante) con lo que la
+  // regla decidió vs. lo que el usuario dejó al aplicar de verdad — para
+  // calibrar esas reglas con uso real. Nunca bloquea la generación si falla.
+  const decisiones = todasActividades.flatMap(a =>
+    a.tareas
+      .filter(t => t.reglaClave !== undefined && t.incluidaPorRegla !== undefined)
+      .map(t => ({
+        id: randomUUID(),
+        proyectoId: cronograma.proyectoId,
+        generacionId,
+        catalogoServicioId: t.catalogoServicioId,
+        edtNombre: a.edtNombre,
+        actividadNombre: a.actividadNombre,
+        reglaClave: t.reglaClave!,
+        incluidaPorRegla: t.incluidaPorRegla!,
+        incluidaFinal: t.incluida,
+        forzada: t.incluida !== t.incluidaPorRegla,
+        decididoPorId: session.user.id,
+      }))
+  )
+  if (decisiones.length > 0) {
+    try {
+      await prisma.cronogramaIATareaDecision.createMany({ data: decisiones })
+    } catch (e) {
+      console.error('No se pudo registrar la auditoría de decisiones de sub-alcance:', e)
+    }
+  }
+
   return NextResponse.json({ generacionId, resultado, advertencias: estructura.advertencias })
 }

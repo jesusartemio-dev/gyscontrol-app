@@ -579,9 +579,19 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
   function eliminarActividad(index: number) {
     setActividades(prev => prev.filter((_, i) => i !== index))
   }
-  function eliminarTarea(actividadIndex: number, tareaIndex: number) {
+  /**
+   * "Eliminar" una tarea y "excluirla" son la misma acción (reversible): en
+   * vez de sacarla del árbol, se desmarca incluida — el Paso 4 ya filtra por
+   * incluida antes de generar, así que el efecto es idéntico pero el usuario
+   * puede arrepentirse sin tener que regenerar nada.
+   */
+  function toggleTarea(actividadIndex: number, tareaIndex: number, incluida: boolean) {
     setActividades(prev =>
-      prev.map((a, i) => (i === actividadIndex ? { ...a, tareas: a.tareas.filter((_, ti) => ti !== tareaIndex) } : a))
+      prev.map((a, i) =>
+        i === actividadIndex
+          ? { ...a, tareas: a.tareas.map((t, ti) => (ti === tareaIndex ? { ...t, incluida } : t)) }
+          : a
+      )
     )
   }
 
@@ -870,13 +880,24 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
                 />
                 <div className="space-y-1">
                   {actividad.tareas.map((tarea, ti) => (
-                    <div key={tarea.catalogoServicioId} className={`flex items-center gap-2 text-xs p-1.5 rounded ${tarea.incluida ? '' : 'opacity-50'}`}>
-                      <span className="flex-1 truncate">{tarea.nombre}</span>
-                      {!tarea.incluida && <Badge variant="outline" className="text-[10px]">{tarea.motivoExclusion}</Badge>}
+                    <div
+                      key={tarea.catalogoServicioId}
+                      className="flex items-start gap-2 text-xs p-1.5 rounded cursor-pointer hover:bg-muted/50"
+                      onClick={() => toggleTarea(index, ti, !tarea.incluida)}
+                    >
+                      <Checkbox
+                        checked={tarea.incluida}
+                        onCheckedChange={checked => toggleTarea(index, ti, checked === true)}
+                        onClick={e => e.stopPropagation()}
+                        className="mt-0.5 shrink-0"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className={tarea.incluida ? '' : 'text-muted-foreground'}>{tarea.nombre}</p>
+                        {tarea.motivoExclusion && (
+                          <p className="text-[10px] text-muted-foreground mt-0.5">{tarea.motivoExclusion}</p>
+                        )}
+                      </div>
                       <span className="text-muted-foreground shrink-0">{tarea.horasEstimadas.toFixed(1)}h</span>
-                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-destructive shrink-0" onClick={() => eliminarTarea(index, ti)}>
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
                     </div>
                   ))}
                 </div>

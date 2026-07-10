@@ -180,14 +180,35 @@ describe('aplicarSubalcanceCMM', () => {
     expect(r.find(t => t.nombre === 'Puesta en Marcha del Sistema')!.incluida).toBe(true)
   })
 
-  it('una tarea ya excluida por otra regla (ej. filtroAlcance) no se reincluye ni se le pisa el motivo', () => {
+  it('una tarea ya excluida por otra regla (ej. filtroAlcance) no se reincluye, no se le pisa el motivo, y no se le atribuye reglaClave (esta regla no participó en la decisión)', () => {
     const yaExcluida: TareaPropuesta = { ...tareaCmm('Pruebas Neumáticas'), incluida: false, motivoExclusion: 'Otro motivo previo' }
     const r = aplicarSubalcanceCMM([yaExcluida], { ...SUBALCANCE_VACIO, neumatica: true })
     expect(r[0].motivoExclusion).toBe('Otro motivo previo')
+    expect(r[0].reglaClave).toBeUndefined()
   })
 
   it('una tarea con nombre no contemplado en la tabla (ej. catálogo cambió) queda siempre incluida, no revienta', () => {
     const r = aplicarSubalcanceCMM([tareaCmm('Tarea Nueva No Contemplada')], SUBALCANCE_VACIO)
     expect(r[0].incluida).toBe(true)
+  })
+
+  it('taggea reglaClave + incluidaPorRegla (snapshot inmutable) en toda tarea regida por una regla, tanto si queda incluida como excluida', () => {
+    const r = aplicarSubalcanceCMM(
+      [tareaCmm('Calibración de Instrumentos'), tareaCmm('Pruebas Neumáticas')],
+      { ...SUBALCANCE_VACIO, instrumentacion: true }
+    )
+    const calibracion = r.find(t => t.nombre === 'Calibración de Instrumentos')!
+    const neumaticas = r.find(t => t.nombre === 'Pruebas Neumáticas')!
+    expect(calibracion.reglaClave).toBe('cmm.instrumentacion')
+    expect(calibracion.incluidaPorRegla).toBe(true)
+    expect(calibracion.incluida).toBe(true)
+    expect(neumaticas.reglaClave).toBe('cmm.neumatica')
+    expect(neumaticas.incluidaPorRegla).toBe(false)
+    expect(neumaticas.incluida).toBe(false)
+  })
+
+  it('una tarea "siempre incluida" (sin entrada en la tabla) no tiene reglaClave', () => {
+    const r = aplicarSubalcanceCMM([tareaCmm('Informe de Comisionamiento')], SUBALCANCE_VACIO)
+    expect(r[0].reglaClave).toBeUndefined()
   })
 })

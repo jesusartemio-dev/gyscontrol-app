@@ -42,6 +42,22 @@ export interface TareaPropuesta {
   horasEstimadas: number
   incluida: boolean
   motivoExclusion?: string
+  /**
+   * Clave de la regla de sub-alcance que decidió el estado inicial de
+   * `incluida` (ej. "cmm.instrumentacion", "ing.control") — ausente si la
+   * tarea no está regida por ninguna regla (siempre incluida por defecto) o
+   * si ya venía excluida por otro mecanismo (ej. filtroAlcance) antes de que
+   * esta regla pudiera evaluarla.
+   */
+  reglaClave?: string
+  /**
+   * Snapshot de lo que decidió `reglaClave` en el momento en que se evaluó
+   * — a diferencia de `incluida` (que el usuario puede tocar libremente en
+   * el Paso 2/3), este valor nunca se vuelve a escribir. Al aplicar el
+   * cronograma, `incluida !== incluidaPorRegla` significa que el usuario
+   * forzó la decisión de la regla (ver CronogramaIATareaDecision).
+   */
+  incluidaPorRegla?: boolean
   orden: number
 }
 

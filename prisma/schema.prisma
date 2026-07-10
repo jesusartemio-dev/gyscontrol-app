@@ -96,6 +96,7 @@ model CatalogoServicio {
   plantillaServicioItem              PlantillaServicioItem[]
   proyectoServicioCotizadoItem       ProyectoServicioCotizadoItem[]
   plantillaServicioItemIndependiente PlantillaServicioItemIndependiente[]
+  cronogramaIATareaDecision          CronogramaIATareaDecision[]
 
   @@map("catalogo_servicio")
 }
@@ -1164,6 +1165,7 @@ model Proyecto {
   mpp                        Mpp?
   pets                       Pets?
   planificacionesDia         PlanificacionDia[]
+  cronogramaIATareaDecision  CronogramaIATareaDecision[]
 
   @@index([clienteId, estado, createdAt(sort: Desc)], map: "idx_proyecto_cliente_estado_fecha")
   @@index([comercialId, estado, fechaInicio], map: "idx_proyecto_comercial_estado_inicio")
@@ -2067,6 +2069,7 @@ model User {
   planTrabajoGeneraciones                  PlanTrabajoGeneracion[]
   planTrabajoImagenes                      PlanTrabajoImagen[]
   proyectoCronogramaGeneracionesIA         ProyectoCronogramaGeneracionIA[]
+  cronogramaIATareaDecisiones              CronogramaIATareaDecision[]
   // Módulo Ausencias
   solicitudesAusencia                      SolicitudAusencia[]      @relation("AusenciaSolicitante")
   ausenciasComoAprobador1                  SolicitudAusencia[]      @relation("AusenciaAprobador1")
@@ -3337,8 +3340,48 @@ model ProyectoCronogramaGeneracionIA {
   generadoEn    DateTime  @default(now())
   aplicadoEn    DateTime?
 
+  tareaDecisiones CronogramaIATareaDecision[]
+
   @@index([proyectoCronogramaId, generadoEn(sort: Desc)])
   @@map("proyecto_cronograma_generacion_ia")
+}
+
+/// Decisión final del usuario sobre una tarea del wizard de cronograma IA
+/// cuya preselección inicial fue decidida por una regla de sub-alcance
+/// (CMM/ING/PLA, ver derivarEdtsSoporte.ts) — no un log de texto: estructura
+/// consultable para calibrar esas reglas con uso real (qué tan seguido los
+/// usuarios las fuerzan en un sentido u otro). Se escribe una fila por tarea
+/// regida por una regla en el momento en que el cronograma se aplica de
+/// verdad (Paso 4), no en cada autoguardado intermedio.
+model CronogramaIATareaDecision {
+  id         String   @id @default(cuid())
+  proyectoId String
+  proyecto   Proyecto @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+
+  generacionId String?
+  generacion   ProyectoCronogramaGeneracionIA? @relation(fields: [generacionId], references: [id], onDelete: SetNull)
+
+  catalogoServicioId String
+  catalogoServicio   CatalogoServicio @relation(fields: [catalogoServicioId], references: [id], onDelete: Cascade)
+
+  edtNombre       String
+  actividadNombre String
+  /// Clave de la regla que decidió la preselección inicial (ej.
+  /// "cmm.instrumentacion", "ing.control") — null si la tarea no tenía
+  /// ninguna regla de sub-alcance (siempre incluida por defecto) y aun así
+  /// el usuario la desmarcó a mano.
+  reglaClave       String?
+  incluidaPorRegla Boolean
+  incluidaFinal    Boolean
+  forzada          Boolean
+
+  decididoPorId String
+  decididoPor   User     @relation(fields: [decididoPorId], references: [id])
+  decididoEn    DateTime @default(now())
+
+  @@index([catalogoServicioId, reglaClave])
+  @@index([proyectoId])
+  @@map("cronograma_ia_tarea_decision")
 }
 
 model ProyectoDependenciasTarea {
