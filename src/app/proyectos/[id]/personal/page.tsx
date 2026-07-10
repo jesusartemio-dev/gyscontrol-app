@@ -102,7 +102,7 @@ interface ContactoClienteProyecto {
 const rolesContactoClienteConfig: Record<string, { label: string; className: string }> = {
   administrador_contrato: { label: 'Administrador de Contrato', className: 'bg-red-100 text-red-700' },
   jefe_proyecto_cliente:  { label: 'Jefe de Proyecto del Cliente', className: 'bg-indigo-100 text-indigo-700' },
-  inspector_supervisor:   { label: 'Inspector / Supervisor', className: 'bg-orange-100 text-orange-700' },
+  inspector_supervisor:   { label: 'Supervisor', className: 'bg-orange-100 text-orange-700' },
 }
 
 const rolesConfig: Record<string, { icon: any; className: string; label: string }> = {
