@@ -87,6 +87,140 @@ export function buildUserPropuestaZonasCon(
     .join('\n')
 }
 
+export interface ContextoInstanciasParaPrompt {
+  tableros: string[]
+  plcs: string[]
+  hmiCantidad: number
+  scada: boolean
+}
+
+function bloqueContextoInstancias(ctx: ContextoInstanciasParaPrompt | null): string {
+  if (!ctx) return ''
+  const partes: string[] = []
+  if (ctx.tableros.length > 0) {
+    partes.push('TABLEROS DEL PROYECTO (dados por el usuario en el Paso 1):', ...ctx.tableros.map(t => `- ${t}`))
+  }
+  if (ctx.plcs.length > 0) {
+    partes.push('NOMBRES DE PLC YA DADOS POR EL USUARIO EN EL PASO 1 (usalos tal cual, uno por Actividad, no los ignores):', ...ctx.plcs.map(p => `- ${p}`))
+  }
+  if (ctx.hmiCantidad > 0) {
+    partes.push(`N° de estaciones HMI estimado por el usuario en el Paso 1: ${ctx.hmiCantidad} (referencia, no una regla estricta).`)
+  }
+  if (ctx.scada) {
+    partes.push('El proyecto integra con un sistema SCADA existente del cliente (confirmado en el Paso 1).')
+  }
+  if (partes.length === 0) return ''
+  return ['', '--- CONTEXTO DE TABLEROS / HMI DEL PASO 1 ---', ...partes, '--- FIN CONTEXTO ---', ''].join('\n')
+}
+
+export const SYSTEM_PROPUESTA_INSTANCIAS_PLC = `
+Eres el Ingeniero de Automatización Senior de GYS CONTROL INDUSTRIAL SAC,
+empresa peruana especializada en proyectos electromecánicos, automatización e
+instrumentación industrial.
+
+Vas a proponer las Actividades de PROGRAMACIÓN DE PLC (EDT "PLC") de un
+proyecto. El catálogo de PLC no distingue tareas por zona ni tablero: es el
+mismo pipeline de programación (lógica, pruebas, documentación) que se repite
+por cada controlador PLC real del proyecto. Tu trabajo es DETECTAR cuántos
+controladores PLC hay — a partir de los tableros del proyecto y la
+descripción de alcance — y proponer una Actividad por cada uno.
+
+REGLAS ESTRICTAS:
+- Las tareas candidatas YA ESTÁN RESUELTAS por el sistema — vienen con un
+  "id" real del catálogo. NUNCA inventes una tarea ni un id nuevo.
+- Cada Actividad que propongas debe representar UN controlador PLC real, con
+  el pipeline completo de tareas candidatas asignado (usando SOLO ids que
+  aparecen literalmente en la lista del input).
+- Si el usuario ya dio nombres de PLC específicos en el Paso 1, usalos
+  directamente — una Actividad por cada nombre dado, sin inventar otros.
+- Si NO hay nombres de PLC dados en el Paso 1, deducí la cantidad de
+  controladores a partir de los tableros del proyecto y la descripción de
+  alcance, y nombrá cada Actividad de forma identificable (ej.
+  "Programación PLC-001", o si un tablero da un TAG claro y hay evidencia de
+  que aloja el controlador, "Programación PLC - Tablero TCO-CMN-001").
+- Si no hay nombres de PLC dados y el alcance/tableros no dan ningún indicio
+  de que el proyecto incluya programación de PLC, NO propongas ninguna
+  Actividad — es preferible 0 actividades que una inventada.
+- Si el contexto de cotización menciona exclusiones, NO generes Actividades
+  para controladores excluidos del contrato.
+- Devolvé SOLO el JSON, sin markdown ni texto antes o después.
+`.trim()
+
+export function buildUserPropuestaInstanciasPlc(
+  tareas: TareaParaPrompt[],
+  alcanceLibre: string,
+  cotizacion: ContextoCotizacionParaPrompt | null,
+  contextoInstancias: ContextoInstanciasParaPrompt | null,
+  notaCorrectiva = ''
+): string {
+  return [
+    `DESCRIPCIÓN LIBRE DEL ALCANCE (dada por el usuario en el wizard):\n${alcanceLibre || '(no se proporcionó)'}`,
+    bloqueContextoInstancias(contextoInstancias),
+    bloqueContextoCotizacion(cotizacion),
+    'TAREAS CANDIDATAS DEL CATÁLOGO (asigná cada una a la Actividad de PLC que corresponda, por su "id"):',
+    JSON.stringify(tareas, null, 2),
+    notaCorrectiva,
+    '',
+    'ESQUEMA DE OUTPUT (devolvé EXACTAMENTE este JSON, sin markdown):',
+    '{ "grupos": [{ "nombre": "string — nombre del controlador PLC", "catalogoServicioIds": ["string — ids copiados del input"] }] }',
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
+export const SYSTEM_PROPUESTA_INSTANCIAS_HMI = `
+Eres el Ingeniero de Automatización Senior de GYS CONTROL INDUSTRIAL SAC,
+empresa peruana especializada en proyectos electromecánicos, automatización e
+instrumentación industrial.
+
+Vas a proponer las Actividades de HMI (EDT "HMI") de un proyecto: pantallas o
+estaciones de operador locales y, si aplica, integración a un sistema SCADA
+existente del cliente. El catálogo de HMI no distingue tareas por estación:
+es el mismo pipeline (configuración de pantallas, tags, pruebas) que se
+repite por cada estación HMI real, más un pipeline aparte para SCADA si
+corresponde.
+
+REGLAS ESTRICTAS:
+- Las tareas candidatas YA ESTÁN RESUELTAS por el sistema — vienen con un
+  "id" real del catálogo. NUNCA inventes una tarea ni un id nuevo.
+- Proponé una Actividad por cada estación HMI física distinta que puedas
+  identificar (ej. "HMI Sala de Control", "HMI Local Tablero TCO-001"). Si no
+  hay forma de diferenciarlas por nombre, usá el N° de estaciones estimado
+  por el usuario en el Paso 1 como referencia para la cantidad de Actividades
+  ("Estación HMI 1", "Estación HMI 2", ...).
+- Si el Paso 1 confirma integración a un SCADA existente del cliente, proponé
+  una Actividad separada "Integración SCADA" con las tareas de
+  integración/protocolo correspondientes — nunca mezcles esas tareas con las
+  de una estación HMI local.
+- Si no hay evidencia de HMI ni de SCADA en el alcance/contexto, NO propongas
+  ninguna Actividad — es preferible 0 actividades que una inventada.
+- Si el contexto de cotización menciona exclusiones, NO generes Actividades
+  para ese alcance excluido.
+- Devolvé SOLO el JSON, sin markdown ni texto antes o después.
+`.trim()
+
+export function buildUserPropuestaInstanciasHmi(
+  tareas: TareaParaPrompt[],
+  alcanceLibre: string,
+  cotizacion: ContextoCotizacionParaPrompt | null,
+  contextoInstancias: ContextoInstanciasParaPrompt | null,
+  notaCorrectiva = ''
+): string {
+  return [
+    `DESCRIPCIÓN LIBRE DEL ALCANCE (dada por el usuario en el wizard):\n${alcanceLibre || '(no se proporcionó)'}`,
+    bloqueContextoInstancias(contextoInstancias),
+    bloqueContextoCotizacion(cotizacion),
+    'TAREAS CANDIDATAS DEL CATÁLOGO (asigná cada una a la Actividad de HMI/SCADA que corresponda, por su "id"):',
+    JSON.stringify(tareas, null, 2),
+    notaCorrectiva,
+    '',
+    'ESQUEMA DE OUTPUT (devolvé EXACTAMENTE este JSON, sin markdown):',
+    '{ "grupos": [{ "nombre": "string — nombre de la estación HMI o \\"Integración SCADA\\"", "catalogoServicioIds": ["string — ids copiados del input"] }] }',
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
 export const SYSTEM_PROPUESTA_FAMILIAS_PRO = `
 Eres el Coordinador de Procura Senior de GYS CONTROL INDUSTRIAL SAC, empresa
 peruana especializada en proyectos electromecánicos, automatización e

@@ -11,9 +11,14 @@ import {
 import {
   SYSTEM_PROPUESTA_ZONAS_CON,
   SYSTEM_PROPUESTA_FAMILIAS_PRO,
+  SYSTEM_PROPUESTA_INSTANCIAS_PLC,
+  SYSTEM_PROPUESTA_INSTANCIAS_HMI,
   buildUserPropuestaZonasCon,
   buildUserPropuestaFamiliasPro,
+  buildUserPropuestaInstanciasPlc,
+  buildUserPropuestaInstanciasHmi,
   type ContextoCotizacionParaPrompt,
+  type ContextoInstanciasParaPrompt,
   type TareaParaPrompt,
 } from './prompts'
 import type { CatalogoServicioParaWizard, ConfiguracionWizardPaso1 } from '@/types/cronogramaIA'
@@ -25,25 +30,56 @@ function extraerTexto(response: Anthropic.Message): string {
     .join('')
 }
 
+type EdtConAgrupacionIA = 'CON' | 'PRO' | 'PLC' | 'HMI'
+
 interface GenerarPropuestaOpciones {
-  edtNombre: 'CON' | 'PRO'
+  edtNombre: EdtConAgrupacionIA
   serviciosPermitidos: CatalogoServicioParaWizard[]
   alcanceLibre: string
   cotizacion: ContextoCotizacionParaPrompt | null
+  contextoInstancias?: ContextoInstanciasParaPrompt | null
   config: Pick<ConfiguracionWizardPaso1, 'brownfield' | 'ingenieriaDetalle'>
   userId: string
   proyectoId: string
   signal?: AbortSignal
 }
 
+const SYSTEM_POR_EDT: Record<EdtConAgrupacionIA, string> = {
+  CON: SYSTEM_PROPUESTA_ZONAS_CON,
+  PRO: SYSTEM_PROPUESTA_FAMILIAS_PRO,
+  PLC: SYSTEM_PROPUESTA_INSTANCIAS_PLC,
+  HMI: SYSTEM_PROPUESTA_INSTANCIAS_HMI,
+}
+
+function construirPromptUsuario(
+  edtNombre: EdtConAgrupacionIA,
+  tareas: TareaParaPrompt[],
+  alcanceLibre: string,
+  cotizacion: ContextoCotizacionParaPrompt | null,
+  contextoInstancias: ContextoInstanciasParaPrompt | null,
+  notaCorrectiva: string
+): string {
+  switch (edtNombre) {
+    case 'CON':
+      return buildUserPropuestaZonasCon(tareas, alcanceLibre, cotizacion, notaCorrectiva)
+    case 'PRO':
+      return buildUserPropuestaFamiliasPro(tareas, alcanceLibre, cotizacion, notaCorrectiva)
+    case 'PLC':
+      return buildUserPropuestaInstanciasPlc(tareas, alcanceLibre, cotizacion, contextoInstancias, notaCorrectiva)
+    case 'HMI':
+      return buildUserPropuestaInstanciasHmi(tareas, alcanceLibre, cotizacion, contextoInstancias, notaCorrectiva)
+  }
+}
+
 /**
- * Propone agrupación (zonas CON / familias PRO) vía IA, con reintento único
- * si la IA inventa ids, y fallback determinista ("Sin agrupar") si tras el
- * reintento sigue habiendo tareas sin asignar — nunca lanza, nunca pierde
- * una tarea. Mismo espíritu que generarAlcanceDetallado.ts de Plan de Trabajo.
+ * Propone agrupación vía IA (zonas CON / familias PRO / instancias de
+ * controlador PLC / estaciones HMI), con reintento único si la IA inventa
+ * ids, y fallback determinista ("Sin agrupar") si tras el reintento sigue
+ * habiendo tareas sin asignar — nunca lanza, nunca pierde una tarea. Mismo
+ * espíritu que generarAlcanceDetallado.ts de Plan de Trabajo.
  */
 export async function generarPropuestaConIA(opciones: GenerarPropuestaOpciones): Promise<ResultadoValidacionGrupos> {
-  const { edtNombre, serviciosPermitidos, alcanceLibre, cotizacion, config, userId, proyectoId, signal } = opciones
+  const { edtNombre, serviciosPermitidos, alcanceLibre, cotizacion, contextoInstancias = null, config, userId, proyectoId, signal } = opciones
 
   if (serviciosPermitidos.length === 0) {
     return { actividades: [], tareaIdsNoAsignadas: [], tareaIdsInventados: [], advertencias: [] }
@@ -55,8 +91,7 @@ export async function generarPropuestaConIA(opciones: GenerarPropuestaOpciones):
     descripcion: s.descripcion,
   }))
 
-  const system = edtNombre === 'CON' ? SYSTEM_PROPUESTA_ZONAS_CON : SYSTEM_PROPUESTA_FAMILIAS_PRO
-  const buildUser = edtNombre === 'CON' ? buildUserPropuestaZonasCon : buildUserPropuestaFamiliasPro
+  const system = SYSTEM_POR_EDT[edtNombre]
 
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   let notaCorrectiva = ''
@@ -71,7 +106,12 @@ export async function generarPropuestaConIA(opciones: GenerarPropuestaOpciones):
           model: MODELS.sonnet,
           max_tokens: 4096,
           system,
-          messages: [{ role: 'user', content: buildUser(tareasParaPrompt, alcanceLibre, cotizacion, notaCorrectiva) }],
+          messages: [
+            {
+              role: 'user',
+              content: construirPromptUsuario(edtNombre, tareasParaPrompt, alcanceLibre, cotizacion, contextoInstancias, notaCorrectiva),
+            },
+          ],
         },
         { signal }
       )

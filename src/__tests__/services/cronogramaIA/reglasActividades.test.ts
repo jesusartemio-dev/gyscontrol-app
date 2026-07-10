@@ -153,24 +153,7 @@ describe('generarActividadesDeterministas — PLA (Tablero replicado por instanc
   })
 })
 
-describe('generarActividadesDeterministas — PLC/TAB (una Actividad por instancia, catálogo completo replicado)', () => {
-  it('PLC genera una Actividad por cada nombre de PLC con TODOS los servicios PLC', () => {
-    const servicios = [servicio({ id: 'plc1', nombre: 'Lógica de Motor' }), servicio({ id: 'plc2', nombre: 'Lógica de Alarmas' })]
-    const edts: EdtParaGenerar[] = [{ nombre: 'PLC', descripcion: 'PLC', servicios }]
-    const r = generarActividadesDeterministas(edts, config({ plcs: [{ nombre: 'PLC Balanza 220' }] }))
-    expect(r.actividades).toHaveLength(1)
-    expect(r.actividades[0].actividadNombre).toBe('PLC Balanza 220')
-    expect(r.actividades[0].tareas).toHaveLength(2)
-  })
-
-  it('PLC sin nombres en el Paso 1 NO genera ninguna Actividad (regla dura: N° de PLCs > 0)', () => {
-    const servicios = [servicio({ id: 'plc1', nombre: 'Lógica de Motor' })]
-    const edts: EdtParaGenerar[] = [{ nombre: 'PLC', descripcion: 'PLC', servicios }]
-    const r = generarActividadesDeterministas(edts, config({ plcs: [] }))
-    expect(r.actividades).toHaveLength(0)
-    expect(r.advertencias.length).toBeGreaterThan(0)
-  })
-
+describe('generarActividadesDeterministas — TAB (una Actividad por instancia, catálogo completo replicado)', () => {
   it('TAB genera una Actividad "Tablero <nombre>" por cada tablero, con TODOS los servicios TAB', () => {
     const servicios = [servicio({ id: 'tab1', nombre: 'Cableado de Fuerza' }), servicio({ id: 'tab2', nombre: 'Pruebas FAT' })]
     const edts: EdtParaGenerar[] = [{ nombre: 'TAB', descripcion: 'Armado de Tableros', servicios }]
@@ -186,33 +169,6 @@ describe('generarActividadesDeterministas — PLC/TAB (una Actividad por instanc
     const r = generarActividadesDeterministas(edts, config({ tableros: [] }))
     expect(r.actividades).toHaveLength(0)
     expect(r.advertencias.length).toBeGreaterThan(0)
-  })
-})
-
-describe('generarActividadesDeterministas — HMI (estaciones + SCADA separado por nombre)', () => {
-  it('sin scada, todo el catálogo va a cada estación', () => {
-    const servicios = [servicio({ id: 'h1', nombre: 'Pantalla de Proceso' }), servicio({ id: 'h2', nombre: 'Configuración de Tags SCADA' })]
-    const edts: EdtParaGenerar[] = [{ nombre: 'HMI', descripcion: 'HMI', servicios }]
-    const r = generarActividadesDeterministas(edts, config({ hmiCantidad: 2, scada: false }))
-    expect(r.actividades.map(a => a.actividadNombre)).toEqual(['Estación HMI 1', 'Estación HMI 2'])
-    expect(r.actividades[0].tareas).toHaveLength(2)
-  })
-
-  it('con scada, las tareas con "SCADA" en el nombre van a una Actividad SCADA separada', () => {
-    const servicios = [servicio({ id: 'h1', nombre: 'Pantalla de Proceso' }), servicio({ id: 'h2', nombre: 'Configuración de Tags SCADA' })]
-    const edts: EdtParaGenerar[] = [{ nombre: 'HMI', descripcion: 'HMI', servicios }]
-    const r = generarActividadesDeterministas(edts, config({ hmiCantidad: 1, scada: true }))
-    const nombres = r.actividades.map(a => a.actividadNombre)
-    expect(nombres).toContain('SCADA')
-    expect(r.actividades.find(a => a.actividadNombre === 'SCADA')!.tareas.map(t => t.catalogoServicioId)).toEqual(['h2'])
-    expect(r.actividades.find(a => a.actividadNombre === 'Estación HMI 1')!.tareas.map(t => t.catalogoServicioId)).toEqual(['h1'])
-  })
-
-  it('hmiCantidad=0 no genera ninguna actividad aunque haya servicios', () => {
-    const servicios = [servicio({ id: 'h1', nombre: 'Pantalla de Proceso' })]
-    const edts: EdtParaGenerar[] = [{ nombre: 'HMI', descripcion: 'HMI', servicios }]
-    const r = generarActividadesDeterministas(edts, config({ hmiCantidad: 0 }))
-    expect(r.actividades).toHaveLength(0)
   })
 })
 
@@ -239,11 +195,13 @@ describe('generarActividadesDeterministas — CMM/SEG (una sola Actividad fija)'
   })
 })
 
-describe('generarActividadesDeterministas — CON/PRO nunca pasan por el motor determinista', () => {
-  it('EDTs CON y PRO se ignoran completamente (se gestionan en Bloque D con IA)', () => {
+describe('generarActividadesDeterministas — CON/PRO/PLC/HMI nunca pasan por el motor determinista', () => {
+  it('EDTs CON, PRO, PLC y HMI se ignoran completamente (se gestionan en Bloque D con IA)', () => {
     const edts: EdtParaGenerar[] = [
       { nombre: 'CON', descripcion: 'Construcción', servicios: [servicio({ id: 'x1', nombre: 'Tendido de cables' })] },
       { nombre: 'PRO', descripcion: 'Procura', servicios: [servicio({ id: 'x2', nombre: 'Solicitud de Cotización' })] },
+      { nombre: 'PLC', descripcion: 'PLC', servicios: [servicio({ id: 'x3', nombre: 'Lógica de Motor' })] },
+      { nombre: 'HMI', descripcion: 'HMI', servicios: [servicio({ id: 'x4', nombre: 'Pantalla de Proceso' })] },
     ]
     const r = generarActividadesDeterministas(edts, config())
     expect(r.actividades).toHaveLength(0)

@@ -8,9 +8,10 @@ import type {
 
 /**
  * EDTs cuya agrupación en Actividades depende de IA (zonas de CON, familias
- * de PRO) — nunca pasan por este motor determinista. Ver Bloque D.
+ * de PRO, controladores PLC detectados, estaciones HMI/SCADA detectadas) —
+ * nunca pasan por este motor determinista. Ver Bloque D.
  */
-export const EDTS_CON_IA = ['CON', 'PRO'] as const
+export const EDTS_AGRUPACION_IA = ['CON', 'PRO', 'PLC', 'HMI'] as const
 
 export function calcularHorasEstimadas(
   horaBase: number | null,
@@ -182,42 +183,12 @@ function generarPorInstancia(
   return actividades
 }
 
-function generarPLC(servicios: CatalogoServicioParaWizard[], config: ConfiguracionWizardPaso1, advertencias: string[]): ActividadPropuesta[] {
-  const nombres = config.plcs.map(p => p.nombre).filter(Boolean)
-  if (servicios.length > 0 && nombres.length === 0) {
-    advertencias.push('PLC tiene servicios en el catálogo pero no se especificó ningún PLC en el Paso 1 — no se generó ninguna Actividad de PLC (regla: N° de PLCs > 0).')
-  }
-  return generarPorInstancia(servicios, 'PLC', nombres, config)
-}
-
 function generarTAB(servicios: CatalogoServicioParaWizard[], config: ConfiguracionWizardPaso1, advertencias: string[]): ActividadPropuesta[] {
   const nombres = config.tableros.map(t => t.nombre).filter(Boolean)
   if (servicios.length > 0 && nombres.length === 0) {
     advertencias.push('TAB tiene servicios en el catálogo pero no se especificó ningún tablero en el Paso 1 — no se generó ninguna Actividad de TAB (regla: N° de tableros > 0).')
   }
   return generarPorInstancia(servicios, 'TAB', nombres.map(formatearNombreTablero), config)
-}
-
-const RX_SCADA = /scada/i
-
-/** HMI: una Actividad por estación (nombres genéricos "Estación HMI N") + una "SCADA" si aplica, separada por nombre del servicio (campo estructurado, no descripción). */
-function generarHMI(servicios: CatalogoServicioParaWizard[], config: ConfiguracionWizardPaso1): ActividadPropuesta[] {
-  if (servicios.length === 0 || config.hmiCantidad <= 0) return []
-
-  const scadaServicios = config.scada ? servicios.filter(s => RX_SCADA.test(s.nombre)) : []
-  const estacionServicios = config.scada ? servicios.filter(s => !RX_SCADA.test(s.nombre)) : servicios
-
-  const nombresEstaciones = Array.from({ length: config.hmiCantidad }, (_, i) => `Estación HMI ${i + 1}`)
-  const actividades = generarPorInstancia(estacionServicios, 'HMI', nombresEstaciones, config)
-
-  if (scadaServicios.length > 0) {
-    const tareas = scadaServicios.map(s => construirTareaPropuesta(s, config))
-    if (tieneAlMenosUnaTareaIncluida(tareas)) {
-      actividades.push({ edtNombre: 'HMI', actividadNombre: 'SCADA', tareas, origen: 'determinista' })
-    }
-  }
-
-  return actividades
 }
 
 /** Fallback genérico — EDTs sin regla propia (ej. CAD) o no contemplados: una única Actividad con todo el catálogo del EDT. */
@@ -250,7 +221,7 @@ export function generarActividadesDeterministas(
   const actividades: ActividadPropuesta[] = []
 
   for (const edt of edts) {
-    if ((EDTS_CON_IA as readonly string[]).includes(edt.nombre)) {
+    if ((EDTS_AGRUPACION_IA as readonly string[]).includes(edt.nombre)) {
       continue
     }
     switch (edt.nombre) {
@@ -272,14 +243,8 @@ export function generarActividadesDeterministas(
       case 'PLA':
         actividades.push(...generarPLA(edt.servicios, config, advertencias))
         break
-      case 'PLC':
-        actividades.push(...generarPLC(edt.servicios, config, advertencias))
-        break
       case 'TAB':
         actividades.push(...generarTAB(edt.servicios, config, advertencias))
-        break
-      case 'HMI':
-        actividades.push(...generarHMI(edt.servicios, config))
         break
       default:
         actividades.push(...generarDefault(edt.servicios, edt.nombre, edt.descripcion, config))

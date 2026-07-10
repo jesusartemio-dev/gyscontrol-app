@@ -6,9 +6,9 @@ import { validarPermisoCronograma } from '@/lib/services/cronogramaPermisos'
 import { isIAFeatureEnabled } from '@/lib/agente/featureFlags'
 import { adquirirLockCronogramaIA, liberarLockCronogramaIA } from '@/lib/cronogramaIA/mutex'
 import { generarPropuestaConIA } from '@/lib/cronogramaIA/generarPropuestaConIA'
-import { EDTS_CON_IA } from '@/lib/cronogramaIA/reglasActividades'
+import { EDTS_AGRUPACION_IA } from '@/lib/cronogramaIA/reglasActividades'
 import type { ActividadPropuesta, CatalogoServicioParaWizard, ConfiguracionWizardPaso1 } from '@/types/cronogramaIA'
-import type { ContextoCotizacionParaPrompt } from '@/lib/cronogramaIA/prompts'
+import type { ContextoCotizacionParaPrompt, ContextoInstanciasParaPrompt } from '@/lib/cronogramaIA/prompts'
 
 export const maxDuration = 120
 
@@ -20,7 +20,9 @@ interface LineaClasificada {
   categoria: 'equipos' | 'servicios' | 'gastos'
 }
 
-const CATEGORIA_LINEAS_POR_EDT: Record<'CON' | 'PRO', LineaClasificada['categoria']> = {
+type EdtConAgrupacionIA = 'CON' | 'PRO' | 'PLC' | 'HMI'
+
+const CATEGORIA_LINEAS_POR_EDT: Partial<Record<EdtConAgrupacionIA, LineaClasificada['categoria']>> = {
   CON: 'servicios',
   PRO: 'equipos',
 }
@@ -66,7 +68,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     const edtsIA = await prisma.edt.findMany({
       where: {
         id: { in: config.edtsSeleccionados },
-        nombre: { in: [...EDTS_CON_IA] },
+        nombre: { in: [...EDTS_AGRUPACION_IA] },
       },
       include: { catalogoServicio: { include: { unidadServicio: true, recurso: true }, orderBy: { orden: 'asc' } } },
     })
@@ -76,7 +78,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
         generacionId: generacion.id,
         propuestaActividades: generacion.propuestaActividades,
         advertencias: generacion.advertencias ?? [],
-        mensaje: 'No hay EDTs de CON/PRO seleccionados en este borrador.',
+        mensaje: 'No hay EDTs de CON/PRO/PLC/HMI seleccionados en este borrador.',
       })
     }
 
@@ -87,11 +89,10 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
 
     const lineasClasificadas = (cotizacionDoc?.lineasClasificadas as LineaClasificada[] | null) ?? []
 
-    function construirContextoCotizacion(edtNombre: 'CON' | 'PRO'): ContextoCotizacionParaPrompt | null {
+    function construirContextoCotizacion(edtNombre: EdtConAgrupacionIA): ContextoCotizacionParaPrompt | null {
       if (!cotizacionDoc) return null
       const categoria = CATEGORIA_LINEAS_POR_EDT[edtNombre]
-      const lineas = lineasClasificadas
-        .filter(l => l.categoria === categoria)
+      const lineas = (categoria ? lineasClasificadas.filter(l => l.categoria === categoria) : lineasClasificadas)
         .sort((a, b) => b.monto - a.monto)
         .slice(0, MAX_LINEAS_CONTEXTO)
       return {
@@ -101,9 +102,16 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
       }
     }
 
+    const contextoInstancias: ContextoInstanciasParaPrompt = {
+      tableros: config.tableros.map(t => t.nombre).filter(Boolean),
+      plcs: config.plcs.map(p => p.nombre).filter(Boolean),
+      hmiCantidad: config.hmiCantidad,
+      scada: config.scada,
+    }
+
     const resultados = await Promise.allSettled(
       edtsIA.map(async edt => {
-        const nombre = edt.nombre as 'CON' | 'PRO'
+        const nombre = edt.nombre as EdtConAgrupacionIA
         const serviciosPermitidos: CatalogoServicioParaWizard[] = edt.catalogoServicio.map(s => ({
           id: s.id,
           nombre: s.nombre,
@@ -126,6 +134,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
           serviciosPermitidos,
           alcanceLibre: config.alcanceLibre,
           cotizacion: construirContextoCotizacion(nombre),
+          contextoInstancias: nombre === 'PLC' || nombre === 'HMI' ? contextoInstancias : null,
           config: { brownfield: config.brownfield, ingenieriaDetalle: config.ingenieriaDetalle },
           userId: session.user.id,
           proyectoId,
