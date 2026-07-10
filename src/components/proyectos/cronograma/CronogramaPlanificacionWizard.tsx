@@ -23,7 +23,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { ChevronLeft, ChevronRight, Loader2, Plus, Trash2, Sparkles, AlertCircle, FileCheck2, History, Pin, PinOff } from 'lucide-react'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { ChevronLeft, ChevronRight, Loader2, Plus, Trash2, Sparkles, AlertCircle, FileCheck2, History, Pin, PinOff, FolderInput } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import type { ActividadPropuesta, ConfiguracionWizardPaso1 } from '@/types/cronogramaIA'
 import type { EdtSugeridoConOrigen } from '@/lib/cronogramaIA/derivarEdtsSoporte'
@@ -575,6 +576,15 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
 
   async function aplicarCronograma() {
     if (!generacionId) return
+    // Advertir, nunca bloquear: si quedan tareas incluidas en "Sin agrupar",
+    // el usuario decide si aplica igual o vuelve a revisar.
+    const sinAgrupar = actividades.find(a => a.actividadNombre === 'Sin agrupar' && a.tareas.some(t => t.incluida))
+    if (sinAgrupar) {
+      toast({
+        title: 'Hay tareas sin zona asignada',
+        description: `"Sin agrupar" tiene ${sinAgrupar.tareas.filter(t => t.incluida).length} tarea(s) incluida(s) — se van a generar igual. Podés moverlas a otra Actividad antes de aplicar.`,
+      })
+    }
     setAplicandoCronograma(true)
     try {
       await guardarActividades()
@@ -652,6 +662,24 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
           : a
       )
     )
+  }
+
+  /**
+   * Reasignación manual: mueve una tarea de una Actividad a otra del mismo
+   * EDT (incluye "Sin agrupar" como origen o destino) — para cuando la IA no
+   * ubicó bien una tarea, sin tener que regenerar toda la propuesta.
+   */
+  function moverTarea(actividadOrigenIndex: number, tareaIndex: number, actividadDestinoIndex: number) {
+    if (actividadOrigenIndex === actividadDestinoIndex) return
+    setActividades(prev => {
+      const tarea = prev[actividadOrigenIndex]?.tareas[tareaIndex]
+      if (!tarea) return prev
+      return prev.map((a, i) => {
+        if (i === actividadOrigenIndex) return { ...a, tareas: a.tareas.filter((_, ti) => ti !== tareaIndex) }
+        if (i === actividadDestinoIndex) return { ...a, tareas: [...a.tareas, tarea] }
+        return a
+      })
+    })
   }
 
   const progreso = (pasoActual / PASOS.length) * 100
@@ -961,6 +989,15 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
                     <Badge variant="secondary" className="text-xs">
                       {actividad.tareas.filter(t => t.incluida).length}/{actividad.tareas.length} tareas
                     </Badge>
+                    {actividad.actividadNombre === 'Sin agrupar' && (
+                      <Badge
+                        variant="destructive"
+                        className="text-[10px]"
+                        title="La IA no supo en qué zona ubicar estas tareas — muévelas a la Actividad que corresponda o déjalas acá. No bloquea aplicar el cronograma."
+                      >
+                        Revisar — sin zona asignada
+                      </Badge>
+                    )}
                   </div>
                 </AccordionTrigger>
                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive shrink-0" onClick={() => eliminarActividad(index)}>
@@ -974,27 +1011,55 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
                   className="h-8 text-sm mb-2"
                 />
                 <div className="space-y-1">
-                  {actividad.tareas.map((tarea, ti) => (
-                    <div
-                      key={tarea.catalogoServicioId}
-                      className="flex items-start gap-2 text-xs p-1.5 rounded cursor-pointer hover:bg-muted/50"
-                      onClick={() => toggleTarea(index, ti, !tarea.incluida)}
-                    >
-                      <Checkbox
-                        checked={tarea.incluida}
-                        onCheckedChange={checked => toggleTarea(index, ti, checked === true)}
-                        onClick={e => e.stopPropagation()}
-                        className="mt-0.5 shrink-0"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className={tarea.incluida ? '' : 'text-muted-foreground'}>{tarea.nombre}</p>
-                        {tarea.motivoExclusion && (
-                          <p className="text-[10px] text-muted-foreground mt-0.5">{tarea.motivoExclusion}</p>
+                  {(() => {
+                    const destinos = actividades
+                      .map((a, ai) => ({ ai, nombre: a.actividadNombre }))
+                      .filter(d => d.ai !== index && actividades[d.ai].edtNombre === actividad.edtNombre)
+                    return actividad.tareas.map((tarea, ti) => (
+                      <div
+                        key={tarea.catalogoServicioId}
+                        className="flex items-start gap-2 text-xs p-1.5 rounded cursor-pointer hover:bg-muted/50"
+                        onClick={() => toggleTarea(index, ti, !tarea.incluida)}
+                      >
+                        <Checkbox
+                          checked={tarea.incluida}
+                          onCheckedChange={checked => toggleTarea(index, ti, checked === true)}
+                          onClick={e => e.stopPropagation()}
+                          className="mt-0.5 shrink-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className={tarea.incluida ? '' : 'text-muted-foreground'}>{tarea.nombre}</p>
+                          {tarea.motivoExclusion && (
+                            <p className="text-[10px] text-muted-foreground mt-0.5">{tarea.motivoExclusion}</p>
+                          )}
+                        </div>
+                        <span className="text-muted-foreground shrink-0">{tarea.horasEstimadas.toFixed(1)}h</span>
+                        {destinos.length > 0 && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0 shrink-0"
+                                title="Mover a otra Actividad"
+                                onClick={e => e.stopPropagation()}
+                              >
+                                <FolderInput className="h-3 w-3" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
+                              <DropdownMenuLabel className="text-xs">Mover a...</DropdownMenuLabel>
+                              {destinos.map(d => (
+                                <DropdownMenuItem key={d.ai} onSelect={() => moverTarea(index, ti, d.ai)}>
+                                  {d.nombre}
+                                </DropdownMenuItem>
+                              ))}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         )}
                       </div>
-                      <span className="text-muted-foreground shrink-0">{tarea.horasEstimadas.toFixed(1)}h</span>
-                    </div>
-                  ))}
+                    ))
+                  })()}
                 </div>
               </AccordionContent>
             </AccordionItem>
