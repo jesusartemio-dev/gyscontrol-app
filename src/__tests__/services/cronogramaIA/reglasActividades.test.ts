@@ -17,6 +17,7 @@ function servicio(overrides: Partial<CatalogoServicioParaWizard> & { id: string;
     horaRepetido: 0,
     cantidad: 1,
     nivelDificultad: 1,
+    orden: 0,
     unidadNombre: 'unidad',
     recursoNombre: 'Ingeniero',
     ...overrides,
@@ -130,18 +131,25 @@ describe('generarActividadesDeterministas — PLA (Tablero replicado por instanc
     const edts: EdtParaGenerar[] = [{ nombre: 'PLA', descripcion: 'Planos', servicios }]
     const r = generarActividadesDeterministas(edts, config({ tableros: [{ nombre: 'TCO-CMN-QUI-007' }, { nombre: 'TCO-CMN-QUI-008' }] }))
 
-    const nombresTableros = r.actividades.filter(a => a.actividadNombre.startsWith('TCO')).map(a => a.actividadNombre)
-    expect(nombresTableros).toEqual(['TCO-CMN-QUI-007', 'TCO-CMN-QUI-008'])
-    expect(r.actividades.find(a => a.actividadNombre === 'TCO-CMN-QUI-007')!.tareas[0].catalogoServicioId).toBe('p1')
+    const nombresTableros = r.actividades.filter(a => a.actividadNombre.startsWith('Tablero ')).map(a => a.actividadNombre)
+    expect(nombresTableros).toEqual(['Tablero TCO-CMN-QUI-007', 'Tablero TCO-CMN-QUI-008'])
+    expect(r.actividades.find(a => a.actividadNombre === 'Tablero TCO-CMN-QUI-007')!.tareas[0].catalogoServicioId).toBe('p1')
     expect(r.actividades.find(a => a.actividadNombre === 'Disciplina Instrumentación')).toBeTruthy()
   })
 
-  it('sin nombres de tablero en el Paso 1, usa "Tablero 1" y agrega advertencia', () => {
+  it('sin nombres de tablero en el Paso 1, NO genera ninguna Actividad de tablero (regla dura: N° tableros > 0) y agrega advertencia', () => {
     const servicios = [servicio({ id: 'p1', nombre: 'Planos Generales de Tablero', actividadTag: ['Tablero'] })]
     const edts: EdtParaGenerar[] = [{ nombre: 'PLA', descripcion: 'Planos', servicios }]
     const r = generarActividadesDeterministas(edts, config({ tableros: [] }))
-    expect(r.actividades.map(a => a.actividadNombre)).toEqual(['Tablero 1'])
+    expect(r.actividades).toHaveLength(0)
     expect(r.advertencias.length).toBeGreaterThan(0)
+  })
+
+  it('un nombre de tablero que ya empieza con "Tablero" no duplica el prefijo', () => {
+    const servicios = [servicio({ id: 'p1', nombre: 'Planos Generales de Tablero', actividadTag: ['Tablero'] })]
+    const edts: EdtParaGenerar[] = [{ nombre: 'PLA', descripcion: 'Planos', servicios }]
+    const r = generarActividadesDeterministas(edts, config({ tableros: [{ nombre: 'Tablero Principal' }] }))
+    expect(r.actividades.map(a => a.actividadNombre)).toEqual(['Tablero Principal'])
   })
 })
 
@@ -153,6 +161,31 @@ describe('generarActividadesDeterministas — PLC/TAB (una Actividad por instanc
     expect(r.actividades).toHaveLength(1)
     expect(r.actividades[0].actividadNombre).toBe('PLC Balanza 220')
     expect(r.actividades[0].tareas).toHaveLength(2)
+  })
+
+  it('PLC sin nombres en el Paso 1 NO genera ninguna Actividad (regla dura: N° de PLCs > 0)', () => {
+    const servicios = [servicio({ id: 'plc1', nombre: 'Lógica de Motor' })]
+    const edts: EdtParaGenerar[] = [{ nombre: 'PLC', descripcion: 'PLC', servicios }]
+    const r = generarActividadesDeterministas(edts, config({ plcs: [] }))
+    expect(r.actividades).toHaveLength(0)
+    expect(r.advertencias.length).toBeGreaterThan(0)
+  })
+
+  it('TAB genera una Actividad "Tablero <nombre>" por cada tablero, con TODOS los servicios TAB', () => {
+    const servicios = [servicio({ id: 'tab1', nombre: 'Cableado de Fuerza' }), servicio({ id: 'tab2', nombre: 'Pruebas FAT' })]
+    const edts: EdtParaGenerar[] = [{ nombre: 'TAB', descripcion: 'Armado de Tableros', servicios }]
+    const r = generarActividadesDeterministas(edts, config({ tableros: [{ nombre: 'TCO-CMN-QUI-007' }] }))
+    expect(r.actividades).toHaveLength(1)
+    expect(r.actividades[0].actividadNombre).toBe('Tablero TCO-CMN-QUI-007')
+    expect(r.actividades[0].tareas).toHaveLength(2)
+  })
+
+  it('TAB sin nombres de tablero en el Paso 1 NO genera ninguna Actividad (regla dura: N° tableros > 0)', () => {
+    const servicios = [servicio({ id: 'tab1', nombre: 'Cableado de Fuerza' })]
+    const edts: EdtParaGenerar[] = [{ nombre: 'TAB', descripcion: 'Armado de Tableros', servicios }]
+    const r = generarActividadesDeterministas(edts, config({ tableros: [] }))
+    expect(r.actividades).toHaveLength(0)
+    expect(r.advertencias.length).toBeGreaterThan(0)
   })
 })
 
@@ -225,5 +258,26 @@ describe('generarActividadesDeterministas — fallback genérico (ej. CAD, EDTs 
     expect(r.actividades).toHaveLength(1)
     expect(r.actividades[0].actividadNombre).toBe('Diagramas y Planos')
     expect(r.actividades[0].tareas).toHaveLength(2)
+  })
+})
+
+describe('generarActividadesDeterministas — orden de tareas siempre por el campo orden del catálogo', () => {
+  it('reordena las tareas por orden real, sin importar el orden de llegada del fetch', () => {
+    const servicios = [
+      servicio({ id: 't-embalaje', nombre: 'Embalaje y Preparación para Despacho', orden: 12 }),
+      servicio({ id: 't-fat', nombre: 'Pruebas FAT', orden: 11 }),
+      servicio({ id: 't-recepcion', nombre: 'Recepción y Verificación de Materiales', orden: 0 }),
+      servicio({ id: 't-cableado', nombre: 'Cableado de Control (PLC-I/O)', orden: 5 }),
+    ]
+    const edts: EdtParaGenerar[] = [{ nombre: 'TAB', descripcion: 'Armado de Tableros', servicios }]
+    const r = generarActividadesDeterministas(edts, config({ tableros: [{ nombre: 'TCO-001' }] }))
+    expect(r.actividades[0].tareas.map(t => t.catalogoServicioId)).toEqual(['t-recepcion', 't-cableado', 't-fat', 't-embalaje'])
+  })
+
+  it('servicios con el mismo orden (o sin orden) no rompen el sort — orden estable', () => {
+    const servicios = [servicio({ id: 's1', nombre: 'A' }), servicio({ id: 's2', nombre: 'B' })]
+    const edts: EdtParaGenerar[] = [{ nombre: 'CMM', descripcion: 'Comisionamiento', servicios }]
+    const r = generarActividadesDeterministas(edts, config())
+    expect(r.actividades[0].tareas.map(t => t.catalogoServicioId)).toEqual(['s1', 's2'])
   })
 })

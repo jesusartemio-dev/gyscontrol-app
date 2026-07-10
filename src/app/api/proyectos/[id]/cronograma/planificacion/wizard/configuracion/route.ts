@@ -77,7 +77,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   const edtsSeleccionados = await prisma.edt.findMany({
     where: { id: { in: config.edtsSeleccionados } },
     include: {
-      catalogoServicio: { include: { unidadServicio: true, recurso: true } },
+      catalogoServicio: { include: { unidadServicio: true, recurso: true }, orderBy: { orden: 'asc' } },
     },
   })
 
@@ -94,6 +94,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       horaRepetido: s.horaRepetido,
       cantidad: s.cantidad,
       nivelDificultad: s.nivelDificultad,
+      orden: s.orden,
       unidadNombre: s.unidadServicio.nombre,
       recursoNombre: s.recurso.nombre,
     }))

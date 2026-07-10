@@ -58,7 +58,13 @@ export function construirTareaPropuesta(
     horasEstimadas: calcularHorasEstimadas(servicio.horaBase, servicio.horaRepetido, cantidad, nivelDificultad),
     incluida,
     motivoExclusion,
+    orden: servicio.orden ?? Number.MAX_SAFE_INTEGER,
   }
+}
+
+/** Orden real del catálogo (nunca el orden de llegada de la respuesta de la IA ni del fetch). */
+export function ordenarPorCatalogo<T extends { orden: number }>(tareas: T[]): T[] {
+  return [...tareas].sort((a, b) => a.orden - b.orden)
 }
 
 /** true si la actividad debe crearse (tiene al menos 1 tarea incluida tras el filtro de alcance). */
@@ -121,6 +127,11 @@ function generarCMM(servicios: CatalogoServicioParaWizard[], config: Configuraci
   return [{ edtNombre: 'CMM', actividadNombre: 'Comisionamiento', tareas, origen: 'determinista' }]
 }
 
+/** "TCO-XXX-001" -> "Tablero TCO-XXX-001"; no duplica el prefijo si el usuario ya lo escribió. */
+function formatearNombreTablero(nombre: string): string {
+  return /^tablero\b/i.test(nombre.trim()) ? nombre.trim() : `Tablero ${nombre.trim()}`
+}
+
 /** PLA (tag Tablero, replicado por tablero) + resto por disciplina (mismo esquema que ING). */
 function generarPLA(
   servicios: CatalogoServicioParaWizard[],
@@ -139,17 +150,14 @@ function generarPLA(
 
   const actividades: ActividadPropuesta[] = []
 
-  if (tablero.length > 0) {
-    let nombresTablero = config.tableros.map(t => t.nombre).filter(Boolean)
-    if (nombresTablero.length === 0) {
-      nombresTablero = ['Tablero 1']
-      advertencias.push('PLA tiene tareas de tablero pero no se especificaron nombres de tablero en el Paso 1 — se usó "Tablero 1" por defecto, edítalo en el Paso 2.')
-    }
-    for (const nombreTablero of nombresTablero) {
-      const tareas = tablero.map(s => construirTareaPropuesta(s, config))
-      if (tieneAlMenosUnaTareaIncluida(tareas)) {
-        actividades.push({ edtNombre: 'PLA', actividadNombre: nombreTablero, tareas, origen: 'determinista' })
-      }
+  const nombresTablero = config.tableros.map(t => t.nombre).filter(Boolean)
+  if (tablero.length > 0 && nombresTablero.length === 0) {
+    advertencias.push('PLA tiene tareas de tablero pero no se especificó ningún tablero en el Paso 1 — no se generó ninguna Actividad de tablero (regla: N° de tableros > 0).')
+  }
+  for (const nombreTablero of nombresTablero) {
+    const tareas = tablero.map(s => construirTareaPropuesta(s, config))
+    if (tieneAlMenosUnaTareaIncluida(tareas)) {
+      actividades.push({ edtNombre: 'PLA', actividadNombre: formatearNombreTablero(nombreTablero), tareas, origen: 'determinista' })
     }
   }
 
@@ -177,18 +185,17 @@ function generarPorInstancia(
 function generarPLC(servicios: CatalogoServicioParaWizard[], config: ConfiguracionWizardPaso1, advertencias: string[]): ActividadPropuesta[] {
   const nombres = config.plcs.map(p => p.nombre).filter(Boolean)
   if (servicios.length > 0 && nombres.length === 0) {
-    advertencias.push('PLC tiene servicios en el catálogo pero no se especificaron nombres de PLC en el Paso 1.')
+    advertencias.push('PLC tiene servicios en el catálogo pero no se especificó ningún PLC en el Paso 1 — no se generó ninguna Actividad de PLC (regla: N° de PLCs > 0).')
   }
   return generarPorInstancia(servicios, 'PLC', nombres, config)
 }
 
 function generarTAB(servicios: CatalogoServicioParaWizard[], config: ConfiguracionWizardPaso1, advertencias: string[]): ActividadPropuesta[] {
-  let nombres = config.tableros.map(t => t.nombre).filter(Boolean)
+  const nombres = config.tableros.map(t => t.nombre).filter(Boolean)
   if (servicios.length > 0 && nombres.length === 0) {
-    nombres = ['Tablero 1']
-    advertencias.push('TAB tiene servicios en el catálogo pero no se especificaron nombres de tablero en el Paso 1 — se usó "Tablero 1" por defecto.')
+    advertencias.push('TAB tiene servicios en el catálogo pero no se especificó ningún tablero en el Paso 1 — no se generó ninguna Actividad de TAB (regla: N° de tableros > 0).')
   }
-  return generarPorInstancia(servicios, 'TAB', nombres, config)
+  return generarPorInstancia(servicios, 'TAB', nombres.map(formatearNombreTablero), config)
 }
 
 const RX_SCADA = /scada/i
@@ -277,6 +284,10 @@ export function generarActividadesDeterministas(
       default:
         actividades.push(...generarDefault(edt.servicios, edt.nombre, edt.descripcion, config))
     }
+  }
+
+  for (const actividad of actividades) {
+    actividad.tareas = ordenarPorCatalogo(actividad.tareas)
   }
 
   return { actividades, advertencias }

@@ -87,6 +87,7 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
   const [actividades, setActividades] = useState<ActividadPropuesta[]>([])
   const [advertencias, setAdvertencias] = useState<string[]>([])
   const [edtsPendientesIA, setEdtsPendientesIA] = useState<EdtPendienteIA[]>([])
+  const [fuenteEdtsSugeridos, setFuenteEdtsSugeridos] = useState<'comercial' | 'ia' | 'manual'>('manual')
 
   useEffect(() => {
     if (!open) return
@@ -104,10 +105,24 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
         if (!res.ok) throw new Error('No se pudo cargar el contexto del wizard')
         return res.json()
       })
-      .then((data: { edts: EdtWizardInfo[]; cotizacionResumen: CotizacionResumen | null; tieneCotizacionDocumento: boolean }) => {
+      .then((data: { edts: EdtWizardInfo[]; cotizacionResumen: CotizacionResumen | null; tieneCotizacionDocumento: boolean; edtsSugeridosComercial: string[] | null }) => {
         setEdts(data.edts)
         setCotizacionResumen(data.cotizacionResumen)
-        setEdtsSeleccionados(new Set(data.edts.filter(e => e.totalServicios > 0).map(e => e.id)))
+
+        // Prioridad de selección de EDTs: 1) cotización COMERCIAL (determinista,
+        // servicios realmente vendidos — nunca adivinado); 2) IA desde el PDF
+        // (más abajo, solo si no hay #1); 3) fallback "todos los EDTs con
+        // servicios" (nunca confiable por sí solo, se sobreescribe apenas
+        // haya una fuente mejor).
+        const edtsComercial = data.edtsSugeridosComercial
+        if (edtsComercial && edtsComercial.length > 0) {
+          setEdtsSeleccionados(new Set(edtsComercial))
+          setFuenteEdtsSugeridos('comercial')
+        } else {
+          setEdtsSeleccionados(new Set(data.edts.filter(e => e.totalServicios > 0).map(e => e.id)))
+          setFuenteEdtsSugeridos('manual')
+        }
+
         if (data.cotizacionResumen?.resumenAlcance?.length) {
           setAlcanceLibre(data.cotizacionResumen.resumenAlcance.join('\n'))
         }
@@ -121,7 +136,12 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
           .then((prellenado: { sugerencia: PrellenadoPaso1; advertencias: string[] } | null) => {
             if (!prellenado) return
             const s = prellenado.sugerencia
-            if (s.edtsSeleccionados.length > 0) setEdtsSeleccionados(new Set(s.edtsSeleccionados))
+            // El EDT sugerido por IA nunca pisa una selección ya determinista
+            // (cotización comercial) — solo se usa cuando no hubo otra fuente.
+            if (s.edtsSeleccionados.length > 0 && !(edtsComercial && edtsComercial.length > 0)) {
+              setEdtsSeleccionados(new Set(s.edtsSeleccionados))
+              setFuenteEdtsSugeridos('ia')
+            }
             setBrownfield(s.brownfield)
             setIngenieriaDetalle(s.ingenieriaDetalle)
             if (s.tableros.length > 0) setTableros(s.tableros)
@@ -362,7 +382,18 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
           )}
 
           <div>
-            <Label className="mb-2 block">EDTs a incluir</Label>
+            <div className="flex items-center justify-between mb-2">
+              <Label>EDTs a incluir</Label>
+              {fuenteEdtsSugeridos === 'comercial' && (
+                <Badge variant="secondary" className="text-xs">Sugerido desde tu cotización comercial</Badge>
+              )}
+              {fuenteEdtsSugeridos === 'ia' && (
+                <Badge variant="outline" className="text-xs">Sugerido por IA — sin cotización comercial, revisa con cuidado</Badge>
+              )}
+              {fuenteEdtsSugeridos === 'manual' && (
+                <Badge variant="outline" className="text-xs">Sin cotización — selecciona manualmente</Badge>
+              )}
+            </div>
             <Card>
               <CardContent className="p-2 max-h-[220px] overflow-y-auto space-y-1">
                 {edts.map(edt => (

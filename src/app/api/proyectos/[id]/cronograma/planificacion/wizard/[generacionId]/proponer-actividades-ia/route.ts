@@ -68,7 +68,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
         id: { in: config.edtsSeleccionados },
         nombre: { in: [...EDTS_CON_IA] },
       },
-      include: { catalogoServicio: { include: { unidadServicio: true, recurso: true } } },
+      include: { catalogoServicio: { include: { unidadServicio: true, recurso: true }, orderBy: { orden: 'asc' } } },
     })
 
     if (edtsIA.length === 0) {
@@ -116,6 +116,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
           horaRepetido: s.horaRepetido,
           cantidad: s.cantidad,
           nivelDificultad: s.nivelDificultad,
+          orden: s.orden,
           unidadNombre: s.unidadServicio.nombre,
           recursoNombre: s.recurso.nombre,
         }))

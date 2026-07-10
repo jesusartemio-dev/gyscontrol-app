@@ -4,7 +4,10 @@ import type { ActividadPropuesta } from '@/types/cronogramaIA'
 
 export interface EdtCatalogoInfo {
   id: string
+  /** Código corto del catálogo (ej. "CON") — uso interno (reglas de tags/dependencias), nunca se muestra. */
   nombre: string
+  /** Nombre real del catálogo de EDTs (ej. "Construccion") — esto es lo que se escribe en ProyectoEdt.nombre. */
+  descripcionEdt: string
   faseNombre: string
   faseOrden: number
 }
@@ -67,6 +70,8 @@ export interface EstructuraReal {
   actividades: FilaActividad[]
   tareas: FilaTarea[]
   advertencias: string[]
+  /** proyectoEdtId -> código corto del catálogo (ej. "CON") — uso interno (reglas de dependencias), no se persiste. */
+  edtIdACodigo: Map<string, string>
 }
 
 const DURACION_MINIMA_DIAS = 1
@@ -128,6 +133,7 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
   const edts: FilaEdt[] = []
   const actividadesFilas: FilaActividad[] = []
   const tareas: FilaTarea[] = []
+  const edtIdACodigo = new Map<string, string>()
 
   let cursorFase = ajustarFechaADiaLaborable(fechaInicioProyecto, calendarioLaboral)
 
@@ -172,7 +178,7 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
         proyectoCronogramaId,
         proyectoFaseId: faseId,
         edtId: edtInfo.id,
-        nombre: edtInfo.nombre,
+        nombre: edtInfo.descripcionEdt,
         descripcion: null,
         orden: ordenEdt++,
         horasPlan: horasEdt,
@@ -180,6 +186,7 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
         fechaFinPlan: fechaFinEdt,
         updatedAt: new Date(),
       })
+      edtIdACodigo.set(edtId, edtInfo.nombre)
 
       let cursorActividad = fechaInicioEdt
       let ordenActividad = 0
@@ -235,5 +242,5 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
     cursorFase = avanzarSiguienteInicio(fechaFinFase, calendarioLaboral)
   }
 
-  return { fases, edts, actividades: actividadesFilas, tareas, advertencias }
+  return { fases, edts, actividades: actividadesFilas, tareas, advertencias, edtIdACodigo }
 }

@@ -14,14 +14,14 @@ function mockCalendario() {
   }
 }
 
-function tarea(id: string, nombre: string, horas: number): TareaPropuesta {
-  return { catalogoServicioId: id, nombre, cantidad: 1, nivelDificultad: 1, horaBase: horas, horaRepetido: 0, horasEstimadas: horas, incluida: true }
+function tarea(id: string, nombre: string, horas: number, orden = 0): TareaPropuesta {
+  return { catalogoServicioId: id, nombre, cantidad: 1, nivelDificultad: 1, horaBase: horas, horaRepetido: 0, horasEstimadas: horas, incluida: true, orden }
 }
 
 const EDTS_CATALOGO: Map<string, EdtCatalogoInfo> = new Map([
-  ['GES', { id: 'edt-ges', nombre: 'GES', faseNombre: 'PLANIFICACION', faseOrden: 1 }],
-  ['ING', { id: 'edt-ing', nombre: 'ING', faseNombre: 'INGENIERIA', faseOrden: 2 }],
-  ['CON', { id: 'edt-con', nombre: 'CON', faseNombre: 'EJECUCION', faseOrden: 4 }],
+  ['GES', { id: 'edt-ges', nombre: 'GES', descripcionEdt: 'Gestion del Proyecto', faseNombre: 'PLANIFICACION', faseOrden: 1 }],
+  ['ING', { id: 'edt-ing', nombre: 'ING', descripcionEdt: 'Ingenieria de Detalle', faseNombre: 'INGENIERIA', faseOrden: 2 }],
+  ['CON', { id: 'edt-con', nombre: 'CON', descripcionEdt: 'Construccion', faseNombre: 'EJECUCION', faseOrden: 4 }],
 ])
 
 describe('construirEstructuraReal', () => {

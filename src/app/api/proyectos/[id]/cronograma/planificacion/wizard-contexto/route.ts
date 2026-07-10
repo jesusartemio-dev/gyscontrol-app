@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { ROLES_CRONOGRAMA } from '@/lib/services/cronogramaPermisos'
+import { obtenerEdtsComercialesProyecto } from '@/lib/cronogramaIA/obtenerEdtsComerciales'
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -39,7 +40,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: 'Sin acceso a este proyecto' }, { status: 403 })
   }
 
-  const [edts, cronogramaPlanificacion, cotizacionDocumento] = await Promise.all([
+  const [edts, cronogramaPlanificacion, cotizacionDocumento, edtsComerciales] = await Promise.all([
     prisma.edt.findMany({
       include: { faseDefault: true, _count: { select: { catalogoServicio: true } } },
       orderBy: [{ faseDefault: { orden: 'asc' } }, { nombre: 'asc' }],
@@ -52,6 +53,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
       where: { proyectoId },
       select: { resumenAlcance: true, exclusiones: true, numeroPropuesta: true, clienteDetectado: true },
     }),
+    obtenerEdtsComercialesProyecto(proyectoId),
   ])
 
   let borrador: { id: string; configuracion: unknown; estado: string } | null = null
@@ -73,6 +75,11 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     })),
     cronogramaBloqueado: cronogramaPlanificacion?.bloqueado ?? false,
     borrador,
+    // EDTs realmente vendidos/contratados en la cotización comercial del
+    // proyecto (determinista, cero IA) — null si el proyecto no tiene
+    // cotización comercial (ej. proyectos internos). Tiene prioridad sobre
+    // cualquier sugerencia de IA para decidir qué EDTs preseleccionar.
+    edtsSugeridosComercial: edtsComerciales,
     tieneCotizacionDocumento: !!cotizacionDocumento,
     cotizacionResumen: cotizacionDocumento
       ? {

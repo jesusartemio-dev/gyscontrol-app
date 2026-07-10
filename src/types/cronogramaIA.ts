@@ -12,6 +12,7 @@ export interface CatalogoServicioParaWizard {
   horaRepetido: number | null
   cantidad: number | null
   nivelDificultad: number | null
+  orden: number | null
   unidadNombre: string
   recursoNombre: string
 }
@@ -41,6 +42,7 @@ export interface TareaPropuesta {
   horasEstimadas: number
   incluida: boolean
   motivoExclusion?: string
+  orden: number
 }
 
 export interface ActividadPropuesta {

@@ -1,5 +1,5 @@
 import type { ActividadPropuesta, CatalogoServicioParaWizard, TareaPropuesta } from '@/types/cronogramaIA'
-import { construirTareaPropuesta } from './reglasActividades'
+import { construirTareaPropuesta, ordenarPorCatalogo } from './reglasActividades'
 
 export const MAX_REINTENTOS = 1
 
@@ -53,13 +53,13 @@ export function validarPropuestaGrupos(
     }
 
     if (tareas.length > 0) {
-      actividades.push({ edtNombre, actividadNombre: grupo.nombre.trim(), tareas, origen: 'ia' })
+      actividades.push({ edtNombre, actividadNombre: grupo.nombre.trim(), tareas: ordenarPorCatalogo(tareas), origen: 'ia' })
     }
   }
 
   const tareaIdsNoAsignadas = serviciosPermitidos.map(s => s.id).filter(id => !idsAsignados.has(id))
   if (tareaIdsNoAsignadas.length > 0) {
-    const tareasSinAgrupar = tareaIdsNoAsignadas.map(id => construirTareaPropuesta(serviciosPorId.get(id)!, config))
+    const tareasSinAgrupar = ordenarPorCatalogo(tareaIdsNoAsignadas.map(id => construirTareaPropuesta(serviciosPorId.get(id)!, config)))
     actividades.push({ edtNombre, actividadNombre: 'Sin agrupar', tareas: tareasSinAgrupar, origen: 'determinista' })
     advertencias.push(`${edtNombre}: ${tareaIdsNoAsignadas.length} tarea(s) que la IA no agrupó se colocaron en "Sin agrupar".`)
   }

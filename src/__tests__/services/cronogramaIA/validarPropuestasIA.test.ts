@@ -12,6 +12,7 @@ function servicio(overrides: Partial<CatalogoServicioParaWizard> & { id: string;
     horaRepetido: 0,
     cantidad: 1,
     nivelDificultad: 1,
+    orden: 0,
     unidadNombre: 'unidad',
     recursoNombre: 'Técnico',
     ...overrides,
@@ -83,6 +84,21 @@ describe('validarPropuestaGrupos', () => {
       'CON'
     )
     expect(r.actividades.find(a => a.actividadNombre.trim() === '')).toBeUndefined()
+  })
+
+  it('las tareas de un grupo se ordenan por el orden real del catálogo, no por el orden en que la IA las listó', () => {
+    const serviciosConOrden = [
+      servicio({ id: 's1', nombre: 'Tendido de cables', orden: 3 }),
+      servicio({ id: 's2', nombre: 'Montaje de tablero', orden: 0 }),
+      servicio({ id: 's3', nombre: 'Pruebas de continuidad', orden: 5 }),
+    ]
+    const r = validarPropuestaGrupos(
+      [{ nombre: 'Sala Eléctrica', catalogoServicioIds: ['s3', 's1', 's2'] }],
+      serviciosConOrden,
+      config,
+      'CON'
+    )
+    expect(r.actividades[0].tareas.map(t => t.catalogoServicioId)).toEqual(['s2', 's1', 's3'])
   })
 })
 

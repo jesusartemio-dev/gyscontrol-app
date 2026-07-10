@@ -84,7 +84,10 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
   const edtsCatalogo = new Map<string, EdtCatalogoInfo>(
     edtsDb
       .filter(e => e.faseDefault)
-      .map(e => [e.nombre, { id: e.id, nombre: e.nombre, faseNombre: e.faseDefault!.nombre, faseOrden: e.faseDefault!.orden }])
+      .map(e => [
+        e.nombre,
+        { id: e.id, nombre: e.nombre, descripcionEdt: e.descripcion || e.nombre, faseNombre: e.faseDefault!.nombre, faseOrden: e.faseDefault!.orden },
+      ])
   )
 
   const estructura = construirEstructuraReal({
@@ -103,11 +106,10 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     )
   }
 
-  const edtIdAEdtNombre = new Map(estructura.edts.map(e => [e.id, e.nombre]))
   const tareasParaDependencias = estructura.tareas.map(t => ({
     id: t.id,
     nombre: t.nombre,
-    edtNombre: edtIdAEdtNombre.get(t.proyectoEdtId) ?? '',
+    edtNombre: estructura.edtIdACodigo.get(t.proyectoEdtId) ?? '',
   }))
   const dependenciasSugeridas = sugerirDependencias(tareasParaDependencias)
 
