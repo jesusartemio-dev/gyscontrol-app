@@ -2914,6 +2914,13 @@ model Edt {
   updatedAt                          DateTime                             @updatedAt
   descripcion                        String?
   faseDefaultId                      String?
+  /// Orden de secuencia constructiva DENTRO de su Fase (ej. en EJECUCION:
+  /// Preparativos Técnicos < Armado de Tableros < Construcción <
+  /// Comisionamiento) — construirEstructuraReal.ts lo usa para asignar
+  /// fechas a los EDTs de una misma Fase; sin esto, el orden dependía del
+  /// orden de llegada del array en memoria y podía salir físicamente
+  /// imposible (ej. Comisionamiento antes de que exista Construcción).
+  orden                              Int                                  @default(0)
   catalogoServicio                   CatalogoServicio[]
   cotizacionServicio                 CotizacionServicio[]                 @relation("CotizacionServicioEdt")
   cotizacionServicioItem             CotizacionServicioItem[]             @relation("CotizacionServicioItemEdt")
@@ -2927,6 +2934,7 @@ model Edt {
   plantillaServicioItemIndependiente PlantillaServicioItemIndependiente[] @relation("PlantillaServicioItemIndependienteEdt")
   cronogramaEdtCorreccion            ProyectoCronogramaEdtCorreccion[]
 
+  @@index([orden])
   @@map("edt")
 }
 

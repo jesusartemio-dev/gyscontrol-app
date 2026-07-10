@@ -71,6 +71,16 @@ export async function updateEdt(
   return res.json()
 }
 
+// ✅ Reordenar EDTs (secuencia constructiva dentro de su Fase)
+export async function reordenarEdts(items: { id: string; orden: number }[]): Promise<void> {
+  const res = await fetch(buildApiUrl('/api/edt/reordenar'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items }),
+  })
+  if (!res.ok) throw new Error('Error al reordenar EDTs')
+}
+
 export async function deleteEdt(id: string): Promise<Edt> {
   const res = await fetch(buildApiUrl(`/api/edt/${id}`), {
     method: 'DELETE',

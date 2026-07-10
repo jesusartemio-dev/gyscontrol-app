@@ -19,9 +19,10 @@ function tarea(id: string, nombre: string, horas: number, orden = 0): TareaPropu
 }
 
 const EDTS_CATALOGO: Map<string, EdtCatalogoInfo> = new Map([
-  ['GES', { id: 'edt-ges', nombre: 'GES', descripcionEdt: 'Gestion del Proyecto', faseNombre: 'PLANIFICACION', faseOrden: 1 }],
-  ['ING', { id: 'edt-ing', nombre: 'ING', descripcionEdt: 'Ingenieria de Detalle', faseNombre: 'INGENIERIA', faseOrden: 2 }],
-  ['CON', { id: 'edt-con', nombre: 'CON', descripcionEdt: 'Construccion', faseNombre: 'EJECUCION', faseOrden: 4 }],
+  ['GES', { id: 'edt-ges', nombre: 'GES', descripcionEdt: 'Gestion del Proyecto', faseNombre: 'PLANIFICACION', faseOrden: 1, edtOrden: 0 }],
+  ['ING', { id: 'edt-ing', nombre: 'ING', descripcionEdt: 'Ingenieria de Detalle', faseNombre: 'INGENIERIA', faseOrden: 2, edtOrden: 0 }],
+  ['CON', { id: 'edt-con', nombre: 'CON', descripcionEdt: 'Construccion', faseNombre: 'EJECUCION', faseOrden: 4, edtOrden: 2 }],
+  ['CMM', { id: 'edt-cmm', nombre: 'CMM', descripcionEdt: 'Comisionamiento', faseNombre: 'EJECUCION', faseOrden: 4, edtOrden: 3 }],
 ])
 
 describe('construirEstructuraReal', () => {
@@ -143,5 +144,30 @@ describe('construirEstructuraReal', () => {
     })
     expect(r.edts[0].horasPlan).toBe(20)
     expect(r.actividades[0].horasPlan).toBe(20)
+  })
+
+  it('ordena los EDTs de una misma Fase por su Edt.orden real, NUNCA por el orden de llegada del array actividades (bug real: Comisionamiento salía antes que Construcción)', () => {
+    // CMM aparece PRIMERO en el array de entrada (ej. determinista, ya
+    // resuelto antes que CON que requiere IA) pero su edtOrden (3) es mayor
+    // que el de CON (2) — CON debe quedar primero en fechas igual.
+    const actividades: ActividadPropuesta[] = [
+      { edtNombre: 'CMM', actividadNombre: 'Comisionamiento', tareas: [tarea('t1', 'Puesta en marcha', 8)], origen: 'determinista' },
+      { edtNombre: 'CON', actividadNombre: 'Zona A', tareas: [tarea('t2', 'Tendido', 8)], origen: 'ia' },
+    ]
+    const r = construirEstructuraReal({
+      actividades,
+      edtsCatalogo: EDTS_CATALOGO,
+      proyectoId: 'p1',
+      proyectoCronogramaId: 'cron1',
+      fechaInicioProyecto,
+      calendarioLaboral: mockCalendario(),
+    })
+
+    expect(r.edts.map(e => e.nombre)).toEqual(['Construccion', 'Comisionamiento'])
+    const con = r.edts.find(e => e.nombre === 'Construccion')!
+    const cmm = r.edts.find(e => e.nombre === 'Comisionamiento')!
+    expect(con.orden).toBeLessThan(cmm.orden)
+    expect(con.fechaInicioPlan.getTime()).toBeLessThanOrEqual(cmm.fechaInicioPlan.getTime())
+    expect(cmm.fechaInicioPlan.getTime()).toBeGreaterThanOrEqual(con.fechaFinPlan.getTime())
   })
 })

@@ -427,6 +427,11 @@ export interface Edt {
   updatedAt: string
   servicios?: CatalogoServicio[] // 🔁 Relación real completa
 
+  // Orden de secuencia constructiva DENTRO de su Fase (ej. en EJECUCION:
+  // Preparativos < Tableros < Construcción < Comisionamiento) — usado por
+  // el generador de cronograma para fechar los EDTs en el orden correcto.
+  orden: number
+
   // 🆕 RELACIÓN: Fase por defecto para esta categoría
   faseDefaultId?: string
   faseDefault?: FaseDefault

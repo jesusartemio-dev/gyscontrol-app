@@ -86,7 +86,14 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
       .filter(e => e.faseDefault)
       .map(e => [
         e.nombre,
-        { id: e.id, nombre: e.nombre, descripcionEdt: e.descripcion || e.nombre, faseNombre: e.faseDefault!.nombre, faseOrden: e.faseDefault!.orden },
+        {
+          id: e.id,
+          nombre: e.nombre,
+          descripcionEdt: e.descripcion || e.nombre,
+          faseNombre: e.faseDefault!.nombre,
+          faseOrden: e.faseDefault!.orden,
+          edtOrden: e.orden,
+        },
       ])
   )
 

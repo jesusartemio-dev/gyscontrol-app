@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
 import EdtModal from '@/components/catalogo/EdtModal'
 import EdtTableView from '@/components/catalogo/EdtTableView'
 import EdtCardView from '@/components/catalogo/EdtCardView'
-import { getEdts, createEdt } from '@/lib/services/edt'
+import { getEdts, createEdt, reordenarEdts } from '@/lib/services/edt'
 import { toast } from 'sonner'
 import { exportarEdtsAExcel } from '@/lib/utils/edtExcel'
 import {
@@ -78,6 +78,17 @@ export default function Page() {
 
   const handleDeleted = (id: string) => {
     setEdts((prev) => prev.filter((c) => c.id !== id))
+  }
+
+  const handleReorder = async (reordered: Edt[]) => {
+    // Optimistic update
+    setEdts(reordered)
+    try {
+      await reordenarEdts(reordered.map((e) => ({ id: e.id, orden: e.orden })))
+    } catch {
+      toast.error('Error al reordenar EDTs')
+      await cargarEdts()
+    }
   }
 
   const handleExportar = () => {
@@ -294,6 +305,7 @@ export default function Page() {
               data={edtsFiltrados}
               onUpdate={handleUpdated}
               onDelete={handleDeleted}
+              onReorder={!searchTerm ? handleReorder : undefined}
             />
           ) : (
             <EdtCardView

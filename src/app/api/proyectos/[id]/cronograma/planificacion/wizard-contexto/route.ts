@@ -47,7 +47,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
   const [edts, cronogramaPlanificacion, cotizacionDocumento, edtsComerciales, correcciones, evidenciasCotizacion] = await Promise.all([
     prisma.edt.findMany({
       include: { faseDefault: true, _count: { select: { catalogoServicio: true } } },
-      orderBy: [{ faseDefault: { orden: 'asc' } }, { nombre: 'asc' }],
+      orderBy: [{ faseDefault: { orden: 'asc' } }, { orden: 'asc' }],
     }),
     prisma.proyectoCronograma.findUnique({
       where: { proyectoId_tipo: { proyectoId, tipo: 'planificacion' } },

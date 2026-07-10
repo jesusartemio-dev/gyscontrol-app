@@ -10,6 +10,15 @@ export interface EdtCatalogoInfo {
   descripcionEdt: string
   faseNombre: string
   faseOrden: number
+  /**
+   * Orden de secuencia constructiva DENTRO de la Fase (Edt.orden real del
+   * catálogo — ej. en EJECUCION: Preparativos < Tableros < Construcción <
+   * Comisionamiento). Sin esto, el orden de EDTs dependía de en qué orden
+   * llegaban en el array `actividades` (deterministas primero, IA después),
+   * lo que podía dar fechas físicamente imposibles (Comisionamiento antes
+   * de que exista Construcción).
+   */
+  edtOrden: number
 }
 
 export interface FilaFase {
@@ -138,7 +147,9 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
   let cursorFase = ajustarFechaADiaLaborable(fechaInicioProyecto, calendarioLaboral)
 
   for (const faseInfo of fasesEnOrden) {
-    const edtsDeFase = edtsOrdenados.filter(e => e.faseNombre === faseInfo.nombre)
+    // Orden real del catálogo (Edt.orden) — NUNCA el orden de llegada del
+    // array `actividades`, que no refleja secuencia constructiva alguna.
+    const edtsDeFase = edtsOrdenados.filter(e => e.faseNombre === faseInfo.nombre).sort((a, b) => a.edtOrden - b.edtOrden)
 
     const horasFase = edtsDeFase.reduce((acc, e) => {
       const acts = porEdt.get(e.nombre) ?? []

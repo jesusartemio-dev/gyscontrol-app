@@ -14,7 +14,7 @@ import { randomUUID } from 'crypto'
 export async function GET() {
   try {
     const edts = await prisma.edt.findMany({
-      orderBy: { nombre: 'asc' },
+      orderBy: [{ faseDefault: { orden: 'asc' } }, { orden: 'asc' }],
       include: {
         catalogoServicio: true,
         faseDefault: true,
