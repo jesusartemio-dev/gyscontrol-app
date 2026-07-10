@@ -40,7 +40,8 @@ import {
   Unlock,
   Table2,
   Wrench,
-  Sparkles
+  Sparkles,
+  UserCheck
 } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import { useToast } from '@/hooks/use-toast'
@@ -61,6 +62,7 @@ import ImportExcelCronogramaModal from './ImportExcelCronogramaModal'
 import { CronogramaVarianza } from './CronogramaVarianza'
 import { CronogramaTableView } from './CronogramaTableView'
 import { AsignarRecursoPorEdt } from './AsignarRecursoPorEdt'
+import { AutoasignarResponsablesModal } from './AutoasignarResponsablesModal'
 import { CronogramaPlanificacionWizard } from './CronogramaPlanificacionWizard'
 import type { ProyectoCronograma } from '@/types/modelos'
 
@@ -97,6 +99,7 @@ export function ProyectoCronogramaTab({
   const [showGenerarIAModal, setShowGenerarIAModal] = useState(false)
   const [showImportExcelModal, setShowImportExcelModal] = useState(false)
   const [showAsignarRecursoModal, setShowAsignarRecursoModal] = useState(false)
+  const [showAutoasignarResponsablesModal, setShowAutoasignarResponsablesModal] = useState(false)
 
   // Estado de datos
   const [selectedCronograma, setSelectedCronograma] = useState<ProyectoCronograma | undefined>(cronograma)
@@ -917,6 +920,16 @@ export function ProyectoCronogramaTab({
                 Asignar Recursos por EDT
               </DropdownMenuItem>
 
+              {esPlanificacion && (
+                <DropdownMenuItem onSelect={() => {
+                  setDropdownOpen(false)
+                  setTimeout(() => setShowAutoasignarResponsablesModal(true), 100)
+                }} disabled={!hasCronograma}>
+                  <UserCheck className="h-4 w-4 mr-2" />
+                  Autoasignar responsables (Matriz)
+                </DropdownMenuItem>
+              )}
+
               <DropdownMenuItem asChild>
                 <ProyectoDependencyManager
                   proyectoId={proyectoId}
@@ -1151,6 +1164,15 @@ export function ProyectoCronogramaTab({
       <AsignarRecursoPorEdt
         open={showAsignarRecursoModal}
         onOpenChange={setShowAsignarRecursoModal}
+        cronogramaId={selectedCronograma?.id || ''}
+        onSuccess={handleRefresh}
+      />
+
+      {/* Modal de autoasignar responsables desde la Matriz de Comunicación */}
+      <AutoasignarResponsablesModal
+        open={showAutoasignarResponsablesModal}
+        onOpenChange={setShowAutoasignarResponsablesModal}
+        proyectoId={proyectoId}
         cronogramaId={selectedCronograma?.id || ''}
         onSuccess={handleRefresh}
       />

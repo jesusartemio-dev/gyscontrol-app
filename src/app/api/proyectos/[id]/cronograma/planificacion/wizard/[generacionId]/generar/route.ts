@@ -97,6 +97,18 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
       ])
   )
 
+  // Recurso (columna Recurso de cada tarea) — precarga determinística desde
+  // el catálogo, sin IA ni confirmación: es un valor por defecto sensato,
+  // editable después como cualquier campo (nunca se le pregunta al usuario).
+  const servicioIds = Array.from(
+    new Set(actividadesIncluidas.flatMap(a => a.tareas.map(t => t.catalogoServicioId)))
+  )
+  const serviciosDb = await prisma.catalogoServicio.findMany({
+    where: { id: { in: servicioIds } },
+    select: { id: true, recursoId: true },
+  })
+  const recursoPorServicio = new Map(serviciosDb.map(s => [s.id, s.recursoId]))
+
   const estructura = construirEstructuraReal({
     actividades: actividadesIncluidas,
     edtsCatalogo,
@@ -104,6 +116,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     proyectoCronogramaId: cronograma.id,
     fechaInicioProyecto: cronograma.proyecto.fechaInicio,
     calendarioLaboral,
+    recursoPorServicio,
   })
 
   if (estructura.fases.length === 0) {
@@ -215,5 +228,5 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     }
   }
 
-  return NextResponse.json({ generacionId, resultado, advertencias: estructura.advertencias })
+  return NextResponse.json({ generacionId, cronogramaId: cronograma.id, resultado, advertencias: estructura.advertencias })
 }

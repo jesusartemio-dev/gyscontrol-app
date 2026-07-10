@@ -40,6 +40,7 @@ describe('construirEstructuraReal', () => {
       proyectoCronogramaId: 'cron1',
       fechaInicioProyecto,
       calendarioLaboral: mockCalendario(),
+      recursoPorServicio: new Map(),
     })
 
     expect(r.fases).toHaveLength(2)
@@ -61,6 +62,7 @@ describe('construirEstructuraReal', () => {
       proyectoCronogramaId: 'cron1',
       fechaInicioProyecto,
       calendarioLaboral: mockCalendario(),
+      recursoPorServicio: new Map(),
     })
     expect(r.fases.map(f => f.nombre)).toEqual(['PLANIFICACION', 'EJECUCION'])
     expect(r.fases[0].fechaInicioPlan.getTime()).toBeLessThan(r.fases[1].fechaInicioPlan.getTime())
@@ -82,6 +84,7 @@ describe('construirEstructuraReal', () => {
       proyectoCronogramaId: 'cron1',
       fechaInicioProyecto,
       calendarioLaboral: mockCalendario(),
+      recursoPorServicio: new Map(),
     })
 
     const fase = r.fases[0]
@@ -108,6 +111,7 @@ describe('construirEstructuraReal', () => {
       proyectoCronogramaId: 'cron1',
       fechaInicioProyecto,
       calendarioLaboral: mockCalendario(),
+      recursoPorServicio: new Map(),
     })
     expect(r.actividades.map(a => a.orden)).toEqual([0, 1])
     const inicio = r.tareas.filter(t => t.proyectoActividadId === r.actividades[0].id)
@@ -125,6 +129,7 @@ describe('construirEstructuraReal', () => {
       proyectoCronogramaId: 'cron1',
       fechaInicioProyecto,
       calendarioLaboral: mockCalendario(),
+      recursoPorServicio: new Map(),
     })
     expect(r.fases).toHaveLength(0)
     expect(r.advertencias.length).toBeGreaterThan(0)
@@ -141,6 +146,7 @@ describe('construirEstructuraReal', () => {
       proyectoCronogramaId: 'cron1',
       fechaInicioProyecto,
       calendarioLaboral: mockCalendario(),
+      recursoPorServicio: new Map(),
     })
     expect(r.edts[0].horasPlan).toBe(20)
     expect(r.actividades[0].horasPlan).toBe(20)
@@ -161,6 +167,7 @@ describe('construirEstructuraReal', () => {
       proyectoCronogramaId: 'cron1',
       fechaInicioProyecto,
       calendarioLaboral: mockCalendario(),
+      recursoPorServicio: new Map(),
     })
 
     expect(r.edts.map(e => e.nombre)).toEqual(['Construccion', 'Comisionamiento'])
@@ -169,5 +176,26 @@ describe('construirEstructuraReal', () => {
     expect(con.orden).toBeLessThan(cmm.orden)
     expect(con.fechaInicioPlan.getTime()).toBeLessThanOrEqual(cmm.fechaInicioPlan.getTime())
     expect(cmm.fechaInicioPlan.getTime()).toBeGreaterThanOrEqual(con.fechaFinPlan.getTime())
+  })
+
+  it('propaga catalogoServicioId siempre, y recursoId solo si el servicio está en recursoPorServicio (nunca revienta con un id no resuelto)', () => {
+    const actividades: ActividadPropuesta[] = [
+      { edtNombre: 'GES', actividadNombre: 'Inicio', tareas: [tarea('t1', 'Kickoff', 8), tarea('t2', 'RFI', 8)], origen: 'determinista' },
+    ]
+    const r = construirEstructuraReal({
+      actividades,
+      edtsCatalogo: EDTS_CATALOGO,
+      proyectoId: 'p1',
+      proyectoCronogramaId: 'cron1',
+      fechaInicioProyecto,
+      calendarioLaboral: mockCalendario(),
+      recursoPorServicio: new Map([['t1', 'recurso-cadista']]),
+    })
+
+    const [t1, t2] = r.tareas
+    expect(t1.catalogoServicioId).toBe('t1')
+    expect(t1.recursoId).toBe('recurso-cadista')
+    expect(t2.catalogoServicioId).toBe('t2')
+    expect(t2.recursoId).toBeNull()
   })
 })

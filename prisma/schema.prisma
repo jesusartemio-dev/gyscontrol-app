@@ -97,6 +97,7 @@ model CatalogoServicio {
   proyectoServicioCotizadoItem       ProyectoServicioCotizadoItem[]
   plantillaServicioItemIndependiente PlantillaServicioItemIndependiente[]
   cronogramaIATareaDecision          CronogramaIATareaDecision[]
+  proyectoTareas                     ProyectoTarea[]
 
   @@map("catalogo_servicio")
 }
@@ -1167,6 +1168,7 @@ model Proyecto {
   planificacionesDia         PlanificacionDia[]
   cronogramaIATareaDecision  CronogramaIATareaDecision[]
   cronogramaEdtCorreccion    ProyectoCronogramaEdtCorreccion[]
+  tareaResponsableAsignacion ProyectoTareaResponsableAsignacion[]
 
   @@index([clienteId, estado, createdAt(sort: Desc)], map: "idx_proyecto_cliente_estado_fecha")
   @@index([comercialId, estado, fechaInicio], map: "idx_proyecto_comercial_estado_inicio")
@@ -2072,6 +2074,8 @@ model User {
   proyectoCronogramaGeneracionesIA         ProyectoCronogramaGeneracionIA[]
   cronogramaIATareaDecisiones              CronogramaIATareaDecision[]
   cronogramaEdtCorreccionesCreadas         ProyectoCronogramaEdtCorreccion[]
+  responsableAsignacionesRecibidas         ProyectoTareaResponsableAsignacion[] @relation("AsignacionResponsableAutomatico")
+  responsableAsignacionesCreadas           ProyectoTareaResponsableAsignacion[] @relation("AsignacionResponsableCreador")
   // Módulo Ausencias
   solicitudesAusencia                      SolicitudAusencia[]      @relation("AusenciaSolicitante")
   ausenciasComoAprobador1                  SolicitudAusencia[]      @relation("AusenciaAprobador1")
@@ -3395,6 +3399,45 @@ model CronogramaIATareaDecision {
   @@map("cronograma_ia_tarea_decision")
 }
 
+/// Auditoría de la autoasignación automática de Responsable (desde la Matriz
+/// de Comunicaciones) a una tarea del cronograma — una fila por TAREA que
+/// recibió una asignación automática (no por EDT), para poder responder
+/// después "¿esto lo asignó el sistema o lo cambió una persona?" comparando
+/// ProyectoTarea.responsableId actual contra responsableIdAsignado de la
+/// última fila de esta tarea, sin necesitar un flag mutable. Mismo espíritu
+/// que CronogramaIATareaDecision, pero para la elección de responsable en
+/// vez de la inclusión de tareas por regla de sub-alcance.
+model ProyectoTareaResponsableAsignacion {
+  id              String        @id @default(cuid())
+  proyectoTareaId String
+  proyectoTarea   ProyectoTarea @relation(fields: [proyectoTareaId], references: [id], onDelete: Cascade)
+
+  proyectoId String
+  proyecto   Proyecto @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+
+  matrizFilaId String?
+  matrizFila   MatrizComunicacionFila? @relation(fields: [matrizFilaId], references: [id], onDelete: SetNull)
+
+  /// Código real del EDT (ej. "CON") al momento de la asignación — la fila de
+  /// la matriz se identifica por texto libre, este código es lo estable.
+  edtCodigo String
+
+  responsableIdAsignado String
+  responsableAsignado   User   @relation("AsignacionResponsableAutomatico", fields: [responsableIdAsignado], references: [id])
+
+  /// "R" (Autoriza) o "E" (Emisor, fallback) — qué código de la matriz
+  /// determinó la elección de esta persona.
+  codigoOrigen String
+
+  asignadoPorId String
+  asignadoPor   User     @relation("AsignacionResponsableCreador", fields: [asignadoPorId], references: [id])
+  asignadoEn    DateTime @default(now())
+
+  @@index([proyectoId])
+  @@index([proyectoTareaId])
+  @@map("proyecto_tarea_responsable_asignacion")
+}
+
 /// Corrección manual de EDTs sugeridos para el wizard de cronograma, a nivel
 /// PROYECTO — nunca toca la cotización comercial (esa es el registro real de
 /// lo que se vendió, no se edita). Para casos como una partida mal
@@ -3543,6 +3586,7 @@ model ProyectoTarea {
   creadoPorId                 String?
   proyectoActividadId         String?
   recursoId                   String?
+  catalogoServicioId          String?
   esExtra                     Boolean                     @default(false)
   createdAt                   DateTime                    @default(now())
   updatedAt                   DateTime
@@ -3558,13 +3602,16 @@ model ProyectoTarea {
   user                        User?                       @relation("TareaResponsable", fields: [responsableId], references: [id])
   creadoPor                   User?                       @relation("TareaCreadaPor", fields: [creadoPorId], references: [id])
   recurso                     Recurso?                    @relation(fields: [recursoId], references: [id], onDelete: SetNull)
+  catalogoServicio            CatalogoServicio?           @relation(fields: [catalogoServicioId], references: [id], onDelete: SetNull)
   registrosCampoTarea         RegistroHorasCampoTarea[]
   registrosAvance             RegistroAvance[]
   avanceSnapshotsTarea        ProyectoAvanceSnapshotTarea[] @relation("AvanceSnapshotTareaProyectoTarea")
   avances                     ProyectoTareaAvance[]
+  responsableAsignaciones     ProyectoTareaResponsableAsignacion[]
 
   @@index([creadoPorId])
   @@index([recursoId])
+  @@index([catalogoServicioId])
   @@index([dependenciaId])
   @@index([proyectoActividadId])
   @@index([proyectoActividadId, orden])
@@ -5566,6 +5613,7 @@ model MatrizComunicacionFila {
 
   matriz MatrizComunicacion @relation(fields: [matrizId], references: [id], onDelete: Cascade)
   edt    ProyectoEdt?       @relation(fields: [edtId], references: [id], onDelete: SetNull)
+  responsableAsignaciones ProyectoTareaResponsableAsignacion[]
 
   @@index([matrizId])
   @@map("matriz_comunicacion_fila")

@@ -71,6 +71,10 @@ export interface FilaTarea {
   fechaFin: Date
   horasEstimadas: number
   updatedAt: Date
+  /** Servicio de catálogo de origen — se necesita para propagar Recurso y para retroalimentación futura de HH reales vs. catálogo. */
+  catalogoServicioId: string
+  /** CatalogoServicio.recursoId del servicio de origen — precarga de la columna Recurso, editable después como cualquier campo. */
+  recursoId: string | null
 }
 
 export interface EstructuraReal {
@@ -102,6 +106,8 @@ interface ConstruirEstructuraOpciones {
   proyectoCronogramaId: string
   fechaInicioProyecto: Date
   calendarioLaboral: { horasPorDia: number }
+  /** CatalogoServicio.id -> CatalogoServicio.recursoId, resuelto por el caller antes de construir la estructura. */
+  recursoPorServicio: Map<string, string>
 }
 
 /**
@@ -112,7 +118,7 @@ interface ConstruirEstructuraOpciones {
  * la única dependencia externa es el reloj de calendario laboral.
  */
 export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): EstructuraReal {
-  const { actividades, edtsCatalogo, proyectoId, proyectoCronogramaId, fechaInicioProyecto, calendarioLaboral } = opciones
+  const { actividades, edtsCatalogo, proyectoId, proyectoCronogramaId, fechaInicioProyecto, calendarioLaboral, recursoPorServicio } = opciones
   const advertencias: string[] = []
   const horasPorDia = calendarioLaboral.horasPorDia
 
@@ -239,6 +245,8 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
             fechaFin: fechaFinTarea,
             horasEstimadas: tarea.horasEstimadas,
             updatedAt: new Date(),
+            catalogoServicioId: tarea.catalogoServicioId,
+            recursoId: recursoPorServicio.get(tarea.catalogoServicioId) ?? null,
           })
 
           cursorTarea = fechaFinTarea

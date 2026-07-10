@@ -29,6 +29,7 @@ import { useToast } from '@/hooks/use-toast'
 import type { ActividadPropuesta, ConfiguracionWizardPaso1 } from '@/types/cronogramaIA'
 import type { EdtSugeridoConOrigen } from '@/lib/cronogramaIA/derivarEdtsSoporte'
 import { detectarEdtsPosibles, type EvidenciaTexto } from '@/lib/cronogramaIA/detectarEdtsPosibles'
+import { AutoasignarResponsablesModal } from './AutoasignarResponsablesModal'
 import {
   BORRADOR_LOCAL_PASO1_VERSION,
   claveBorradorLocalPaso1,
@@ -146,6 +147,10 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
   const [ultimoGuardadoFallo, setUltimoGuardadoFallo] = useState(false)
   const [mostrarConfirmarCierre, setMostrarConfirmarCierre] = useState(false)
   const [mostrarConfirmarReset, setMostrarConfirmarReset] = useState(false)
+  // Al aplicar el cronograma, se ofrece autoasignar responsables desde la
+  // Matriz de Comunicación (con confirmación propia) — no null significa
+  // "mostrar el modal para este cronograma recién aplicado".
+  const [cronogramaIdAplicado, setCronogramaIdAplicado] = useState<string | null>(null)
 
   // Gate de hidratación para el autoguardado de Paso 1 en localStorage: un
   // useState (cargandoContexto/decidiendoBorrador) NO sirve para esto porque
@@ -722,6 +727,11 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
         description: `${data.resultado.fasesCreadas} fases, ${data.resultado.edtsCreados} EDTs, ${data.resultado.actividadesCreadas} actividades, ${data.resultado.tareasCreadas} tareas.`,
       })
       onSuccess?.()
+      // No cierra directo: abre la propuesta de autoasignación de
+      // responsables (Matriz de Comunicación) — sigue exigiendo la
+      // confirmación explícita del usuario, solo evita que tenga que ir a
+      // buscar el botón manual.
+      setCronogramaIdAplicado(data.cronogramaId)
       onOpenChange(false)
     } catch (e) {
       toast({ title: e instanceof Error ? e.message : 'Error inesperado', variant: 'destructive' })
@@ -1339,6 +1349,21 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {cronogramaIdAplicado && (
+        <AutoasignarResponsablesModal
+          open={!!cronogramaIdAplicado}
+          onOpenChange={next => {
+            if (!next) setCronogramaIdAplicado(null)
+          }}
+          proyectoId={proyectoId}
+          cronogramaId={cronogramaIdAplicado}
+          onSuccess={() => {
+            onSuccess?.()
+            setCronogramaIdAplicado(null)
+          }}
+        />
+      )}
     </>
   )
 }
