@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Input } from '@/components/ui/input'
 import {
-  Upload, FileText, CheckCircle2, AlertTriangle, HelpCircle, RefreshCw, Trash2, ExternalLink,
+  Upload, FileText, CheckCircle2, AlertTriangle, HelpCircle, RefreshCw, Trash2, ExternalLink, X, Plus,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { CotizacionDiff } from '@/lib/agente/cotizacionDocumentoExtractor'
@@ -51,6 +52,80 @@ function EstadoBadge({ estado }: { estado: string | null }) {
     <Badge variant="secondary">
       <HelpCircle className="h-3 w-3 mr-1" /> Sin verificar
     </Badge>
+  )
+}
+
+// Lista de bullets editable (editar texto, eliminar línea, agregar línea) con
+// guardado explícito. Usada para "Resumen de alcance" y "Exclusiones" — se
+// pueden corregir/quitar líneas que quedaron mal (p. ej. tras el kickoff
+// interno, si comercial detecta que algo no es parte del alcance real).
+function EditableBulletList({
+  items, onSave,
+}: {
+  items: string[]
+  onSave: (items: string[]) => Promise<void>
+}) {
+  const [local, setLocal] = useState(items)
+  const [guardando, setGuardando] = useState(false)
+
+  useEffect(() => { setLocal(items) }, [items])
+
+  const dirty = JSON.stringify(local) !== JSON.stringify(items)
+
+  const actualizar = (idx: number, valor: string) => {
+    setLocal(prev => prev.map((v, i) => (i === idx ? valor : v)))
+  }
+
+  const eliminar = (idx: number) => {
+    setLocal(prev => prev.filter((_, i) => i !== idx))
+  }
+
+  const agregar = () => {
+    setLocal(prev => [...prev, ''])
+  }
+
+  const guardar = async () => {
+    setGuardando(true)
+    try {
+      await onSave(local.map(v => v.trim()).filter(v => v.length > 0))
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <ul className="space-y-1.5">
+        {local.map((texto, i) => (
+          <li key={i} className="flex items-center gap-1.5">
+            <span className="text-muted-foreground text-sm">•</span>
+            <Input
+              value={texto}
+              onChange={e => actualizar(i, e.target.value)}
+              className="h-7 text-sm"
+            />
+            <Button
+              size="sm" variant="ghost"
+              className="h-7 w-7 p-0 text-muted-foreground hover:text-red-600 shrink-0"
+              onClick={() => eliminar(i)}
+              title="Eliminar línea"
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          </li>
+        ))}
+      </ul>
+      <div className="flex items-center gap-2">
+        <Button size="sm" variant="outline" onClick={agregar} className="h-7 text-xs">
+          <Plus className="h-3 w-3 mr-1" /> Agregar línea
+        </Button>
+        {dirty && (
+          <Button size="sm" onClick={guardar} disabled={guardando} className="h-7 text-xs">
+            {guardando ? 'Guardando...' : 'Guardar cambios'}
+          </Button>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -117,6 +192,22 @@ export default function CotizacionDocumentoPanel({ proyectoId }: { proyectoId: s
       toast.error(err instanceof Error ? err.message : 'Error al reverificar')
     } finally {
       setReverificando(false)
+    }
+  }
+
+  const handleGuardarLista = async (campo: 'resumenAlcance' | 'exclusiones', items: string[]) => {
+    try {
+      const res = await fetch(`/api/proyecto/${proyectoId}/cotizacion-documento`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [campo]: items }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Error al guardar los cambios')
+      setDocumento(data)
+      toast.success('Cambios guardados')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al guardar los cambios')
     }
   }
 
@@ -251,24 +342,26 @@ export default function CotizacionDocumentoPanel({ proyectoId }: { proyectoId: s
         </CardContent>
       </Card>
 
-      {documento.resumenAlcance && documento.resumenAlcance.length > 0 && (
+      {documento.resumenAlcance !== null && (
         <Card>
           <CardHeader><CardTitle className="text-base">Resumen de alcance</CardTitle></CardHeader>
           <CardContent>
-            <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-              {documento.resumenAlcance.map((b, i) => <li key={i}>{b}</li>)}
-            </ul>
+            <EditableBulletList
+              items={documento.resumenAlcance}
+              onSave={items => handleGuardarLista('resumenAlcance', items)}
+            />
           </CardContent>
         </Card>
       )}
 
-      {documento.exclusiones && documento.exclusiones.length > 0 && (
+      {documento.exclusiones !== null && (
         <Card>
           <CardHeader><CardTitle className="text-base">Exclusiones y observaciones clave</CardTitle></CardHeader>
           <CardContent>
-            <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-              {documento.exclusiones.map((b, i) => <li key={i}>{b}</li>)}
-            </ul>
+            <EditableBulletList
+              items={documento.exclusiones}
+              onSave={items => handleGuardarLista('exclusiones', items)}
+            />
           </CardContent>
         </Card>
       )}
