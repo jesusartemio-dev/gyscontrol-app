@@ -19,6 +19,7 @@ import {
   buildUserPropuestaInstanciasHmi,
   type ContextoCotizacionParaPrompt,
   type ContextoInstanciasParaPrompt,
+  type EquipoRealParaPrompt,
   type TareaParaPrompt,
 } from './prompts'
 import type { CatalogoServicioParaWizard, ConfiguracionWizardPaso1 } from '@/types/cronogramaIA'
@@ -38,6 +39,8 @@ interface GenerarPropuestaOpciones {
   alcanceLibre: string
   cotizacion: ContextoCotizacionParaPrompt | null
   contextoInstancias?: ContextoInstanciasParaPrompt | null
+  /** Solo relevante para PRO — lista real de ProyectoEquipoCotizadoItem (señal fuerte, ver prompts.ts). */
+  equiposReales?: EquipoRealParaPrompt[] | null
   config: Pick<ConfiguracionWizardPaso1, 'brownfield' | 'ingenieriaDetalle'>
   userId: string
   proyectoId: string
@@ -57,13 +60,14 @@ function construirPromptUsuario(
   alcanceLibre: string,
   cotizacion: ContextoCotizacionParaPrompt | null,
   contextoInstancias: ContextoInstanciasParaPrompt | null,
+  equiposReales: EquipoRealParaPrompt[] | null,
   notaCorrectiva: string
 ): string {
   switch (edtNombre) {
     case 'CON':
       return buildUserPropuestaZonasCon(tareas, alcanceLibre, cotizacion, notaCorrectiva)
     case 'PRO':
-      return buildUserPropuestaFamiliasPro(tareas, alcanceLibre, cotizacion, notaCorrectiva)
+      return buildUserPropuestaFamiliasPro(tareas, alcanceLibre, cotizacion, equiposReales, notaCorrectiva)
     case 'PLC':
       return buildUserPropuestaInstanciasPlc(tareas, alcanceLibre, cotizacion, contextoInstancias, notaCorrectiva)
     case 'HMI':
@@ -79,7 +83,18 @@ function construirPromptUsuario(
  * espíritu que generarAlcanceDetallado.ts de Plan de Trabajo.
  */
 export async function generarPropuestaConIA(opciones: GenerarPropuestaOpciones): Promise<ResultadoValidacionGrupos> {
-  const { edtNombre, serviciosPermitidos, alcanceLibre, cotizacion, contextoInstancias = null, config, userId, proyectoId, signal } = opciones
+  const {
+    edtNombre,
+    serviciosPermitidos,
+    alcanceLibre,
+    cotizacion,
+    contextoInstancias = null,
+    equiposReales = null,
+    config,
+    userId,
+    proyectoId,
+    signal,
+  } = opciones
 
   if (serviciosPermitidos.length === 0) {
     return { actividades: [], tareaIdsNoAsignadas: [], tareaIdsInventados: [], advertencias: [] }
@@ -109,7 +124,7 @@ export async function generarPropuestaConIA(opciones: GenerarPropuestaOpciones):
           messages: [
             {
               role: 'user',
-              content: construirPromptUsuario(edtNombre, tareasParaPrompt, alcanceLibre, cotizacion, contextoInstancias, notaCorrectiva),
+              content: construirPromptUsuario(edtNombre, tareasParaPrompt, alcanceLibre, cotizacion, contextoInstancias, equiposReales, notaCorrectiva),
             },
           ],
         },

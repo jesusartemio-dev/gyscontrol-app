@@ -8,7 +8,7 @@ import { adquirirLockCronogramaIA, liberarLockCronogramaIA } from '@/lib/cronogr
 import { generarPropuestaConIA } from '@/lib/cronogramaIA/generarPropuestaConIA'
 import { EDTS_AGRUPACION_IA } from '@/lib/cronogramaIA/reglasActividades'
 import type { ActividadPropuesta, CatalogoServicioParaWizard, ConfiguracionWizardPaso1 } from '@/types/cronogramaIA'
-import type { ContextoCotizacionParaPrompt, ContextoInstanciasParaPrompt } from '@/lib/cronogramaIA/prompts'
+import type { ContextoCotizacionParaPrompt, ContextoInstanciasParaPrompt, EquipoRealParaPrompt } from '@/lib/cronogramaIA/prompts'
 
 export const maxDuration = 120
 
@@ -109,6 +109,32 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
       scada: config.scada,
     }
 
+    // Solo para PRO: lista real de equipos/materiales ya cotizados (señal
+    // fuerte para el prompt de familias de procura — ver prompts.ts). Nunca
+    // se consulta si PRO no está entre los EDTs a resolver, para no pagar
+    // una query de más en el resto de los casos.
+    let equiposReales: EquipoRealParaPrompt[] | null = null
+    if (edtsIA.some(e => e.nombre === 'PRO')) {
+      const equipos = await prisma.proyectoEquipoCotizado.findMany({
+        where: { proyectoId },
+        select: {
+          proyectoEquipoCotizadoItem: {
+            select: { codigo: true, descripcion: true, marca: true, cantidad: true, unidad: true, categoria: true },
+          },
+        },
+      })
+      equiposReales = equipos.flatMap(g =>
+        g.proyectoEquipoCotizadoItem.map(item => ({
+          codigo: item.codigo,
+          descripcion: item.descripcion,
+          marca: item.marca,
+          cantidad: item.cantidad,
+          unidad: item.unidad,
+          categoria: item.categoria,
+        }))
+      )
+    }
+
     const resultados = await Promise.allSettled(
       edtsIA.map(async edt => {
         const nombre = edt.nombre as EdtConAgrupacionIA
@@ -135,6 +161,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
           alcanceLibre: config.alcanceLibre,
           cotizacion: construirContextoCotizacion(nombre),
           contextoInstancias: nombre === 'PLC' || nombre === 'HMI' ? contextoInstancias : null,
+          equiposReales: nombre === 'PRO' ? equiposReales : null,
           config: { brownfield: config.brownfield, ingenieriaDetalle: config.ingenieriaDetalle },
           userId: session.user.id,
           proyectoId,

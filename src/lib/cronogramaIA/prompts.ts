@@ -24,6 +24,36 @@ export interface ContextoCotizacionParaPrompt {
   lineas: LineaCotizacionParaPrompt[]
 }
 
+export interface EquipoRealParaPrompt {
+  codigo: string
+  descripcion: string
+  marca: string
+  cantidad: number
+  unidad: string
+  categoria: string
+}
+
+/**
+ * Lista real de ProyectoEquipoCotizadoItem (dato estructurado de lo que
+ * efectivamente se cotizó, con marca/cantidad/unidad reales) — señal FUERTE
+ * para el prompt de familias de PRO, a diferencia de `lineasClasificadas`
+ * (texto extraído por IA de un PDF, señal DÉBIL). Ver bloqueEquiposReales.
+ */
+function bloqueEquiposReales(equipos: EquipoRealParaPrompt[] | null): string {
+  if (!equipos || equipos.length === 0) return ''
+  const filas = equipos.map(e => `- [${e.codigo}] ${e.descripcion} — marca: ${e.marca}, cantidad: ${e.cantidad} ${e.unidad}, categoría: ${e.categoria}`)
+  return [
+    '',
+    '--- SEÑAL FUERTE: EQUIPOS REALES YA COTIZADOS (dato estructurado, no extraído por IA) ---',
+    'Esta es la lista REAL de materiales/equipos que el proyecto compró, con marca y cantidad reales.',
+    'Tus familias DEBEN cubrir todos estos ítems — podés citarlos por su código/descripción al nombrar',
+    'la familia (ej. si hay "TUBO CONDUIT RGS 1x10FT" proponé "Procura de Conduit/Tuberías").',
+    ...filas,
+    '--- FIN EQUIPOS REALES ---',
+    '',
+  ].join('\n')
+}
+
 function bloqueContextoCotizacion(ctx: ContextoCotizacionParaPrompt | null): string {
   if (!ctx) return ''
   const partes: string[] = []
@@ -252,10 +282,20 @@ REGLAS ESTRICTAS:
 - Cada FAMILIA que propongas debe incluir el pipeline completo relevante
   para ese tipo de compra, usando SOLO ids que aparecen literalmente en la
   lista de tareas candidatas del input.
-- Las familias deben basarse en lo que realmente hay que comprar según el
-  alcance del proyecto y el contexto de cotización (ej. si la cotización
-  menciona "cables de instrumentación" y "tableros", proponé familias como
-  "Procura de Cables" y "Procura de Tableros", no una familia genérica única).
+- Tenés DOS fuentes de contexto, con distinta confiabilidad — no las mezcles:
+  1) EQUIPOS REALES YA COTIZADOS (si aparece más abajo): dato estructurado,
+     con marca y cantidad reales. Es la fuente de mayor prioridad — tus
+     familias DEBEN cubrir TODOS estos ítems, sin excepción, y podés citarlos
+     por nombre al armar cada familia.
+  2) Descripción libre del alcance + contexto de cotización extraído de PDF:
+     texto de menor confiabilidad (puede ser impreciso o genérico). Usalo
+     SOLO para detectar familias de materiales a granel que NO aparecen en
+     la lista de equipos reales (ej. cables/tuberías/bandejas/soportería/
+     consumibles mencionados en el alcance pero sin ítem propio cotizado).
+     Si algo de acá ya está cubierto por un equipo real, no crees una
+     familia duplicada para lo mismo.
+- Las familias deben basarse en lo que realmente hay que comprar — nunca una
+  familia genérica única si hay evidencia suficiente para nombrarlas mejor.
 - Si el contexto de cotización menciona exclusiones, NO generes familias
   para ese material/servicio excluido.
 - Devolvé SOLO el JSON, sin markdown ni texto antes o después.
@@ -265,10 +305,12 @@ export function buildUserPropuestaFamiliasPro(
   tareas: TareaParaPrompt[],
   alcanceLibre: string,
   cotizacion: ContextoCotizacionParaPrompt | null,
+  equiposReales: EquipoRealParaPrompt[] | null = null,
   notaCorrectiva = ''
 ): string {
   return [
-    `DESCRIPCIÓN LIBRE DEL ALCANCE (dada por el usuario en el wizard):\n${alcanceLibre || '(no se proporcionó)'}`,
+    bloqueEquiposReales(equiposReales),
+    `DESCRIPCIÓN LIBRE DEL ALCANCE (dada por el usuario en el wizard — señal más débil que los equipos reales de arriba):\n${alcanceLibre || '(no se proporcionó)'}`,
     bloqueContextoCotizacion(cotizacion),
     'TAREAS CANDIDATAS DEL PIPELINE DE PROCURA (asigná cada una a una familia por su "id"):',
     JSON.stringify(tareas, null, 2),
