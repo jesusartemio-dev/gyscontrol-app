@@ -5,7 +5,17 @@ import type {
   ResultadoActividadesDeterministas,
   TareaPropuesta,
 } from '@/types/cronogramaIA'
-import { evaluarSubalcanceCMM, aplicarSubalcanceCMM, type SubalcanceCMM } from './derivarEdtsSoporte'
+import {
+  evaluarSubalcanceCMM,
+  aplicarSubalcanceCMM,
+  type SubalcanceCMM,
+  evaluarSubalcanceDisciplinas,
+  aplicarSubalcanceDisciplina,
+  type SubalcanceDisciplina,
+  evaluarSubalcanceProtocolosIng,
+  aplicarSubalcanceProtocolosIng,
+  type SubalcanceProtocolosIng,
+} from './derivarEdtsSoporte'
 
 /**
  * EDTs cuya agrupación en Actividades depende de IA (zonas de CON, familias
@@ -91,25 +101,38 @@ function tieneAlMenosUnaTareaIncluida(tareas: TareaPropuesta[]): boolean {
   return tareas.some(t => t.incluida)
 }
 
+/**
+ * `reglasPorTag` es un mapa opcional tag-crudo -> transformación de sub-alcance
+ * (ver derivarEdtsSoporte.ts) aplicada a las tareas de ese bucket antes de
+ * decidir si la Actividad se crea. Un bucket CON regla queda siempre visible
+ * — aunque termine con 0 tareas incluidas, el usuario debe poder confirmar o
+ * revertir esa exclusión, no que la Actividad desaparezca sin explicación.
+ * Un bucket SIN regla mantiene el comportamiento de siempre: se omite si
+ * ninguna de sus tareas quedó incluida.
+ */
 function agruparPorTag(
   servicios: CatalogoServicioParaWizard[],
   edtNombre: string,
   tagLabels: Record<string, string>,
-  config: ConfiguracionWizardPaso1
+  config: ConfiguracionWizardPaso1,
+  reglasPorTag?: Record<string, (tareas: TareaPropuesta[]) => TareaPropuesta[]>
 ): ActividadPropuesta[] {
   const buckets = new Map<string, TareaPropuesta[]>()
 
   for (const servicio of servicios) {
     const tagReconocido = servicio.actividadTag.find(t => t in tagLabels)
-    const label = tagReconocido ? tagLabels[tagReconocido] : 'Otros'
+    const claveBucket = tagReconocido ?? 'Otros'
     const tarea = construirTareaPropuesta(servicio, config)
-    if (!buckets.has(label)) buckets.set(label, [])
-    buckets.get(label)!.push(tarea)
+    if (!buckets.has(claveBucket)) buckets.set(claveBucket, [])
+    buckets.get(claveBucket)!.push(tarea)
   }
 
   const actividades: ActividadPropuesta[] = []
-  for (const [actividadNombre, tareas] of buckets) {
-    if (!tieneAlMenosUnaTareaIncluida(tareas)) continue
+  for (const [claveBucket, tareasCrudas] of buckets) {
+    const regla = reglasPorTag?.[claveBucket]
+    const tareas = regla ? regla(tareasCrudas) : tareasCrudas
+    if (!regla && !tieneAlMenosUnaTareaIncluida(tareas)) continue
+    const actividadNombre = claveBucket === 'Otros' ? 'Otros' : tagLabels[claveBucket]
     actividades.push({ edtNombre, actividadNombre, tareas, origen: 'determinista' })
   }
   return actividades
@@ -119,15 +142,30 @@ function generarGES(servicios: CatalogoServicioParaWizard[], config: Configuraci
   return agruparPorTag(servicios, 'GES', { Inicio: 'Inicio', Documentos: 'Documentos de Gestión', Seguimiento: 'Control y Seguimiento' }, config)
 }
 
-function generarING(servicios: CatalogoServicioParaWizard[], config: ConfiguracionWizardPaso1): ActividadPropuesta[] {
-  return agruparPorTag(servicios, 'ING', {
-    Generales: 'Generales',
-    Electrico: 'Disciplina Eléctrica',
-    Instrumentacion: 'Disciplina Instrumentación',
-    Control: 'Disciplina Control',
-    Protocolos: 'Protocolos',
-    Envios: 'Envíos',
-  }, config)
+function generarING(
+  servicios: CatalogoServicioParaWizard[],
+  config: ConfiguracionWizardPaso1,
+  subalcanceDisciplina: SubalcanceDisciplina,
+  subalcanceProtocolos: SubalcanceProtocolosIng
+): ActividadPropuesta[] {
+  return agruparPorTag(
+    servicios,
+    'ING',
+    {
+      Generales: 'Generales',
+      Electrico: 'Disciplina Eléctrica',
+      Instrumentacion: 'Disciplina Instrumentación',
+      Control: 'Disciplina Control',
+      Protocolos: 'Protocolos',
+      Envios: 'Envíos',
+    },
+    config,
+    {
+      Control: tareas => aplicarSubalcanceDisciplina('ING', 'Control', tareas, subalcanceDisciplina),
+      Instrumentacion: tareas => aplicarSubalcanceDisciplina('ING', 'Instrumentacion', tareas, subalcanceDisciplina),
+      Protocolos: tareas => aplicarSubalcanceProtocolosIng(tareas, subalcanceProtocolos),
+    }
+  )
 }
 
 function generarCIE(servicios: CatalogoServicioParaWizard[], config: ConfiguracionWizardPaso1): ActividadPropuesta[] {
@@ -162,7 +200,8 @@ function formatearNombreTablero(nombre: string): string {
 function generarPLA(
   servicios: CatalogoServicioParaWizard[],
   config: ConfiguracionWizardPaso1,
-  advertencias: string[]
+  advertencias: string[],
+  subalcanceDisciplina: SubalcanceDisciplina
 ): ActividadPropuesta[] {
   const TAG_LABELS_RESTO: Record<string, string> = {
     Electrico: 'Disciplina Eléctrica',
@@ -187,7 +226,12 @@ function generarPLA(
     }
   }
 
-  actividades.push(...agruparPorTag(resto, 'PLA', TAG_LABELS_RESTO, config))
+  actividades.push(
+    ...agruparPorTag(resto, 'PLA', TAG_LABELS_RESTO, config, {
+      Control: tareas => aplicarSubalcanceDisciplina('PLA', 'Control', tareas, subalcanceDisciplina),
+      Instrumentacion: tareas => aplicarSubalcanceDisciplina('PLA', 'Instrumentacion', tareas, subalcanceDisciplina),
+    })
+  )
   return actividades
 }
 
@@ -252,6 +296,11 @@ export function generarActividadesDeterministas(
     edts.map(e => e.nombre),
     config.alcanceLibre
   )
+  // Sub-alcance de disciplinas ING/PLA (Control/Instrumentación) y de las
+  // tareas de [Protocolos] de ING — mismo criterio: una sola evaluación,
+  // reusada por ambos EDTs.
+  const subalcanceDisciplina = evaluarSubalcanceDisciplinas(edts.map(e => e.nombre), config.alcanceLibre)
+  const subalcanceProtocolosIng = evaluarSubalcanceProtocolosIng(config.alcanceLibre)
 
   for (const edt of edts) {
     if ((EDTS_AGRUPACION_IA as readonly string[]).includes(edt.nombre)) {
@@ -262,7 +311,7 @@ export function generarActividadesDeterministas(
         actividades.push(...generarGES(edt.servicios, config))
         break
       case 'ING':
-        actividades.push(...generarING(edt.servicios, config))
+        actividades.push(...generarING(edt.servicios, config, subalcanceDisciplina, subalcanceProtocolosIng))
         break
       case 'CIE':
         actividades.push(...generarCIE(edt.servicios, config))
@@ -274,7 +323,7 @@ export function generarActividadesDeterministas(
         actividades.push(...generarCMM(edt.servicios, config, subalcanceCMM))
         break
       case 'PLA':
-        actividades.push(...generarPLA(edt.servicios, config, advertencias))
+        actividades.push(...generarPLA(edt.servicios, config, advertencias, subalcanceDisciplina))
         break
       case 'TAB':
         actividades.push(...generarTAB(edt.servicios, config, advertencias))

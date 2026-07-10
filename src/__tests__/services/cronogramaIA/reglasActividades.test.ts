@@ -99,20 +99,41 @@ describe('generarActividadesDeterministas — GES (por tag fijo)', () => {
   })
 })
 
-describe('generarActividadesDeterministas — ING (crea solo actividades con >=1 tarea incluida)', () => {
-  it('una disciplina cuyas tareas son todas detalle-only y ingenieriaDetalle=false no genera Actividad', () => {
+describe('generarActividadesDeterministas — ING (crea solo actividades con >=1 tarea incluida, salvo Control/Instrumentacion que siempre son visibles por su regla de sub-alcance)', () => {
+  it('Disciplina Eléctrica (sin regla de sub-alcance) no se crea si todas sus tareas son detalle-only y el toggle está apagado', () => {
     const servicios = [
       servicio({ id: 'i1', nombre: 'Memoria de Cálculo', actividadTag: ['Electrico'], filtroAlcance: 'detalle' }),
       servicio({ id: 'i2', nombre: 'Listado de Cables', actividadTag: ['Electrico'], filtroAlcance: 'general' }),
-      servicio({ id: 'i3', nombre: 'Filosofía de Control', actividadTag: ['Control'], filtroAlcance: 'detalle' }),
     ]
     const edts: EdtParaGenerar[] = [{ nombre: 'ING', descripcion: 'Ingeniería', servicios }]
 
     const sinDetalle = generarActividadesDeterministas(edts, config({ ingenieriaDetalle: false }))
     expect(sinDetalle.actividades.map(a => a.actividadNombre)).toEqual(['Disciplina Eléctrica'])
+  })
 
-    const conDetalle = generarActividadesDeterministas(edts, config({ ingenieriaDetalle: true }))
-    expect(conDetalle.actividades.map(a => a.actividadNombre).sort()).toEqual(['Disciplina Control', 'Disciplina Eléctrica'])
+  it('Disciplina Control (con regla de sub-alcance) SIEMPRE es visible, aunque termine con 0 tareas incluidas — nunca desaparece sin explicación', () => {
+    const servicios = [servicio({ id: 'i3', nombre: 'Filosofía de Control', actividadTag: ['Control'], filtroAlcance: 'detalle' })]
+    const edts: EdtParaGenerar[] = [{ nombre: 'ING', descripcion: 'Ingeniería', servicios }]
+
+    // Sin ingeniería de detalle: la tarea ya queda excluida por evaluarAlcance,
+    // esta regla ni participa (no reglaClave) — pero la Actividad igual se crea.
+    const sinDetalle = generarActividadesDeterministas(edts, config({ ingenieriaDetalle: false }))
+    expect(sinDetalle.actividades.map(a => a.actividadNombre)).toEqual(['Disciplina Control'])
+    expect(sinDetalle.actividades[0].tareas[0].incluida).toBe(false)
+    expect(sinDetalle.actividades[0].tareas[0].reglaClave).toBeUndefined()
+
+    // Con detalle=ON pero SIN PLC/HMI ni control programable/SCADA en el alcance:
+    // el toggle solo no basta — la regla de disciplina la excluye igual.
+    const conDetalleSinControl = generarActividadesDeterministas(edts, config({ ingenieriaDetalle: true }))
+    const control = conDetalleSinControl.actividades.find(a => a.actividadNombre === 'Disciplina Control')!
+    expect(control.tareas[0].incluida).toBe(false)
+    expect(control.tareas[0].reglaClave).toBe('ing.control')
+
+    // Con detalle=ON Y PLC en el alcance: recién ahí queda incluida (regla AND).
+    const edtsConPlc: EdtParaGenerar[] = [...edts, { nombre: 'PLC', descripcion: 'PLC', servicios: [] }]
+    const conDetalleYControl = generarActividadesDeterministas(edtsConPlc, config({ ingenieriaDetalle: true }))
+    const controlActivo = conDetalleYControl.actividades.find(a => a.actividadNombre === 'Disciplina Control')!
+    expect(controlActivo.tareas[0].incluida).toBe(true)
   })
 
   it('servicios sin tag reconocido caen en "Otros"', () => {
@@ -120,6 +141,52 @@ describe('generarActividadesDeterministas — ING (crea solo actividades con >=1
     const edts: EdtParaGenerar[] = [{ nombre: 'ING', descripcion: 'Ingeniería', servicios }]
     const r = generarActividadesDeterministas(edts, config())
     expect(r.actividades.map(a => a.actividadNombre)).toEqual(['Otros'])
+  })
+
+  it('Instrumentación (con regla de sub-alcance) se incluye si la descripción libre menciona instrumentos', () => {
+    const servicios = [servicio({ id: 'i5', nombre: 'Listado de Instrumentos', actividadTag: ['Instrumentacion'], filtroAlcance: 'general' })]
+    const edts: EdtParaGenerar[] = [{ nombre: 'ING', descripcion: 'Ingeniería', servicios }]
+
+    const sinInstrumentos = generarActividadesDeterministas(edts, config({ alcanceLibre: 'Solo cableado y tendido de bandejas' }))
+    expect(sinInstrumentos.actividades.find(a => a.actividadNombre === 'Disciplina Instrumentación')!.tareas[0].incluida).toBe(false)
+
+    const conInstrumentos = generarActividadesDeterministas(edts, config({ alcanceLibre: 'Incluye instalación de transmisores de presión' }))
+    expect(conInstrumentos.actividades.find(a => a.actividadNombre === 'Disciplina Instrumentación')!.tareas[0].incluida).toBe(true)
+  })
+
+  it('[Protocolos]: cada tarea se preselecciona según su propio trigger textual, con fail-safe si el nombre no coincide', () => {
+    const servicios = [
+      servicio({ id: 'p1', nombre: 'Protocolo de Cableado', actividadTag: ['Protocolos'] }),
+      servicio({ id: 'p2', nombre: 'Protocolo de Tuberías y Soportes', actividadTag: ['Protocolos'] }),
+      servicio({ id: 'p3', nombre: 'Protocolo de Megado', actividadTag: ['Protocolos'] }),
+    ]
+    const edts: EdtParaGenerar[] = [{ nombre: 'ING', descripcion: 'Ingeniería', servicios }]
+
+    const r = generarActividadesDeterministas(edts, config({ alcanceLibre: 'Tendido de cables de fuerza en bandejas' }))
+    const protocolos = r.actividades.find(a => a.actividadNombre === 'Protocolos')!
+    expect(protocolos.tareas.find(t => t.catalogoServicioId === 'p1')!.incluida).toBe(true) // tendido -> cableado
+    expect(protocolos.tareas.find(t => t.catalogoServicioId === 'p2')!.incluida).toBe(true) // bandejas -> canalizacion
+    expect(protocolos.tareas.find(t => t.catalogoServicioId === 'p3')!.incluida).toBe(true) // cables de fuerza -> fuerza
+
+    const sinNada = generarActividadesDeterministas(edts, config({ alcanceLibre: 'Solo gestión documentaria' }))
+    const protocolosSinNada = sinNada.actividades.find(a => a.actividadNombre === 'Protocolos')!
+    expect(protocolosSinNada.tareas.every(t => !t.incluida)).toBe(true)
+  })
+})
+
+describe('generarActividadesDeterministas — PLA disciplinas Control/Instrumentación (mismo mecanismo que ING)', () => {
+  it('Disciplina Control de PLA también se rige por la regla de sub-alcance compartida', () => {
+    const servicios = [servicio({ id: 'pla-c1', nombre: 'Arquitectura del Sistema de Control', actividadTag: ['Control'], filtroAlcance: 'detalle' })]
+    const edts: EdtParaGenerar[] = [{ nombre: 'PLA', descripcion: 'Planos', servicios }]
+
+    const sinControl = generarActividadesDeterministas(edts, config({ ingenieriaDetalle: true }))
+    const control = sinControl.actividades.find(a => a.actividadNombre === 'Disciplina Control')!
+    expect(control.tareas[0].incluida).toBe(false)
+    expect(control.tareas[0].reglaClave).toBe('pla.control')
+
+    const edtsConHmi: EdtParaGenerar[] = [...edts, { nombre: 'HMI', descripcion: 'HMI', servicios: [] }]
+    const conControl = generarActividadesDeterministas(edtsConHmi, config({ ingenieriaDetalle: true }))
+    expect(conControl.actividades.find(a => a.actividadNombre === 'Disciplina Control')!.tareas[0].incluida).toBe(true)
   })
 })
 

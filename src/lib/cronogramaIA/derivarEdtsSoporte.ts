@@ -187,3 +187,107 @@ export function aplicarSubalcanceCMM(tareas: TareaPropuesta[], subalcance: Subal
     return { ...t, incluida: false, motivoExclusion: MOTIVO_EXCLUSION_CMM[clave], reglaClave, incluidaPorRegla }
   })
 }
+
+// --- Sub-alcance de disciplinas ING/PLA (Control, Instrumentación) ---
+//
+// A diferencia de CMM (12 tareas fijas, tabla por nombre exacto), acá el
+// sub-alcance se decide a nivel de la Actividad completa agrupada por tag:
+// TODAS las tareas de "Disciplina Control" o "Disciplina Instrumentación"
+// comparten un mismo veredicto — la Actividad queda siempre visible en el
+// Paso 2 (aunque termine con 0 tareas incluidas), nunca desaparece sin
+// explicación. [Electrico]/[Generales]/[Protocolos]/[Envios] no pasan por
+// acá: siempre se preseleccionan cuando el EDT está activo.
+
+export interface SubalcanceDisciplina {
+  control: boolean
+  instrumentacion: boolean
+}
+
+const RX_CONTROL_LIBRE = /control programable|scada/i
+const RX_INSTRUMENTOS_LIBRE = /instrumentos?|transmisor(es)?|v[aá]lvulas?/i
+
+const MOTIVO_DISCIPLINA: Record<keyof SubalcanceDisciplina, string> = {
+  control: 'No hay PLC/HMI en el alcance seleccionado ni menciones de control programable/SCADA en la descripción libre del Paso 1 — confirma si aplica.',
+  instrumentacion: 'No se detectaron instrumentos/transmisores/válvulas en la descripción libre del Paso 1 — confirma si aplica.',
+}
+
+/**
+ * Evalúa si hay control programable/instrumentación en el alcance a partir
+ * de los EDTs YA seleccionados (PLC/HMI) y la descripción libre del Paso 1
+ * — nunca del propio ING/PLA, para no ser circular.
+ */
+export function evaluarSubalcanceDisciplinas(edtsNombresSeleccionados: string[], alcanceLibre: string): SubalcanceDisciplina {
+  return {
+    control: edtsNombresSeleccionados.includes('PLC') || edtsNombresSeleccionados.includes('HMI') || RX_CONTROL_LIBRE.test(alcanceLibre),
+    instrumentacion: RX_INSTRUMENTOS_LIBRE.test(alcanceLibre),
+  }
+}
+
+/**
+ * Aplica el veredicto de sub-alcance a TODAS las tareas de una Actividad de
+ * ING/PLA agrupada por tag "Control" o "Instrumentacion" — mismo criterio de
+ * no pisar una exclusión previa (ej. filtroAlcance=detalle sin el toggle
+ * activado) que aplicarSubalcanceCMM, así que una tarea [Detalle] de Control
+ * solo termina incluida si AMBAS condiciones se cumplen (detalle=ON Y
+ * disciplina activa).
+ */
+export function aplicarSubalcanceDisciplina(
+  edtNombre: 'ING' | 'PLA',
+  tagDisciplina: 'Control' | 'Instrumentacion',
+  tareas: TareaPropuesta[],
+  subalcance: SubalcanceDisciplina
+): TareaPropuesta[] {
+  const clave: keyof SubalcanceDisciplina = tagDisciplina === 'Control' ? 'control' : 'instrumentacion'
+  const reglaClave = `${edtNombre.toLowerCase()}.${clave}`
+  const incluidaPorRegla = subalcance[clave]
+  return tareas.map(t => {
+    if (!t.incluida) return t
+    if (incluidaPorRegla) return { ...t, reglaClave, incluidaPorRegla }
+    return { ...t, incluida: false, motivoExclusion: MOTIVO_DISCIPLINA[clave], reglaClave, incluidaPorRegla }
+  })
+}
+
+// --- Sub-alcance por tarea dentro de [Protocolos] de ING ---
+
+export interface SubalcanceProtocolosIng {
+  cableado: boolean
+  canalizacion: boolean
+  fuerza: boolean
+}
+
+const RX_TENDIDO = /tendido|cableado/i
+const RX_CANALIZACION = /canalizaci[oó]n|bandejas?|tuber[ií]as? conduit|conduit/i
+const RX_FUERZA = /cables? de fuerza|circuitos? de fuerza/i
+
+/** Tabla estática por nombre real (las 3 tareas de [Protocolos] en ING) — mismo fail-safe que CMM: nombre no contemplado = siempre incluida. */
+const REGLA_TAREA_PROTOCOLOS_ING: Record<string, keyof SubalcanceProtocolosIng | undefined> = {
+  'Protocolo de Cableado': 'cableado',
+  'Protocolo de Tuberías y Soportes': 'canalizacion',
+  'Protocolo de Megado': 'fuerza',
+}
+
+const MOTIVO_PROTOCOLOS_ING: Record<keyof SubalcanceProtocolosIng, string> = {
+  cableado: 'No se detectó tendido/cableado en la descripción libre del Paso 1 — confirma si aplica.',
+  canalizacion: 'No se detectó canalización (bandejas/tuberías conduit) en la descripción libre — confirma si aplica.',
+  fuerza: 'No se detectaron cables de fuerza en la descripción libre — confirma si aplica.',
+}
+
+export function evaluarSubalcanceProtocolosIng(alcanceLibre: string): SubalcanceProtocolosIng {
+  return {
+    cableado: RX_TENDIDO.test(alcanceLibre),
+    canalizacion: RX_CANALIZACION.test(alcanceLibre),
+    fuerza: RX_FUERZA.test(alcanceLibre),
+  }
+}
+
+export function aplicarSubalcanceProtocolosIng(tareas: TareaPropuesta[], subalcance: SubalcanceProtocolosIng): TareaPropuesta[] {
+  return tareas.map(t => {
+    if (!t.incluida) return t
+    const clave = REGLA_TAREA_PROTOCOLOS_ING[t.nombre]
+    if (!clave) return t
+    const reglaClave = `ing.protocolo.${clave}`
+    const incluidaPorRegla = subalcance[clave]
+    if (incluidaPorRegla) return { ...t, reglaClave, incluidaPorRegla }
+    return { ...t, incluida: false, motivoExclusion: MOTIVO_PROTOCOLOS_ING[clave], reglaClave, incluidaPorRegla }
+  })
+}
