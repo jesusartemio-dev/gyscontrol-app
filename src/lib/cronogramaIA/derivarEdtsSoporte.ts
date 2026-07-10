@@ -120,6 +120,11 @@ export interface SubalcanceCMM {
  * Una tarea sin entrada acá (protocolos, pruebas eléctricas, energización,
  * informe — o cualquier tarea nueva que se agregue a futuro) queda SIEMPRE
  * incluida: sin condición = sin riesgo de excluir algo por error.
+ *
+ * ATENCIÓN: esta tabla matchea por nombre real de las tareas del catálogo.
+ * Si se renombra una tarea de CMM en el catálogo, hay que actualizar esta
+ * tabla — de lo contrario la tarea caerá al grupo "siempre incluida" por el
+ * fail-safe.
  */
 const REGLA_TAREA_CMM: Record<string, keyof SubalcanceCMM | undefined> = {
   'Calibración de Instrumentos': 'instrumentacion',
