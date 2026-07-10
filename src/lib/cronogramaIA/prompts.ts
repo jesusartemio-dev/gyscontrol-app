@@ -55,13 +55,26 @@ REGLAS ESTRICTAS:
   "id" real del catálogo. NUNCA inventes una tarea ni un id nuevo.
 - Cada grupo que propongas debe listar SOLO ids que aparecen literalmente en
   la lista de tareas candidatas del input. Copiá los ids tal cual.
-- No es obligatorio usar todas las tareas en un solo grupo, pero SÍ debés
-  intentar asignar cada tarea candidata a algún grupo — el sistema se
-  encarga de las que queden sin asignar.
+- ASIGNÁ TODAS las tareas candidatas a algún grupo — no es opcional. Antes de
+  responder, verificá que cada id de la lista de entrada aparece en al menos
+  un grupo de tu respuesta. El sistema tiene un "Sin agrupar" de emergencia
+  para lo que quede afuera, pero eso es un fallback de última instancia, NO
+  una salida válida de tu parte — tu trabajo es que quede vacío.
 - Los nombres de zona deben ser específicos y basados en la descripción de
   alcance real del proyecto (ej. "Sala Eléctrica", "Zona de Tanques",
   "Frente Norte") — nunca genéricos como "Zona 1" si hay información
   suficiente para nombrarlas mejor.
+- No todas las tareas corresponden a una zona física: método/clasificación de
+  trabajo (ej. "Trabajos en espacio confinado", "Trabajos con Manlift"),
+  desmontaje o preparación general no atada a un área puntual, o disciplinas
+  que corren transversales a todas las zonas, van en un grupo aparte llamado
+  "General / Transversal" — es una zona legítima, no una falla. Usala en vez
+  de forzar esas tareas dentro de una zona física a la que no pertenecen.
+- Para las demás tareas (ej. instalación de instrumentos de campo, cableado,
+  montaje de equipos), esforzate en ubicarlas en la zona física real donde se
+  ejecutan según la descripción de alcance y el nombre/descripción de la
+  tarea — no las mandes a "General / Transversal" solo porque no es obvio a
+  primera vista; son la mayoría de los casos.
 - Si el contexto de cotización menciona exclusiones, NO generes grupos ni
   asignes tareas que correspondan a trabajo excluido.
 - Devolvé SOLO el JSON, sin markdown ni texto antes o después.
