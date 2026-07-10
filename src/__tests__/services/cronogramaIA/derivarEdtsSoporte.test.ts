@@ -67,8 +67,15 @@ describe('derivarEdtsSoporte', () => {
     expect(r.filter(e => e.nombre === 'CMM')).toHaveLength(1)
   })
 
-  it('sin TAB/PLC/HMI, no se sugiere CMM', () => {
+  it('CON solo (sin TAB/PLC/HMI) también sugiere CMM — caso G300: montaje eléctrico termina en energización/pruebas aunque no haya tableros ni control programable', () => {
     const r = derivarEdtsSoporte(['e-con'], CATALOGO)
+    const cmm = r.find(e => e.nombre === 'CMM')!
+    expect(cmm.origen).toBe('regla-sugerencia')
+    expect(cmm.motivo).toContain('CON')
+  })
+
+  it('sin CON/TAB/PLC/HMI (solo ING), no se sugiere CMM', () => {
+    const r = derivarEdtsSoporte(['e-ing'], CATALOGO)
     expect(r.find(e => e.nombre === 'CMM')).toBeUndefined()
   })
 

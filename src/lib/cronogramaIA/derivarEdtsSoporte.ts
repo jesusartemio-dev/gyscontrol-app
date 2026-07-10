@@ -6,7 +6,10 @@
  * GES (gestión) y CIE (cierre) siempre aplican; SEG (seguridad/HSE) y PRO
  * (procura) se derivan de si hay trabajo en campo/taller o suministro de
  * materiales; CMM (comisionamiento) se sugiere (no se fuerza) cuando hay
- * alcance eléctrico/de control pero no viene explícito en la cotización.
+ * montaje eléctrico/instrumentación/control en el alcance (CON, TAB, PLC o
+ * HMI) y no viene ya como partida explícita en la cotización — casi todo
+ * ese tipo de trabajo termina en energización/pruebas, tenga o no tableros
+ * nuevos o control programable.
  *
  * Reglas duras en código — nunca vía LLM. Cada EDT derivado sigue siendo
  * editable por el usuario en el Paso 1 (esto solo decide la preselección y
@@ -31,8 +34,12 @@ const EDTS_SIEMPRE: Record<string, string> = {
 const EDTS_TRIGGER_SEG = ['CON', 'TAB', 'CMM'] as const
 /** CON/TAB implican suministro de materiales/equipos que hay que procurar. */
 const EDTS_TRIGGER_PRO = ['CON', 'TAB'] as const
-/** Tableros armados o controladores/HMI presentes → hay algo que comisionar. */
-const EDTS_TRIGGER_CMM_SUGERENCIA = ['TAB', 'PLC', 'HMI'] as const
+/**
+ * CON, no solo TAB/PLC/HMI: casi todo montaje eléctrico/instrumentación en
+ * campo termina en precomisionamiento (energización, megado, pruebas),
+ * tenga o no tableros nuevos o control programable en el alcance.
+ */
+const EDTS_TRIGGER_CMM_SUGERENCIA = ['CON', 'TAB', 'PLC', 'HMI'] as const
 
 function motivoSeg(triggers: string[]): string {
   return `Documentos de seguridad (HSE) requeridos para trabajo en campo/taller (${triggers.join(', ')}) — no se cotiza como partida aparte pero es obligatorio para ingresar a planta.`
@@ -41,7 +48,7 @@ function motivoPro(triggers: string[]): string {
   return `Ciclo de procura (cotización → OC → recepción) requerido por el suministro de materiales/equipos del alcance (${triggers.join(', ')}) — no se cotiza como partida aparte.`
 }
 function motivoCmmSugerencia(triggers: string[]): string {
-  return `Alcance eléctrico/de control detectado (${triggers.join(', ')}) — se sugiere Comisionamiento aunque no esté cotizado explícitamente. Confirma si aplica.`
+  return `Alcance eléctrico/de instrumentación/de control detectado (${triggers.join(', ')}) — casi siempre termina en precomisionamiento (energización, megado, pruebas). Se sugiere Comisionamiento aunque no esté cotizado explícitamente. Confirma si aplica.`
 }
 
 /**
