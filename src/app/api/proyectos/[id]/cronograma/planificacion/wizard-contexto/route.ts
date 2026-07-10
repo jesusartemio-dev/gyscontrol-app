@@ -5,6 +5,8 @@ import { prisma } from '@/lib/prisma'
 import { ROLES_CRONOGRAMA } from '@/lib/services/cronogramaPermisos'
 import { obtenerEdtsComercialesProyecto } from '@/lib/cronogramaIA/obtenerEdtsComerciales'
 import { derivarEdtsSoporte } from '@/lib/cronogramaIA/derivarEdtsSoporte'
+import { calcularEdtsPendientesIA } from '@/lib/cronogramaIA/reglasActividades'
+import type { ActividadPropuesta, ConfiguracionWizardPaso1 } from '@/types/cronogramaIA'
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -57,13 +59,38 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     obtenerEdtsComercialesProyecto(proyectoId),
   ])
 
-  let borrador: { id: string; configuracion: unknown; estado: string } | null = null
+  let borrador: {
+    id: string
+    configuracion: ConfiguracionWizardPaso1
+    propuestaActividades: ActividadPropuesta[]
+    advertencias: string[]
+    edtsPendientesIA: { id: string; nombre: string }[]
+    estado: string
+  } | null = null
   if (cronogramaPlanificacion) {
-    borrador = await prisma.proyectoCronogramaGeneracionIA.findFirst({
+    const fila = await prisma.proyectoCronogramaGeneracionIA.findFirst({
       where: { proyectoCronogramaId: cronogramaPlanificacion.id, estado: 'borrador' },
       orderBy: { generadoEn: 'desc' },
-      select: { id: true, configuracion: true, estado: true },
+      select: { id: true, configuracion: true, propuestaActividades: true, advertencias: true, estado: true },
     })
+    if (fila) {
+      const configuracion = fila.configuracion as unknown as ConfiguracionWizardPaso1
+      const propuestaActividades = (fila.propuestaActividades as unknown as ActividadPropuesta[] | null) ?? []
+      borrador = {
+        id: fila.id,
+        configuracion,
+        propuestaActividades,
+        advertencias: (fila.advertencias as unknown as string[] | null) ?? [],
+        // Recalculado contra la propuesta YA guardada, no asumido en blanco —
+        // si el borrador se guardó después de generar con IA, esos EDTs no
+        // deben volver a aparecer como pendientes al restaurar.
+        edtsPendientesIA: calcularEdtsPendientesIA(
+          edts.filter(e => configuracion.edtsSeleccionados.includes(e.id)).map(e => ({ id: e.id, nombre: e.nombre })),
+          propuestaActividades
+        ),
+        estado: fila.estado,
+      }
+    }
   }
 
   // La cotización solo resuelve EDTs de ENTREGABLES (lo que se vendió). Los

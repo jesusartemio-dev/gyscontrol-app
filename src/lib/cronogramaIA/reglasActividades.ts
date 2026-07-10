@@ -14,6 +14,23 @@ import { evaluarSubalcanceCMM, aplicarSubalcanceCMM, type SubalcanceCMM } from '
  */
 export const EDTS_AGRUPACION_IA = ['CON', 'PRO', 'PLC', 'HMI'] as const
 
+/**
+ * EDTs seleccionados que requieren IA (EDTS_AGRUPACION_IA) y todavía no
+ * tienen ninguna Actividad propuesta para ellos — usado tanto al crear un
+ * borrador nuevo (actividadesExistentes=[], todos pendientes) como al
+ * restaurar uno existente (actividadesExistentes=propuestaActividades ya
+ * guardada, para no marcar como "pendiente" un EDT que ya se resolvió).
+ */
+export function calcularEdtsPendientesIA<T extends { id: string; nombre: string }>(
+  edtsSeleccionados: T[],
+  actividadesExistentes: Pick<ActividadPropuesta, 'edtNombre'>[]
+): T[] {
+  const edtsConPropuesta = new Set(actividadesExistentes.map(a => a.edtNombre))
+  return edtsSeleccionados.filter(
+    e => (EDTS_AGRUPACION_IA as readonly string[]).includes(e.nombre) && !edtsConPropuesta.has(e.nombre)
+  )
+}
+
 export function calcularHorasEstimadas(
   horaBase: number | null,
   horaRepetido: number | null,

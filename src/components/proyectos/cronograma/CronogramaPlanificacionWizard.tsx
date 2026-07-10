@@ -13,9 +13,19 @@ import { Progress } from '@/components/ui/progress'
 import { Card, CardContent } from '@/components/ui/card'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { ChevronLeft, ChevronRight, Loader2, Plus, Trash2, Sparkles, AlertCircle, FileCheck2 } from 'lucide-react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { ChevronLeft, ChevronRight, Loader2, Plus, Trash2, Sparkles, AlertCircle, FileCheck2, History } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
-import type { ActividadPropuesta } from '@/types/cronogramaIA'
+import type { ActividadPropuesta, ConfiguracionWizardPaso1 } from '@/types/cronogramaIA'
 import type { EdtSugeridoConOrigen } from '@/lib/cronogramaIA/derivarEdtsSoporte'
 
 interface EdtWizardInfo {
@@ -46,6 +56,42 @@ interface PrellenadoPaso1 {
   plcs: { nombre: string }[]
   hmiCantidad: number
   scada: boolean
+}
+
+interface BorradorGeneracion {
+  id: string
+  configuracion: ConfiguracionWizardPaso1
+  propuestaActividades: ActividadPropuesta[]
+  advertencias: string[]
+  edtsPendientesIA: EdtPendienteIA[]
+  estado: string
+}
+
+interface DatosContextoWizard {
+  edtsSugeridosComercial: string[] | null
+  edtsSugeridosConOrigen: EdtSugeridoConOrigen[] | null
+  cotizacionResumen: CotizacionResumen | null
+  tieneCotizacionDocumento: boolean
+}
+
+/** Snapshot liviano del Paso 1 antes de que exista un borrador en BD (generacionId aún null) — sobrevive a un cierre accidental del modal. */
+interface BorradorLocalPaso1 {
+  edtsSeleccionados: string[]
+  brownfield: boolean
+  ingenieriaDetalle: boolean
+  tableros: { nombre: string }[]
+  plcs: { nombre: string }[]
+  hmiCantidad: number
+  scada: boolean
+  nValorizaciones: number
+  duracionSemanas: number
+  nPersonas: number
+  nPets: number
+  alcanceLibre: string
+}
+
+function claveBorradorLocalPaso1(proyectoId: string) {
+  return `cronograma-wizard-paso1:${proyectoId}`
 }
 
 interface Props {
@@ -88,8 +134,128 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
   const [actividades, setActividades] = useState<ActividadPropuesta[]>([])
   const [advertencias, setAdvertencias] = useState<string[]>([])
   const [edtsPendientesIA, setEdtsPendientesIA] = useState<EdtPendienteIA[]>([])
-  const [fuenteEdtsSugeridos, setFuenteEdtsSugeridos] = useState<'comercial' | 'ia' | 'manual'>('manual')
+  const [fuenteEdtsSugeridos, setFuenteEdtsSugeridos] = useState<'comercial' | 'ia' | 'manual' | 'restaurado'>('manual')
   const [edtsOrigen, setEdtsOrigen] = useState<Map<string, EdtSugeridoConOrigen>>(new Map())
+
+  // Persistencia del wizard (evita perder Paso 1/Paso 2/propuestas de IA por un cierre accidental).
+  const [datosContexto, setDatosContexto] = useState<DatosContextoWizard | null>(null)
+  const [borradorDisponible, setBorradorDisponible] = useState<BorradorGeneracion | null>(null)
+  const [decidiendoBorrador, setDecidiendoBorrador] = useState(false)
+  const [guardadoPendiente, setGuardadoPendiente] = useState(false)
+  const [ultimoGuardadoFallo, setUltimoGuardadoFallo] = useState(false)
+  const [mostrarConfirmarCierre, setMostrarConfirmarCierre] = useState(false)
+
+  /**
+   * Flujo normal de precarga del Paso 1 (cotización comercial + reglas de
+   * soporte + draft local + prellenado IA como último recurso) — separado
+   * del efecto para poder reusarlo desde "Empezar de nuevo" cuando el
+   * usuario descarta un borrador existente en BD.
+   */
+  function aplicarFlujoNormal(contexto: DatosContextoWizard, edtsFrescos: EdtWizardInfo[]) {
+    const edtsComercial = contexto.edtsSugeridosComercial
+    let huboBorradorLocal = false
+
+    if (contexto.edtsSugeridosConOrigen && contexto.edtsSugeridosConOrigen.length > 0) {
+      setEdtsSeleccionados(new Set(contexto.edtsSugeridosConOrigen.map(e => e.id)))
+      setEdtsOrigen(new Map(contexto.edtsSugeridosConOrigen.map(e => [e.id, e])))
+      setFuenteEdtsSugeridos('comercial')
+    } else {
+      setEdtsSeleccionados(new Set(edtsFrescos.filter(e => e.totalServicios > 0).map(e => e.id)))
+      setFuenteEdtsSugeridos('manual')
+    }
+
+    if (contexto.cotizacionResumen?.resumenAlcance?.length) {
+      setAlcanceLibre(contexto.cotizacionResumen.resumenAlcance.join('\n'))
+    }
+
+    // Draft local del Paso 1 (antes de que exista un borrador en BD) — gana
+    // sobre cotización/IA porque es lo último que el usuario escribió a mano.
+    try {
+      const crudo = localStorage.getItem(claveBorradorLocalPaso1(proyectoId))
+      if (crudo) {
+        const local = JSON.parse(crudo) as BorradorLocalPaso1
+        setEdtsSeleccionados(new Set(local.edtsSeleccionados))
+        setBrownfield(local.brownfield)
+        setIngenieriaDetalle(local.ingenieriaDetalle)
+        setTableros(local.tableros)
+        setPlcs(local.plcs)
+        setHmiCantidad(local.hmiCantidad)
+        setScada(local.scada)
+        setNValorizaciones(local.nValorizaciones)
+        setDuracionSemanas(local.duracionSemanas)
+        setNPersonas(local.nPersonas)
+        setNPets(local.nPets)
+        setAlcanceLibre(local.alcanceLibre)
+        setFuenteEdtsSugeridos('restaurado')
+        huboBorradorLocal = true
+        toast({ title: 'Se restauró tu configuración del Paso 1', description: 'Seguías donde la dejaste antes de que se cerrara el asistente.' })
+      }
+    } catch {
+      // localStorage corrupto o no disponible — no bloquea el wizard
+    }
+
+    // Si hay draft local, es la fuente de verdad del usuario — no lo pisamos
+    // con una sugerencia de IA sobre el PDF.
+    if (!contexto.tieneCotizacionDocumento || huboBorradorLocal) return
+
+    setCargandoPrellenado(true)
+    fetch(`/api/proyectos/${proyectoId}/cronograma/planificacion/wizard/prellenado-ia`, { method: 'POST' })
+      .then(async res => (res.ok ? res.json() : null))
+      .then((prellenado: { sugerencia: PrellenadoPaso1; advertencias: string[] } | null) => {
+        if (!prellenado) return
+        const s = prellenado.sugerencia
+        // El EDT sugerido por IA nunca pisa una selección ya determinista
+        // (cotización comercial) — solo se usa cuando no hubo otra fuente.
+        if (s.edtsSeleccionados.length > 0 && !(edtsComercial && edtsComercial.length > 0)) {
+          setEdtsSeleccionados(new Set(s.edtsSeleccionados))
+          setFuenteEdtsSugeridos('ia')
+        }
+        setBrownfield(s.brownfield)
+        setIngenieriaDetalle(s.ingenieriaDetalle)
+        if (s.tableros.length > 0) setTableros(s.tableros)
+        if (s.plcs.length > 0) setPlcs(s.plcs)
+        if (s.hmiCantidad > 0) setHmiCantidad(s.hmiCantidad)
+        setScada(s.scada)
+        setAdvertenciasPrellenado(prellenado.advertencias ?? [])
+      })
+      .catch(() => {
+        toast({ title: 'Error sugiriendo el Paso 1 con IA', variant: 'destructive' })
+      })
+      .finally(() => setCargandoPrellenado(false))
+  }
+
+  function continuarBorrador() {
+    if (!borradorDisponible) return
+    const c = borradorDisponible.configuracion
+    setGeneracionId(borradorDisponible.id)
+    setEdtsSeleccionados(new Set(c.edtsSeleccionados))
+    setBrownfield(c.brownfield)
+    setIngenieriaDetalle(c.ingenieriaDetalle)
+    setTableros(c.tableros)
+    setPlcs(c.plcs)
+    setHmiCantidad(c.hmiCantidad)
+    setScada(c.scada)
+    setNValorizaciones(c.nValorizaciones)
+    setDuracionSemanas(c.duracionSemanas)
+    setNPersonas(c.nPersonas)
+    setNPets(c.nPets)
+    setAlcanceLibre(c.alcanceLibre)
+    setActividades(borradorDisponible.propuestaActividades)
+    setAdvertencias(borradorDisponible.advertencias)
+    setEdtsPendientesIA(borradorDisponible.edtsPendientesIA)
+    setFuenteEdtsSugeridos('restaurado')
+    setPasoActual(borradorDisponible.propuestaActividades.length > 0 ? 2 : 1)
+    setDecidiendoBorrador(false)
+    localStorage.removeItem(claveBorradorLocalPaso1(proyectoId))
+    toast({ title: 'Borrador restaurado', description: 'Seguís exactamente donde lo dejaste, sin regenerar nada con IA.' })
+  }
+
+  function empezarDeNuevo() {
+    setDecidiendoBorrador(false)
+    setBorradorDisponible(null)
+    localStorage.removeItem(claveBorradorLocalPaso1(proyectoId))
+    if (datosContexto) aplicarFlujoNormal(datosContexto, edts)
+  }
 
   useEffect(() => {
     if (!open) return
@@ -100,6 +266,11 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
     setAdvertencias([])
     setAdvertenciasPrellenado([])
     setEdtsPendientesIA([])
+    setDatosContexto(null)
+    setBorradorDisponible(null)
+    setDecidiendoBorrador(false)
+    setGuardadoPendiente(false)
+    setUltimoGuardadoFallo(false)
     setCargandoContexto(true)
 
     fetch(`/api/proyectos/${proyectoId}/cronograma/planificacion/wizard-contexto`)
@@ -114,55 +285,32 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
           tieneCotizacionDocumento: boolean
           edtsSugeridosComercial: string[] | null
           edtsSugeridosConOrigen: EdtSugeridoConOrigen[] | null
+          borrador: BorradorGeneracion | null
         }) => {
-        setEdts(data.edts)
-        setCotizacionResumen(data.cotizacionResumen)
+          setEdts(data.edts)
+          setCotizacionResumen(data.cotizacionResumen)
+          setCargandoContexto(false)
 
-        // Prioridad de selección de EDTs: 1) cotización COMERCIAL, enriquecida
-        // con los EDTs de soporte derivados por regla (GES/CIE siempre,
-        // SEG/PRO por alcance, CMM sugerido — ver derivarEdtsSoporte, nunca
-        // IA); 2) IA desde el PDF (más abajo, solo si no hay #1); 3) fallback
-        // "todos los EDTs con servicios" (nunca confiable por sí solo, se
-        // sobreescribe apenas haya una fuente mejor).
-        const edtsComercial = data.edtsSugeridosComercial
-        if (data.edtsSugeridosConOrigen && data.edtsSugeridosConOrigen.length > 0) {
-          setEdtsSeleccionados(new Set(data.edtsSugeridosConOrigen.map(e => e.id)))
-          setEdtsOrigen(new Map(data.edtsSugeridosConOrigen.map(e => [e.id, e])))
-          setFuenteEdtsSugeridos('comercial')
-        } else {
-          setEdtsSeleccionados(new Set(data.edts.filter(e => e.totalServicios > 0).map(e => e.id)))
-          setFuenteEdtsSugeridos('manual')
+          const contexto: DatosContextoWizard = {
+            edtsSugeridosComercial: data.edtsSugeridosComercial,
+            edtsSugeridosConOrigen: data.edtsSugeridosConOrigen,
+            cotizacionResumen: data.cotizacionResumen,
+            tieneCotizacionDocumento: data.tieneCotizacionDocumento,
+          }
+          setDatosContexto(contexto)
+
+          if (data.borrador) {
+            // Hay una configuración guardada en BD — puede incluir propuestas
+            // de IA ya generadas (costaron tokens). Se le pregunta al usuario
+            // antes de sobreescribir nada con el flujo normal.
+            setBorradorDisponible(data.borrador)
+            setDecidiendoBorrador(true)
+            return
+          }
+
+          aplicarFlujoNormal(contexto, data.edts)
         }
-
-        if (data.cotizacionResumen?.resumenAlcance?.length) {
-          setAlcanceLibre(data.cotizacionResumen.resumenAlcance.join('\n'))
-        }
-        setCargandoContexto(false)
-
-        if (!data.tieneCotizacionDocumento) return
-
-        setCargandoPrellenado(true)
-        return fetch(`/api/proyectos/${proyectoId}/cronograma/planificacion/wizard/prellenado-ia`, { method: 'POST' })
-          .then(async res => (res.ok ? res.json() : null))
-          .then((prellenado: { sugerencia: PrellenadoPaso1; advertencias: string[] } | null) => {
-            if (!prellenado) return
-            const s = prellenado.sugerencia
-            // El EDT sugerido por IA nunca pisa una selección ya determinista
-            // (cotización comercial) — solo se usa cuando no hubo otra fuente.
-            if (s.edtsSeleccionados.length > 0 && !(edtsComercial && edtsComercial.length > 0)) {
-              setEdtsSeleccionados(new Set(s.edtsSeleccionados))
-              setFuenteEdtsSugeridos('ia')
-            }
-            setBrownfield(s.brownfield)
-            setIngenieriaDetalle(s.ingenieriaDetalle)
-            if (s.tableros.length > 0) setTableros(s.tableros)
-            if (s.plcs.length > 0) setPlcs(s.plcs)
-            if (s.hmiCantidad > 0) setHmiCantidad(s.hmiCantidad)
-            setScada(s.scada)
-            setAdvertenciasPrellenado(prellenado.advertencias ?? [])
-          })
-          .finally(() => setCargandoPrellenado(false))
-      })
+      )
       .catch(() => {
         toast({ title: 'Error cargando el contexto del wizard', variant: 'destructive' })
         setCargandoContexto(false)
@@ -170,8 +318,90 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
       })
     // toast (useToast) no está memoizado: cambia de referencia en cada render, así que
     // incluirlo aquí reintroduce el loop infinito (efecto -> setState -> re-render -> nuevo
-    // toast -> efecto de nuevo) que rompió producción — no agregarlo a este array.
+    // toast -> efecto de nuevo) que rompió producción — no agregarlo a este array. Lo mismo
+    // aplica a aplicarFlujoNormal (se redefine cada render, pero solo se llama de forma
+    // imperativa acá y desde "Empezar de nuevo" — no necesita ser dependencia).
   }, [open, proyectoId])
+
+  // Autoguardado del Paso 1 en localStorage — antes de que exista un
+  // generacionId en BD no hay nada que persistir del lado del servidor, pero
+  // perder esto en un cierre accidental es justo el bug reportado.
+  useEffect(() => {
+    if (!open || generacionId || decidiendoBorrador || cargandoContexto) return
+    const payload: BorradorLocalPaso1 = {
+      edtsSeleccionados: Array.from(edtsSeleccionados),
+      brownfield,
+      ingenieriaDetalle,
+      tableros,
+      plcs,
+      hmiCantidad,
+      scada,
+      nValorizaciones,
+      duracionSemanas,
+      nPersonas,
+      nPets,
+      alcanceLibre,
+    }
+    try {
+      localStorage.setItem(claveBorradorLocalPaso1(proyectoId), JSON.stringify(payload))
+    } catch {
+      // localStorage lleno/no disponible — no es crítico
+    }
+  }, [
+    open,
+    generacionId,
+    decidiendoBorrador,
+    cargandoContexto,
+    edtsSeleccionados,
+    brownfield,
+    ingenieriaDetalle,
+    tableros,
+    plcs,
+    hmiCantidad,
+    scada,
+    nValorizaciones,
+    duracionSemanas,
+    nPersonas,
+    nPets,
+    alcanceLibre,
+    proyectoId,
+  ])
+
+  // Autoguardado del Paso 2 en BD — reusa el mismo PATCH que "Guardar
+  // borrador", pero disparado automáticamente (debounced) en cada cambio del
+  // árbol de Actividades, para no depender de que el usuario recuerde guardar.
+  useEffect(() => {
+    if (!open || !generacionId || pasoActual !== 2 || actividades.length === 0) return
+    setGuardadoPendiente(true)
+    const timer = setTimeout(() => {
+      guardarActividades()
+        .then(() => {
+          setGuardadoPendiente(false)
+          setUltimoGuardadoFallo(false)
+        })
+        .catch(() => {
+          setGuardadoPendiente(false)
+          setUltimoGuardadoFallo(true)
+        })
+    }, 1200)
+    return () => clearTimeout(timer)
+    // guardarActividades se redefine cada render pero solo lee closures
+    // (generacionId/actividades/proyectoId) al momento de ejecutarse —
+    // no hace falta como dependencia.
+  }, [actividades, generacionId, pasoActual, open])
+
+  function solicitarCierre() {
+    if (guardadoPendiente || ultimoGuardadoFallo) {
+      setMostrarConfirmarCierre(true)
+      return
+    }
+    onOpenChange(false)
+  }
+
+  function confirmarCierreDeTodasFormas() {
+    setMostrarConfirmarCierre(false)
+    onOpenChange(false)
+  }
 
   function toggleEdt(id: string) {
     setEdtsSeleccionados(prev => {
@@ -203,6 +433,7 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
   }
 
   function puedeAvanzar() {
+    if (decidiendoBorrador) return false
     if (pasoActual === 1) return edtsSeleccionados.size > 0 && !generandoPaso1
     if (pasoActual === 2) return actividades.length > 0 && !guardandoPaso2 && !generandoIA && !aplicandoCronograma
     return false
@@ -245,6 +476,9 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
       setAdvertencias(data.advertencias ?? [])
       setEdtsPendientesIA(data.edtsPendientesIA ?? [])
       setPasoActual(2)
+      // A partir de acá el borrador vive en BD (autoguardado del Paso 2) — el
+      // draft local del Paso 1 queda obsoleto.
+      localStorage.removeItem(claveBorradorLocalPaso1(proyectoId))
     } catch (e) {
       toast({ title: e instanceof Error ? e.message : 'Error inesperado', variant: 'destructive' })
     } finally {
@@ -363,6 +597,31 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
       )
     }
 
+    if (decidiendoBorrador && borradorDisponible) {
+      const tieneIA = borradorDisponible.propuestaActividades.some(a => a.origen === 'ia')
+      return (
+        <div className="space-y-4 py-8">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <History className="h-4 w-4" />
+            Hay una configuración guardada para este proyecto
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {borradorDisponible.propuestaActividades.length > 0
+              ? `Tiene ${borradorDisponible.propuestaActividades.length} Actividad(es) ya propuesta(s)${tieneIA ? ', incluidas propuestas de IA (ya generadas, sin costo adicional si continúas)' : ''}.`
+              : 'Tiene las respuestas del Paso 1 guardadas, todavía sin actividades generadas.'}
+          </p>
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" size="sm" onClick={empezarDeNuevo}>
+              Empezar de nuevo
+            </Button>
+            <Button size="sm" onClick={continuarBorrador}>
+              Continuar donde quedaste
+            </Button>
+          </div>
+        </div>
+      )
+    }
+
     if (pasoActual === 1) {
       return (
         <div className="space-y-5">
@@ -403,6 +662,9 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
               )}
               {fuenteEdtsSugeridos === 'manual' && (
                 <Badge variant="outline" className="text-xs">Sin cotización — selecciona manualmente</Badge>
+              )}
+              {fuenteEdtsSugeridos === 'restaurado' && (
+                <Badge variant="secondary" className="text-xs">Restaurado desde tu configuración guardada</Badge>
               )}
             </div>
             <Card>
@@ -646,12 +908,17 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
       <div className="min-h-[300px]">{renderPasoActual()}</div>
 
       <div className="flex justify-between pt-2 border-t">
-        <Button variant="ghost" size="sm" onClick={retrocederPaso} disabled={!puedeRetroceder()}>
-          <ChevronLeft className="h-4 w-4 mr-1" />
-          Anterior
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="sm" onClick={solicitarCierre}>
+            Cancelar
+          </Button>
+          <Button variant="ghost" size="sm" onClick={retrocederPaso} disabled={!puedeRetroceder()}>
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            Anterior
+          </Button>
+        </div>
 
-        {pasoActual === 1 ? (
+        {!decidiendoBorrador && (pasoActual === 1 ? (
           <Button size="sm" onClick={avanzarPaso} disabled={!puedeAvanzar()}>
             {generandoPaso1 ? (
               <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Generando...</>
@@ -660,7 +927,12 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
             )}
           </Button>
         ) : (
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
+            {guardadoPendiente && (
+              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <Loader2 className="h-3 w-3 animate-spin" />Guardando...
+              </span>
+            )}
             <Button size="sm" variant="outline" onClick={guardarBorrador} disabled={!puedeAvanzar()}>
               {guardandoPaso2 ? (
                 <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Guardando...</>
@@ -682,25 +954,54 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
               )}
             </Button>
           </div>
-        )}
+        ))}
       </div>
     </div>
   )
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5" />
-            Generar Cronograma con IA
-          </DialogTitle>
-          <DialogDescription>
-            La IA solo redacta agrupaciones y sugerencias — la estructura y los datos vienen del catálogo real. Nada se aplica al cronograma sin tu revisión.
-          </DialogDescription>
-        </DialogHeader>
-        {content}
-      </DialogContent>
-    </Dialog>
+    <>
+      <Dialog
+        open={open}
+        onOpenChange={next => {
+          if (!next) solicitarCierre()
+          else onOpenChange(next)
+        }}
+      >
+        <DialogContent
+          className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6"
+          onPointerDownOutside={e => e.preventDefault()}
+          onEscapeKeyDown={e => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5" />
+              Generar Cronograma con IA
+            </DialogTitle>
+            <DialogDescription>
+              La IA solo redacta agrupaciones y sugerencias — la estructura y los datos vienen del catálogo real. Nada se aplica al cronograma sin tu revisión.
+            </DialogDescription>
+          </DialogHeader>
+          {content}
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={mostrarConfirmarCierre} onOpenChange={setMostrarConfirmarCierre}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Cerrar sin guardar?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {ultimoGuardadoFallo
+                ? 'El último cambio no se pudo guardar automáticamente. Si cierras ahora, se perderá.'
+                : 'Todavía se está guardando tu último cambio. Si cierras ahora, podría perderse.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Seguir editando</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmarCierreDeTodasFormas}>Cerrar de todas formas</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }

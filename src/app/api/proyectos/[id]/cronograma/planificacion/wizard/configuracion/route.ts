@@ -5,7 +5,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { ROLES_CRONOGRAMA } from '@/lib/services/cronogramaPermisos'
 import { configuracionWizardPaso1Schema } from '@/lib/validators/cronogramaIA'
-import { generarActividadesDeterministas, EDTS_AGRUPACION_IA, type EdtParaGenerar } from '@/lib/cronogramaIA/reglasActividades'
+import { generarActividadesDeterministas, calcularEdtsPendientesIA, type EdtParaGenerar } from '@/lib/cronogramaIA/reglasActividades'
 import type { CatalogoServicioParaWizard } from '@/types/cronogramaIA'
 
 type Ctx = { params: Promise<{ id: string }> }
@@ -119,8 +119,9 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     proyectoCronogramaId: cronograma.id,
     propuestaActividades: actividades,
     advertencias,
-    edtsPendientesIA: edtsSeleccionados
-      .filter(e => (EDTS_AGRUPACION_IA as readonly string[]).includes(e.nombre))
-      .map(e => ({ id: e.id, nombre: e.nombre })),
+    edtsPendientesIA: calcularEdtsPendientesIA(
+      edtsSeleccionados.map(e => ({ id: e.id, nombre: e.nombre })),
+      []
+    ),
   })
 }

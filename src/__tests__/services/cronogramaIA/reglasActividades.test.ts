@@ -2,6 +2,7 @@ import {
   calcularHorasEstimadas,
   evaluarAlcance,
   generarActividadesDeterministas,
+  calcularEdtsPendientesIA,
   type EdtParaGenerar,
 } from '@/lib/cronogramaIA/reglasActividades'
 import type { CatalogoServicioParaWizard, ConfiguracionWizardPaso1 } from '@/types/cronogramaIA'
@@ -237,5 +238,37 @@ describe('generarActividadesDeterministas — orden de tareas siempre por el cam
     const edts: EdtParaGenerar[] = [{ nombre: 'CMM', descripcion: 'Comisionamiento', servicios }]
     const r = generarActividadesDeterministas(edts, config())
     expect(r.actividades[0].tareas.map(t => t.catalogoServicioId)).toEqual(['s1', 's2'])
+  })
+})
+
+describe('calcularEdtsPendientesIA', () => {
+  const SELECCIONADOS = [
+    { id: 'e-ges', nombre: 'GES' },
+    { id: 'e-con', nombre: 'CON' },
+    { id: 'e-pro', nombre: 'PRO' },
+    { id: 'e-plc', nombre: 'PLC' },
+  ]
+
+  it('borrador recién creado (sin actividades todavía): todos los EDTs de agrupación IA quedan pendientes', () => {
+    const r = calcularEdtsPendientesIA(SELECCIONADOS, [])
+    expect(r.map(e => e.nombre).sort()).toEqual(['CON', 'PLC', 'PRO'])
+  })
+
+  it('EDTs con Actividades ya propuestas no cuentan como pendientes (restaurar un borrador con IA ya generada)', () => {
+    const r = calcularEdtsPendientesIA(SELECCIONADOS, [
+      { edtNombre: 'CON' },
+      { edtNombre: 'PRO' },
+    ])
+    expect(r.map(e => e.nombre)).toEqual(['PLC'])
+  })
+
+  it('EDTs deterministas (GES) nunca cuentan como pendientes de IA', () => {
+    const r = calcularEdtsPendientesIA(SELECCIONADOS, [])
+    expect(r.find(e => e.nombre === 'GES')).toBeUndefined()
+  })
+
+  it('todos los EDTs de agrupación IA ya resueltos: no queda ninguno pendiente', () => {
+    const r = calcularEdtsPendientesIA(SELECCIONADOS, [{ edtNombre: 'CON' }, { edtNombre: 'PRO' }, { edtNombre: 'PLC' }])
+    expect(r).toHaveLength(0)
   })
 })
