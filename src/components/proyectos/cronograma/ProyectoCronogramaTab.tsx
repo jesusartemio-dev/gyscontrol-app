@@ -893,10 +893,21 @@ export function ProyectoCronogramaTab({
                     Generar Cronograma
                   </DropdownMenuItem>
                   {esPlanificacion && (
-                    <DropdownMenuItem onSelect={() => {
-                      setDropdownOpen(false)
-                      setTimeout(() => setShowGenerarIAModal(true), 100)
-                    }} disabled={esBloqueado}>
+                    <DropdownMenuItem
+                      onSelect={() => {
+                        setDropdownOpen(false)
+                        if (hasCronograma) {
+                          toast({
+                            title: 'Este cronograma ya tiene una estructura generada',
+                            description: 'El wizard solo genera desde cero — no se puede volver a aplicar sobre un cronograma que ya tiene Fases/EDTs/Tareas. Elimina el cronograma actual primero si querés regenerar.',
+                          })
+                          return
+                        }
+                        setTimeout(() => setShowGenerarIAModal(true), 100)
+                      }}
+                      disabled={esBloqueado}
+                      className={hasCronograma ? 'text-muted-foreground' : undefined}
+                    >
                       <Sparkles className="h-4 w-4 mr-2" />
                       Generar con IA (desde catálogo)
                     </DropdownMenuItem>
