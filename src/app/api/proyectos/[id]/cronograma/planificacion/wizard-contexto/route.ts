@@ -8,6 +8,7 @@ import { derivarEdtsSoporte } from '@/lib/cronogramaIA/derivarEdtsSoporte'
 import type { EvidenciaTexto } from '@/lib/cronogramaIA/detectarEdtsPosibles'
 import { calcularEdtsPendientesIA } from '@/lib/cronogramaIA/reglasActividades'
 import type { ActividadPropuesta, ConfiguracionWizardPaso1 } from '@/types/cronogramaIA'
+import { configuracionWizardPaso1Schema } from '@/lib/validators/cronogramaIA'
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -80,6 +81,10 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     edtsPendientesIA: { id: string; nombre: string }[]
     estado: string
   } | null = null
+  // true si se encontró un borrador pero su `configuracion` no pasó la
+  // validación (corrupta, vacía o de un schemaVersion/schema anterior) — el
+  // cliente lo usa para avisar al usuario en vez de fallar en silencio.
+  let borradorDescartado = false
   if (cronogramaPlanificacion) {
     const fila = await prisma.proyectoCronogramaGeneracionIA.findFirst({
       where: { proyectoCronogramaId: cronogramaPlanificacion.id, estado: 'borrador' },
@@ -87,21 +92,34 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
       select: { id: true, configuracion: true, propuestaActividades: true, advertencias: true, estado: true },
     })
     if (fila) {
-      const configuracion = fila.configuracion as unknown as ConfiguracionWizardPaso1
-      const propuestaActividades = (fila.propuestaActividades as unknown as ActividadPropuesta[] | null) ?? []
-      borrador = {
-        id: fila.id,
-        configuracion,
-        propuestaActividades,
-        advertencias: (fila.advertencias as unknown as string[] | null) ?? [],
-        // Recalculado contra la propuesta YA guardada, no asumido en blanco —
-        // si el borrador se guardó después de generar con IA, esos EDTs no
-        // deben volver a aparecer como pendientes al restaurar.
-        edtsPendientesIA: calcularEdtsPendientesIA(
-          edts.filter(e => configuracion.edtsSeleccionados.includes(e.id)).map(e => ({ id: e.id, nombre: e.nombre })),
-          propuestaActividades
-        ),
-        estado: fila.estado,
+      const parsed = configuracionWizardPaso1Schema.safeParse(fila.configuracion)
+      if (!parsed.success) {
+        // Nunca se restaura en silencio un borrador corrupto/vacío/desactualizado
+        // (bug real: reabrir el wizard mostraba "restaurado" con todos los EDTs
+        // destildados). Se descarta de forma no destructiva — queda auditable —
+        // y el wizard cae al flujo normal de precarga.
+        await prisma.proyectoCronogramaGeneracionIA.update({
+          where: { id: fila.id },
+          data: { estado: 'descartado' },
+        })
+        borradorDescartado = true
+      } else {
+        const configuracion = parsed.data
+        const propuestaActividades = (fila.propuestaActividades as unknown as ActividadPropuesta[] | null) ?? []
+        borrador = {
+          id: fila.id,
+          configuracion,
+          propuestaActividades,
+          advertencias: (fila.advertencias as unknown as string[] | null) ?? [],
+          // Recalculado contra la propuesta YA guardada, no asumido en blanco —
+          // si el borrador se guardó después de generar con IA, esos EDTs no
+          // deben volver a aparecer como pendientes al restaurar.
+          edtsPendientesIA: calcularEdtsPendientesIA(
+            edts.filter(e => configuracion.edtsSeleccionados.includes(e.id)).map(e => ({ id: e.id, nombre: e.nombre })),
+            propuestaActividades
+          ),
+          estado: fila.estado,
+        }
       }
     }
   }
@@ -148,6 +166,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     })),
     cronogramaBloqueado: cronogramaPlanificacion?.bloqueado ?? false,
     borrador,
+    borradorDescartado,
     // EDTs realmente vendidos/contratados en la cotización comercial del
     // proyecto (determinista, cero IA) — null si el proyecto no tiene
     // cotización comercial (ej. proyectos internos). Tiene prioridad sobre

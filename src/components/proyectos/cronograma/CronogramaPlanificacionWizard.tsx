@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -24,11 +24,17 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { ChevronLeft, ChevronRight, Loader2, Plus, Trash2, Sparkles, AlertCircle, FileCheck2, History, Pin, PinOff, FolderInput } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, Plus, Trash2, Sparkles, AlertCircle, FileCheck2, History, Pin, PinOff, FolderInput, RotateCcw } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import type { ActividadPropuesta, ConfiguracionWizardPaso1 } from '@/types/cronogramaIA'
 import type { EdtSugeridoConOrigen } from '@/lib/cronogramaIA/derivarEdtsSoporte'
 import { detectarEdtsPosibles, type EvidenciaTexto } from '@/lib/cronogramaIA/detectarEdtsPosibles'
+import {
+  BORRADOR_LOCAL_PASO1_VERSION,
+  claveBorradorLocalPaso1,
+  esBorradorLocalValido,
+  type BorradorLocalPaso1,
+} from '@/lib/cronogramaIA/borradorWizard'
 
 interface EdtWizardInfo {
   id: string
@@ -85,26 +91,6 @@ interface DatosContextoWizard {
   tieneCotizacionDocumento: boolean
 }
 
-/** Snapshot liviano del Paso 1 antes de que exista un borrador en BD (generacionId aún null) — sobrevive a un cierre accidental del modal. */
-interface BorradorLocalPaso1 {
-  edtsSeleccionados: string[]
-  brownfield: boolean
-  ingenieriaDetalle: boolean
-  tableros: { nombre: string }[]
-  plcs: { nombre: string }[]
-  hmiCantidad: number
-  scada: boolean
-  nValorizaciones: number
-  duracionSemanas: number
-  nPersonas: number
-  nPets: number
-  alcanceLibre: string
-}
-
-function claveBorradorLocalPaso1(proyectoId: string) {
-  return `cronograma-wizard-paso1:${proyectoId}`
-}
-
 interface Props {
   proyectoId: string
   open: boolean
@@ -154,20 +140,64 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
   // Persistencia del wizard (evita perder Paso 1/Paso 2/propuestas de IA por un cierre accidental).
   const [datosContexto, setDatosContexto] = useState<DatosContextoWizard | null>(null)
   const [borradorDisponible, setBorradorDisponible] = useState<BorradorGeneracion | null>(null)
+  const [borradorLocalDisponible, setBorradorLocalDisponible] = useState<BorradorLocalPaso1 | null>(null)
   const [decidiendoBorrador, setDecidiendoBorrador] = useState(false)
   const [guardadoPendiente, setGuardadoPendiente] = useState(false)
   const [ultimoGuardadoFallo, setUltimoGuardadoFallo] = useState(false)
   const [mostrarConfirmarCierre, setMostrarConfirmarCierre] = useState(false)
+  const [mostrarConfirmarReset, setMostrarConfirmarReset] = useState(false)
+
+  // Gate de hidratación para el autoguardado de Paso 1 en localStorage: un
+  // useState (cargandoContexto/decidiendoBorrador) NO sirve para esto porque
+  // dos efectos que corren en el mismo commit ven el mismo snapshot de
+  // estado pre-render — el efecto de autoguardado podía correr con
+  // cargandoContexto todavía en false (valor previo) y escribir un draft en
+  // blanco ANTES de que la carga real terminara, que después se "restauraba"
+  // pisando la precarga real. Una ref se lee/escribe de forma síncrona e
+  // inmediata, sin ese desfase.
+  const contextoListoRef = useRef(false)
+
+  /**
+   * Lee el draft local del Paso 1, validándolo (schemaVersion + no vacío)
+   * antes de considerarlo restaurable. Si hay algo guardado pero no pasa la
+   * validación, se descarta silenciosamente (nunca se restaura "en blanco"
+   * como si fuera una elección del usuario) y se avisa con un toast.
+   */
+  function leerBorradorLocal(): BorradorLocalPaso1 | null {
+    let crudo: string | null = null
+    try {
+      crudo = localStorage.getItem(claveBorradorLocalPaso1(proyectoId))
+    } catch {
+      return null
+    }
+    if (!crudo) return null
+
+    let parsed: unknown = null
+    try {
+      parsed = JSON.parse(crudo)
+    } catch {
+      parsed = null
+    }
+
+    if (esBorradorLocalValido(parsed)) return parsed
+
+    try {
+      localStorage.removeItem(claveBorradorLocalPaso1(proyectoId))
+    } catch {
+      // no-op
+    }
+    toast({ title: 'Tu borrador anterior no era válido, se recargó desde la cotización' })
+    return null
+  }
 
   /**
    * Flujo normal de precarga del Paso 1 (cotización comercial + reglas de
-   * soporte + draft local + prellenado IA como último recurso) — separado
-   * del efecto para poder reusarlo desde "Empezar de nuevo" cuando el
-   * usuario descarta un borrador existente en BD.
+   * soporte + prellenado IA como último recurso) — separado del efecto para
+   * poder reusarlo desde "Empezar de nuevo"/"Restablecer" cuando el usuario
+   * descarta un borrador existente (en BD o local).
    */
   function aplicarFlujoNormal(contexto: DatosContextoWizard, edtsFrescos: EdtWizardInfo[]) {
     const edtsComercial = contexto.edtsSugeridosComercial
-    let huboBorradorLocal = false
 
     if (contexto.edtsSugeridosConOrigen && contexto.edtsSugeridosConOrigen.length > 0) {
       setEdtsSeleccionados(new Set(contexto.edtsSugeridosConOrigen.map(e => e.id)))
@@ -182,35 +212,11 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
       setAlcanceLibre(contexto.cotizacionResumen.resumenAlcance.join('\n'))
     }
 
-    // Draft local del Paso 1 (antes de que exista un borrador en BD) — gana
-    // sobre cotización/IA porque es lo último que el usuario escribió a mano.
-    try {
-      const crudo = localStorage.getItem(claveBorradorLocalPaso1(proyectoId))
-      if (crudo) {
-        const local = JSON.parse(crudo) as BorradorLocalPaso1
-        setEdtsSeleccionados(new Set(local.edtsSeleccionados))
-        setBrownfield(local.brownfield)
-        setIngenieriaDetalle(local.ingenieriaDetalle)
-        setTableros(local.tableros)
-        setPlcs(local.plcs)
-        setHmiCantidad(local.hmiCantidad)
-        setScada(local.scada)
-        setNValorizaciones(local.nValorizaciones)
-        setDuracionSemanas(local.duracionSemanas)
-        setNPersonas(local.nPersonas)
-        setNPets(local.nPets)
-        setAlcanceLibre(local.alcanceLibre)
-        setFuenteEdtsSugeridos('restaurado')
-        huboBorradorLocal = true
-        toast({ title: 'Se restauró tu configuración del Paso 1', description: 'Seguías donde la dejaste antes de que se cerrara el asistente.' })
-      }
-    } catch {
-      // localStorage corrupto o no disponible — no bloquea el wizard
-    }
+    // A partir de acá el estado del Paso 1 refleja una precarga real (no el
+    // valor en blanco inicial) — recién ahora es seguro autoguardar.
+    contextoListoRef.current = true
 
-    // Si hay draft local, es la fuente de verdad del usuario — no lo pisamos
-    // con una sugerencia de IA sobre el PDF.
-    if (!contexto.tieneCotizacionDocumento || huboBorradorLocal) return
+    if (!contexto.tieneCotizacionDocumento) return
 
     setCargandoPrellenado(true)
     fetch(`/api/proyectos/${proyectoId}/cronograma/planificacion/wizard/prellenado-ia`, { method: 'POST' })
@@ -260,19 +266,82 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
     setFuenteEdtsSugeridos('restaurado')
     setPasoActual(borradorDisponible.propuestaActividades.length > 0 ? 2 : 1)
     setDecidiendoBorrador(false)
-    localStorage.removeItem(claveBorradorLocalPaso1(proyectoId))
+    contextoListoRef.current = true
+    try {
+      localStorage.removeItem(claveBorradorLocalPaso1(proyectoId))
+    } catch {
+      // no-op
+    }
     toast({ title: 'Borrador restaurado', description: 'Seguís exactamente donde lo dejaste, sin regenerar nada con IA.' })
+  }
+
+  /** Igual que continuarBorrador pero para el draft liviano de localStorage (Paso 1 sin generacionId todavía). */
+  function continuarBorradorLocal() {
+    if (!borradorLocalDisponible) return
+    const c = borradorLocalDisponible
+    setEdtsSeleccionados(new Set(c.edtsSeleccionados))
+    setBrownfield(c.brownfield)
+    setIngenieriaDetalle(c.ingenieriaDetalle)
+    setTableros(c.tableros)
+    setPlcs(c.plcs)
+    setHmiCantidad(c.hmiCantidad)
+    setScada(c.scada)
+    setNValorizaciones(c.nValorizaciones)
+    setDuracionSemanas(c.duracionSemanas)
+    setNPersonas(c.nPersonas)
+    setNPets(c.nPets)
+    setAlcanceLibre(c.alcanceLibre)
+    setFuenteEdtsSugeridos('restaurado')
+    setDecidiendoBorrador(false)
+    setBorradorLocalDisponible(null)
+    contextoListoRef.current = true
+    toast({ title: 'Se restauró tu configuración del Paso 1', description: 'Seguías donde la dejaste antes de que se cerrara el asistente.' })
   }
 
   function empezarDeNuevo() {
     setDecidiendoBorrador(false)
     setBorradorDisponible(null)
-    localStorage.removeItem(claveBorradorLocalPaso1(proyectoId))
+    setBorradorLocalDisponible(null)
+    try {
+      localStorage.removeItem(claveBorradorLocalPaso1(proyectoId))
+    } catch {
+      // no-op
+    }
     if (datosContexto) aplicarFlujoNormal(datosContexto, edts)
+  }
+
+  /** Botón "Restablecer" — descarta cualquier borrador (BD y local) y vuelve a la precarga limpia desde la cotización, con confirmación previa. */
+  function restablecerWizard() {
+    setMostrarConfirmarReset(false)
+    const generacionAnterior = generacionId
+    try {
+      localStorage.removeItem(claveBorradorLocalPaso1(proyectoId))
+    } catch {
+      // no-op
+    }
+    if (generacionAnterior) {
+      fetch(`/api/proyectos/${proyectoId}/cronograma/planificacion/wizard/${generacionAnterior}`, { method: 'DELETE' }).catch(() => {})
+    }
+    setGeneracionId(null)
+    setActividades([])
+    setAdvertencias([])
+    setEdtsPendientesIA([])
+    setBorradorDisponible(null)
+    setBorradorLocalDisponible(null)
+    setDecidiendoBorrador(false)
+    setPasoActual(1)
+    contextoListoRef.current = false
+    if (datosContexto) aplicarFlujoNormal(datosContexto, edts)
+    toast({ title: 'Asistente restablecido', description: 'Se recargó la configuración desde la cotización, sin tu progreso anterior.' })
   }
 
   useEffect(() => {
     if (!open) return
+
+    // Ref, no state: debe quedar en false de forma síncrona e inmediata para
+    // que el efecto de autoguardado (que puede correr en el mismo commit,
+    // antes de que este fetch resuelva) no escriba un draft en blanco.
+    contextoListoRef.current = false
 
     setPasoActual(1)
     setGeneracionId(null)
@@ -282,6 +351,7 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
     setEdtsPendientesIA([])
     setDatosContexto(null)
     setBorradorDisponible(null)
+    setBorradorLocalDisponible(null)
     setDecidiendoBorrador(false)
     setGuardadoPendiente(false)
     setUltimoGuardadoFallo(false)
@@ -302,6 +372,7 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
           correccionesEdt: CorreccionEdt[]
           evidenciasCotizacion: EvidenciaTexto[]
           borrador: BorradorGeneracion | null
+          borradorDescartado: boolean
         }) => {
           setEdts(data.edts)
           setCotizacionResumen(data.cotizacionResumen)
@@ -317,11 +388,25 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
           }
           setDatosContexto(contexto)
 
+          if (data.borradorDescartado) {
+            toast({ title: 'Tu borrador anterior no era válido, se recargó desde la cotización' })
+          }
+
           if (data.borrador) {
             // Hay una configuración guardada en BD — puede incluir propuestas
             // de IA ya generadas (costaron tokens). Se le pregunta al usuario
             // antes de sobreescribir nada con el flujo normal.
             setBorradorDisponible(data.borrador)
+            setDecidiendoBorrador(true)
+            return
+          }
+
+          // Sin borrador en BD, pero puede haber un draft liviano del Paso 1
+          // en localStorage (wizard cerrado antes de generar actividades) —
+          // se pregunta igual, nunca se restaura en silencio.
+          const borradorLocal = leerBorradorLocal()
+          if (borradorLocal) {
+            setBorradorLocalDisponible(borradorLocal)
             setDecidiendoBorrador(true)
             return
           }
@@ -333,12 +418,17 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
         toast({ title: 'Error cargando el contexto del wizard', variant: 'destructive' })
         setCargandoContexto(false)
         setCargandoPrellenado(false)
+        // Sin contexto real no hay nada que precargar, pero el usuario puede
+        // seguir configurando el Paso 1 a mano — a partir de acá sí es
+        // seguro autoguardar lo que vaya escribiendo.
+        contextoListoRef.current = true
       })
     // toast (useToast) no está memoizado: cambia de referencia en cada render, así que
     // incluirlo aquí reintroduce el loop infinito (efecto -> setState -> re-render -> nuevo
     // toast -> efecto de nuevo) que rompió producción — no agregarlo a este array. Lo mismo
-    // aplica a aplicarFlujoNormal (se redefine cada render, pero solo se llama de forma
-    // imperativa acá y desde "Empezar de nuevo" — no necesita ser dependencia).
+    // aplica a aplicarFlujoNormal/leerBorradorLocal (se redefinen cada render, pero solo se
+    // llaman de forma imperativa acá y desde los handlers de la pantalla de decisión — no
+    // necesitan ser dependencia).
   }, [open, proyectoId])
 
   // Autoguardado del Paso 1 en localStorage — antes de que exista un
@@ -346,7 +436,16 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
   // perder esto en un cierre accidental es justo el bug reportado.
   useEffect(() => {
     if (!open || generacionId || decidiendoBorrador || cargandoContexto) return
+    // Gate real de la condición de carrera (ver contextoListoRef arriba) —
+    // sin esto, el primer pase de este efecto tras abrir el wizard podía
+    // correr antes de que la precarga terminara y grabar un draft en blanco.
+    if (!contextoListoRef.current) return
+    // Nunca persiste un estado "en blanco/sin tocar" (cero EDTs marcados) —
+    // ni la precarga real ni una interacción real del usuario dejan el Paso 1
+    // así, así que solo puede pasar durante una carrera de hidratación.
+    if (edtsSeleccionados.size === 0) return
     const payload: BorradorLocalPaso1 = {
+      schemaVersion: BORRADOR_LOCAL_PASO1_VERSION,
       edtsSeleccionados: Array.from(edtsSeleccionados),
       brownfield,
       ingenieriaDetalle,
@@ -716,8 +815,8 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
       )
     }
 
-    if (decidiendoBorrador && borradorDisponible) {
-      const tieneIA = borradorDisponible.propuestaActividades.some(a => a.origen === 'ia')
+    if (decidiendoBorrador && (borradorDisponible || borradorLocalDisponible)) {
+      const tieneIA = borradorDisponible?.propuestaActividades.some(a => a.origen === 'ia') ?? false
       return (
         <div className="space-y-4 py-8">
           <div className="flex items-center gap-2 text-sm font-medium">
@@ -725,15 +824,17 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
             Hay una configuración guardada para este proyecto
           </div>
           <p className="text-sm text-muted-foreground">
-            {borradorDisponible.propuestaActividades.length > 0
-              ? `Tiene ${borradorDisponible.propuestaActividades.length} Actividad(es) ya propuesta(s)${tieneIA ? ', incluidas propuestas de IA (ya generadas, sin costo adicional si continúas)' : ''}.`
-              : 'Tiene las respuestas del Paso 1 guardadas, todavía sin actividades generadas.'}
+            {borradorDisponible
+              ? borradorDisponible.propuestaActividades.length > 0
+                ? `Tiene ${borradorDisponible.propuestaActividades.length} Actividad(es) ya propuesta(s)${tieneIA ? ', incluidas propuestas de IA (ya generadas, sin costo adicional si continúas)' : ''}.`
+                : 'Tiene las respuestas del Paso 1 guardadas, todavía sin actividades generadas.'
+              : 'Quedaron guardadas las respuestas del Paso 1 de la última vez que abriste el asistente, antes de generar actividades.'}
           </p>
           <div className="flex gap-2 justify-end">
             <Button variant="outline" size="sm" onClick={empezarDeNuevo}>
               Empezar de nuevo
             </Button>
-            <Button size="sm" onClick={continuarBorrador}>
+            <Button size="sm" onClick={borradorDisponible ? continuarBorrador : continuarBorradorLocal}>
               Continuar donde quedaste
             </Button>
           </div>
@@ -1125,6 +1226,18 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
             <ChevronLeft className="h-4 w-4 mr-1" />
             Anterior
           </Button>
+          {!cargandoContexto && !decidiendoBorrador && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground"
+              title="Descarta tu progreso guardado y vuelve a precargar desde la cotización"
+              onClick={() => setMostrarConfirmarReset(true)}
+            >
+              <RotateCcw className="h-3.5 w-3.5 mr-1" />
+              Restablecer
+            </Button>
+          )}
         </div>
 
         {!decidiendoBorrador && (pasoActual === 1 ? (
@@ -1208,6 +1321,21 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
           <AlertDialogFooter>
             <AlertDialogCancel>Seguir editando</AlertDialogCancel>
             <AlertDialogAction onClick={confirmarCierreDeTodasFormas}>Cerrar de todas formas</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={mostrarConfirmarReset} onOpenChange={setMostrarConfirmarReset}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Restablecer el asistente?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se descarta todo tu progreso guardado en este proyecto (Paso 1 y, si ya generaste actividades, también el Paso 2) y se vuelve a precargar desde cero a partir de la cotización. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={restablecerWizard}>Restablecer</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
