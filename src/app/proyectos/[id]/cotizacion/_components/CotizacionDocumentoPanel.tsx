@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
 import {
-  Upload, FileText, CheckCircle2, AlertTriangle, HelpCircle, RefreshCw, Trash2, ExternalLink, X, Plus,
+  Upload, FileText, CheckCircle2, AlertTriangle, HelpCircle, RefreshCw, Trash2, ExternalLink, X, Plus, Pencil, Check,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { CotizacionDiff } from '@/lib/agente/cotizacionDocumentoExtractor'
@@ -66,9 +66,10 @@ function EditableBulletList({
   onSave: (items: string[]) => Promise<void>
 }) {
   const [local, setLocal] = useState(items)
+  const [editingIndex, setEditingIndex] = useState<number | null>(null)
   const [guardando, setGuardando] = useState(false)
 
-  useEffect(() => { setLocal(items) }, [items])
+  useEffect(() => { setLocal(items); setEditingIndex(null) }, [items])
 
   const dirty = JSON.stringify(local) !== JSON.stringify(items)
 
@@ -78,16 +79,21 @@ function EditableBulletList({
 
   const eliminar = (idx: number) => {
     setLocal(prev => prev.filter((_, i) => i !== idx))
+    setEditingIndex(null)
   }
 
   const agregar = () => {
-    setLocal(prev => [...prev, ''])
+    setLocal(prev => {
+      setEditingIndex(prev.length)
+      return [...prev, '']
+    })
   }
 
   const guardar = async () => {
     setGuardando(true)
     try {
       await onSave(local.map(v => v.trim()).filter(v => v.length > 0))
+      setEditingIndex(null)
     } finally {
       setGuardando(false)
     }
@@ -96,24 +102,41 @@ function EditableBulletList({
   return (
     <div className="space-y-2">
       <ul className="space-y-1.5">
-        {local.map((texto, i) => (
-          <li key={i} className="flex items-center gap-1.5">
-            <span className="text-muted-foreground text-sm">•</span>
-            <Input
-              value={texto}
-              onChange={e => actualizar(i, e.target.value)}
-              className="h-7 text-sm"
-            />
-            <Button
-              size="sm" variant="ghost"
-              className="h-7 w-7 p-0 text-muted-foreground hover:text-red-600 shrink-0"
-              onClick={() => eliminar(i)}
-              title="Eliminar línea"
-            >
-              <X className="h-3.5 w-3.5" />
-            </Button>
-          </li>
-        ))}
+        {local.map((texto, i) => {
+          const editando = editingIndex === i
+          return (
+            <li key={i} className="flex items-center gap-1.5">
+              <span className="text-muted-foreground text-sm">•</span>
+              {editando ? (
+                <Input
+                  autoFocus
+                  value={texto}
+                  onChange={e => actualizar(i, e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') setEditingIndex(null) }}
+                  className="h-7 text-sm"
+                />
+              ) : (
+                <span className="flex-1 text-sm text-muted-foreground py-1">{texto}</span>
+              )}
+              <Button
+                size="sm" variant="ghost"
+                className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground shrink-0"
+                onClick={() => setEditingIndex(editando ? null : i)}
+                title={editando ? 'Listo' : 'Editar línea'}
+              >
+                {editando ? <Check className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
+              </Button>
+              <Button
+                size="sm" variant="ghost"
+                className="h-7 w-7 p-0 text-muted-foreground hover:text-red-600 shrink-0"
+                onClick={() => eliminar(i)}
+                title="Eliminar línea"
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </li>
+          )
+        })}
       </ul>
       <div className="flex items-center gap-2">
         <Button size="sm" variant="outline" onClick={agregar} className="h-7 text-xs">
