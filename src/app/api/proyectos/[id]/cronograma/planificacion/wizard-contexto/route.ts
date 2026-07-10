@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { ROLES_CRONOGRAMA } from '@/lib/services/cronogramaPermisos'
 import { obtenerEdtsComercialesProyecto } from '@/lib/cronogramaIA/obtenerEdtsComerciales'
+import { derivarEdtsSoporte } from '@/lib/cronogramaIA/derivarEdtsSoporte'
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -65,6 +66,18 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     })
   }
 
+  // La cotización solo resuelve EDTs de ENTREGABLES (lo que se vendió). Los
+  // EDTs de SOPORTE (GES/CIE siempre, SEG/PRO por alcance, CMM sugerido) casi
+  // nunca son una partida propia — se derivan acá por reglas duras, nunca
+  // por IA. Cada uno sigue siendo editable en el Paso 1; solo cambia la
+  // preselección y el motivo mostrado al usuario.
+  const edtsSugeridosConOrigen = edtsComerciales
+    ? derivarEdtsSoporte(
+        edtsComerciales,
+        edts.map(e => ({ id: e.id, nombre: e.nombre }))
+      )
+    : null
+
   return NextResponse.json({
     edts: edts.map(e => ({
       id: e.id,
@@ -80,6 +93,12 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     // cotización comercial (ej. proyectos internos). Tiene prioridad sobre
     // cualquier sugerencia de IA para decidir qué EDTs preseleccionar.
     edtsSugeridosComercial: edtsComerciales,
+    // Igual que edtsSugeridosComercial pero enriquecido con los EDTs de
+    // soporte derivados por regla (ver derivarEdtsSoporte) y el origen de
+    // cada uno ('cotizacion' | 'regla-siempre' | 'regla-derivada' |
+    // 'regla-sugerencia') — el wizard lo usa para mostrar de dónde salió
+    // cada preselección. null si no hay cotización comercial.
+    edtsSugeridosConOrigen,
     tieneCotizacionDocumento: !!cotizacionDocumento,
     cotizacionResumen: cotizacionDocumento
       ? {

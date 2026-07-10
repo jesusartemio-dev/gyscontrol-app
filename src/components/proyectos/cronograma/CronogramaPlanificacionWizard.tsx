@@ -16,6 +16,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ChevronLeft, ChevronRight, Loader2, Plus, Trash2, Sparkles, AlertCircle, FileCheck2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import type { ActividadPropuesta } from '@/types/cronogramaIA'
+import type { EdtSugeridoConOrigen } from '@/lib/cronogramaIA/derivarEdtsSoporte'
 
 interface EdtWizardInfo {
   id: string
@@ -88,6 +89,7 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
   const [advertencias, setAdvertencias] = useState<string[]>([])
   const [edtsPendientesIA, setEdtsPendientesIA] = useState<EdtPendienteIA[]>([])
   const [fuenteEdtsSugeridos, setFuenteEdtsSugeridos] = useState<'comercial' | 'ia' | 'manual'>('manual')
+  const [edtsOrigen, setEdtsOrigen] = useState<Map<string, EdtSugeridoConOrigen>>(new Map())
 
   useEffect(() => {
     if (!open) return
@@ -105,18 +107,27 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
         if (!res.ok) throw new Error('No se pudo cargar el contexto del wizard')
         return res.json()
       })
-      .then((data: { edts: EdtWizardInfo[]; cotizacionResumen: CotizacionResumen | null; tieneCotizacionDocumento: boolean; edtsSugeridosComercial: string[] | null }) => {
+      .then(
+        (data: {
+          edts: EdtWizardInfo[]
+          cotizacionResumen: CotizacionResumen | null
+          tieneCotizacionDocumento: boolean
+          edtsSugeridosComercial: string[] | null
+          edtsSugeridosConOrigen: EdtSugeridoConOrigen[] | null
+        }) => {
         setEdts(data.edts)
         setCotizacionResumen(data.cotizacionResumen)
 
-        // Prioridad de selección de EDTs: 1) cotización COMERCIAL (determinista,
-        // servicios realmente vendidos — nunca adivinado); 2) IA desde el PDF
-        // (más abajo, solo si no hay #1); 3) fallback "todos los EDTs con
-        // servicios" (nunca confiable por sí solo, se sobreescribe apenas
-        // haya una fuente mejor).
+        // Prioridad de selección de EDTs: 1) cotización COMERCIAL, enriquecida
+        // con los EDTs de soporte derivados por regla (GES/CIE siempre,
+        // SEG/PRO por alcance, CMM sugerido — ver derivarEdtsSoporte, nunca
+        // IA); 2) IA desde el PDF (más abajo, solo si no hay #1); 3) fallback
+        // "todos los EDTs con servicios" (nunca confiable por sí solo, se
+        // sobreescribe apenas haya una fuente mejor).
         const edtsComercial = data.edtsSugeridosComercial
-        if (edtsComercial && edtsComercial.length > 0) {
-          setEdtsSeleccionados(new Set(edtsComercial))
+        if (data.edtsSugeridosConOrigen && data.edtsSugeridosConOrigen.length > 0) {
+          setEdtsSeleccionados(new Set(data.edtsSugeridosConOrigen.map(e => e.id)))
+          setEdtsOrigen(new Map(data.edtsSugeridosConOrigen.map(e => [e.id, e])))
           setFuenteEdtsSugeridos('comercial')
         } else {
           setEdtsSeleccionados(new Set(data.edts.filter(e => e.totalServicios > 0).map(e => e.id)))
@@ -396,22 +407,36 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
             </div>
             <Card>
               <CardContent className="p-2 max-h-[220px] overflow-y-auto space-y-1">
-                {edts.map(edt => (
-                  <div
-                    key={edt.id}
-                    className="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-muted/50"
-                    onClick={() => toggleEdt(edt.id)}
-                  >
-                    <Checkbox checked={edtsSeleccionados.has(edt.id)} onCheckedChange={() => toggleEdt(edt.id)} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{edt.descripcion || edt.nombre} ({edt.nombre})</p>
-                      <p className="text-xs text-muted-foreground truncate">{edt.faseNombre ?? 'Sin fase asignada'}</p>
+                {edts.map(edt => {
+                  const origen = edtsOrigen.get(edt.id)
+                  return (
+                    <div
+                      key={edt.id}
+                      className="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-muted/50"
+                      onClick={() => toggleEdt(edt.id)}
+                    >
+                      <Checkbox checked={edtsSeleccionados.has(edt.id)} onCheckedChange={() => toggleEdt(edt.id)} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{edt.descripcion || edt.nombre} ({edt.nombre})</p>
+                        <p className="text-xs text-muted-foreground truncate">{edt.faseNombre ?? 'Sin fase asignada'}</p>
+                      </div>
+                      {origen && origen.origen !== 'cotizacion' && (
+                        <Badge
+                          variant={origen.origen === 'regla-sugerencia' ? 'outline' : 'secondary'}
+                          className="text-[10px] shrink-0"
+                          title={origen.motivo}
+                        >
+                          {origen.origen === 'regla-siempre' && 'Siempre aplica'}
+                          {origen.origen === 'regla-derivada' && 'Derivado del alcance'}
+                          {origen.origen === 'regla-sugerencia' && 'Sugerido — confirma'}
+                        </Badge>
+                      )}
+                      <Badge variant={edt.totalServicios > 0 ? 'secondary' : 'outline'} className="text-xs">
+                        {edt.totalServicios} servicios
+                      </Badge>
                     </div>
-                    <Badge variant={edt.totalServicios > 0 ? 'secondary' : 'outline'} className="text-xs">
-                      {edt.totalServicios} servicios
-                    </Badge>
-                  </div>
-                ))}
+                  )
+                })}
               </CardContent>
             </Card>
           </div>
