@@ -355,6 +355,9 @@ export interface Cliente {
   codigo: string // ✅ Código automático formato CLI-XXXX-YY
   numeroSecuencia: number // ✅ Número secuencial para generación de código
   nombre: string
+  // Nombre corto para celdas angostas de documentos (ej. tabla de contactos
+  // del Word de la Matriz de Comunicaciones) — fallback a `nombre` si vacío.
+  nombreCorto?: string | null
   ruc?: string
   direccion?: string
   telefono?: string

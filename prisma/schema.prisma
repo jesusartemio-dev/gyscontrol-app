@@ -185,6 +185,10 @@ model Cliente {
   numeroSecuencia                   Int?                   @default(1)
   ventaEquipoNumeroSecuencia        Int                    @default(0)
   nombre                   String
+  /// Nombre corto para celdas angostas de documentos (ej. tabla de contactos
+  /// del Word de la Matriz de Comunicaciones) — la razón social completa
+  /// suele partir la celda en varias líneas. Fallback a `nombre` si vacío.
+  nombreCorto              String?
   ruc                      String?
   direccion                String?
   telefono                 String?

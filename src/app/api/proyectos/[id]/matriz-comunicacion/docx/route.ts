@@ -6,6 +6,8 @@ import { generarDocxMatriz } from '@/lib/matrizComunicacion/exportDocx'
 import { generarSiglas, calcularNivelesOrgNodos, NIVELES_PARTICIPANTES_MATRIZ } from '@/lib/matrizComunicacion/utils'
 import { ROL_CONTACTO_CLIENTE_LABELS } from '@/lib/config/rolesContactoCliente'
 import { renderMatrizPlantillaOficial } from '@/lib/matrizComunicacion/plantillaOficial/renderizar'
+import { EMPRESA_CORTA_GYS } from '@/lib/matrizComunicacion/codigoDocumentoAsistente'
+import { ordenarPorJerarquiaCargo } from '@/lib/matrizComunicacion/ordenContactos'
 
 function parseCeldas(json: string): { siglas: string; valor: string }[] {
   try {
@@ -41,7 +43,7 @@ export async function GET(
           sede: true,
           etapa: true,
           ordenCompraCliente: true,
-          cliente: { select: { nombre: true, logoUrl: true } },
+          cliente: { select: { nombre: true, nombreCorto: true, logoUrl: true } },
           orgNodos: {
             // Se traen TODOS los nodos (no solo los que tienen usuario) para poder
             // calcular el nivel de cada uno recorriendo la cadena de padres completa.
@@ -72,45 +74,51 @@ export async function GET(
     const niveles = calcularNivelesOrgNodos(proyecto.orgNodos)
     const seenUserIds = new Set<string>()
     const usadas = new Set<string>()
-    const personal = proyecto.orgNodos
-      .filter(n => {
-        if (!n.user?.name || !n.userId) return false
-        if (!NIVELES_PARTICIPANTES_MATRIZ.includes(niveles.get(n.id) as 2 | 3 | 4)) return false
-        if (seenUserIds.has(n.userId)) return false
-        seenUserIds.add(n.userId)
-        return true
-      })
-      .map(n => {
-        const siglas = generarSiglas(n.user!.name!, usadas)
-        usadas.add(siglas)
-        return {
-          siglas,
-          nombre: n.user!.name!,
-          cargo: n.cargoLabel,
-          empresa: n.empresaOverride ?? 'GYS CONTROL INDUSTRIAL SAC',
-          celular: n.telefonoOverride ?? n.user?.empleado?.telefono ?? '',
-          correo: n.user!.email,
-        }
-      })
+    const personalGys = ordenarPorJerarquiaCargo(
+      proyecto.orgNodos
+        .filter(n => {
+          if (!n.user?.name || !n.userId) return false
+          if (!NIVELES_PARTICIPANTES_MATRIZ.includes(niveles.get(n.id) as 2 | 3 | 4)) return false
+          if (seenUserIds.has(n.userId)) return false
+          seenUserIds.add(n.userId)
+          return true
+        })
+        .map(n => {
+          const siglas = generarSiglas(n.user!.name!, usadas)
+          usadas.add(siglas)
+          return {
+            siglas,
+            nombre: n.user!.name!,
+            cargo: n.cargoLabel,
+            empresa: n.empresaOverride ?? EMPRESA_CORTA_GYS,
+            celular: n.telefonoOverride ?? n.user?.empleado?.telefono ?? '',
+            correo: n.user!.email,
+          }
+        })
+    )
 
-    // Agregar contactos del cliente como participantes adicionales
+    // El contacto del cliente encabeza la tabla — así es el formato real del
+    // entregable (ej. el supervisor del cliente va primero, no el equipo GYS).
     const contactosCliente = await prisma.proyectoContactoCliente.findMany({
       where: { proyectoId },
       include: { crmContacto: { select: { nombre: true, email: true, celular: true, telefono: true } } },
       orderBy: { createdAt: 'asc' },
     })
-    for (const cc of contactosCliente) {
+    const empresaCliente = proyecto.cliente?.nombreCorto || proyecto.cliente?.nombre || 'Cliente'
+    const personalCliente = contactosCliente.map(cc => {
       const siglas = generarSiglas(cc.crmContacto.nombre, usadas)
       usadas.add(siglas)
-      personal.push({
+      return {
         siglas,
         nombre: cc.crmContacto.nombre,
         cargo: ROL_CONTACTO_CLIENTE_LABELS[cc.rolEnProyecto] ?? cc.rolEnProyecto,
-        empresa: proyecto.cliente?.nombre ?? 'Cliente',
+        empresa: empresaCliente,
         celular: cc.crmContacto.celular ?? cc.crmContacto.telefono ?? '',
         correo: cc.crmContacto.email ?? '',
-      })
-    }
+      }
+    })
+
+    const personal = [...personalCliente, ...personalGys]
 
     const filas = matriz.filas.map(f => ({
       orden: f.orden,

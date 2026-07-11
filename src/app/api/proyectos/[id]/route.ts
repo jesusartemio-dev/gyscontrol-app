@@ -78,7 +78,7 @@ export async function GET(
       where: { id: proyectoId },
       include: {
         cliente: {
-          select: { id: true, codigo: true, nombre: true, ruc: true, logoUrl: true }
+          select: { id: true, codigo: true, nombre: true, nombreCorto: true, ruc: true, logoUrl: true }
         },
         comercial: {
           select: { id: true, name: true, email: true }

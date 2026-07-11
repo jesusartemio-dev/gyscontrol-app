@@ -650,6 +650,7 @@ export interface ListaEquipoItemUpdatePayload extends Partial<ListaEquipoItemPay
 // ✅ Cliente
 export interface ClientePayload {
   nombre: string
+  nombreCorto?: string
   ruc?: string
   direccion?: string
   telefono?: string

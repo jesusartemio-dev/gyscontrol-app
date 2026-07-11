@@ -141,6 +141,21 @@ export default function ClienteForm({ onSaved, initial, onCancel }: Props) {
         )}
       </div>
 
+      {/* Nombre Corto Field */}
+      <div className="space-y-2">
+        <Label htmlFor="nombreCorto" className="flex items-center gap-2">
+          <User className="h-4 w-4" />
+          Nombre Corto
+        </Label>
+        <Input
+          id="nombreCorto"
+          placeholder="ej: NEXA"
+          value={form.nombreCorto || ''}
+          onChange={(e) => handleChange('nombreCorto', e.target.value)}
+        />
+        <p className="text-sm text-gray-500">Usado en documentos con celdas angostas (ej. Matriz de Comunicaciones) — si se deja vacío, se usa el nombre completo.</p>
+      </div>
+
       {/* Código Field */}
       <div className="space-y-2">
         <Label htmlFor="codigo" className="flex items-center gap-2">

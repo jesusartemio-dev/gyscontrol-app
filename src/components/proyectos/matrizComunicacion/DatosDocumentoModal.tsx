@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -52,6 +53,12 @@ function heuristicaDefault(personal: PersonalInfo[], patron: RegExp): string {
   return personal.find(p => patron.test(p.cargo))?.nombre ?? ''
 }
 
+// "Gerencia/Gerente de Proyectos" (rol corporativo, ej. Jesús Mamani en G300)
+// es un cargo DISTINTO de "Gestor de Proyectos" (rol de proyecto, ej. Piero
+// Ríos) — no deben confundirse. Requiere ambos "gerenc/gerente" Y "proyecto"
+// para no matchear por accidente "Gerencia General"/"Gerencia Comercial".
+const RX_GERENTE_PROYECTOS = /(gerenc|gerente).*proyecto/i
+
 export function DatosDocumentoModal({ open, onOpenChange, proyectoId, matriz, proyectoInfo, personal, onSaved }: Props) {
   const [form, setForm] = useState({
     codigoDocumento: '', revisionDocumento: '0', numeroConsultor: '',
@@ -61,38 +68,51 @@ export function DatosDocumentoModal({ open, onOpenChange, proyectoId, matriz, pr
   const [etapaDigitoManual, setEtapaDigitoManual] = useState('')
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
-    if (!open) return
-    const clienteContacto = personal.find(p => p.esCliente)?.nombre ?? ''
-    setForm({
-      codigoDocumento: matriz.codigoDocumento ?? '',
-      revisionDocumento: matriz.revisionDocumento || '0',
-      numeroConsultor: matriz.numeroConsultor ?? '',
-      desarrolloNombre: matriz.desarrolloNombre ?? heuristicaDefault(personal, /residente/i),
-      verificoNombre: matriz.verificoNombre ?? heuristicaDefault(personal, /gestor/i),
-      aproboNombre: matriz.aproboNombre ?? heuristicaDefault(personal, /gestor/i),
-      autorizoNombre: matriz.autorizoNombre ?? clienteContacto,
-    })
-  }, [open, matriz, personal])
-
   const estandar = detectarEstandarCliente(proyectoInfo.clienteNombre)
   const digitoAuto = digitoEtapa(proyectoInfo.etapa)
   const faltanDatosNexa = !proyectoInfo.codigoPEP || !proyectoInfo.areaSeccion
   const asistenteDisponible = estandar === 'nexa' && !faltanDatosNexa
 
-  function sugerirCodigo() {
-    const etapaDigito = digitoAuto ?? etapaDigitoManual
-    if (!etapaDigito) {
-      toast.error('Falta el dígito de etapa — escríbelo abajo o define la etapa del proyecto.')
-      return
-    }
-    const codigo = componerCodigoNexa({
+  function componerSugerencia(correlativoValor: string, revisionValor: string, etapaDigitoManualValor: string): string | null {
+    if (!asistenteDisponible) return null
+    const etapaDigito = digitoAuto ?? etapaDigitoManualValor
+    if (!etapaDigito) return null
+    return componerCodigoNexa({
       pep: proyectoInfo.codigoPEP!,
       etapaDigito,
       area: proyectoInfo.areaSeccion!,
-      correlativo,
-      revision: form.revisionDocumento || '0',
+      correlativo: correlativoValor,
+      revision: revisionValor || '0',
     })
+  }
+
+  useEffect(() => {
+    if (!open) return
+    const clienteContacto = personal.find(p => p.esCliente)?.nombre ?? ''
+    const revisionInicial = matriz.revisionDocumento || '0'
+    // Auto-sugerencia al abrir: si el código está vacío y los datos del
+    // proyecto ya alcanzan para componerlo (incluye el dígito de etapa
+    // automático — si hiciera falta escribirlo a mano, no se auto-sugiere),
+    // se pre-llena editable. El usuario acepta guardando o lo sobreescribe.
+    const autoSugerido = !matriz.codigoDocumento ? componerSugerencia(correlativo, revisionInicial, '') ?? '' : ''
+    setForm({
+      codigoDocumento: matriz.codigoDocumento || autoSugerido,
+      revisionDocumento: revisionInicial,
+      numeroConsultor: matriz.numeroConsultor ?? '',
+      desarrolloNombre: matriz.desarrolloNombre ?? heuristicaDefault(personal, /residente/i),
+      verificoNombre: matriz.verificoNombre ?? heuristicaDefault(personal, RX_GERENTE_PROYECTOS),
+      aproboNombre: matriz.aproboNombre ?? heuristicaDefault(personal, RX_GERENTE_PROYECTOS),
+      autorizoNombre: matriz.autorizoNombre ?? clienteContacto,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
+  function sugerirCodigo() {
+    const codigo = componerSugerencia(correlativo, form.revisionDocumento, etapaDigitoManual)
+    if (!codigo) {
+      toast.error('Falta el dígito de etapa — escríbelo abajo o define la etapa del proyecto.')
+      return
+    }
     setForm(f => ({ ...f, codigoDocumento: codigo }))
   }
 
@@ -137,18 +157,29 @@ export function DatosDocumentoModal({ open, onOpenChange, proyectoId, matriz, pr
           <div>
             <Label className="text-xs">Código de documento</Label>
             <div className="flex gap-2 mt-1">
-              <Input value={form.codigoDocumento} onChange={e => setForm({ ...form, codigoDocumento: e.target.value })} placeholder="ej: MX-I790126021-3GYS-0240COR0001-R0" className="h-8 text-sm" />
+              <Input value={form.codigoDocumento} onChange={e => setForm({ ...form, codigoDocumento: e.target.value })} placeholder="Ingresa o sugiere el código del cliente" className="h-8 text-sm" />
             </div>
             {estandar === 'nexa' && (
-              <div className="flex items-center gap-2 mt-2">
-                <Input value={correlativo} onChange={e => setCorrelativo(e.target.value)} placeholder="Correlativo" className="h-8 text-sm w-28" />
-                {!digitoAuto && (
-                  <Input value={etapaDigitoManual} onChange={e => setEtapaDigitoManual(e.target.value)} placeholder="Dígito etapa" className="h-8 text-sm w-24" maxLength={1} />
+              <>
+                <div className="flex items-center gap-2 mt-2">
+                  <Input value={correlativo} onChange={e => setCorrelativo(e.target.value)} placeholder="Correlativo" className="h-8 text-sm w-28" />
+                  {!digitoAuto && (
+                    <Input value={etapaDigitoManual} onChange={e => setEtapaDigitoManual(e.target.value)} placeholder="Dígito etapa" className="h-8 text-sm w-24" maxLength={1} />
+                  )}
+                  <Button type="button" size="sm" variant="secondary" onClick={sugerirCodigo} disabled={!asistenteDisponible}>
+                    <Sparkles size={13} className="mr-1" />Sugerir código
+                  </Button>
+                </div>
+                {!asistenteDisponible && (
+                  <p className="text-xs text-amber-600 mt-1">
+                    Completa Código PEP, etapa y área en la{' '}
+                    <Link href={`/proyectos/${proyectoId}`} target="_blank" className="underline font-medium">
+                      ficha del proyecto
+                    </Link>{' '}
+                    para sugerir.
+                  </p>
                 )}
-                <Button type="button" size="sm" variant="secondary" onClick={sugerirCodigo} disabled={!asistenteDisponible} title={!asistenteDisponible ? 'Faltan Código PEP/Área en el proyecto' : undefined}>
-                  <Sparkles size={13} className="mr-1" />Sugerir código
-                </Button>
-              </div>
+              </>
             )}
             {estandar === 'qroma' && (
               <p className="text-xs text-muted-foreground mt-1">Asistente no configurado para este cliente todavía — escribe el código a mano.</p>

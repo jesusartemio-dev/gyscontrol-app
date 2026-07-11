@@ -86,6 +86,7 @@ export default function MatrizComunicacionPage() {
     nombre: string
     codigo: string
     cliente: string
+    clienteNombreCorto: string
     sede: string | null
     etapa: string | null
     codigoPEP: string | null
@@ -134,6 +135,7 @@ export default function MatrizComunicacionPage() {
           nombre: p.nombre ?? '',
           codigo: p.codigo ?? '',
           cliente: clienteNombre,
+          clienteNombreCorto: p.cliente?.nombreCorto || clienteNombre,
           sede: p.sede ?? null,
           etapa: p.etapa ?? null,
           codigoPEP: p.codigoPEP ?? null,
@@ -428,7 +430,7 @@ export default function MatrizComunicacionPage() {
                     )}
                     {cliCount > 0 && (
                       <th className="border border-rose-400 px-2 py-1.5 text-center font-semibold bg-rose-700" colSpan={cliCount}>
-                        CLIENTE{proyectoInfo?.cliente ? `: ${proyectoInfo.cliente}` : ''}
+                        CLIENTE{proyectoInfo?.clienteNombreCorto ? `: ${proyectoInfo.clienteNombreCorto}` : ''}
                       </th>
                     )}
                   </>

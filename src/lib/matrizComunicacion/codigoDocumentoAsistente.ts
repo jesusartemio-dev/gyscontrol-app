@@ -9,6 +9,15 @@
 
 export const CONTRATISTA_SIGLAS = 'GYS'
 
+/**
+ * Nombre corto de la empresa GYS para celdas angostas (tabla de contactos del
+ * Word) — la razón social completa ("GYS Control Industrial SAC") parte la
+ * celda en varias líneas. Nunca reemplaza la razón social completa usada en
+ * otros contextos (organigrama, PDFs, prompts) — solo aplica donde el espacio
+ * de la celda es limitado.
+ */
+export const EMPRESA_CORTA_GYS = 'GYS CONTROL'
+
 const ETAPA_DIGITO: Record<string, string> = { FEL1: '1', FEL2: '2', FEL3: '3', 'E&C': '4' }
 
 /** null = la etapa del proyecto no está en la tabla (cliente distinto de Nexa, o texto libre) — el usuario debe teclear el dígito a mano. */
