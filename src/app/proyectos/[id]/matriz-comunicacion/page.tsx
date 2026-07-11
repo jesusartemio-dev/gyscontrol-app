@@ -598,7 +598,19 @@ export default function MatrizComunicacionPage() {
             if (updated.codigoDocumento) handleExportWord()
           }}
           onProyectoActualizado={updated => {
-            setProyectoInfo(p => (p ? { ...p, ...updated } : p))
+            // OJO: `updated` es el Proyecto COMPLETO devuelto por el PUT
+            // (incluye `cliente` como objeto de relación) — nunca hacer
+            // spread ciego acá, se clobberea `proyectoInfo.cliente` (string)
+            // con ese objeto y revienta detectarEstandarCliente más
+            // adelante ("e.toLowerCase is not a function"). Solo se toman
+            // los 4 campos que este modal realmente edita.
+            setProyectoInfo(p => (p ? {
+              ...p,
+              sede: updated.sede,
+              etapa: updated.etapa,
+              codigoPEP: updated.codigoPEP,
+              areaSeccion: updated.areaSeccion,
+            } : p))
           }}
         />
       )}
