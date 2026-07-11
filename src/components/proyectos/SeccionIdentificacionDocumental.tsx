@@ -12,16 +12,12 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 import type { Proyecto } from '@/types'
+import { ETAPAS_SUGERIDAS, OTRA_ETAPA } from '@/lib/config/etapasProyecto'
 
 interface Props {
   proyecto: Proyecto
   onUpdateProyecto: (updated: Partial<Proyecto>) => void
 }
-
-// Sugeridos por el estándar Nexa — otros clientes necesitan texto libre, por
-// eso `etapa` en el modelo es String, nunca un enum de Prisma.
-const ETAPAS_SUGERIDAS = ['FEL1', 'FEL2', 'FEL3', 'E&C']
-const OTRA_ETAPA = '__otra__'
 
 export default function SeccionIdentificacionDocumental({ proyecto, onUpdateProyecto }: Props) {
   const [expanded, setExpanded] = useState(false)

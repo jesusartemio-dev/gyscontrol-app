@@ -597,6 +597,9 @@ export default function MatrizComunicacionPage() {
             setMatriz(m => (m ? { ...m, ...updated } : m))
             if (updated.codigoDocumento) handleExportWord()
           }}
+          onProyectoActualizado={updated => {
+            setProyectoInfo(p => (p ? { ...p, ...updated } : p))
+          }}
         />
       )}
     </div>

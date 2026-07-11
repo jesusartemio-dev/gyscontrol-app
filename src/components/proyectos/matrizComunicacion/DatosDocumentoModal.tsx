@@ -1,11 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Loader2, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -13,6 +13,7 @@ import {
   digitoEtapa,
   detectarEstandarCliente,
 } from '@/lib/matrizComunicacion/codigoDocumentoAsistente'
+import { ETAPAS_SUGERIDAS, OTRA_ETAPA } from '@/lib/config/etapasProyecto'
 
 interface PersonalInfo {
   siglas: string
@@ -39,6 +40,13 @@ interface ProyectoDatosDocumento {
   areaSeccion: string | null
 }
 
+interface ProyectoActualizado {
+  sede: string | null
+  etapa: string | null
+  codigoPEP: string | null
+  areaSeccion: string | null
+}
+
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -47,6 +55,7 @@ interface Props {
   proyectoInfo: ProyectoDatosDocumento
   personal: PersonalInfo[]
   onSaved: (updated: MatrizDatosDocumento) => void
+  onProyectoActualizado: (updated: ProyectoActualizado) => void
 }
 
 function heuristicaDefault(personal: PersonalInfo[], patron: RegExp): string {
@@ -59,18 +68,24 @@ function heuristicaDefault(personal: PersonalInfo[], patron: RegExp): string {
 // para no matchear por accidente "Gerencia General"/"Gerencia Comercial".
 const RX_GERENTE_PROYECTOS = /(gerenc|gerente).*proyecto/i
 
-export function DatosDocumentoModal({ open, onOpenChange, proyectoId, matriz, proyectoInfo, personal, onSaved }: Props) {
+export function DatosDocumentoModal({ open, onOpenChange, proyectoId, matriz, proyectoInfo, personal, onSaved, onProyectoActualizado }: Props) {
   const [form, setForm] = useState({
     codigoDocumento: '', revisionDocumento: '0', numeroConsultor: '',
     desarrolloNombre: '', verificoNombre: '', aproboNombre: '', autorizoNombre: '',
   })
+  // Editables acá mismo — evita el callejón sin salida de tener que ir a
+  // buscar una tarjeta colapsada en la ficha del proyecto (bug real
+  // detectado en uso: el link llevaba a la página correcta, pero la sección
+  // estaba colapsada y sin resaltar, sin ninguna pista de qué hacer ahí).
+  const [proyectoForm, setProyectoForm] = useState({ sede: '', etapa: '', etapaLibre: '', codigoPEP: '', areaSeccion: '' })
   const [correlativo, setCorrelativo] = useState('0001')
   const [etapaDigitoManual, setEtapaDigitoManual] = useState('')
   const [saving, setSaving] = useState(false)
 
+  const etapaResuelta = proyectoForm.etapa === OTRA_ETAPA ? proyectoForm.etapaLibre : proyectoForm.etapa
   const estandar = detectarEstandarCliente(proyectoInfo.clienteNombre)
-  const digitoAuto = digitoEtapa(proyectoInfo.etapa)
-  const faltanDatosNexa = !proyectoInfo.codigoPEP || !proyectoInfo.areaSeccion
+  const digitoAuto = digitoEtapa(etapaResuelta)
+  const faltanDatosNexa = !proyectoForm.codigoPEP || !proyectoForm.areaSeccion
   const asistenteDisponible = estandar === 'nexa' && !faltanDatosNexa
 
   function componerSugerencia(correlativoValor: string, revisionValor: string, etapaDigitoManualValor: string): string | null {
@@ -78,9 +93,9 @@ export function DatosDocumentoModal({ open, onOpenChange, proyectoId, matriz, pr
     const etapaDigito = digitoAuto ?? etapaDigitoManualValor
     if (!etapaDigito) return null
     return componerCodigoNexa({
-      pep: proyectoInfo.codigoPEP!,
+      pep: proyectoForm.codigoPEP,
       etapaDigito,
-      area: proyectoInfo.areaSeccion!,
+      area: proyectoForm.areaSeccion,
       correlativo: correlativoValor,
       revision: revisionValor || '0',
     })
@@ -90,11 +105,29 @@ export function DatosDocumentoModal({ open, onOpenChange, proyectoId, matriz, pr
     if (!open) return
     const clienteContacto = personal.find(p => p.esCliente)?.nombre ?? ''
     const revisionInicial = matriz.revisionDocumento || '0'
+    const etapaInicial = proyectoInfo.etapa && !ETAPAS_SUGERIDAS.includes(proyectoInfo.etapa) ? OTRA_ETAPA : (proyectoInfo.etapa ?? '')
+    setProyectoForm({
+      sede: proyectoInfo.sede ?? '',
+      etapa: etapaInicial,
+      etapaLibre: etapaInicial === OTRA_ETAPA ? proyectoInfo.etapa ?? '' : '',
+      codigoPEP: proyectoInfo.codigoPEP ?? '',
+      areaSeccion: proyectoInfo.areaSeccion ?? '',
+    })
     // Auto-sugerencia al abrir: si el código está vacío y los datos del
     // proyecto ya alcanzan para componerlo (incluye el dígito de etapa
     // automático — si hiciera falta escribirlo a mano, no se auto-sugiere),
     // se pre-llena editable. El usuario acepta guardando o lo sobreescribe.
-    const autoSugerido = !matriz.codigoDocumento ? componerSugerencia(correlativo, revisionInicial, '') ?? '' : ''
+    const etapaDigitoInicial = digitoEtapa(proyectoInfo.etapa)
+    const autoSugerido =
+      !matriz.codigoDocumento && detectarEstandarCliente(proyectoInfo.clienteNombre) === 'nexa' && proyectoInfo.codigoPEP && proyectoInfo.areaSeccion && etapaDigitoInicial
+        ? componerCodigoNexa({
+            pep: proyectoInfo.codigoPEP,
+            etapaDigito: etapaDigitoInicial,
+            area: proyectoInfo.areaSeccion,
+            correlativo,
+            revision: revisionInicial,
+          })
+        : ''
     setForm({
       codigoDocumento: matriz.codigoDocumento || autoSugerido,
       revisionDocumento: revisionInicial,
@@ -119,18 +152,37 @@ export function DatosDocumentoModal({ open, onOpenChange, proyectoId, matriz, pr
   async function guardar() {
     setSaving(true)
     try {
-      const res = await fetch(`/api/proyectos/${proyectoId}/matriz-comunicacion`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      })
-      if (!res.ok) throw new Error()
-      const updated = await res.json()
-      onSaved(updated)
-      toast.success('Datos del documento guardados')
+      const proyectoPayload = {
+        sede: proyectoForm.sede || null,
+        etapa: etapaResuelta || null,
+        codigoPEP: proyectoForm.codigoPEP || null,
+        areaSeccion: proyectoForm.areaSeccion || null,
+      }
+      const [resProyecto, resMatriz] = await Promise.all([
+        fetch(`/api/proyectos/${proyectoId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(proyectoPayload),
+        }),
+        fetch(`/api/proyectos/${proyectoId}/matriz-comunicacion`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(form),
+        }),
+      ])
+      if (!resProyecto.ok) {
+        throw new Error(resProyecto.status === 403 ? 'Sin permiso para editar los datos del proyecto' : 'Error al guardar los datos del proyecto')
+      }
+      if (!resMatriz.ok) throw new Error('Error al guardar los datos del documento')
+
+      const { data: proyectoActualizado } = await resProyecto.json()
+      const matrizActualizada = await resMatriz.json()
+      onProyectoActualizado(proyectoActualizado)
+      onSaved(matrizActualizada)
+      toast.success('Datos guardados')
       onOpenChange(false)
-    } catch {
-      toast.error('Error al guardar los datos del documento')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Error al guardar')
     } finally {
       setSaving(false)
     }
@@ -142,16 +194,45 @@ export function DatosDocumentoModal({ open, onOpenChange, proyectoId, matriz, pr
         <DialogHeader>
           <DialogTitle>Datos del documento</DialogTitle>
           <DialogDescription>
-            Completa antes de descargar el Word con la plantilla oficial — sede/etapa/código PEP/área se editan en la ficha del proyecto.
+            Completa antes de descargar el Word con la plantilla oficial. Sede/etapa/código PEP/área se guardan en el proyecto y las usarán también futuros documentos (dossier, informes, protocolos).
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
-          <div className="text-xs bg-muted/50 rounded p-2 grid grid-cols-2 gap-1">
-            <span><b>Sede:</b> {proyectoInfo.sede || '—'}</span>
-            <span><b>Etapa:</b> {proyectoInfo.etapa || '—'}</span>
-            <span><b>Código PEP:</b> {proyectoInfo.codigoPEP || '—'}</span>
-            <span><b>Área/Sección:</b> {proyectoInfo.areaSeccion || '—'}</span>
+          <div className="border rounded p-3 space-y-3">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Datos del proyecto</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Sede</Label>
+                <Input value={proyectoForm.sede} onChange={e => setProyectoForm({ ...proyectoForm, sede: e.target.value })} placeholder="ej: Unidad Cerro Lindo" className="h-8 text-sm mt-1" />
+              </div>
+              <div>
+                <Label className="text-xs">Etapa</Label>
+                <Select value={proyectoForm.etapa} onValueChange={v => setProyectoForm({ ...proyectoForm, etapa: v })}>
+                  <SelectTrigger className="h-8 text-sm mt-1"><SelectValue placeholder="Selecciona..." /></SelectTrigger>
+                  <SelectContent>
+                    {ETAPAS_SUGERIDAS.map(e => <SelectItem key={e} value={e}>{e}</SelectItem>)}
+                    <SelectItem value={OTRA_ETAPA}>Otro (texto libre)</SelectItem>
+                  </SelectContent>
+                </Select>
+                {proyectoForm.etapa === OTRA_ETAPA && (
+                  <Input
+                    value={proyectoForm.etapaLibre}
+                    onChange={e => setProyectoForm({ ...proyectoForm, etapaLibre: e.target.value })}
+                    placeholder="Etapa del proyecto"
+                    className="h-8 text-sm mt-1"
+                  />
+                )}
+              </div>
+              <div>
+                <Label className="text-xs">Código PEP (del cliente)</Label>
+                <Input value={proyectoForm.codigoPEP} onChange={e => setProyectoForm({ ...proyectoForm, codigoPEP: e.target.value })} placeholder="ej: I790126021" className="h-8 text-sm mt-1" />
+              </div>
+              <div>
+                <Label className="text-xs">Área/Sección</Label>
+                <Input value={proyectoForm.areaSeccion} onChange={e => setProyectoForm({ ...proyectoForm, areaSeccion: e.target.value })} placeholder="ej: 0240" className="h-8 text-sm mt-1" />
+              </div>
+            </div>
           </div>
 
           <div>
@@ -171,13 +252,7 @@ export function DatosDocumentoModal({ open, onOpenChange, proyectoId, matriz, pr
                   </Button>
                 </div>
                 {!asistenteDisponible && (
-                  <p className="text-xs text-amber-600 mt-1">
-                    Completa Código PEP, etapa y área en la{' '}
-                    <Link href={`/proyectos/${proyectoId}`} target="_blank" className="underline font-medium">
-                      ficha del proyecto
-                    </Link>{' '}
-                    para sugerir.
-                  </p>
+                  <p className="text-xs text-amber-600 mt-1">Completa Código PEP y Área arriba para poder sugerir.</p>
                 )}
               </>
             )}
