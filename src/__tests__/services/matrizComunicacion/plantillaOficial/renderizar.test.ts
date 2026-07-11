@@ -1,5 +1,6 @@
 import PizZip from 'pizzip'
 import { renderMatrizPlantillaOficial, type DatosMatrizPlantilla } from '@/lib/matrizComunicacion/plantillaOficial/renderizar'
+import { asertarXmlBienFormado } from './xmlTestUtils'
 
 jest.mock('@/lib/services/googleDrive', () => ({
   getFileContent: jest.fn(),
@@ -75,5 +76,36 @@ describe('renderMatrizPlantillaOficial — contra la plantilla REAL', () => {
     // fila Construcción) y que TA aparece como sigla de columna.
     expect(documentXml).toContain('Construcción')
     expect(documentXml.match(/>R<\/w:t>/g)?.length ?? 0).toBeGreaterThan(0)
+  })
+
+  it('TODAS las partes XML/rels del paquete generado están bien formadas — Word rechaza el .docx entero si UNA sola parte está rota', async () => {
+    // Este es exactamente el gap que dejó pasar el bug real: los tests
+    // anteriores solo revisaban document.xml/header1.xml con "contiene el
+    // texto X", nunca la buena formación real del paquete completo
+    // ([Content_Types].xml, document.xml, header1.xml, footnotes, settings,
+    // rels...). Un solo tag mal cerrado en CUALQUIER parte = "Word no puede
+    // abrir el archivo" para el usuario final.
+    const buffer = await renderMatrizPlantillaOficial(datosDePrueba())
+    const zip = new PizZip(buffer)
+
+    const partesXml = Object.keys(zip.files).filter(
+      nombre => !zip.files[nombre].dir && (nombre.endsWith('.xml') || nombre.endsWith('.rels'))
+    )
+    // Sanidad de la sanidad: si esto da 0, el test de arriba no está probando nada.
+    expect(partesXml.length).toBeGreaterThan(5)
+
+    for (const nombre of partesXml) {
+      const contenido = zip.file(nombre)!.asText()
+      asertarXmlBienFormado(contenido, nombre)
+    }
+  })
+
+  it('el paquete final queda con [Content_Types].xml primero y sin entradas de directorio (compatibilidad máxima)', async () => {
+    const buffer = await renderMatrizPlantillaOficial(datosDePrueba())
+    const zip = new PizZip(buffer)
+    const nombres = Object.keys(zip.files)
+
+    expect(nombres[0]).toBe('[Content_Types].xml')
+    expect(nombres.filter(n => zip.files[n].dir)).toEqual([])
   })
 })

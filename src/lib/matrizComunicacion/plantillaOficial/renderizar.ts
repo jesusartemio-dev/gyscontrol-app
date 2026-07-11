@@ -4,6 +4,7 @@ import { descargarPlantillaMatrizOficial } from './descargarPlantilla'
 import { resolverLogoClienteBuffer } from './resolverLogoCliente'
 import { prepararXmlPlantilla, codigoTagName } from './prepararXmlDinamico'
 import { formatearFirma, inicialesDe } from './formatearFirma'
+import { reempaquetarZip } from './reempaquetarZip'
 
 export interface PersonaMatrizPlantilla {
   siglas: string
@@ -146,5 +147,6 @@ export async function renderMatrizPlantillaOficial(datos: DatosMatrizPlantilla):
     throw new Error(`[matriz-plantilla] Error al renderizar la plantilla oficial: ${err.message ?? String(e)}\n${mensajes}`)
   }
 
-  return doc.getZip().generate({ type: 'nodebuffer' }) as Buffer
+  const bufferGenerado = doc.getZip().generate({ type: 'nodebuffer' }) as Buffer
+  return reempaquetarZip(bufferGenerado)
 }

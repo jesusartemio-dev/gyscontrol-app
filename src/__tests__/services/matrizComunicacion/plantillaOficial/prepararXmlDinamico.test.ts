@@ -10,6 +10,7 @@ import {
   siglasTagName,
   codigoTagName,
 } from '@/lib/matrizComunicacion/plantillaOficial/prepararXmlDinamico'
+import { asertarXmlBienFormado } from './xmlTestUtils'
 
 const TEMPLATE_PATH = path.join(process.cwd(), 'src/lib/services/Matriz/plantilla_matriz_comunicacion.docx')
 
@@ -62,6 +63,7 @@ describe('expandirColumnasResponsabilidad — contra el document.xml REAL de la 
     expect(resultado).toContain(`{${codigoTagName(4)}}{/filas}`)
     // {#filas}{id} sigue intacto, sin tocar.
     expect(resultado).toContain('{#filas}{id}')
+    asertarXmlBienFormado(resultado, 'expandirColumnasResponsabilidad')
   })
 
   it('con N=1 sigue produciendo exactamente un par siglas_0/codigo_0 con el cierre del loop', () => {
@@ -96,6 +98,7 @@ describe('ajustarGridColumnas — contra el document.xml REAL', () => {
     expect(cols).toHaveLength(4 + 7)
     expect(cols.slice(0, 4)).toEqual([412, 2415, 1334, 779])
     expect(cols.slice(4)).toEqual(anchos)
+    asertarXmlBienFormado(resultado, 'ajustarGridColumnas')
   })
 })
 
@@ -116,6 +119,20 @@ describe('insertarCamposPaginacion — contra el header1.xml REAL', () => {
     expect(resultado).toContain('<w:fldChar w:fldCharType="begin"/>')
     expect(resultado).toContain('<w:fldChar w:fldCharType="separate"/>')
     expect(resultado).toContain('<w:fldChar w:fldCharType="end"/>')
+
+    // Regresión del bug real: <w:r[^>]*> matcheaba por accidente <w:rPr>/
+    // <w:rFonts> (cualquier elemento que empiece con "r"), dejando el <w:r>
+    // original sin cerrar y produciendo un .docx que Word rechazaba al abrir
+    // ("error trying to open the file"). Un parser XML estricto es la única
+    // forma confiable de detectar esto — un simple "contiene el texto X" lo
+    // dejó pasar la vez anterior.
+    asertarXmlBienFormado(resultado, 'insertarCamposPaginacion')
+  })
+
+  it('nunca anida un <w:r> dentro de otro <w:r>/<w:rPr> (regresión exacta del bug real)', () => {
+    const { header1Xml } = cargarXmlReal()
+    const resultado = insertarCamposPaginacion(header1Xml)
+    expect(resultado).not.toMatch(/<w:rPr>\s*<w:r>/)
   })
 })
 
@@ -137,5 +154,10 @@ describe('prepararXmlPlantilla — orquestador end-to-end contra los archivos RE
     const abiertas = (resultado.documentXml.match(/<w:tc>/g) ?? []).length
     const cerradas = (resultado.documentXml.match(/<\/w:tc>/g) ?? []).length
     expect(abiertas).toBe(cerradas)
+
+    // Validación estricta con parser real — la que hubiera atrapado el bug
+    // de NUMPAGES (runs anidados) antes de que llegara a un .docx real.
+    asertarXmlBienFormado(resultado.documentXml, 'prepararXmlPlantilla:documentXml')
+    asertarXmlBienFormado(resultado.header1Xml, 'prepararXmlPlantilla:header1Xml')
   })
 })
