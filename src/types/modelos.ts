@@ -1124,6 +1124,12 @@ export interface Proyecto {
   adelantoPorcentaje?: number
   adelantoMonto?: number
   adelantoAmortizado?: number
+  // Identificación documental — reutilizada por todos los documentos
+  // templeteados del proyecto (matriz, dossier, informes, protocolos)
+  sede?: string | null
+  etapa?: string | null
+  codigoPEP?: string | null
+  areaSeccion?: string | null
   // Contrato
   ordenCompraCliente?: string | null
   numeroContrato?: string | null

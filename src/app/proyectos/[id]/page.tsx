@@ -44,6 +44,7 @@ import toast from 'react-hot-toast'
 
 import { useProyectoContext } from './ProyectoContext'
 import SeccionContrato from '@/components/proyectos/SeccionContrato'
+import SeccionIdentificacionDocumental from '@/components/proyectos/SeccionIdentificacionDocumental'
 
 // Utility function
 const formatCurrency = (amount: number): string => {
@@ -1073,6 +1074,12 @@ export default function ProyectoHubPage() {
 
       {/* Contrato y Cartas Fianza */}
       <SeccionContrato
+        proyecto={proyecto}
+        onUpdateProyecto={(updated: Partial<typeof proyecto>) => setProyecto({ ...proyecto, ...updated })}
+      />
+
+      {/* Identificación Documental (sede/etapa/código PEP/área-sección) */}
+      <SeccionIdentificacionDocumental
         proyecto={proyecto}
         onUpdateProyecto={(updated: Partial<typeof proyecto>) => setProyecto({ ...proyecto, ...updated })}
       />

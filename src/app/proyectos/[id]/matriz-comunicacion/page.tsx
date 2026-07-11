@@ -12,6 +12,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { calcularNivelesOrgNodos, NIVELES_PARTICIPANTES_MATRIZ } from '@/lib/matrizComunicacion/utils'
+import { DatosDocumentoModal } from '@/components/proyectos/matrizComunicacion/DatosDocumentoModal'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -32,6 +33,13 @@ interface Matriz {
   version: string
   generadoConIA: boolean
   filas: MatrizFila[]
+  codigoDocumento: string | null
+  revisionDocumento: string
+  numeroConsultor: string | null
+  desarrolloNombre: string | null
+  verificoNombre: string | null
+  aproboNombre: string | null
+  autorizoNombre: string | null
 }
 
 interface PersonalInfo {
@@ -74,7 +82,16 @@ export default function MatrizComunicacionPage() {
 
   const [matriz, setMatriz] = useState<Matriz | null>(null)
   const [personal, setPersonal] = useState<PersonalInfo[]>([])
-  const [proyectoInfo, setProyectoInfo] = useState<{ nombre: string; codigo: string; cliente: string } | null>(null)
+  const [proyectoInfo, setProyectoInfo] = useState<{
+    nombre: string
+    codigo: string
+    cliente: string
+    sede: string | null
+    etapa: string | null
+    codigoPEP: string | null
+    areaSeccion: string | null
+  } | null>(null)
+  const [showDatosDocumento, setShowDatosDocumento] = useState(false)
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [generating, setGenerating] = useState(false)
@@ -111,12 +128,16 @@ export default function MatrizComunicacionPage() {
 
       let clienteNombre = ''
       if (pRes.ok) {
-        const p = await pRes.json()
+        const { data: p } = await pRes.json()
         clienteNombre = p.cliente?.nombre ?? ''
         setProyectoInfo({
           nombre: p.nombre ?? '',
           codigo: p.codigo ?? '',
           cliente: clienteNombre,
+          sede: p.sede ?? null,
+          etapa: p.etapa ?? null,
+          codigoPEP: p.codigoPEP ?? null,
+          areaSeccion: p.areaSeccion ?? null,
         })
       }
 
@@ -260,6 +281,10 @@ export default function MatrizComunicacionPage() {
 
   async function handleExportWord() {
     if (!proyectoInfo) return
+    if (!matriz?.codigoDocumento) {
+      setShowDatosDocumento(true)
+      return
+    }
     setExportingWord(true)
     try {
       const res = await fetch(`/api/proyectos/${proyectoId}/matriz-comunicacion/docx`)
@@ -335,6 +360,9 @@ export default function MatrizComunicacionPage() {
               ? <Loader2 size={13} className="animate-spin mr-1" />
               : <FileText size={13} className="mr-1" />}
             Word
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setShowDatosDocumento(true)} title="Datos del documento (código, revisión, firmas)">
+            <Pencil size={13} className="mr-1" />Datos del documento
           </Button>
           <Button size="sm" variant="outline" onClick={() => setShowDeleteDialog(true)}
             className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700">
@@ -548,6 +576,27 @@ export default function MatrizComunicacionPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {proyectoInfo && (
+        <DatosDocumentoModal
+          open={showDatosDocumento}
+          onOpenChange={setShowDatosDocumento}
+          proyectoId={proyectoId}
+          matriz={matriz}
+          proyectoInfo={{
+            clienteNombre: proyectoInfo.cliente,
+            sede: proyectoInfo.sede,
+            etapa: proyectoInfo.etapa,
+            codigoPEP: proyectoInfo.codigoPEP,
+            areaSeccion: proyectoInfo.areaSeccion,
+          }}
+          personal={personal}
+          onSaved={updated => {
+            setMatriz(m => (m ? { ...m, ...updated } : m))
+            if (updated.codigoDocumento) handleExportWord()
+          }}
+        />
+      )}
     </div>
   )
 }

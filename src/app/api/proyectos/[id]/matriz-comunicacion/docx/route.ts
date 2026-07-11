@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth'
 import { generarDocxMatriz } from '@/lib/matrizComunicacion/exportDocx'
 import { generarSiglas, calcularNivelesOrgNodos, NIVELES_PARTICIPANTES_MATRIZ } from '@/lib/matrizComunicacion/utils'
 import { ROL_CONTACTO_CLIENTE_LABELS } from '@/lib/config/rolesContactoCliente'
+import { renderMatrizPlantillaOficial } from '@/lib/matrizComunicacion/plantillaOficial/renderizar'
 
 function parseCeldas(json: string): { siglas: string; valor: string }[] {
   try {
@@ -37,7 +38,10 @@ export async function GET(
         select: {
           nombre: true,
           codigo: true,
-          cliente: { select: { nombre: true } },
+          sede: true,
+          etapa: true,
+          ordenCompraCliente: true,
+          cliente: { select: { nombre: true, logoUrl: true } },
           orgNodos: {
             // Se traen TODOS los nodos (no solo los que tienen usuario) para poder
             // calcular el nivel de cada uno recorriendo la cadena de padres completa.
@@ -119,17 +123,44 @@ export async function GET(
     const today = new Date().toLocaleDateString('es-PE', {
       day: '2-digit', month: '2-digit', year: 'numeric',
     })
-    const codigo = `MX-${proyecto.codigo || proyectoId.substring(0, 8)}-GYS-001`
+    const codigoFallback = `MX-${proyecto.codigo || proyectoId.substring(0, 8)}-GYS-001`
+    const codigo = matriz.codigoDocumento || codigoFallback
 
-    const buffer = await generarDocxMatriz({
-      proyecto: proyecto.nombre,
-      cliente: proyecto.cliente?.nombre ?? '',
-      codigoDocumento: codigo,
-      revision: matriz.version,
-      fecha: today,
-      personal,
-      filas,
-    })
+    let buffer: Buffer
+    try {
+      buffer = await renderMatrizPlantillaOficial({
+        proyecto: {
+          nombre: proyecto.nombre,
+          clienteNombre: proyecto.cliente?.nombre ?? '',
+          clienteLogoUrl: proyecto.cliente?.logoUrl ?? null,
+          sede: proyecto.sede,
+          etapa: proyecto.etapa,
+          ordenCompraCliente: proyecto.ordenCompraCliente,
+        },
+        matriz: {
+          codigoDocumento: matriz.codigoDocumento,
+          revisionDocumento: matriz.revisionDocumento,
+          numeroConsultor: matriz.numeroConsultor,
+          desarrolloNombre: matriz.desarrolloNombre,
+          verificoNombre: matriz.verificoNombre,
+          aproboNombre: matriz.aproboNombre,
+          autorizoNombre: matriz.autorizoNombre,
+        },
+        personal,
+        filas,
+      })
+    } catch (e) {
+      console.warn('[matriz-plantilla] Fallback al export genérico:', e instanceof Error ? e.message : e)
+      buffer = await generarDocxMatriz({
+        proyecto: proyecto.nombre,
+        cliente: proyecto.cliente?.nombre ?? '',
+        codigoDocumento: codigoFallback,
+        revision: matriz.version,
+        fecha: today,
+        personal,
+        filas,
+      })
+    }
 
     return new Response(buffer, {
       headers: {

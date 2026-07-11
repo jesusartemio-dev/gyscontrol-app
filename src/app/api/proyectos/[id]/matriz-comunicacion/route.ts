@@ -305,6 +305,13 @@ export async function PATCH(
       data: {
         ...(body.version !== undefined && { version: body.version }),
         ...(body.estado !== undefined && { estado: body.estado }),
+        ...(body.codigoDocumento !== undefined && { codigoDocumento: body.codigoDocumento }),
+        ...(body.revisionDocumento !== undefined && { revisionDocumento: body.revisionDocumento }),
+        ...(body.numeroConsultor !== undefined && { numeroConsultor: body.numeroConsultor }),
+        ...(body.desarrolloNombre !== undefined && { desarrolloNombre: body.desarrolloNombre }),
+        ...(body.verificoNombre !== undefined && { verificoNombre: body.verificoNombre }),
+        ...(body.aproboNombre !== undefined && { aproboNombre: body.aproboNombre }),
+        ...(body.autorizoNombre !== undefined && { autorizoNombre: body.autorizoNombre }),
       },
     })
 

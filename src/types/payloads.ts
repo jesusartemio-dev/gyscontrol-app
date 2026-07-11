@@ -457,6 +457,12 @@ export interface ProyectoPayload {
   igvPct?: number
   condicionPago?: string
   diasCredito?: number
+  // Identificación documental — reutilizada por todos los documentos
+  // templeteados del proyecto (matriz, dossier, informes, protocolos)
+  sede?: string
+  etapa?: string
+  codigoPEP?: string
+  areaSeccion?: string
 }
 
 export interface ProyectoUpdatePayload extends Partial<ProyectoPayload> {}

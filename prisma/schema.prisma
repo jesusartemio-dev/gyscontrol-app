@@ -1100,6 +1100,14 @@ model Proyecto {
   descuentoComercialPct      Float                       @default(0)
   igvPct                     Float                       @default(18)
   ordenCompraCliente         String?
+  /// Atributos de identificación documental — reutilizados por TODOS los documentos
+  /// templeteados del proyecto (matriz, dossier, informes, protocolos), no solo la Matriz
+  /// de Comunicaciones. `etapa` es texto libre a propósito (no enum): el estándar Nexa
+  /// sugiere FEL1/FEL2/FEL3/E&C pero otros clientes necesitan valores arbitrarios.
+  sede                       String?
+  etapa                      String?
+  codigoPEP                  String?
+  areaSeccion                String?
   /// @deprecated — usar Valorizacion.condicionPago. Estos campos son legacy huérfanos sin uso operacional. Mantener solo por retrocompatibilidad.
   condicionPago              String?
   /// @deprecated — usar Valorizacion.diasCredito.
@@ -5583,6 +5591,22 @@ model MatrizComunicacion {
   generadoConIA Boolean @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  /// Datos del entregable real (plantilla oficial de cliente) — distintos de `version`
+  /// (versión interna del sistema). `codigoDocumento` nunca se sintetiza automáticamente:
+  /// lo llena el usuario, opcionalmente con ayuda del asistente de codificación por
+  /// cliente (ver src/lib/matrizComunicacion/codigoDocumentoAsistente.ts).
+  codigoDocumento   String?
+  /// Formato alfanumérico real del cliente ("0", "A", "B"...), no un semver — default "0".
+  revisionDocumento String  @default("0")
+  numeroConsultor   String?
+  /// Nombres de los 4 firmantes (Desarrolló/Verificó/Aprobó/Autorizó) — texto plano, NO FK
+  /// a User: "Autorizó" suele ser un contacto externo del cliente, no un usuario del
+  /// sistema. Las siglas para el formato "AP: ALONSO PISCOYA" se derivan en el render.
+  desarrolloNombre String?
+  verificoNombre   String?
+  aproboNombre     String?
+  autorizoNombre   String?
 
   proyecto Proyecto                 @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
   filas    MatrizComunicacionFila[]
