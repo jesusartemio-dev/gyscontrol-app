@@ -11,7 +11,16 @@ const nextConfig: NextConfig = {
   
   // 🔧 React 19 compatibility: Disable StrictMode in development to prevent duplicate key warnings
   reactStrictMode: process.env.NODE_ENV !== 'development',
-  
+
+  // 📎 Plantillas .docx leídas con fs en runtime (no importadas por JS) — el
+  // file-tracing de Vercel (@vercel/nft) no las detecta solo con análisis
+  // estático a través de indirecciones, así que se fuerzan acá explícitamente
+  // (bug real: ENOENT en producción en el export Word del organigrama).
+  outputFileTracingIncludes: {
+    '/api/proyectos/*/organigrama/docx': ['./src/lib/services/Organigrama/plantilla_organigrama.docx'],
+    '/api/proyectos/*/matriz-comunicacion/docx': ['./src/lib/services/Matriz/plantilla_matriz_comunicacion.docx'],
+  },
+
   // 🚀 Fase 3: Bundle Optimization & Code Splitting
   experimental: {
     optimizePackageImports: ['@tanstack/react-query', 'lucide-react', 'framer-motion'],

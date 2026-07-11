@@ -80,10 +80,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         organigramaImagenBuffer: imagenBuffer,
       })
     } catch (e) {
-      const detalle = e instanceof Error ? `${e.message}\n${e.stack ?? ''}` : String(e)
-      console.error('[organigrama-plantilla] Error al renderizar:', detalle, `| imagenBuffer: ${imagenBuffer.length} bytes, tipo: ${file.type}`)
-      // TODO(temporal-debug): quitar `detalle` de la respuesta una vez diagnosticado el 500 en producción.
-      return NextResponse.json({ error: 'No se pudo generar el Word del organigrama', detalle }, { status: 500 })
+      console.error('[organigrama-plantilla] Error al renderizar:', e instanceof Error ? e.message : e)
+      return NextResponse.json({ error: 'No se pudo generar el Word del organigrama' }, { status: 500 })
     }
 
     const codigo = meta.codigoDocumento || `OR-${proyecto.codigo || proyectoId.substring(0, 8)}-GYS-001`
