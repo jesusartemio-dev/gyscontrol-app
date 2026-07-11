@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs'
 import path from 'path'
 import PizZip from 'pizzip'
-import { reempaquetarZip } from '@/lib/matrizComunicacion/plantillaOficial/reempaquetarZip'
+import { reempaquetarZip } from '@/lib/documentosOficiales/plantillaOficial/reempaquetarZip'
 
 const TEMPLATE_PATH = path.join(process.cwd(), 'src/lib/services/Matriz/plantilla_matriz_comunicacion.docx')
 

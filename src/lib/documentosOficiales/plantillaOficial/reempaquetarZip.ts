@@ -1,7 +1,7 @@
 import PizZip from 'pizzip'
 
 /**
- * Re-empaqueta el .docx generado por docxtemplater para máxima compatibilidad:
+ * Re-empaqueta un .docx generado por docxtemplater para máxima compatibilidad:
  * - `[Content_Types].xml` primero (convención OPC — docxtemplater lo deja
  *   como ÚLTIMA entrada al regenerar el zip, que Word suele tolerar pero no
  *   es lo estándar).

@@ -4,13 +4,13 @@ import PizZip from 'pizzip'
 import {
   expandirColumnasResponsabilidad,
   ajustarGridColumnas,
-  insertarCamposPaginacion,
   calcularAnchosColumnas,
   prepararXmlPlantilla,
   siglasTagName,
   codigoTagName,
 } from '@/lib/matrizComunicacion/plantillaOficial/prepararXmlDinamico'
-import { asertarXmlBienFormado } from './xmlTestUtils'
+import { insertarCamposPaginacion } from '@/lib/documentosOficiales/plantillaOficial/insertarCamposPaginacion'
+import { asertarXmlBienFormado } from '@/__tests__/testUtils/xmlTestUtils'
 
 const TEMPLATE_PATH = path.join(process.cwd(), 'src/lib/services/Matriz/plantilla_matriz_comunicacion.docx')
 

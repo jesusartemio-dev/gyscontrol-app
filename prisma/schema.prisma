@@ -1171,6 +1171,7 @@ model Proyecto {
   orgNodos                   ProyectoOrgNodo[]
   contactosCliente           ProyectoContactoCliente[]
   matrizComunicacion         MatrizComunicacion?
+  documentosMeta             DocumentoProyectoMeta[]
   tdrAnalisis                ProyectoTdrAnalisis?
   cotizacionDocumento        ProyectoCotizacionDocumento?
   planTrabajo                PlanTrabajo?
@@ -5645,6 +5646,30 @@ model MatrizComunicacionFila {
 
   @@index([matrizId])
   @@map("matriz_comunicacion_fila")
+}
+
+/// Metadata de documento por proyecto+tipo (código, revisión, firmas), reutilizable
+/// para futuros documentos con plantilla oficial. MatrizComunicacion mantiene sus
+/// propias 7 columnas (no migradas acá) — unificación es trabajo futuro.
+model DocumentoProyectoMeta {
+  id                String   @id @default(cuid())
+  proyectoId        String
+  /// 'ORGANIGRAMA' | ... — String, no enum (ver Proyecto.etapa)
+  tipo              String
+  codigoDocumento   String?
+  revisionDocumento String   @default("0")
+  numeroConsultor   String?
+  desarrolloNombre  String?
+  verificoNombre    String?
+  aproboNombre      String?
+  autorizoNombre    String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  proyecto Proyecto @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+
+  @@unique([proyectoId, tipo])
+  @@map("documento_proyecto_meta")
 }
 
 model ProyectoTdrAnalisis {

@@ -1,10 +1,10 @@
 import PizZip from 'pizzip'
 import Docxtemplater from 'docxtemplater'
 import { descargarPlantillaMatrizOficial } from './descargarPlantilla'
-import { resolverLogoClienteBuffer } from './resolverLogoCliente'
 import { prepararXmlPlantilla, codigoTagName } from './prepararXmlDinamico'
-import { formatearFirma, inicialesDe } from './formatearFirma'
-import { reempaquetarZip } from './reempaquetarZip'
+import { resolverLogoClienteBuffer } from '@/lib/documentosOficiales/plantillaOficial/resolverLogoCliente'
+import { reempaquetarZip } from '@/lib/documentosOficiales/plantillaOficial/reempaquetarZip'
+import { construirDataBagEncabezado } from '@/lib/documentosOficiales/plantillaOficial/construirDataBagEncabezado'
 
 export interface PersonaMatrizPlantilla {
   siglas: string
@@ -76,38 +76,12 @@ export async function renderMatrizPlantillaOficial(datos: DatosMatrizPlantilla):
     zip.file('word/media/image4.png', logoBuffer)
   }
 
-  const hoy = new Date().toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' })
-
   const dataBag: Record<string, unknown> = {
-    cliente: datos.proyecto.clienteNombre,
-    sede: datos.proyecto.sede ?? '',
-    ordenCompra: datos.proyecto.ordenCompraCliente ?? '',
-    nombreProyecto: datos.proyecto.nombre,
-    etapa: datos.proyecto.etapa ?? '',
-    tituloDocumento: TITULO_DOCUMENTO,
-    codigoDocumento: datos.matriz.codigoDocumento ?? '',
-    numeroConsultor: datos.matriz.numeroConsultor ?? '',
-    revision: datos.matriz.revisionDocumento,
-    // v1: una sola fila con la revisión actual — no se modela historial de
-    // revisiones todavía (decidido explícitamente, ver plan). Las filas
-    // vacías fijas de la plantilla (formato del cliente) quedan tal cual,
-    // fuera de este loop.
-    revisiones: [
-      {
-        rev: datos.matriz.revisionDocumento,
-        te: 'A',
-        teDescripcion: 'Para Conocimiento',
-        des: inicialesDe(datos.matriz.desarrolloNombre ?? ''),
-        ver: inicialesDe(datos.matriz.verificoNombre ?? ''),
-        apr: inicialesDe(datos.matriz.aproboNombre ?? ''),
-        aut: inicialesDe(datos.matriz.autorizoNombre ?? ''),
-        fecha: hoy,
-      },
-    ],
-    firmaDes: formatearFirma(datos.matriz.desarrolloNombre),
-    firmaVer: formatearFirma(datos.matriz.verificoNombre),
-    firmaApr: formatearFirma(datos.matriz.aproboNombre),
-    firmaAut: formatearFirma(datos.matriz.autorizoNombre),
+    ...construirDataBagEncabezado({
+      proyecto: datos.proyecto,
+      documento: datos.matriz,
+      tituloDocumento: TITULO_DOCUMENTO,
+    }),
     contactos: datos.personal,
     filas: datos.filas.map((f, idx) => {
       const codigos: Record<string, string> = {}

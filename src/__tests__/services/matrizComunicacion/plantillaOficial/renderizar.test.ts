@@ -1,6 +1,6 @@
 import PizZip from 'pizzip'
 import { renderMatrizPlantillaOficial, type DatosMatrizPlantilla } from '@/lib/matrizComunicacion/plantillaOficial/renderizar'
-import { asertarXmlBienFormado } from './xmlTestUtils'
+import { asertarXmlBienFormado } from '@/__tests__/testUtils/xmlTestUtils'
 
 jest.mock('@/lib/services/googleDrive', () => ({
   getFileContent: jest.fn(),

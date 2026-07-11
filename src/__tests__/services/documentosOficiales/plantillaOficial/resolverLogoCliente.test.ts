@@ -1,5 +1,5 @@
 import sharp from 'sharp'
-import { resolverLogoClienteBuffer } from '@/lib/matrizComunicacion/plantillaOficial/resolverLogoCliente'
+import { resolverLogoClienteBuffer } from '@/lib/documentosOficiales/plantillaOficial/resolverLogoCliente'
 import { getFileContent } from '@/lib/services/googleDrive'
 
 jest.mock('@/lib/services/googleDrive', () => ({

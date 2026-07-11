@@ -19,10 +19,18 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import OrgChart, { OrgNodoCompleto } from '@/components/organigrama/OrgChart'
+import { DatosDocumentoModal, type DatosDocumentoMeta } from '@/components/documentosOficiales/DatosDocumentoModal'
 
 interface Plantilla { id: string; nombre: string; _count?: { nodos: number } }
 interface UserOption { id: string; name: string; email: string }
-interface ProyectoInfo { nombre: string; cliente: { id: string; nombre: string; logoUrl?: string | null } | null }
+interface ProyectoInfo {
+  nombre: string
+  cliente: { id: string; nombre: string; logoUrl?: string | null } | null
+  sede: string | null
+  etapa: string | null
+  codigoPEP: string | null
+  areaSeccion: string | null
+}
 
 export default function OrganigramaProyectoPage() {
   const { id: proyectoId } = useParams<{ id: string }>()
@@ -35,6 +43,9 @@ export default function OrganigramaProyectoPage() {
   const [selectedPlantillaId, setSelectedPlantillaId] = useState('')
   const [proyectoInfo, setProyectoInfo] = useState<ProyectoInfo | null>(null)
   const [pdfExporting, setPdfExporting] = useState(false)
+  const [exportingWord, setExportingWord] = useState(false)
+  const [showDatosDocumento, setShowDatosDocumento] = useState(false)
+  const [documentoMeta, setDocumentoMeta] = useState<DatosDocumentoMeta | null>(null)
 
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
@@ -77,10 +88,11 @@ export default function OrganigramaProyectoPage() {
 
   useEffect(() => {
     const init = async () => {
-      const [pRes, uRes, projRes] = await Promise.all([
+      const [pRes, uRes, projRes, metaRes] = await Promise.all([
         fetch('/api/configuracion/plantillas-organigrama'),
         fetch('/api/admin/usuarios'),
         fetch(`/api/proyectos/${proyectoId}`),
+        fetch(`/api/proyectos/${proyectoId}/documentos-meta/ORGANIGRAMA`),
       ])
       if (pRes.ok) setPlantillas(await pRes.json())
       if (uRes.ok) {
@@ -90,8 +102,16 @@ export default function OrganigramaProyectoPage() {
       if (projRes.ok) {
         const p = await projRes.json()
         const proj = p.data ?? p
-        setProyectoInfo({ nombre: proj.nombre ?? '', cliente: proj.cliente ?? null })
+        setProyectoInfo({
+          nombre: proj.nombre ?? '',
+          cliente: proj.cliente ?? null,
+          sede: proj.sede ?? null,
+          etapa: proj.etapa ?? null,
+          codigoPEP: proj.codigoPEP ?? null,
+          areaSeccion: proj.areaSeccion ?? null,
+        })
       }
+      if (metaRes.ok) setDocumentoMeta(await metaRes.json())
       await loadNodos()
     }
     init()
@@ -303,119 +323,162 @@ export default function OrganigramaProyectoPage() {
     }
   }
 
-  // ── EXPORTAR PNG ───────────────────────────────────────────────────────────
+  // ── CAPTURA PNG (compartida entre el botón PNG y el export Word) ───────────
+
+  const generarOrganigramaPngBlob = async (scale: number): Promise<Blob> => {
+    const { buildLayout, NORMAL_DIMS } = await import('@/components/organigrama/OrgChart')
+    const { nodes, edges, svgWidth, svgHeight } = buildLayout(nodos, NORMAL_DIMS)
+    const { NODE_W, NODE_H } = NORMAL_DIMS
+
+    const canvas = document.createElement('canvas')
+    canvas.width = svgWidth * scale
+    canvas.height = svgHeight * scale
+    const ctx = canvas.getContext('2d')!
+    ctx.scale(scale, scale)
+
+    // Background + dot grid
+    ctx.fillStyle = '#F8FAFC'
+    ctx.fillRect(0, 0, svgWidth, svgHeight)
+    ctx.fillStyle = '#CBD5E1'
+    for (let gx = 0; gx < svgWidth; gx += 24)
+      for (let gy = 0; gy < svgHeight; gy += 24) {
+        ctx.beginPath(); ctx.arc(gx + 1, gy + 1, 1, 0, Math.PI * 2); ctx.fill()
+      }
+
+    // Helper: rounded rect path
+    const rr = (x: number, y: number, w: number, h: number, r: number) => {
+      ctx.beginPath()
+      ctx.moveTo(x + r, y)
+      ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r)
+      ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h)
+      ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r)
+      ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y)
+      ctx.closePath()
+    }
+
+    // Edges (right-angle connectors)
+    ctx.strokeStyle = '#94A3B8'
+    ctx.lineWidth = 1.5
+    for (const e of edges) {
+      ctx.beginPath()
+      ctx.moveTo(e.x1, e.y1)
+      ctx.lineTo(e.x1, e.midY)
+      ctx.lineTo(e.x2, e.midY)
+      ctx.lineTo(e.x2, e.y2)
+      ctx.stroke()
+    }
+
+    // Nodes
+    const HDR = 34
+    for (const n of nodes) {
+      const { x, y, nodo } = n
+      const isVacant = !nodo.user
+
+      // Shadow
+      ctx.shadowColor = 'rgba(0,0,0,0.08)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2
+      ctx.fillStyle = '#FFFFFF'
+      rr(x, y, NODE_W, NODE_H, 8); ctx.fill()
+      ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0
+
+      // Border
+      ctx.strokeStyle = isVacant ? '#FCA5A5' : '#E5E7EB'
+      ctx.lineWidth = isVacant ? 1.5 : 2
+      if (isVacant) ctx.setLineDash([6, 3])
+      rr(x, y, NODE_W, NODE_H, 8); ctx.stroke()
+      ctx.setLineDash([])
+
+      // Header strip (clipped to top rounded corners)
+      ctx.save()
+      rr(x, y, NODE_W, NODE_H, 8); ctx.clip()
+      ctx.fillStyle = isVacant ? '#FEF2F2' : '#F8FAFC'
+      ctx.fillRect(x, y, NODE_W, HDR)
+      ctx.restore()
+
+      // Separator
+      ctx.strokeStyle = isVacant ? '#FCA5A5' : '#E5E7EB'
+      ctx.lineWidth = 1; ctx.setLineDash([])
+      ctx.beginPath(); ctx.moveTo(x, y + HDR); ctx.lineTo(x + NODE_W, y + HDR); ctx.stroke()
+
+      // Cargo
+      ctx.fillStyle = isVacant ? '#F87171' : '#4F46E5'
+      ctx.font = 'bold 9px system-ui, sans-serif'
+      ctx.textAlign = 'center'
+      ctx.fillText(nodo.cargoLabel, x + NODE_W / 2, y + 21, NODE_W - 12)
+
+      // Body
+      if (isVacant) {
+        ctx.fillStyle = '#F87171'
+        ctx.font = 'bold italic 11px system-ui, sans-serif'
+        ctx.fillText('VACANTE', x + NODE_W / 2, y + HDR + (NODE_H - HDR) / 2 + 4)
+      } else {
+        ctx.fillStyle = '#1F2937'
+        ctx.font = 'bold 13px system-ui, sans-serif'
+        ctx.fillText(nodo.user!.name, x + NODE_W / 2, y + 58, NODE_W - 12)
+
+        ctx.fillStyle = '#9CA3AF'
+        ctx.font = '10px system-ui, sans-serif'
+        ctx.textAlign = 'left'
+        let dy = y + 74
+        if (nodo._telefono) { ctx.fillText(`Tel: ${nodo._telefono}`, x + 8, dy, NODE_W - 16); dy += 13 }
+        if (nodo._cip) { ctx.fillText(`CIP ${nodo._cip}`, x + 8, dy, NODE_W - 16); dy += 13 }
+        ctx.fillStyle = '#D1D5DB'
+        ctx.fillText(nodo.user!.email, x + 8, dy, NODE_W - 16)
+      }
+    }
+
+    return new Promise((resolve, reject) => {
+      canvas.toBlob(b => (b ? resolve(b) : reject(new Error('No se pudo generar el PNG'))), 'image/png')
+    })
+  }
 
   const handleExportPng = async () => {
     try {
-      const { buildLayout, NORMAL_DIMS } = await import('@/components/organigrama/OrgChart')
-      const { nodes, edges, svgWidth, svgHeight } = buildLayout(nodos, NORMAL_DIMS)
-      const { NODE_W, NODE_H } = NORMAL_DIMS
-      const SCALE = 2
-
-      const canvas = document.createElement('canvas')
-      canvas.width = svgWidth * SCALE
-      canvas.height = svgHeight * SCALE
-      const ctx = canvas.getContext('2d')!
-      ctx.scale(SCALE, SCALE)
-
-      // Background + dot grid
-      ctx.fillStyle = '#F8FAFC'
-      ctx.fillRect(0, 0, svgWidth, svgHeight)
-      ctx.fillStyle = '#CBD5E1'
-      for (let gx = 0; gx < svgWidth; gx += 24)
-        for (let gy = 0; gy < svgHeight; gy += 24) {
-          ctx.beginPath(); ctx.arc(gx + 1, gy + 1, 1, 0, Math.PI * 2); ctx.fill()
-        }
-
-      // Helper: rounded rect path
-      const rr = (x: number, y: number, w: number, h: number, r: number) => {
-        ctx.beginPath()
-        ctx.moveTo(x + r, y)
-        ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r)
-        ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h)
-        ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r)
-        ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y)
-        ctx.closePath()
-      }
-
-      // Edges (right-angle connectors)
-      ctx.strokeStyle = '#94A3B8'
-      ctx.lineWidth = 1.5
-      for (const e of edges) {
-        ctx.beginPath()
-        ctx.moveTo(e.x1, e.y1)
-        ctx.lineTo(e.x1, e.midY)
-        ctx.lineTo(e.x2, e.midY)
-        ctx.lineTo(e.x2, e.y2)
-        ctx.stroke()
-      }
-
-      // Nodes
-      const HDR = 34
-      for (const n of nodes) {
-        const { x, y, nodo } = n
-        const isVacant = !nodo.user
-
-        // Shadow
-        ctx.shadowColor = 'rgba(0,0,0,0.08)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2
-        ctx.fillStyle = '#FFFFFF'
-        rr(x, y, NODE_W, NODE_H, 8); ctx.fill()
-        ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0
-
-        // Border
-        ctx.strokeStyle = isVacant ? '#FCA5A5' : '#E5E7EB'
-        ctx.lineWidth = isVacant ? 1.5 : 2
-        if (isVacant) ctx.setLineDash([6, 3])
-        rr(x, y, NODE_W, NODE_H, 8); ctx.stroke()
-        ctx.setLineDash([])
-
-        // Header strip (clipped to top rounded corners)
-        ctx.save()
-        rr(x, y, NODE_W, NODE_H, 8); ctx.clip()
-        ctx.fillStyle = isVacant ? '#FEF2F2' : '#F8FAFC'
-        ctx.fillRect(x, y, NODE_W, HDR)
-        ctx.restore()
-
-        // Separator
-        ctx.strokeStyle = isVacant ? '#FCA5A5' : '#E5E7EB'
-        ctx.lineWidth = 1; ctx.setLineDash([])
-        ctx.beginPath(); ctx.moveTo(x, y + HDR); ctx.lineTo(x + NODE_W, y + HDR); ctx.stroke()
-
-        // Cargo
-        ctx.fillStyle = isVacant ? '#F87171' : '#4F46E5'
-        ctx.font = 'bold 9px system-ui, sans-serif'
-        ctx.textAlign = 'center'
-        ctx.fillText(nodo.cargoLabel, x + NODE_W / 2, y + 21, NODE_W - 12)
-
-        // Body
-        if (isVacant) {
-          ctx.fillStyle = '#F87171'
-          ctx.font = 'bold italic 11px system-ui, sans-serif'
-          ctx.fillText('VACANTE', x + NODE_W / 2, y + HDR + (NODE_H - HDR) / 2 + 4)
-        } else {
-          ctx.fillStyle = '#1F2937'
-          ctx.font = 'bold 13px system-ui, sans-serif'
-          ctx.fillText(nodo.user!.name, x + NODE_W / 2, y + 58, NODE_W - 12)
-
-          ctx.fillStyle = '#9CA3AF'
-          ctx.font = '10px system-ui, sans-serif'
-          ctx.textAlign = 'left'
-          let dy = y + 74
-          if (nodo._telefono) { ctx.fillText(`Tel: ${nodo._telefono}`, x + 8, dy, NODE_W - 16); dy += 13 }
-          if (nodo._cip) { ctx.fillText(`CIP ${nodo._cip}`, x + 8, dy, NODE_W - 16); dy += 13 }
-          ctx.fillStyle = '#D1D5DB'
-          ctx.fillText(nodo.user!.email, x + 8, dy, NODE_W - 16)
-        }
-      }
-
+      const blob = await generarOrganigramaPngBlob(2)
+      const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.download = `organigrama-${proyectoId}.png`
-      link.href = canvas.toDataURL('image/png')
+      link.href = url
       link.click()
+      URL.revokeObjectURL(url)
       toast.success('Imagen exportada')
     } catch (e) {
       console.error(e)
       toast.error('Error al exportar imagen')
+    }
+  }
+
+  // ── EXPORTAR WORD ──────────────────────────────────────────────────────────
+
+  const handleExportWord = async () => {
+    if (!proyectoInfo) return
+    if (!documentoMeta?.codigoDocumento) {
+      setShowDatosDocumento(true)
+      return
+    }
+    setExportingWord(true)
+    try {
+      const { buildLayout, NORMAL_DIMS } = await import('@/components/organigrama/OrgChart')
+      const { svgWidth } = buildLayout(nodos, NORMAL_DIMS)
+      const scale = Math.max(2, Math.ceil(2000 / svgWidth))
+      const pngBlob = await generarOrganigramaPngBlob(scale)
+
+      const form = new FormData()
+      form.append('imagen', pngBlob, 'organigrama.png')
+      const res = await fetch(`/api/proyectos/${proyectoId}/organigrama/docx`, { method: 'POST', body: form })
+      if (!res.ok) throw new Error()
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${documentoMeta.codigoDocumento}.docx`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error('Error al exportar Word')
+    } finally {
+      setExportingWord(false)
     }
   }
 
@@ -755,6 +818,18 @@ export default function OrganigramaProyectoPage() {
           >
             <Download className="h-3.5 w-3.5" />
             PNG
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 text-xs text-muted-foreground gap-1.5"
+            onClick={handleExportWord}
+            disabled={exportingWord}
+          >
+            {exportingWord
+              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              : <FileText className="h-3.5 w-3.5" />}
+            Word
           </Button>
           <Button
             variant="ghost"
@@ -1179,6 +1254,42 @@ export default function OrganigramaProyectoPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {proyectoInfo && documentoMeta && (
+        <DatosDocumentoModal
+          open={showDatosDocumento}
+          onOpenChange={setShowDatosDocumento}
+          proyectoId={proyectoId}
+          documento={documentoMeta}
+          proyectoInfo={{
+            clienteNombre: proyectoInfo.cliente?.nombre ?? '',
+            sede: proyectoInfo.sede,
+            etapa: proyectoInfo.etapa,
+            codigoPEP: proyectoInfo.codigoPEP,
+            areaSeccion: proyectoInfo.areaSeccion,
+          }}
+          personal={nodos.filter(n => n.user).map(n => ({ siglas: '', nombre: n.user!.name, cargo: n.cargoLabel, esCliente: false }))}
+          codigoTipoDocumento="OR"
+          onGuardarDocumento={payload => fetch(`/api/proyectos/${proyectoId}/documentos-meta/ORGANIGRAMA`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          })}
+          onSaved={updated => {
+            setDocumentoMeta(m => (m ? { ...m, ...updated } : m))
+            if (updated.codigoDocumento) handleExportWord()
+          }}
+          onProyectoActualizado={updated => {
+            setProyectoInfo(p => (p ? {
+              ...p,
+              sede: updated.sede,
+              etapa: updated.etapa,
+              codigoPEP: updated.codigoPEP,
+              areaSeccion: updated.areaSeccion,
+            } : p))
+          }}
+        />
+      )}
     </div>
   )
 }

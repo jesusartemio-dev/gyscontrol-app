@@ -12,7 +12,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { calcularNivelesOrgNodos, NIVELES_PARTICIPANTES_MATRIZ } from '@/lib/matrizComunicacion/utils'
-import { DatosDocumentoModal } from '@/components/proyectos/matrizComunicacion/DatosDocumentoModal'
+import { DatosDocumentoModal } from '@/components/documentosOficiales/DatosDocumentoModal'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -584,7 +584,7 @@ export default function MatrizComunicacionPage() {
           open={showDatosDocumento}
           onOpenChange={setShowDatosDocumento}
           proyectoId={proyectoId}
-          matriz={matriz}
+          documento={matriz}
           proyectoInfo={{
             clienteNombre: proyectoInfo.cliente,
             sede: proyectoInfo.sede,
@@ -593,6 +593,11 @@ export default function MatrizComunicacionPage() {
             areaSeccion: proyectoInfo.areaSeccion,
           }}
           personal={personal}
+          onGuardarDocumento={payload => fetch(`/api/proyectos/${proyectoId}/matriz-comunicacion`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          })}
           onSaved={updated => {
             setMatriz(m => (m ? { ...m, ...updated } : m))
             if (updated.codigoDocumento) handleExportWord()

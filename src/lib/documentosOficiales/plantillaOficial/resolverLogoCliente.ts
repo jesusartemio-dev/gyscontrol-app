@@ -22,7 +22,7 @@ const ALTO_LOGO_PX = 104
 
 export async function resolverLogoClienteBuffer(logoUrl: string | null | undefined): Promise<Buffer | null> {
   if (!logoUrl) {
-    console.warn('[matriz-plantilla] Cliente sin logoUrl — se mantiene el logo placeholder de la plantilla.')
+    console.warn('[plantilla-oficial] Cliente sin logoUrl — se mantiene el logo placeholder de la plantilla.')
     return null
   }
 
@@ -34,7 +34,7 @@ export async function resolverLogoClienteBuffer(logoUrl: string | null | undefin
       .toBuffer()
   } catch (e) {
     console.warn(
-      `[matriz-plantilla] No se pudo resolver el logo del cliente (logoUrl: ${logoUrl}) — se mantiene el placeholder de la plantilla.`,
+      `[plantilla-oficial] No se pudo resolver el logo del cliente (logoUrl: ${logoUrl}) — se mantiene el placeholder de la plantilla.`,
       e instanceof Error ? e.message : e
     )
     return null

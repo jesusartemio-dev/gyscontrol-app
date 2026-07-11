@@ -22,7 +22,7 @@ interface PersonalInfo {
   esCliente?: boolean
 }
 
-interface MatrizDatosDocumento {
+export interface DatosDocumentoMeta {
   codigoDocumento: string | null
   revisionDocumento: string
   numeroConsultor: string | null
@@ -51,10 +51,13 @@ interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   proyectoId: string
-  matriz: MatrizDatosDocumento
+  documento: DatosDocumentoMeta
   proyectoInfo: ProyectoDatosDocumento
   personal: PersonalInfo[]
-  onSaved: (updated: MatrizDatosDocumento) => void
+  /** 'MX' (default, Matriz) | 'OR' (Organigrama) — pasado a componerCodigoNexa. */
+  codigoTipoDocumento?: string
+  onGuardarDocumento: (payload: DatosDocumentoMeta) => Promise<Response>
+  onSaved: (updated: DatosDocumentoMeta) => void
   onProyectoActualizado: (updated: ProyectoActualizado) => void
 }
 
@@ -68,7 +71,10 @@ function heuristicaDefault(personal: PersonalInfo[], patron: RegExp): string {
 // para no matchear por accidente "Gerencia General"/"Gerencia Comercial".
 const RX_GERENTE_PROYECTOS = /(gerenc|gerente).*proyecto/i
 
-export function DatosDocumentoModal({ open, onOpenChange, proyectoId, matriz, proyectoInfo, personal, onSaved, onProyectoActualizado }: Props) {
+export function DatosDocumentoModal({
+  open, onOpenChange, proyectoId, documento, proyectoInfo, personal,
+  codigoTipoDocumento, onGuardarDocumento, onSaved, onProyectoActualizado,
+}: Props) {
   const [form, setForm] = useState({
     codigoDocumento: '', revisionDocumento: '0', numeroConsultor: '',
     desarrolloNombre: '', verificoNombre: '', aproboNombre: '', autorizoNombre: '',
@@ -98,13 +104,14 @@ export function DatosDocumentoModal({ open, onOpenChange, proyectoId, matriz, pr
       area: proyectoForm.areaSeccion,
       correlativo: correlativoValor,
       revision: revisionValor || '0',
+      tipoDocumento: codigoTipoDocumento,
     })
   }
 
   useEffect(() => {
     if (!open) return
     const clienteContacto = personal.find(p => p.esCliente)?.nombre ?? ''
-    const revisionInicial = matriz.revisionDocumento || '0'
+    const revisionInicial = documento.revisionDocumento || '0'
     const etapaInicial = proyectoInfo.etapa && !ETAPAS_SUGERIDAS.includes(proyectoInfo.etapa) ? OTRA_ETAPA : (proyectoInfo.etapa ?? '')
     setProyectoForm({
       sede: proyectoInfo.sede ?? '',
@@ -119,23 +126,24 @@ export function DatosDocumentoModal({ open, onOpenChange, proyectoId, matriz, pr
     // se pre-llena editable. El usuario acepta guardando o lo sobreescribe.
     const etapaDigitoInicial = digitoEtapa(proyectoInfo.etapa)
     const autoSugerido =
-      !matriz.codigoDocumento && detectarEstandarCliente(proyectoInfo.clienteNombre) === 'nexa' && proyectoInfo.codigoPEP && proyectoInfo.areaSeccion && etapaDigitoInicial
+      !documento.codigoDocumento && detectarEstandarCliente(proyectoInfo.clienteNombre) === 'nexa' && proyectoInfo.codigoPEP && proyectoInfo.areaSeccion && etapaDigitoInicial
         ? componerCodigoNexa({
             pep: proyectoInfo.codigoPEP,
             etapaDigito: etapaDigitoInicial,
             area: proyectoInfo.areaSeccion,
             correlativo,
             revision: revisionInicial,
+            tipoDocumento: codigoTipoDocumento,
           })
         : ''
     setForm({
-      codigoDocumento: matriz.codigoDocumento || autoSugerido,
+      codigoDocumento: documento.codigoDocumento || autoSugerido,
       revisionDocumento: revisionInicial,
-      numeroConsultor: matriz.numeroConsultor ?? '',
-      desarrolloNombre: matriz.desarrolloNombre ?? heuristicaDefault(personal, /residente/i),
-      verificoNombre: matriz.verificoNombre ?? heuristicaDefault(personal, RX_GERENTE_PROYECTOS),
-      aproboNombre: matriz.aproboNombre ?? heuristicaDefault(personal, RX_GERENTE_PROYECTOS),
-      autorizoNombre: matriz.autorizoNombre ?? clienteContacto,
+      numeroConsultor: documento.numeroConsultor ?? '',
+      desarrolloNombre: documento.desarrolloNombre ?? heuristicaDefault(personal, /residente/i),
+      verificoNombre: documento.verificoNombre ?? heuristicaDefault(personal, RX_GERENTE_PROYECTOS),
+      aproboNombre: documento.aproboNombre ?? heuristicaDefault(personal, RX_GERENTE_PROYECTOS),
+      autorizoNombre: documento.autorizoNombre ?? clienteContacto,
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
@@ -158,27 +166,23 @@ export function DatosDocumentoModal({ open, onOpenChange, proyectoId, matriz, pr
         codigoPEP: proyectoForm.codigoPEP || null,
         areaSeccion: proyectoForm.areaSeccion || null,
       }
-      const [resProyecto, resMatriz] = await Promise.all([
+      const [resProyecto, resDocumento] = await Promise.all([
         fetch(`/api/proyectos/${proyectoId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(proyectoPayload),
         }),
-        fetch(`/api/proyectos/${proyectoId}/matriz-comunicacion`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(form),
-        }),
+        onGuardarDocumento(form),
       ])
       if (!resProyecto.ok) {
         throw new Error(resProyecto.status === 403 ? 'Sin permiso para editar los datos del proyecto' : 'Error al guardar los datos del proyecto')
       }
-      if (!resMatriz.ok) throw new Error('Error al guardar los datos del documento')
+      if (!resDocumento.ok) throw new Error('Error al guardar los datos del documento')
 
       const { data: proyectoActualizado } = await resProyecto.json()
-      const matrizActualizada = await resMatriz.json()
+      const documentoActualizado = await resDocumento.json()
       onProyectoActualizado(proyectoActualizado)
-      onSaved(matrizActualizada)
+      onSaved(documentoActualizado)
       toast.success('Datos guardados')
       onOpenChange(false)
     } catch (e) {
