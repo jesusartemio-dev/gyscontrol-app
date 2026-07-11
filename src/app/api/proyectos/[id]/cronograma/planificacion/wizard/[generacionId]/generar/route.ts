@@ -7,6 +7,9 @@ import { validarPermisoCronograma } from '@/lib/services/cronogramaPermisos'
 import { obtenerCalendarioLaboral } from '@/lib/utils/calendarioLaboral'
 import { construirEstructuraReal, type EdtCatalogoInfo } from '@/lib/cronogramaIA/construirEstructuraReal'
 import { sugerirDependencias } from '@/lib/cronogramaIA/reglasDependencias'
+import { resolverOrganigramaProyecto } from '@/lib/cronogramaResponsables/resolverOrganigrama'
+import { asignarResponsablesEstructura, construirFilasAsignacionAuditoria } from '@/lib/cronogramaResponsables/asignarResponsablesEstructura'
+import { registrarCargoLabelsNoReconocidos } from '@/lib/cronogramaResponsables/auditoriaOrganigrama'
 import type { ActividadPropuesta } from '@/types/cronogramaIA'
 
 export const maxDuration = 120
@@ -143,6 +146,21 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     )
   }
 
+  // Responsables (EDT->rol global + organigrama del proyecto) — reemplaza el
+  // paso posterior que los leía de la Matriz de Comunicaciones. Nunca
+  // bloquea la generación: un rol sin persona en el organigrama queda
+  // responsableId: null + advertencia visible, jamás una adivinanza.
+  const orgNodos = await prisma.proyectoOrgNodo.findMany({
+    where: { proyectoId: cronograma.proyectoId },
+    select: { id: true, userId: true, cargoLabel: true, orden: true, user: { select: { name: true } } },
+  })
+  const organigramaResuelto = resolverOrganigramaProyecto(orgNodos)
+  const asignacionResponsables = asignarResponsablesEstructura(estructura, organigramaResuelto.porRol)
+  estructura.edts = asignacionResponsables.edts
+  estructura.actividades = asignacionResponsables.actividades
+  estructura.tareas = asignacionResponsables.tareas
+  const advertenciasResponsables = asignacionResponsables.advertencias
+
   const tareasParaDependencias = estructura.tareas.map(t => ({
     id: t.id,
     nombre: t.nombre,
@@ -182,6 +200,12 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     },
   ]
 
+  const filasAsignacionResponsables = construirFilasAsignacionAuditoria(
+    cronograma.proyectoId,
+    session.user.id,
+    asignacionResponsables.asignaciones
+  )
+
   try {
     await prisma.$transaction([
       prisma.proyectoFase.createMany({ data: estructura.fases }),
@@ -196,6 +220,9 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
           ]
         : []),
       prisma.proyectoHito.createMany({ data: hitos }),
+      ...(filasAsignacionResponsables.length > 0
+        ? [prisma.proyectoTareaResponsableAsignacion.createMany({ data: filasAsignacionResponsables })]
+        : []),
     ])
   } catch (e) {
     console.error('Error aplicando la estructura del cronograma:', e)
@@ -212,7 +239,10 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     tareasCreadas: estructura.tareas.length,
     dependenciasCreadas: dependenciasSugeridas.length,
     hitosCreados: hitos.length,
+    responsablesAsignados: asignacionResponsables.asignaciones.length,
   }
+
+  const advertenciasTotales = [...estructura.advertencias, ...advertenciasResponsables]
 
   await prisma.proyectoCronogramaGeneracionIA.update({
     where: { id: generacionId },
@@ -220,9 +250,11 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
       estado: 'aplicado',
       aplicadoEn: new Date(),
       resultado,
-      advertencias: estructura.advertencias.length > 0 ? estructura.advertencias : undefined,
+      advertencias: advertenciasTotales.length > 0 ? advertenciasTotales : undefined,
     },
   })
+
+  await registrarCargoLabelsNoReconocidos(session.user.id, cronograma.proyectoId, organigramaResuelto.cargoLabelsNoReconocidos)
 
   // Auditoría de decisiones (Fase 2, punto f): una fila por tarea regida por
   // una regla de sub-alcance (CMM hoy, ING/PLA más adelante) con lo que la
@@ -253,5 +285,11 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     }
   }
 
-  return NextResponse.json({ generacionId, cronogramaId: cronograma.id, resultado, advertencias: estructura.advertencias })
+  return NextResponse.json({
+    generacionId,
+    cronogramaId: cronograma.id,
+    resultado,
+    advertencias: advertenciasTotales,
+    previewResponsables: asignacionResponsables.preview,
+  })
 }

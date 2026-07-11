@@ -9,15 +9,20 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Loader2, UserCheck, AlertTriangle, FileWarning } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import Link from 'next/link'
+import { ROL_RESPONSABLE_LABELS, type RolResponsable } from '@/lib/cronogramaResponsables/reglasResponsable'
 
-interface PropuestaResponsableEdt {
-  proyectoEdtId: string
-  edtCodigo: string
+interface ResponsablePreviewDesglose {
+  rol: RolResponsable
+  responsableUserId: string | null
+  responsableNombre: string | null
+  tareasCount: number
+}
+
+interface ResponsablePreviewEdt {
+  proyectoEdtId?: string
   edtNombre: string
-  matrizFilaId: string | null
-  matrizInformacion: string | null
-  responsable: { userId: string; nombre: string; siglas: string; codigoOrigen: 'R' | 'E' } | null
-  totalTareas: number
+  edtCodigo: string
+  desglose: ResponsablePreviewDesglose[]
   advertencia: string | null
 }
 
@@ -33,21 +38,21 @@ export function AutoasignarResponsablesModal({ open, onOpenChange, proyectoId, c
   const { toast } = useToast()
   const [cargando, setCargando] = useState(false)
   const [aplicando, setAplicando] = useState(false)
-  const [sinMatriz, setSinMatriz] = useState(false)
-  const [propuestas, setPropuestas] = useState<PropuestaResponsableEdt[]>([])
+  const [sinOrganigrama, setSinOrganigrama] = useState(false)
+  const [propuestas, setPropuestas] = useState<ResponsablePreviewEdt[]>([])
 
   useEffect(() => {
     if (!open) return
     setCargando(true)
-    setSinMatriz(false)
+    setSinOrganigrama(false)
     setPropuestas([])
     fetch(`/api/proyectos/${proyectoId}/cronograma/planificacion/autoasignar-responsables?cronogramaId=${cronogramaId}`)
       .then(async res => {
         if (!res.ok) throw new Error('No se pudo calcular la propuesta de responsables')
         return res.json()
       })
-      .then((data: { sinMatriz: boolean; propuestas?: PropuestaResponsableEdt[] }) => {
-        setSinMatriz(data.sinMatriz)
+      .then((data: { sinOrganigrama: boolean; propuestas?: ResponsablePreviewEdt[] }) => {
+        setSinOrganigrama(data.sinOrganigrama)
         setPropuestas(data.propuestas ?? [])
       })
       .catch(() => {
@@ -57,7 +62,7 @@ export function AutoasignarResponsablesModal({ open, onOpenChange, proyectoId, c
       .finally(() => setCargando(false))
   }, [open, proyectoId, cronogramaId, onOpenChange, toast])
 
-  const totalAsignables = propuestas.filter(p => p.responsable && p.totalTareas > 0).length
+  const totalAsignables = propuestas.filter(p => p.desglose.some(d => d.responsableUserId)).length
 
   async function confirmar() {
     setAplicando(true)
@@ -72,9 +77,10 @@ export function AutoasignarResponsablesModal({ open, onOpenChange, proyectoId, c
         throw new Error(err.error || 'Error asignando responsables')
       }
       const data = await res.json()
+      const omitidasTexto = data.tareasOmitidasPorEdicionManual > 0 ? ` (${data.tareasOmitidasPorEdicionManual} editada(s) manualmente, sin tocar)` : ''
       toast({
-        title: 'Responsables asignados',
-        description: `${data.edtsAsignados} EDT(s), ${data.tareasActualizadas} tarea(s) actualizadas.`,
+        title: 'Responsables sincronizados',
+        description: `${data.tareasActualizadas} tarea(s) actualizadas${omitidasTexto}.`,
       })
       onSuccess()
       onOpenChange(false)
@@ -91,10 +97,10 @@ export function AutoasignarResponsablesModal({ open, onOpenChange, proyectoId, c
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <UserCheck className="h-5 w-5" />
-            Autoasignar responsables
+            Re-sincronizar responsables
           </DialogTitle>
           <DialogDescription>
-            Se infiere desde la Matriz de Comunicaciones del proyecto (persona con código "Autoriza" por fila) — revisa antes de confirmar, nada se escribe todavía.
+            Se infiere desde el organigrama del proyecto (rol requerido por cada EDT) — revisa antes de confirmar, nada se escribe todavía. Las tareas editadas manualmente nunca se sobrescriben.
           </DialogDescription>
         </DialogHeader>
 
@@ -103,13 +109,13 @@ export function AutoasignarResponsablesModal({ open, onOpenChange, proyectoId, c
             <Loader2 className="h-5 w-5 mr-2 animate-spin" />
             Calculando propuesta...
           </div>
-        ) : sinMatriz ? (
+        ) : sinOrganigrama ? (
           <Alert>
             <FileWarning className="h-4 w-4" />
             <AlertDescription>
-              Este proyecto no tiene una Matriz de Comunicaciones — créala para poder autoasignar responsables.{' '}
-              <Link href={`/proyectos/${proyectoId}/matriz-comunicacion`} className="underline font-medium">
-                Ir a la Matriz de Comunicaciones
+              Este proyecto no tiene organigrama definido — créalo para poder autoasignar responsables.{' '}
+              <Link href={`/proyectos/${proyectoId}/organigrama`} className="underline font-medium">
+                Ir al organigrama
               </Link>
             </AlertDescription>
           </Alert>
@@ -121,24 +127,27 @@ export function AutoasignarResponsablesModal({ open, onOpenChange, proyectoId, c
               <TableHeader>
                 <TableRow>
                   <TableHead>EDT</TableHead>
-                  <TableHead>Responsable propuesto</TableHead>
-                  <TableHead className="text-right">Tareas</TableHead>
+                  <TableHead>Responsable(s) propuesto(s)</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {propuestas.map(p => (
-                  <TableRow key={p.proyectoEdtId}>
+                  <TableRow key={p.proyectoEdtId ?? p.edtCodigo}>
                     <TableCell>
                       <div className="font-medium text-sm">{p.edtNombre}</div>
                       <div className="text-xs text-muted-foreground">{p.edtCodigo}</div>
                     </TableCell>
                     <TableCell>
-                      {p.responsable ? (
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm">{p.responsable.nombre}</span>
-                          <Badge variant={p.responsable.codigoOrigen === 'R' ? 'secondary' : 'outline'} className="text-[10px]">
-                            {p.responsable.codigoOrigen === 'R' ? 'Autoriza' : 'Emisor'}
-                          </Badge>
+                      {p.desglose.length > 0 ? (
+                        <div className="flex flex-col gap-1">
+                          {p.desglose.map(d => (
+                            <div key={d.rol} className="flex items-center gap-2">
+                              <span className="text-sm">{d.responsableNombre ?? '—'}</span>
+                              <Badge variant={d.responsableUserId ? 'secondary' : 'destructive'} className="text-[10px]">
+                                {ROL_RESPONSABLE_LABELS[d.rol]} · {d.tareasCount} tarea(s)
+                              </Badge>
+                            </div>
+                          ))}
                         </div>
                       ) : (
                         <span className="text-sm text-muted-foreground">—</span>
@@ -150,7 +159,6 @@ export function AutoasignarResponsablesModal({ open, onOpenChange, proyectoId, c
                         </div>
                       )}
                     </TableCell>
-                    <TableCell className="text-right text-sm">{p.totalTareas}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -165,7 +173,7 @@ export function AutoasignarResponsablesModal({ open, onOpenChange, proyectoId, c
           <Button variant="outline" size="sm" onClick={() => onOpenChange(false)} disabled={aplicando}>
             Cancelar
           </Button>
-          {!sinMatriz && propuestas.length > 0 && (
+          {!sinOrganigrama && propuestas.length > 0 && (
             <Button size="sm" onClick={confirmar} disabled={aplicando || cargando || totalAsignables === 0}>
               {aplicando ? (
                 <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Asignando...</>

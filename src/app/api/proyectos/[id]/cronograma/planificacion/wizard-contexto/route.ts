@@ -9,6 +9,7 @@ import type { EvidenciaTexto } from '@/lib/cronogramaIA/detectarEdtsPosibles'
 import { calcularEdtsPendientesIA } from '@/lib/cronogramaIA/reglasActividades'
 import type { ActividadPropuesta, ConfiguracionWizardPaso1 } from '@/types/cronogramaIA'
 import { configuracionWizardPaso1Schema } from '@/lib/validators/cronogramaIA'
+import { resolverOrganigramaProyecto } from '@/lib/cronogramaResponsables/resolverOrganigrama'
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -45,7 +46,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: 'Sin acceso a este proyecto' }, { status: 403 })
   }
 
-  const [edts, cronogramaPlanificacion, cotizacionDocumento, edtsComerciales, correcciones, evidenciasCotizacion] = await Promise.all([
+  const [edts, cronogramaPlanificacion, cotizacionDocumento, edtsComerciales, correcciones, evidenciasCotizacion, orgNodos] = await Promise.all([
     prisma.edt.findMany({
       include: { faseDefault: true, _count: { select: { catalogoServicio: true } } },
       orderBy: [{ faseDefault: { orden: 'asc' } }, { orden: 'asc' }],
@@ -71,6 +72,12 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     // cada línea + a qué EDT está tageada) para detectarEdtsPosibles — ver
     // abajo. Nunca modifica la cotización, solo la lee.
     obtenerEvidenciasCotizacion(proyectoId),
+    // Organigrama del proyecto — base para el badge/advertencia del Paso 1 y
+    // para la autoasignación de responsables integrada en la generación.
+    prisma.proyectoOrgNodo.findMany({
+      where: { proyectoId },
+      select: { id: true, userId: true, cargoLabel: true, orden: true, user: { select: { name: true } } },
+    }),
   ])
 
   let borrador: {
@@ -156,6 +163,16 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
   ).map(bullet => ({ texto: bullet, origen: 'Resumen de alcance de la cotización' }))
   const todasLasEvidencias = [...evidenciasCotizacion, ...resumenAlcanceEvidencias]
 
+  // Resumen del organigrama para el Paso 1 (badge/advertencia, nunca
+  // bloqueante) — los responsables se autoasignan desde acá al generar.
+  const organigramaResuelto = resolverOrganigramaProyecto(orgNodos)
+  const rolesResueltos = Array.from(organigramaResuelto.porRol.entries())
+  const organigramaResumen = {
+    tieneOrganigrama: orgNodos.some(n => n.userId),
+    rolesDetectados: rolesResueltos.filter(([, persona]) => !!persona).length,
+    rolesFaltantes: rolesResueltos.filter(([, persona]) => !persona).map(([rol]) => rol),
+  }
+
   return NextResponse.json({
     edts: edts.map(e => ({
       id: e.id,
@@ -196,6 +213,8 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     // confirma", sin marcarlos automáticamente.
     evidenciasCotizacion: todasLasEvidencias,
     tieneCotizacionDocumento: !!cotizacionDocumento,
+    // Ver comentario arriba — badge/advertencia no bloqueante del Paso 1.
+    organigramaResumen,
     cotizacionResumen: cotizacionDocumento
       ? {
           numeroPropuesta: cotizacionDocumento.numeroPropuesta,

@@ -937,7 +937,7 @@ export function ProyectoCronogramaTab({
                   setTimeout(() => setShowAutoasignarResponsablesModal(true), 100)
                 }} disabled={!hasCronograma}>
                   <UserCheck className="h-4 w-4 mr-2" />
-                  Autoasignar responsables (Matriz)
+                  Re-sincronizar responsables (Organigrama)
                 </DropdownMenuItem>
               )}
 

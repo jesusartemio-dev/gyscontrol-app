@@ -5,8 +5,11 @@ import { authOptions } from '@/lib/auth'
 import Anthropic from '@anthropic-ai/sdk'
 import { buildPromptMatriz, type MatrizFilaIA } from '@/lib/matrizComunicacion/prompt'
 import { getModelForTask } from '@/lib/agente/models'
-import { generarSiglas, calcularNivelesOrgNodos, NIVELES_PARTICIPANTES_MATRIZ } from '@/lib/matrizComunicacion/utils'
+import { generarSiglas, calcularNivelesOrgNodos, normalizarTexto, NIVELES_PARTICIPANTES_MATRIZ } from '@/lib/matrizComunicacion/utils'
+import { aplicarReglaResponsableAFilas } from '@/lib/matrizComunicacion/aplicarReglaResponsable'
 import { ROL_CONTACTO_CLIENTE_LABELS } from '@/lib/config/rolesContactoCliente'
+import { resolverOrganigramaProyecto } from '@/lib/cronogramaResponsables/resolverOrganigrama'
+import { registrarCargoLabelsNoReconocidos } from '@/lib/cronogramaResponsables/auditoriaOrganigrama'
 import { trackUsage, trackUsageError } from '@/lib/agente/usageTracker'
 import { isIAFeatureEnabled } from '@/lib/agente/featureFlags'
 
@@ -66,6 +69,7 @@ export async function POST(
             parentId: true,
             userId: true,
             cargoLabel: true,
+            orden: true,
             empresaOverride: true,
             telefonoOverride: true,
             cipOverride: true,
@@ -89,6 +93,7 @@ export async function POST(
     type FilaInput = {
       orden: number; informacion: string; emisor: string; receptores: string
       medio: string; frecuencia: string; formato: string; notas: string | null
+      edtId?: string | null
     }
     let filasData: FilaInput[] = []
     let generadoConIA = false
@@ -114,9 +119,15 @@ export async function POST(
       })
 
       const usadas = new Set<string>()
+      // userId -> siglas asignadas acá — se necesita después para forzar el
+      // código "R" en la celda de quien resuelva la tabla EDT->rol +
+      // organigrama (ver aplicarReglaResponsableAFilas), sin tocar el resto
+      // de la forma de `personal` que ya usa el prompt de la IA.
+      const siglaPorUserId = new Map<string, string>()
       const personal = orgNodos.map(n => {
         const siglas = generarSiglas(n.user!.name!, usadas)
         usadas.add(siglas)
+        siglaPorUserId.set(n.userId!, siglas)
         return {
           siglas,
           nombre: n.user!.name!,
@@ -149,7 +160,7 @@ export async function POST(
       // Query all EDTs for this project — no cronograma type filter so we get all
       const proyectoEdtsRaw = await prisma.proyectoEdt.findMany({
         where: { proyectoId },
-        include: { proyectoFase: { select: { nombre: true, orden: true } } },
+        include: { proyectoFase: { select: { nombre: true, orden: true } }, edt: { select: { nombre: true } } },
         orderBy: [{ proyectoFase: { orden: 'asc' } }, { orden: 'asc' }],
         take: 60,
       })
@@ -161,7 +172,12 @@ export async function POST(
           seenEdtNames.add(e.nombre)
           return true
         })
-        .map(e => ({ nombre: e.nombre, fase: e.proyectoFase?.nombre ?? 'Sin fase', orden: e.orden }))
+        .map(e => ({ id: e.id, nombre: e.nombre, fase: e.proyectoFase?.nombre ?? 'Sin fase', orden: e.orden, codigo: e.edt.nombre }))
+      // ProyectoEdt.nombre (descriptivo, ej. "Construcción") -> {id, código
+      // real del catálogo, ej. "CON"} — se usa después para (a) resolver el
+      // rol responsable de cada fila vía la tabla EDT->rol y (b) setear
+      // edtId en la fila persistida en vez de dejarlo null.
+      const edtInfoPorNombre = new Map(edts.map(e => [normalizarTexto(e.nombre), { id: e.id, codigo: e.codigo }]))
       console.log('Total EDTs encontrados:', edts.length)
       console.log('EDTs enviados al prompt:', edts.map(e => e.nombre))
       console.log('Proyecto codigo:', proyecto.codigo)
@@ -205,7 +221,13 @@ export async function POST(
 
       // IA returns { filas: [...] } or directly [...]
       const parsed = JSON.parse(text)
-      const filas: MatrizFilaIA[] = Array.isArray(parsed) ? parsed : (parsed.filas ?? [])
+      const filasCrudas: MatrizFilaIA[] = Array.isArray(parsed) ? parsed : (parsed.filas ?? [])
+
+      // El código "R" (Autoriza) nunca lo decide la IA — se calcula acá desde
+      // la tabla EDT->rol + el organigrama de este proyecto y se fuerza en
+      // la celda correspondiente (ver aplicarReglaResponsableAFilas).
+      const organigramaResuelto = resolverOrganigramaProyecto(orgNodos)
+      const filas = aplicarReglaResponsableAFilas(filasCrudas, edtInfoPorNombre, organigramaResuelto.porRol, siglaPorUserId)
 
       filasData = filas.map(f => ({
         orden: f.orden,
@@ -216,9 +238,12 @@ export async function POST(
         frecuencia: f.frecuencia,
         formato: '',
         notas: null,
+        edtId: edtInfoPorNombre.get(normalizarTexto(f.edtNombre))?.id ?? null,
       }))
 
       generadoConIA = true
+
+      await registrarCargoLabelsNoReconocidos(userId, proyectoId, organigramaResuelto.cargoLabelsNoReconocidos)
     }
 
     const matriz = await prisma.matrizComunicacion.create({

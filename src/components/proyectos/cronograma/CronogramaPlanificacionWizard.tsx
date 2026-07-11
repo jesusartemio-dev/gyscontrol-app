@@ -29,7 +29,7 @@ import { useToast } from '@/hooks/use-toast'
 import type { ActividadPropuesta, ConfiguracionWizardPaso1 } from '@/types/cronogramaIA'
 import type { EdtSugeridoConOrigen } from '@/lib/cronogramaIA/derivarEdtsSoporte'
 import { detectarEdtsPosibles, type EvidenciaTexto } from '@/lib/cronogramaIA/detectarEdtsPosibles'
-import { AutoasignarResponsablesModal } from './AutoasignarResponsablesModal'
+import { ROL_RESPONSABLE_LABELS, type RolResponsable } from '@/lib/cronogramaResponsables/reglasResponsable'
 import {
   BORRADOR_LOCAL_PASO1_VERSION,
   claveBorradorLocalPaso1,
@@ -92,6 +92,26 @@ interface DatosContextoWizard {
   tieneCotizacionDocumento: boolean
 }
 
+interface OrganigramaResumen {
+  tieneOrganigrama: boolean
+  rolesDetectados: number
+  rolesFaltantes: string[]
+}
+
+interface ResponsablePreviewDesglose {
+  rol: RolResponsable
+  responsableUserId: string | null
+  responsableNombre: string | null
+  tareasCount: number
+}
+
+interface ResponsablePreviewEdt {
+  edtNombre: string
+  edtCodigo: string
+  desglose: ResponsablePreviewDesglose[]
+  advertencia: string | null
+}
+
 interface Props {
   proyectoId: string
   open: boolean
@@ -137,6 +157,9 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
   const [correccionesEdt, setCorreccionesEdt] = useState<CorreccionEdt[]>([])
   const [guardandoCorreccion, setGuardandoCorreccion] = useState<string | null>(null)
   const [evidenciasCotizacion, setEvidenciasCotizacion] = useState<EvidenciaTexto[]>([])
+  const [organigramaResumen, setOrganigramaResumen] = useState<OrganigramaResumen | null>(null)
+  const [previewResponsables, setPreviewResponsables] = useState<ResponsablePreviewEdt[]>([])
+  const [cargandoPreviewResponsables, setCargandoPreviewResponsables] = useState(false)
 
   // Persistencia del wizard (evita perder Paso 1/Paso 2/propuestas de IA por un cierre accidental).
   const [datosContexto, setDatosContexto] = useState<DatosContextoWizard | null>(null)
@@ -147,10 +170,6 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
   const [ultimoGuardadoFallo, setUltimoGuardadoFallo] = useState(false)
   const [mostrarConfirmarCierre, setMostrarConfirmarCierre] = useState(false)
   const [mostrarConfirmarReset, setMostrarConfirmarReset] = useState(false)
-  // Al aplicar el cronograma, se ofrece autoasignar responsables desde la
-  // Matriz de Comunicación (con confirmación propia) — no null significa
-  // "mostrar el modal para este cronograma recién aplicado".
-  const [cronogramaIdAplicado, setCronogramaIdAplicado] = useState<string | null>(null)
 
   // Gate de hidratación para el autoguardado de Paso 1 en localStorage: un
   // useState (cargandoContexto/decidiendoBorrador) NO sirve para esto porque
@@ -378,11 +397,13 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
           evidenciasCotizacion: EvidenciaTexto[]
           borrador: BorradorGeneracion | null
           borradorDescartado: boolean
+          organigramaResumen: OrganigramaResumen
         }) => {
           setEdts(data.edts)
           setCotizacionResumen(data.cotizacionResumen)
           setCorreccionesEdt(data.correccionesEdt)
           setEvidenciasCotizacion(data.evidenciasCotizacion)
+          setOrganigramaResumen(data.organigramaResumen)
           setCargandoContexto(false)
 
           const contexto: DatosContextoWizard = {
@@ -672,6 +693,33 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
     }
   }
 
+  async function cargarPreviewResponsables(actividadesActuales: ActividadPropuesta[]) {
+    if (actividadesActuales.length === 0) {
+      setPreviewResponsables([])
+      return
+    }
+    setCargandoPreviewResponsables(true)
+    try {
+      const res = await fetch(`/api/proyectos/${proyectoId}/cronograma/planificacion/preview-responsables`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ actividades: actividadesActuales }),
+      })
+      if (!res.ok) return
+      const data = await res.json()
+      setPreviewResponsables(data.preview ?? [])
+    } catch {
+      // Preview best-effort — nunca bloquea el flujo de aplicar el cronograma.
+    } finally {
+      setCargandoPreviewResponsables(false)
+    }
+  }
+
+  useEffect(() => {
+    if (pasoActual === 2) cargarPreviewResponsables(actividades)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pasoActual])
+
   async function guardarActividades(): Promise<boolean> {
     if (!generacionId) return false
     const res = await fetch(`/api/proyectos/${proyectoId}/cronograma/planificacion/wizard/${generacionId}/actividades`, {
@@ -722,16 +770,15 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
         throw new Error(err.error || 'Error aplicando el cronograma')
       }
       const data = await res.json()
+      const responsablesTexto =
+        typeof data.resultado.responsablesAsignados === 'number'
+          ? ` ${data.resultado.responsablesAsignados} responsable(s) autoasignado(s) desde el organigrama.`
+          : ''
       toast({
         title: 'Cronograma generado',
-        description: `${data.resultado.fasesCreadas} fases, ${data.resultado.edtsCreados} EDTs, ${data.resultado.actividadesCreadas} actividades, ${data.resultado.tareasCreadas} tareas.`,
+        description: `${data.resultado.fasesCreadas} fases, ${data.resultado.edtsCreados} EDTs, ${data.resultado.actividadesCreadas} actividades, ${data.resultado.tareasCreadas} tareas.${responsablesTexto}`,
       })
       onSuccess?.()
-      // No cierra directo: abre la propuesta de autoasignación de
-      // responsables (Matriz de Comunicación) — sigue exigiendo la
-      // confirmación explícita del usuario, solo evita que tenga que ir a
-      // buscar el botón manual.
-      setCronogramaIdAplicado(data.cronogramaId)
       onOpenChange(false)
     } catch (e) {
       toast({ title: e instanceof Error ? e.message : 'Error inesperado', variant: 'destructive' })
@@ -755,6 +802,7 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
       setActividades(data.propuestaActividades)
       setAdvertencias(data.advertencias ?? [])
       setEdtsPendientesIA([])
+      cargarPreviewResponsables(data.propuestaActividades)
       toast({ title: 'Propuesta de IA generada', description: 'Revisa y edita las zonas/familias antes de aplicar.' })
     } catch (e) {
       toast({ title: e instanceof Error ? e.message : 'Error inesperado', variant: 'destructive' })
@@ -879,6 +927,24 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
                 </ul>
               </AlertDescription>
             </Alert>
+          )}
+
+          {organigramaResumen && (
+            organigramaResumen.tieneOrganigrama ? (
+              <Badge variant="secondary" className="text-xs font-normal">
+                Responsables se autoasignarán desde el organigrama ({organigramaResumen.rolesDetectados} rol(es) detectado(s))
+              </Badge>
+            ) : (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Sin organigrama, las tareas se generarán sin responsable —{' '}
+                  <a href={`/proyectos/${proyectoId}/organigrama`} target="_blank" rel="noreferrer" className="underline">
+                    créalo primero para autoasignar
+                  </a>.
+                </AlertDescription>
+              </Alert>
+            )
           )}
 
           <div>
@@ -1117,6 +1183,41 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
           </div>
         )}
 
+        {previewResponsables.length > 0 && (
+          <div className="border rounded-lg">
+            <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/40">
+              <span className="text-sm font-medium">Responsables (autoasignados desde el organigrama)</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => cargarPreviewResponsables(actividades)}
+                disabled={cargandoPreviewResponsables}
+              >
+                {cargandoPreviewResponsables ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5 mr-1" />}
+                Actualizar
+              </Button>
+            </div>
+            <div className="p-2 max-h-[200px] overflow-y-auto space-y-1.5">
+              {previewResponsables.map(p => (
+                <div key={p.edtCodigo} className="text-sm px-2 py-1.5 rounded border">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium">{p.edtNombre}</span>
+                    <div className="flex flex-wrap gap-1 justify-end">
+                      {p.desglose.map(d => (
+                        <Badge key={d.rol} variant={d.responsableUserId ? 'secondary' : 'destructive'} className="text-xs font-normal">
+                          {ROL_RESPONSABLE_LABELS[d.rol] ?? d.rol}: {d.responsableNombre ?? 'sin asignar'}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                  {p.advertencia && <p className="text-xs text-muted-foreground mt-1">{p.advertencia}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <Accordion type="multiple" className="space-y-2">
           {actividades.map((actividad, index) => (
             <AccordionItem key={index} value={String(index)} className="border rounded-lg px-3">
@@ -1349,21 +1450,6 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {cronogramaIdAplicado && (
-        <AutoasignarResponsablesModal
-          open={!!cronogramaIdAplicado}
-          onOpenChange={next => {
-            if (!next) setCronogramaIdAplicado(null)
-          }}
-          proyectoId={proyectoId}
-          cronogramaId={cronogramaIdAplicado}
-          onSuccess={() => {
-            onSuccess?.()
-            setCronogramaIdAplicado(null)
-          }}
-        />
-      )}
     </>
   )
 }

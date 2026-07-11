@@ -46,6 +46,8 @@ export interface FilaEdt {
   fechaInicioPlan: Date
   fechaFinPlan: Date
   updatedAt: Date
+  /** Resuelto luego por asignarResponsablesEstructura (tabla EDT->rol + organigrama del proyecto) — null si aún no se asignó. */
+  responsableId: string | null
 }
 
 export interface FilaActividad {
@@ -58,6 +60,8 @@ export interface FilaActividad {
   fechaInicioPlan: Date
   fechaFinPlan: Date
   updatedAt: Date
+  /** Resuelto luego por asignarResponsablesEstructura (tabla EDT->rol + organigrama del proyecto) — null si aún no se asignó. */
+  responsableId: string | null
 }
 
 export interface FilaTarea {
@@ -75,6 +79,8 @@ export interface FilaTarea {
   catalogoServicioId: string
   /** CatalogoServicio.recursoId del servicio de origen — precarga de la columna Recurso, editable después como cualquier campo. */
   recursoId: string | null
+  /** Resuelto luego por asignarResponsablesEstructura (tabla EDT->rol + organigrama del proyecto, con excepciones por tarea) — null si aún no se asignó. */
+  responsableId: string | null
 }
 
 export interface EstructuraReal {
@@ -202,6 +208,7 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
         fechaInicioPlan: fechaInicioEdt,
         fechaFinPlan: fechaFinEdt,
         updatedAt: new Date(),
+        responsableId: null,
       })
       edtIdACodigo.set(edtId, edtInfo.nombre)
 
@@ -224,6 +231,7 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
           fechaInicioPlan: fechaInicioActividad,
           fechaFinPlan: fechaFinActividad,
           updatedAt: new Date(),
+          responsableId: null,
         })
 
         let cursorTarea = fechaInicioActividad
@@ -247,6 +255,7 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
             updatedAt: new Date(),
             catalogoServicioId: tarea.catalogoServicioId,
             recursoId: recursoPorServicio.get(tarea.catalogoServicioId) ?? null,
+            responsableId: null,
           })
 
           cursorTarea = fechaFinTarea
