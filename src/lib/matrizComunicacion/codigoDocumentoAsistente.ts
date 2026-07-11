@@ -43,11 +43,30 @@ export interface ComposerInputNexa {
   disciplina?: string
 }
 
+/** El área/sección del catálogo Nexa es SIEMPRE de 4 dígitos (ej. "40" -> "0240" es un typo real de usuario; acá sólo se rellena "40" -> "0040", el usuario sigue siendo responsable del valor correcto). */
+function normalizarAreaSeccionNexa(area: string): string {
+  return area.padStart(4, '0')
+}
+
 /** `{TD}-{PEP}-{ETAPA}{CONTRATISTA}-{AREA}{DISC}{CORR}-R{REV}` — ej. real: MX-I790126021-3GYS-0240COR0001-R0 */
 export function componerCodigoNexa(input: ComposerInputNexa): string {
   const td = input.tipoDocumento ?? 'MX'
   const disciplina = input.disciplina ?? 'COR'
-  return `${td}-${input.pep}-${input.etapaDigito}${CONTRATISTA_SIGLAS}-${input.area}${disciplina}${input.correlativo}-R${input.revision}`
+  const area = normalizarAreaSeccionNexa(input.area)
+  return `${td}-${input.pep}-${input.etapaDigito}${CONTRATISTA_SIGLAS}-${area}${disciplina}${input.correlativo}-R${input.revision}`
+}
+
+/** Formato real del código PEP de Nexa: 1 letra + 9 dígitos (ej. I790126021). */
+const PEP_NEXA_REGEX = /^[A-Za-z]\d{9}$/
+
+/**
+ * Validación SUAVE — solo para mostrar una advertencia visible en el asistente
+ * cuando el cliente detectado es Nexa; nunca bloquea el guardado, porque el
+ * dato lo puede haber ingresado bien un usuario con un caso real que esta
+ * heurística no contempla.
+ */
+export function validarFormatoPepNexa(pep: string): boolean {
+  return PEP_NEXA_REGEX.test(pep.trim())
 }
 
 export interface ComposerInputQroma {

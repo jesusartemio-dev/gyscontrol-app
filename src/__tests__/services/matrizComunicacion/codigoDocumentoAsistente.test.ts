@@ -3,6 +3,7 @@ import {
   componerCodigoQroma,
   digitoEtapa,
   detectarEstandarCliente,
+  validarFormatoPepNexa,
   CONTRATISTA_SIGLAS,
 } from '@/lib/matrizComunicacion/codigoDocumentoAsistente'
 
@@ -44,6 +45,32 @@ describe('componerCodigoNexa', () => {
       tipoDocumento: 'DS', disciplina: 'GRL',
     })
     expect(codigo).toBe('DS-I790126021-3GYS-0240GRL0001-R0')
+  })
+
+  it('rellena el área/sección con ceros a la izquierda hasta 4 dígitos — caso real del organigrama de G300 ("40" -> "0040")', () => {
+    const codigo = componerCodigoNexa({
+      pep: '586654', etapaDigito: '1', area: '40', correlativo: '0001', revision: '0', tipoDocumento: 'OR',
+    })
+    expect(codigo).toBe('OR-586654-1GYS-0040COR0001-R0')
+  })
+
+  it('un área ya de 4 dígitos no se toca', () => {
+    const codigo = componerCodigoNexa({ pep: 'I790126021', etapaDigito: '3', area: '0240', correlativo: '0001', revision: '0' })
+    expect(codigo).toContain('-0240COR')
+  })
+})
+
+describe('validarFormatoPepNexa', () => {
+  it('acepta el formato real de Nexa: 1 letra + 9 dígitos', () => {
+    expect(validarFormatoPepNexa('I790126021')).toBe(true)
+  })
+  it('rechaza un PEP que no calza el formato (caso real detectado en G300)', () => {
+    expect(validarFormatoPepNexa('586654')).toBe(false)
+  })
+  it('rechaza vacío, letras de más, o dígitos de más/menos', () => {
+    expect(validarFormatoPepNexa('')).toBe(false)
+    expect(validarFormatoPepNexa('AB790126021')).toBe(false)
+    expect(validarFormatoPepNexa('I79012602')).toBe(false)
   })
 })
 

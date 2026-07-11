@@ -325,7 +325,7 @@ export default function OrganigramaProyectoPage() {
 
   // ── CAPTURA PNG (compartida entre el botón PNG y el export Word) ───────────
 
-  const generarOrganigramaPngBlob = async (scale: number): Promise<Blob> => {
+  const generarOrganigramaPngBlob = async (scale: number, modoDocumento = false): Promise<Blob> => {
     const { buildLayout, NORMAL_DIMS } = await import('@/components/organigrama/OrgChart')
     const { nodes, edges, svgWidth, svgHeight } = buildLayout(nodos, NORMAL_DIMS)
     const { NODE_W, NODE_H } = NORMAL_DIMS
@@ -336,14 +336,24 @@ export default function OrganigramaProyectoPage() {
     const ctx = canvas.getContext('2d')!
     ctx.scale(scale, scale)
 
-    // Background + dot grid
-    ctx.fillStyle = '#F8FAFC'
+    // Background + dot grid — el modo documento (export Word) no lleva la
+    // grilla ni el fondo gris del editor: debe verse como una página impresa,
+    // fondo blanco puro.
+    ctx.fillStyle = modoDocumento ? '#FFFFFF' : '#F8FAFC'
     ctx.fillRect(0, 0, svgWidth, svgHeight)
-    ctx.fillStyle = '#CBD5E1'
-    for (let gx = 0; gx < svgWidth; gx += 24)
-      for (let gy = 0; gy < svgHeight; gy += 24) {
-        ctx.beginPath(); ctx.arc(gx + 1, gy + 1, 1, 0, Math.PI * 2); ctx.fill()
-      }
+    if (!modoDocumento) {
+      ctx.fillStyle = '#CBD5E1'
+      for (let gx = 0; gx < svgWidth; gx += 24)
+        for (let gy = 0; gy < svgHeight; gy += 24) {
+          ctx.beginPath(); ctx.arc(gx + 1, gy + 1, 1, 0, Math.PI * 2); ctx.fill()
+        }
+    }
+
+    // En modo documento se sube un nivel de contraste el texto secundario
+    // (teléfono/CIP/correo) — sobre fondo blanco de impresión, los grises
+    // pensados para la UI del editor quedan demasiado tenues para leer.
+    const colorSecundario = modoDocumento ? '#6B7280' : '#9CA3AF'
+    const colorTerciario = modoDocumento ? '#9CA3AF' : '#D1D5DB'
 
     // Helper: rounded rect path
     const rr = (x: number, y: number, w: number, h: number, r: number) => {
@@ -415,13 +425,13 @@ export default function OrganigramaProyectoPage() {
         ctx.font = 'bold 13px system-ui, sans-serif'
         ctx.fillText(nodo.user!.name, x + NODE_W / 2, y + 58, NODE_W - 12)
 
-        ctx.fillStyle = '#9CA3AF'
+        ctx.fillStyle = colorSecundario
         ctx.font = '10px system-ui, sans-serif'
         ctx.textAlign = 'left'
         let dy = y + 74
         if (nodo._telefono) { ctx.fillText(`Tel: ${nodo._telefono}`, x + 8, dy, NODE_W - 16); dy += 13 }
         if (nodo._cip) { ctx.fillText(`CIP ${nodo._cip}`, x + 8, dy, NODE_W - 16); dy += 13 }
-        ctx.fillStyle = '#D1D5DB'
+        ctx.fillStyle = colorTerciario
         ctx.fillText(nodo.user!.email, x + 8, dy, NODE_W - 16)
       }
     }
@@ -460,7 +470,7 @@ export default function OrganigramaProyectoPage() {
       const { buildLayout, NORMAL_DIMS } = await import('@/components/organigrama/OrgChart')
       const { svgWidth } = buildLayout(nodos, NORMAL_DIMS)
       const scale = Math.max(2, Math.ceil(2000 / svgWidth))
-      const pngBlob = await generarOrganigramaPngBlob(scale)
+      const pngBlob = await generarOrganigramaPngBlob(scale, true)
 
       const form = new FormData()
       form.append('imagen', pngBlob, 'organigrama.png')

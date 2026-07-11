@@ -12,6 +12,7 @@ import {
   componerCodigoNexa,
   digitoEtapa,
   detectarEstandarCliente,
+  validarFormatoPepNexa,
 } from '@/lib/matrizComunicacion/codigoDocumentoAsistente'
 import { ETAPAS_SUGERIDAS, OTRA_ETAPA } from '@/lib/config/etapasProyecto'
 
@@ -93,6 +94,7 @@ export function DatosDocumentoModal({
   const digitoAuto = digitoEtapa(etapaResuelta)
   const faltanDatosNexa = !proyectoForm.codigoPEP || !proyectoForm.areaSeccion
   const asistenteDisponible = estandar === 'nexa' && !faltanDatosNexa
+  const pepFormatoInvalido = estandar === 'nexa' && !!proyectoForm.codigoPEP && !validarFormatoPepNexa(proyectoForm.codigoPEP)
 
   function componerSugerencia(correlativoValor: string, revisionValor: string, etapaDigitoManualValor: string): string | null {
     if (!asistenteDisponible) return null
@@ -231,10 +233,13 @@ export function DatosDocumentoModal({
               <div>
                 <Label className="text-xs">Código PEP (del cliente)</Label>
                 <Input value={proyectoForm.codigoPEP} onChange={e => setProyectoForm({ ...proyectoForm, codigoPEP: e.target.value })} placeholder="ej: I790126021" className="h-8 text-sm mt-1" />
+                {pepFormatoInvalido && (
+                  <p className="text-xs text-amber-600 mt-1">El PEP no tiene el formato Nexa esperado (1 letra + 9 dígitos, ej: I790126021).</p>
+                )}
               </div>
               <div>
                 <Label className="text-xs">Área/Sección</Label>
-                <Input value={proyectoForm.areaSeccion} onChange={e => setProyectoForm({ ...proyectoForm, areaSeccion: e.target.value })} placeholder="ej: 0240" className="h-8 text-sm mt-1" />
+                <Input value={proyectoForm.areaSeccion} onChange={e => setProyectoForm({ ...proyectoForm, areaSeccion: e.target.value })} placeholder="4 dígitos, ej: 0240" className="h-8 text-sm mt-1" />
               </div>
             </div>
           </div>
