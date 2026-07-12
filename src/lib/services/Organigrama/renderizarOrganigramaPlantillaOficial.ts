@@ -2,6 +2,7 @@ import PizZip from 'pizzip'
 import Docxtemplater from 'docxtemplater'
 import { descargarPlantillaOrganigramaOficial } from './descargarPlantillaOrganigrama'
 import { normalizarImagenOrganigrama } from './normalizarImagenOrganigrama'
+import { calcularExtentEmu, ajustarExtentEnDocumentXml } from './ajustarExtentImagenOrganigrama'
 import { insertarCamposPaginacion } from '@/lib/documentosOficiales/plantillaOficial/insertarCamposPaginacion'
 import { resolverLogoClienteBuffer } from '@/lib/documentosOficiales/plantillaOficial/resolverLogoCliente'
 import { reempaquetarZip } from '@/lib/documentosOficiales/plantillaOficial/reempaquetarZip'
@@ -32,9 +33,11 @@ const TITULO_DOCUMENTO = 'ORGANIGRAMA DEL PROYECTO'
 
 /**
  * Render del organigrama con la plantilla oficial de cliente. A diferencia de
- * la Matriz, document.xml NO se toca a nivel texto: no hay tabla dinámica y
- * {#revisiones}...{/revisiones} ya viene balanceado en esta plantilla. La
- * imagen del árbol se inyecta 100% por byte-swap de word/media/organigrama.png
+ * la Matriz, document.xml no tiene tabla dinámica ni loops sin cerrar — el
+ * único texto que se toca es el wp:extent/a:ext del drawing de la imagen,
+ * ajustado dinámicamente al aspect ratio real del árbol capturado (ver
+ * ajustarExtentImagenOrganigrama.ts) para que ocupe la página sin padding.
+ * La imagen en sí se inyecta 100% por byte-swap de word/media/organigrama.png
  * (igual que el logo del cliente) — no existe render server-side del árbol,
  * la imagen llega ya generada desde el navegador.
  */
@@ -43,8 +46,9 @@ export async function renderOrganigramaPlantillaOficial(datos: DatosOrganigramaP
   const zip = new PizZip(plantillaBuffer)
 
   const header1XmlOriginal = zip.file('word/header1.xml')?.asText()
-  if (!header1XmlOriginal) {
-    throw new Error('[organigrama-plantilla] La plantilla no tiene word/header1.xml — archivo corrupto o formato inesperado.')
+  const documentXmlOriginal = zip.file('word/document.xml')?.asText()
+  if (!header1XmlOriginal || !documentXmlOriginal) {
+    throw new Error('[organigrama-plantilla] La plantilla no tiene word/header1.xml o word/document.xml — archivo corrupto o formato inesperado.')
   }
   zip.file('word/header1.xml', insertarCamposPaginacion(header1XmlOriginal))
 
@@ -54,7 +58,10 @@ export async function renderOrganigramaPlantillaOficial(datos: DatosOrganigramaP
   }
 
   const imagenNormalizada = await normalizarImagenOrganigrama(datos.organigramaImagenBuffer)
-  zip.file('word/media/organigrama.png', imagenNormalizada)
+  zip.file('word/media/organigrama.png', imagenNormalizada.buffer)
+
+  const { cx, cy } = calcularExtentEmu(imagenNormalizada.width, imagenNormalizada.height)
+  zip.file('word/document.xml', ajustarExtentEnDocumentXml(documentXmlOriginal, cx, cy))
 
   const dataBag = construirDataBagEncabezado({
     proyecto: datos.proyecto,

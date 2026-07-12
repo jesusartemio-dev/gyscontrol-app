@@ -1,24 +1,38 @@
 import sharp from 'sharp'
 
 /**
- * Normaliza el PNG del organigrama capturado en el cliente al tamaño del
- * placeholder `word/media/organigrama.png` de la plantilla (ratio ≈1.7547 =
- * 9300000/5300000 EMU). Fondo blanco opaco (no transparente): el canvas de
- * captura ya usa #F8FAFC como fondo, así que el padding queda visualmente
- * continuo con el propio árbol, y esta imagen ocupa toda una página apaisada
- * por sí sola (a diferencia del logo, un badge chico sobre otro fondo) —
- * transparencia acá solo arriesga artefactos si el .docx se reconvierte a PDF.
+ * Normaliza el PNG del organigrama capturado en el cliente — SOLO garantiza
+ * un ancho mínimo de impresión nítida (≥2000px), sin tocar el aspect ratio y
+ * SIN padding: el bug real detectado (cajas chicas con mucho blanco
+ * alrededor en el Word de G300) era forzar la imagen a un canvas 1.7547:1
+ * fijo con `fit:'contain'` — el árbol real (~2.1:1) quedaba con franjas
+ * blancas arriba/abajo. Ahora el tamaño del FRAME en el documento
+ * (`wp:extent`/`a:ext`) se calcula dinámicamente a partir del aspect ratio
+ * real de esta imagen (ver ajustarExtentImagenOrganigrama.ts) — la imagen
+ * ocupa su propio frame a sangre, sin padding interno.
  *
  * No comparte código con resolverLogoCliente.ts: esa función descarga de
- * Drive por URL; esta recibe un Buffer ya en memoria subido por el cliente en
- * el mismo request — forma de entrada e I/O distintas.
+ * Drive por URL y SÍ necesita normalizar a un marco fijo (VML legacy de
+ * tamaño constante); esta recibe un Buffer ya en memoria y el frame que la
+ * contiene se ajusta a ELLA, no al revés.
  */
-const ANCHO_PX = 2400
-const ALTO_PX = 1368 // 2400 / 1.7547 ≈ 1368
+const ANCHO_MINIMO_PX = 2000
 
-export async function normalizarImagenOrganigrama(buffer: Buffer): Promise<Buffer> {
-  return sharp(buffer)
-    .resize(ANCHO_PX, ALTO_PX, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 1 } })
-    .png()
-    .toBuffer()
+export interface ImagenNormalizada {
+  buffer: Buffer
+  width: number
+  height: number
+}
+
+export async function normalizarImagenOrganigrama(buffer: Buffer): Promise<ImagenNormalizada> {
+  const metadata = await sharp(buffer).metadata()
+  const anchoOriginal = metadata.width ?? ANCHO_MINIMO_PX
+
+  let pipeline = sharp(buffer)
+  if (anchoOriginal < ANCHO_MINIMO_PX) {
+    pipeline = pipeline.resize({ width: ANCHO_MINIMO_PX })
+  }
+
+  const { data, info } = await pipeline.png().toBuffer({ resolveWithObject: true })
+  return { buffer: data, width: info.width, height: info.height }
 }

@@ -326,9 +326,10 @@ export default function OrganigramaProyectoPage() {
   // ── CAPTURA PNG (compartida entre el botón PNG y el export Word) ───────────
 
   const generarOrganigramaPngBlob = async (scale: number, modoDocumento = false): Promise<Blob> => {
-    const { buildLayout, NORMAL_DIMS } = await import('@/components/organigrama/OrgChart')
-    const { nodes, edges, svgWidth, svgHeight } = buildLayout(nodos, NORMAL_DIMS)
-    const { NODE_W, NODE_H } = NORMAL_DIMS
+    const { buildLayout, NORMAL_DIMS, DOCUMENTO_DIMS } = await import('@/components/organigrama/OrgChart')
+    const dims = modoDocumento ? DOCUMENTO_DIMS : NORMAL_DIMS
+    const { nodes, edges, svgWidth, svgHeight } = buildLayout(nodos, dims)
+    const { NODE_W, NODE_H } = dims
 
     const canvas = document.createElement('canvas')
     canvas.width = svgWidth * scale
@@ -467,8 +468,8 @@ export default function OrganigramaProyectoPage() {
     }
     setExportingWord(true)
     try {
-      const { buildLayout, NORMAL_DIMS } = await import('@/components/organigrama/OrgChart')
-      const { svgWidth } = buildLayout(nodos, NORMAL_DIMS)
+      const { buildLayout, DOCUMENTO_DIMS } = await import('@/components/organigrama/OrgChart')
+      const { svgWidth } = buildLayout(nodos, DOCUMENTO_DIMS)
       const scale = Math.max(2, Math.ceil(2000 / svgWidth))
       const pngBlob = await generarOrganigramaPngBlob(scale, true)
 

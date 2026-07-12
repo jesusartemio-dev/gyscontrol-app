@@ -41,6 +41,15 @@ interface ChartDims {
 
 export const NORMAL_DIMS: ChartDims = { NODE_W: 160, NODE_H: 120, H_GAP: 5, V_GAP: 22, MAX_COLS: 999, WRAP_FROM_DEPTH: 1, isCompact: false }
 const COMPACT_DIMS: ChartDims = { NODE_W: 130, NODE_H: 64, H_GAP: 6, V_GAP: 24, MAX_COLS: 999, WRAP_FROM_DEPTH: 0, isCompact: true }
+/**
+ * Espaciado para el export a Word (captura de canvas, no esta vista) — los
+ * gaps de NORMAL_DIMS son generosos a propósito para editar cómodo en
+ * pantalla; en el documento eso se traduce en cajas chicas con mucho blanco
+ * alrededor. H_GAP/V_GAP al ~60% y NODE_W un poco más ancho para que las
+ * cajas ocupen más lámina — mismo contenido (cargo/nombre/tel/CIP/correo),
+ * NODE_H sin tocar.
+ */
+export const DOCUMENTO_DIMS: ChartDims = { NODE_W: 175, NODE_H: 120, H_GAP: 3, V_GAP: 13, MAX_COLS: 999, WRAP_FROM_DEPTH: 1, isCompact: false }
 
 export interface LayoutNode {
   nodo: OrgNodoCompleto
