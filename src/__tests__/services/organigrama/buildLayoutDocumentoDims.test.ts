@@ -29,21 +29,31 @@ describe('DOCUMENTO_DIMS — espaciado compacto para el export a Word', () => {
     expect(DOCUMENTO_DIMS.NODE_H).toBe(NORMAL_DIMS.NODE_H)
   })
 
-  it('para el mismo árbol, el layout compacto ocupa menos alto total que el del editor (mismos niveles, menos gap acumulado)', () => {
-    const normal = buildLayout(NODOS, NORMAL_DIMS)
+  // NOTA: el layout compacto reduce el ancho (menos hermanos empujados a los
+  // extremos), pero el ALTO ya no se garantiza menor que el editor — la
+  // compactación por contorno impone un V_GAP mínimo (~40% de NODE_H, ver
+  // GAP_H_MIN_PROP/GAP_V_MIN_PROP en OrgChart.tsx) para que el codo del
+  // conector sea visible, y ese mínimo puede terminar siendo MAYOR que el
+  // V_GAP del editor (bug real detectado tras la primera versión del
+  // compactado: cajas/niveles quedaban borde con borde, sin espacio para
+  // dibujar los conectores).
+  it('la separación vertical entre padre e hijo respeta el mínimo proporcional (≥40% de NODE_H) aunque sea mayor que la del editor', () => {
     const documento = buildLayout(NODOS, DOCUMENTO_DIMS)
-    expect(documento.svgHeight).toBeLessThan(normal.svgHeight)
+    const root = documento.nodes.find(n => n.nodo.id === 'root')!
+    const hijoA = documento.nodes.find(n => n.nodo.id === 'a')!
+    const gap = hijoA.y - (root.y + root.dims.NODE_H)
+    expect(gap).toBeGreaterThanOrEqual(DOCUMENTO_DIMS.NODE_H * 0.4)
   })
 
-  it('la separación vertical entre un padre y su hijo es menor en modo documento', () => {
-    const normal = buildLayout(NODOS, NORMAL_DIMS)
-    const documento = buildLayout(NODOS, DOCUMENTO_DIMS)
-    const gapEntreNiveles = (layout: ReturnType<typeof buildLayout>) => {
-      const root = layout.nodes.find(n => n.nodo.id === 'root')!
-      const hijoA = layout.nodes.find(n => n.nodo.id === 'a')!
-      return hijoA.y - (root.y + root.dims.NODE_H)
-    }
-    expect(gapEntreNiveles(documento)).toBeLessThan(gapEntreNiveles(normal))
+  it('dos hermanos simples (sin hijos) quedan separados por EXACTAMENTE el mínimo proporcional (≥15% de NODE_W) — ni pegados ni con hueco de más', () => {
+    const dosHermanos: OrgNodoCompleto[] = [nodo('root', null), nodo('x', 'root', 0), nodo('y', 'root', 1)]
+    const documento = buildLayout(dosHermanos, DOCUMENTO_DIMS)
+    const x = documento.nodes.find(n => n.nodo.id === 'x')!
+    const y = documento.nodes.find(n => n.nodo.id === 'y')!
+    const gap = y.x - (x.x + DOCUMENTO_DIMS.NODE_W)
+    const minimoEsperado = DOCUMENTO_DIMS.NODE_W * 0.15
+    expect(gap).toBeCloseTo(minimoEsperado, 0)
+    expect(gap).toBeGreaterThan(0) // nunca bordes tocándose
   })
 })
 

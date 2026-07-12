@@ -57,9 +57,12 @@ const COMPACT_DIMS: ChartDims = { NODE_W: 130, NODE_H: 64, H_GAP: 6, V_GAP: 24, 
  * Espaciado para el export a Word (captura de canvas, no esta vista) — los
  * gaps de NORMAL_DIMS son generosos a propósito para editar cómodo en
  * pantalla; en el documento eso se traduce en cajas chicas con mucho blanco
- * alrededor. H_GAP/V_GAP al ~60% y NODE_W un poco más ancho para que las
- * cajas ocupen más lámina — mismo contenido (cargo/nombre/tel/CIP/correo),
- * NODE_H sin tocar. Usa el layout compacto (layoutCompacto: true).
+ * alrededor. NODE_W un poco más ancho para que las cajas ocupen más lámina —
+ * mismo contenido (cargo/nombre/tel/CIP/correo), NODE_H sin tocar. Usa el
+ * layout compacto (layoutCompacto: true), que además IMPONE un mínimo
+ * proporcional a H_GAP/V_GAP (ver GAP_H_MIN_PROP/GAP_V_MIN_PROP) — los
+ * valores acá son solo el piso declarado, casi siempre el mínimo del
+ * algoritmo termina siendo mayor.
  */
 export const DOCUMENTO_DIMS: ChartDims = { NODE_W: 175, NODE_H: 120, H_GAP: 3, V_GAP: 13, MAX_COLS: 999, WRAP_FROM_DEPTH: 1, isCompact: false, layoutCompacto: true }
 /**
@@ -277,7 +280,20 @@ function combinarHermanosCompacto(layouts: SubarbolCompacto[], H_GAP: number): {
  * borde de la fila más ancha de esa rama (que puede estar varios niveles más
  * abajo). Nunca se usa en el editor.
  */
-function buildLayoutCompacto(nodos: OrgNodoCompleto[], dims: ChartDims): LayoutResult {
+// Mínimos proporcionales al tamaño de caja — sin esto, la compactación deja
+// hermanos y niveles borde con borde y los conectores no tienen espacio para
+// dibujarse (bug real detectado tras la primera versión del compactado: "se
+// pasó"). H_GAP/V_GAP declarados en el preset se usan solo si ya son
+// mayores que este mínimo.
+const GAP_H_MIN_PROP = 0.15 // ≥15% del ancho de caja entre hermanos/ramas vecinas
+const GAP_V_MIN_PROP = 0.40 // ≥40% del alto de caja entre niveles, para que el codo del conector sea visible
+
+function buildLayoutCompacto(nodos: OrgNodoCompleto[], dimsOriginal: ChartDims): LayoutResult {
+  const dims: ChartDims = {
+    ...dimsOriginal,
+    H_GAP: Math.max(dimsOriginal.H_GAP, dimsOriginal.NODE_W * GAP_H_MIN_PROP),
+    V_GAP: Math.max(dimsOriginal.V_GAP, dimsOriginal.NODE_H * GAP_V_MIN_PROP),
+  }
   const { NODE_W, NODE_H, H_GAP, V_GAP } = dims
   const { children } = construirIndiceHijos(nodos)
 

@@ -118,10 +118,12 @@ describe('renderOrganigramaPlantillaOficial — contra la plantilla REAL', () =>
 
     const anchoEsperado = 2000
     const altoEsperado = Math.round(2000 * (57 / 100))
-    const { cx, cy } = calcularExtentEmu(anchoEsperado, altoEsperado)
+    // Imagen de prueba ratio ~1.754 (>1.5) -> orientación apaisada, sin cambios.
+    const { cx, cy } = calcularExtentEmu(anchoEsperado, altoEsperado, 'apaisada')
 
     expect(documentXml).not.toContain('cx="9300000" cy="5300000"')
     expect((documentXml.match(new RegExp(`cx="${cx}" cy="${cy}"`, 'g')) ?? []).length).toBe(2)
+    expect(documentXml).toContain('w:orient="landscape"')
   })
 
   it('el paquete final queda con [Content_Types].xml primero y sin entradas de directorio', async () => {

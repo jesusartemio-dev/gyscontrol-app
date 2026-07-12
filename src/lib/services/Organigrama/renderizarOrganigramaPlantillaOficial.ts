@@ -2,7 +2,7 @@ import PizZip from 'pizzip'
 import Docxtemplater from 'docxtemplater'
 import { descargarPlantillaOrganigramaOficial } from './descargarPlantillaOrganigrama'
 import { normalizarImagenOrganigrama } from './normalizarImagenOrganigrama'
-import { calcularExtentEmu, ajustarExtentEnDocumentXml } from './ajustarExtentImagenOrganigrama'
+import { elegirOrientacion, calcularExtentEmu, ajustarExtentEnDocumentXml, ajustarOrientacionEnDocumentXml } from './ajustarExtentImagenOrganigrama'
 import { insertarCamposPaginacion } from '@/lib/documentosOficiales/plantillaOficial/insertarCamposPaginacion'
 import { resolverLogoClienteBuffer } from '@/lib/documentosOficiales/plantillaOficial/resolverLogoCliente'
 import { reempaquetarZip } from '@/lib/documentosOficiales/plantillaOficial/reempaquetarZip'
@@ -34,9 +34,12 @@ const TITULO_DOCUMENTO = 'ORGANIGRAMA DEL PROYECTO'
 /**
  * Render del organigrama con la plantilla oficial de cliente. A diferencia de
  * la Matriz, document.xml no tiene tabla dinámica ni loops sin cerrar — el
- * único texto que se toca es el wp:extent/a:ext del drawing de la imagen,
- * ajustado dinámicamente al aspect ratio real del árbol capturado (ver
- * ajustarExtentImagenOrganigrama.ts) para que ocupe la página sin padding.
+ * único texto que se toca es el sectPr de la sección 2 (orientación de la
+ * lámina, swap a vertical si el árbol compactado queda cuadrado/alto — ver
+ * elegirOrientacion) y el wp:extent/a:ext del drawing de la imagen, ajustado
+ * dinámicamente al aspect ratio real del árbol capturado dentro del área
+ * útil real de la orientación elegida (ver ajustarExtentImagenOrganigrama.ts)
+ * para que ocupe la página sin padding ni márgenes laterales enormes.
  * La imagen en sí se inyecta 100% por byte-swap de word/media/organigrama.png
  * (igual que el logo del cliente) — no existe render server-side del árbol,
  * la imagen llega ya generada desde el navegador.
@@ -60,8 +63,13 @@ export async function renderOrganigramaPlantillaOficial(datos: DatosOrganigramaP
   const imagenNormalizada = await normalizarImagenOrganigrama(datos.organigramaImagenBuffer)
   zip.file('word/media/organigrama.png', imagenNormalizada.buffer)
 
-  const { cx, cy } = calcularExtentEmu(imagenNormalizada.width, imagenNormalizada.height)
-  zip.file('word/document.xml', ajustarExtentEnDocumentXml(documentXmlOriginal, cx, cy))
+  // Árboles ya compactados con aspecto cuadrado/alto van en página vertical
+  // (mismo formato que la carátula) en vez de dejar márgenes laterales
+  // enormes en una apaisada que ya no hace falta — ver elegirOrientacion.
+  const orientacion = elegirOrientacion(imagenNormalizada.width, imagenNormalizada.height)
+  const { cx, cy } = calcularExtentEmu(imagenNormalizada.width, imagenNormalizada.height, orientacion)
+  const documentXmlConOrientacion = ajustarOrientacionEnDocumentXml(documentXmlOriginal, orientacion)
+  zip.file('word/document.xml', ajustarExtentEnDocumentXml(documentXmlConOrientacion, cx, cy))
 
   const dataBag = construirDataBagEncabezado({
     proyecto: datos.proyecto,
