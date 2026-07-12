@@ -62,7 +62,7 @@ export async function generarEsquemasConIA(opciones: GenerarEsquemasOpciones): P
   for (let intento = 0; intento <= MAX_REINTENTOS_JSON; intento++) {
     const userPrompt =
       edtNombre === 'CON'
-        ? buildUserEsquemasZonasCon(alcanceLibre, cotizacion)
+        ? buildUserEsquemasZonasCon(alcanceLibre, cotizacion, equiposReales)
         : buildUserEsquemasFamiliasPro(alcanceLibre, cotizacion, equiposReales)
 
     const inicio = Date.now()
@@ -100,7 +100,11 @@ export async function generarEsquemasConIA(opciones: GenerarEsquemasOpciones): P
       const parsed = parseJsonIA(extraerTexto(response)) as { esquemas?: EsquemaPropuestoIA[] }
       const esquemas = (parsed.esquemas ?? [])
         .filter(e => e && typeof e.criterio === 'string' && Array.isArray(e.nombres) && e.nombres.length > 0)
-        .map(e => ({ criterio: e.criterio, nombres: e.nombres.filter((n): n is string => typeof n === 'string' && n.trim().length > 0) }))
+        .map(e => ({
+          criterio: e.criterio,
+          nombres: e.nombres.filter((n): n is string => typeof n === 'string' && n.trim().length > 0),
+          ...(typeof e.nota === 'string' && e.nota.trim().length > 0 ? { nota: e.nota.trim() } : {}),
+        }))
         .filter(e => e.nombres.length > 0)
       return { esquemas, advertencias: [] }
     } catch {

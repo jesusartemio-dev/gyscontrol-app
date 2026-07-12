@@ -77,6 +77,8 @@ export interface ResultadoActividadesDeterministas {
 export interface EsquemaAgrupacionPropuesto {
   criterio: string
   nombres: string[]
+  /** Aclaración opcional para el usuario — ej. cuando el esquema "Por zona" de CON usa placeholders genéricos por falta de contexto geográfico. */
+  nota?: string
 }
 
 /** Esquema con el que el usuario confirmó la Etapa B — nombres ya posiblemente editados (renombrados/agregados/quitados) respecto al propuesto. */

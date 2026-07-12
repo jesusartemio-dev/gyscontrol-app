@@ -46,8 +46,9 @@ function bloqueEquiposReales(equipos: EquipoRealParaPrompt[] | null): string {
     '',
     '--- SEÑAL FUERTE: EQUIPOS REALES YA COTIZADOS (dato estructurado, no extraído por IA) ---',
     'Esta es la lista REAL de materiales/equipos que el proyecto compró, con marca y cantidad reales.',
-    'Tus familias DEBEN cubrir todos estos ítems — podés citarlos por su código/descripción al nombrar',
-    'la familia (ej. si hay "TUBO CONDUIT RGS 1x10FT" proponé "Procura de Conduit/Tuberías").',
+    'Tus grupos/Actividades DEBEN considerar todos estos ítems — podés citarlos por su código/descripción',
+    'al nombrarlos (ej. si hay "TABLERO MCC 70-81" proponé una zona "Sala MCC 70-81"; si hay "TUBO CONDUIT',
+    'RGS 1x10FT" proponé una familia "Procura de Conduit/Tuberías").',
     ...filas,
     '--- FIN EQUIPOS REALES ---',
     '',
@@ -334,6 +335,7 @@ export function buildUserPropuestaFamiliasPro(
 export interface EsquemaPropuestoIA {
   criterio: string
   nombres: string[]
+  nota?: string
 }
 
 export const SYSTEM_ESQUEMAS_ZONAS_CON = `
@@ -341,27 +343,50 @@ Eres el Jefe de Obra Senior de GYS CONTROL INDUSTRIAL SAC, empresa peruana
 especializada en proyectos electromecánicos, automatización e
 instrumentación industrial.
 
-Vas a proponer 2 o 3 ESQUEMAS ALTERNATIVOS de cómo agrupar las tareas de
-EJECUCIÓN (EDT "CON") de un proyecto en Actividades — cada esquema es una
-forma distinta y válida de organizar el mismo trabajo (ej. por zona física,
-por sistema/disciplina, por frente de trabajo). Todavía NO estás asignando
-tareas a ningún grupo — solo proponés nombres de Actividad y el criterio que
-los organiza, para que el usuario elija cuál prefiere.
+Vas a proponer SIEMPRE estos 3 ESQUEMAS de cómo agrupar las tareas de
+EJECUCIÓN (EDT "CON") de un proyecto en Actividades — en este orden exacto,
+sin omitir ninguno y sin agregar otros ejes distintos. Todavía NO estás
+asignando tareas a ningún grupo — solo proponés nombres de Actividad y el
+criterio que los organiza, para que el usuario elija cuál prefiere.
 
-REGLAS ESTRICTAS:
-- Proponé 2 o 3 esquemas, nunca más de 3 ni menos de 2 (salvo que el alcance
-  sea tan simple que solo tenga sentido un único esquema razonable — en ese
-  caso proponé igual 2 variantes con distinto nivel de detalle).
+1. "Por zona / área física" — Actividades nombradas por zona o área concreta
+   del proyecto (ej. "Sala MCC 70-81", "Recorrido Eléctrico", "Zona
+   Elevador"). Es el esquema canónico con el que la empresa organiza sus
+   cronogramas reales de obra — NUNCA lo omitas, aunque el alcance parezca
+   simple o falte información.
+2. "Por sistema / disciplina técnica" — Actividades nombradas por disciplina
+   (ej. "Canalización", "Tendido y Conexionado", "Montaje de Equipos").
+3. "Por etapa / frente constructivo" — Actividades nombradas por etapa o
+   frente de avance de obra.
+
+Tu creatividad va en NOMBRAR los grupos concretos de cada esquema usando el
+contexto real del proyecto — NO en decidir qué ejes ofrecer, esos 3 son
+fijos y obligatorios, no a tu criterio.
+
+REGLAS ESTRICTAS PARA EL ESQUEMA 1 ("Por zona / área física"):
+- Derivá los nombres de zona de la descripción libre del alcance, de las
+  partidas de la cotización y de los EQUIPOS REALES YA COTIZADOS (si
+  aparecen más abajo) — ej. si hay un tablero "MCC 70-81" cotizado, proponé
+  una zona "Sala MCC 70-81"; si el alcance menciona un elevador, proponé
+  "Zona Elevador".
+- Si el contexto NO da información suficiente para nombrar zonas concretas
+  (alcance muy genérico, sin referencias de ubicación ni equipos), NO omitas
+  igual el esquema: proponelo con nombres genéricos editables como
+  "Zona 1 — renombrar", "Zona equipo principal", "General/Transversal", y
+  completá su "nota" con: "Nombra las zonas reales de tu proyecto" — el
+  usuario las edita en el paso siguiente, que existe justamente para eso.
+
+REGLAS GENERALES:
 - Cada esquema debe tener un "criterio" (una frase corta, ej. "Por zona
-  física", "Por sistema", "Por frente de trabajo") y una lista de "nombres"
-  de Actividad específicos y basados en la descripción de alcance real del
-  proyecto (ej. "Sala MCC", "Recorrido", "Zona Elevador") — nunca genéricos
-  como "Zona 1" si hay información suficiente para nombrarlos mejor.
-- Los esquemas deben ser genuinamente alternativos entre sí (distinto
-  criterio organizador), no variaciones triviales del mismo esquema.
+  física") y una lista de "nombres" de Actividad — un esquema con 4-8
+  nombres suele ser razonable, ajustá según la complejidad real del alcance
+  descrito. "nota" es opcional: usala SOLO para aclarar algo al usuario (ej.
+  el caso de fallback del esquema 1); dejala vacía/omitida en los demás.
+- Los 3 esquemas deben ser genuinamente distintos entre sí (distinto
+  criterio organizador cada uno), nunca variaciones triviales del mismo
+  esquema.
 - No calcules ni asignes ninguna tarea — no tenés la lista de tareas en este
-  paso, solo el alcance narrativo. Un esquema con 4-8 nombres de Actividad
-  suele ser razonable; ajustá según la complejidad real del alcance descrito.
+  paso, solo el alcance narrativo y el contexto de cotización/equipos.
 - Si el contexto de cotización menciona exclusiones, no propongas nombres de
   Actividad para trabajo excluido.
 - Devolvé SOLO el JSON, sin markdown ni texto antes o después.
@@ -369,14 +394,16 @@ REGLAS ESTRICTAS:
 
 export function buildUserEsquemasZonasCon(
   alcanceLibre: string,
-  cotizacion: ContextoCotizacionParaPrompt | null
+  cotizacion: ContextoCotizacionParaPrompt | null,
+  equiposReales: EquipoRealParaPrompt[] | null = null
 ): string {
   return [
+    bloqueEquiposReales(equiposReales),
     `DESCRIPCIÓN LIBRE DEL ALCANCE (dada por el usuario en el wizard):\n${alcanceLibre || '(no se proporcionó)'}`,
     bloqueContextoCotizacion(cotizacion),
     '',
-    'ESQUEMA DE OUTPUT (devolvé EXACTAMENTE este JSON, sin markdown):',
-    '{ "esquemas": [{ "criterio": "string", "nombres": ["string", "..."] }] }',
+    'ESQUEMA DE OUTPUT (devolvé EXACTAMENTE este JSON, sin markdown — "nota" es opcional):',
+    '{ "esquemas": [{ "criterio": "string", "nombres": ["string", "..."], "nota": "string opcional" }] }',
   ]
     .filter(Boolean)
     .join('\n')

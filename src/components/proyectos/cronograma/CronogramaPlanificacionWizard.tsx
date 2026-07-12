@@ -1342,6 +1342,7 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
                       <div className="min-w-0">
                         <p className="text-sm font-medium">{esquema.criterio}</p>
                         <p className="text-xs text-muted-foreground">{esquema.nombres.join(' / ')}</p>
+                        {esquema.nota && <p className="text-xs text-amber-600 mt-0.5">{esquema.nota}</p>}
                       </div>
                     </RadioGroupItem>
                   ))}

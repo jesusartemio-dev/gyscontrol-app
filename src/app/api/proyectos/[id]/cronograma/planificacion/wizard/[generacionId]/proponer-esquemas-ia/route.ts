@@ -101,7 +101,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     }
 
     let equiposReales: EquipoRealParaPrompt[] | null = null
-    if (edtsEsquema.some(e => e.nombre === 'PRO')) {
+    if (edtsEsquema.length > 0) {
       const equipos = await prisma.proyectoEquipoCotizado.findMany({
         where: { proyectoId },
         select: {
@@ -130,7 +130,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
           tieneTareasCandidatas: edt._count.catalogoServicio > 0,
           alcanceLibre: config.alcanceLibre,
           cotizacion: construirContextoCotizacion(nombre),
-          equiposReales: nombre === 'PRO' ? equiposReales : null,
+          equiposReales,
           userId: session.user!.id,
           proyectoId,
         })
