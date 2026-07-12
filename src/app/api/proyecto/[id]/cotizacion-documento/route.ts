@@ -25,6 +25,7 @@ async function construirRespuesta(proyectoId: string, documento: ProyectoCotizac
     resumenAlcance: (documento.resumenAlcance as string[] | null) ?? [],
     exclusiones: (documento.exclusiones as string[] | null) ?? [],
     lineasClasificadas: (documento.lineasClasificadas as CotizacionDocumentoExtracted['lineasClasificadas'] | null) ?? [],
+    formaPago: (documento.formaPago as CotizacionDocumentoExtracted['formaPago'] | null) ?? { tipo: null, numeroValorizaciones: null, descripcion: null },
     confianza: (documento.confianzaExtraccion as 'alta' | 'media' | 'baja') ?? 'media',
     advertencias: (documento.advertenciasExtraccion as string[] | null) ?? [],
   }

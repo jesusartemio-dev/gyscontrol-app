@@ -57,7 +57,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     }),
     prisma.proyectoCotizacionDocumento.findUnique({
       where: { proyectoId },
-      select: { resumenAlcance: true, exclusiones: true, numeroPropuesta: true, clienteDetectado: true },
+      select: { resumenAlcance: true, exclusiones: true, numeroPropuesta: true, clienteDetectado: true, formaPago: true },
     }),
     obtenerEdtsComercialesProyecto(proyectoId),
     // Correcciones manuales a nivel proyecto (ver ProyectoCronogramaEdtCorreccion)
@@ -221,6 +221,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
           clienteDetectado: cotizacionDocumento.clienteDetectado,
           resumenAlcance: (cotizacionDocumento.resumenAlcance as string[] | null) ?? [],
           exclusiones: (cotizacionDocumento.exclusiones as string[] | null) ?? [],
+          formaPago: cotizacionDocumento.formaPago ?? null,
         }
       : null,
   })

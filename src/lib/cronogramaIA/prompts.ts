@@ -324,6 +324,218 @@ export function buildUserPropuestaFamiliasPro(
 }
 
 /**
+ * Etapa A del flujo de 2 etapas de CON/PRO — propone 2-3 ESQUEMAS
+ * alternativos de agrupación (solo criterio + nombres de Actividad), SIN
+ * lista de tareas/ids: es la llamada barata que deja elegir al usuario
+ * CÓMO agrupar antes de comprometer ninguna asignación. La Etapa B
+ * (buildUserAsignacionCon/Pro más abajo) recién ahí asigna tareas al
+ * esquema que el usuario elija/edite.
+ */
+export interface EsquemaPropuestoIA {
+  criterio: string
+  nombres: string[]
+}
+
+export const SYSTEM_ESQUEMAS_ZONAS_CON = `
+Eres el Jefe de Obra Senior de GYS CONTROL INDUSTRIAL SAC, empresa peruana
+especializada en proyectos electromecánicos, automatización e
+instrumentación industrial.
+
+Vas a proponer 2 o 3 ESQUEMAS ALTERNATIVOS de cómo agrupar las tareas de
+EJECUCIÓN (EDT "CON") de un proyecto en Actividades — cada esquema es una
+forma distinta y válida de organizar el mismo trabajo (ej. por zona física,
+por sistema/disciplina, por frente de trabajo). Todavía NO estás asignando
+tareas a ningún grupo — solo proponés nombres de Actividad y el criterio que
+los organiza, para que el usuario elija cuál prefiere.
+
+REGLAS ESTRICTAS:
+- Proponé 2 o 3 esquemas, nunca más de 3 ni menos de 2 (salvo que el alcance
+  sea tan simple que solo tenga sentido un único esquema razonable — en ese
+  caso proponé igual 2 variantes con distinto nivel de detalle).
+- Cada esquema debe tener un "criterio" (una frase corta, ej. "Por zona
+  física", "Por sistema", "Por frente de trabajo") y una lista de "nombres"
+  de Actividad específicos y basados en la descripción de alcance real del
+  proyecto (ej. "Sala MCC", "Recorrido", "Zona Elevador") — nunca genéricos
+  como "Zona 1" si hay información suficiente para nombrarlos mejor.
+- Los esquemas deben ser genuinamente alternativos entre sí (distinto
+  criterio organizador), no variaciones triviales del mismo esquema.
+- No calcules ni asignes ninguna tarea — no tenés la lista de tareas en este
+  paso, solo el alcance narrativo. Un esquema con 4-8 nombres de Actividad
+  suele ser razonable; ajustá según la complejidad real del alcance descrito.
+- Si el contexto de cotización menciona exclusiones, no propongas nombres de
+  Actividad para trabajo excluido.
+- Devolvé SOLO el JSON, sin markdown ni texto antes o después.
+`.trim()
+
+export function buildUserEsquemasZonasCon(
+  alcanceLibre: string,
+  cotizacion: ContextoCotizacionParaPrompt | null
+): string {
+  return [
+    `DESCRIPCIÓN LIBRE DEL ALCANCE (dada por el usuario en el wizard):\n${alcanceLibre || '(no se proporcionó)'}`,
+    bloqueContextoCotizacion(cotizacion),
+    '',
+    'ESQUEMA DE OUTPUT (devolvé EXACTAMENTE este JSON, sin markdown):',
+    '{ "esquemas": [{ "criterio": "string", "nombres": ["string", "..."] }] }',
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
+export const SYSTEM_ESQUEMAS_FAMILIAS_PRO = `
+Eres el Coordinador de Procura Senior de GYS CONTROL INDUSTRIAL SAC, empresa
+peruana especializada en proyectos electromecánicos, automatización e
+instrumentación industrial.
+
+Vas a proponer 2 o 3 ESQUEMAS ALTERNATIVOS de cómo agrupar las tareas de
+PROCURA (EDT "PRO") de un proyecto en Actividades por FAMILIA o PAQUETE de
+compra — cada esquema es una forma distinta y válida de organizar el mismo
+seguimiento de compras. Todavía NO estás asignando tareas a ningún grupo —
+solo proponés nombres de familia y el criterio que los organiza.
+
+REGLAS ESTRICTAS:
+- Proponé 2 o 3 esquemas, nunca más de 3 ni menos de 2.
+- Cada esquema debe tener un "criterio" (ej. "Por tipo de material", "Por
+  proveedor/rubro") y una lista de "nombres" de familia específicos.
+- Si aparecen EQUIPOS REALES YA COTIZADOS más abajo (dato estructurado, con
+  marca y cantidad reales), tus esquemas DEBEN nombrar familias que cubran
+  esos ítems — es la señal de mayor prioridad, por encima del alcance libre.
+- No calcules ni asignes ninguna tarea — no tenés la lista de tareas en este
+  paso.
+- Si el contexto de cotización menciona exclusiones, no propongas familias
+  para ese material/servicio excluido.
+- Devolvé SOLO el JSON, sin markdown ni texto antes o después.
+`.trim()
+
+export function buildUserEsquemasFamiliasPro(
+  alcanceLibre: string,
+  cotizacion: ContextoCotizacionParaPrompt | null,
+  equiposReales: EquipoRealParaPrompt[] | null = null
+): string {
+  return [
+    bloqueEquiposReales(equiposReales),
+    `DESCRIPCIÓN LIBRE DEL ALCANCE (dada por el usuario en el wizard — señal más débil que los equipos reales de arriba):\n${alcanceLibre || '(no se proporcionó)'}`,
+    bloqueContextoCotizacion(cotizacion),
+    '',
+    'ESQUEMA DE OUTPUT (devolvé EXACTAMENTE este JSON, sin markdown):',
+    '{ "esquemas": [{ "criterio": "string", "nombres": ["string", "..."] }] }',
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
+/**
+ * Etapa B del flujo de 2 etapas de CON/PRO — los nombres de Actividad ya
+ * están DECIDIDOS (el usuario eligió/editó un esquema de la Etapa A): acá
+ * la IA solo asigna cada tarea candidata (por "id") a uno de esos nombres
+ * FIJOS. A diferencia de SYSTEM_PROPUESTA_ZONAS_CON/FAMILIAS_PRO, no puede
+ * inventar ni renombrar ninguna Actividad — el servidor descarta cualquier
+ * actividadNombre que no esté en la lista dada (ver validarPropuestaGrupos).
+ */
+export const SYSTEM_ASIGNACION_CON = `
+Eres el Jefe de Obra Senior de GYS CONTROL INDUSTRIAL SAC, empresa peruana
+especializada en proyectos electromecánicos, automatización e
+instrumentación industrial.
+
+El usuario ya decidió los nombres de las Actividades de EJECUCIÓN (EDT
+"CON") de este proyecto (ver lista más abajo). Tu trabajo es asignar cada
+tarea candidata del catálogo a la Actividad que corresponda — NO podés
+crear, renombrar ni ignorar ninguna Actividad de la lista dada.
+
+REGLAS ESTRICTAS:
+- Las tareas candidatas YA ESTÁN RESUELTAS por el sistema — vienen con un
+  "id" real del catálogo. NUNCA inventes una tarea ni un id nuevo.
+- Cada asignación que propongas debe usar un "actividadNombre" que sea
+  EXACTAMENTE uno de los nombres de la lista dada más abajo — copiado tal
+  cual, sin variar mayúsculas/tildes/espacios. Cualquier nombre que no
+  calce se descarta en el servidor.
+- ASIGNÁ TODAS las tareas candidatas a alguna Actividad de la lista — no es
+  opcional. El sistema tiene un "Sin agrupar" de emergencia para lo que
+  quede afuera, pero es un fallback de última instancia, no una salida
+  válida de tu parte.
+- Si el contexto de cotización menciona exclusiones, NO asignes tareas que
+  correspondan a trabajo excluido (dejalas fuera de toda asignación, caerán
+  en "Sin agrupar" para que el usuario decida).
+- Devolvé SOLO el JSON, sin markdown ni texto antes o después.
+`.trim()
+
+export function buildUserAsignacionCon(
+  tareas: TareaParaPrompt[],
+  nombresActividades: string[],
+  alcanceLibre: string,
+  cotizacion: ContextoCotizacionParaPrompt | null,
+  notaCorrectiva = ''
+): string {
+  return [
+    `DESCRIPCIÓN LIBRE DEL ALCANCE (dada por el usuario en el wizard):\n${alcanceLibre || '(no se proporcionó)'}`,
+    bloqueContextoCotizacion(cotizacion),
+    'NOMBRES DE ACTIVIDAD YA DECIDIDOS (usá EXACTAMENTE estos, no inventes otros):',
+    JSON.stringify(nombresActividades, null, 2),
+    'TAREAS CANDIDATAS DEL CATÁLOGO (asigná cada una a una de las Actividades de arriba, por su "id"):',
+    JSON.stringify(tareas, null, 2),
+    notaCorrectiva,
+    '',
+    'ESQUEMA DE OUTPUT (devolvé EXACTAMENTE este JSON, sin markdown):',
+    '{ "asignaciones": [{ "actividadNombre": "string — EXACTAMENTE uno de los nombres dados", "catalogoServicioIds": ["string — ids copiados del input"] }] }',
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
+export const SYSTEM_ASIGNACION_PRO = `
+Eres el Coordinador de Procura Senior de GYS CONTROL INDUSTRIAL SAC, empresa
+peruana especializada en proyectos electromecánicos, automatización e
+instrumentación industrial.
+
+El usuario ya decidió los nombres de las familias de PROCURA (EDT "PRO") de
+este proyecto (ver lista más abajo). Tu trabajo es asignar cada tarea
+candidata del pipeline de compra a la familia que corresponda — NO podés
+crear, renombrar ni ignorar ninguna familia de la lista dada.
+
+REGLAS ESTRICTAS:
+- Las tareas candidatas YA ESTÁN RESUELTAS por el sistema — vienen con un
+  "id" real del catálogo (pasos genéricos de un pipeline de compra:
+  cotización, OC, seguimiento, recepción, traslado, etc). NUNCA inventes una
+  tarea ni un id nuevo.
+- Cada asignación que propongas debe usar un "actividadNombre" que sea
+  EXACTAMENTE uno de los nombres de la lista dada más abajo — copiado tal
+  cual. Cualquier nombre que no calce se descarta en el servidor.
+- ASIGNÁ TODAS las tareas candidatas a alguna familia de la lista — no es
+  opcional.
+- Si aparecen EQUIPOS REALES YA COTIZADOS más abajo, usalos para decidir a
+  qué familia pertenece cada tarea del pipeline cuando el alcance libre no
+  alcance a diferenciarlo.
+- Si el contexto de cotización menciona exclusiones, NO asignes tareas que
+  correspondan a material/servicio excluido.
+- Devolvé SOLO el JSON, sin markdown ni texto antes o después.
+`.trim()
+
+export function buildUserAsignacionPro(
+  tareas: TareaParaPrompt[],
+  nombresActividades: string[],
+  alcanceLibre: string,
+  cotizacion: ContextoCotizacionParaPrompt | null,
+  equiposReales: EquipoRealParaPrompt[] | null = null,
+  notaCorrectiva = ''
+): string {
+  return [
+    bloqueEquiposReales(equiposReales),
+    `DESCRIPCIÓN LIBRE DEL ALCANCE (dada por el usuario en el wizard — señal más débil que los equipos reales de arriba):\n${alcanceLibre || '(no se proporcionó)'}`,
+    bloqueContextoCotizacion(cotizacion),
+    'NOMBRES DE FAMILIA YA DECIDIDOS (usá EXACTAMENTE estos, no inventes otros):',
+    JSON.stringify(nombresActividades, null, 2),
+    'TAREAS CANDIDATAS DEL PIPELINE DE PROCURA (asigná cada una a una de las familias de arriba, por su "id"):',
+    JSON.stringify(tareas, null, 2),
+    notaCorrectiva,
+    '',
+    'ESQUEMA DE OUTPUT (devolvé EXACTAMENTE este JSON, sin markdown):',
+    '{ "asignaciones": [{ "actividadNombre": "string — EXACTAMENTE uno de los nombres dados", "catalogoServicioIds": ["string — ids copiados del input"] }] }',
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
+/**
  * Pre-llenado del Paso 1 del wizard a partir de la cotización real del
  * proyecto — el catálogo es estático (siempre están los mismos EDTs/
  * servicios disponibles), lo que cambia por proyecto es la cotización/TDR.

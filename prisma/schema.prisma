@@ -3361,6 +3361,13 @@ model ProyectoCronogramaGeneracionIA {
   propuestaTareas      Json?
   resultado            Json?
   advertencias         Json?
+  /// Auditoría del flujo de esquemas en 2 etapas de CON/PRO (ver
+  /// EsquemaAgrupacionPropuesto) — Record<edtNombre, EsquemaAgrupacionPropuesto[]>,
+  /// los 2-3 esquemas alternativos ofrecidos por la IA en la Etapa A.
+  esquemasPropuestos Json?
+  /// Record<edtNombre, EsquemaElegido> — el esquema (posiblemente editado
+  /// por el usuario) con el que se confirmó la Etapa B, para auditoría.
+  esquemaElegido     Json?
   estado               String   @default("borrador")
 
   generadoPorId String
@@ -5749,6 +5756,10 @@ model ProyectoCotizacionDocumento {
   resumenAlcance         Json? // string[]
   exclusiones            Json? // string[]
   lineasClasificadas     Json? // [{descripcion, monto, categoria, seccionOriginalDocumento}]
+  /// Forma de pago/hitos de FACTURACIÓN declarados en el contrato — nunca
+  /// confundir con hitos de ENTREGA de un TDR (CotizacionTdrAnalisis.hitosContractuales).
+  /// {tipo, numeroValorizaciones, descripcion} — ver FormaPagoExtraida.
+  formaPago              Json?
   advertenciasExtraccion Json? // string[]
 
   // Última verificación (snapshot persistido)

@@ -25,6 +25,18 @@ import {
 export const EDTS_AGRUPACION_IA = ['CON', 'PRO', 'PLC', 'HMI'] as const
 
 /**
+ * De los 4 EDTs de EDTS_AGRUPACION_IA, CON y PRO pasan por el flujo de
+ * esquemas en 2 etapas (Etapa A: 2-3 esquemas alternativos de nombres,
+ * sin ids; Etapa B: el usuario elige/edita uno y recién ahí se asignan
+ * tareas) — tienen ambigüedad real de "cómo agrupar" (zonas/familias).
+ * PLC/HMI siguen el flujo de un solo paso: no hay varias formas válidas de
+ * agrupar (una Actividad por controlador/estación real), así que la IA
+ * decide nombres y asignación en la misma llamada, como siempre.
+ */
+export const EDTS_ESQUEMA_DOS_ETAPAS = ['CON', 'PRO'] as const
+export const EDTS_AGRUPACION_UN_PASO = ['PLC', 'HMI'] as const
+
+/**
  * EDTs seleccionados que requieren IA (EDTS_AGRUPACION_IA) y todavía no
  * tienen ninguna Actividad propuesta para ellos — usado tanto al crear un
  * borrador nuevo (actividadesExistentes=[], todos pendientes) como al
@@ -217,7 +229,7 @@ function generarPLA(
 
   const nombresTablero = config.tableros.map(t => t.nombre).filter(Boolean)
   if (tablero.length > 0 && nombresTablero.length === 0) {
-    advertencias.push('PLA tiene tareas de tablero pero no se especificó ningún tablero en el Paso 1 — no se generó ninguna Actividad de tablero (regla: N° de tableros > 0).')
+    advertencias.push('PLA: no se generaron Actividades de tablero porque el proyecto no tiene tableros en el Paso 1 — las tareas [Tablero] quedaron fuera; las de disciplina sí se generaron. Si el proyecto fabrica un tablero, agrégalo en el Paso 1.')
   }
   for (const nombreTablero of nombresTablero) {
     const tareas = tablero.map(s => construirTareaPropuesta(s, config))
@@ -255,7 +267,7 @@ function generarPorInstancia(
 function generarTAB(servicios: CatalogoServicioParaWizard[], config: ConfiguracionWizardPaso1, advertencias: string[]): ActividadPropuesta[] {
   const nombres = config.tableros.map(t => t.nombre).filter(Boolean)
   if (servicios.length > 0 && nombres.length === 0) {
-    advertencias.push('TAB tiene servicios en el catálogo pero no se especificó ningún tablero en el Paso 1 — no se generó ninguna Actividad de TAB (regla: N° de tableros > 0).')
+    advertencias.push('TAB: no se generaron Actividades porque el proyecto no tiene tableros en el Paso 1 — sus tareas quedaron fuera. Si el proyecto fabrica un tablero, agrégalo en el Paso 1.')
   }
   return generarPorInstancia(servicios, 'TAB', nombres.map(formatearNombreTablero), config)
 }

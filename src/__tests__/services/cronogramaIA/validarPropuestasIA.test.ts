@@ -1,4 +1,4 @@
-import { validarPropuestaGrupos, validarSugerenciasCantidad, validarPrellenadoPaso1 } from '@/lib/cronogramaIA/validarPropuestasIA'
+import { validarPropuestaGrupos, validarSugerenciasCantidad, validarPrellenadoPaso1, validarAsignacionEsquema } from '@/lib/cronogramaIA/validarPropuestasIA'
 import type { CatalogoServicioParaWizard, ConfiguracionWizardPaso1 } from '@/types/cronogramaIA'
 
 function servicio(overrides: Partial<CatalogoServicioParaWizard> & { id: string; nombre: string }): CatalogoServicioParaWizard {
@@ -176,5 +176,70 @@ describe('validarPrellenadoPaso1', () => {
     expect(r.sugerencia.edtsSeleccionados).toEqual([])
     expect(r.sugerencia.tableros).toEqual([])
     expect(r.sugerencia.plcs).toEqual([])
+  })
+})
+
+describe('validarAsignacionEsquema — Etapa B del flujo de esquemas (CON/PRO)', () => {
+  const servicios = [
+    servicio({ id: 's1', nombre: 'Tendido de cables' }),
+    servicio({ id: 's2', nombre: 'Montaje de tablero' }),
+    servicio({ id: 's3', nombre: 'Pruebas de continuidad' }),
+  ]
+  const nombresActividades = ['Sala Eléctrica', 'Zona de Tanques']
+
+  it('asigna tareas a los nombres fijos del esquema elegido', () => {
+    const r = validarAsignacionEsquema(
+      [
+        { actividadNombre: 'Sala Eléctrica', catalogoServicioIds: ['s1', 's2'] },
+        { actividadNombre: 'Zona de Tanques', catalogoServicioIds: ['s3'] },
+      ],
+      nombresActividades,
+      servicios,
+      config,
+      'CON'
+    )
+    expect(r.actividades.find(a => a.actividadNombre === 'Sala Eléctrica')?.tareas).toHaveLength(2)
+    expect(r.actividades.find(a => a.actividadNombre === 'Zona de Tanques')?.tareas).toHaveLength(1)
+    expect(r.advertencias).toHaveLength(0)
+  })
+
+  it('un actividadNombre inventado (fuera del esquema elegido) se descarta — sus tareas caen en "Sin agrupar", nunca se pierden', () => {
+    const r = validarAsignacionEsquema(
+      [
+        { actividadNombre: 'Zona Inventada', catalogoServicioIds: ['s1'] },
+        { actividadNombre: 'Sala Eléctrica', catalogoServicioIds: ['s2', 's3'] },
+      ],
+      nombresActividades,
+      servicios,
+      config,
+      'CON'
+    )
+    const sinAgrupar = r.actividades.find(a => a.actividadNombre === 'Sin agrupar')
+    expect(sinAgrupar?.tareas.map(t => t.catalogoServicioId)).toEqual(['s1'])
+    expect(r.advertencias.some(a => a.includes('no estaba en el esquema elegido'))).toBe(true)
+  })
+
+  it('un nombre del esquema elegido que queda sin ninguna tarea asignada se preserva como Actividad vacía (para poder mover tareas ahí manualmente después)', () => {
+    const r = validarAsignacionEsquema(
+      [{ actividadNombre: 'Sala Eléctrica', catalogoServicioIds: ['s1', 's2', 's3'] }],
+      nombresActividades,
+      servicios,
+      config,
+      'CON'
+    )
+    const zonaVacia = r.actividades.find(a => a.actividadNombre === 'Zona de Tanques')
+    expect(zonaVacia).toBeTruthy()
+    expect(zonaVacia?.tareas).toEqual([])
+  })
+
+  it('un id inventado por la IA se descarta igual que en validarPropuestaGrupos (reutiliza el mismo guardrail)', () => {
+    const r = validarAsignacionEsquema(
+      [{ actividadNombre: 'Sala Eléctrica', catalogoServicioIds: ['s1', 'id-inventado'] }],
+      nombresActividades,
+      servicios,
+      config,
+      'CON'
+    )
+    expect(r.tareaIdsInventados).toEqual(['id-inventado'])
   })
 })

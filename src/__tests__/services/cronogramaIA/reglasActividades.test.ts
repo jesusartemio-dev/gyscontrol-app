@@ -205,12 +205,14 @@ describe('generarActividadesDeterministas — PLA (Tablero replicado por instanc
     expect(r.actividades.find(a => a.actividadNombre === 'Disciplina Instrumentación')).toBeTruthy()
   })
 
-  it('sin nombres de tablero en el Paso 1, NO genera ninguna Actividad de tablero (regla dura: N° tableros > 0) y agrega advertencia', () => {
+  it('sin nombres de tablero en el Paso 1, NO genera ninguna Actividad de tablero (regla dura: N° tableros > 0) y agrega advertencia informativa (no alarmante)', () => {
     const servicios = [servicio({ id: 'p1', nombre: 'Planos Generales de Tablero', actividadTag: ['Tablero'] })]
     const edts: EdtParaGenerar[] = [{ nombre: 'PLA', descripcion: 'Planos', servicios }]
     const r = generarActividadesDeterministas(edts, config({ tableros: [] }))
     expect(r.actividades).toHaveLength(0)
-    expect(r.advertencias.length).toBeGreaterThan(0)
+    expect(r.advertencias).toEqual([
+      'PLA: no se generaron Actividades de tablero porque el proyecto no tiene tableros en el Paso 1 — las tareas [Tablero] quedaron fuera; las de disciplina sí se generaron. Si el proyecto fabrica un tablero, agrégalo en el Paso 1.',
+    ])
   })
 
   it('un nombre de tablero que ya empieza con "Tablero" no duplica el prefijo', () => {
@@ -231,12 +233,14 @@ describe('generarActividadesDeterministas — TAB (una Actividad por instancia, 
     expect(r.actividades[0].tareas).toHaveLength(2)
   })
 
-  it('TAB sin nombres de tablero en el Paso 1 NO genera ninguna Actividad (regla dura: N° tableros > 0)', () => {
+  it('TAB sin nombres de tablero en el Paso 1 NO genera ninguna Actividad (regla dura: N° tableros > 0) y agrega advertencia informativa (no alarmante)', () => {
     const servicios = [servicio({ id: 'tab1', nombre: 'Cableado de Fuerza' })]
     const edts: EdtParaGenerar[] = [{ nombre: 'TAB', descripcion: 'Armado de Tableros', servicios }]
     const r = generarActividadesDeterministas(edts, config({ tableros: [] }))
     expect(r.actividades).toHaveLength(0)
-    expect(r.advertencias.length).toBeGreaterThan(0)
+    expect(r.advertencias).toEqual([
+      'TAB: no se generaron Actividades porque el proyecto no tiene tableros en el Paso 1 — sus tareas quedaron fuera. Si el proyecto fabrica un tablero, agrégalo en el Paso 1.',
+    ])
   })
 })
 

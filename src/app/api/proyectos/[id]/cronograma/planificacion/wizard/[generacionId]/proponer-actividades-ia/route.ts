@@ -6,9 +6,9 @@ import { validarPermisoCronograma } from '@/lib/services/cronogramaPermisos'
 import { isIAFeatureEnabled } from '@/lib/agente/featureFlags'
 import { adquirirLockCronogramaIA, liberarLockCronogramaIA } from '@/lib/cronogramaIA/mutex'
 import { generarPropuestaConIA } from '@/lib/cronogramaIA/generarPropuestaConIA'
-import { EDTS_AGRUPACION_IA } from '@/lib/cronogramaIA/reglasActividades'
+import { EDTS_AGRUPACION_UN_PASO } from '@/lib/cronogramaIA/reglasActividades'
 import type { ActividadPropuesta, CatalogoServicioParaWizard, ConfiguracionWizardPaso1 } from '@/types/cronogramaIA'
-import type { ContextoCotizacionParaPrompt, ContextoInstanciasParaPrompt, EquipoRealParaPrompt } from '@/lib/cronogramaIA/prompts'
+import type { ContextoCotizacionParaPrompt, ContextoInstanciasParaPrompt } from '@/lib/cronogramaIA/prompts'
 
 export const maxDuration = 120
 
@@ -20,12 +20,12 @@ interface LineaClasificada {
   categoria: 'equipos' | 'servicios' | 'gastos'
 }
 
-type EdtConAgrupacionIA = 'CON' | 'PRO' | 'PLC' | 'HMI'
+// CON/PRO pasaron al flujo de esquemas en 2 etapas (ver
+// proponer-esquemas-ia/ y agrupar-esquema-ia/) — esta ruta ahora solo
+// resuelve PLC/HMI en un solo paso (sin ambigüedad de "cómo agrupar": una
+// Actividad por controlador/estación real detectado).
+type EdtConAgrupacionIA = (typeof EDTS_AGRUPACION_UN_PASO)[number]
 
-const CATEGORIA_LINEAS_POR_EDT: Partial<Record<EdtConAgrupacionIA, LineaClasificada['categoria']>> = {
-  CON: 'servicios',
-  PRO: 'equipos',
-}
 const MAX_LINEAS_CONTEXTO = 15
 
 export async function POST(_req: NextRequest, { params }: Ctx) {
@@ -68,7 +68,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     const edtsIA = await prisma.edt.findMany({
       where: {
         id: { in: config.edtsSeleccionados },
-        nombre: { in: [...EDTS_AGRUPACION_IA] },
+        nombre: { in: [...EDTS_AGRUPACION_UN_PASO] },
       },
       include: { catalogoServicio: { include: { unidadServicio: true, recurso: true }, orderBy: { orden: 'asc' } } },
     })
@@ -78,7 +78,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
         generacionId: generacion.id,
         propuestaActividades: generacion.propuestaActividades,
         advertencias: generacion.advertencias ?? [],
-        mensaje: 'No hay EDTs de CON/PRO/PLC/HMI seleccionados en este borrador.',
+        mensaje: 'No hay EDTs de PLC/HMI seleccionados en este borrador.',
       })
     }
 
@@ -89,12 +89,9 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
 
     const lineasClasificadas = (cotizacionDoc?.lineasClasificadas as LineaClasificada[] | null) ?? []
 
-    function construirContextoCotizacion(edtNombre: EdtConAgrupacionIA): ContextoCotizacionParaPrompt | null {
+    function construirContextoCotizacion(): ContextoCotizacionParaPrompt | null {
       if (!cotizacionDoc) return null
-      const categoria = CATEGORIA_LINEAS_POR_EDT[edtNombre]
-      const lineas = (categoria ? lineasClasificadas.filter(l => l.categoria === categoria) : lineasClasificadas)
-        .sort((a, b) => b.monto - a.monto)
-        .slice(0, MAX_LINEAS_CONTEXTO)
+      const lineas = lineasClasificadas.sort((a, b) => b.monto - a.monto).slice(0, MAX_LINEAS_CONTEXTO)
       return {
         resumenAlcance: (cotizacionDoc.resumenAlcance as string[] | null) ?? [],
         exclusiones: (cotizacionDoc.exclusiones as string[] | null) ?? [],
@@ -107,32 +104,6 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
       plcs: config.plcs.map(p => p.nombre).filter(Boolean),
       hmiCantidad: config.hmiCantidad,
       scada: config.scada,
-    }
-
-    // Solo para PRO: lista real de equipos/materiales ya cotizados (señal
-    // fuerte para el prompt de familias de procura — ver prompts.ts). Nunca
-    // se consulta si PRO no está entre los EDTs a resolver, para no pagar
-    // una query de más en el resto de los casos.
-    let equiposReales: EquipoRealParaPrompt[] | null = null
-    if (edtsIA.some(e => e.nombre === 'PRO')) {
-      const equipos = await prisma.proyectoEquipoCotizado.findMany({
-        where: { proyectoId },
-        select: {
-          proyectoEquipoCotizadoItem: {
-            select: { codigo: true, descripcion: true, marca: true, cantidad: true, unidad: true, categoria: true },
-          },
-        },
-      })
-      equiposReales = equipos.flatMap(g =>
-        g.proyectoEquipoCotizadoItem.map(item => ({
-          codigo: item.codigo,
-          descripcion: item.descripcion,
-          marca: item.marca,
-          cantidad: item.cantidad,
-          unidad: item.unidad,
-          categoria: item.categoria,
-        }))
-      )
     }
 
     const resultados = await Promise.allSettled(
@@ -159,9 +130,8 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
           edtNombre: nombre,
           serviciosPermitidos,
           alcanceLibre: config.alcanceLibre,
-          cotizacion: construirContextoCotizacion(nombre),
-          contextoInstancias: nombre === 'PLC' || nombre === 'HMI' ? contextoInstancias : null,
-          equiposReales: nombre === 'PRO' ? equiposReales : null,
+          cotizacion: construirContextoCotizacion(),
+          contextoInstancias,
           config: { brownfield: config.brownfield, ingenieriaDetalle: config.ingenieriaDetalle },
           userId: session.user.id,
           proyectoId,

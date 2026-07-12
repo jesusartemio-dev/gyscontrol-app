@@ -72,3 +72,16 @@ export interface ResultadoActividadesDeterministas {
   actividades: ActividadPropuesta[]
   advertencias: string[]
 }
+
+/** Uno de los 2-3 esquemas alternativos de agrupación que la IA propone en la Etapa A (CON/PRO), antes de asignar ninguna tarea. */
+export interface EsquemaAgrupacionPropuesto {
+  criterio: string
+  nombres: string[]
+}
+
+/** Esquema con el que el usuario confirmó la Etapa B — nombres ya posiblemente editados (renombrados/agregados/quitados) respecto al propuesto. */
+export interface EsquemaElegido {
+  nombres: string[]
+  criterioOriginal: string | null
+  indiceOriginal: number | null
+}

@@ -24,11 +24,13 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { ChevronLeft, ChevronRight, Loader2, Plus, Trash2, Sparkles, AlertCircle, FileCheck2, History, Pin, PinOff, FolderInput, RotateCcw } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
-import type { ActividadPropuesta, ConfiguracionWizardPaso1 } from '@/types/cronogramaIA'
+import type { ActividadPropuesta, ConfiguracionWizardPaso1, EsquemaAgrupacionPropuesto } from '@/types/cronogramaIA'
 import type { EdtSugeridoConOrigen } from '@/lib/cronogramaIA/derivarEdtsSoporte'
 import { detectarEdtsPosibles, type EvidenciaTexto } from '@/lib/cronogramaIA/detectarEdtsPosibles'
+import { EDTS_AGRUPACION_UN_PASO, EDTS_ESQUEMA_DOS_ETAPAS, calcularEdtsPendientesIA } from '@/lib/cronogramaIA/reglasActividades'
 import { ROL_RESPONSABLE_LABELS, type RolResponsable } from '@/lib/cronogramaResponsables/reglasResponsable'
 import {
   BORRADOR_LOCAL_PASO1_VERSION,
@@ -45,11 +47,18 @@ interface EdtWizardInfo {
   totalServicios: number
 }
 
+interface FormaPagoCotizacion {
+  tipo: 'valorizaciones_mensuales' | 'hitos' | 'contra_entrega' | 'anticipo_saldo' | 'otro' | null
+  numeroValorizaciones: number | null
+  descripcion: string | null
+}
+
 interface CotizacionResumen {
   numeroPropuesta: string | null
   clienteDetectado: string | null
   resumenAlcance: string[]
   exclusiones: string[]
+  formaPago: FormaPagoCotizacion | null
 }
 
 interface EdtPendienteIA {
@@ -139,9 +148,10 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
   const [hmiCantidad, setHmiCantidad] = useState(0)
   const [scada, setScada] = useState(false)
   const [nValorizaciones, setNValorizaciones] = useState(0)
+  const [valorizacionesTocadas, setValorizacionesTocadas] = useState(false)
   const [duracionSemanas, setDuracionSemanas] = useState(0)
   const [nPersonas, setNPersonas] = useState(0)
-  const [nPets, setNPets] = useState(0)
+  const [nPets, setNPets] = useState(1) // norma de la empresa
   const [alcanceLibre, setAlcanceLibre] = useState('')
 
   const [generandoPaso1, setGenerandoPaso1] = useState(false)
@@ -158,6 +168,16 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
   const [guardandoCorreccion, setGuardandoCorreccion] = useState<string | null>(null)
   const [evidenciasCotizacion, setEvidenciasCotizacion] = useState<EvidenciaTexto[]>([])
   const [organigramaResumen, setOrganigramaResumen] = useState<OrganigramaResumen | null>(null)
+
+  // Flujo de esquemas en 2 etapas (CON/PRO) — Etapa A: 2-3 esquemas
+  // alternativos por EDT (sin tareas); Etapa B: el usuario elige/edita uno y
+  // recién ahí se asignan tareas. mostrandoEsquemas gatea una sub-vista
+  // dentro del Paso 2, antes del acordeón final de Actividades.
+  const [esquemasPorEdt, setEsquemasPorEdt] = useState<Record<string, EsquemaAgrupacionPropuesto[]>>({})
+  const [indiceElegido, setIndiceElegido] = useState<Record<string, number | null>>({})
+  const [nombresEditables, setNombresEditables] = useState<Record<string, string[]>>({})
+  const [mostrandoEsquemas, setMostrandoEsquemas] = useState(false)
+  const [confirmandoEsquemas, setConfirmandoEsquemas] = useState(false)
   const [previewResponsables, setPreviewResponsables] = useState<ResponsablePreviewEdt[]>([])
   const [cargandoPreviewResponsables, setCargandoPreviewResponsables] = useState(false)
 
@@ -280,6 +300,7 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
     setHmiCantidad(c.hmiCantidad)
     setScada(c.scada)
     setNValorizaciones(c.nValorizaciones)
+    setValorizacionesTocadas(true) // restaurado tal cual, no recalcular con la fórmula por encima
     setDuracionSemanas(c.duracionSemanas)
     setNPersonas(c.nPersonas)
     setNPets(c.nPets)
@@ -311,6 +332,7 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
     setHmiCantidad(c.hmiCantidad)
     setScada(c.scada)
     setNValorizaciones(c.nValorizaciones)
+    setValorizacionesTocadas(true) // restaurado tal cual, no recalcular con la fórmula por encima
     setDuracionSemanas(c.duracionSemanas)
     setNPersonas(c.nPersonas)
     setNPets(c.nPets)
@@ -619,6 +641,31 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
     })
   }, [evidenciasCotizacion, alcanceLibre, edts, edtsSeleccionados, edtsOrigen])
 
+  // `edtsSeleccionados` guarda ids (no códigos) — este mapa permite
+  // preguntar "¿está PLA/TAB/PLC/HMI/SEG marcado?" para mostrar solo los
+  // campos del Paso 1 que de verdad aplican a los EDTs elegidos.
+  const edtIdPorNombre = useMemo(() => new Map(edts.map(e => [e.nombre, e.id])), [edts])
+  function edtEstaSeleccionada(nombre: string): boolean {
+    const id = edtIdPorNombre.get(nombre)
+    return id ? edtsSeleccionados.has(id) : false
+  }
+
+  // La norma es valorización mensual, con la última viviendo en CIE (por
+  // eso el -1) — el usuario no suele conocer el N° exacto de antemano.
+  function sugerirValorizaciones(semanas: number): number {
+    return Math.max(0, Math.round(semanas / 4.33) - 1)
+  }
+
+  // Recalcula en vivo mientras el usuario escribe la duración — pero deja de
+  // tocar el campo apenas lo edita a mano (ver setValorizacionesTocadas en el
+  // input). La cotización (si trae una forma de pago con N° de
+  // valorizaciones detectado) manda sobre la fórmula.
+  useEffect(() => {
+    if (valorizacionesTocadas) return
+    const detectadoEnCotizacion = cotizacionResumen?.formaPago?.numeroValorizaciones
+    setNValorizaciones(detectadoEnCotizacion != null ? detectadoEnCotizacion : sugerirValorizaciones(duracionSemanas))
+  }, [duracionSemanas, cotizacionResumen, valorizacionesTocadas])
+
   function agregarTablero() {
     setTableros(prev => [...prev, { nombre: '' }])
   }
@@ -682,6 +729,12 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
       setActividades(data.propuestaActividades)
       setAdvertencias(data.advertencias ?? [])
       setEdtsPendientesIA(data.edtsPendientesIA ?? [])
+      // Evita arrastrar esquemas propuestos/elegidos de una vuelta anterior
+      // al Paso 1 (ej. "Anterior" y volver a "Proponer actividades").
+      setEsquemasPorEdt({})
+      setIndiceElegido({})
+      setNombresEditables({})
+      setMostrandoEsquemas(false)
       setPasoActual(2)
       // A partir de acá el borrador vive en BD (autoguardado del Paso 2) — el
       // draft local del Paso 1 queda obsoleto.
@@ -787,27 +840,125 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
     }
   }
 
+  // PLC/HMI (un solo paso) y CON/PRO (esquemas en 2 etapas) comparten el
+  // mismo lock de IA por cronograma (ver mutex.ts) — SIEMPRE secuencial,
+  // nunca Promise.all entre llamadas que tocan la misma generación, o la
+  // segunda falla con 409 "operación en curso".
   async function generarConIA() {
     if (!generacionId) return
     setGenerandoIA(true)
     try {
-      const res = await fetch(`/api/proyectos/${proyectoId}/cronograma/planificacion/wizard/${generacionId}/proponer-actividades-ia`, {
-        method: 'POST',
-      })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.error || 'Error generando la propuesta de IA')
+      const pendientesUnPaso = edtsPendientesIA.filter(e => (EDTS_AGRUPACION_UN_PASO as readonly string[]).includes(e.nombre))
+      const pendientesEsquema = edtsPendientesIA.filter(e => (EDTS_ESQUEMA_DOS_ETAPAS as readonly string[]).includes(e.nombre))
+
+      let actividadesActuales = actividades
+      let advertenciasAcumuladas = [...advertencias]
+
+      if (pendientesUnPaso.length > 0) {
+        const res = await fetch(`/api/proyectos/${proyectoId}/cronograma/planificacion/wizard/${generacionId}/proponer-actividades-ia`, {
+          method: 'POST',
+        })
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          throw new Error(err.error || 'Error generando la propuesta de IA (PLC/HMI)')
+        }
+        const data = await res.json()
+        actividadesActuales = data.propuestaActividades
+        advertenciasAcumuladas = data.advertencias ?? advertenciasAcumuladas
       }
-      const data = await res.json()
-      setActividades(data.propuestaActividades)
-      setAdvertencias(data.advertencias ?? [])
-      setEdtsPendientesIA([])
-      cargarPreviewResponsables(data.propuestaActividades)
-      toast({ title: 'Propuesta de IA generada', description: 'Revisa y edita las zonas/familias antes de aplicar.' })
+
+      let huboEsquemas = false
+      if (pendientesEsquema.length > 0) {
+        const res = await fetch(`/api/proyectos/${proyectoId}/cronograma/planificacion/wizard/${generacionId}/proponer-esquemas-ia`, {
+          method: 'POST',
+        })
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          throw new Error(err.error || 'Error proponiendo esquemas de agrupación')
+        }
+        const data = await res.json()
+        const esquemas: Record<string, EsquemaAgrupacionPropuesto[]> = data.esquemasPorEdt ?? {}
+        setEsquemasPorEdt(esquemas)
+        setIndiceElegido(Object.fromEntries(Object.keys(esquemas).map(k => [k, null])))
+        setNombresEditables(Object.fromEntries(Object.keys(esquemas).map(k => [k, []])))
+        advertenciasAcumuladas = [...advertenciasAcumuladas, ...(data.advertencias ?? [])]
+        huboEsquemas = Object.values(esquemas).some(lista => lista.length > 0)
+        if (huboEsquemas) setMostrandoEsquemas(true)
+      }
+
+      setActividades(actividadesActuales)
+      setAdvertencias(advertenciasAcumuladas)
+      setEdtsPendientesIA(calcularEdtsPendientesIA(edtsPendientesIA, actividadesActuales))
+      cargarPreviewResponsables(actividadesActuales)
+      if (!huboEsquemas) {
+        toast({ title: 'Propuesta de IA generada', description: 'Revisa y edita las zonas/familias antes de aplicar.' })
+      }
     } catch (e) {
       toast({ title: e instanceof Error ? e.message : 'Error inesperado', variant: 'destructive' })
     } finally {
       setGenerandoIA(false)
+    }
+  }
+
+  function actualizarNombreEsquema(edtNombre: string, indice: number, nombre: string) {
+    setNombresEditables(prev => ({
+      ...prev,
+      [edtNombre]: (prev[edtNombre] ?? []).map((n, i) => (i === indice ? nombre : n)),
+    }))
+  }
+  function agregarNombreEsquema(edtNombre: string) {
+    setNombresEditables(prev => ({ ...prev, [edtNombre]: [...(prev[edtNombre] ?? []), ''] }))
+  }
+  function quitarNombreEsquema(edtNombre: string, indice: number) {
+    setNombresEditables(prev => ({ ...prev, [edtNombre]: (prev[edtNombre] ?? []).filter((_, i) => i !== indice) }))
+  }
+
+  async function confirmarEsquemas() {
+    if (!generacionId) return
+    const edtsAConfirmar = Object.keys(esquemasPorEdt).filter(
+      edtNombre => esquemasPorEdt[edtNombre].length === 0 || indiceElegido[edtNombre] != null
+    )
+    setConfirmandoEsquemas(true)
+    try {
+      let actividadesActuales = actividades
+      let advertenciasActuales = advertencias
+
+      // Secuencial (no Promise.all): comparten el mismo lock de IA del
+      // cronograma — dos llamadas concurrentes harían fallar la segunda.
+      for (const edtNombre of edtsAConfirmar) {
+        const nombres = (nombresEditables[edtNombre] ?? []).map(n => n.trim()).filter(Boolean)
+        if (nombres.length === 0) continue // esquema vacío/sin elegir — el usuario agrupará a mano en el acordeón
+        const idx = indiceElegido[edtNombre]
+        const res = await fetch(`/api/proyectos/${proyectoId}/cronograma/planificacion/wizard/${generacionId}/agrupar-esquema-ia`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            edtNombre,
+            nombresActividades: nombres,
+            indiceOriginal: idx ?? null,
+            criterioOriginal: idx != null ? esquemasPorEdt[edtNombre][idx]?.criterio ?? null : null,
+          }),
+        })
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          throw new Error(err.error || `Error asignando tareas de ${edtNombre}`)
+        }
+        const data = await res.json()
+        actividadesActuales = data.propuestaActividades
+        advertenciasActuales = data.advertencias ?? advertenciasActuales
+      }
+
+      setActividades(actividadesActuales)
+      setAdvertencias(advertenciasActuales)
+      setEdtsPendientesIA(calcularEdtsPendientesIA(edtsPendientesIA, actividadesActuales))
+      cargarPreviewResponsables(actividadesActuales)
+      setMostrandoEsquemas(false)
+      setEsquemasPorEdt({})
+      toast({ title: 'Actividades generadas', description: 'Revisa y edita las tareas asignadas antes de aplicar.' })
+    } catch (e) {
+      toast({ title: e instanceof Error ? e.message : 'Error inesperado', variant: 'destructive' })
+    } finally {
+      setConfirmandoEsquemas(false)
     }
   }
 
@@ -1058,82 +1209,177 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
             </div>
           </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <Label>Tableros</Label>
-              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={agregarTablero}>
-                <Plus className="h-3 w-3 mr-1" />
-                Agregar
-              </Button>
-            </div>
-            <div className="space-y-1.5">
-              {tableros.map((t, i) => (
-                <div key={i} className="flex gap-2 items-center">
-                  <Input value={t.nombre} onChange={e => actualizarTablero(i, e.target.value)} placeholder="Ej: TCO-CMN-QUI-007" className="h-8 text-sm" />
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive" onClick={() => quitarTablero(i)}>
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                </div>
-              ))}
-              {tableros.length === 0 && <p className="text-xs text-muted-foreground">Sin tableros — omite si el proyecto no incluye PLA/TAB.</p>}
-            </div>
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <Label>PLCs / Controladores</Label>
-              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={agregarPlc}>
-                <Plus className="h-3 w-3 mr-1" />
-                Agregar
-              </Button>
-            </div>
-            <div className="space-y-1.5">
-              {plcs.map((p, i) => (
-                <div key={i} className="flex gap-2 items-center">
-                  <Input value={p.nombre} onChange={e => actualizarPlc(i, e.target.value)} placeholder="Ej: PLC Balanza 220" className="h-8 text-sm" />
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive" onClick={() => quitarPlc(i)}>
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                </div>
-              ))}
-              {plcs.length === 0 && <p className="text-xs text-muted-foreground">Sin PLCs — omite si el proyecto no incluye PLC.</p>}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 items-end">
+          {(edtEstaSeleccionada('PLA') || edtEstaSeleccionada('TAB')) && (
             <div>
-              <Label className="text-sm">N° de estaciones HMI</Label>
-              <Input type="number" min={0} value={hmiCantidad} onChange={e => setHmiCantidad(Math.max(0, Number(e.target.value)))} className="h-8 mt-1" />
+              <div className="flex items-center justify-between mb-2">
+                <Label>Tableros</Label>
+                <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={agregarTablero}>
+                  <Plus className="h-3 w-3 mr-1" />
+                  Agregar
+                </Button>
+              </div>
+              <div className="space-y-1.5">
+                {tableros.map((t, i) => (
+                  <div key={i} className="flex gap-2 items-center">
+                    <Input value={t.nombre} onChange={e => actualizarTablero(i, e.target.value)} placeholder="Ej: TCO-CMN-QUI-007" className="h-8 text-sm" />
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive" onClick={() => quitarTablero(i)}>
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className="flex items-center justify-between rounded-lg border p-3">
-              <Label className="text-sm">Integración a SCADA existente</Label>
-              <Switch checked={scada} onCheckedChange={setScada} />
+          )}
+
+          {edtEstaSeleccionada('PLC') && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <Label>PLCs / Controladores</Label>
+                <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={agregarPlc}>
+                  <Plus className="h-3 w-3 mr-1" />
+                  Agregar
+                </Button>
+              </div>
+              <div className="space-y-1.5">
+                {plcs.map((p, i) => (
+                  <div key={i} className="flex gap-2 items-center">
+                    <Input value={p.nombre} onChange={e => actualizarPlc(i, e.target.value)} placeholder="Ej: PLC Balanza 220" className="h-8 text-sm" />
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive" onClick={() => quitarPlc(i)}>
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
+
+          {edtEstaSeleccionada('HMI') && (
+            <div className="grid grid-cols-2 gap-4 items-end">
+              <div>
+                <Label className="text-sm">N° de estaciones HMI</Label>
+                <Input type="number" min={0} value={hmiCantidad} onChange={e => setHmiCantidad(Math.max(0, Number(e.target.value)))} className="h-8 mt-1" />
+              </div>
+              <div className="flex items-center justify-between rounded-lg border p-3">
+                <Label className="text-sm">Integración a SCADA existente</Label>
+                <Switch checked={scada} onCheckedChange={setScada} />
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label className="text-sm">N° valorizaciones intermedias</Label>
-              <Input type="number" min={0} value={nValorizaciones} onChange={e => setNValorizaciones(Math.max(0, Number(e.target.value)))} className="h-8 mt-1" />
+              <Input type="number" min={0} value={nValorizaciones} onChange={e => { setValorizacionesTocadas(true); setNValorizaciones(Math.max(0, Number(e.target.value))) }} className="h-8 mt-1" />
+              <p className="text-xs text-muted-foreground mt-1">
+                {cotizacionResumen?.formaPago?.numeroValorizaciones != null
+                  ? `Detectado en tu cotización: ${cotizacionResumen.formaPago.numeroValorizaciones} valorización(es) — ajusta si es necesario.`
+                  : 'Sugerido: 1 mensual — ajusta si el contrato define hitos.'}
+              </p>
             </div>
             <div>
               <Label className="text-sm">Duración estimada (semanas)</Label>
               <Input type="number" min={0} value={duracionSemanas} onChange={e => setDuracionSemanas(Math.max(0, Number(e.target.value)))} className="h-8 mt-1" />
             </div>
-            <div>
-              <Label className="text-sm">N° de personas a habilitar</Label>
-              <Input type="number" min={0} value={nPersonas} onChange={e => setNPersonas(Math.max(0, Number(e.target.value)))} className="h-8 mt-1" />
-            </div>
-            <div>
-              <Label className="text-sm">N° de PETS</Label>
-              <Input type="number" min={0} value={nPets} onChange={e => setNPets(Math.max(0, Number(e.target.value)))} className="h-8 mt-1" />
-            </div>
+            {edtEstaSeleccionada('SEG') && brownfield && (
+              <div>
+                <Label className="text-sm">N° de personas a habilitar</Label>
+                <Input type="number" min={0} value={nPersonas} onChange={e => setNPersonas(Math.max(0, Number(e.target.value)))} className="h-8 mt-1" />
+              </div>
+            )}
+            {edtEstaSeleccionada('SEG') && (
+              <div>
+                <Label className="text-sm">N° de PETS</Label>
+                <Input type="number" min={0} value={nPets} onChange={e => setNPets(Math.max(0, Number(e.target.value)))} className="h-8 mt-1" />
+              </div>
+            )}
           </div>
 
           <div>
             <Label className="text-sm">Descripción libre del alcance</Label>
-            <p className="text-xs text-muted-foreground mb-1.5">Usado por la IA para proponer zonas de construcción y familias de procura (Bloque D).</p>
+            <p className="text-xs text-muted-foreground mb-1.5">Usada por la IA para proponer zonas de construcción y familias de procura, y por las reglas de preselección (ej: menciones de neumática, arranque de equipos, instrumentos activan tareas de CMM).</p>
             <Textarea value={alcanceLibre} onChange={e => setAlcanceLibre(e.target.value)} rows={4} placeholder="Ej: instalación eléctrica en sala de tanques y zona de bombas..." />
+          </div>
+        </div>
+      )
+    }
+
+    if (mostrandoEsquemas) {
+      const puedeConfirmar = Object.keys(esquemasPorEdt).every(
+        edtNombre => esquemasPorEdt[edtNombre].length === 0 || indiceElegido[edtNombre] != null
+      )
+      return (
+        <div className="space-y-4">
+          <Alert>
+            <Sparkles className="h-4 w-4" />
+            <AlertDescription>
+              Elegí cómo agrupar cada EDT — podés renombrar, agregar o quitar Actividades del esquema elegido antes de
+              que la IA asigne las tareas.
+            </AlertDescription>
+          </Alert>
+
+          {Object.entries(esquemasPorEdt).map(([edtNombre, esquemas]) => (
+            <div key={edtNombre} className="border rounded-lg p-3 space-y-3">
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-xs">{edtNombre}</Badge>
+                <span className="text-sm font-medium">Esquema de agrupación</span>
+              </div>
+
+              {esquemas.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  La IA no propuso esquemas para este EDT — podrás agrupar las tareas a mano en el paso siguiente.
+                </p>
+              ) : (
+                <RadioGroup
+                  value={indiceElegido[edtNombre] != null ? String(indiceElegido[edtNombre]) : undefined}
+                  onValueChange={v => {
+                    const idx = Number(v)
+                    setIndiceElegido(prev => ({ ...prev, [edtNombre]: idx }))
+                    setNombresEditables(prev => ({ ...prev, [edtNombre]: [...esquemas[idx].nombres] }))
+                  }}
+                >
+                  {esquemas.map((esquema, idx) => (
+                    <RadioGroupItem key={idx} value={String(idx)} className="items-start border rounded-lg p-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">{esquema.criterio}</p>
+                        <p className="text-xs text-muted-foreground">{esquema.nombres.join(' / ')}</p>
+                      </div>
+                    </RadioGroupItem>
+                  ))}
+                </RadioGroup>
+              )}
+
+              {indiceElegido[edtNombre] != null && (
+                <div className="space-y-1.5 pt-2 border-t">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs">Actividades de este esquema (editable)</Label>
+                    <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => agregarNombreEsquema(edtNombre)}>
+                      <Plus className="h-3 w-3 mr-1" />Agregar
+                    </Button>
+                  </div>
+                  {(nombresEditables[edtNombre] ?? []).map((nombre, ni) => (
+                    <div key={ni} className="flex gap-2 items-center">
+                      <Input value={nombre} onChange={e => actualizarNombreEsquema(edtNombre, ni, e.target.value)} className="h-8 text-sm" />
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive" onClick={() => quitarNombreEsquema(edtNombre, ni)}>
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => setMostrandoEsquemas(false)} disabled={confirmandoEsquemas}>
+              Omitir por ahora
+            </Button>
+            <Button size="sm" onClick={confirmarEsquemas} disabled={confirmandoEsquemas || !puedeConfirmar}>
+              {confirmandoEsquemas ? (
+                <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Generando...</>
+              ) : (
+                'Confirmar y generar Actividades'
+              )}
+            </Button>
           </div>
         </div>
       )
@@ -1144,8 +1390,8 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
         {edtsPendientesIA.length > 0 && (
           <Alert>
             <Sparkles className="h-4 w-4" />
-            <AlertDescription className="flex items-center justify-between gap-3">
-              <span>
+            <AlertDescription className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <span className="min-w-0">
                 {edtsPendientesIA.map(e => e.nombre).join(', ')} requiere{edtsPendientesIA.length > 1 ? 'n' : ''} una
                 propuesta de zonas/familias con IA antes de guardar.
               </span>
@@ -1161,7 +1407,7 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
         )}
 
         {advertencias.length > 0 && (
-          <Alert variant="destructive">
+          <Alert>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
               <ul className="list-disc pl-4 space-y-0.5">
@@ -1221,18 +1467,18 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
         <Accordion type="multiple" className="space-y-2">
           {actividades.map((actividad, index) => (
             <AccordionItem key={index} value={String(index)} className="border rounded-lg px-3">
-              <div className="flex items-center gap-2 py-1">
-                <AccordionTrigger className="flex-1 py-2 hover:no-underline">
-                  <div className="flex items-center gap-2 text-left">
-                    <Badge variant="outline" className="text-xs">{actividad.edtNombre}</Badge>
-                    <span className="font-medium text-sm">{actividad.actividadNombre}</span>
-                    <Badge variant="secondary" className="text-xs">
+              <div className="flex items-center gap-2 py-1 min-w-0">
+                <AccordionTrigger className="flex-1 min-w-0 py-2 hover:no-underline">
+                  <div className="flex flex-wrap items-center gap-2 text-left min-w-0">
+                    <Badge variant="outline" className="text-xs shrink-0">{actividad.edtNombre}</Badge>
+                    <span className="font-medium text-sm truncate min-w-0 max-w-[240px]">{actividad.actividadNombre}</span>
+                    <Badge variant="secondary" className="text-xs shrink-0">
                       {actividad.tareas.filter(t => t.incluida).length}/{actividad.tareas.length} tareas
                     </Badge>
                     {actividad.actividadNombre === 'Sin agrupar' && (
                       <Badge
                         variant="destructive"
-                        className="text-[10px]"
+                        className="text-[10px] shrink-0"
                         title="La IA no supo en qué zona ubicar estas tareas — muévelas a la Actividad que corresponda o déjalas acá. No bloquea aplicar el cronograma."
                       >
                         Revisar — sin zona asignada
@@ -1402,7 +1648,7 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
         }}
       >
         <DialogContent
-          className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6"
+          className="w-[95vw] max-w-2xl sm:max-w-3xl lg:max-w-4xl max-h-[90vh] overflow-y-auto p-4 sm:p-6"
           onPointerDownOutside={e => e.preventDefault()}
           onEscapeKeyDown={e => e.preventDefault()}
         >

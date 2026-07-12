@@ -16,6 +16,20 @@ export interface LineaClasificada {
   seccionOriginalDocumento: string | null
 }
 
+/**
+ * Forma de pago/hitos de facturación tal como los declara el contrato — NO
+ * confundir con los hitos de ENTREGA/aceptación de un TDR (KOM/FAT/SAT/
+ * comisionamiento, ver CotizacionTdrAnalisis.hitosContractuales), que son un
+ * dato distinto. `numeroValorizaciones` solo se llena si el documento lo
+ * declara explícitamente (un número o una lista de hitos de pago
+ * contable) — nunca se infiere/calcula desde la duración del proyecto.
+ */
+export interface FormaPagoExtraida {
+  tipo: 'valorizaciones_mensuales' | 'hitos' | 'contra_entrega' | 'anticipo_saldo' | 'otro' | null
+  numeroValorizaciones: number | null
+  descripcion: string | null
+}
+
 export interface CotizacionDocumentoExtracted {
   numeroPropuesta: string | null
   clienteDetectado: string | null
@@ -30,6 +44,7 @@ export interface CotizacionDocumentoExtracted {
   resumenAlcance: string[]
   exclusiones: string[]
   lineasClasificadas: LineaClasificada[]
+  formaPago: FormaPagoExtraida
   confianza: 'alta' | 'media' | 'baja'
   advertencias: string[]
 }
@@ -85,9 +100,14 @@ Suma los montos de cada categoría para obtener totalEquipos, totalServicios, to
 
 6. lineasClasificadas: array de auditoría con cada línea de la tabla de resumen (descripcion, monto, categoria asignada, seccionOriginalDocumento si el PDF ya la separaba en secciones, sino null).
 
-7. confianza: "alta" si la tabla de resumen es clara y sin ambigüedad de clasificación; "media" si tuviste que inferir la categoría de algunas líneas; "baja" si el documento es confuso o incompleto.
+7. FORMA DE PAGO: busca una sección "FORMA DE PAGO"/"CONDICIONES DE PAGO"/"FACTURACIÓN" y devuelve:
+   - tipo: "valorizaciones_mensuales" si se factura por avance mensual; "hitos" si se factura contra hitos/entregables específicos (no necesariamente mensuales); "contra_entrega" si es un solo pago contra entrega; "anticipo_saldo" si es anticipo + saldo únicamente; "otro" si no calza en las anteriores; null si el documento no menciona forma de pago.
+   - numeroValorizaciones: SOLO si el documento declara explícitamente un número de valorizaciones o lista hitos de pago contables (cuéntalos). NUNCA calcules ni infieras este número a partir de la duración del proyecto — si no hay un número o listado explícito, devuelve null.
+   - descripcion: la frase o bullet original relevante (o null si no hay sección de forma de pago).
 
-8. advertencias: array de strings señalando decisiones no triviales (ej. "línea 'Gastos operativos, costos indirectos' clasificada como gastos por inferencia, el documento no la separaba explícitamente").
+8. confianza: "alta" si la tabla de resumen es clara y sin ambigüedad de clasificación; "media" si tuviste que inferir la categoría de algunas líneas; "baja" si el documento es confuso o incompleto.
+
+9. advertencias: array de strings señalando decisiones no triviales (ej. "línea 'Gastos operativos, costos indirectos' clasificada como gastos por inferencia, el documento no la separaba explícitamente").
 
 Responde ÚNICAMENTE con el objeto JSON, sin markdown, sin backticks, sin texto adicional.`
 
@@ -109,6 +129,7 @@ function buildUserPrompt(): string {
   "lineasClasificadas": [
     { "descripcion": "...", "monto": 0, "categoria": "equipos|servicios|gastos", "seccionOriginalDocumento": "string|null" }
   ],
+  "formaPago": { "tipo": "valorizaciones_mensuales|hitos|contra_entrega|anticipo_saldo|otro|null", "numeroValorizaciones": "number|null", "descripcion": "string|null" },
   "confianza": "alta",
   "advertencias": []
 }`
@@ -148,6 +169,19 @@ function parseExtractedResponse(text: string): CotizacionDocumentoExtracted {
     }
   })
 
+  const TIPOS_FORMA_PAGO = ['valorizaciones_mensuales', 'hitos', 'contra_entrega', 'anticipo_saldo', 'otro'] as const
+  const formaPagoRaw = (parsed.formaPago && typeof parsed.formaPago === 'object' ? parsed.formaPago : {}) as Record<string, unknown>
+  const formaPago: FormaPagoExtraida = {
+    tipo: (TIPOS_FORMA_PAGO as readonly string[]).includes(formaPagoRaw.tipo as string)
+      ? (formaPagoRaw.tipo as FormaPagoExtraida['tipo'])
+      : null,
+    numeroValorizaciones:
+      typeof formaPagoRaw.numeroValorizaciones === 'number' && Number.isFinite(formaPagoRaw.numeroValorizaciones) && formaPagoRaw.numeroValorizaciones > 0
+        ? Math.round(formaPagoRaw.numeroValorizaciones)
+        : null,
+    descripcion: typeof formaPagoRaw.descripcion === 'string' && formaPagoRaw.descripcion.trim().length > 0 ? formaPagoRaw.descripcion : null,
+  }
+
   return {
     numeroPropuesta: typeof parsed.numeroPropuesta === 'string' ? parsed.numeroPropuesta : null,
     clienteDetectado: typeof parsed.clienteDetectado === 'string' ? parsed.clienteDetectado : null,
@@ -162,6 +196,7 @@ function parseExtractedResponse(text: string): CotizacionDocumentoExtracted {
     resumenAlcance: Array.isArray(parsed.resumenAlcance) ? parsed.resumenAlcance.filter((s): s is string => typeof s === 'string') : [],
     exclusiones: Array.isArray(parsed.exclusiones) ? parsed.exclusiones.filter((s): s is string => typeof s === 'string') : [],
     lineasClasificadas,
+    formaPago,
     confianza: (['alta', 'media', 'baja'] as const).includes(parsed.confianza as never)
       ? (parsed.confianza as 'alta' | 'media' | 'baja')
       : 'media',

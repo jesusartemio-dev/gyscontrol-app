@@ -71,6 +71,60 @@ export function validarPropuestaGrupos(
   return { actividades, tareaIdsNoAsignadas, tareaIdsInventados, advertencias }
 }
 
+export interface AsignacionPropuestaIA {
+  actividadNombre: string
+  catalogoServicioIds: string[]
+}
+
+/**
+ * Validación de la Etapa B del flujo de esquemas (CON/PRO) — los nombres de
+ * Actividad ya están FIJOS (el usuario los eligió/editó en la Etapa A), a
+ * diferencia de validarPropuestaGrupos donde la IA puede nombrar lo que
+ * quiera. Cualquier asignación con un actividadNombre fuera de la lista
+ * elegida se descarta igual que un id inventado — sus tareas caen en "Sin
+ * agrupar" vía el mismo mecanismo de ids no asignados. Los nombres del
+ * esquema elegido que terminan sin ninguna tarea asignada se preservan como
+ * Actividad vacía, para que el usuario pueda mover tareas ahí manualmente
+ * en vez de que la Actividad simplemente desaparezca.
+ */
+export function validarAsignacionEsquema(
+  asignaciones: AsignacionPropuestaIA[],
+  nombresActividades: string[],
+  serviciosPermitidos: CatalogoServicioParaWizard[],
+  config: Parameters<typeof construirTareaPropuesta>[1],
+  edtNombre: string
+): ResultadoValidacionGrupos {
+  const nombresPermitidos = new Set(nombresActividades.map(n => n.trim()))
+  const gruposValidos: GrupoPropuestoIA[] = []
+  let tareasConNombreInvalido = 0
+
+  for (const a of asignaciones) {
+    const nombre = (a.actividadNombre ?? '').trim()
+    if (nombresPermitidos.has(nombre)) {
+      gruposValidos.push({ nombre, catalogoServicioIds: a.catalogoServicioIds })
+    } else {
+      tareasConNombreInvalido += a.catalogoServicioIds.length
+    }
+  }
+
+  const resultado = validarPropuestaGrupos(gruposValidos, serviciosPermitidos, config, edtNombre)
+
+  if (tareasConNombreInvalido > 0) {
+    resultado.advertencias.push(
+      `${edtNombre}: la IA asignó ${tareasConNombreInvalido} tarea(s) a un nombre de Actividad que no estaba en el esquema elegido — cayeron en "Sin agrupar".`
+    )
+  }
+
+  const nombresConActividad = new Set(resultado.actividades.map(a => a.actividadNombre))
+  for (const nombre of nombresActividades) {
+    if (!nombresConActividad.has(nombre)) {
+      resultado.actividades.push({ edtNombre, actividadNombre: nombre, tareas: [], origen: 'ia' })
+    }
+  }
+
+  return resultado
+}
+
 export interface SugerenciaCantidadIA {
   catalogoServicioId: string
   cantidad: number
