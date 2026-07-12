@@ -37,19 +37,38 @@ interface ChartDims {
   MAX_COLS: number       // max children per row before wrapping
   WRAP_FROM_DEPTH: number // apply MAX_COLS only at depth >= this (0 = always)
   isCompact: boolean
+  /**
+   * false (editor, NORMAL_DIMS/COMPACT_DIMS): algoritmo clásico — el ancho de
+   * cada subárbol se reserva como un rectángulo monolítico igual a su fila
+   * más ancha, ocupado en TODA su extensión vertical. En árboles desbalanceados
+   * (una rama profunda + hermanos hoja) esto empuja los hermanos chicos a los
+   * extremos del lienzo aunque no haya colisión real cerca de la raíz.
+   * true (DOCUMENTO_DIMS*, solo export a Word): algoritmo tidy-tree con
+   * compactación por contorno (estilo Reingold-Tilford) — cada hermano se
+   * arrima al anterior con un gap fijo comparando sus bordes REALES fila por
+   * fila, no el ancho total reservado. Nunca se usa en el editor.
+   */
+  layoutCompacto: boolean
 }
 
-export const NORMAL_DIMS: ChartDims = { NODE_W: 160, NODE_H: 120, H_GAP: 5, V_GAP: 22, MAX_COLS: 999, WRAP_FROM_DEPTH: 1, isCompact: false }
-const COMPACT_DIMS: ChartDims = { NODE_W: 130, NODE_H: 64, H_GAP: 6, V_GAP: 24, MAX_COLS: 999, WRAP_FROM_DEPTH: 0, isCompact: true }
+export const NORMAL_DIMS: ChartDims = { NODE_W: 160, NODE_H: 120, H_GAP: 5, V_GAP: 22, MAX_COLS: 999, WRAP_FROM_DEPTH: 1, isCompact: false, layoutCompacto: false }
+const COMPACT_DIMS: ChartDims = { NODE_W: 130, NODE_H: 64, H_GAP: 6, V_GAP: 24, MAX_COLS: 999, WRAP_FROM_DEPTH: 0, isCompact: true, layoutCompacto: false }
 /**
  * Espaciado para el export a Word (captura de canvas, no esta vista) — los
  * gaps de NORMAL_DIMS son generosos a propósito para editar cómodo en
  * pantalla; en el documento eso se traduce en cajas chicas con mucho blanco
  * alrededor. H_GAP/V_GAP al ~60% y NODE_W un poco más ancho para que las
  * cajas ocupen más lámina — mismo contenido (cargo/nombre/tel/CIP/correo),
- * NODE_H sin tocar.
+ * NODE_H sin tocar. Usa el layout compacto (layoutCompacto: true).
  */
-export const DOCUMENTO_DIMS: ChartDims = { NODE_W: 175, NODE_H: 120, H_GAP: 3, V_GAP: 13, MAX_COLS: 999, WRAP_FROM_DEPTH: 1, isCompact: false }
+export const DOCUMENTO_DIMS: ChartDims = { NODE_W: 175, NODE_H: 120, H_GAP: 3, V_GAP: 13, MAX_COLS: 999, WRAP_FROM_DEPTH: 1, isCompact: false, layoutCompacto: true }
+/**
+ * Variante más grande, usada automáticamente (ver elegirDimsDocumento) cuando
+ * el árbol ya compactado queda con aspect ratio <1.6:1 (angosto/alto) — para
+ * aprovechar mejor el área útil de la página apaisada en vez de dejar cajas
+ * chicas sobre una lámina que ya no está limitada por el ancho.
+ */
+export const DOCUMENTO_DIMS_ANCHO: ChartDims = { NODE_W: 210, NODE_H: 132, H_GAP: 3, V_GAP: 13, MAX_COLS: 999, WRAP_FROM_DEPTH: 1, isCompact: false, layoutCompacto: true }
 
 export interface LayoutNode {
   nodo: OrgNodoCompleto
@@ -59,15 +78,15 @@ export interface LayoutNode {
   dims: ChartDims
 }
 
-export function buildLayout(nodos: OrgNodoCompleto[], dims: ChartDims): {
+interface LayoutResult {
   nodes: LayoutNode[]
   svgWidth: number
   svgHeight: number
   edges: { x1: number; y1: number; x2: number; y2: number; midY: number }[]
-} {
-  const { NODE_W, NODE_H, H_GAP, V_GAP, MAX_COLS, WRAP_FROM_DEPTH } = dims
-  if (nodos.length === 0) return { nodes: [], svgWidth: 0, svgHeight: 0, edges: [] }
+}
 
+/** Índice padre->hijos, ordenado por `orden` — usado por ambos algoritmos de layout. */
+function construirIndiceHijos(nodos: OrgNodoCompleto[]): { byId: Record<string, OrgNodoCompleto>; children: Record<string, string[]> } {
   const byId = Object.fromEntries(nodos.map(n => [n.id, n]))
   const children: Record<string, string[]> = {}
   for (const n of nodos) {
@@ -78,6 +97,62 @@ export function buildLayout(nodos: OrgNodoCompleto[], dims: ChartDims): {
   for (const key of Object.keys(children)) {
     children[key].sort((a, b) => (byId[a]?.orden ?? 0) - (byId[b]?.orden ?? 0))
   }
+  return { byId, children }
+}
+
+/** Normaliza posiciones (margen + origen en 0,0), arma los LayoutNode y calcula los edges — común a ambos algoritmos. */
+function finalizarLayout(nodos: OrgNodoCompleto[], positions: Record<string, { x: number; y: number }>, dims: ChartDims): LayoutResult {
+  const { NODE_W, NODE_H, V_GAP } = dims
+  const allX = Object.values(positions).map(p => p.x)
+  const allY = Object.values(positions).map(p => p.y)
+  const minX = Math.min(...allX)
+  const minY = Math.min(...allY)
+  const MARGIN = 16
+  for (const id of Object.keys(positions)) {
+    positions[id].x -= minX - MARGIN
+    positions[id].y -= minY - MARGIN
+  }
+
+  const maxX = Math.max(...Object.values(positions).map(p => p.x)) + NODE_W + MARGIN
+  const maxY = Math.max(...Object.values(positions).map(p => p.y)) + NODE_H + MARGIN
+
+  const nodes: LayoutNode[] = nodos.map(n => ({
+    nodo: n,
+    x: positions[n.id]?.x ?? 0,
+    y: positions[n.id]?.y ?? 0,
+    width: NODE_W,
+    dims,
+  }))
+
+  const edges: LayoutResult['edges'] = []
+  for (const n of nodos) {
+    if (!n.parentId) continue
+    const parent = positions[n.parentId]
+    const child = positions[n.id]
+    if (!parent || !child) continue
+    const y2 = child.y
+    edges.push({
+      x1: parent.x + NODE_W / 2,
+      y1: parent.y + NODE_H,
+      x2: child.x + NODE_W / 2,
+      y2,
+      // Connector turns just above the child node (inside the V_GAP space)
+      // so it never passes through sibling wrap-row nodes at intermediate Y levels
+      midY: y2 - V_GAP / 2,
+    })
+  }
+
+  return { nodes, svgWidth: maxX, svgHeight: maxY, edges }
+}
+
+/**
+ * Algoritmo CLÁSICO (editor, NORMAL_DIMS/COMPACT_DIMS) — sin cambios de
+ * comportamiento respecto a la versión original. Cada subárbol reserva un
+ * ancho igual a su fila más ancha, ocupado en toda su extensión vertical.
+ */
+function buildLayoutClasico(nodos: OrgNodoCompleto[], dims: ChartDims): LayoutResult {
+  const { NODE_W, NODE_H, H_GAP, V_GAP, MAX_COLS, WRAP_FROM_DEPTH } = dims
+  const { byId, children } = construirIndiceHijos(nodos)
 
   const positions: Record<string, { x: number; y: number }> = {}
   const widths: Record<string, number> = {}
@@ -137,46 +212,142 @@ export function buildLayout(nodos: OrgNodoCompleto[], dims: ChartDims): {
     curX += widths[root.id] + H_GAP
   }
 
-  const allX = Object.values(positions).map(p => p.x)
-  const allY = Object.values(positions).map(p => p.y)
-  const minX = Math.min(...allX)
-  const minY = Math.min(...allY)
-  const MARGIN = 16
-  for (const id of Object.keys(positions)) {
-    positions[id].x -= minX - MARGIN
-    positions[id].y -= minY - MARGIN
-  }
+  return finalizarLayout(nodos, positions, dims)
+}
 
-  const maxX = Math.max(...Object.values(positions).map(p => p.x)) + NODE_W + MARGIN
-  const maxY = Math.max(...Object.values(positions).map(p => p.y)) + NODE_H + MARGIN
+interface SubarbolCompacto {
+  /** id -> x relativo a la raíz de ESTE subárbol (raíz en x=0). */
+  offsets: Map<string, number>
+  /** id -> profundidad relativa a la raíz de este subárbol (0 = la raíz misma). */
+  depths: Map<string, number>
+  /** borde izquierdo/derecho por fila relativa (índice = profundidad), en las mismas coordenadas que `offsets`. */
+  contornoIzq: number[]
+  contornoDer: number[]
+}
 
-  const nodes: LayoutNode[] = nodos.map(n => ({
-    nodo: n,
-    x: positions[n.id]?.x ?? 0,
-    y: positions[n.id]?.y ?? 0,
-    width: NODE_W,
-    dims,
-  }))
-
-  const edges: { x1: number; y1: number; x2: number; y2: number; midY: number }[] = []
-  for (const n of nodos) {
-    if (!n.parentId) continue
-    const parent = positions[n.parentId]
-    const child = positions[n.id]
-    if (!parent || !child) continue
-    const y2 = child.y
-    edges.push({
-      x1: parent.x + NODE_W / 2,
-      y1: parent.y + NODE_H,
-      x2: child.x + NODE_W / 2,
-      y2,
-      // Connector turns just above the child node (inside the V_GAP space)
-      // so it never passes through sibling wrap-row nodes at intermediate Y levels
-      midY: y2 - V_GAP / 2,
+/**
+ * Coloca una lista de subárboles hermanos de izquierda a derecha, arrimando
+ * cada uno al anterior con exactamente H_GAP de separación entre sus bordes
+ * REALES fila por fila (comparando contornos), no el ancho total reservado
+ * de cada uno — esta es la compactación estilo Reingold-Tilford que el
+ * algoritmo clásico no hace.
+ */
+function combinarHermanosCompacto(layouts: SubarbolCompacto[], H_GAP: number): { offsets: number[]; contornoIzq: number[]; contornoDer: number[] } {
+  const offsets: number[] = []
+  const contornoDerAcumulado: number[] = []
+  layouts.forEach((l, i) => {
+    let offset = 0
+    if (i > 0) {
+      const filas = Math.min(contornoDerAcumulado.length, l.contornoIzq.length)
+      for (let f = 0; f < filas; f++) {
+        const necesario = contornoDerAcumulado[f] + H_GAP - l.contornoIzq[f]
+        if (necesario > offset) offset = necesario
+      }
+    }
+    offsets.push(offset)
+    l.contornoDer.forEach((v, f) => {
+      const val = v + offset
+      contornoDerAcumulado[f] = contornoDerAcumulado[f] === undefined ? val : Math.max(contornoDerAcumulado[f], val)
     })
+  })
+
+  const maxFilas = layouts.length === 0 ? 0 : Math.max(...layouts.map(l => l.contornoIzq.length))
+  const contornoIzq: number[] = []
+  const contornoDer: number[] = []
+  for (let f = 0; f < maxFilas; f++) {
+    let minIzq = Infinity
+    let maxDer = -Infinity
+    layouts.forEach((l, i) => {
+      if (f < l.contornoIzq.length) {
+        minIzq = Math.min(minIzq, l.contornoIzq[f] + offsets[i])
+        maxDer = Math.max(maxDer, l.contornoDer[f] + offsets[i])
+      }
+    })
+    contornoIzq.push(minIzq)
+    contornoDer.push(maxDer)
+  }
+  return { offsets, contornoIzq, contornoDer }
+}
+
+/**
+ * Algoritmo COMPACTO (solo DOCUMENTO_DIMS/DOCUMENTO_DIMS_ANCHO, export a
+ * Word) — tidy-tree con compactación por contorno. A diferencia del
+ * algoritmo clásico, un hermano hoja (sin hijos) queda pegado al borde REAL
+ * de la rama vecina en su propia fila, en vez de quedar empujado hasta el
+ * borde de la fila más ancha de esa rama (que puede estar varios niveles más
+ * abajo). Nunca se usa en el editor.
+ */
+function buildLayoutCompacto(nodos: OrgNodoCompleto[], dims: ChartDims): LayoutResult {
+  const { NODE_W, NODE_H, H_GAP, V_GAP } = dims
+  const { children } = construirIndiceHijos(nodos)
+
+  function layoutSubarbol(id: string): SubarbolCompacto {
+    const kids = children[id] ?? []
+    if (kids.length === 0) {
+      return { offsets: new Map([[id, 0]]), depths: new Map([[id, 0]]), contornoIzq: [0], contornoDer: [NODE_W] }
+    }
+
+    const layoutsHijos = kids.map(k => layoutSubarbol(k))
+    const { offsets: offsetsHijos, contornoIzq: contornoIzqHijos, contornoDer: contornoDerHijos } = combinarHermanosCompacto(layoutsHijos, H_GAP)
+
+    const offsets = new Map<string, number>()
+    const depths = new Map<string, number>()
+    layoutsHijos.forEach((l, i) => {
+      l.offsets.forEach((x, nid) => offsets.set(nid, x + offsetsHijos[i]))
+      l.depths.forEach((d, nid) => depths.set(nid, d + 1))
+    })
+
+    // Centrar `id` sobre el span de sus hijos directos (primero y último).
+    const xId = (offsetsHijos[0] + offsetsHijos[offsetsHijos.length - 1]) / 2
+    // Defensivo: si el propio nodo se saldría por la izquierda del contorno de
+    // sus hijos (posible con muy pocos hijos muy juntos), desplazar todo.
+    const shiftGlobal = Math.max(0, -xId)
+    if (shiftGlobal > 0) {
+      offsets.forEach((x, k) => offsets.set(k, x + shiftGlobal))
+    }
+    const xIdFinal = xId + shiftGlobal
+    offsets.set(id, xIdFinal)
+    depths.set(id, 0)
+
+    return {
+      offsets,
+      depths,
+      contornoIzq: [xIdFinal, ...contornoIzqHijos.map(v => v + shiftGlobal)],
+      contornoDer: [xIdFinal + NODE_W, ...contornoDerHijos.map(v => v + shiftGlobal)],
+    }
   }
 
-  return { nodes, svgWidth: maxX, svgHeight: maxY, edges }
+  const roots = nodos.filter(n => !n.parentId).sort((a, b) => a.orden - b.orden)
+  const layoutsRaices = roots.map(r => layoutSubarbol(r.id))
+  const { offsets: offsetsRaices } = combinarHermanosCompacto(layoutsRaices, H_GAP)
+
+  const positions: Record<string, { x: number; y: number }> = {}
+  layoutsRaices.forEach((l, i) => {
+    l.offsets.forEach((x, nid) => {
+      const depth = l.depths.get(nid) ?? 0
+      positions[nid] = { x: x + offsetsRaices[i], y: depth * (NODE_H + V_GAP) }
+    })
+  })
+
+  return finalizarLayout(nodos, positions, dims)
+}
+
+export function buildLayout(nodos: OrgNodoCompleto[], dims: ChartDims): LayoutResult {
+  if (nodos.length === 0) return { nodes: [], svgWidth: 0, svgHeight: 0, edges: [] }
+  return dims.layoutCompacto ? buildLayoutCompacto(nodos, dims) : buildLayoutClasico(nodos, dims)
+}
+
+/**
+ * Elige el preset de tamaño para el export a Word: DOCUMENTO_DIMS por
+ * defecto, o DOCUMENTO_DIMS_ANCHO (cajas y fuente más grandes) si el árbol
+ * ya compactado queda angosto/alto (aspect ratio <1.6) — aprovecha mejor el
+ * área útil de la página en vez de dejar cajas chicas sobre una lámina que
+ * ya no está limitada por el ancho.
+ */
+export function elegirDimsDocumento(nodos: OrgNodoCompleto[]): ChartDims {
+  const layout = buildLayout(nodos, DOCUMENTO_DIMS)
+  if (layout.svgHeight === 0) return DOCUMENTO_DIMS
+  return layout.svgWidth / layout.svgHeight < 1.6 ? DOCUMENTO_DIMS_ANCHO : DOCUMENTO_DIMS
 }
 
 function NodoCard({ node, onClick }: { node: LayoutNode; onClick?: (n: OrgNodoCompleto) => void }) {

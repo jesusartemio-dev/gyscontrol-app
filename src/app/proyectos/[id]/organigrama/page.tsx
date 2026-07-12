@@ -326,10 +326,15 @@ export default function OrganigramaProyectoPage() {
   // ── CAPTURA PNG (compartida entre el botón PNG y el export Word) ───────────
 
   const generarOrganigramaPngBlob = async (scale: number, modoDocumento = false): Promise<Blob> => {
-    const { buildLayout, NORMAL_DIMS, DOCUMENTO_DIMS } = await import('@/components/organigrama/OrgChart')
-    const dims = modoDocumento ? DOCUMENTO_DIMS : NORMAL_DIMS
+    const { buildLayout, NORMAL_DIMS, elegirDimsDocumento } = await import('@/components/organigrama/OrgChart')
+    const dims = modoDocumento ? elegirDimsDocumento(nodos) : NORMAL_DIMS
     const { nodes, edges, svgWidth, svgHeight } = buildLayout(nodos, dims)
     const { NODE_W, NODE_H } = dims
+    // Cajas más grandes (DOCUMENTO_DIMS_ANCHO) también necesitan fuente/franja
+    // de encabezado más grandes en proporción — nunca aplica en el editor
+    // (NORMAL_DIMS siempre da escala 1).
+    const escalaAncho = NODE_W / NORMAL_DIMS.NODE_W
+    const escalaAlto = NODE_H / NORMAL_DIMS.NODE_H
 
     const canvas = document.createElement('canvas')
     canvas.width = svgWidth * scale
@@ -380,7 +385,7 @@ export default function OrganigramaProyectoPage() {
     }
 
     // Nodes
-    const HDR = 34
+    const HDR = Math.round(34 * escalaAlto)
     for (const n of nodes) {
       const { x, y, nodo } = n
       const isVacant = !nodo.user
@@ -412,26 +417,27 @@ export default function OrganigramaProyectoPage() {
 
       // Cargo
       ctx.fillStyle = isVacant ? '#F87171' : '#4F46E5'
-      ctx.font = 'bold 9px system-ui, sans-serif'
+      ctx.font = `bold ${Math.round(9 * escalaAncho)}px system-ui, sans-serif`
       ctx.textAlign = 'center'
-      ctx.fillText(nodo.cargoLabel, x + NODE_W / 2, y + 21, NODE_W - 12)
+      ctx.fillText(nodo.cargoLabel, x + NODE_W / 2, y + Math.round(21 * escalaAlto), NODE_W - 12)
 
       // Body
       if (isVacant) {
         ctx.fillStyle = '#F87171'
-        ctx.font = 'bold italic 11px system-ui, sans-serif'
+        ctx.font = `bold italic ${Math.round(11 * escalaAncho)}px system-ui, sans-serif`
         ctx.fillText('VACANTE', x + NODE_W / 2, y + HDR + (NODE_H - HDR) / 2 + 4)
       } else {
         ctx.fillStyle = '#1F2937'
-        ctx.font = 'bold 13px system-ui, sans-serif'
-        ctx.fillText(nodo.user!.name, x + NODE_W / 2, y + 58, NODE_W - 12)
+        ctx.font = `bold ${Math.round(13 * escalaAncho)}px system-ui, sans-serif`
+        ctx.fillText(nodo.user!.name, x + NODE_W / 2, y + Math.round(58 * escalaAlto), NODE_W - 12)
 
         ctx.fillStyle = colorSecundario
-        ctx.font = '10px system-ui, sans-serif'
+        ctx.font = `${Math.round(10 * escalaAncho)}px system-ui, sans-serif`
         ctx.textAlign = 'left'
-        let dy = y + 74
-        if (nodo._telefono) { ctx.fillText(`Tel: ${nodo._telefono}`, x + 8, dy, NODE_W - 16); dy += 13 }
-        if (nodo._cip) { ctx.fillText(`CIP ${nodo._cip}`, x + 8, dy, NODE_W - 16); dy += 13 }
+        let dy = y + Math.round(74 * escalaAlto)
+        const lineHeight = Math.round(13 * escalaAlto)
+        if (nodo._telefono) { ctx.fillText(`Tel: ${nodo._telefono}`, x + 8, dy, NODE_W - 16); dy += lineHeight }
+        if (nodo._cip) { ctx.fillText(`CIP ${nodo._cip}`, x + 8, dy, NODE_W - 16); dy += lineHeight }
         ctx.fillStyle = colorTerciario
         ctx.fillText(nodo.user!.email, x + 8, dy, NODE_W - 16)
       }
@@ -468,8 +474,8 @@ export default function OrganigramaProyectoPage() {
     }
     setExportingWord(true)
     try {
-      const { buildLayout, DOCUMENTO_DIMS } = await import('@/components/organigrama/OrgChart')
-      const { svgWidth } = buildLayout(nodos, DOCUMENTO_DIMS)
+      const { buildLayout, elegirDimsDocumento } = await import('@/components/organigrama/OrgChart')
+      const { svgWidth } = buildLayout(nodos, elegirDimsDocumento(nodos))
       const scale = Math.max(2, Math.ceil(2000 / svgWidth))
       const pngBlob = await generarOrganigramaPngBlob(scale, true)
 
