@@ -32,7 +32,7 @@ import type { ActividadPropuesta, ConfiguracionWizardPaso1, EsquemaAgrupacionPro
 import type { EdtSugeridoConOrigen } from '@/lib/cronogramaIA/derivarEdtsSoporte'
 import { detectarEdtsPosibles, type EvidenciaTexto } from '@/lib/cronogramaIA/detectarEdtsPosibles'
 import { EDTS_AGRUPACION_UN_PASO, EDTS_ESQUEMA_DOS_ETAPAS, calcularEdtsPendientesIA, tieneAlMenosUnaTareaIncluida } from '@/lib/cronogramaIA/reglasActividades'
-import { agruparYOrdenarPorEstructura, type InfoOrdenEdt } from '@/lib/cronogramaIA/construirEstructuraReal'
+import { agruparYOrdenarPorEstructura, type InfoOrdenEdt } from '@/lib/cronogramaIA/agruparYOrdenarPorEstructura'
 import { derivarAliasCandidato } from '@/lib/cronogramaIA/aliasActividad'
 import { ROL_RESPONSABLE_LABELS, type RolResponsable } from '@/lib/cronogramaResponsables/reglasResponsable'
 import {
