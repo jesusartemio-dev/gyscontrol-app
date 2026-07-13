@@ -93,7 +93,8 @@ export function DetalleGeneracion({ proyectoId, generacionId, isOpen, onClose }:
             <>
               <Section titulo="Objetivo"><ObjetivoView plan={plan} /></Section>
               <Section titulo="Alcance General"><AlcanceGeneralView plan={plan} /></Section>
-              <Section titulo="Alcance Detallado"><AlcanceDetalladoView plan={plan} /></Section>
+              {/* Snapshot histórico — las imágenes no están versionadas por generación, solo el JSON del plan */}
+              <Section titulo="Alcance Detallado"><AlcanceDetalladoView plan={plan} proyectoId={proyectoId} imagenes={[]} /></Section>
               <Section titulo="EPP Requeridos"><EppRequeridosView plan={plan} /></Section>
               <Section titulo="Herramientas y Equipos"><HerramientasView plan={plan} /></Section>
               <Section titulo="Restricciones"><RestriccionesView plan={plan} /></Section>

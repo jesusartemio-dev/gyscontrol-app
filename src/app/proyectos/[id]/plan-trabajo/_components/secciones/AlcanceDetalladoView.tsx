@@ -1,13 +1,59 @@
-import type { PlanTrabajo } from '@prisma/client'
+import type { PlanTrabajo, PlanTrabajoImagen } from '@prisma/client'
 import type { PlanAlcanceDetalladoEdt, PlanAlcanceItem } from '@/types/planTrabajo'
+import { captionEfectivo } from '@/lib/planTrabajo/imagenCaption'
 
-interface Props { plan: PlanTrabajo }
+interface Props {
+  plan: PlanTrabajo
+  proyectoId: string
+  imagenes: PlanTrabajoImagen[]
+}
 
 function isNuevoFormato(item: unknown): item is PlanAlcanceDetalladoEdt {
   return typeof item === 'object' && item !== null && 'edtNombre' in item
 }
 
-export function AlcanceDetalladoView({ plan }: Props) {
+/**
+ * Galería de solo lectura para el modo vista (Bloque 4.2, Tarea 2) — antes las
+ * imágenes solo se veían dentro del editor; el responsable que solo revisa el
+ * plan (sin entrar a editar) no las veía. Mismo orden (por `orden`) y mismo
+ * caption efectivo que el export a docx — nunca upload/reordenar/borrar acá.
+ */
+function GaleriaSoloLectura({
+  proyectoId,
+  edtRef,
+  subItemRef,
+  imagenes,
+}: {
+  proyectoId: string
+  edtRef: string
+  subItemRef?: string
+  imagenes: PlanTrabajoImagen[]
+}) {
+  const propias = imagenes
+    .filter(img => img.edtRef === edtRef && (img.subItemRef ?? undefined) === subItemRef)
+    .sort((a, b) => a.orden - b.orden)
+
+  if (propias.length === 0) return null
+
+  return (
+    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+      {propias.map(img => (
+        <figure key={img.id} className="border rounded overflow-hidden bg-gray-50">
+          <img
+            src={`/api/proyectos/${proyectoId}/plan-trabajo/alcance-imagenes/${img.id}/contenido`}
+            alt={captionEfectivo(img, '')}
+            className="w-full h-20 object-cover"
+          />
+          <figcaption className="text-[10px] text-gray-600 px-1 py-0.5 truncate" title={captionEfectivo(img, '')}>
+            {captionEfectivo(img, '')}
+          </figcaption>
+        </figure>
+      ))}
+    </div>
+  )
+}
+
+export function AlcanceDetalladoView({ plan, proyectoId, imagenes }: Props) {
   const raw = plan.alcanceDetallado as unknown[] | null
   if (!raw || raw.length === 0) return null
 
@@ -54,10 +100,15 @@ export function AlcanceDetalladoView({ plan }: Props) {
                   {item.descripcion && (
                     <p className="text-xs text-gray-600 ml-8 leading-relaxed">{item.descripcion}</p>
                   )}
+                  {item.tipoDetalle === 'detallado' && item.edtRefId && (
+                    <div className="ml-8">
+                      <GaleriaSoloLectura proyectoId={proyectoId} edtRef={item.edtRefId} imagenes={imagenes} />
+                    </div>
+                  )}
                   {(item.subItems ?? []).length > 0 && (
                     <div className="ml-8 mt-2 space-y-2 border-l-2 border-indigo-100 pl-3">
                       {(item.subItems ?? []).map((sub, si) => (
-                        <div key={si} className="space-y-0.5">
+                        <div key={si} className="space-y-1">
                           <div className="flex items-baseline gap-1.5">
                             <span className="text-[10px] font-mono text-muted-foreground shrink-0">
                               {sub.numeracion}
@@ -68,6 +119,14 @@ export function AlcanceDetalladoView({ plan }: Props) {
                           </div>
                           {sub.descripcion && (
                             <p className="text-xs text-gray-500 leading-relaxed">{sub.descripcion}</p>
+                          )}
+                          {item.tipoDetalle === 'detallado' && sub.actividadRefId && (
+                            <GaleriaSoloLectura
+                              proyectoId={proyectoId}
+                              edtRef={item.edtRefId ?? ''}
+                              subItemRef={sub.actividadRefId}
+                              imagenes={imagenes}
+                            />
                           )}
                         </div>
                       ))}

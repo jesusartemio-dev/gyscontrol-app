@@ -732,7 +732,7 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
           mensajeRegen={mensajeRegen}
           onEditar={() => setEditandoSeccion('alcanceDetallado')}
         >
-          <AlcanceDetalladoView plan={plan} />
+          <AlcanceDetalladoView plan={plan} proyectoId={proyectoId} imagenes={plan.imagenes} />
         </SeccionContainer>
 
         <SeccionContainer
