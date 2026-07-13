@@ -149,6 +149,7 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, imagenes, onImagenes
                     <GaleriaImagenesAlcance
                       proyectoId={proyectoId}
                       edtRef={item.edtRefId}
+                      nombreDefault={item.edtNombre}
                       imagenes={imagenes}
                       onChanged={onImagenesChanged}
                     />
@@ -173,6 +174,7 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, imagenes, onImagenes
                               proyectoId={proyectoId}
                               edtRef={item.edtRefId ?? ''}
                               subItemRef={sub.actividadRefId}
+                              nombreDefault={sub.actividadNombre}
                               imagenes={imagenes}
                               onChanged={onImagenesChanged}
                             />

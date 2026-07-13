@@ -16,6 +16,7 @@ import { getSnapshotPlan } from './snapshotHelpers'
 import { REFERENCIAS_BASE } from './referenciasBase'
 import { calcularTotalHH } from './calcularDatos'
 import { IMAGEN_PLACEHOLDER, type ImagenResueltaTag } from './exportDocx'
+import { captionEfectivo } from './imagenCaption'
 
 type ProyectoConCliente = Proyecto & { cliente: Cliente | null }
 
@@ -39,6 +40,7 @@ export interface ConstruirDataBagOpciones {
 function construirImagenesDeNodo(
   edtRef: string,
   subItemRef: string | undefined,
+  nombreDefault: string,
   imagenesAlcance: PlanTrabajoImagen[],
   imagenesResueltas: Map<string, ImagenResueltaTag | null>
 ): { img: ImagenResueltaTag; caption: string }[] {
@@ -50,7 +52,9 @@ function construirImagenesDeNodo(
       // (ver IMAGEN_PLACEHOLDER en exportDocx.ts). Imagen inaccesible en Drive
       // → placeholder 1x1, mismo resultado visual que antes.
       img: imagenesResueltas.get(img.id) ?? IMAGEN_PLACEHOLDER,
-      caption: img.caption ?? '',
+      // Migración suave (Bloque 4.2, Tarea 1): si el caption persistido es el
+      // filename subido, se sustituye por el nombre de la actividad/EDT.
+      caption: captionEfectivo(img, nombreDefault),
     }))
 }
 
@@ -333,7 +337,7 @@ export function construirDataBag({
           ubicacion: n.ubicacion ?? '',
           // personalRequerido/imagenes solo existen en EDTs 'detallado' (Bloque 4, Tarea 1/4)
           personalRequerido: n.personalRequerido ?? [],
-          imagenes: n.edtRefId ? construirImagenesDeNodo(n.edtRefId, undefined, imagenesAlcance, imagenesResueltas) : [],
+          imagenes: n.edtRefId ? construirImagenesDeNodo(n.edtRefId, undefined, n.edtNombre, imagenesAlcance, imagenesResueltas) : [],
           // Mismos nombres que el builder/validador/editor (numeracion/actividadNombre/
           // descripcion) — NUNCA renombrar acá. La plantilla .docx ya usa estos nombres
           // dentro de {#subItems}; renombrarlos hacía que docxtemplater, al no encontrar
@@ -348,7 +352,7 @@ export function construirDataBag({
             // la Tarea 4 del Bloque 4.2, nunca ausente para no romper el nullGetter.
             tareas: [] as { texto: string }[],
             imagenes: n.edtRefId && s.actividadRefId
-              ? construirImagenesDeNodo(n.edtRefId, s.actividadRefId, imagenesAlcance, imagenesResueltas)
+              ? construirImagenesDeNodo(n.edtRefId, s.actividadRefId, s.actividadNombre, imagenesAlcance, imagenesResueltas)
               : [],
           })),
         }

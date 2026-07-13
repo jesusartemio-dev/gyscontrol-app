@@ -6,11 +6,14 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Loader2, Trash2, Upload, ChevronUp, ChevronDown, ImageIcon } from 'lucide-react'
 import type { PlanTrabajoImagen } from '@prisma/client'
+import { captionEfectivo } from '@/lib/planTrabajo/imagenCaption'
 
 interface Props {
   proyectoId: string
   edtRef: string
   subItemRef?: string
+  /** Nombre del EDT o de la actividad (subItem) al que pertenece esta galería — default del caption al subir (Bloque 4.2, Tarea 1; antes era el filename). */
+  nombreDefault: string
   imagenes: PlanTrabajoImagen[]
   onChanged: () => Promise<void>
 }
@@ -22,7 +25,7 @@ const MAX_IMAGENES = 10
  * Las imágenes NUNCA pasan por IA — solo suben/reordenan/borran vía estos
  * endpoints REST directos a Google Drive (mismo patrón que evidencias/seguridad).
  */
-export function GaleriaImagenesAlcance({ proyectoId, edtRef, subItemRef, imagenes, onChanged }: Props) {
+export function GaleriaImagenesAlcance({ proyectoId, edtRef, subItemRef, nombreDefault, imagenes, onChanged }: Props) {
   const [subiendo, setSubiendo] = useState(false)
   const [procesandoId, setProcesandoId] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -44,7 +47,7 @@ export function GaleriaImagenesAlcance({ proyectoId, edtRef, subItemRef, imagene
         formData.append('file', file)
         formData.append('edtRef', edtRef)
         if (subItemRef) formData.append('subItemRef', subItemRef)
-        formData.append('caption', file.name.replace(/\.[^.]+$/, ''))
+        formData.append('caption', nombreDefault)
 
         const res = await fetch(`/api/proyectos/${proyectoId}/plan-trabajo/alcance-imagenes`, {
           method: 'POST',
@@ -160,7 +163,7 @@ export function GaleriaImagenesAlcance({ proyectoId, edtRef, subItemRef, imagene
               />
               <div className="p-1.5 space-y-1">
                 <Input
-                  defaultValue={img.caption ?? ''}
+                  defaultValue={captionEfectivo(img, nombreDefault)}
                   placeholder="Pie de imagen"
                   className="h-6 text-[10px]"
                   onBlur={e => handleCaption(img.id, e.target.value)}
