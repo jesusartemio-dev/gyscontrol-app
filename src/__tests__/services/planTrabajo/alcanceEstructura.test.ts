@@ -88,6 +88,7 @@ const cronogramaFixture: NonNullable<CronogramaContexto> = {
 const personalFixture: PlanPersonal[] = [
   { nombre: 'Roly Segundo', cargo: 'Técnico Operario', siglas: 'RS' },
   { nombre: 'Jesus Mamani', cargo: 'Gestor de Proyecto', siglas: 'JM' },
+  { nombre: 'Ana Vera', cargo: 'Ingeniero de Seguridad SSOMA', siglas: 'AV' },
 ]
 
 describe('esEdtDetallado', () => {
@@ -141,11 +142,15 @@ describe('calcularEstructuraAlcanceDetallado', () => {
     for (const n of nombres) expect(n.trim().length).toBeGreaterThan(0)
   })
 
-  it('personalRequerido solo aparece en EDTs detallado, e infiere el pico de personasEstimadas', () => {
+  it('personalRequerido solo aparece en EDTs detallado, e incluye siempre Supervisor + Seguridad además del pico de personasEstimadas', () => {
     const plan = estructura.find(e => e.edtNombre === 'Planificación General')!
     const con = estructura.find(e => e.edtNombre === 'Construcción')!
     expect(plan.personalRequerido).toBeUndefined()
-    expect(con.personalRequerido).toEqual([{ cantidad: 2, cargo: 'Técnico Operario' }])
+    expect(con.personalRequerido).toEqual([
+      { cantidad: 1, cargo: 'Gestor de Proyecto' },
+      { cantidad: 1, cargo: 'Ingeniero de Seguridad SSOMA' },
+      { cantidad: 2, cargo: 'Técnico Operario' },
+    ])
   })
 
   it('un EDT resumido con una sola actividad no genera subItems', () => {

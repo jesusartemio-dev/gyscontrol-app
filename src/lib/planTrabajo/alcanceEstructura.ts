@@ -52,13 +52,20 @@ export function esEdtDetallado(faseNombre: string, edtNombre: string): boolean {
 }
 
 const CARGO_CAMPO_PATRON = /t[eé]cnico|residente|supervisor|construcci[oó]n/i
+/** Mismo patrón que el rol RACI "R en gestión" (ver raciReglas.ts) — la supervisión base que los planes manuales del cliente siempre listan. */
+const CARGO_SUPERVISOR_PROYECTO_PATRON = /(gestor|supervisor\s+de\s+proyecto)/i
+/** Mismo patrón que el rol RACI de Seguridad/SSOMA (ver raciReglas.ts). */
+const CARGO_SEGURIDAD_PATRON = /seguridad|ssoma|sso|hseq|hse/i
 
 /**
  * personalRequerido — {cantidad, cargo} inferido de personasEstimadas de las
  * tareas del EDT (pico de dotación real del cronograma) + un cargo de campo
  * real del organigrama (no hay dato de asignación persona↔tarea en el schema,
  * así que NO se inventa un desglose por cargo; se reporta el pico de dotación
- * bajo el cargo de campo más relevante disponible).
+ * bajo el cargo de campo más relevante disponible). Además, siempre que hay
+ * dotación de campo se agrega 1 Supervisor de Proyecto y 1 responsable de
+ * Seguridad del organigrama (personal), tal como listan los planes manuales
+ * del cliente ("01 Supervisor de Proyectos, 01 Ing. de Seguridad, 0N Técnicos...").
  */
 function calcularPersonalRequerido(
   actividades: { tareas: { personasEstimadas: number }[] }[],
@@ -69,8 +76,25 @@ function calcularPersonalRequerido(
     .reduce((max, n) => Math.max(max, n), 0)
   if (maxPersonas === 0) return []
 
-  const cargoCampo = personal.find(p => CARGO_CAMPO_PATRON.test(p.cargo))?.cargo ?? 'Personal de campo'
-  return [{ cantidad: maxPersonas, cargo: cargoCampo }]
+  const resultado: PlanPersonalRequerido[] = []
+  const cargosIncluidos = new Set<string>()
+
+  const supervisor = personal.find(p => CARGO_SUPERVISOR_PROYECTO_PATRON.test(p.cargo))
+  if (supervisor) {
+    resultado.push({ cantidad: 1, cargo: supervisor.cargo })
+    cargosIncluidos.add(supervisor.cargo)
+  }
+
+  const seguridad = personal.find(p => CARGO_SEGURIDAD_PATRON.test(p.cargo) && !cargosIncluidos.has(p.cargo))
+  if (seguridad) {
+    resultado.push({ cantidad: 1, cargo: seguridad.cargo })
+    cargosIncluidos.add(seguridad.cargo)
+  }
+
+  const cargoCampo = personal.find(p => CARGO_CAMPO_PATRON.test(p.cargo) && !cargosIncluidos.has(p.cargo))?.cargo ?? 'Personal de campo'
+  resultado.push({ cantidad: maxPersonas, cargo: cargoCampo })
+
+  return resultado
 }
 
 export function calcularEstructuraAlcanceDetallado(
