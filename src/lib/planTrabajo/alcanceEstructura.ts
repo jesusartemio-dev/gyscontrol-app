@@ -87,15 +87,17 @@ export function calcularEstructuraAlcanceDetallado(
       const numeracionEdt = `11.${contadorEdt}`
       const detallado = esEdtDetallado(fase.nombre, edt.nombre)
 
-      let subItems: PlanAlcanceDetalladoSubItem[] | undefined
-      if (detallado || edt.actividades.length > 1) {
-        subItems = edt.actividades.map((act, j) => ({
-          numeracion: `${numeracionEdt}.${j + 1}`,
-          actividadNombre: act.nombre,
-          descripcion: '', // la completa la IA — ver generarAlcanceDetallado.ts
-          actividadRefId: act.id,
-        }))
-      }
+      // Regla de negocio: SOLO los EDTs 'detallado' tienen subItems — un EDT
+      // 'resumido' con varias actividades se describe en un único párrafo, nunca
+      // desglosado (bug auditado: salían con 3-5 subItems clonados en el docx).
+      const subItems: PlanAlcanceDetalladoSubItem[] = detallado
+        ? edt.actividades.map((act, j) => ({
+            numeracion: `${numeracionEdt}.${j + 1}`,
+            actividadNombre: act.nombre,
+            descripcion: '', // la completa la IA — ver generarAlcanceDetallado.ts
+            actividadRefId: act.id,
+          }))
+        : []
 
       estructura.push({
         numeracion: numeracionEdt,

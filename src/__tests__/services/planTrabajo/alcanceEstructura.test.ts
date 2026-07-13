@@ -150,7 +150,29 @@ describe('calcularEstructuraAlcanceDetallado', () => {
 
   it('un EDT resumido con una sola actividad no genera subItems', () => {
     const plan = estructura.find(e => e.edtNombre === 'Planificación General')!
-    expect(plan.subItems).toBeUndefined()
+    expect(plan.subItems).toEqual([])
+  })
+
+  it('un EDT resumido con VARIAS actividades tampoco genera subItems (regla de negocio: solo detallado los tiene)', () => {
+    const cronConResumidoMultiple: CronogramaContexto = {
+      ...cronogramaFixture,
+      fases: [
+        {
+          ...cronogramaFixture.fases[0],
+          edts: [
+            edt('edt-procura', 'Procura', [
+              actividad('act-proc-1', 'Cotización de cables', [tarea('cotiz-1')]),
+              actividad('act-proc-2', 'Orden de compra de tableros', [tarea('oc-1')]),
+              actividad('act-proc-3', 'Recepción en almacén', [tarea('recep-1')]),
+            ]),
+          ],
+        },
+      ],
+    }
+    const { data } = calcularEstructuraAlcanceDetallado(cronConResumidoMultiple, personalFixture)
+    const procura = data.find(e => e.edtNombre === 'Procura')!
+    expect(procura.tipoDetalle).toBe('resumido')
+    expect(procura.subItems).toEqual([])
   })
 })
 
