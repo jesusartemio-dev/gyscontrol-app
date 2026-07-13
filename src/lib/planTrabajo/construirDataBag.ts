@@ -331,10 +331,15 @@ export function construirDataBag({
           // personalRequerido/imagenes solo existen en EDTs 'detallado' (Bloque 4, Tarea 1/4)
           personalRequerido: n.personalRequerido ?? [],
           imagenes: n.edtRefId ? construirImagenesDeNodo(n.edtRefId, undefined, imagenesAlcance, imagenesResueltas) : [],
+          // Mismos nombres que el builder/validador/editor (numeracion/actividadNombre/
+          // descripcion) — NUNCA renombrar acá. La plantilla .docx ya usa estos nombres
+          // dentro de {#subItems}; renombrarlos hacía que docxtemplater, al no encontrar
+          // el tag en el subItem, resolviera contra el scope del EDT padre (numeracion/
+          // descripcion clonados, actividadNombre vacío) — causa raíz del bug auditado.
           subItems: (n.subItems ?? []).map(s => ({
-            subnumero: s.numeracion,
-            subnombre: s.actividadNombre,
-            subdescripcion: s.descripcion,
+            numeracion: s.numeracion,
+            actividadNombre: s.actividadNombre,
+            descripcion: s.descripcion,
             imagenes: n.edtRefId && s.actividadRefId
               ? construirImagenesDeNodo(n.edtRefId, s.actividadRefId, imagenesAlcance, imagenesResueltas)
               : [],
