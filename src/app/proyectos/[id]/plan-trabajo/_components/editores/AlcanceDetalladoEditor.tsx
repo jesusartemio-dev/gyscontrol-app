@@ -126,7 +126,7 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, imagenes, onImagenes
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <Label className="text-xs">Ubicación (opcional)</Label>
-                      <Input value={item.ubicacion ?? ''} onChange={e => updateItem(edtIdx, { ubicacion: e.target.value })} className="h-8 text-sm" placeholder="Site cliente / Sección 50" />
+                      <Input value={item.ubicacion ?? ''} onChange={e => updateItem(edtIdx, { ubicacion: e.target.value })} className="h-8 text-sm" placeholder="Ej: Nave principal — Nivel 3" />
                     </div>
                     <div>
                       <Label className="text-xs">Nivel de detalle</Label>
