@@ -31,6 +31,7 @@ import type { ActividadPropuesta, ConfiguracionWizardPaso1, EsquemaAgrupacionPro
 import type { EdtSugeridoConOrigen } from '@/lib/cronogramaIA/derivarEdtsSoporte'
 import { detectarEdtsPosibles, type EvidenciaTexto } from '@/lib/cronogramaIA/detectarEdtsPosibles'
 import { EDTS_AGRUPACION_UN_PASO, EDTS_ESQUEMA_DOS_ETAPAS, calcularEdtsPendientesIA } from '@/lib/cronogramaIA/reglasActividades'
+import { derivarAliasCandidato } from '@/lib/cronogramaIA/aliasActividad'
 import { ROL_RESPONSABLE_LABELS, type RolResponsable } from '@/lib/cronogramaResponsables/reglasResponsable'
 import {
   BORRADOR_LOCAL_PASO1_VERSION,
@@ -128,6 +129,13 @@ interface Props {
   onSuccess?: () => void
 }
 
+/** Nombre + alias de un esquema en edición — `aliasManual` evita que el re-cálculo de alias al renombrar pise un alias que el usuario ya editó a mano. */
+interface NombreEditableEsquema {
+  nombre: string
+  alias: string
+  aliasManual?: boolean
+}
+
 const PASOS = ['Alcance del proyecto', 'Actividades propuestas']
 
 export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, onSuccess }: Props) {
@@ -175,7 +183,7 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
   // dentro del Paso 2, antes del acordeón final de Actividades.
   const [esquemasPorEdt, setEsquemasPorEdt] = useState<Record<string, EsquemaAgrupacionPropuesto[]>>({})
   const [indiceElegido, setIndiceElegido] = useState<Record<string, number | null>>({})
-  const [nombresEditables, setNombresEditables] = useState<Record<string, string[]>>({})
+  const [nombresEditables, setNombresEditables] = useState<Record<string, NombreEditableEsquema[]>>({})
   const [mostrandoEsquemas, setMostrandoEsquemas] = useState(false)
   const [confirmandoEsquemas, setConfirmandoEsquemas] = useState(false)
   const [previewResponsables, setPreviewResponsables] = useState<ResponsablePreviewEdt[]>([])
@@ -900,14 +908,24 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
     }
   }
 
+  // Renombrar re-deriva el alias sugerido, salvo que el usuario ya lo haya
+  // editado a mano (aliasManual) — no le pisamos una elección explícita.
   function actualizarNombreEsquema(edtNombre: string, indice: number, nombre: string) {
     setNombresEditables(prev => ({
       ...prev,
-      [edtNombre]: (prev[edtNombre] ?? []).map((n, i) => (i === indice ? nombre : n)),
+      [edtNombre]: (prev[edtNombre] ?? []).map((item, i) =>
+        i === indice ? { ...item, nombre, alias: item.aliasManual ? item.alias : derivarAliasCandidato(nombre) } : item
+      ),
+    }))
+  }
+  function actualizarAliasEsquema(edtNombre: string, indice: number, alias: string) {
+    setNombresEditables(prev => ({
+      ...prev,
+      [edtNombre]: (prev[edtNombre] ?? []).map((item, i) => (i === indice ? { ...item, alias, aliasManual: true } : item)),
     }))
   }
   function agregarNombreEsquema(edtNombre: string) {
-    setNombresEditables(prev => ({ ...prev, [edtNombre]: [...(prev[edtNombre] ?? []), ''] }))
+    setNombresEditables(prev => ({ ...prev, [edtNombre]: [...(prev[edtNombre] ?? []), { nombre: '', alias: '' }] }))
   }
   function quitarNombreEsquema(edtNombre: string, indice: number) {
     setNombresEditables(prev => ({ ...prev, [edtNombre]: (prev[edtNombre] ?? []).filter((_, i) => i !== indice) }))
@@ -926,7 +944,9 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
       // Secuencial (no Promise.all): comparten el mismo lock de IA del
       // cronograma — dos llamadas concurrentes harían fallar la segunda.
       for (const edtNombre of edtsAConfirmar) {
-        const nombres = (nombresEditables[edtNombre] ?? []).map(n => n.trim()).filter(Boolean)
+        const nombres = (nombresEditables[edtNombre] ?? [])
+          .map(item => ({ nombre: item.nombre.trim(), alias: item.alias.trim() }))
+          .filter(item => item.nombre.length > 0)
         if (nombres.length === 0) continue // esquema vacío/sin elegir — el usuario agrupará a mano en el acordeón
         const idx = indiceElegido[edtNombre]
         const res = await fetch(`/api/proyectos/${proyectoId}/cronograma/planificacion/wizard/${generacionId}/agrupar-esquema-ia`, {
@@ -1334,14 +1354,14 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
                   onValueChange={v => {
                     const idx = Number(v)
                     setIndiceElegido(prev => ({ ...prev, [edtNombre]: idx }))
-                    setNombresEditables(prev => ({ ...prev, [edtNombre]: [...esquemas[idx].nombres] }))
+                    setNombresEditables(prev => ({ ...prev, [edtNombre]: esquemas[idx].nombres.map(n => ({ ...n })) }))
                   }}
                 >
                   {esquemas.map((esquema, idx) => (
                     <RadioGroupItem key={idx} value={String(idx)} className="items-start border rounded-lg p-2">
                       <div className="min-w-0">
                         <p className="text-sm font-medium">{esquema.criterio}</p>
-                        <p className="text-xs text-muted-foreground">{esquema.nombres.join(' / ')}</p>
+                        <p className="text-xs text-muted-foreground">{esquema.nombres.map(n => n.nombre).join(' / ')}</p>
                         {esquema.nota && <p className="text-xs text-amber-600 mt-0.5">{esquema.nota}</p>}
                       </div>
                     </RadioGroupItem>
@@ -1352,15 +1372,27 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
               {indiceElegido[edtNombre] != null && (
                 <div className="space-y-1.5 pt-2 border-t">
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs">Actividades de este esquema (editable)</Label>
+                    <Label className="text-xs">Actividades de este esquema (editable) — el alias prefija las tareas repetidas</Label>
                     <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => agregarNombreEsquema(edtNombre)}>
                       <Plus className="h-3 w-3 mr-1" />Agregar
                     </Button>
                   </div>
-                  {(nombresEditables[edtNombre] ?? []).map((nombre, ni) => (
+                  {(nombresEditables[edtNombre] ?? []).map((item, ni) => (
                     <div key={ni} className="flex gap-2 items-center">
-                      <Input value={nombre} onChange={e => actualizarNombreEsquema(edtNombre, ni, e.target.value)} className="h-8 text-sm" />
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive" onClick={() => quitarNombreEsquema(edtNombre, ni)}>
+                      <Input
+                        value={item.nombre}
+                        onChange={e => actualizarNombreEsquema(edtNombre, ni, e.target.value)}
+                        className="h-8 text-sm flex-1"
+                        placeholder="Nombre de la Actividad"
+                      />
+                      <Input
+                        value={item.alias}
+                        onChange={e => actualizarAliasEsquema(edtNombre, ni, e.target.value)}
+                        className="h-8 text-sm w-20 shrink-0"
+                        placeholder="Alias"
+                        maxLength={12}
+                      />
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive shrink-0" onClick={() => quitarNombreEsquema(edtNombre, ni)}>
                         <Trash2 className="h-3 w-3" />
                       </Button>
                     </div>

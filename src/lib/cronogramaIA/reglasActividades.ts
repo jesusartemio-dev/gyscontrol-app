@@ -16,6 +16,7 @@ import {
   aplicarSubalcanceProtocolosIng,
   type SubalcanceProtocolosIng,
 } from './derivarEdtsSoporte'
+import { aplicarPrefijoDeActividad } from './aliasActividad'
 
 /**
  * EDTs cuya agrupación en Actividades depende de IA (zonas de CON, familias
@@ -225,18 +226,19 @@ function generarPLA(
   const tablero = servicios.filter(s => s.actividadTag.includes('Tablero'))
   const resto = servicios.filter(s => !s.actividadTag.includes('Tablero'))
 
-  const actividades: ActividadPropuesta[] = []
-
   const nombresTablero = config.tableros.map(t => t.nombre).filter(Boolean)
   if (tablero.length > 0 && nombresTablero.length === 0) {
     advertencias.push('PLA: no se generaron Actividades de tablero porque el proyecto no tiene tableros en el Paso 1 — las tareas [Tablero] quedaron fuera; las de disciplina sí se generaron. Si el proyecto fabrica un tablero, agrégalo en el Paso 1.')
   }
+  const actividadesTablero: ActividadPropuesta[] = []
   for (const nombreTablero of nombresTablero) {
     const tareas = tablero.map(s => construirTareaPropuesta(s, config))
     if (tieneAlMenosUnaTareaIncluida(tareas)) {
-      actividades.push({ edtNombre: 'PLA', actividadNombre: formatearNombreTablero(nombreTablero), tareas, origen: 'determinista' })
+      actividadesTablero.push({ edtNombre: 'PLA', actividadNombre: formatearNombreTablero(nombreTablero), tareas, origen: 'determinista' })
     }
   }
+
+  const actividades: ActividadPropuesta[] = [...aplicarPrefijoDeActividad(actividadesTablero)]
 
   actividades.push(
     ...agruparPorTag(resto, 'PLA', TAG_LABELS_RESTO, config, {
@@ -261,7 +263,7 @@ function generarPorInstancia(
       actividades.push({ edtNombre, actividadNombre: nombreInstancia, tareas, origen: 'determinista' })
     }
   }
-  return actividades
+  return aplicarPrefijoDeActividad(actividades)
 }
 
 function generarTAB(servicios: CatalogoServicioParaWizard[], config: ConfiguracionWizardPaso1, advertencias: string[]): ActividadPropuesta[] {

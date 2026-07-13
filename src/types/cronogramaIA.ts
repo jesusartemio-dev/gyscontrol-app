@@ -73,17 +73,23 @@ export interface ResultadoActividadesDeterministas {
   advertencias: string[]
 }
 
+/** Nombre de Actividad de un esquema junto con su alias corto (ver aliasActividad.ts) usado para prefijar las tareas repetidas entre Actividades. */
+export interface NombreConAlias {
+  nombre: string
+  alias: string
+}
+
 /** Uno de los 2-3 esquemas alternativos de agrupación que la IA propone en la Etapa A (CON/PRO), antes de asignar ninguna tarea. */
 export interface EsquemaAgrupacionPropuesto {
   criterio: string
-  nombres: string[]
+  nombres: NombreConAlias[]
   /** Aclaración opcional para el usuario — ej. cuando el esquema "Por zona" de CON usa placeholders genéricos por falta de contexto geográfico. */
   nota?: string
 }
 
-/** Esquema con el que el usuario confirmó la Etapa B — nombres ya posiblemente editados (renombrados/agregados/quitados) respecto al propuesto. */
+/** Esquema con el que el usuario confirmó la Etapa B — nombres/alias ya posiblemente editados (renombrados/agregados/quitados) respecto al propuesto. */
 export interface EsquemaElegido {
-  nombres: string[]
+  nombres: NombreConAlias[]
   criterioOriginal: string | null
   indiceOriginal: number | null
 }

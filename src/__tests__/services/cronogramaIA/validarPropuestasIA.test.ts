@@ -69,6 +69,23 @@ describe('validarPropuestaGrupos', () => {
     expect(r.advertencias.length).toBeGreaterThan(0)
   })
 
+  it('con 2+ grupos reales, prefija sus tareas con el alias de cada uno pero NUNCA prefija "Sin agrupar"', () => {
+    const r = validarPropuestaGrupos(
+      [
+        { nombre: 'Sala Eléctrica', catalogoServicioIds: ['s1'] },
+        { nombre: 'Zona de Tanques', catalogoServicioIds: ['s2'] },
+      ],
+      servicios,
+      config,
+      'CON'
+    )
+    const sala = r.actividades.find(a => a.actividadNombre === 'Sala Eléctrica')!
+    const sinAgrupar = r.actividades.find(a => a.actividadNombre === 'Sin agrupar')!
+    expect(sala.tareas[0].nombre).not.toBe('Tendido de cables')
+    expect(sala.tareas[0].nombre.endsWith(' - Tendido de cables')).toBe(true)
+    expect(sinAgrupar.tareas[0].nombre).toBe('Pruebas de continuidad')
+  })
+
   it('la IA no devuelve nada (fallo total) — todo cae en "Sin agrupar", nunca se pierde una tarea', () => {
     const r = validarPropuestaGrupos([], servicios, config, 'CON')
     expect(r.actividades).toHaveLength(1)
@@ -185,7 +202,10 @@ describe('validarAsignacionEsquema — Etapa B del flujo de esquemas (CON/PRO)',
     servicio({ id: 's2', nombre: 'Montaje de tablero' }),
     servicio({ id: 's3', nombre: 'Pruebas de continuidad' }),
   ]
-  const nombresActividades = ['Sala Eléctrica', 'Zona de Tanques']
+  const nombresActividades = [
+    { nombre: 'Sala Eléctrica', alias: 'Sala' },
+    { nombre: 'Zona de Tanques', alias: 'Tanques' },
+  ]
 
   it('asigna tareas a los nombres fijos del esquema elegido', () => {
     const r = validarAsignacionEsquema(
@@ -201,6 +221,23 @@ describe('validarAsignacionEsquema — Etapa B del flujo de esquemas (CON/PRO)',
     expect(r.actividades.find(a => a.actividadNombre === 'Sala Eléctrica')?.tareas).toHaveLength(2)
     expect(r.actividades.find(a => a.actividadNombre === 'Zona de Tanques')?.tareas).toHaveLength(1)
     expect(r.advertencias).toHaveLength(0)
+  })
+
+  it('con 2+ Actividades reales, prefija el nombre de cada tarea con el alias de su Actividad', () => {
+    const r = validarAsignacionEsquema(
+      [
+        { actividadNombre: 'Sala Eléctrica', catalogoServicioIds: ['s1', 's2'] },
+        { actividadNombre: 'Zona de Tanques', catalogoServicioIds: ['s3'] },
+      ],
+      nombresActividades,
+      servicios,
+      config,
+      'CON'
+    )
+    const sala = r.actividades.find(a => a.actividadNombre === 'Sala Eléctrica')!
+    const tanques = r.actividades.find(a => a.actividadNombre === 'Zona de Tanques')!
+    expect(sala.tareas.map(t => t.nombre)).toEqual(['Sala - Tendido de cables', 'Sala - Montaje de tablero'])
+    expect(tanques.tareas.map(t => t.nombre)).toEqual(['Tanques - Pruebas de continuidad'])
   })
 
   it('un actividadNombre inventado (fuera del esquema elegido) se descarta — sus tareas caen en "Sin agrupar", nunca se pierden', () => {

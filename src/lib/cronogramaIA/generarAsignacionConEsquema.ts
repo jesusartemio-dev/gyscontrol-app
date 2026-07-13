@@ -17,7 +17,7 @@ import {
   type EquipoRealParaPrompt,
   type TareaParaPrompt,
 } from './prompts'
-import type { CatalogoServicioParaWizard, ConfiguracionWizardPaso1 } from '@/types/cronogramaIA'
+import type { CatalogoServicioParaWizard, ConfiguracionWizardPaso1, NombreConAlias } from '@/types/cronogramaIA'
 
 function extraerTexto(response: Anthropic.Message): string {
   return response.content
@@ -30,7 +30,7 @@ type EdtConEsquema = 'CON' | 'PRO'
 
 interface GenerarAsignacionOpciones {
   edtNombre: EdtConEsquema
-  nombresActividades: string[]
+  nombresActividades: NombreConAlias[]
   serviciosPermitidos: CatalogoServicioParaWizard[]
   alcanceLibre: string
   cotizacion: ContextoCotizacionParaPrompt | null
@@ -68,6 +68,7 @@ export async function generarAsignacionConEsquema(opciones: GenerarAsignacionOpc
 
   const tareasParaPrompt: TareaParaPrompt[] = serviciosPermitidos.map(s => ({ id: s.id, nombre: s.nombre, descripcion: s.descripcion }))
   const system = edtNombre === 'CON' ? SYSTEM_ASIGNACION_CON : SYSTEM_ASIGNACION_PRO
+  const nombresPlano = nombresActividades.map(n => n.nombre)
 
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   let notaCorrectiva = ''
@@ -76,8 +77,8 @@ export async function generarAsignacionConEsquema(opciones: GenerarAsignacionOpc
   for (let intento = 0; intento <= MAX_REINTENTOS; intento++) {
     const userPrompt =
       edtNombre === 'CON'
-        ? buildUserAsignacionCon(tareasParaPrompt, nombresActividades, alcanceLibre, cotizacion, notaCorrectiva)
-        : buildUserAsignacionPro(tareasParaPrompt, nombresActividades, alcanceLibre, cotizacion, equiposReales, notaCorrectiva)
+        ? buildUserAsignacionCon(tareasParaPrompt, nombresPlano, alcanceLibre, cotizacion, notaCorrectiva)
+        : buildUserAsignacionPro(tareasParaPrompt, nombresPlano, alcanceLibre, cotizacion, equiposReales, notaCorrectiva)
 
     const inicio = Date.now()
     let response: Anthropic.Message

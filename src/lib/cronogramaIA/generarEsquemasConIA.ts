@@ -11,6 +11,7 @@ import {
   type EquipoRealParaPrompt,
   type EsquemaPropuestoIA,
 } from './prompts'
+import { resolverAliasParaNombres } from './aliasActividad'
 import type { EsquemaAgrupacionPropuesto } from '@/types/cronogramaIA'
 
 function extraerTexto(response: Anthropic.Message): string {
@@ -100,11 +101,24 @@ export async function generarEsquemasConIA(opciones: GenerarEsquemasOpciones): P
       const parsed = parseJsonIA(extraerTexto(response)) as { esquemas?: EsquemaPropuestoIA[] }
       const esquemas = (parsed.esquemas ?? [])
         .filter(e => e && typeof e.criterio === 'string' && Array.isArray(e.nombres) && e.nombres.length > 0)
-        .map(e => ({
-          criterio: e.criterio,
-          nombres: e.nombres.filter((n): n is string => typeof n === 'string' && n.trim().length > 0),
-          ...(typeof e.nota === 'string' && e.nota.trim().length > 0 ? { nota: e.nota.trim() } : {}),
-        }))
+        .map(e => {
+          const nombresCrudos = (e.nombres as unknown[])
+            .filter((n): n is { nombre?: unknown; alias?: unknown } => !!n && typeof n === 'object')
+            .map(n => ({
+              nombre: typeof n.nombre === 'string' ? n.nombre.trim() : '',
+              aliasPropuesto: typeof n.alias === 'string' ? n.alias : undefined,
+            }))
+            .filter(n => n.nombre.length > 0)
+          // El alias que propone la IA nunca se usa tal cual — se valida/deriva
+          // acá para garantizar el invariante (una palabra, único) siempre.
+          const aliasPorNombre = resolverAliasParaNombres(nombresCrudos)
+          const nombres = nombresCrudos.map(n => ({ nombre: n.nombre, alias: aliasPorNombre.get(n.nombre)! }))
+          return {
+            criterio: e.criterio,
+            nombres,
+            ...(typeof e.nota === 'string' && e.nota.trim().length > 0 ? { nota: e.nota.trim() } : {}),
+          }
+        })
         .filter(e => e.nombres.length > 0)
       return { esquemas, advertencias: [] }
     } catch {

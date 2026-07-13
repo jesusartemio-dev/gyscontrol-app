@@ -1,11 +1,14 @@
-import type { ActividadPropuesta, CatalogoServicioParaWizard, TareaPropuesta } from '@/types/cronogramaIA'
+import type { ActividadPropuesta, CatalogoServicioParaWizard, NombreConAlias, TareaPropuesta } from '@/types/cronogramaIA'
 import { construirTareaPropuesta, ordenarPorCatalogo } from './reglasActividades'
+import { aplicarPrefijoDeActividad } from './aliasActividad'
 
 export const MAX_REINTENTOS = 1
 
 export interface GrupoPropuestoIA {
   nombre: string
   catalogoServicioIds: string[]
+  /** Alias ya resuelto (Etapa B de CON/PRO, ver validarAsignacionEsquema) — si se omite, se deriva genéricamente del nombre (PLC/HMI). */
+  alias?: string
 }
 
 export interface ResultadoValidacionGrupos {
@@ -31,12 +34,12 @@ export function validarPropuestaGrupos(
   edtNombre: string
 ): ResultadoValidacionGrupos {
   const serviciosPorId = new Map(serviciosPermitidos.map(s => [s.id, s]))
-  const idsPermitidos = new Set(serviciosPermitidos.map(s => s.id))
   const idsAsignados = new Set<string>()
   const tareaIdsInventados: string[] = []
   const advertencias: string[] = []
 
-  const actividades: ActividadPropuesta[] = []
+  let actividades: ActividadPropuesta[] = []
+  const aliasPropuestoPorNombre = new Map<string, string>()
 
   for (const grupo of grupos) {
     if (!grupo.nombre || grupo.nombre.trim().length === 0) continue
@@ -53,9 +56,16 @@ export function validarPropuestaGrupos(
     }
 
     if (tareas.length > 0) {
-      actividades.push({ edtNombre, actividadNombre: grupo.nombre.trim(), tareas: ordenarPorCatalogo(tareas), origen: 'ia' })
+      const actividadNombre = grupo.nombre.trim()
+      actividades.push({ edtNombre, actividadNombre, tareas: ordenarPorCatalogo(tareas), origen: 'ia' })
+      if (grupo.alias) aliasPropuestoPorNombre.set(actividadNombre, grupo.alias)
     }
   }
+
+  // Prefijo de tareas por alias de Actividad — ANTES de agregar "Sin
+  // agrupar" (nunca se prefija: no es una instancia real, es un catch-all
+  // temporal para que el usuario reasigne a mano).
+  actividades = aplicarPrefijoDeActividad(actividades, aliasPropuestoPorNombre)
 
   const tareaIdsNoAsignadas = serviciosPermitidos.map(s => s.id).filter(id => !idsAsignados.has(id))
   if (tareaIdsNoAsignadas.length > 0) {
@@ -89,19 +99,20 @@ export interface AsignacionPropuestaIA {
  */
 export function validarAsignacionEsquema(
   asignaciones: AsignacionPropuestaIA[],
-  nombresActividades: string[],
+  nombresActividades: NombreConAlias[],
   serviciosPermitidos: CatalogoServicioParaWizard[],
   config: Parameters<typeof construirTareaPropuesta>[1],
   edtNombre: string
 ): ResultadoValidacionGrupos {
-  const nombresPermitidos = new Set(nombresActividades.map(n => n.trim()))
+  const aliasPorNombre = new Map(nombresActividades.map(n => [n.nombre.trim(), n.alias]))
+  const nombresPermitidos = new Set(nombresActividades.map(n => n.nombre.trim()))
   const gruposValidos: GrupoPropuestoIA[] = []
   let tareasConNombreInvalido = 0
 
   for (const a of asignaciones) {
     const nombre = (a.actividadNombre ?? '').trim()
     if (nombresPermitidos.has(nombre)) {
-      gruposValidos.push({ nombre, catalogoServicioIds: a.catalogoServicioIds })
+      gruposValidos.push({ nombre, catalogoServicioIds: a.catalogoServicioIds, alias: aliasPorNombre.get(nombre) })
     } else {
       tareasConNombreInvalido += a.catalogoServicioIds.length
     }
@@ -116,7 +127,7 @@ export function validarAsignacionEsquema(
   }
 
   const nombresConActividad = new Set(resultado.actividades.map(a => a.actividadNombre))
-  for (const nombre of nombresActividades) {
+  for (const { nombre } of nombresActividades) {
     if (!nombresConActividad.has(nombre)) {
       resultado.actividades.push({ edtNombre, actividadNombre: nombre, tareas: [], origen: 'ia' })
     }

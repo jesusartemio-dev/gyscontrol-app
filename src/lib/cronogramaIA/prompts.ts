@@ -332,11 +332,34 @@ export function buildUserPropuestaFamiliasPro(
  * (buildUserAsignacionCon/Pro más abajo) recién ahí asigna tareas al
  * esquema que el usuario elija/edite.
  */
+export interface NombreConAliasIA {
+  nombre: string
+  alias?: string
+}
+
 export interface EsquemaPropuestoIA {
   criterio: string
-  nombres: string[]
+  nombres: NombreConAliasIA[]
   nota?: string
 }
+
+/**
+ * Instrucción compartida por CON y PRO en la Etapa A: además del nombre,
+ * cada Actividad del esquema lleva un "alias" corto (una palabra) que el
+ * código usa después para prefijar el nombre de sus tareas cuando el
+ * mismo catálogo se repite en varias Actividades (ej. "Elevador -
+ * Armado de Andamios") — así son distinguibles en vistas planas. El
+ * código valida/deriva el alias si falta o es inválido — ver
+ * aliasActividad.ts.
+ */
+const REGLA_ALIAS_ESQUEMA = `
+- Cada nombre de Actividad lleva además un "alias": UNA sola palabra
+  (máx. 12 caracteres), la más distintiva del nombre, y ÚNICA dentro del
+  esquema. Ej: "Zona Elevador G300" -> alias "Elevador"; "Sala MCC 70-81"
+  -> alias "MCC"; "Recorrido Eléctrico (MCC a Elevador)" -> alias
+  "Recorrido"; "General/Transversal" -> alias "General". Elegí la palabra
+  que un ingeniero de campo reconocería de inmediato, no un conector
+  genérico ("Zona", "Sala", "de", "por").`.trim()
 
 export const SYSTEM_ESQUEMAS_ZONAS_CON = `
 Eres el Jefe de Obra Senior de GYS CONTROL INDUSTRIAL SAC, empresa peruana
@@ -382,6 +405,7 @@ REGLAS GENERALES:
   nombres suele ser razonable, ajustá según la complejidad real del alcance
   descrito. "nota" es opcional: usala SOLO para aclarar algo al usuario (ej.
   el caso de fallback del esquema 1); dejala vacía/omitida en los demás.
+${REGLA_ALIAS_ESQUEMA}
 - Los 3 esquemas deben ser genuinamente distintos entre sí (distinto
   criterio organizador cada uno), nunca variaciones triviales del mismo
   esquema.
@@ -403,7 +427,7 @@ export function buildUserEsquemasZonasCon(
     bloqueContextoCotizacion(cotizacion),
     '',
     'ESQUEMA DE OUTPUT (devolvé EXACTAMENTE este JSON, sin markdown — "nota" es opcional):',
-    '{ "esquemas": [{ "criterio": "string", "nombres": ["string", "..."], "nota": "string opcional" }] }',
+    '{ "esquemas": [{ "criterio": "string", "nombres": [{ "nombre": "string", "alias": "string — una palabra, máx 12 caracteres, distintiva y única en el esquema" }], "nota": "string opcional" }] }',
   ]
     .filter(Boolean)
     .join('\n')
@@ -424,6 +448,7 @@ REGLAS ESTRICTAS:
 - Proponé 2 o 3 esquemas, nunca más de 3 ni menos de 2.
 - Cada esquema debe tener un "criterio" (ej. "Por tipo de material", "Por
   proveedor/rubro") y una lista de "nombres" de familia específicos.
+${REGLA_ALIAS_ESQUEMA}
 - Si aparecen EQUIPOS REALES YA COTIZADOS más abajo (dato estructurado, con
   marca y cantidad reales), tus esquemas DEBEN nombrar familias que cubran
   esos ítems — es la señal de mayor prioridad, por encima del alcance libre.
@@ -445,7 +470,7 @@ export function buildUserEsquemasFamiliasPro(
     bloqueContextoCotizacion(cotizacion),
     '',
     'ESQUEMA DE OUTPUT (devolvé EXACTAMENTE este JSON, sin markdown):',
-    '{ "esquemas": [{ "criterio": "string", "nombres": ["string", "..."] }] }',
+    '{ "esquemas": [{ "criterio": "string", "nombres": [{ "nombre": "string", "alias": "string — una palabra, máx 12 caracteres, distintiva y única en el esquema" }] }] }',
   ]
     .filter(Boolean)
     .join('\n')

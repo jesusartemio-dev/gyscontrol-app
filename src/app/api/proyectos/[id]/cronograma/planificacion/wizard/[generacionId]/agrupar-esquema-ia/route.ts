@@ -7,7 +7,8 @@ import { isIAFeatureEnabled } from '@/lib/agente/featureFlags'
 import { adquirirLockCronogramaIA, liberarLockCronogramaIA } from '@/lib/cronogramaIA/mutex'
 import { generarAsignacionConEsquema } from '@/lib/cronogramaIA/generarAsignacionConEsquema'
 import { EDTS_ESQUEMA_DOS_ETAPAS } from '@/lib/cronogramaIA/reglasActividades'
-import type { ActividadPropuesta, CatalogoServicioParaWizard, ConfiguracionWizardPaso1, EsquemaElegido } from '@/types/cronogramaIA'
+import { resolverAliasParaNombres } from '@/lib/cronogramaIA/aliasActividad'
+import type { ActividadPropuesta, CatalogoServicioParaWizard, ConfiguracionWizardPaso1, EsquemaElegido, NombreConAlias } from '@/types/cronogramaIA'
 import type { ContextoCotizacionParaPrompt, EquipoRealParaPrompt } from '@/lib/cronogramaIA/prompts'
 
 export const maxDuration = 120
@@ -30,18 +31,35 @@ const MAX_LINEAS_CONTEXTO = 15
 
 interface BodyEsperado {
   edtNombre: EdtConEsquema
-  nombresActividades: string[]
+  nombresActividades: NombreConAlias[]
   indiceOriginal: number | null
   criterioOriginal: string | null
 }
 
+/**
+ * El alias que llega del cliente ya pasó por la misma validación en el
+ * wizard (ver aliasActividad.ts), pero el servidor nunca confía en eso —
+ * se vuelve a resolver acá (no vacío, una palabra, único dentro del
+ * esquema) antes de usarlo para prefijar tareas.
+ */
 function validarBody(raw: unknown): BodyEsperado | null {
   if (!raw || typeof raw !== 'object') return null
   const b = raw as Record<string, unknown>
   if (b.edtNombre !== 'CON' && b.edtNombre !== 'PRO') return null
   if (!Array.isArray(b.nombresActividades) || b.nombresActividades.length === 0) return null
-  const nombresActividades = b.nombresActividades.filter((n): n is string => typeof n === 'string' && n.trim().length > 0)
-  if (nombresActividades.length === 0) return null
+
+  const crudos = b.nombresActividades
+    .filter((n): n is Record<string, unknown> => !!n && typeof n === 'object')
+    .map(n => ({
+      nombre: typeof n.nombre === 'string' ? n.nombre.trim() : '',
+      aliasPropuesto: typeof n.alias === 'string' ? n.alias : undefined,
+    }))
+    .filter(n => n.nombre.length > 0)
+  if (crudos.length === 0) return null
+
+  const aliasPorNombre = resolverAliasParaNombres(crudos)
+  const nombresActividades = crudos.map(n => ({ nombre: n.nombre, alias: aliasPorNombre.get(n.nombre)! }))
+
   return {
     edtNombre: b.edtNombre,
     nombresActividades,
@@ -61,7 +79,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
   const body = validarBody(await req.json().catch(() => null))
   if (!body) {
-    return NextResponse.json({ error: 'Body inválido — se espera { edtNombre: "CON"|"PRO", nombresActividades: string[] }' }, { status: 400 })
+    return NextResponse.json({ error: 'Body inválido — se espera { edtNombre: "CON"|"PRO", nombresActividades: { nombre: string; alias?: string }[] }' }, { status: 400 })
   }
 
   const generacion = await prisma.proyectoCronogramaGeneracionIA.findUnique({
