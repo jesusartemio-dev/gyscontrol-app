@@ -44,6 +44,13 @@ El campo TOC es nativo de Word con `updateFields` activado: Word pedirá "¿Actu
 
 ## 2. Mapeo de tags → dataBag
 
+> ⚠️ Los nombres de tags de este documento deben coincidir EXACTAMENTE con
+> `plan-trabajo-nexa-template.docx` y con las claves de `construirDataBag.ts`.
+> Un nombre distinto no produce error visible: Docxtemplater resuelve el tag
+> subiendo al scope del padre y clona sus valores silenciosamente (bug
+> corregido en `ac1f0672`). Ante cualquier duda, la plantilla docx es la
+> fuente de verdad.
+
 Leyenda de estado: ✅ ya existe en `construirDataBag.ts` (según informe) · 🆕 clave nueva a agregar · 🔧 existe pero cambia de forma.
 
 ### Cabecera y carátula (BD, sin IA)
@@ -84,7 +91,7 @@ Objetivo-bullets, Definiciones generales, **Responsabilidades completas (§5)**,
 | `{objetivo}` | Texto multipárrafo (requiere `linebreaks: true`) |
 | `{alcanceGeneral}` | Ídem. Inyectar **`cliente.direccion`** al contexto (quick win #1) — la dirección correcta ya existe en BD (`/comercial/clientes/cli-import-1769535277176-...`) |
 | `{#tieneUbicacion}` + `{ubicacionProyecto}` | 🆕 flag + string desde `cliente.direccion` o `ProyectoTdrAnalisis.ubicacionDetectada`. Dato mostrado explícito, no solo dentro de la prosa de IA |
-| `{#alcanceDetallado}` → `{numeracion} {edtNombre} {faseNombre} {descripcion} {codigo} {ubicacion}` + `{#subItems}` → `{subnumero} {subnombre} {subdescripcion}` (anidado) + `{#personalRequerido}` → `{cantidad} {cargo}` + `{#imagenes}` → `{%img} {caption}` (EDT y subItem) | ✅ implementado (Bloque 4, Tarea 1/4). Estructura/numeración/`personalRequerido`/`imagenes` **100% servidor, cero IA**; IA solo redacta `descripcion`. `numeracion` es incremental real (`11.1`, `11.1.1`, `11.1.2`, `11.2`, ...), nunca repetida entre subItems consecutivos. `personalRequerido`/`imagenes` solo existen en EDTs de fase EJECUCIÓN con EDT CON/CMN (ver `{tipoDetalle}` más abajo); en el resto llegan como array vacío |
+| `{#alcanceDetallado}` → `{numeracion} {edtNombre} {faseNombre} {descripcion} {codigo} {ubicacion}` + `{#subItems}` → `{numeracion} {actividadNombre} {descripcion}` (anidado, MISMOS nombres que el nivel EDT) + `{#personalRequerido}` → `{cantidad} {cargo}` + `{#imagenes}` → `{%img} {caption}` (EDT y subItem) | ✅ implementado (Bloque 4, Tarea 1/4). Estructura/numeración/`personalRequerido`/`imagenes` **100% servidor, cero IA**; IA solo redacta `descripcion`. `numeracion` es incremental real (`11.1`, `11.1.1`, `11.1.2`, `11.2`, ...), nunca repetida entre subItems consecutivos. `personalRequerido`/`imagenes` solo existen en EDTs de fase EJECUCIÓN con EDT CON/CMN (ver `{tipoDetalle}` más abajo); en el resto llegan como array vacío |
 | `{#eppBasico}` / `{#eppRiesgoEspecifico}` / `{#eppBioseguridad}` → `{nombre} {norma}` | Catálogo + selección IA. `{#hayEppBioseguridad}` 🆕 boolean = `eppBioseguridad.length > 0` (resuelve el "título vacío" §4.4) |
 | `{#equipos}` / `{#herramientas}` / `{#materiales}` → `{nombre} {cantidad}` | Mixto cotización + IA |
 | `{#restricciones}` → `{categoria} {texto}` | Catálogo + selección IA |
@@ -114,6 +121,6 @@ Objetivo-bullets, Definiciones generales, **Responsabilidades completas (§5)**,
 2. Abrir en Word → aceptar "Actualizar campos" → índice poblado.
 3. `hayEppBioseguridad=false` → el bloque completo (título incluido) desaparece.
 4. Sumar `{totalHH}` vs. suma de filas de `{#histogramaHH}` vs. suma de `{horasPlan}` del cronograma: deben coincidir (test automatizable).
-5. (Bloque 4) Ningún par de `subItems` consecutivos dentro de un mismo `{#alcanceDetallado}` tiene la misma `{subnumero}` ni la misma `{subdescripcion}` — regresión cubierta por `alcanceEstructura.test.ts`.
+5. (Bloque 4) Ningún par de `subItems` consecutivos dentro de un mismo `{#alcanceDetallado}` tiene la misma `{numeracion}` ni la misma `{descripcion}` — regresión cubierta por `alcanceEstructura.test.ts` y `construirDataBag.test.ts`.
 6. (Bloque 4) Un EDT de fase EJECUCIÓN con 2+ imágenes subidas exporta ambas dentro de `{#imagenes}` con su `{caption}`, y una imagen con `driveFileId` inválido no rompe el export (placeholder + warning en logs).
 7. (Bloque 4) Las columnas `{des}`/`{ver}`/`{apr}`/`{aut}` de `{#revisiones}` muestran siglas (no nombres completos); `{aut}` sin dato muestra `"-"`; la leyenda `{#firmantes}` no repite la misma persona por diferencias de mayúsculas/tildes.
