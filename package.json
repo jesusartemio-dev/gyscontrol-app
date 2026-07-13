@@ -129,7 +129,7 @@
     "date-fns": "^4.1.0",
     "docx": "^9.6.1",
     "docxtemplater": "^3.68.7",
-    "docxtemplater-image-module-free": "^1.1.1",
+    "docxtemplater-image-module-free": "1.1.1",
     "exceljs": "^4.4.0",
     "framer-motion": "^12.23.12",
     "googleapis": "^171.4.0",

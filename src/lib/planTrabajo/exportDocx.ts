@@ -18,6 +18,18 @@ const ANCHO_MAXIMO_PX = 566 // ~15cm a 96dpi (Tarea 4 — imágenes de alcance d
 const ANCHO_ORGANIGRAMA_PX = 600
 const ALTO_ORGANIGRAMA_PX = 400
 
+// docxtemplater-image-module-free tiene 2 bugs conocidos:
+// 1) render() síncrono no soporta objetos {data,width,height} como valor de {%img}
+// 2) resolve() con valores falsy (''/null) devuelve objeto plano en vez de Promise
+// → SIEMPRE usar renderAsync() y NUNCA pasar ''/null a un tag de imagen (usar IMAGEN_PLACEHOLDER)
+// Versión pineada exacta en package.json (sin ^/~) — un patch upstream podría
+// cambiar este comportamiento y romper el export silenciosamente.
+export const IMAGEN_PLACEHOLDER: ImagenResueltaTag = {
+  data: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQI12NgAAIABQAABjE+ibYAAAAASUVORK5CYII=',
+  width: 0,
+  height: 0,
+}
+
 function esImagenResuelta(v: unknown): v is ImagenResueltaTag {
   return typeof v === 'object' && v !== null && 'data' in v && typeof (v as { data: unknown }).data === 'string'
 }
@@ -83,7 +95,11 @@ export async function renderizarPlanTrabajoDocx({ dataBag }: RenderInput): Promi
   })
 
   try {
-    doc.render(dataBag)
+    // docxtemplater-image-module-free tiene 2 bugs conocidos:
+    // 1) render() síncrono no soporta objetos {data,width,height} como valor de {%img}
+    // 2) resolve() con valores falsy (''/null) devuelve objeto plano en vez de Promise
+    // → SIEMPRE usar renderAsync() y NUNCA pasar ''/null a un tag de imagen (usar IMAGEN_PLACEHOLDER)
+    await doc.renderAsync(dataBag)
   } catch (e: unknown) {
     const err = e as { message?: string; properties?: { errors?: Array<{ properties?: { id?: string; explanation?: string }; message?: string }> } }
     const errores = err.properties?.errors ?? []

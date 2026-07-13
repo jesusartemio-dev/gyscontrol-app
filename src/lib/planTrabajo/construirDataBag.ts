@@ -15,7 +15,7 @@ import { deduplicarSiglas, calcularSiglasBase } from './siglas'
 import { getSnapshotPlan } from './snapshotHelpers'
 import { REFERENCIAS_BASE } from './referenciasBase'
 import { calcularTotalHH } from './calcularDatos'
-import type { ImagenResueltaTag } from './exportDocx'
+import { IMAGEN_PLACEHOLDER, type ImagenResueltaTag } from './exportDocx'
 
 type ProyectoConCliente = Proyecto & { cliente: Cliente | null }
 
@@ -41,12 +41,15 @@ function construirImagenesDeNodo(
   subItemRef: string | undefined,
   imagenesAlcance: PlanTrabajoImagen[],
   imagenesResueltas: Map<string, ImagenResueltaTag | null>
-): { img: ImagenResueltaTag | null; caption: string }[] {
+): { img: ImagenResueltaTag; caption: string }[] {
   return imagenesAlcance
     .filter(img => img.edtRef === edtRef && (img.subItemRef ?? undefined) === subItemRef)
     .sort((a, b) => a.orden - b.orden)
     .map(img => ({
-      img: imagenesResueltas.get(img.id) ?? null,
+      // NUNCA null acá — un {%img} con valor null/falsy rompe doc.renderAsync
+      // (ver IMAGEN_PLACEHOLDER en exportDocx.ts). Imagen inaccesible en Drive
+      // → placeholder 1x1, mismo resultado visual que antes.
+      img: imagenesResueltas.get(img.id) ?? IMAGEN_PLACEHOLDER,
       caption: img.caption ?? '',
     }))
 }
@@ -406,6 +409,8 @@ export function construirDataBag({
     incluirTDR: plan.incluirTDR !== false,
 
     // ─── Imagen del organigrama ───
-    organigramaPng: organigramaPngBase64,
+    // NUNCA '' acá — un {%organigramaPng} con valor falsy rompe doc.renderAsync
+    // (ver IMAGEN_PLACEHOLDER en exportDocx.ts, mismo motivo que en imagenes).
+    organigramaPng: organigramaPngBase64 || IMAGEN_PLACEHOLDER,
   }
 }
