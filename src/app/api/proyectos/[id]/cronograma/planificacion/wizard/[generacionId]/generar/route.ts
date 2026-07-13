@@ -10,6 +10,7 @@ import { sugerirDependencias } from '@/lib/cronogramaIA/reglasDependencias'
 import { resolverOrganigramaProyecto } from '@/lib/cronogramaResponsables/resolverOrganigrama'
 import { asignarResponsablesEstructura, construirFilasAsignacionAuditoria } from '@/lib/cronogramaResponsables/asignarResponsablesEstructura'
 import { registrarCargoLabelsNoReconocidos } from '@/lib/cronogramaResponsables/auditoriaOrganigrama'
+import { normalizarNombreTarea } from '@/lib/cronogramaIA/matchTareaCatalogo'
 import type { ActividadPropuesta } from '@/types/cronogramaIA'
 
 export const maxDuration = 120
@@ -120,14 +121,17 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
   // Recurso (columna Recurso de cada tarea) — precarga determinística desde
   // el catálogo, sin IA ni confirmación: es un valor por defecto sensato,
   // editable después como cualquier campo (nunca se le pregunta al usuario).
+  // Las tareas propuestas por IA (esPropuestaIA) no tienen catalogoServicioId
+  // — se excluyen de esta consulta, su recurso lo elige el usuario en el wizard.
   const servicioIds = Array.from(
-    new Set(actividadesIncluidas.flatMap(a => a.tareas.map(t => t.catalogoServicioId)))
+    new Set(actividadesIncluidas.flatMap(a => a.tareas.map(t => t.catalogoServicioId).filter((id): id is string => id !== null)))
   )
   const serviciosDb = await prisma.catalogoServicio.findMany({
     where: { id: { in: servicioIds } },
-    select: { id: true, recursoId: true },
+    select: { id: true, recursoId: true, nombre: true },
   })
   const recursoPorServicio = new Map(serviciosDb.map(s => [s.id, s.recursoId]))
+  const nombreCatalogoPorServicio = new Map(serviciosDb.map(s => [s.id, s.nombre]))
 
   const estructura = construirEstructuraReal({
     actividades: actividadesIncluidas,
@@ -161,12 +165,19 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
   estructura.tareas = asignacionResponsables.tareas
   const advertenciasResponsables = asignacionResponsables.advertencias
 
-  const tareasParaDependencias = estructura.tareas.map(t => ({
-    id: t.id,
-    nombre: t.nombre,
-    edtNombre: estructura.edtIdACodigo.get(t.proyectoEdtId) ?? '',
-  }))
-  const dependenciasSugeridas = sugerirDependencias(tareasParaDependencias)
+  // Nombre REAL del catálogo (no el nombre de presentación, que puede
+  // llevar el prefijo "{alias} - " de CON/PRO) + Actividad de pertenencia —
+  // ambos necesarios para que sugerirDependencias matchee de forma estable.
+  const actividadIdANombre = new Map(estructura.actividades.map(a => [a.id, a.nombre]))
+  const tareasParaDependencias = estructura.tareas
+    .filter(t => t.catalogoServicioId !== null)
+    .map(t => ({
+      id: t.id,
+      nombreCatalogo: nombreCatalogoPorServicio.get(t.catalogoServicioId!) ?? t.nombre,
+      edtNombre: estructura.edtIdACodigo.get(t.proyectoEdtId) ?? '',
+      actividadNombre: actividadIdANombre.get(t.proyectoActividadId) ?? '',
+    }))
+  const { sugerencias: dependenciasSugeridas, advertencias: advertenciasDependencias } = sugerirDependencias(tareasParaDependencias)
 
   const primeraFase = estructura.fases[0]
   const ultimaFase = estructura.fases[estructura.fases.length - 1]
@@ -242,7 +253,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     responsablesAsignados: asignacionResponsables.asignaciones.length,
   }
 
-  const advertenciasTotales = [...estructura.advertencias, ...advertenciasResponsables]
+  const advertenciasTotales = [...estructura.advertencias, ...advertenciasResponsables, ...advertenciasDependencias]
 
   await prisma.proyectoCronogramaGeneracionIA.update({
     where: { id: generacionId },
@@ -262,7 +273,13 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
   // calibrar esas reglas con uso real. Nunca bloquea la generación si falla.
   const decisiones = todasActividades.flatMap(a =>
     a.tareas
-      .filter(t => t.reglaClave !== undefined && t.incluidaPorRegla !== undefined)
+      // Las tareas propuestas por IA (esPropuestaIA) nunca pasan por reglas
+      // de sub-alcance (no tienen catalogoServicioId) — este filtro ya las
+      // excluye naturalmente, pero lo hacemos explícito para que TS angoste
+      // catalogoServicioId a no-null.
+      .filter((t): t is typeof t & { reglaClave: string; incluidaPorRegla: boolean; catalogoServicioId: string } =>
+        t.reglaClave !== undefined && t.incluidaPorRegla !== undefined && t.catalogoServicioId !== null
+      )
       .map(t => ({
         id: randomUUID(),
         proyectoId: cronograma.proyectoId,
@@ -282,6 +299,34 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
       await prisma.cronogramaIATareaDecision.createMany({ data: decisiones })
     } catch (e) {
       console.error('No se pudo registrar la auditoría de decisiones de sub-alcance:', e)
+    }
+  }
+
+  // Registro PURAMENTE INFORMATIVO (ver CronogramaIASugerenciaAceptada) —
+  // nunca escribe en CatalogoServicio. Una fila por cada tarea propuesta
+  // por IA que el usuario efectivamente aceptó (incluida: true) al aplicar
+  // — alimenta el aviso de "usada en N proyectos" de /catalogo/servicios.
+  // Best-effort, nunca bloquea la generación del cronograma.
+  const tareasPropuestasAceptadas = todasActividades.flatMap(a =>
+    a.tareas
+      .filter(t => t.esPropuestaIA === true && t.incluida)
+      .map(t => ({
+        id: randomUUID(),
+        proyectoId: cronograma.proyectoId,
+        generacionId,
+        tipo: 'tarea_ia_propuesta',
+        nombre: t.nombre,
+        nombreNormalizado: normalizarNombreTarea(t.nombre),
+        edtNombre: a.edtNombre,
+        justificacion: t.justificacion ?? null,
+        aceptadaPorId: session.user.id,
+      }))
+  )
+  if (tareasPropuestasAceptadas.length > 0) {
+    try {
+      await prisma.cronogramaIASugerenciaAceptada.createMany({ data: tareasPropuestasAceptadas })
+    } catch (e) {
+      console.error('No se pudo registrar la sugerencia de tarea propuesta por IA:', e)
     }
   }
 

@@ -1,5 +1,11 @@
-import { validarPropuestaGrupos, validarSugerenciasCantidad, validarPrellenadoPaso1, validarAsignacionEsquema } from '@/lib/cronogramaIA/validarPropuestasIA'
-import type { CatalogoServicioParaWizard, ConfiguracionWizardPaso1 } from '@/types/cronogramaIA'
+import {
+  validarPropuestaGrupos,
+  validarSugerenciasCantidad,
+  validarPrellenadoPaso1,
+  validarAsignacionEsquema,
+  validarTareasNuevasPropuestas,
+} from '@/lib/cronogramaIA/validarPropuestasIA'
+import type { ActividadPropuesta, CatalogoServicioParaWizard, ConfiguracionWizardPaso1 } from '@/types/cronogramaIA'
 
 function servicio(overrides: Partial<CatalogoServicioParaWizard> & { id: string; nombre: string }): CatalogoServicioParaWizard {
   return {
@@ -278,5 +284,71 @@ describe('validarAsignacionEsquema — Etapa B del flujo de esquemas (CON/PRO)',
       'CON'
     )
     expect(r.tareaIdsInventados).toEqual(['id-inventado'])
+  })
+})
+
+describe('validarTareasNuevasPropuestas — canal separado de tareas fuera del catálogo', () => {
+  const catalogoCompleto = [
+    { id: 'c1', nombre: 'Tendido de cables' },
+    { id: 'c2', nombre: 'Protocolo de Megado' },
+  ]
+
+  function actividad(nombre: string): ActividadPropuesta {
+    return { edtNombre: 'CON', actividadNombre: nombre, origen: 'ia', tareas: [] }
+  }
+
+  it('una tarea nueva legítima (sin duplicado en el catálogo) se agrega con catalogoServicioId null, esPropuestaIA true e incluida false (opt-in)', () => {
+    const r = validarTareasNuevasPropuestas(
+      [{ actividadDestino: 'Sala Eléctrica', nombre: 'Instalación de Sensores de Vibración', justificacion: 'el alcance menciona monitoreo de vibración' }],
+      [actividad('Sala Eléctrica')],
+      catalogoCompleto,
+      'CON'
+    )
+    const tarea = r.actividades[0].tareas[0]
+    expect(tarea.catalogoServicioId).toBeNull()
+    expect(tarea.esPropuestaIA).toBe(true)
+    expect(tarea.incluida).toBe(false)
+    expect(tarea.justificacion).toBe('el alcance menciona monitoreo de vibración')
+    expect(r.advertencias).toHaveLength(0)
+  })
+
+  it('anti-duplicado: una tarea que se parece a una existente del catálogo se descarta con advertencia, nunca se crea', () => {
+    const r = validarTareasNuevasPropuestas(
+      [{ actividadDestino: 'Sala Eléctrica', nombre: 'Protocolo de Megado de cableado', justificacion: 'verificar aislamiento' }],
+      [actividad('Sala Eléctrica')],
+      catalogoCompleto,
+      'CON'
+    )
+    expect(r.actividades[0].tareas).toHaveLength(0)
+    expect(r.advertencias.some(a => a.includes('se parece a la tarea de catálogo existente') && a.includes('Protocolo de Megado'))).toBe(true)
+  })
+
+  it('una tarea que apunta a una Actividad que no existe en el esquema se descarta con advertencia', () => {
+    const r = validarTareasNuevasPropuestas(
+      [{ actividadDestino: 'Zona Inexistente', nombre: 'Instalación de Sensores', justificacion: 'x' }],
+      [actividad('Sala Eléctrica')],
+      catalogoCompleto,
+      'CON'
+    )
+    expect(r.actividades[0].tareas).toHaveLength(0)
+    expect(r.advertencias.some(a => a.includes('no existe en el esquema'))).toBe(true)
+  })
+
+  it('límite de 5 tareas nuevas por generación — el resto se recorta con advertencia', () => {
+    const propuestas = Array.from({ length: 7 }, (_, i) => ({
+      actividadDestino: 'Sala Eléctrica',
+      nombre: `Tarea nueva completamente distinta número ${i}`,
+      justificacion: 'x',
+    }))
+    const r = validarTareasNuevasPropuestas(propuestas, [actividad('Sala Eléctrica')], catalogoCompleto, 'CON')
+    expect(r.actividades[0].tareas).toHaveLength(5)
+    expect(r.advertencias.some(a => a.includes('se recortó a las primeras 5'))).toBe(true)
+  })
+
+  it('sin tareas nuevas propuestas, las actividades quedan intactas', () => {
+    const original = [actividad('Sala Eléctrica')]
+    const r = validarTareasNuevasPropuestas([], original, catalogoCompleto, 'CON')
+    expect(r.actividades).toEqual(original)
+    expect(r.advertencias).toHaveLength(0)
   })
 })

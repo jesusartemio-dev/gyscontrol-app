@@ -1180,6 +1180,7 @@ model Proyecto {
   pets                       Pets?
   planificacionesDia         PlanificacionDia[]
   cronogramaIATareaDecision  CronogramaIATareaDecision[]
+  cronogramaIASugerenciaAceptada CronogramaIASugerenciaAceptada[]
   cronogramaEdtCorreccion    ProyectoCronogramaEdtCorreccion[]
   tareaResponsableAsignacion ProyectoTareaResponsableAsignacion[]
 
@@ -2086,6 +2087,7 @@ model User {
   planTrabajoImagenes                      PlanTrabajoImagen[]
   proyectoCronogramaGeneracionesIA         ProyectoCronogramaGeneracionIA[]
   cronogramaIATareaDecisiones              CronogramaIATareaDecision[]
+  cronogramaIASugerenciasAceptadas         CronogramaIASugerenciaAceptada[]
   cronogramaEdtCorreccionesCreadas         ProyectoCronogramaEdtCorreccion[]
   responsableAsignacionesRecibidas         ProyectoTareaResponsableAsignacion[] @relation("AsignacionResponsableAutomatico")
   responsableAsignacionesCreadas           ProyectoTareaResponsableAsignacion[] @relation("AsignacionResponsableCreador")
@@ -3376,6 +3378,7 @@ model ProyectoCronogramaGeneracionIA {
   aplicadoEn    DateTime?
 
   tareaDecisiones CronogramaIATareaDecision[]
+  sugerenciasAceptadas CronogramaIASugerenciaAceptada[]
 
   @@index([proyectoCronogramaId, generadoEn(sort: Desc)])
   @@map("proyecto_cronograma_generacion_ia")
@@ -3417,6 +3420,37 @@ model CronogramaIATareaDecision {
   @@index([catalogoServicioId, reglaClave])
   @@index([proyectoId])
   @@map("cronograma_ia_tarea_decision")
+}
+
+/// Registro PURAMENTE INFORMATIVO de familias fuera de vocabulario (PRO) y
+/// tareas propuestas por IA (esPropuestaIA) que el usuario aceptó en un
+/// proyecto — nunca escribe ni sugiere programáticamente nada en
+/// CatalogoServicio (ver /catalogo/servicios: candidatas-ia). Cuando el
+/// mismo nombreNormalizado se repite en 2+ proyectos, esa página muestra un
+/// aviso para que el usuario decida agregarlo al catálogo A MANO.
+model CronogramaIASugerenciaAceptada {
+  id         String   @id @default(cuid())
+  proyectoId String
+  proyecto   Proyecto @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+
+  generacionId String?
+  generacion   ProyectoCronogramaGeneracionIA? @relation(fields: [generacionId], references: [id], onDelete: SetNull)
+
+  /// 'familia_fuera_vocabulario' (Parte 2, solo PRO) | 'tarea_ia_propuesta' (Parte 3, Etapa B de CON/PRO)
+  tipo              String
+  /// Nombre tal cual se mostró/aceptó (presentación).
+  nombre            String
+  /// Normalizado (ver matchTareaCatalogo.ts) — agrupa la misma sugerencia aceptada en distintos proyectos.
+  nombreNormalizado String
+  edtNombre         String
+  justificacion     String?
+
+  aceptadaPorId String
+  aceptadaPor   User     @relation(fields: [aceptadaPorId], references: [id])
+  aceptadaEn    DateTime @default(now())
+
+  @@index([nombreNormalizado])
+  @@map("cronograma_ia_sugerencia_aceptada")
 }
 
 /// Auditoría de la autoasignación automática de Responsable (desde la Matriz
@@ -3608,6 +3642,13 @@ model ProyectoTarea {
   recursoId                   String?
   catalogoServicioId          String?
   esExtra                     Boolean                     @default(false)
+  /// true si esta tarea fue propuesta por la IA (Etapa B de CON/PRO) sin
+  /// respaldo de catálogo — catalogoServicioId siempre null en ese caso.
+  /// Ver validarTareasNuevasPropuestas.ts y matchTareaCatalogo.ts.
+  esPropuestaIA               Boolean                     @default(false)
+  /// Justificación de 1 línea dada por la IA al proponerla — solo presente
+  /// cuando esPropuestaIA es true.
+  justificacionIA             String?
   createdAt                   DateTime                    @default(now())
   updatedAt                   DateTime
   registroHoras               RegistroHoras[]

@@ -12,7 +12,31 @@ import {
   type EsquemaPropuestoIA,
 } from './prompts'
 import { resolverAliasParaNombres } from './aliasActividad'
+import { NOMBRE_FAMILIA_OFICIAL_PRO } from './vocabularioFamiliasPro'
 import type { EsquemaAgrupacionPropuesto } from '@/types/cronogramaIA'
+
+const JUSTIFICACION_FALTANTE = 'Propuesta por IA sin justificación explícita — revisar antes de aceptar.'
+
+/**
+ * Corrige el flag `fueraDeVocabulario` contra la lista oficial — nunca se
+ * confía el criterio del LLM en ninguna dirección: si el nombre SÍ está en
+ * el vocabulario pero la IA lo marcó fuera, se corrige a `false`; si NO
+ * está pero la IA no lo marcó (u omitió justificación), se corrige a
+ * `true` con una justificación genérica. Solo aplica a PRO — CON no tiene
+ * vocabulario oficial.
+ */
+export function corregirFueraDeVocabulario(
+  edtNombre: 'CON' | 'PRO',
+  nombre: string,
+  fueraDeVocabularioPropuesto: boolean | undefined,
+  justificacionPropuesta: string | undefined
+): { fueraDeVocabulario?: boolean; justificacion?: string } {
+  if (edtNombre !== 'PRO') return {}
+  const esOficial = NOMBRE_FAMILIA_OFICIAL_PRO.has(nombre)
+  if (esOficial) return {}
+  const justificacion = justificacionPropuesta?.trim() ? justificacionPropuesta.trim() : JUSTIFICACION_FALTANTE
+  return { fueraDeVocabulario: true, justificacion }
+}
 
 function extraerTexto(response: Anthropic.Message): string {
   return response.content
@@ -103,16 +127,22 @@ export async function generarEsquemasConIA(opciones: GenerarEsquemasOpciones): P
         .filter(e => e && typeof e.criterio === 'string' && Array.isArray(e.nombres) && e.nombres.length > 0)
         .map(e => {
           const nombresCrudos = (e.nombres as unknown[])
-            .filter((n): n is { nombre?: unknown; alias?: unknown } => !!n && typeof n === 'object')
+            .filter((n): n is { nombre?: unknown; alias?: unknown; fueraDeVocabulario?: unknown; justificacion?: unknown } => !!n && typeof n === 'object')
             .map(n => ({
               nombre: typeof n.nombre === 'string' ? n.nombre.trim() : '',
               aliasPropuesto: typeof n.alias === 'string' ? n.alias : undefined,
+              fueraDeVocabularioPropuesto: typeof n.fueraDeVocabulario === 'boolean' ? n.fueraDeVocabulario : undefined,
+              justificacionPropuesta: typeof n.justificacion === 'string' ? n.justificacion : undefined,
             }))
             .filter(n => n.nombre.length > 0)
           // El alias que propone la IA nunca se usa tal cual — se valida/deriva
           // acá para garantizar el invariante (una palabra, único) siempre.
           const aliasPorNombre = resolverAliasParaNombres(nombresCrudos)
-          const nombres = nombresCrudos.map(n => ({ nombre: n.nombre, alias: aliasPorNombre.get(n.nombre)! }))
+          const nombres = nombresCrudos.map(n => ({
+            nombre: n.nombre,
+            alias: aliasPorNombre.get(n.nombre)!,
+            ...corregirFueraDeVocabulario(edtNombre, n.nombre, n.fueraDeVocabularioPropuesto, n.justificacionPropuesta),
+          }))
           return {
             criterio: e.criterio,
             nombres,

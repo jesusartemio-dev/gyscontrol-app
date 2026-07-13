@@ -8,6 +8,8 @@ import { adquirirLockCronogramaIA, liberarLockCronogramaIA } from '@/lib/cronogr
 import { generarAsignacionConEsquema } from '@/lib/cronogramaIA/generarAsignacionConEsquema'
 import { EDTS_ESQUEMA_DOS_ETAPAS } from '@/lib/cronogramaIA/reglasActividades'
 import { resolverAliasParaNombres } from '@/lib/cronogramaIA/aliasActividad'
+import { FAMILIA_SOPORTES_FABRICADOS, NOMBRE_FAMILIA_OFICIAL_PRO } from '@/lib/cronogramaIA/vocabularioFamiliasPro'
+import { normalizarNombreTarea } from '@/lib/cronogramaIA/matchTareaCatalogo'
 import type { ActividadPropuesta, CatalogoServicioParaWizard, ConfiguracionWizardPaso1, EsquemaElegido, NombreConAlias } from '@/types/cronogramaIA'
 import type { ContextoCotizacionParaPrompt, EquipoRealParaPrompt } from '@/lib/cronogramaIA/prompts'
 
@@ -178,10 +180,16 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       )
     }
 
+    // Anti-duplicado de tareasNuevasPropuestas mira TODO el catálogo real,
+    // no solo el filtrado por este EDT — una tarea nueva podría calzar con
+    // un servicio de otro EDT.
+    const catalogoCompleto = await prisma.catalogoServicio.findMany({ select: { id: true, nombre: true } })
+
     const resultado = await generarAsignacionConEsquema({
       edtNombre: body.edtNombre,
       nombresActividades: body.nombresActividades,
       serviciosPermitidos,
+      catalogoCompleto,
       alcanceLibre: config.alcanceLibre,
       cotizacion,
       equiposReales,
@@ -192,7 +200,24 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
     const actividadesPrevias = ((generacion.propuestaActividades as unknown as ActividadPropuesta[]) ?? []).filter(a => a.edtNombre !== body.edtNombre)
     const propuestaActividades = [...actividadesPrevias, ...resultado.actividades]
-    const advertencias = [...((generacion.advertencias as unknown as string[]) ?? []), ...resultado.advertencias]
+
+    // Aviso temprano (antes de aplicar) — "Soportes Fabricados" depende de
+    // planos previos de PLA (ver reglasDependencias.ts); el vínculo real se
+    // crea recién al aplicar el cronograma, pero el usuario debe poder verlo
+    // acá, en el mismo Alert de advertencias del Paso 2.
+    const advertenciasSoportesFabricados: string[] = []
+    if (body.edtNombre === 'PRO' && body.nombresActividades.some(n => n.nombre === FAMILIA_SOPORTES_FABRICADOS)) {
+      const plaEnAlcance = await prisma.edt.findFirst({ where: { nombre: 'PLA', id: { in: config.edtsSeleccionados } }, select: { id: true } })
+      if (!plaEnAlcance) {
+        advertenciasSoportesFabricados.push('Soportes Fabricados requiere planos previos — verifica quién los elabora.')
+      }
+    }
+
+    const advertencias = [
+      ...((generacion.advertencias as unknown as string[]) ?? []),
+      ...resultado.advertencias,
+      ...advertenciasSoportesFabricados,
+    ]
 
     const esquemaElegidoPrevio = (generacion.esquemaElegido as Record<string, EsquemaElegido> | null) ?? {}
     const esquemaElegido: Record<string, EsquemaElegido> = {
@@ -208,6 +233,32 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       where: { id: generacionId },
       data: { propuestaActividades, advertencias, esquemaElegido },
     })
+
+    // Registro PURAMENTE INFORMATIVO (ver CronogramaIASugerenciaAceptada) —
+    // nunca escribe en CatalogoServicio. Cualquier familia de PRO confirmada
+    // que no esté en el vocabulario oficial queda registrada para el aviso
+    // de "usada en N proyectos" de /catalogo/servicios. Best-effort, nunca
+    // bloquea la confirmación de la Etapa B.
+    if (body.edtNombre === 'PRO') {
+      const familiasFueraDeVocabulario = body.nombresActividades.filter(n => !NOMBRE_FAMILIA_OFICIAL_PRO.has(n.nombre))
+      if (familiasFueraDeVocabulario.length > 0) {
+        try {
+          await prisma.cronogramaIASugerenciaAceptada.createMany({
+            data: familiasFueraDeVocabulario.map(n => ({
+              proyectoId,
+              generacionId,
+              tipo: 'familia_fuera_vocabulario',
+              nombre: n.nombre,
+              nombreNormalizado: normalizarNombreTarea(n.nombre),
+              edtNombre: body.edtNombre,
+              aceptadaPorId: session.user!.id,
+            })),
+          })
+        } catch (e) {
+          console.error('No se pudo registrar la sugerencia de familia fuera de vocabulario:', e)
+        }
+      }
+    }
 
     return NextResponse.json({
       generacionId: actualizado.id,

@@ -33,7 +33,8 @@ export interface ConfiguracionWizardPaso1 {
 }
 
 export interface TareaPropuesta {
-  catalogoServicioId: string
+  /** null solo cuando esPropuestaIA es true — una tarea IA sin respaldo de catálogo (ver validarTareasNuevasPropuestas). */
+  catalogoServicioId: string | null
   nombre: string
   cantidad: number
   nivelDificultad: number
@@ -59,6 +60,10 @@ export interface TareaPropuesta {
    */
   incluidaPorRegla?: boolean
   orden: number
+  /** true si esta tarea fue propuesta por la IA (Etapa B de CON/PRO) sin respaldo de catálogo — nunca tiene catalogoServicioId. */
+  esPropuestaIA?: boolean
+  /** Justificación de 1 línea dada por la IA al proponerla — solo presente si esPropuestaIA es true. */
+  justificacion?: string
 }
 
 export interface ActividadPropuesta {
@@ -77,6 +82,10 @@ export interface ResultadoActividadesDeterministas {
 export interface NombreConAlias {
   nombre: string
   alias: string
+  /** Solo relevante para familias de PRO — true si el nombre no está en NOMBRE_FAMILIA_OFICIAL_PRO (ver vocabularioFamiliasPro.ts). Corregido en código, nunca confiado al LLM. */
+  fueraDeVocabulario?: boolean
+  /** Justificación de 1 línea citando evidencia del alcance — presente cuando fueraDeVocabulario es true. */
+  justificacion?: string
 }
 
 /** Uno de los 2-3 esquemas alternativos de agrupación que la IA propone en la Etapa A (CON/PRO), antes de asignar ninguna tarea. */

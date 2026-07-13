@@ -42,6 +42,12 @@ import {
 
 import type { CatalogoServicio } from '@/types'
 
+interface CandidataIA {
+  tipo: string
+  nombre: string
+  proyectos: number
+}
+
 export default function CatalogoServicioPage() {
   const [servicios, setServicios] = useState<CatalogoServicio[]>([])
   const [loading, setLoading] = useState(true)
@@ -51,6 +57,7 @@ export default function CatalogoServicioPage() {
   const [duplicados, setDuplicados] = useState<{ id: string; nombre: string }[]>([])
   const [serviciosDuplicados, setServiciosDuplicados] = useState<any[]>([])
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [candidatasIA, setCandidatasIA] = useState<CandidataIA[]>([])
 
   const cargarServicios = async () => {
     try {
@@ -67,6 +74,11 @@ export default function CatalogoServicioPage() {
 
   useEffect(() => {
     cargarServicios()
+    // Puramente informativo — si falla, no afecta el resto de la página.
+    fetch('/api/catalogo-servicio/candidatas-ia')
+      .then(res => (res.ok ? res.json() : { candidatas: [] }))
+      .then(data => setCandidatasIA(data.candidatas ?? []))
+      .catch(() => setCandidatasIA([]))
   }, [])
 
   const handleCreated = () => {
@@ -282,6 +294,26 @@ export default function CatalogoServicioPage() {
             {errores.length > 5 && <li>... y {errores.length - 5} más</li>}
           </ul>
         </div>
+      )}
+
+      {/* Candidatas IA — puramente informativo, nunca se agrega nada automáticamente al catálogo */}
+      {candidatasIA.length > 0 && (
+        <Card>
+          <CardContent className="py-3 space-y-1.5">
+            <p className="text-sm font-medium">Candidatas del cronograma con IA</p>
+            <p className="text-xs text-muted-foreground">
+              Familias o tareas propuestas por IA en el cronograma (no están en este catálogo) que se aceptaron en 2 o más proyectos —
+              considera agregarlas acá manualmente si son recurrentes.
+            </p>
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {candidatasIA.map(c => (
+                <Badge key={`${c.tipo}::${c.nombre}`} variant="outline" className="font-normal text-xs">
+                  {c.nombre} — usada en {c.proyectos} proyectos
+                </Badge>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Services Table */}

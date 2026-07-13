@@ -358,6 +358,8 @@ export async function GET(
                       recursoNombre: tarea.recurso?.nombre,
                       recursoTipo: tarea.recurso?.tipo,
                       esExtra: tarea.esExtra || false,
+                      esPropuestaIA: tarea.esPropuestaIA || false,
+                      justificacionIA: tarea.justificacionIA || null,
                       creadoPorId: tarea.creadoPorId,
                       creadoPorNombre: (tarea as any).creadoPor?.name || null
                     },

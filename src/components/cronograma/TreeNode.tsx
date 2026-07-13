@@ -289,7 +289,7 @@ export function TreeNode({
 
           {/* Node icon and name */}
           <span className="text-xs shrink-0">
-            {node.data?.isExtrasGroup ? '✨' : node.data?.esExtra ? '➕' : config.icon}
+            {node.data?.isExtrasGroup ? '✨' : node.data?.esExtra ? '➕' : node.data?.esPropuestaIA ? '🤖' : config.icon}
           </span>
           <span className={`text-xs font-medium truncate ${node.data?.isExtrasGroup ? 'text-amber-700 italic' : 'text-gray-900'}`}>
             {node.nombre}
@@ -311,6 +311,17 @@ export function TreeNode({
           {node.type === 'tarea' && node.data?.esExtra && (
             <Badge variant="outline" className="text-[10px] leading-none px-1 py-0 h-4 bg-amber-50 text-amber-700 border-amber-300 shrink-0">
               Extra
+            </Badge>
+          )}
+
+          {/* Badge "IA" para tareas propuestas por IA sin respaldo de catálogo (nunca se confunde con "Extra") */}
+          {node.type === 'tarea' && node.data?.esPropuestaIA && (
+            <Badge
+              variant="outline"
+              className="text-[10px] leading-none px-1 py-0 h-4 bg-blue-50 text-blue-700 border-blue-300 shrink-0"
+              title={node.data?.justificacionIA || 'Tarea propuesta por IA, sin respaldo de catálogo.'}
+            >
+              IA
             </Badge>
           )}
 

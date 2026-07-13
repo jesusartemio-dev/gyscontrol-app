@@ -1,6 +1,7 @@
 import type { ActividadPropuesta, CatalogoServicioParaWizard, NombreConAlias, TareaPropuesta } from '@/types/cronogramaIA'
 import { construirTareaPropuesta, ordenarPorCatalogo } from './reglasActividades'
 import { aplicarPrefijoDeActividad } from './aliasActividad'
+import { buscarDuplicadoEnCatalogo, type CatalogoParaMatch } from './matchTareaCatalogo'
 
 export const MAX_REINTENTOS = 1
 
@@ -134,6 +135,95 @@ export function validarAsignacionEsquema(
   }
 
   return resultado
+}
+
+export interface TareaNuevaPropuestaIA {
+  actividadDestino: string
+  nombre: string
+  justificacion: string
+}
+
+export interface ResultadoTareasNuevasPropuestas {
+  actividades: ActividadPropuesta[]
+  advertencias: string[]
+}
+
+const MAX_TAREAS_NUEVAS_PROPUESTAS = 5
+const JUSTIFICACION_TAREA_NUEVA_FALTANTE = 'Propuesta por IA sin justificación explícita — revisar antes de aceptar.'
+
+/**
+ * Canal SEPARADO para tareas que la IA propone porque ningún id candidato
+ * cubre ese trabajo (Etapa B de CON/PRO) — nunca se mezclan con
+ * `asignaciones` ni reciben un id de catálogo. Cada una pasa por:
+ * (a) anti-duplicado contra TODO el catálogo (no solo el filtrado por EDT
+ * — una tarea nueva podría calzar con un servicio de otro EDT), (b) límite
+ * de cantidad, (c) debe apuntar a una Actividad real del esquema. Las que
+ * sobreviven se agregan con `catalogoServicioId: null`, `esPropuestaIA:
+ * true` e `incluida: false` — opt-in explícito, el usuario las revisa y
+ * marca a mano en el wizard antes de aplicar.
+ */
+export function validarTareasNuevasPropuestas(
+  tareasNuevas: TareaNuevaPropuestaIA[],
+  actividades: ActividadPropuesta[],
+  catalogoCompleto: CatalogoParaMatch[],
+  edtNombre: string
+): ResultadoTareasNuevasPropuestas {
+  const advertencias: string[] = []
+  const actividadesPorNombre = new Set(actividades.map(a => a.actividadNombre))
+
+  const limitadas = tareasNuevas.slice(0, MAX_TAREAS_NUEVAS_PROPUESTAS)
+  if (tareasNuevas.length > MAX_TAREAS_NUEVAS_PROPUESTAS) {
+    advertencias.push(
+      `${edtNombre}: la IA propuso ${tareasNuevas.length} tarea(s) nueva(s) — se recortó a las primeras ${MAX_TAREAS_NUEVAS_PROPUESTAS}.`
+    )
+  }
+
+  const nuevasPorActividad = new Map<string, TareaPropuesta[]>()
+
+  for (const propuesta of limitadas) {
+    const nombre = (propuesta.nombre ?? '').trim()
+    const actividadDestino = (propuesta.actividadDestino ?? '').trim()
+    if (!nombre) continue
+
+    if (!actividadesPorNombre.has(actividadDestino)) {
+      advertencias.push(
+        `${edtNombre}: la IA propuso la tarea nueva "${nombre}" para una Actividad ("${actividadDestino}") que no existe en el esquema — se descartó.`
+      )
+      continue
+    }
+
+    const duplicado = buscarDuplicadoEnCatalogo(nombre, catalogoCompleto)
+    if (duplicado.esDuplicado) {
+      advertencias.push(
+        `${edtNombre}: "${nombre}" se parece a la tarea de catálogo existente "${duplicado.candidato!.nombre}" — considera agregarla en vez de crear una nueva.`
+      )
+      continue
+    }
+
+    const tarea: TareaPropuesta = {
+      catalogoServicioId: null,
+      nombre,
+      cantidad: 1,
+      nivelDificultad: 1,
+      horaBase: 0,
+      horaRepetido: 0,
+      horasEstimadas: 0,
+      incluida: false,
+      orden: Number.MAX_SAFE_INTEGER,
+      esPropuestaIA: true,
+      justificacion: (propuesta.justificacion ?? '').trim() || JUSTIFICACION_TAREA_NUEVA_FALTANTE,
+    }
+    if (!nuevasPorActividad.has(actividadDestino)) nuevasPorActividad.set(actividadDestino, [])
+    nuevasPorActividad.get(actividadDestino)!.push(tarea)
+  }
+
+  const actividadesActualizadas = actividades.map(a => {
+    const nuevas = nuevasPorActividad.get(a.actividadNombre)
+    if (!nuevas) return a
+    return { ...a, tareas: [...a.tareas, ...nuevas] }
+  })
+
+  return { actividades: actividadesActualizadas, advertencias }
 }
 
 export interface SugerenciaCantidadIA {

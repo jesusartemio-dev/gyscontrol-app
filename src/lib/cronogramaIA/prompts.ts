@@ -7,6 +7,8 @@
  * (validarPropuestasIA.ts) antes de usar cualquier resultado.
  */
 
+import { textoVocabularioFamiliasPro } from './vocabularioFamiliasPro'
+
 export interface TareaParaPrompt {
   id: string
   nombre: string
@@ -335,6 +337,10 @@ export function buildUserPropuestaFamiliasPro(
 export interface NombreConAliasIA {
   nombre: string
   alias?: string
+  /** Solo relevante para familias de PRO — ver textoVocabularioFamiliasPro(). El servidor nunca confía este flag tal cual, lo corrige contra NOMBRE_FAMILIA_OFICIAL_PRO. */
+  fueraDeVocabulario?: boolean
+  /** Justificación de 1 línea citando evidencia del alcance — obligatoria cuando fueraDeVocabulario es true. */
+  justificacion?: string
 }
 
 export interface EsquemaPropuestoIA {
@@ -444,14 +450,39 @@ compra — cada esquema es una forma distinta y válida de organizar el mismo
 seguimiento de compras. Todavía NO estás asignando tareas a ningún grupo —
 solo proponés nombres de familia y el criterio que los organiza.
 
+VOCABULARIO OFICIAL DE FAMILIAS DE PROCURA (usá estos nombres EXACTOS,
+sin sinónimos — "Cables", nunca "Conductores eléctricos"):
+${textoVocabularioFamiliasPro()}
+
+Este vocabulario es una lista de nombres disponibles, NO un checklist a
+completar — proponé solo las familias que el alcance realmente evidencia:
+- Los EQUIPOS REALES YA COTIZADOS (si aparecen más abajo) son señal FUERTE
+  — si hay un ítem que calza en una familia, esa familia va.
+- El alcance libre y las partidas de cotización son señal DÉBIL — usalos
+  para completar lo que los equipos reales no cubren.
+- En proyectos chicos, fusioná familias afines en una sola Actividad (ej.
+  "Cables" + "Tuberías y Canalización" si el volumen no justifica
+  separarlas); en proyectos grandes, desplegalas por separado. Los 2-3
+  esquemas alternativos pueden diferenciarse justamente por su nivel de
+  granularidad (uno más agregado, otro más desagregado), no solo por
+  criterio organizador distinto como en CON.
+
+FAMILIAS FUERA DEL VOCABULARIO:
+- Si un material/equipo del alcance NO calza en ninguna familia oficial de
+  arriba, podés proponer una familia nueva — marcala con
+  "fueraDeVocabulario": true y una "justificacion" de 1 línea citando la
+  evidencia concreta (ej. "el equipo cotizado XYZ-123 no es un instrumento
+  ni un equipo eléctrico estándar"). Nunca marques "fueraDeVocabulario" en
+  una familia que sí está en el vocabulario oficial.
+
 REGLAS ESTRICTAS:
 - Proponé 2 o 3 esquemas, nunca más de 3 ni menos de 2.
 - Cada esquema debe tener un "criterio" (ej. "Por tipo de material", "Por
-  proveedor/rubro") y una lista de "nombres" de familia específicos.
+  proveedor/rubro", o el nivel de granularidad si aplica) y una lista de
+  "nombres" de familia — preferí SIEMPRE un nombre del vocabulario oficial
+  cuando exista, y solo recurrí a una familia fuera de vocabulario cuando
+  de verdad no hay ninguna que calce.
 ${REGLA_ALIAS_ESQUEMA}
-- Si aparecen EQUIPOS REALES YA COTIZADOS más abajo (dato estructurado, con
-  marca y cantidad reales), tus esquemas DEBEN nombrar familias que cubran
-  esos ítems — es la señal de mayor prioridad, por encima del alcance libre.
 - No calcules ni asignes ninguna tarea — no tenés la lista de tareas en este
   paso.
 - Si el contexto de cotización menciona exclusiones, no propongas familias
@@ -469,8 +500,8 @@ export function buildUserEsquemasFamiliasPro(
     `DESCRIPCIÓN LIBRE DEL ALCANCE (dada por el usuario en el wizard — señal más débil que los equipos reales de arriba):\n${alcanceLibre || '(no se proporcionó)'}`,
     bloqueContextoCotizacion(cotizacion),
     '',
-    'ESQUEMA DE OUTPUT (devolvé EXACTAMENTE este JSON, sin markdown):',
-    '{ "esquemas": [{ "criterio": "string", "nombres": [{ "nombre": "string", "alias": "string — una palabra, máx 12 caracteres, distintiva y única en el esquema" }] }] }',
+    'ESQUEMA DE OUTPUT (devolvé EXACTAMENTE este JSON, sin markdown — "fueraDeVocabulario" y "justificacion" son opcionales, solo para familias fuera del vocabulario oficial):',
+    '{ "esquemas": [{ "criterio": "string", "nombres": [{ "nombre": "string", "alias": "string — una palabra, máx 12 caracteres, distintiva y única en el esquema", "fueraDeVocabulario": "boolean opcional", "justificacion": "string opcional" }] }] }',
   ]
     .filter(Boolean)
     .join('\n')
@@ -484,6 +515,25 @@ export function buildUserEsquemasFamiliasPro(
  * inventar ni renombrar ninguna Actividad — el servidor descarta cualquier
  * actividadNombre que no esté en la lista dada (ver validarPropuestaGrupos).
  */
+/**
+ * Instrucción compartida por CON y PRO en la Etapa B: canal SEPARADO y
+ * controlado para que la IA proponga tareas que ningún id candidato
+ * cubre — nunca mezcladas con "asignaciones" ni con ids inventados. El
+ * servidor valida anti-duplicado contra TODO el catálogo antes de
+ * mostrarlas, limita la cantidad, y quedan con opt-in explícito del
+ * usuario (nunca incluidas por defecto) — ver validarTareasNuevasPropuestas.
+ */
+const REGLA_TAREAS_NUEVAS = `
+- Si detectás trabajo evidenciado en el alcance/cotización que NINGUNA
+  tarea candidata cubre, NO le inventes un id ni la mezcles en
+  "asignaciones" — proponela en el arreglo SEPARADO "tareasNuevasPropuestas":
+  cada una con "actividadDestino" (uno de los nombres de Actividad ya
+  decididos), "nombre" (corto, en el mismo estilo que las tareas del
+  catálogo) y "justificacion" (1 línea citando la evidencia concreta del
+  alcance/cotización). Esto es la EXCEPCIÓN, no la regla — la mayoría de
+  las tareas ya están cubiertas por el catálogo; usá este canal solo
+  cuando de verdad no hay ningún id que sirva. Máximo 5 tareas nuevas.`.trim()
+
 export const SYSTEM_ASIGNACION_CON = `
 Eres el Jefe de Obra Senior de GYS CONTROL INDUSTRIAL SAC, empresa peruana
 especializada en proyectos electromecánicos, automatización e
@@ -505,6 +555,7 @@ REGLAS ESTRICTAS:
   opcional. El sistema tiene un "Sin agrupar" de emergencia para lo que
   quede afuera, pero es un fallback de última instancia, no una salida
   válida de tu parte.
+${REGLA_TAREAS_NUEVAS}
 - Si el contexto de cotización menciona exclusiones, NO asignes tareas que
   correspondan a trabajo excluido (dejalas fuera de toda asignación, caerán
   en "Sin agrupar" para que el usuario decida).
@@ -527,8 +578,8 @@ export function buildUserAsignacionCon(
     JSON.stringify(tareas, null, 2),
     notaCorrectiva,
     '',
-    'ESQUEMA DE OUTPUT (devolvé EXACTAMENTE este JSON, sin markdown):',
-    '{ "asignaciones": [{ "actividadNombre": "string — EXACTAMENTE uno de los nombres dados", "catalogoServicioIds": ["string — ids copiados del input"] }] }',
+    'ESQUEMA DE OUTPUT (devolvé EXACTAMENTE este JSON, sin markdown — "tareasNuevasPropuestas" es opcional y va SEPARADO de "asignaciones"):',
+    '{ "asignaciones": [{ "actividadNombre": "string — EXACTAMENTE uno de los nombres dados", "catalogoServicioIds": ["string — ids copiados del input"] }], "tareasNuevasPropuestas": [{ "actividadDestino": "string — uno de los nombres dados", "nombre": "string", "justificacion": "string" }] }',
   ]
     .filter(Boolean)
     .join('\n')
@@ -557,6 +608,7 @@ REGLAS ESTRICTAS:
 - Si aparecen EQUIPOS REALES YA COTIZADOS más abajo, usalos para decidir a
   qué familia pertenece cada tarea del pipeline cuando el alcance libre no
   alcance a diferenciarlo.
+${REGLA_TAREAS_NUEVAS}
 - Si el contexto de cotización menciona exclusiones, NO asignes tareas que
   correspondan a material/servicio excluido.
 - Devolvé SOLO el JSON, sin markdown ni texto antes o después.
@@ -580,8 +632,8 @@ export function buildUserAsignacionPro(
     JSON.stringify(tareas, null, 2),
     notaCorrectiva,
     '',
-    'ESQUEMA DE OUTPUT (devolvé EXACTAMENTE este JSON, sin markdown):',
-    '{ "asignaciones": [{ "actividadNombre": "string — EXACTAMENTE uno de los nombres dados", "catalogoServicioIds": ["string — ids copiados del input"] }] }',
+    'ESQUEMA DE OUTPUT (devolvé EXACTAMENTE este JSON, sin markdown — "tareasNuevasPropuestas" es opcional y va SEPARADO de "asignaciones"):',
+    '{ "asignaciones": [{ "actividadNombre": "string — EXACTAMENTE uno de los nombres dados", "catalogoServicioIds": ["string — ids copiados del input"] }], "tareasNuevasPropuestas": [{ "actividadDestino": "string — uno de los nombres dados", "nombre": "string", "justificacion": "string" }] }',
   ]
     .filter(Boolean)
     .join('\n')

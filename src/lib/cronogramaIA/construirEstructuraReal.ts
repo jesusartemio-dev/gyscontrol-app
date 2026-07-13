@@ -75,12 +75,16 @@ export interface FilaTarea {
   fechaFin: Date
   horasEstimadas: number
   updatedAt: Date
-  /** Servicio de catálogo de origen — se necesita para propagar Recurso y para retroalimentación futura de HH reales vs. catálogo. */
-  catalogoServicioId: string
+  /** Servicio de catálogo de origen — se necesita para propagar Recurso y para retroalimentación futura de HH reales vs. catálogo. null solo si esPropuestaIA es true. */
+  catalogoServicioId: string | null
   /** CatalogoServicio.recursoId del servicio de origen — precarga de la columna Recurso, editable después como cualquier campo. */
   recursoId: string | null
   /** Resuelto luego por asignarResponsablesEstructura (tabla EDT->rol + organigrama del proyecto, con excepciones por tarea) — null si aún no se asignó. */
   responsableId: string | null
+  /** true si esta tarea fue propuesta por la IA (Etapa B de CON/PRO) sin respaldo de catálogo. */
+  esPropuestaIA?: boolean
+  /** Justificación de 1 línea dada por la IA al proponerla — ausente salvo cuando esPropuestaIA es true. */
+  justificacionIA?: string | null
 }
 
 export interface EstructuraReal {
@@ -254,8 +258,10 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
             horasEstimadas: tarea.horasEstimadas,
             updatedAt: new Date(),
             catalogoServicioId: tarea.catalogoServicioId,
-            recursoId: recursoPorServicio.get(tarea.catalogoServicioId) ?? null,
+            recursoId: tarea.catalogoServicioId ? recursoPorServicio.get(tarea.catalogoServicioId) ?? null : null,
             responsableId: null,
+            esPropuestaIA: tarea.esPropuestaIA ?? false,
+            justificacionIA: tarea.justificacion ?? null,
           })
 
           cursorTarea = fechaFinTarea

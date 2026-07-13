@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ChevronLeft, ChevronRight, Loader2, Plus, Trash2, Sparkles, AlertCircle, FileCheck2, History, Pin, PinOff, FolderInput, RotateCcw } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import type { ActividadPropuesta, ConfiguracionWizardPaso1, EsquemaAgrupacionPropuesto } from '@/types/cronogramaIA'
@@ -134,6 +135,9 @@ interface NombreEditableEsquema {
   nombre: string
   alias: string
   aliasManual?: boolean
+  /** Solo relevante para familias de PRO — ver NOMBRE_FAMILIA_OFICIAL_PRO. Ya viene corregido por el servidor, nunca se recalcula en el cliente. */
+  fueraDeVocabulario?: boolean
+  justificacion?: string
 }
 
 const PASOS = ['Alcance del proyecto', 'Actividades propuestas']
@@ -1014,6 +1018,17 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
     )
   }
 
+  /** Edita nombre/HH estimadas de una tarea propuesta por IA (esPropuestaIA) antes de aceptarla — nunca aplica a tareas de catálogo. */
+  function actualizarTareaPropuestaIA(actividadIndex: number, tareaIndex: number, cambios: { nombre?: string; horasEstimadas?: number }) {
+    setActividades(prev =>
+      prev.map((a, i) =>
+        i === actividadIndex
+          ? { ...a, tareas: a.tareas.map((t, ti) => (ti === tareaIndex ? { ...t, ...cambios } : t)) }
+          : a
+      )
+    )
+  }
+
   /**
    * Reasignación manual: mueve una tarea de una Actividad a otra del mismo
    * EDT (incluye "Sin agrupar" como origen o destino) — para cuando la IA no
@@ -1379,6 +1394,16 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
                   </div>
                   {(nombresEditables[edtNombre] ?? []).map((item, ni) => (
                     <div key={ni} className="flex gap-2 items-center">
+                      {item.fueraDeVocabulario && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Badge variant="outline" className="shrink-0 text-xs text-amber-600 border-amber-600">
+                              Nueva — fuera del vocabulario
+                            </Badge>
+                          </TooltipTrigger>
+                          <TooltipContent>{item.justificacion || 'Propuesta por IA sin justificación explícita.'}</TooltipContent>
+                        </Tooltip>
+                      )}
                       <Input
                         value={item.nombre}
                         onChange={e => actualizarNombreEsquema(edtNombre, ni, e.target.value)}
@@ -1534,7 +1559,12 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
                     const destinos = actividades
                       .map((a, ai) => ({ ai, nombre: a.actividadNombre }))
                       .filter(d => d.ai !== index && actividades[d.ai].edtNombre === actividad.edtNombre)
-                    return actividad.tareas.map((tarea, ti) => (
+                    // Las tareas propuestas por IA (esPropuestaIA) se muestran en su
+                    // propia sección más abajo — acá solo las de catálogo. El índice
+                    // real (ti) se preserva para que toggleTarea/moverTarea sigan
+                    // apuntando a la posición correcta en actividad.tareas.
+                    const tareasCatalogo = actividad.tareas.map((tarea, ti) => ({ tarea, ti })).filter(({ tarea }) => !tarea.esPropuestaIA)
+                    return tareasCatalogo.map(({ tarea, ti }) => (
                       <div
                         key={tarea.catalogoServicioId}
                         className="flex items-start gap-2 text-xs p-1.5 rounded cursor-pointer hover:bg-muted/50"
@@ -1580,6 +1610,45 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
                     ))
                   })()}
                 </div>
+
+                {actividad.tareas.some(t => t.esPropuestaIA) && (
+                  <div className="mt-2 pt-2 border-t space-y-1.5">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Tareas adicionales propuestas por la IA — no están en el catálogo
+                    </p>
+                    {actividad.tareas.map((tarea, ti) => ({ tarea, ti })).filter(({ tarea }) => tarea.esPropuestaIA).map(({ tarea, ti }) => (
+                      <div key={`ia-${ti}`} className="flex items-start gap-2 text-xs p-1.5 rounded border border-dashed">
+                        <Checkbox
+                          checked={tarea.incluida}
+                          onCheckedChange={checked => toggleTarea(index, ti, checked === true)}
+                          className="mt-1 shrink-0"
+                        />
+                        <div className="flex-1 min-w-0 space-y-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <Badge variant="outline" className="text-[10px] shrink-0 text-blue-600 border-blue-600">
+                              IA — nueva
+                            </Badge>
+                            <Input
+                              value={tarea.nombre}
+                              onChange={e => actualizarTareaPropuestaIA(index, ti, { nombre: e.target.value })}
+                              className="h-7 text-xs flex-1 min-w-[140px]"
+                            />
+                            <Input
+                              type="number"
+                              min={0}
+                              step={0.5}
+                              value={tarea.horasEstimadas}
+                              onChange={e => actualizarTareaPropuestaIA(index, ti, { horasEstimadas: Number(e.target.value) || 0 })}
+                              className="h-7 text-xs w-20 shrink-0"
+                              title="Horas estimadas"
+                            />
+                          </div>
+                          {tarea.justificacion && <p className="text-[10px] text-muted-foreground">{tarea.justificacion}</p>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </AccordionContent>
             </AccordionItem>
           ))}
