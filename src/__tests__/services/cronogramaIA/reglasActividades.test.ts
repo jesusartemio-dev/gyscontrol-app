@@ -3,6 +3,7 @@ import {
   evaluarAlcance,
   generarActividadesDeterministas,
   calcularEdtsPendientesIA,
+  tieneAlMenosUnaTareaIncluida,
   type EdtParaGenerar,
 } from '@/lib/cronogramaIA/reglasActividades'
 import type { CatalogoServicioParaWizard, ConfiguracionWizardPaso1 } from '@/types/cronogramaIA'
@@ -73,6 +74,28 @@ describe('evaluarAlcance', () => {
   it('detalle solo incluida si el contrato tiene ingeniería de detalle', () => {
     expect(evaluarAlcance('detalle', { brownfield: false, ingenieriaDetalle: true }).incluida).toBe(true)
     expect(evaluarAlcance('detalle', { brownfield: false, ingenieriaDetalle: false }).incluida).toBe(false)
+  })
+})
+
+describe('tieneAlMenosUnaTareaIncluida — usado por el wizard para filtrar Actividades vacías antes de "Aplicar al Cronograma"', () => {
+  it('false si el array de tareas está vacío', () => {
+    expect(tieneAlMenosUnaTareaIncluida([])).toBe(false)
+  })
+
+  it('false si todas las tareas están destildadas (incluida: false), aunque el array no esté vacío', () => {
+    const tareas = [
+      { catalogoServicioId: 's1', nombre: 'A', cantidad: 1, nivelDificultad: 1, horaBase: 1, horaRepetido: 0, horasEstimadas: 1, incluida: false, orden: 0 },
+      { catalogoServicioId: 's2', nombre: 'B', cantidad: 1, nivelDificultad: 1, horaBase: 1, horaRepetido: 0, horasEstimadas: 1, incluida: false, orden: 1 },
+    ]
+    expect(tieneAlMenosUnaTareaIncluida(tareas)).toBe(false)
+  })
+
+  it('true si al menos una tarea está incluida', () => {
+    const tareas = [
+      { catalogoServicioId: 's1', nombre: 'A', cantidad: 1, nivelDificultad: 1, horaBase: 1, horaRepetido: 0, horasEstimadas: 1, incluida: false, orden: 0 },
+      { catalogoServicioId: 's2', nombre: 'B', cantidad: 1, nivelDificultad: 1, horaBase: 1, horaRepetido: 0, horasEstimadas: 1, incluida: true, orden: 1 },
+    ]
+    expect(tieneAlMenosUnaTareaIncluida(tareas)).toBe(true)
   })
 })
 

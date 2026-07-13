@@ -31,7 +31,8 @@ import { useToast } from '@/hooks/use-toast'
 import type { ActividadPropuesta, ConfiguracionWizardPaso1, EsquemaAgrupacionPropuesto } from '@/types/cronogramaIA'
 import type { EdtSugeridoConOrigen } from '@/lib/cronogramaIA/derivarEdtsSoporte'
 import { detectarEdtsPosibles, type EvidenciaTexto } from '@/lib/cronogramaIA/detectarEdtsPosibles'
-import { EDTS_AGRUPACION_UN_PASO, EDTS_ESQUEMA_DOS_ETAPAS, calcularEdtsPendientesIA } from '@/lib/cronogramaIA/reglasActividades'
+import { EDTS_AGRUPACION_UN_PASO, EDTS_ESQUEMA_DOS_ETAPAS, calcularEdtsPendientesIA, tieneAlMenosUnaTareaIncluida } from '@/lib/cronogramaIA/reglasActividades'
+import { agruparYOrdenarPorEstructura, type InfoOrdenEdt } from '@/lib/cronogramaIA/construirEstructuraReal'
 import { derivarAliasCandidato } from '@/lib/cronogramaIA/aliasActividad'
 import { ROL_RESPONSABLE_LABELS, type RolResponsable } from '@/lib/cronogramaResponsables/reglasResponsable'
 import {
@@ -46,6 +47,9 @@ interface EdtWizardInfo {
   nombre: string
   descripcion: string | null
   faseNombre: string | null
+  /** Orden real del catálogo (Fase.orden / Edt.orden) — usado para que el Paso 2 liste las Actividades en el mismo orden final del cronograma. */
+  faseOrden: number | null
+  edtOrden: number
   totalServicios: number
 }
 
@@ -669,6 +673,53 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
     return id ? edtsSeleccionados.has(id) : false
   }
 
+  // EDTs cuyas Actividades quedaron TODAS con 0 tareas incluidas — no van a
+  // aportar nada al cronograma aplicado, aunque el EDT siga seleccionado.
+  const edtsSinTareasIncluidas = useMemo(() => {
+    const tieneAlgunaPorEdt = new Map<string, boolean>()
+    for (const a of actividades) {
+      const yaTieneAlguna = tieneAlgunaPorEdt.get(a.edtNombre) ?? false
+      tieneAlgunaPorEdt.set(a.edtNombre, yaTieneAlguna || tieneAlMenosUnaTareaIncluida(a.tareas))
+    }
+    return Array.from(tieneAlgunaPorEdt.entries())
+      .filter(([, tieneAlguna]) => !tieneAlguna)
+      .map(([edtNombre]) => edtNombre)
+  }, [actividades])
+
+  // El Paso 2 debe ser un preview fiel del árbol final: mismo orden Fase ->
+  // EDT.orden -> orden natural dentro del EDT que construirEstructuraReal
+  // usa al aplicar de verdad — una sola fuente de verdad para el criterio
+  // (agruparYOrdenarPorEstructura), nunca un criterio de orden duplicado acá.
+  const actividadesOrdenadas = useMemo(() => {
+    const edtsCatalogo = new Map<string, InfoOrdenEdt>()
+    for (const e of edts) {
+      if (e.faseNombre === null || e.faseOrden === null) continue
+      edtsCatalogo.set(e.nombre, { nombre: e.nombre, faseNombre: e.faseNombre, faseOrden: e.faseOrden, edtOrden: e.edtOrden })
+    }
+    const { gruposOrdenados } = agruparYOrdenarPorEstructura(actividades, edtsCatalogo)
+
+    // Los índices se resuelven por referencia de objeto (misma instancia que
+    // en `actividades`) — todo el resto del componente (toggleTarea,
+    // renombrarActividad, eliminarActividad, moverTarea...) sigue indexando
+    // sobre el array original, así que el índice real debe preservarse.
+    const indicePorActividad = new Map(actividades.map((a, i) => [a, i] as const))
+    const ordenadas: { actividad: ActividadPropuesta; index: number }[] = []
+    for (const grupo of gruposOrdenados) {
+      for (const actividad of grupo.actividades) {
+        const index = indicePorActividad.get(actividad)
+        if (index !== undefined) ordenadas.push({ actividad, index })
+      }
+    }
+    // EDT no encontrado en el catálogo (advertencia ya la emite
+    // agruparYOrdenarPorEstructura) — nunca esconder la Actividad, se
+    // muestra al final en vez de desaparecer del preview.
+    const indicesYaMostrados = new Set(ordenadas.map(o => o.index))
+    actividades.forEach((actividad, index) => {
+      if (!indicesYaMostrados.has(index)) ordenadas.push({ actividad, index })
+    })
+    return ordenadas
+  }, [actividades, edts])
+
   // La norma es valorización mensual, con la última viviendo en CIE (por
   // eso el -1) — el usuario no suele conocer el N° exacto de antemano.
   function sugerirValorizaciones(semanas: number): number {
@@ -792,16 +843,25 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pasoActual])
 
-  async function guardarActividades(): Promise<boolean> {
+  /** Mensaje legible a partir de un error de API — incluye el detalle de validación del servidor (ej. zod) si viene, nunca falla en silencio. */
+  function mensajeErrorServidor(err: { error?: string; detalles?: { formErrors?: string[]; fieldErrors?: Record<string, string[]> } }, fallback: string): string {
+    const base = err.error || fallback
+    const detalles = err.detalles
+    if (!detalles) return base
+    const partes = [...(detalles.formErrors ?? []), ...Object.entries(detalles.fieldErrors ?? {}).flatMap(([campo, msgs]) => msgs.map(m => `${campo}: ${m}`))]
+    return partes.length > 0 ? `${base} — ${partes.join('; ')}` : base
+  }
+
+  async function guardarActividades(actividadesAGuardar: ActividadPropuesta[] = actividades): Promise<boolean> {
     if (!generacionId) return false
     const res = await fetch(`/api/proyectos/${proyectoId}/cronograma/planificacion/wizard/${generacionId}/actividades`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(actividades),
+      body: JSON.stringify(actividadesAGuardar),
     })
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
-      throw new Error(err.error || 'Error guardando el borrador')
+      throw new Error(mensajeErrorServidor(err, 'Error guardando el borrador'))
     }
     return true
   }
@@ -814,7 +874,7 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
       onSuccess?.()
       onOpenChange(false)
     } catch (e) {
-      toast({ title: e instanceof Error ? e.message : 'Error inesperado', variant: 'destructive' })
+      toast({ title: 'No se pudo guardar el borrador', description: e instanceof Error ? e.message : 'Error inesperado', variant: 'destructive' })
     } finally {
       setGuardandoPaso2(false)
     }
@@ -831,15 +891,19 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
         description: `"Sin agrupar" tiene ${sinAgrupar.tareas.filter(t => t.incluida).length} tarea(s) incluida(s) — se van a generar igual. Podés moverlas a otra Actividad antes de aplicar.`,
       })
     }
+    // Regla de negocio: una Actividad con 0 tareas incluidas no se crea en
+    // el cronograma — se filtra acá (servidor también la tolera si llegara)
+    // para que lo persistido antes de aplicar refleje lo que va a pasar.
+    const actividadesParaAplicar = actividades.filter(a => tieneAlMenosUnaTareaIncluida(a.tareas))
     setAplicandoCronograma(true)
     try {
-      await guardarActividades()
+      await guardarActividades(actividadesParaAplicar)
       const res = await fetch(`/api/proyectos/${proyectoId}/cronograma/planificacion/wizard/${generacionId}/generar`, {
         method: 'POST',
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        throw new Error(err.error || 'Error aplicando el cronograma')
+        throw new Error(mensajeErrorServidor(err, 'Error aplicando el cronograma'))
       }
       const data = await res.json()
       const responsablesTexto =
@@ -853,7 +917,7 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
       onSuccess?.()
       onOpenChange(false)
     } catch (e) {
-      toast({ title: e instanceof Error ? e.message : 'Error inesperado', variant: 'destructive' })
+      toast({ title: 'No se pudo aplicar al cronograma', description: e instanceof Error ? e.message : 'Error inesperado', variant: 'destructive' })
     } finally {
       setAplicandoCronograma(false)
     }
@@ -1543,8 +1607,18 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
           </div>
         )}
 
+        {edtsSinTareasIncluidas.length > 0 && (
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              {edtsSinTareasIncluidas.join(', ')} no {edtsSinTareasIncluidas.length > 1 ? 'tendrán' : 'tendrá'} ninguna tarea en el
+              cronograma — todas sus Actividades están vacías o con todas las tareas destildadas.
+            </AlertDescription>
+          </Alert>
+        )}
+
         <Accordion type="multiple" className="space-y-2">
-          {actividades.map((actividad, index) => (
+          {actividadesOrdenadas.map(({ actividad, index }) => (
             <AccordionItem key={index} value={String(index)} className="border rounded-lg px-3">
               <div className="flex items-center gap-2 py-1 min-w-0">
                 <AccordionTrigger className="flex-1 min-w-0 py-2 hover:no-underline">
@@ -1554,6 +1628,15 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
                     <Badge variant="secondary" className="text-xs shrink-0">
                       {actividad.tareas.filter(t => t.incluida).length}/{actividad.tareas.length} tareas
                     </Badge>
+                    {!tieneAlMenosUnaTareaIncluida(actividad.tareas) && (
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] shrink-0 text-muted-foreground"
+                        title="Ninguna tarea de esta Actividad está incluida — no se va a crear al aplicar el cronograma."
+                      >
+                        No se agregará al cronograma (0 tareas)
+                      </Badge>
+                    )}
                     {actividad.actividadNombre === 'Sin agrupar' && (
                       <Badge
                         variant="destructive"

@@ -184,6 +184,11 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
       nombre: e.nombre,
       descripcion: e.descripcion,
       faseNombre: e.faseDefault?.nombre ?? null,
+      // Orden real del catálogo (Fase.orden + Edt.orden, el mismo campo con
+      // drag&drop del catálogo) — el wizard lo usa para que el Paso 2 sea un
+      // preview fiel del orden final (ver agruparYOrdenarPorEstructura).
+      faseOrden: e.faseDefault?.orden ?? null,
+      edtOrden: e.orden,
       totalServicios: e._count.catalogoServicio,
     })),
     cronogramaBloqueado: cronogramaPlanificacion?.bloqueado ?? false,

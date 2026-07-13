@@ -109,8 +109,8 @@ export function ordenarPorCatalogo<T extends { orden: number }>(tareas: T[]): T[
   return [...tareas].sort((a, b) => a.orden - b.orden)
 }
 
-/** true si la actividad debe crearse (tiene al menos 1 tarea incluida tras el filtro de alcance). */
-function tieneAlMenosUnaTareaIncluida(tareas: TareaPropuesta[]): boolean {
+/** true si la actividad debe crearse (tiene al menos 1 tarea incluida tras el filtro de alcance) — también usado por el wizard para decidir qué actividades filtrar antes de "Aplicar al Cronograma". */
+export function tieneAlMenosUnaTareaIncluida(tareas: TareaPropuesta[]): boolean {
   return tareas.some(t => t.incluida)
 }
 

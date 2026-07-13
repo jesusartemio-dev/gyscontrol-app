@@ -1,4 +1,4 @@
-import { construirEstructuraReal, type EdtCatalogoInfo } from '@/lib/cronogramaIA/construirEstructuraReal'
+import { construirEstructuraReal, agruparYOrdenarPorEstructura, type EdtCatalogoInfo } from '@/lib/cronogramaIA/construirEstructuraReal'
 import type { ActividadPropuesta, TareaPropuesta } from '@/types/cronogramaIA'
 
 function mockCalendario() {
@@ -197,5 +197,58 @@ describe('construirEstructuraReal', () => {
     expect(t1.recursoId).toBe('recurso-cadista')
     expect(t2.catalogoServicioId).toBe('t2')
     expect(t2.recursoId).toBeNull()
+  })
+})
+
+describe('agruparYOrdenarPorEstructura — única fuente de verdad del orden, compartida por construirEstructuraReal y el preview del Paso 2', () => {
+  // Mismo caso que el test de más arriba: CMM llega PRIMERO en el array de
+  // entrada pero su edtOrden (3) es mayor que el de CON (2) — el orden
+  // final debe ser Construccion -> Comisionamiento, no el de llegada.
+  const actividades: ActividadPropuesta[] = [
+    { edtNombre: 'CMM', actividadNombre: 'Comisionamiento', tareas: [tarea('t1', 'Puesta en marcha', 8)], origen: 'determinista' },
+    { edtNombre: 'GES', actividadNombre: 'Inicio', tareas: [tarea('t2', 'Kickoff', 8)], origen: 'determinista' },
+    { edtNombre: 'CON', actividadNombre: 'Zona A', tareas: [tarea('t3', 'Tendido', 8)], origen: 'ia' },
+  ]
+
+  it('ordena por (faseOrden, edtOrden), preservando el orden de llegada de las Actividades dentro de cada EDT', () => {
+    const { gruposOrdenados, advertencias } = agruparYOrdenarPorEstructura(actividades, EDTS_CATALOGO)
+    expect(gruposOrdenados.map(g => g.edtInfo.nombre)).toEqual(['GES', 'CON', 'CMM'])
+    expect(advertencias).toHaveLength(0)
+  })
+
+  it('un EDT sin match en el catálogo se omite del agrupado y genera advertencia (nunca revienta)', () => {
+    const conEdtInexistente: ActividadPropuesta[] = [...actividades, { edtNombre: 'X', actividadNombre: 'Y', tareas: [], origen: 'determinista' }]
+    const { gruposOrdenados, advertencias } = agruparYOrdenarPorEstructura(conEdtInexistente, EDTS_CATALOGO)
+    expect(gruposOrdenados.map(g => g.edtInfo.nombre)).toEqual(['GES', 'CON', 'CMM'])
+    expect(advertencias.length).toBeGreaterThan(0)
+  })
+
+  it('el orden final coincide EXACTAMENTE con el que produce construirEstructuraReal para el mismo input (el Paso 2 es un preview fiel)', () => {
+    const { gruposOrdenados } = agruparYOrdenarPorEstructura(actividades, EDTS_CATALOGO)
+    const ordenEsperado = gruposOrdenados.flatMap(g => g.actividades.map(a => a.actividadNombre))
+
+    const r = construirEstructuraReal({
+      actividades,
+      edtsCatalogo: EDTS_CATALOGO,
+      proyectoId: 'p1',
+      proyectoCronogramaId: 'cron1',
+      fechaInicioProyecto: new Date('2026-08-03T00:00:00'),
+      calendarioLaboral: mockCalendario(),
+      recursoPorServicio: new Map(),
+    })
+
+    expect(r.actividades.map(a => a.nombre)).toEqual(ordenEsperado)
+    expect(ordenEsperado).toEqual(['Inicio', 'Zona A', 'Comisionamiento'])
+  })
+
+  it('funciona con un catálogo "liviano" (sin id/descripcionEdt) — lo que el Paso 2 del wizard puede armar sin fechas ni ids reales', () => {
+    const catalogoLiviano = new Map(
+      Array.from(EDTS_CATALOGO.entries()).map(([nombre, info]) => [
+        nombre,
+        { nombre: info.nombre, faseNombre: info.faseNombre, faseOrden: info.faseOrden, edtOrden: info.edtOrden },
+      ])
+    )
+    const { gruposOrdenados } = agruparYOrdenarPorEstructura(actividades, catalogoLiviano)
+    expect(gruposOrdenados.map(g => g.edtInfo.nombre)).toEqual(['GES', 'CON', 'CMM'])
   })
 })
