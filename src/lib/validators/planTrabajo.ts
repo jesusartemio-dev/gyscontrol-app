@@ -29,12 +29,22 @@ export const planPersonalRequeridoSchema = z.object({
   cargo: z.string().min(1),
 })
 
+// ─── Tareas por subItem (Bloque 4.2, Tarea 4) — viñeta redactada por IA, nunca vacía. ───
+export const planAlcanceDetalladoTareaSchema = z.object({
+  tareaRefId: z.string().optional(),
+  nombre: z.string().min(1),
+  texto: z.string().min(1),
+})
+
 // ─── Nuevo formato (basado en EDTs del cronograma de planificación) ───
 export const planAlcanceDetalladoSubItemSchema = z.object({
   numeracion: z.string().min(1),
   actividadNombre: z.string().min(1),
   descripcion: z.string().min(60),
   actividadRefId: z.string().optional(),
+  tareas: z.array(planAlcanceDetalladoTareaSchema).optional(),
+  // Solo UI (Bloque 4.2, Tarea 5) — nunca se exporta al docx, puede quedar vacía.
+  fotoSugerida: z.string().optional(),
   imagenes: z.array(planAlcanceImagenSchema).optional(),
 })
 

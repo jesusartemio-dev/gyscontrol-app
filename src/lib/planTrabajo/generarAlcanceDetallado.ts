@@ -45,6 +45,8 @@ export interface ResultadoDetalladoEdt {
   subItems: Map<string, string>
   /** subItemId -> (tareaId -> viñeta redactada) — Bloque 4.2, Tarea 4. */
   tareas: Map<string, Map<string, string>>
+  /** subItemId -> fotoSugerida — Bloque 4.2, Tarea 5 (solo UI, nunca se exporta al docx). */
+  fotosSugeridas: Map<string, string>
 }
 
 /**
@@ -86,6 +88,7 @@ export function mergearDescripcionesEnEstructura(
           ...t,
           texto: tareasIa?.get(t.tareaRefId ?? '') || textoFallbackTarea(t.nombre),
         })),
+        fotoSugerida: resultado?.fotosSugeridas.get(s.actividadRefId ?? '') || '',
       }
     })
     return {
@@ -183,7 +186,7 @@ async function generarDescripcionesDetallado(
   userId: string,
   proyectoId: string,
   signal?: AbortSignal
-): Promise<{ edtDescripcion: string; subItems: Map<string, string>; tareas: Map<string, Map<string, string>>; advertencias: string[] }> {
+): Promise<{ edtDescripcion: string; subItems: Map<string, string>; tareas: Map<string, Map<string, string>>; fotosSugeridas: Map<string, string>; advertencias: string[] }> {
   const advertencias: string[] = []
   const subItems = edt.subItems ?? []
   const idsSubItemsEsperados = new Set(subItems.map(s => s.actividadRefId).filter((id): id is string => !!id))
@@ -211,7 +214,7 @@ async function generarDescripcionesDetallado(
   let ultimaRespuesta: {
     id?: string
     edtDescripcion?: string
-    subItems?: { id: string; descripcion: string; tareas?: { id: string; texto: string }[] }[]
+    subItems?: { id: string; descripcion: string; tareas?: { id: string; texto: string }[]; fotoSugerida?: string }[]
   } = {}
 
   function validarTareasDeSubItems(subItemsRecibidos: NonNullable<typeof ultimaRespuesta.subItems>): boolean {
@@ -268,6 +271,7 @@ async function generarDescripcionesDetallado(
         edtDescripcion: ultimaRespuesta.edtDescripcion!,
         subItems: new Map(subItemsRecibidos.map(s => [s.id, s.descripcion])),
         tareas: new Map(subItemsRecibidos.map(s => [s.id, new Map((s.tareas ?? []).map(t => [t.id, t.texto]))])),
+        fotosSugeridas: new Map(subItemsRecibidos.map(s => [s.id, s.fotoSugerida ?? ''])),
         advertencias,
       }
     }
@@ -276,11 +280,13 @@ async function generarDescripcionesDetallado(
 
   const mapaSubItems = new Map<string, string>()
   const mapaTareas = new Map<string, Map<string, string>>()
+  const mapaFotosSugeridas = new Map<string, string>()
   for (const s of ultimaRespuesta.subItems ?? []) {
     if (!idsSubItemsEsperados.has(s.id)) continue
     mapaSubItems.set(s.id, s.descripcion)
     const idsTareasEsperadas = idsTareasEsperadasPorSubItem.get(s.id) ?? new Set<string>()
     mapaTareas.set(s.id, new Map((s.tareas ?? []).filter(t => idsTareasEsperadas.has(t.id)).map(t => [t.id, t.texto])))
+    mapaFotosSugeridas.set(s.id, s.fotoSugerida ?? '')
   }
   const faltantes = subItems.filter(s => !mapaSubItems.has(s.actividadRefId ?? ''))
   if (faltantes.length > 0 || !ultimaRespuesta.edtDescripcion) {
@@ -292,6 +298,7 @@ async function generarDescripcionesDetallado(
     edtDescripcion: ultimaRespuesta.edtDescripcion ?? descripcionFallbackEdt(edt.faseNombre, edt.edtNombre),
     subItems: mapaSubItems,
     tareas: mapaTareas,
+    fotosSugeridas: mapaFotosSugeridas,
     advertencias,
   }
 }

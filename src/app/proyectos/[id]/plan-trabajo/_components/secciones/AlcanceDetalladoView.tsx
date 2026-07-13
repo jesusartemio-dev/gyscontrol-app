@@ -120,6 +120,12 @@ export function AlcanceDetalladoView({ plan, proyectoId, imagenes }: Props) {
                           {sub.descripcion && (
                             <p className="text-xs text-gray-500 leading-relaxed">{sub.descripcion}</p>
                           )}
+                          {item.tipoDetalle === 'detallado' && sub.fotoSugerida &&
+                            imagenes.filter(img => img.edtRef === (item.edtRefId ?? '') && (img.subItemRef ?? undefined) === sub.actividadRefId).length === 0 && (
+                              <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                                📷 <strong>Foto sugerida:</strong> {sub.fotoSugerida}
+                              </p>
+                          )}
                           {item.tipoDetalle === 'detallado' && sub.actividadRefId && (
                             <GaleriaSoloLectura
                               proyectoId={proyectoId}

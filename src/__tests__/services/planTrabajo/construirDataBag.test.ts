@@ -77,6 +77,7 @@ function edtDetallado(): PlanAlcanceDetalladoEdt {
           { tareaRefId: 'tarea-2', nombre: 'delimitar-area', texto: 'Delimitar el área de trabajo con cinta de seguridad y señalización visible.' },
           { tareaRefId: 'tarea-3', nombre: 'verificar-tension', texto: 'Verificar ausencia de tensión con multímetro certificado.' },
         ],
+        fotoSugerida: 'Foto del área antes de iniciar el tendido de cable.',
       },
       { numeracion: '11.2.2', actividadNombre: 'Montaje de tablero eléctrico', descripcion: 'Descripción específica de montaje.', actividadRefId: 'act-2' },
       { numeracion: '11.2.3', actividadNombre: 'Pruebas eléctricas de continuidad', descripcion: 'Descripción específica de pruebas.', actividadRefId: 'act-3' },
@@ -147,5 +148,12 @@ describe('construirDataBag — alcanceDetallado.subItems', () => {
   it('(Tarea 4) un subItem sin tareas (o de un EDT resumido) llega al dataBag con tareas.length === 0', () => {
     expect(con.subItems[1].tareas).toEqual([])
     expect(plan.subItems).toEqual([])
+  })
+
+  it('(Tarea 5) fotoSugerida NUNCA llega al dataBag — es solo UI, no se exporta al docx', () => {
+    // El fixture del subItem[0] trae fotoSugerida (ver arriba) — confirma que
+    // construirDataBag no la incluye en ningún campo del objeto mapeado.
+    expect(con.subItems[0]).not.toHaveProperty('fotoSugerida')
+    expect(Object.keys(con.subItems[0])).toEqual(['numeracion', 'actividadNombre', 'descripcion', 'tareas', 'imagenes'])
   })
 })

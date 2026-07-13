@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Plus, Trash2, PlusCircle } from 'lucide-react'
+import { Plus, Trash2, PlusCircle, Camera } from 'lucide-react'
 import { GaleriaImagenesAlcance } from './GaleriaImagenesAlcance'
 import type { PlanTrabajoImagen } from '@prisma/client'
 
@@ -169,6 +169,27 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, imagenes, onImagenes
                             </Button>
                           </div>
                           <Textarea value={sub.descripcion} onChange={e => updateSubItem(edtIdx, subIdx, { descripcion: e.target.value })} rows={3} className="text-xs resize-none" placeholder="Descripción narrativa de la actividad..." />
+                          {item.tipoDetalle === 'detallado' && (() => {
+                            const imagenesDelSubItem = imagenes.filter(
+                              img => img.edtRef === (item.edtRefId ?? '') && (img.subItemRef ?? undefined) === sub.actividadRefId
+                            )
+                            return (
+                              <>
+                                {sub.fotoSugerida && imagenesDelSubItem.length === 0 && (
+                                  <div className="flex items-start gap-1.5 rounded bg-amber-50 border border-amber-200 px-2 py-1.5 text-[11px] text-amber-800">
+                                    <Camera size={12} className="shrink-0 mt-0.5" />
+                                    <span><strong>Foto sugerida:</strong> {sub.fotoSugerida}</span>
+                                  </div>
+                                )}
+                                <Input
+                                  value={sub.fotoSugerida ?? ''}
+                                  onChange={e => updateSubItem(edtIdx, subIdx, { fotoSugerida: e.target.value })}
+                                  className="h-7 text-xs"
+                                  placeholder="Foto sugerida para el levantamiento (opcional, no se exporta al docx)"
+                                />
+                              </>
+                            )
+                          })()}
                           {item.tipoDetalle === 'detallado' && sub.actividadRefId && (
                             <GaleriaImagenesAlcance
                               proyectoId={proyectoId}

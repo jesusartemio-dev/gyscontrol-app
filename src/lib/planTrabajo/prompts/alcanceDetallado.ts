@@ -55,11 +55,12 @@ e instrumentación.
 
 Vas a redactar la descripción técnica de UN EDT de la fase de EJECUCIÓN
 (Construcción/Comisionamiento) de un Plan de Trabajo, de cada una de sus
-actividades (subItems), y de cada TAREA real de esas actividades. La
-estructura, numeración e IDs de este EDT, sus subItems y sus tareas YA ESTÁN
-RESUELTOS por el sistema — tu única tarea es escribir el texto de
-"edtDescripcion", el "descripcion" de cada subItem, y el "texto" de cada
-tarea (viñeta operativa).
+actividades (subItems), de cada TAREA real de esas actividades, y de una
+sugerencia de foto por actividad. La estructura, numeración e IDs de este
+EDT, sus subItems y sus tareas YA ESTÁN RESUELTOS por el sistema — tu única
+tarea es escribir el texto de "edtDescripcion", el "descripcion" de cada
+subItem, el "texto" de cada tarea (viñeta operativa), y el "fotoSugerida"
+de cada subItem.
 
 ESTILO (plan de trabajo Nexa):
 - edtDescripcion: 2-4 oraciones técnicas describiendo el alcance general del EDT.
@@ -82,6 +83,12 @@ ESTILO (plan de trabajo Nexa):
 - Fundamentá la descripción y las viñetas en las tareas reales de cada
   actividad (nombres, horas, personas) que se incluyen más abajo — no
   inventes actividades, tareas, equipos ni cifras que no estén en el contexto.
+- Cada subItem.fotoSugerida: UNA línea (10-20 palabras) indicando qué foto
+  tomar en el levantamiento de información para esa actividad — nunca una
+  instrucción de trabajo, sino qué registrar visualmente antes/durante la
+  intervención. Ejemplo: "Foto del área del elevador y del tablero existente
+  antes de la intervención." Esto es solo para uso interno del equipo de
+  campo — no se exporta al documento final.
 
 REGLAS:
 - Devolvé EXACTAMENTE un subItem por cada "id" de subItem recibido, mismos IDs.
@@ -128,6 +135,6 @@ export function buildUserDetalleEdt(
     notaCorrectiva,
     '',
     'ESQUEMA DE OUTPUT (devolvé EXACTAMENTE este JSON, sin markdown):',
-    `{ "id": "${edt.id}", "edtDescripcion": "string — 2-4 oraciones", "subItems": [{ "id": "string — copiado tal cual", "descripcion": "string — 2-4 oraciones", "tareas": [{ "id": "string — copiado tal cual", "texto": "string — viñeta operativa de 1 línea" }] }] }`,
+    `{ "id": "${edt.id}", "edtDescripcion": "string — 2-4 oraciones", "subItems": [{ "id": "string — copiado tal cual", "descripcion": "string — 2-4 oraciones", "tareas": [{ "id": "string — copiado tal cual", "texto": "string — viñeta operativa de 1 línea" }], "fotoSugerida": "string — 1 línea, qué foto tomar en el levantamiento" }] }`,
   ].join('\n')
 }
