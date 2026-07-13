@@ -6,6 +6,8 @@ import { getSnapshotPlan, getSnapshotPng } from '@/lib/planTrabajo/snapshotHelpe
 import { construirDataBag } from '@/lib/planTrabajo/construirDataBag'
 import { renderizarPlanTrabajoDocx } from '@/lib/planTrabajo/exportDocx'
 import { resolverImagenesAlcance } from '@/lib/planTrabajo/resolverImagenesAlcance'
+import { generarHistogramaEquipoPng, generarHistogramaHHPng } from '@/lib/planTrabajo/generarHistogramaPng'
+import type { PlanHistogramas } from '@/types/planTrabajo'
 
 type Ctx = { params: Promise<{ id: string; generacionId: string }> }
 
@@ -71,7 +73,12 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 })
   }
 
-  const imagenesResueltas = await resolverImagenesAlcance(imagenesAlcance)
+  const histogramas = (snapshotPlan.histogramas as PlanHistogramas | null) ?? { meses: [], equipoTrabajo: [], horasHombre: [] }
+  const [imagenesResueltas, histogramaEquipoPng, histogramaHHPng] = await Promise.all([
+    resolverImagenesAlcance(imagenesAlcance),
+    generarHistogramaEquipoPng(histogramas),
+    generarHistogramaHHPng(histogramas),
+  ])
 
   const dataBag = construirDataBag({
     plan: snapshotPlan,
@@ -81,6 +88,8 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     ubicacionDetectadaTdr: tdr?.ubicacionDetectada ?? null,
     imagenesAlcance,
     imagenesResueltas,
+    histogramaEquipoPng,
+    histogramaHHPng,
   })
 
   let docxBuffer: Buffer

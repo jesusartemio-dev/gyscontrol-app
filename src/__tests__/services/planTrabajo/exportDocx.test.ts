@@ -1,8 +1,9 @@
 import PizZip from 'pizzip'
 import { renderizarPlanTrabajoDocx, IMAGEN_PLACEHOLDER, type ImagenResueltaTag } from '@/lib/planTrabajo/exportDocx'
 import { construirDataBag } from '@/lib/planTrabajo/construirDataBag'
+import { generarHistogramaEquipoPng, generarHistogramaHHPng } from '@/lib/planTrabajo/generarHistogramaPng'
 import { asertarXmlBienFormado } from '@/__tests__/testUtils/xmlTestUtils'
-import type { PlanAlcanceDetalladoEdt } from '@/types/planTrabajo'
+import type { PlanAlcanceDetalladoEdt, PlanHistogramas } from '@/types/planTrabajo'
 import type { PlanTrabajo, Cliente, Proyecto, PlanTrabajoImagen } from '@prisma/client'
 
 /**
@@ -185,6 +186,55 @@ describe('renderizarPlanTrabajoDocx — imágenes contra la plantilla REAL', () 
 
     const alcance = dataBag.alcanceDetallado as Array<{ imagenes: { img: ImagenResueltaTag }[] }>
     expect(alcance[0].imagenes[0].img).toEqual(IMAGEN_PLACEHOLDER)
+
+    const buffer = await renderizarPlanTrabajoDocx({ dataBag })
+    expect(Buffer.isBuffer(buffer)).toBe(true)
+    asertarPaqueteBienFormado(buffer)
+  })
+})
+
+describe('renderizarPlanTrabajoDocx — gráficos de histograma (Bloque 4.2, Tarea 3)', () => {
+  const histogramasFixture: PlanHistogramas = {
+    meses: ['2026-02', '2026-03'],
+    equipoTrabajo: [{ etiqueta: 'Construcción', valoresPorMes: [1, 1], total: 2 }],
+    horasHombre: [{ etiqueta: 'Construcción', valoresPorMes: [80, 80], total: 160 }],
+  }
+
+  it('con datos: los dos gráficos se generan y el docx los renderiza sin drawings de tamaño cero', async () => {
+    const [histogramaEquipoPng, histogramaHHPng] = await Promise.all([
+      generarHistogramaEquipoPng(histogramasFixture),
+      generarHistogramaHHPng(histogramasFixture),
+    ])
+
+    const dataBag = construirDataBag({
+      plan: planFixture([edtDetallado()]),
+      proyecto: proyectoFixture,
+      organigramaPngBase64: `data:image/png;base64,${PNG_1X1_BASE64}`,
+      histogramaEquipoPng,
+      histogramaHHPng,
+    })
+
+    expect(dataBag.tieneHistogramaEquipoPng).toBe(true)
+    expect(dataBag.tieneHistogramaHHPng).toBe(true)
+
+    const buffer = await renderizarPlanTrabajoDocx({ dataBag })
+    const partes = asertarPaqueteBienFormado(buffer)
+    const documentXml = partes.find(p => p.nombre === 'word/document.xml')!.contenido
+    for (const { cx, cy } of extentsDeImagenes(documentXml)) {
+      expect(cx).toBeGreaterThan(0)
+      expect(cy).toBeGreaterThan(0)
+    }
+  })
+
+  it('sin datos (plan nuevo, aún sin Etapa 1 calculada): los flags quedan en false y el export no truena', async () => {
+    const dataBag = construirDataBag({
+      plan: planFixture([edtDetallado()]),
+      proyecto: proyectoFixture,
+      organigramaPngBase64: `data:image/png;base64,${PNG_1X1_BASE64}`,
+    })
+
+    expect(dataBag.tieneHistogramaEquipoPng).toBe(false)
+    expect(dataBag.tieneHistogramaHHPng).toBe(false)
 
     const buffer = await renderizarPlanTrabajoDocx({ dataBag })
     expect(Buffer.isBuffer(buffer)).toBe(true)

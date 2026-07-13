@@ -35,6 +35,10 @@ export interface ConstruirDataBagOpciones {
   imagenesAlcance?: PlanTrabajoImagen[]
   /** {data,width,height} ya resueltas por imagen (ver resolverImagenesAlcance.ts) — null = imagen inaccesible → placeholder. */
   imagenesResueltas?: Map<string, ImagenResueltaTag | null>
+  /** PNG ya generado (ver generarHistogramaPng.ts) — null si no hay datos suficientes (Bloque 4.2, Tarea 3). */
+  histogramaEquipoPng?: ImagenResueltaTag | null
+  /** PNG ya generado (ver generarHistogramaPng.ts) — null si no hay datos suficientes (Bloque 4.2, Tarea 3). */
+  histogramaHHPng?: ImagenResueltaTag | null
 }
 
 function construirImagenesDeNodo(
@@ -213,6 +217,8 @@ export function construirDataBag({
   ubicacionDetectadaTdr = null,
   imagenesAlcance = [],
   imagenesResueltas = new Map(),
+  histogramaEquipoPng = null,
+  histogramaHHPng = null,
 }: ConstruirDataBagOpciones): Record<string, unknown> {
   const personal = (plan.personalAsignado as PlanPersonal[] | null) ?? []
   const raci = (plan.matrizRaci as PlanRaci | null) ?? { filas: [] }
@@ -422,12 +428,14 @@ export function construirDataBag({
     organigramaPng: organigramaPngBase64 || IMAGEN_PLACEHOLDER,
 
     // ─── Gráficos de histograma (plantilla v4, sección 13) ───
-    // false/IMAGEN_PLACEHOLDER hasta la Tarea 3 del Bloque 4.2 (generarHistogramaPng.ts) —
-    // el flag en false hace que docxtemplater NUNCA renderice el bloque {#tieneHistogramaXPng},
-    // el placeholder es solo defensivo por si algo referencia el tag fuera del condicional.
-    tieneHistogramaEquipoPng: false,
-    histogramaEquipoPng: IMAGEN_PLACEHOLDER,
-    tieneHistogramaHHPng: false,
-    histogramaHHPng: IMAGEN_PLACEHOLDER,
+    // PNG ya generado por generarHistogramaPng.ts (Bloque 4.2, Tarea 3), pasado
+    // por el caller (exportar-docx/route.ts) — construirDataBag se mantiene puro/
+    // síncrono, igual que con organigramaPngBase64/imagenesResueltas. El flag en
+    // false (sin datos suficientes) hace que docxtemplater NUNCA renderice el
+    // bloque {#tieneHistogramaXPng}; el placeholder es solo defensivo.
+    tieneHistogramaEquipoPng: histogramaEquipoPng !== null,
+    histogramaEquipoPng: histogramaEquipoPng ?? IMAGEN_PLACEHOLDER,
+    tieneHistogramaHHPng: histogramaHHPng !== null,
+    histogramaHHPng: histogramaHHPng ?? IMAGEN_PLACEHOLDER,
   }
 }
