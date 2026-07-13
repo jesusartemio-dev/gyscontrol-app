@@ -1,4 +1,10 @@
-import { derivarEdtsSoporte, evaluarSubalcanceCMM, aplicarSubalcanceCMM } from '@/lib/cronogramaIA/derivarEdtsSoporte'
+import {
+  derivarEdtsSoporte,
+  evaluarSubalcanceCMM,
+  aplicarSubalcanceCMM,
+  evaluarSubalcanceDisciplinas,
+  evaluarSubalcanceProtocolosIng,
+} from '@/lib/cronogramaIA/derivarEdtsSoporte'
 import type { TareaPropuesta } from '@/types/cronogramaIA'
 
 const CATALOGO = [
@@ -229,5 +235,53 @@ describe('aplicarSubalcanceCMM', () => {
   it('una tarea "siempre incluida" (sin entrada en la tabla) no tiene reglaClave', () => {
     const r = aplicarSubalcanceCMM([tareaCmm('Informe de Comisionamiento')], SUBALCANCE_VACIO)
     expect(r[0].reglaClave).toBeUndefined()
+  })
+})
+
+describe('textoTdr — señal débil adicional para los triggers de sub-alcance (nunca para EDTs del Paso 1)', () => {
+  it('evaluarSubalcanceCMM: detecta neumática/proceso mencionados SOLO en el TDR, no en la descripción libre', () => {
+    const sinTdr = evaluarSubalcanceCMM([], [], 'Solo cableado y tendido de bandejas')
+    expect(sinTdr.neumatica).toBe(false)
+    expect(sinTdr.proceso).toBe(false)
+
+    const conTdr = evaluarSubalcanceCMM([], [], 'Solo cableado y tendido de bandejas', 'El TDR original menciona líneas neumáticas y arranque de equipos')
+    expect(conTdr.neumatica).toBe(true)
+    expect(conTdr.proceso).toBe(true)
+  })
+
+  it('evaluarSubalcanceDisciplinas: detecta control/instrumentación mencionados solo en el TDR', () => {
+    const sinTdr = evaluarSubalcanceDisciplinas([], '')
+    expect(sinTdr.control).toBe(false)
+    expect(sinTdr.instrumentacion).toBe(false)
+
+    const conTdr = evaluarSubalcanceDisciplinas([], '', 'El TDR pide integración SCADA y transmisores de presión')
+    expect(conTdr.control).toBe(true)
+    expect(conTdr.instrumentacion).toBe(true)
+  })
+
+  it('evaluarSubalcanceProtocolosIng: detecta cableado/canalización/fuerza mencionados solo en el TDR', () => {
+    const sinTdr = evaluarSubalcanceProtocolosIng('')
+    expect(sinTdr.cableado).toBe(false)
+
+    const conTdr = evaluarSubalcanceProtocolosIng('', 'El TDR menciona tendido de cables de fuerza y canalización con bandejas')
+    expect(conTdr.cableado).toBe(true)
+    expect(conTdr.fuerza).toBe(true)
+    expect(conTdr.canalizacion).toBe(true)
+  })
+
+  it('sin textoTdr (parámetro omitido), el comportamiento es idéntico al de antes de esta feature', () => {
+    expect(evaluarSubalcanceCMM([], [], 'Incluye líneas neumáticas')).toEqual(evaluarSubalcanceCMM([], [], 'Incluye líneas neumáticas', ''))
+  })
+})
+
+describe('derivarEdtsSoporte (Paso 1) — el TDR NUNCA participa en esta función', () => {
+  it('no acepta ningún parámetro de texto — la firma en sí garantiza que el TDR no puede cambiar qué EDTs se sugieren', () => {
+    // derivarEdtsSoporte solo recibe ids (edtsBaseIds/edtsCatalogo/correccionesIds) —
+    // nunca texto libre ni TDR. Este test documenta esa garantía estructural:
+    // llamarla dos veces con los mismos ids da SIEMPRE el mismo resultado,
+    // sin importar cuánto contexto textual exista en otro lado del wizard.
+    const r1 = derivarEdtsSoporte(['e-con'], CATALOGO)
+    const r2 = derivarEdtsSoporte(['e-con'], CATALOGO)
+    expect(nombres(r1)).toEqual(nombres(r2))
   })
 })

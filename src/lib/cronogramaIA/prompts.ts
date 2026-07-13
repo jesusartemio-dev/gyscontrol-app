@@ -74,6 +74,48 @@ function bloqueContextoCotizacion(ctx: ContextoCotizacionParaPrompt | null): str
   return ['', '--- CONTEXTO DE LA COTIZACIÓN REAL DEL PROYECTO ---', ...partes, '--- FIN CONTEXTO COTIZACIÓN ---', ''].join('\n')
 }
 
+/**
+ * Contenido (o resumen) del TDR — los términos de referencia ORIGINALES del
+ * cliente al cotizar, con más detalle técnico que la cotización. Señal
+ * DÉBIL, al mismo nivel que la descripción libre: el alcance pudo haberse
+ * REDUCIDO en la negociación comercial, así que el TDR puede describir
+ * trabajo que NO se vendió. Se usa SOLO para nombrar zonas/familias con más
+ * precisión (Etapa A de CON/PRO) — nunca para decidir qué EDTs aplican ni
+ * para proponer tareas fuera del catálogo (ver derivarEdtsSoporte.ts para
+ * el otro destino permitido: triggers textuales de sub-alcance).
+ */
+export interface ContextoTdrParaPrompt {
+  /** resumenEjecutivoNarrativa || alcanceDetectado || resumenTdr (ya truncado por el caller si hace falta). */
+  resumen: string
+  /** resumenEjecutivoPuntos.texto — bullets cortos categorizados (entregable/ubicación/plazo/condición). */
+  puntos: string[]
+  /** Nombres de equiposIdentificados — señal para nombrar zonas (ej. "zona del transformador X"). */
+  equiposIdentificados: string[]
+  /** Nombres de serviciosIdentificados — señal para nombrar familias de PRO. */
+  serviciosIdentificados: string[]
+}
+
+function bloqueContextoTdr(tdr: ContextoTdrParaPrompt | null): string {
+  if (!tdr) return ''
+  const partes: string[] = []
+  if (tdr.resumen) partes.push(tdr.resumen)
+  if (tdr.puntos.length > 0) partes.push(...tdr.puntos.map(p => `- ${p}`))
+  if (tdr.equiposIdentificados.length > 0) partes.push(`Equipos mencionados en el TDR: ${tdr.equiposIdentificados.join(', ')}`)
+  if (tdr.serviciosIdentificados.length > 0) partes.push(`Servicios mencionados en el TDR: ${tdr.serviciosIdentificados.join(', ')}`)
+  if (partes.length === 0) return ''
+  return [
+    '',
+    '--- CONTEXTO DEL TDR (solicitud ORIGINAL del cliente al cotizar) ---',
+    'ADVERTENCIA: el alcance pudo REDUCIRSE en la negociación comercial — este TDR puede',
+    'describir trabajo que NO se vendió. Usalo SOLO para nombrar zonas/familias con más',
+    'precisión y como contexto técnico adicional — NUNCA para agregar alcance, EDTs o',
+    'tareas que la cotización/equipos reales no evidencien.',
+    ...partes,
+    '--- FIN CONTEXTO TDR ---',
+    '',
+  ].join('\n')
+}
+
 export const SYSTEM_PROPUESTA_ZONAS_CON = `
 Eres el Jefe de Obra Senior de GYS CONTROL INDUSTRIAL SAC, empresa peruana
 especializada en proyectos electromecánicos, automatización e
@@ -419,18 +461,24 @@ ${REGLA_ALIAS_ESQUEMA}
   paso, solo el alcance narrativo y el contexto de cotización/equipos.
 - Si el contexto de cotización menciona exclusiones, no propongas nombres de
   Actividad para trabajo excluido.
+- Si aparece más abajo un bloque de CONTEXTO DEL TDR, es una señal DÉBIL —
+  puede describir alcance que no se vendió. Usalo solo para nombrar zonas
+  con más precisión, nunca para agregar zonas que la cotización/equipos
+  reales no evidencien.
 - Devolvé SOLO el JSON, sin markdown ni texto antes o después.
 `.trim()
 
 export function buildUserEsquemasZonasCon(
   alcanceLibre: string,
   cotizacion: ContextoCotizacionParaPrompt | null,
-  equiposReales: EquipoRealParaPrompt[] | null = null
+  equiposReales: EquipoRealParaPrompt[] | null = null,
+  tdr: ContextoTdrParaPrompt | null = null
 ): string {
   return [
     bloqueEquiposReales(equiposReales),
     `DESCRIPCIÓN LIBRE DEL ALCANCE (dada por el usuario en el wizard):\n${alcanceLibre || '(no se proporcionó)'}`,
     bloqueContextoCotizacion(cotizacion),
+    bloqueContextoTdr(tdr),
     '',
     'ESQUEMA DE OUTPUT (devolvé EXACTAMENTE este JSON, sin markdown — "nota" es opcional):',
     '{ "esquemas": [{ "criterio": "string", "nombres": [{ "nombre": "string", "alias": "string — una palabra, máx 12 caracteres, distintiva y única en el esquema" }], "nota": "string opcional" }] }',
@@ -487,18 +535,24 @@ ${REGLA_ALIAS_ESQUEMA}
   paso.
 - Si el contexto de cotización menciona exclusiones, no propongas familias
   para ese material/servicio excluido.
+- Si aparece más abajo un bloque de CONTEXTO DEL TDR, es una señal DÉBIL —
+  puede describir alcance que no se vendió. Usalo solo para nombrar
+  familias con más precisión, nunca para agregar familias que la
+  cotización/equipos reales no evidencien.
 - Devolvé SOLO el JSON, sin markdown ni texto antes o después.
 `.trim()
 
 export function buildUserEsquemasFamiliasPro(
   alcanceLibre: string,
   cotizacion: ContextoCotizacionParaPrompt | null,
-  equiposReales: EquipoRealParaPrompt[] | null = null
+  equiposReales: EquipoRealParaPrompt[] | null = null,
+  tdr: ContextoTdrParaPrompt | null = null
 ): string {
   return [
     bloqueEquiposReales(equiposReales),
     `DESCRIPCIÓN LIBRE DEL ALCANCE (dada por el usuario en el wizard — señal más débil que los equipos reales de arriba):\n${alcanceLibre || '(no se proporcionó)'}`,
     bloqueContextoCotizacion(cotizacion),
+    bloqueContextoTdr(tdr),
     '',
     'ESQUEMA DE OUTPUT (devolvé EXACTAMENTE este JSON, sin markdown — "fueraDeVocabulario" y "justificacion" son opcionales, solo para familias fuera del vocabulario oficial):',
     '{ "esquemas": [{ "criterio": "string", "nombres": [{ "nombre": "string", "alias": "string — una palabra, máx 12 caracteres, distintiva y única en el esquema", "fueraDeVocabulario": "boolean opcional", "justificacion": "string opcional" }] }] }',

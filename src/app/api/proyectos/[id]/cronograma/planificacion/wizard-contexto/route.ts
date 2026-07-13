@@ -46,7 +46,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: 'Sin acceso a este proyecto' }, { status: 403 })
   }
 
-  const [edts, cronogramaPlanificacion, cotizacionDocumento, edtsComerciales, correcciones, evidenciasCotizacion, orgNodos] = await Promise.all([
+  const [edts, cronogramaPlanificacion, cotizacionDocumento, edtsComerciales, correcciones, evidenciasCotizacion, orgNodos, tdrAnalisis] = await Promise.all([
     prisma.edt.findMany({
       include: { faseDefault: true, _count: { select: { catalogoServicio: true } } },
       orderBy: [{ faseDefault: { orden: 'asc' } }, { orden: 'asc' }],
@@ -78,6 +78,11 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
       where: { proyectoId },
       select: { id: true, userId: true, cargoLabel: true, orden: true, user: { select: { name: true } } },
     }),
+    // Solo existencia — el contenido del TDR nunca se manda acá: es señal
+    // débil que solo alimenta el nombrado de zonas/familias en Etapa A y los
+    // triggers de sub-alcance (ver proponer-esquemas-ia y
+    // wizard/configuracion routes), NUNCA la sugerencia de EDTs del Paso 1.
+    prisma.proyectoTdrAnalisis.findUnique({ where: { proyectoId }, select: { id: true } }),
   ])
 
   let borrador: {
@@ -213,6 +218,9 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     // confirma", sin marcarlos automáticamente.
     evidenciasCotizacion: todasLasEvidencias,
     tieneCotizacionDocumento: !!cotizacionDocumento,
+    // Solo un flag — ver comentario en el Promise.all de arriba. El wizard
+    // muestra un badge informativo; nunca cambia qué EDTs se sugieren.
+    tieneTdr: !!tdrAnalisis,
     // Ver comentario arriba — badge/advertencia no bloqueante del Paso 1.
     organigramaResumen,
     cotizacionResumen: cotizacionDocumento

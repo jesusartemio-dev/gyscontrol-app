@@ -343,3 +343,30 @@ describe('calcularEdtsPendientesIA', () => {
     expect(r).toHaveLength(0)
   })
 })
+
+describe('generarActividadesDeterministas — textoTdr (Paso 1): el TDR nunca cambia qué EDTs/Actividades aparecen', () => {
+  it('mismo set de Actividades con y sin textoTdr — el TDR solo puede afectar qué tarea queda pre-marcada DENTRO de un EDT ya seleccionado', () => {
+    const servicios = [servicio({ id: 'i3', nombre: 'Filosofía de Control', actividadTag: ['Control'], filtroAlcance: 'general' })]
+    const edts: EdtParaGenerar[] = [{ nombre: 'ING', descripcion: 'Ingeniería', servicios }]
+
+    const sinTdr = generarActividadesDeterministas(edts, config({ ingenieriaDetalle: true }))
+    // Texto de TDR que, si (por error) se usara para sugerir EDTs, agregaría
+    // PLC/HMI/CON — acá NO existen esos EDTs en `edts`, así que no pueden
+    // aparecer de la nada por más que el TDR los mencione.
+    const conTdr = generarActividadesDeterministas(
+      edts,
+      config({ ingenieriaDetalle: true }),
+      'El TDR original menciona integración SCADA, PLC Siemens y montaje eléctrico en 3 salas'
+    )
+
+    expect(conTdr.actividades.map(a => a.actividadNombre)).toEqual(sinTdr.actividades.map(a => a.actividadNombre))
+    expect(conTdr.actividades.map(a => a.edtNombre)).toEqual(sinTdr.actividades.map(a => a.edtNombre))
+
+    // Sí puede cambiar la preselección DENTRO de "Disciplina Control" (ya
+    // seleccionada por el usuario en el Paso 1) — el TDR menciona SCADA.
+    const controlConTdr = conTdr.actividades.find(a => a.actividadNombre === 'Disciplina Control')!
+    expect(controlConTdr.tareas[0].incluida).toBe(true)
+    const controlSinTdr = sinTdr.actividades.find(a => a.actividadNombre === 'Disciplina Control')!
+    expect(controlSinTdr.tareas[0].incluida).toBe(false)
+  })
+})

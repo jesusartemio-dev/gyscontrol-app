@@ -168,17 +168,25 @@ const RX_PROCESO = /proceso|arranque de (equipo|planta|l[ií]nea)|puesta en marc
  * el Paso 1 (nunca de CMM mismo — si se buscara en el propio catálogo de
  * CMM, "proceso"/"neumática" siempre darían true por el texto de sus
  * propias tareas) y de la descripción libre del alcance.
+ *
+ * `textoTdr` es una señal DÉBIL adicional (ver prompts.ts bloqueContextoTdr)
+ * — el TDR original del cliente puede mencionar neumática/proceso aunque el
+ * alcance vendido se haya reducido; por eso solo afecta esta preselección
+ * (siempre editable por el usuario en el Paso 2/3), nunca qué EDTs se
+ * seleccionan en el Paso 1.
  */
 export function evaluarSubalcanceCMM(
   serviciosSeleccionadosSinCmm: Pick<CatalogoServicioParaWizard, 'actividadTag'>[],
   edtsNombresSeleccionados: string[],
-  alcanceLibre: string
+  alcanceLibre: string,
+  textoTdr = ''
 ): SubalcanceCMM {
+  const textoCompleto = `${alcanceLibre}\n${textoTdr}`
   return {
     instrumentacion: serviciosSeleccionadosSinCmm.some(s => s.actividadTag.includes('Instrumentacion')),
     plcOHmi: edtsNombresSeleccionados.includes('PLC') || edtsNombresSeleccionados.includes('HMI'),
-    neumatica: RX_NEUMATICA.test(alcanceLibre),
-    proceso: RX_PROCESO.test(alcanceLibre),
+    neumatica: RX_NEUMATICA.test(textoCompleto),
+    proceso: RX_PROCESO.test(textoCompleto),
   }
 }
 
@@ -230,12 +238,14 @@ const MOTIVO_DISCIPLINA: Record<keyof SubalcanceDisciplina, string> = {
 /**
  * Evalúa si hay control programable/instrumentación en el alcance a partir
  * de los EDTs YA seleccionados (PLC/HMI) y la descripción libre del Paso 1
- * — nunca del propio ING/PLA, para no ser circular.
+ * — nunca del propio ING/PLA, para no ser circular. `textoTdr` es señal
+ * débil adicional (ver evaluarSubalcanceCMM) — mismo criterio.
  */
-export function evaluarSubalcanceDisciplinas(edtsNombresSeleccionados: string[], alcanceLibre: string): SubalcanceDisciplina {
+export function evaluarSubalcanceDisciplinas(edtsNombresSeleccionados: string[], alcanceLibre: string, textoTdr = ''): SubalcanceDisciplina {
+  const textoCompleto = `${alcanceLibre}\n${textoTdr}`
   return {
-    control: edtsNombresSeleccionados.includes('PLC') || edtsNombresSeleccionados.includes('HMI') || RX_CONTROL_LIBRE.test(alcanceLibre),
-    instrumentacion: RX_INSTRUMENTOS_LIBRE.test(alcanceLibre),
+    control: edtsNombresSeleccionados.includes('PLC') || edtsNombresSeleccionados.includes('HMI') || RX_CONTROL_LIBRE.test(textoCompleto),
+    instrumentacion: RX_INSTRUMENTOS_LIBRE.test(textoCompleto),
   }
 }
 
@@ -288,11 +298,13 @@ const MOTIVO_PROTOCOLOS_ING: Record<keyof SubalcanceProtocolosIng, string> = {
   fuerza: 'No se detectaron cables de fuerza en la descripción libre — confirma si aplica.',
 }
 
-export function evaluarSubalcanceProtocolosIng(alcanceLibre: string): SubalcanceProtocolosIng {
+/** `textoTdr` es señal débil adicional (ver evaluarSubalcanceCMM) — mismo criterio. */
+export function evaluarSubalcanceProtocolosIng(alcanceLibre: string, textoTdr = ''): SubalcanceProtocolosIng {
+  const textoCompleto = `${alcanceLibre}\n${textoTdr}`
   return {
-    cableado: RX_TENDIDO.test(alcanceLibre),
-    canalizacion: RX_CANALIZACION.test(alcanceLibre),
-    fuerza: RX_FUERZA.test(alcanceLibre),
+    cableado: RX_TENDIDO.test(textoCompleto),
+    canalizacion: RX_CANALIZACION.test(textoCompleto),
+    fuerza: RX_FUERZA.test(textoCompleto),
   }
 }
 

@@ -101,7 +101,18 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     return { nombre: edt.nombre, descripcion: edt.descripcion, servicios }
   })
 
-  const { actividades, advertencias } = generarActividadesDeterministas(edtsParaGenerar, config)
+  // TDR — señal DÉBIL adicional para los triggers textuales de sub-alcance
+  // (neumática/proceso/control/instrumentos/protocolos): la solicitud
+  // original del cliente puede mencionar trabajo que se redujo en la
+  // negociación comercial. Solo afecta qué tarea queda pre-marcada dentro de
+  // un EDT ya elegido — nunca qué EDTs se seleccionan (eso ya pasó, arriba).
+  const tdrDoc = await prisma.proyectoTdrAnalisis.findUnique({
+    where: { proyectoId },
+    select: { resumenTdr: true, alcanceDetectado: true },
+  })
+  const textoTdr = [tdrDoc?.alcanceDetectado, tdrDoc?.resumenTdr].filter(Boolean).join('\n')
+
+  const { actividades, advertencias } = generarActividadesDeterministas(edtsParaGenerar, config, textoTdr)
 
   const generacion = await prisma.proyectoCronogramaGeneracionIA.create({
     data: {

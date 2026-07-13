@@ -1,4 +1,4 @@
-import { SYSTEM_ESQUEMAS_ZONAS_CON, buildUserEsquemasZonasCon } from '@/lib/cronogramaIA/prompts'
+import { SYSTEM_ESQUEMAS_ZONAS_CON, buildUserEsquemasZonasCon, buildUserEsquemasFamiliasPro } from '@/lib/cronogramaIA/prompts'
 
 describe('SYSTEM_ESQUEMAS_ZONAS_CON — ejes fijos del esquema de agrupación de CON', () => {
   it('exige los 3 ejes fijos en orden, sin dejarlos a criterio del modelo', () => {
@@ -34,5 +34,34 @@ describe('buildUserEsquemasZonasCon — contexto para nombrar zonas', () => {
     const prompt = buildUserEsquemasZonasCon('', null, null)
     expect(prompt).toContain('(no se proporcionó)')
     expect(prompt).not.toContain('EQUIPOS REALES YA COTIZADOS')
+  })
+})
+
+describe('Contexto del TDR — señal débil, claramente etiquetada, en la Etapa A de CON y PRO', () => {
+  const tdr = {
+    resumen: 'El cliente solicita automatización completa de la planta de tratamiento.',
+    puntos: ['Incluye SCADA redundante'],
+    equiposIdentificados: ['Tablero MCC principal'],
+    serviciosIdentificados: ['Programación PLC'],
+  }
+
+  it('buildUserEsquemasZonasCon incluye el TDR etiquetado con la advertencia de alcance no vendido', () => {
+    const prompt = buildUserEsquemasZonasCon('Instalación eléctrica', null, null, tdr)
+    expect(prompt).toContain('CONTEXTO DEL TDR')
+    expect(prompt).toContain('pudo REDUCIRSE en la negociación comercial')
+    expect(prompt).toContain('El cliente solicita automatización completa de la planta de tratamiento.')
+    expect(prompt).toContain('Tablero MCC principal')
+  })
+
+  it('buildUserEsquemasFamiliasPro incluye el TDR etiquetado con la misma advertencia', () => {
+    const prompt = buildUserEsquemasFamiliasPro('Procura de materiales', null, null, tdr)
+    expect(prompt).toContain('CONTEXTO DEL TDR')
+    expect(prompt).toContain('pudo REDUCIRSE en la negociación comercial')
+    expect(prompt).toContain('Programación PLC')
+  })
+
+  it('sin TDR (parámetro omitido), no aparece ningún bloque de TDR en el prompt', () => {
+    const prompt = buildUserEsquemasZonasCon('Instalación eléctrica', null, null)
+    expect(prompt).not.toContain('CONTEXTO DEL TDR')
   })
 })

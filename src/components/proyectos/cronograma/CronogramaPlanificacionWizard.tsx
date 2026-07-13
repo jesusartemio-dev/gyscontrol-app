@@ -101,6 +101,8 @@ interface DatosContextoWizard {
   edtsSugeridosConOrigen: EdtSugeridoConOrigen[] | null
   cotizacionResumen: CotizacionResumen | null
   tieneCotizacionDocumento: boolean
+  /** Solo existencia — el TDR nunca cambia qué EDTs se sugieren, ver wizard-contexto/route.ts. */
+  tieneTdr: boolean
 }
 
 interface OrganigramaResumen {
@@ -150,6 +152,8 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
   const [cargandoPrellenado, setCargandoPrellenado] = useState(false)
   const [edts, setEdts] = useState<EdtWizardInfo[]>([])
   const [cotizacionResumen, setCotizacionResumen] = useState<CotizacionResumen | null>(null)
+  /** Solo existencia — nunca cambia sugerencias de EDT, solo habilita un badge informativo. */
+  const [tieneTdr, setTieneTdr] = useState(false)
   const [advertenciasPrellenado, setAdvertenciasPrellenado] = useState<string[]>([])
 
   const [edtsSeleccionados, setEdtsSeleccionados] = useState<Set<string>>(new Set())
@@ -425,6 +429,7 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
           edts: EdtWizardInfo[]
           cotizacionResumen: CotizacionResumen | null
           tieneCotizacionDocumento: boolean
+          tieneTdr: boolean
           edtsSugeridosComercial: string[] | null
           edtsSugeridosConOrigen: EdtSugeridoConOrigen[] | null
           correccionesEdt: CorreccionEdt[]
@@ -435,6 +440,7 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
         }) => {
           setEdts(data.edts)
           setCotizacionResumen(data.cotizacionResumen)
+          setTieneTdr(data.tieneTdr)
           setCorreccionesEdt(data.correccionesEdt)
           setEvidenciasCotizacion(data.evidenciasCotizacion)
           setOrganigramaResumen(data.organigramaResumen)
@@ -445,6 +451,7 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
             edtsSugeridosConOrigen: data.edtsSugeridosConOrigen,
             cotizacionResumen: data.cotizacionResumen,
             tieneCotizacionDocumento: data.tieneCotizacionDocumento,
+            tieneTdr: data.tieneTdr,
           }
           setDatosContexto(contexto)
 
@@ -1099,6 +1106,20 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
                   <span className="inline-flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" />La IA está sugiriendo los EDTs y parámetros del Paso 1 a partir de su alcance real...</span>
                 ) : (
                   'La IA sugirió los EDTs y parámetros de abajo a partir de su alcance real — revisa y edita lo que necesites.'
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {tieneTdr && (
+            <Alert>
+              <FileCheck2 className="h-4 w-4" />
+              <AlertDescription>
+                TDR disponible — se usará como contexto para zonas y familias al generar con IA (nunca para sugerir EDTs ni tareas).
+                {!cotizacionResumen && (
+                  <span className="block mt-1 text-amber-600">
+                    Sin cotización estructurada, el alcance se define manualmente — el TDR solo aporta contexto, revisa que no incluyas trabajo no vendido.
+                  </span>
                 )}
               </AlertDescription>
             </Alert>

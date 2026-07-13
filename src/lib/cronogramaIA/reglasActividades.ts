@@ -296,9 +296,18 @@ export interface EdtParaGenerar {
  * Genera el árbol de Actividades para todos los EDTs deterministas (todo
  * salvo CON/PRO, que requieren IA — ver Bloque D). Cero IA, 100% reglas.
  */
+/**
+ * `textoTdr` es señal DÉBIL adicional para los triggers textuales de
+ * sub-alcance (neumática/proceso/control/instrumentos/protocolos) — el TDR
+ * original del cliente puede mencionar trabajo que se redujo en la
+ * negociación comercial, así que solo afecta esta preselección (siempre
+ * editable después), nunca qué EDTs se seleccionaron en el Paso 1. Ver
+ * derivarEdtsSoporte.ts.
+ */
 export function generarActividadesDeterministas(
   edts: EdtParaGenerar[],
-  config: ConfiguracionWizardPaso1
+  config: ConfiguracionWizardPaso1,
+  textoTdr = ''
 ): ResultadoActividadesDeterministas {
   const advertencias: string[] = []
   const actividades: ActividadPropuesta[] = []
@@ -308,13 +317,14 @@ export function generarActividadesDeterministas(
   const subalcanceCMM = evaluarSubalcanceCMM(
     edts.filter(e => e.nombre !== 'CMM').flatMap(e => e.servicios),
     edts.map(e => e.nombre),
-    config.alcanceLibre
+    config.alcanceLibre,
+    textoTdr
   )
   // Sub-alcance de disciplinas ING/PLA (Control/Instrumentación) y de las
   // tareas de [Protocolos] de ING — mismo criterio: una sola evaluación,
   // reusada por ambos EDTs.
-  const subalcanceDisciplina = evaluarSubalcanceDisciplinas(edts.map(e => e.nombre), config.alcanceLibre)
-  const subalcanceProtocolosIng = evaluarSubalcanceProtocolosIng(config.alcanceLibre)
+  const subalcanceDisciplina = evaluarSubalcanceDisciplinas(edts.map(e => e.nombre), config.alcanceLibre, textoTdr)
+  const subalcanceProtocolosIng = evaluarSubalcanceProtocolosIng(config.alcanceLibre, textoTdr)
 
   for (const edt of edts) {
     if ((EDTS_AGRUPACION_IA as readonly string[]).includes(edt.nombre)) {

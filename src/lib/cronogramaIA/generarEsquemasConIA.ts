@@ -8,6 +8,7 @@ import {
   buildUserEsquemasZonasCon,
   buildUserEsquemasFamiliasPro,
   type ContextoCotizacionParaPrompt,
+  type ContextoTdrParaPrompt,
   type EquipoRealParaPrompt,
   type EsquemaPropuestoIA,
 } from './prompts'
@@ -54,6 +55,8 @@ interface GenerarEsquemasOpciones {
   alcanceLibre: string
   cotizacion: ContextoCotizacionParaPrompt | null
   equiposReales?: EquipoRealParaPrompt[] | null
+  /** Señal débil de contexto (ver prompts.ts bloqueContextoTdr) — solo para nombrar zonas/familias, nunca para decidir alcance. */
+  tdr?: ContextoTdrParaPrompt | null
   userId: string
   proyectoId: string
   signal?: AbortSignal
@@ -74,7 +77,7 @@ const MAX_REINTENTOS_JSON = 1
  * válido (mismo criterio que generarPropuestaConIA).
  */
 export async function generarEsquemasConIA(opciones: GenerarEsquemasOpciones): Promise<ResultadoEsquemasIA> {
-  const { edtNombre, tieneTareasCandidatas, alcanceLibre, cotizacion, equiposReales = null, userId, proyectoId, signal } = opciones
+  const { edtNombre, tieneTareasCandidatas, alcanceLibre, cotizacion, equiposReales = null, tdr = null, userId, proyectoId, signal } = opciones
 
   if (!tieneTareasCandidatas) {
     return { esquemas: [], advertencias: [] }
@@ -87,8 +90,8 @@ export async function generarEsquemasConIA(opciones: GenerarEsquemasOpciones): P
   for (let intento = 0; intento <= MAX_REINTENTOS_JSON; intento++) {
     const userPrompt =
       edtNombre === 'CON'
-        ? buildUserEsquemasZonasCon(alcanceLibre, cotizacion, equiposReales)
-        : buildUserEsquemasFamiliasPro(alcanceLibre, cotizacion, equiposReales)
+        ? buildUserEsquemasZonasCon(alcanceLibre, cotizacion, equiposReales, tdr)
+        : buildUserEsquemasFamiliasPro(alcanceLibre, cotizacion, equiposReales, tdr)
 
     const inicio = Date.now()
     let response: Anthropic.Message

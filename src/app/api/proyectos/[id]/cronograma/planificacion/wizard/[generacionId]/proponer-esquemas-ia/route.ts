@@ -8,7 +8,7 @@ import { adquirirLockCronogramaIA, liberarLockCronogramaIA } from '@/lib/cronogr
 import { generarEsquemasConIA } from '@/lib/cronogramaIA/generarEsquemasConIA'
 import { EDTS_ESQUEMA_DOS_ETAPAS } from '@/lib/cronogramaIA/reglasActividades'
 import type { ConfiguracionWizardPaso1, EsquemaAgrupacionPropuesto } from '@/types/cronogramaIA'
-import type { ContextoCotizacionParaPrompt, EquipoRealParaPrompt } from '@/lib/cronogramaIA/prompts'
+import type { ContextoCotizacionParaPrompt, ContextoTdrParaPrompt, EquipoRealParaPrompt } from '@/lib/cronogramaIA/prompts'
 
 export const maxDuration = 60
 
@@ -27,6 +27,8 @@ const CATEGORIA_LINEAS_POR_EDT: Record<EdtConEsquema, LineaClasificada['categori
   PRO: 'equipos',
 }
 const MAX_LINEAS_CONTEXTO = 15
+/** Tope de caracteres del resumen del TDR embebido en el prompt — es señal débil de contexto, no hace falta el texto completo. */
+const MAX_RESUMEN_TDR = 1200
 
 /** Etapa A del flujo de esquemas — propone 2-3 esquemas alternativos (solo nombres) para CON/PRO, sin asignar ninguna tarea todavía. */
 export async function POST(_req: NextRequest, { params }: Ctx) {
@@ -100,6 +102,30 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
       }
     }
 
+    // TDR — señal DÉBIL de contexto (ver bloqueContextoTdr en prompts.ts): la
+    // solicitud original del cliente puede describir alcance que se redujo
+    // en la negociación comercial. Solo alimenta el nombrado de zonas/
+    // familias acá — nunca la selección de EDTs ni tareas fuera de catálogo.
+    const tdrDoc = await prisma.proyectoTdrAnalisis.findUnique({
+      where: { proyectoId },
+      select: {
+        resumenTdr: true,
+        alcanceDetectado: true,
+        resumenEjecutivoNarrativa: true,
+        resumenEjecutivoPuntos: true,
+        equiposIdentificados: true,
+        serviciosIdentificados: true,
+      },
+    })
+    const tdr: ContextoTdrParaPrompt | null = tdrDoc
+      ? {
+          resumen: (tdrDoc.resumenEjecutivoNarrativa || tdrDoc.alcanceDetectado || tdrDoc.resumenTdr || '').slice(0, MAX_RESUMEN_TDR),
+          puntos: ((tdrDoc.resumenEjecutivoPuntos as { texto: string }[] | null) ?? []).map(p => p.texto),
+          equiposIdentificados: ((tdrDoc.equiposIdentificados as { nombre: string }[] | null) ?? []).map(e => e.nombre),
+          serviciosIdentificados: ((tdrDoc.serviciosIdentificados as { nombre: string }[] | null) ?? []).map(s => s.nombre),
+        }
+      : null
+
     let equiposReales: EquipoRealParaPrompt[] | null = null
     if (edtsEsquema.length > 0) {
       const equipos = await prisma.proyectoEquipoCotizado.findMany({
@@ -131,6 +157,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
           alcanceLibre: config.alcanceLibre,
           cotizacion: construirContextoCotizacion(nombre),
           equiposReales,
+          tdr,
           userId: session.user!.id,
           proyectoId,
         })
