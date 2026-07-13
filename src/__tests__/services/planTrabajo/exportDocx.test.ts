@@ -81,6 +81,32 @@ function edtDetallado(): PlanAlcanceDetalladoEdt {
   }
 }
 
+function edtDetalladoConTareas(): PlanAlcanceDetalladoEdt {
+  return {
+    numeracion: '11.2',
+    edtNombre: 'Construcción',
+    edtCodigo: 'CON',
+    faseNombre: 'EJECUCIÓN',
+    faseAbreviatura: 'EJECUCIÓN',
+    descripcion: 'Descripción general del EDT de Construcción.',
+    tipoDetalle: 'detallado',
+    edtRefId: 'edt-con',
+    personalRequerido: [{ cantidad: 2, cargo: 'Técnico Operario' }],
+    subItems: [
+      {
+        numeracion: '11.2.1',
+        actividadNombre: 'Tendido de cable de fuerza',
+        descripcion: 'Descripción específica de tendido.',
+        actividadRefId: 'act-1',
+        tareas: [
+          { tareaRefId: 'tarea-1', nombre: 'desenergizar', texto: 'Desenergizar y bloquear la alimentación mediante dispositivos DAE.' },
+          { tareaRefId: 'tarea-2', nombre: 'delimitar-area', texto: 'Delimitar el área de trabajo con cinta de seguridad y señalización visible.' },
+        ],
+      },
+    ],
+  }
+}
+
 function imagenFixture(id: string): PlanTrabajoImagen {
   return {
     id,
@@ -239,5 +265,23 @@ describe('renderizarPlanTrabajoDocx — gráficos de histograma (Bloque 4.2, Tar
     const buffer = await renderizarPlanTrabajoDocx({ dataBag })
     expect(Buffer.isBuffer(buffer)).toBe(true)
     asertarPaqueteBienFormado(buffer)
+  })
+})
+
+describe('renderizarPlanTrabajoDocx — viñetas de tareas por subItem (Bloque 4.2, Tarea 4)', () => {
+  it('el docx real renderiza cada viñeta de tarea dentro de {#subItems}/{#tareas}, sin dejar tags crudos', async () => {
+    const dataBag = construirDataBag({
+      plan: planFixture([edtDetalladoConTareas()]),
+      proyecto: proyectoFixture,
+      organigramaPngBase64: `data:image/png;base64,${PNG_1X1_BASE64}`,
+    })
+
+    const buffer = await renderizarPlanTrabajoDocx({ dataBag })
+    const partes = asertarPaqueteBienFormado(buffer)
+    const documentXml = partes.find(p => p.nombre === 'word/document.xml')!.contenido
+
+    expect(documentXml).toContain('Desenergizar y bloquear la alimentación mediante dispositivos DAE.')
+    expect(documentXml).toContain('Delimitar el área de trabajo con cinta de seguridad y señalización visible.')
+    expect(documentXml).not.toMatch(/\{#tareas\}|\{\/tareas\}|\{texto\}/)
   })
 })

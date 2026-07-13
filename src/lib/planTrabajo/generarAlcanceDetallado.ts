@@ -35,9 +35,16 @@ export function descripcionFallbackSubItem(actividadNombre: string): string {
   return `${actividadNombre} — actividad ejecutada según lo establecido en el cronograma de planificación del proyecto, sin mayor detalle adicional disponible.`
 }
 
+/** Fallback de la viñeta de una tarea — el nombre de la tarea tal cual (Bloque 4.2, Tarea 4). */
+export function textoFallbackTarea(nombreTarea: string): string {
+  return nombreTarea
+}
+
 export interface ResultadoDetalladoEdt {
   edtDescripcion: string
   subItems: Map<string, string>
+  /** subItemId -> (tareaId -> viñeta redactada) — Bloque 4.2, Tarea 4. */
+  tareas: Map<string, Map<string, string>>
 }
 
 /**
@@ -70,10 +77,17 @@ export function mergearDescripcionesEnEstructura(
 
     const resultado = detalladoResultados[cursorDetallado]
     cursorDetallado++
-    const subItems = edt.subItems?.map(s => ({
-      ...s,
-      descripcion: resultado?.subItems.get(s.actividadRefId ?? '') || descripcionFallbackSubItem(s.actividadNombre),
-    }))
+    const subItems = edt.subItems?.map(s => {
+      const tareasIa = resultado?.tareas.get(s.actividadRefId ?? '')
+      return {
+        ...s,
+        descripcion: resultado?.subItems.get(s.actividadRefId ?? '') || descripcionFallbackSubItem(s.actividadNombre),
+        tareas: (s.tareas ?? []).map(t => ({
+          ...t,
+          texto: tareasIa?.get(t.tareaRefId ?? '') || textoFallbackTarea(t.nombre),
+        })),
+      }
+    })
     return {
       ...edt,
       descripcion: resultado?.edtDescripcion || descripcionFallbackEdt(edt.faseNombre, edt.edtNombre),
@@ -164,15 +178,21 @@ async function generarDescripcionesResumido(
 
 async function generarDescripcionesDetallado(
   edt: PlanAlcanceDetalladoEdt,
-  tareasPorActividad: Map<string, { nombre: string; horasEstimadas: number | null; personasEstimadas: number }[]>,
+  tareasPorActividad: Map<string, { id: string; nombre: string; horasEstimadas: number | null; personasEstimadas: number }[]>,
   hechosEtapa1: string,
   userId: string,
   proyectoId: string,
   signal?: AbortSignal
-): Promise<{ edtDescripcion: string; subItems: Map<string, string>; advertencias: string[] }> {
+): Promise<{ edtDescripcion: string; subItems: Map<string, string>; tareas: Map<string, Map<string, string>>; advertencias: string[] }> {
   const advertencias: string[] = []
   const subItems = edt.subItems ?? []
   const idsSubItemsEsperados = new Set(subItems.map(s => s.actividadRefId).filter((id): id is string => !!id))
+  // subItemId -> Set(tareaId) esperados — misma validación estructural que los subItems (Tarea 4).
+  const idsTareasEsperadasPorSubItem = new Map<string, Set<string>>(
+    subItems
+      .filter((s): s is typeof s & { actividadRefId: string } => !!s.actividadRefId)
+      .map(s => [s.actividadRefId, new Set((s.tareas ?? []).map(t => t.tareaRefId).filter((id): id is string => !!id))])
+  )
 
   const payload = {
     id: edt.edtRefId ?? edt.numeracion,
@@ -188,7 +208,20 @@ async function generarDescripcionesDetallado(
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   let notaCorrectiva = ''
   let tokensParaIntento = 4096
-  let ultimaRespuesta: { id?: string; edtDescripcion?: string; subItems?: { id: string; descripcion: string }[] } = {}
+  let ultimaRespuesta: {
+    id?: string
+    edtDescripcion?: string
+    subItems?: { id: string; descripcion: string; tareas?: { id: string; texto: string }[] }[]
+  } = {}
+
+  function validarTareasDeSubItems(subItemsRecibidos: NonNullable<typeof ultimaRespuesta.subItems>): boolean {
+    return subItemsRecibidos.every(s => {
+      const esperadas = idsTareasEsperadasPorSubItem.get(s.id)
+      if (!esperadas) return true // subItem no reconocido — ya lo rechaza el chequeo de IDs de subItems
+      const recibidas = new Set((s.tareas ?? []).map(t => t.id))
+      return recibidas.size === esperadas.size && [...esperadas].every(id => recibidas.has(id))
+    })
+  }
 
   for (let intento = 0; intento <= MAX_REINTENTOS; intento++) {
     const inicio = Date.now()
@@ -227,21 +260,27 @@ async function generarDescripcionesDetallado(
     const coincide =
       idsRecibidos.size === idsSubItemsEsperados.size &&
       [...idsSubItemsEsperados].every(id => idsRecibidos.has(id)) &&
-      Boolean(ultimaRespuesta.edtDescripcion)
+      Boolean(ultimaRespuesta.edtDescripcion) &&
+      validarTareasDeSubItems(subItemsRecibidos)
 
     if (coincide) {
       return {
         edtDescripcion: ultimaRespuesta.edtDescripcion!,
         subItems: new Map(subItemsRecibidos.map(s => [s.id, s.descripcion])),
+        tareas: new Map(subItemsRecibidos.map(s => [s.id, new Map((s.tareas ?? []).map(t => [t.id, t.texto]))])),
         advertencias,
       }
     }
-    notaCorrectiva = `\n\nTu respuesta anterior no tenía exactamente estos IDs de subItems (o faltó "edtDescripcion"). Devolvé EXACTAMENTE estos IDs de subItems, ni uno más ni uno menos:\n${JSON.stringify([...idsSubItemsEsperados])}`
+    notaCorrectiva = `\n\nTu respuesta anterior no tenía exactamente estos IDs de subItems y/o de tareas dentro de cada subItem (o faltó "edtDescripcion"). Devolvé EXACTAMENTE estos IDs de subItems, ni uno más ni uno menos:\n${JSON.stringify([...idsSubItemsEsperados])}\ny, para cada subItem, EXACTAMENTE los IDs de "tareas" del input original (sin agregar, quitar ni reordenar).`
   }
 
   const mapaSubItems = new Map<string, string>()
+  const mapaTareas = new Map<string, Map<string, string>>()
   for (const s of ultimaRespuesta.subItems ?? []) {
-    if (idsSubItemsEsperados.has(s.id)) mapaSubItems.set(s.id, s.descripcion)
+    if (!idsSubItemsEsperados.has(s.id)) continue
+    mapaSubItems.set(s.id, s.descripcion)
+    const idsTareasEsperadas = idsTareasEsperadasPorSubItem.get(s.id) ?? new Set<string>()
+    mapaTareas.set(s.id, new Map((s.tareas ?? []).filter(t => idsTareasEsperadas.has(t.id)).map(t => [t.id, t.texto])))
   }
   const faltantes = subItems.filter(s => !mapaSubItems.has(s.actividadRefId ?? ''))
   if (faltantes.length > 0 || !ultimaRespuesta.edtDescripcion) {
@@ -252,6 +291,7 @@ async function generarDescripcionesDetallado(
   return {
     edtDescripcion: ultimaRespuesta.edtDescripcion ?? descripcionFallbackEdt(edt.faseNombre, edt.edtNombre),
     subItems: mapaSubItems,
+    tareas: mapaTareas,
     advertencias,
   }
 }
@@ -273,14 +313,15 @@ export async function generarAlcanceDetallado(
   const { data: estructura, advertencias: advEstructura } = calcularEstructuraAlcanceDetallado(cron, personal)
   const advertencias = [...advEstructura]
 
-  // Mapa actividadId -> tareas (para el contexto de los EDT 'detallado')
-  const tareasPorActividad = new Map<string, { nombre: string; horasEstimadas: number | null; personasEstimadas: number }[]>()
+  // Mapa actividadId -> tareas (para el contexto de los EDT 'detallado' — incluye
+  // el id real de cada tarea para que la IA pueda referenciarlas por id, Tarea 4)
+  const tareasPorActividad = new Map<string, { id: string; nombre: string; horasEstimadas: number | null; personasEstimadas: number }[]>()
   for (const fase of cron.fases) {
     for (const edt of fase.edts) {
       for (const act of edt.actividades) {
         tareasPorActividad.set(
           act.id,
-          act.tareas.map(t => ({ nombre: t.nombre, horasEstimadas: t.horasEstimadas, personasEstimadas: t.personasEstimadas }))
+          act.tareas.map(t => ({ id: t.id, nombre: t.nombre, horasEstimadas: t.horasEstimadas, personasEstimadas: t.personasEstimadas }))
         )
       }
     }

@@ -54,10 +54,12 @@ empresa peruana especializada en proyectos electromecánicos, automatización
 e instrumentación.
 
 Vas a redactar la descripción técnica de UN EDT de la fase de EJECUCIÓN
-(Construcción/Comisionamiento) de un Plan de Trabajo, y de cada una de sus
-actividades (subItems). La estructura, numeración e IDs de este EDT y sus
-subItems YA ESTÁN RESUELTOS por el sistema — tu única tarea es escribir el
-texto de "edtDescripcion" y el "descripcion" de cada subItem.
+(Construcción/Comisionamiento) de un Plan de Trabajo, de cada una de sus
+actividades (subItems), y de cada TAREA real de esas actividades. La
+estructura, numeración e IDs de este EDT, sus subItems y sus tareas YA ESTÁN
+RESUELTOS por el sistema — tu única tarea es escribir el texto de
+"edtDescripcion", el "descripcion" de cada subItem, y el "texto" de cada
+tarea (viñeta operativa).
 
 ESTILO (plan de trabajo Nexa):
 - edtDescripcion: 2-4 oraciones técnicas describiendo el alcance general del EDT.
@@ -68,21 +70,42 @@ ESTILO (plan de trabajo Nexa):
   desde la sala eléctrica X mediante bandejas existentes; para esta actividad
   se armará andamio de N cuerpos certificado y personal calificado en
   trabajos eléctricos energizados y no energizados."
-- Fundamentá la descripción en las tareas reales de cada actividad (nombres,
-  horas, personas) que se incluyen más abajo — no inventes actividades,
-  equipos ni cifras que no estén en el contexto.
+- Cada tarea.texto: UNA viñeta operativa de 1 línea (8-16 palabras aprox.),
+  en modo imperativo/futuro simple, convirtiendo el nombre técnico de la
+  tarea en una instrucción de campo concreta y accionable — nunca repitas el
+  nombre de la tarea tal cual, nunca repitas la misma viñeta en dos tareas.
+  Ejemplos de estilo esperado: "Desenergizar y bloquear la alimentación
+  mediante dispositivos DAE antes de iniciar cualquier intervención.",
+  "Delimitar el área de trabajo con cinta de seguridad y señalización
+  visible.", "Verificar ausencia de tensión con multímetro certificado antes
+  de manipular los conductores."
+- Fundamentá la descripción y las viñetas en las tareas reales de cada
+  actividad (nombres, horas, personas) que se incluyen más abajo — no
+  inventes actividades, tareas, equipos ni cifras que no estén en el contexto.
 
 REGLAS:
 - Devolvé EXACTAMENTE un subItem por cada "id" de subItem recibido, mismos IDs.
-- NUNCA cambies, acortes ni inventes ningún "id" — copialos tal cual del input.
-- Si el EDT no tiene subItems, devolvé "subItems": [].
+- Dentro de cada subItem, devolvé EXACTAMENTE una tarea por cada "id" de tarea
+  recibido en su lista "tareas", mismos IDs — nunca agregues, quites ni
+  reordenes tareas.
+- NUNCA cambies, acortes ni inventes ningún "id" (de subItem ni de tarea) —
+  copialos tal cual del input.
+- Si el EDT no tiene subItems, devolvé "subItems": []. Si un subItem no tiene
+  tareas, devolvé "tareas": [] para ese subItem.
 - Devolvé SOLO el JSON, sin markdown ni texto antes o después.
 `.trim()
+
+interface TareaParaDetalle {
+  id: string
+  nombre: string
+  horasEstimadas: number | null
+  personasEstimadas: number
+}
 
 interface SubItemParaDetalle {
   id: string
   actividadNombre: string
-  tareas: { nombre: string; horasEstimadas: number | null; personasEstimadas: number }[]
+  tareas: TareaParaDetalle[]
 }
 
 interface EdtParaDetalle {
@@ -105,6 +128,6 @@ export function buildUserDetalleEdt(
     notaCorrectiva,
     '',
     'ESQUEMA DE OUTPUT (devolvé EXACTAMENTE este JSON, sin markdown):',
-    `{ "id": "${edt.id}", "edtDescripcion": "string — 2-4 oraciones", "subItems": [{ "id": "string — copiado tal cual", "descripcion": "string — 2-4 oraciones" }] }`,
+    `{ "id": "${edt.id}", "edtDescripcion": "string — 2-4 oraciones", "subItems": [{ "id": "string — copiado tal cual", "descripcion": "string — 2-4 oraciones", "tareas": [{ "id": "string — copiado tal cual", "texto": "string — viñeta operativa de 1 línea" }] }] }`,
   ].join('\n')
 }

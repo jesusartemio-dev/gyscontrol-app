@@ -120,6 +120,11 @@ export function calcularEstructuraAlcanceDetallado(
             actividadNombre: act.nombre,
             descripcion: '', // la completa la IA — ver generarAlcanceDetallado.ts
             actividadRefId: act.id,
+            // Tareas reales del cronograma, en su orden natural — la IA solo
+            // redacta `texto` (viñeta), nunca agrega/quita/reordena (Tarea 4).
+            tareas: [...act.tareas]
+              .sort((a, b) => a.orden - b.orden)
+              .map(t => ({ tareaRefId: t.id, nombre: t.nombre, texto: '' })),
           }))
         : []
 

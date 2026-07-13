@@ -67,7 +67,17 @@ function edtDetallado(): PlanAlcanceDetalladoEdt {
     edtRefId: 'edt-con',
     personalRequerido: [{ cantidad: 3, cargo: 'Técnico Operario' }],
     subItems: [
-      { numeracion: '11.2.1', actividadNombre: 'Tendido de cable de fuerza', descripcion: 'Descripción específica de tendido.', actividadRefId: 'act-1' },
+      {
+        numeracion: '11.2.1',
+        actividadNombre: 'Tendido de cable de fuerza',
+        descripcion: 'Descripción específica de tendido.',
+        actividadRefId: 'act-1',
+        tareas: [
+          { tareaRefId: 'tarea-1', nombre: 'desenergizar', texto: 'Desenergizar y bloquear la alimentación mediante dispositivos DAE.' },
+          { tareaRefId: 'tarea-2', nombre: 'delimitar-area', texto: 'Delimitar el área de trabajo con cinta de seguridad y señalización visible.' },
+          { tareaRefId: 'tarea-3', nombre: 'verificar-tension', texto: 'Verificar ausencia de tensión con multímetro certificado.' },
+        ],
+      },
       { numeracion: '11.2.2', actividadNombre: 'Montaje de tablero eléctrico', descripcion: 'Descripción específica de montaje.', actividadRefId: 'act-2' },
       { numeracion: '11.2.3', actividadNombre: 'Pruebas eléctricas de continuidad', descripcion: 'Descripción específica de pruebas.', actividadRefId: 'act-3' },
     ],
@@ -97,7 +107,7 @@ describe('construirDataBag — alcanceDetallado.subItems', () => {
   const alcance = dataBag.alcanceDetallado as Array<{
     edtNombre: string
     descripcion: string
-    subItems: { numeracion: string; actividadNombre: string; descripcion: string }[]
+    subItems: { numeracion: string; actividadNombre: string; descripcion: string; tareas: { texto: string }[] }[]
   }>
   const con = alcance.find(a => a.edtNombre === 'Construcción')!
   const plan = alcance.find(a => a.edtNombre === 'Planificación General')!
@@ -123,6 +133,19 @@ describe('construirDataBag — alcanceDetallado.subItems', () => {
   })
 
   it('un EDT resumido llega al dataBag con subItems vacío', () => {
+    expect(plan.subItems).toEqual([])
+  })
+
+  it('(Tarea 4) un subItem detallado con 3 tareas llega al dataBag con 3 viñetas distintas y no vacías', () => {
+    const tareas = con.subItems[0].tareas
+    expect(tareas).toHaveLength(3)
+    const textos = tareas.map(t => t.texto)
+    for (const t of textos) expect(t.trim().length).toBeGreaterThan(0)
+    expect(new Set(textos).size).toBe(textos.length)
+  })
+
+  it('(Tarea 4) un subItem sin tareas (o de un EDT resumido) llega al dataBag con tareas.length === 0', () => {
+    expect(con.subItems[1].tareas).toEqual([])
     expect(plan.subItems).toEqual([])
   })
 })

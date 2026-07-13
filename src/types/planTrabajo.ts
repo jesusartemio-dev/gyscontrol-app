@@ -4,12 +4,23 @@ import type { PlanTrabajo, PlanTrabajoGeneracion, PlanTrabajoImagen } from '@pri
 // SECCIONES ESTRUCTURADAS (campos Json)
 // ============================================
 
+/** Viñeta operativa de 1 línea por tarea real del cronograma (Bloque 4.2, Tarea 4) — texto redactado por IA, fallback = nombre de la tarea. */
+export interface PlanAlcanceDetalladoTarea {
+  tareaRefId?: string
+  nombre: string
+  texto: string
+}
+
 // ─── Alcance detallado (formato nuevo — basado en EDTs del cronograma) ───
 export interface PlanAlcanceDetalladoSubItem {
   numeracion: string       // "11.5.1"
   actividadNombre: string
   descripcion: string
   actividadRefId?: string
+  /** Tareas reales del cronograma de esta actividad, como viñetas (Bloque 4.2, Tarea 4) — [] en subItems de EDTs 'resumido'. */
+  tareas?: PlanAlcanceDetalladoTarea[]
+  /** 1 línea sugiriendo qué foto tomar en el levantamiento (Bloque 4.2, Tarea 5) — solo UI, nunca se exporta al docx. */
+  fotoSugerida?: string
   /** Imágenes adjuntas (solo EDTs/subItems de fase EJECUCIÓN) — nunca generadas por IA. */
   imagenes?: PlanAlcanceImagen[]
 }

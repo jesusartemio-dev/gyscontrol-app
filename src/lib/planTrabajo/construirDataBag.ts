@@ -353,10 +353,10 @@ export function construirDataBag({
             numeracion: s.numeracion,
             actividadNombre: s.actividadNombre,
             descripcion: s.descripcion,
-            // Viñetas de tareas por subItem (plantilla v4, {#tareas}{texto}{/tareas}) —
-            // [] por ahora (restaura el export, Tarea 0); el builder/IA las puebla en
-            // la Tarea 4 del Bloque 4.2, nunca ausente para no romper el nullGetter.
-            tareas: [] as { texto: string }[],
+            // Viñetas de tareas por subItem (plantilla v4, {#tareas}{texto}{/tareas},
+            // Bloque 4.2, Tarea 4) — texto redactado por IA, fallback = nombre de la
+            // tarea (ver textoFallbackTarea en generarAlcanceDetallado.ts).
+            tareas: (s.tareas ?? []).map(t => ({ texto: t.texto || t.nombre })),
             imagenes: n.edtRefId && s.actividadRefId
               ? construirImagenesDeNodo(n.edtRefId, s.actividadRefId, s.actividadNombre, imagenesAlcance, imagenesResueltas)
               : [],

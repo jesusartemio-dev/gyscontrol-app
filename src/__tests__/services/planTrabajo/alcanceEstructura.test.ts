@@ -192,6 +192,7 @@ describe('mergearDescripcionesEnEstructura', () => {
       {
         edtDescripcion: 'Descripción general del EDT de Construcción, redactada por IA.',
         subItems: new Map(subItemIds.map((id, i) => [id, `Descripción específica y distinta de la actividad #${i + 1}.`])),
+        tareas: new Map<string, Map<string, string>>(),
       },
     ]
 
@@ -212,7 +213,7 @@ describe('mergearDescripcionesEnEstructura', () => {
 
   it('si la IA no devuelve nada (fallo total), cada subItem cae a un fallback determinista distinto por actividad — nunca vacío ni repetido', () => {
     const resumidoMapa = new Map<string, string>()
-    const detalladoResultados = [{ edtDescripcion: '', subItems: new Map<string, string>() }]
+    const detalladoResultados = [{ edtDescripcion: '', subItems: new Map<string, string>(), tareas: new Map<string, Map<string, string>>() }]
 
     const final = mergearDescripcionesEnEstructura(estructura, resumidoMapa, detalladoResultados)
     const conFinal = final.find(e => e.edtNombre === 'Construcción')!
@@ -221,5 +222,76 @@ describe('mergearDescripcionesEnEstructura', () => {
     for (const d of descripciones) expect(d.trim().length).toBeGreaterThan(0)
     expect(new Set(descripciones).size).toBe(descripciones.length)
     expect(descripciones[0]).toBe(descripcionFallbackSubItem('Tendido de cable de fuerza'))
+  })
+})
+
+describe('tareas por subItem (Bloque 4.2, Tarea 4)', () => {
+  const cronConTresTareas: CronogramaContexto = {
+    ...cronogramaFixture,
+    fases: [
+      cronogramaFixture.fases[0],
+      {
+        ...cronogramaFixture.fases[1],
+        edts: [
+          edt('edt-con', 'Construcción', [
+            actividad('act-con-1', 'Tendido de cable de fuerza', [
+              tarea('desenergizar'),
+              tarea('delimitar-area'),
+              tarea('verificar-tension'),
+            ]),
+          ]),
+        ],
+      },
+    ],
+  }
+
+  it('el subItem detallado incluye las tareas reales del cronograma, con tareaRefId/nombre y texto vacío (la IA lo completa después)', () => {
+    const { data } = calcularEstructuraAlcanceDetallado(cronConTresTareas, personalFixture)
+    const con = data.find(e => e.edtNombre === 'Construcción')!
+    const sub = con.subItems![0]
+    expect(sub.tareas).toHaveLength(3)
+    expect(sub.tareas!.map(t => t.nombre)).toEqual(['desenergizar', 'delimitar-area', 'verificar-tension'])
+    expect(sub.tareas!.map(t => t.tareaRefId)).toEqual(['tarea-desenergizar', 'tarea-delimitar-area', 'tarea-verificar-tension'])
+    for (const t of sub.tareas!) expect(t.texto).toBe('')
+  })
+
+  it('un EDT resumido nunca tiene tareas (subItems ya es [])', () => {
+    const { data } = calcularEstructuraAlcanceDetallado(cronConTresTareas, personalFixture)
+    const plan = data.find(e => e.edtNombre === 'Planificación General')!
+    expect(plan.subItems).toEqual([])
+  })
+
+  it('asigna a cada tarea SU PROPIA viñeta de IA por id; si falta, cae al nombre de la tarea (fallback)', () => {
+    const { data: estructura } = calcularEstructuraAlcanceDetallado(cronConTresTareas, personalFixture)
+    const con = estructura.find(e => e.edtNombre === 'Construcción')!
+    const subItemId = con.subItems![0].actividadRefId!
+    const tareaIds = con.subItems![0].tareas!.map(t => t.tareaRefId!)
+
+    const resumidoMapa = new Map<string, string>()
+    const detalladoResultados = [
+      {
+        edtDescripcion: 'Descripción del EDT.',
+        subItems: new Map([[subItemId, 'Descripción del subItem.']]),
+        tareas: new Map([
+          [
+            subItemId,
+            new Map([
+              [tareaIds[0], 'Desenergizar y bloquear la alimentación mediante dispositivos DAE.'],
+              // tareaIds[1] deliberadamente ausente — debe caer al fallback (nombre de la tarea).
+              [tareaIds[2], 'Verificar ausencia de tensión con multímetro certificado.'],
+            ]),
+          ],
+        ]),
+      },
+    ]
+
+    const final = mergearDescripcionesEnEstructura(estructura, resumidoMapa, detalladoResultados)
+    const conFinal = final.find(e => e.edtNombre === 'Construcción')!
+    const textos = conFinal.subItems![0].tareas!.map(t => t.texto)
+
+    expect(textos[0]).toBe('Desenergizar y bloquear la alimentación mediante dispositivos DAE.')
+    expect(textos[1]).toBe('delimitar-area')
+    expect(textos[2]).toBe('Verificar ausencia de tensión con multímetro certificado.')
+    expect(new Set(textos).size).toBe(textos.length)
   })
 })
