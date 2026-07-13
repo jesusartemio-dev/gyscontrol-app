@@ -343,6 +343,10 @@ export function construirDataBag({
             numeracion: s.numeracion,
             actividadNombre: s.actividadNombre,
             descripcion: s.descripcion,
+            // Viñetas de tareas por subItem (plantilla v4, {#tareas}{texto}{/tareas}) —
+            // [] por ahora (restaura el export, Tarea 0); el builder/IA las puebla en
+            // la Tarea 4 del Bloque 4.2, nunca ausente para no romper el nullGetter.
+            tareas: [] as { texto: string }[],
             imagenes: n.edtRefId && s.actividadRefId
               ? construirImagenesDeNodo(n.edtRefId, s.actividadRefId, imagenesAlcance, imagenesResueltas)
               : [],
@@ -412,5 +416,14 @@ export function construirDataBag({
     // NUNCA '' acá — un {%organigramaPng} con valor falsy rompe doc.renderAsync
     // (ver IMAGEN_PLACEHOLDER en exportDocx.ts, mismo motivo que en imagenes).
     organigramaPng: organigramaPngBase64 || IMAGEN_PLACEHOLDER,
+
+    // ─── Gráficos de histograma (plantilla v4, sección 13) ───
+    // false/IMAGEN_PLACEHOLDER hasta la Tarea 3 del Bloque 4.2 (generarHistogramaPng.ts) —
+    // el flag en false hace que docxtemplater NUNCA renderice el bloque {#tieneHistogramaXPng},
+    // el placeholder es solo defensivo por si algo referencia el tag fuera del condicional.
+    tieneHistogramaEquipoPng: false,
+    histogramaEquipoPng: IMAGEN_PLACEHOLDER,
+    tieneHistogramaHHPng: false,
+    histogramaHHPng: IMAGEN_PLACEHOLDER,
   }
 }
