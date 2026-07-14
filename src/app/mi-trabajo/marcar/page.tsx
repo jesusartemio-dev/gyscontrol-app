@@ -298,23 +298,34 @@ export default function MarcarPage() {
       setDialogGpsBloqueado(true)
       return
     }
-    const c = geo.coords || (await geo.solicitar())
-    if (!c) {
-      // Si después de pedirlo no hay coords, casi siempre es porque lo bloqueó el navegador.
-      setDialogGpsBloqueado(true)
+    // Si ya tenemos coords (normalmente ya están por el pre-fetch al cargar la página),
+    // podemos decidir de una vez si corresponde "visita externa" o abrir el scanner.
+    if (geo.coords) {
+      if (cercanas && !cercanas.sedeEnZona && !cercanas.sedeRemota?.dentro) {
+        setVisitaTipo(tipo)
+        setVisitaLugar('')
+        setDialogVisitaExterna(true)
+        return
+      }
+      setScannerOpen(true)
+      setTimeout(() => iniciar(scannerElemId), 100)
       return
     }
-    // Si ya sabemos por las sedes cercanas que NO está en ninguna sede ni en su sede remota
-    // aprobada, el scanner QR no aplica — saltamos directo al flujo de visita externa para
-    // no obligar al usuario a abrir una cámara que no usará.
-    if (cercanas && !cercanas.sedeEnZona && !cercanas.sedeRemota?.dentro) {
-      setVisitaTipo(tipo)
-      setVisitaLugar('')
-      setDialogVisitaExterna(true)
-      return
-    }
+    // Aún no hay coords: abrimos la cámara YA, en el mismo gesto de este click, y
+    // pedimos el GPS en paralelo (no lo esperamos antes de abrir la cámara).
+    // En iOS/Safari, esperar (await) un permiso nativo del sistema (ubicación) antes
+    // de solicitar otro permiso distinto (cámara) dentro del mismo handler de click
+    // puede hacer que Safari considere "perdido" el gesto del usuario y bloquee
+    // getUserMedia — por eso la cámara no debe esperar a que el GPS se resuelva.
     setScannerOpen(true)
     setTimeout(() => iniciar(scannerElemId), 100)
+    geo.solicitar().then(c => {
+      if (!c) {
+        void detener()
+        setScannerOpen(false)
+        setDialogGpsBloqueado(true)
+      }
+    })
   }
 
   async function marcarSinQr() {
@@ -329,13 +340,22 @@ export default function MarcarPage() {
       setDialogGpsBloqueado(true)
       return
     }
-    const c = geo.coords || (await geo.solicitar())
-    if (!c) {
-      setDialogGpsBloqueado(true)
+    if (geo.coords) {
+      setScannerOpen(true)
+      setTimeout(() => iniciar(scannerElemId), 100)
       return
     }
+    // Misma razón que en onClickTipo: abrir la cámara sin esperar al GPS para no
+    // perder el gesto del usuario en iOS/Safari.
     setScannerOpen(true)
     setTimeout(() => iniciar(scannerElemId), 100)
+    geo.solicitar().then(c => {
+      if (!c) {
+        void detener()
+        setScannerOpen(false)
+        setDialogGpsBloqueado(true)
+      }
+    })
   }
 
   if (status === 'loading') {
@@ -897,6 +917,11 @@ export default function MarcarPage() {
                 <li>Ajustes → Privacidad → Localización → activado</li>
                 <li>Vuelve a Safari y recarga</li>
               </ol>
+              <p className="mt-2 text-xs text-muted-foreground">
+                💡 Si agregaste esta página a tu pantalla de inicio (ícono propio, no Safari),
+                busca los permisos en <strong>Ajustes → [nombre de esta app]</strong> en vez de
+                Ajustes → Safari — iPhone los maneja por separado.
+              </p>
             </div>
             <div className="rounded-md border bg-muted/40 p-3">
               <p className="font-semibold">🦊 Firefox</p>
