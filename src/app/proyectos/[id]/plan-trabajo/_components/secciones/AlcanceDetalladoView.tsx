@@ -120,6 +120,15 @@ export function AlcanceDetalladoView({ plan, proyectoId, imagenes }: Props) {
                           {sub.descripcion && (
                             <p className="text-xs text-gray-500 leading-relaxed">{sub.descripcion}</p>
                           )}
+                          {(sub.tareas ?? []).length > 0 && (
+                            <ul className="list-disc list-inside space-y-0.5 pl-1">
+                              {(sub.tareas ?? []).map((tarea, ti) => (
+                                <li key={tarea.tareaRefId ?? ti} className="text-xs text-gray-500 leading-relaxed">
+                                  {tarea.texto || tarea.nombre}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
                           {item.tipoDetalle === 'detallado' && sub.fotoSugerida &&
                             imagenes.filter(img => img.edtRef === (item.edtRefId ?? '') && (img.subItemRef ?? undefined) === sub.actividadRefId).length === 0 && (
                               <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1">

@@ -84,6 +84,20 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
       return { ...it, subItems: (it.subItems ?? []).filter((_, si) => si !== subIdx) }
     }))
 
+  // Viñetas de tareas (Bloque 4.2, Tarea 1) — el texto redactado por IA es
+  // corregible a mano; nunca se agregan/quitan tareas acá (vienen 1:1 del
+  // cronograma real, ver alcanceEstructura.ts).
+  const updateTarea = (edtIdx: number, subIdx: number, tareaIdx: number, texto: string) =>
+    setItems(prev => prev.map((it, i) => {
+      if (i !== edtIdx) return it
+      const subs = (it.subItems ?? []).map((s, si) => {
+        if (si !== subIdx) return s
+        const tareas = (s.tareas ?? []).map((t, ti) => ti === tareaIdx ? { ...t, texto } : t)
+        return { ...s, tareas }
+      })
+      return { ...it, subItems: subs }
+    }))
+
   const handleSave = async () => {
     setSaving(true)
     try { await onSave(items) } finally { setSaving(false) }
@@ -181,6 +195,25 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                             </Button>
                           </div>
                           <Textarea value={sub.descripcion} onChange={e => updateSubItem(edtIdx, subIdx, { descripcion: e.target.value })} rows={3} className="text-xs resize-none" placeholder="Descripción narrativa de la actividad..." />
+
+                          {(sub.tareas ?? []).length > 0 && (
+                            <div className="space-y-1 pl-2 border-l-2 border-gray-200">
+                              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Tareas</p>
+                              {(sub.tareas ?? []).map((tarea, tareaIdx) => (
+                                <div key={tarea.tareaRefId ?? tareaIdx} className="flex items-start gap-1">
+                                  <span className="text-[10px] text-muted-foreground mt-1.5 shrink-0">•</span>
+                                  <Textarea
+                                    value={tarea.texto}
+                                    onChange={e => updateTarea(edtIdx, subIdx, tareaIdx, e.target.value)}
+                                    rows={1}
+                                    className="text-xs resize-none min-h-0 py-1"
+                                    placeholder={tarea.nombre}
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
                           {item.tipoDetalle === 'detallado' && (() => {
                             const imagenesDelSubItem = imagenes.filter(
                               img => img.edtRef === (item.edtRefId ?? '') && (img.subItemRef ?? undefined) === sub.actividadRefId
