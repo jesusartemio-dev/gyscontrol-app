@@ -380,7 +380,11 @@ export function construirDataBag({
                 ? construirImagenesDeNodo(n.edtRefId, undefined, t.tareaRefId, t.nombre, imagenesAlcance, imagenesResueltas)
                 : [],
             })),
-            imagenes: n.edtRefId && s.actividadRefId
+            // Plantilla v6 (Bloque 4.2 sesión 2, micro-fix): loop propio
+            // {#imagenesSubItem} DESPUÉS de {/tareas}, para no colisionar con el
+            // {#imagenes} anidado en cada tarea — mismo nivel/filtro que antes
+            // (subItemRef sin tareaRef), solo cambia el nombre del tag.
+            imagenesSubItem: n.edtRefId && s.actividadRefId
               ? construirImagenesDeNodo(n.edtRefId, s.actividadRefId, undefined, s.actividadNombre, imagenesAlcance, imagenesResueltas)
               : [],
           })),
