@@ -264,3 +264,75 @@ describe('construirDataBag — imágenes por tarea (Tarea 3, sesión 2)', () => 
     expect(construccion.imagenes[0].caption).toMatch(/^Figura 4\. /)
   })
 })
+
+describe('construirDataBag — tareas excluidas del plan (Bloque 4.2 sesión 3)', () => {
+  function imagenFixture(overrides: Partial<PlanTrabajoImagen>): PlanTrabajoImagen {
+    return {
+      id: 'img-default',
+      planTrabajoId: 'plan-1',
+      edtRef: 'edt-con',
+      subItemRef: null,
+      tareaRef: null,
+      nombreArchivo: 'foto.jpg',
+      urlArchivo: '',
+      driveFileId: 'drive-1',
+      tipoArchivo: null,
+      tamano: null,
+      caption: null,
+      orden: 0,
+      createdById: 'user-1',
+      createdAt: new Date('2026-01-01'),
+      ...overrides,
+    } as unknown as PlanTrabajoImagen
+  }
+
+  function edtConTareaExcluida(): PlanAlcanceDetalladoEdt {
+    const base = edtDetallado()
+    return {
+      ...base,
+      subItems: base.subItems!.map((s, i) =>
+        i !== 0 ? s : {
+          ...s,
+          tareas: s.tareas!.map(t => t.tareaRefId === 'tarea-2' ? { ...t, excluida: true } : t),
+        }
+      ),
+    }
+  }
+
+  const imagenResuelta: ImagenResueltaTag = { data: 'base64', width: 100, height: 100 }
+  // Imagen adjunta a la tarea EXCLUIDA — no debe aparecer en ningún lado del export.
+  const imagenesAlcance: PlanTrabajoImagen[] = [imagenFixture({ id: 'img-tarea-excluida', tareaRef: 'tarea-2', orden: 0 })]
+  const imagenesResueltas = new Map<string, ImagenResueltaTag | null>([['img-tarea-excluida', imagenResuelta]])
+
+  const dataBag = construirDataBag({
+    plan: planFixture([edtConTareaExcluida()]),
+    proyecto: proyectoFixture,
+    organigramaPngBase64: '',
+    imagenesAlcance,
+    imagenesResueltas,
+  })
+  const alcance = dataBag.alcanceDetallado as Array<{
+    edtNombre: string
+    subItems: { tareas: { texto: string; imagenes: unknown[] }[] }[]
+  }>
+  const con = alcance.find(a => a.edtNombre === 'Construcción')!
+
+  it('la tarea excluida NO aparece en tareas[] del export (ni su viñeta ni sus imágenes)', () => {
+    const tareas = con.subItems[0].tareas
+    expect(tareas).toHaveLength(2) // de 3 tareas, 1 excluida -> quedan 2
+    expect(tareas.some(t => t.texto.includes('Delimitar el área de trabajo'))).toBe(false)
+  })
+
+  it('las imágenes de la tarea excluida no consumen numeración de Figura ni aparecen en ningún otro nivel', () => {
+    const tareas = con.subItems[0].tareas
+    for (const t of tareas) expect(t.imagenes).toHaveLength(0)
+  })
+
+  it('las demás tareas (no excluidas) del subItem se exportan igual que siempre', () => {
+    const textos = con.subItems[0].tareas.map(t => t.texto)
+    expect(textos).toEqual([
+      'Desenergizar y bloquear la alimentación mediante dispositivos DAE.',
+      'Verificar ausencia de tensión con multímetro certificado.',
+    ])
+  })
+})

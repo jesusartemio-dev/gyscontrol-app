@@ -2,6 +2,7 @@ import { calcularEstructuraAlcanceDetallado, esEdtDetallado } from '@/lib/planTr
 import {
   mergearDescripcionesEnEstructura,
   descripcionFallbackSubItem,
+  preservarEstadoManualTareas,
 } from '@/lib/planTrabajo/generarAlcanceDetallado'
 import type { CronogramaContexto, PlanPersonal } from '@/types/planTrabajo'
 
@@ -359,5 +360,94 @@ describe('tareas por subItem (Bloque 4.2, Tarea 4)', () => {
     expect(fotos[0]).toBe('Foto del punto de bloqueo antes de intervenir.')
     expect(fotos[1]).toBe('')
     expect(fotos[2]).toBe('Foto del multímetro marcando 0V.')
+  })
+
+  describe('preservarEstadoManualTareas (Bloque 4.2 sesión 3) — sobrevive a una regeneración', () => {
+    const { data: estructuraRecienGenerada } = calcularEstructuraAlcanceDetallado(cronConTresTareas, personalFixture)
+
+    it('una tarea marcada excluida en el estado anterior sigue excluida en la estructura recién regenerada', () => {
+      const con = estructuraRecienGenerada.find(e => e.edtNombre === 'Construcción')!
+      const subItemId = con.subItems![0].actividadRefId!
+      const tareaIds = con.subItems![0].tareas!.map(t => t.tareaRefId!)
+
+      const estructuraAnterior = estructuraRecienGenerada.map(edt =>
+        edt.edtNombre !== 'Construcción' ? edt : {
+          ...edt,
+          subItems: edt.subItems!.map(s =>
+            s.actividadRefId !== subItemId ? s : {
+              ...s,
+              tareas: s.tareas!.map(t => t.tareaRefId === tareaIds[1] ? { ...t, excluida: true } : t),
+            }
+          ),
+        }
+      )
+
+      const resultado = preservarEstadoManualTareas(estructuraRecienGenerada, estructuraAnterior)
+      const conResultado = resultado.find(e => e.edtNombre === 'Construcción')!
+      const tareas = conResultado.subItems![0].tareas!
+
+      expect(tareas.find(t => t.tareaRefId === tareaIds[1])!.excluida).toBe(true)
+      expect(tareas.find(t => t.tareaRefId === tareaIds[0])!.excluida).toBeFalsy()
+      expect(tareas.find(t => t.tareaRefId === tareaIds[2])!.excluida).toBeFalsy()
+    })
+
+    it('el orden manual del usuario (reordenar viñetas) se reaplica tras regenerar', () => {
+      const con = estructuraRecienGenerada.find(e => e.edtNombre === 'Construcción')!
+      const subItemId = con.subItems![0].actividadRefId!
+      const tareaIds = con.subItems![0].tareas!.map(t => t.tareaRefId!)
+      // Orden original: [desenergizar, delimitar-area, verificar-tension].
+      // El usuario lo reordenó a: [verificar-tension, desenergizar, delimitar-area].
+      const ordenManual = [tareaIds[2], tareaIds[0], tareaIds[1]]
+
+      const estructuraAnterior = estructuraRecienGenerada.map(edt =>
+        edt.edtNombre !== 'Construcción' ? edt : {
+          ...edt,
+          subItems: edt.subItems!.map(s =>
+            s.actividadRefId !== subItemId ? s : {
+              ...s,
+              tareas: ordenManual.map(id => s.tareas!.find(t => t.tareaRefId === id)!),
+            }
+          ),
+        }
+      )
+
+      const resultado = preservarEstadoManualTareas(estructuraRecienGenerada, estructuraAnterior)
+      const conResultado = resultado.find(e => e.edtNombre === 'Construcción')!
+      const idsResultado = conResultado.subItems![0].tareas!.map(t => t.tareaRefId)
+
+      expect(idsResultado).toEqual(ordenManual)
+    })
+
+    it('una tarea NUEVA en el cronograma (no existía en el estado anterior) se agrega al final, sin excluir', () => {
+      const con = estructuraRecienGenerada.find(e => e.edtNombre === 'Construcción')!
+      const subItemId = con.subItems![0].actividadRefId!
+      const tareaIds = con.subItems![0].tareas!.map(t => t.tareaRefId!)
+
+      // El estado anterior solo tenía 2 de las 3 tareas (ej. la tercera se agregó al cronograma después).
+      const estructuraAnterior = estructuraRecienGenerada.map(edt =>
+        edt.edtNombre !== 'Construcción' ? edt : {
+          ...edt,
+          subItems: edt.subItems!.map(s =>
+            s.actividadRefId !== subItemId ? s : {
+              ...s,
+              tareas: s.tareas!.filter(t => t.tareaRefId !== tareaIds[2]),
+            }
+          ),
+        }
+      )
+
+      const resultado = preservarEstadoManualTareas(estructuraRecienGenerada, estructuraAnterior)
+      const conResultado = resultado.find(e => e.edtNombre === 'Construcción')!
+      const idsResultado = conResultado.subItems![0].tareas!.map(t => t.tareaRefId)
+
+      // La tarea nueva (tareaIds[2]) queda al final, y ninguna sale excluida.
+      expect(idsResultado).toEqual([tareaIds[0], tareaIds[1], tareaIds[2]])
+      expect(conResultado.subItems![0].tareas!.every(t => !t.excluida)).toBe(true)
+    })
+
+    it('sin estado anterior para ese subItem, devuelve la estructura nueva sin cambios', () => {
+      const resultado = preservarEstadoManualTareas(estructuraRecienGenerada, [])
+      expect(resultado).toEqual(estructuraRecienGenerada)
+    })
   })
 })

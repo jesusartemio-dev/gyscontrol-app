@@ -398,7 +398,10 @@ export function construirDataBag({
             // se intercalan tras cada viñeta (plantilla v6, {#tareas}{#imagenes},
             // Bloque 4.2 sesión 2, Tarea 3) — caption default = nombre corto de la
             // tarea del cronograma, nunca la viñeta redactada completa.
-            tareas: (s.tareas ?? []).map(t => ({
+            // Las tareas `excluida` (borrado lógico del plan, Bloque 4.2 sesión 3)
+            // se filtran ANTES de mapear — no exportan viñeta, imágenes ni consumen
+            // numeración de figura; nunca tocan el cronograma real del proyecto.
+            tareas: (s.tareas ?? []).filter(t => !t.excluida).map(t => ({
               texto: t.texto || t.nombre,
               imagenes: n.edtRefId && t.tareaRefId
                 ? numerarFiguras(construirImagenesDeNodo(n.edtRefId, undefined, t.tareaRefId, t.nombre, imagenesAlcance, imagenesResueltas), contadorFigura)

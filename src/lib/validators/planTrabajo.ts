@@ -37,6 +37,9 @@ export const planAlcanceDetalladoTareaSchema = z.object({
   // Solo UI (Bloque 4.2 sesión 2, Tarea 2) — nunca se exporta al docx, puede quedar vacía.
   // Un campo no declarado acá se descarta en silencio al validar (ver ac1f0672 / bug de Tarea 5).
   fotoSugerida: z.string().optional(),
+  // Borrado lógico del plan (Bloque 4.2 sesión 3) — nunca toca el cronograma real.
+  // Mismo riesgo que fotoSugerida: si no se declara acá, se descarta en silencio al guardar.
+  excluida: z.boolean().optional(),
 })
 
 // ─── Nuevo formato (basado en EDTs del cronograma de planificación) ───

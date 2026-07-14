@@ -4,13 +4,15 @@ import { useRef, useState } from 'react'
 import type { PlanAlcanceDetalladoEdt, PlanAlcanceDetalladoSubItem, PlanAlcanceDetalladoTarea } from '@/types/planTrabajo'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Plus, Trash2, PlusCircle } from 'lucide-react'
+import { Plus, Trash2, PlusCircle, ChevronUp, ChevronDown, EyeOff } from 'lucide-react'
 import { GaleriaImagenesAlcance, type GaleriaImagenesAlcanceHandle } from './GaleriaImagenesAlcance'
 import { HintFotoSugerida } from '@/components/catalogoImagenes/HintFotoSugerida'
+import { DeleteAlertDialog } from '@/components/ui/DeleteAlertDialog'
 import type { PlanTrabajoImagen } from '@prisma/client'
 import type { PlanHerramientasYEquipos } from '@/types/planTrabajo'
 
@@ -100,6 +102,36 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
       const subs = (it.subItems ?? []).map((s, si) => {
         if (si !== subIdx) return s
         const tareas = (s.tareas ?? []).map((t, ti) => ti === tareaIdx ? { ...t, ...patch } : t)
+        return { ...s, tareas }
+      })
+      return { ...it, subItems: subs }
+    }))
+
+  // Borrado lógico del plan (Bloque 4.2 sesión 3) — NUNCA quita la tarea del
+  // cronograma real, solo la oculta de este documento. Sobrevive a un
+  // regenerar de sección (ver preservarEstadoManualTareas.ts) salvo que el
+  // usuario la restaure explícitamente con "Restaurar".
+  const excluirTarea = (edtIdx: number, subIdx: number, tareaIdx: number) =>
+    updateTarea(edtIdx, subIdx, tareaIdx, { excluida: true })
+
+  const restaurarTarea = (edtIdx: number, subIdx: number, tareaIdx: number) =>
+    updateTarea(edtIdx, subIdx, tareaIdx, { excluida: false })
+
+  // Reordena viñetas — el orden del cronograma no siempre es el orden
+  // narrativo deseado. Salta tareas ocultas (excluida) al buscar el vecino,
+  // así las flechas siempre mueven la tarea respecto de la siguiente VISIBLE.
+  const moverTarea = (edtIdx: number, subIdx: number, tareaIdx: number, direccion: -1 | 1) =>
+    setItems(prev => prev.map((it, i) => {
+      if (i !== edtIdx) return it
+      const subs = (it.subItems ?? []).map((s, si) => {
+        if (si !== subIdx) return s
+        const tareas = [...(s.tareas ?? [])]
+        let otroIdx = tareaIdx + direccion
+        while (otroIdx >= 0 && otroIdx < tareas.length && tareas[otroIdx].excluida) {
+          otroIdx += direccion
+        }
+        if (otroIdx < 0 || otroIdx >= tareas.length) return s
+        ;[tareas[tareaIdx], tareas[otroIdx]] = [tareas[otroIdx], tareas[tareaIdx]]
         return { ...s, tareas }
       })
       return { ...it, subItems: subs }
@@ -218,57 +250,99 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                           </div>
                           <Textarea value={sub.descripcion} onChange={e => updateSubItem(edtIdx, subIdx, { descripcion: e.target.value })} rows={3} className="text-xs resize-none" placeholder="Descripción narrativa de la actividad..." />
 
-                          {(sub.tareas ?? []).length > 0 && (
-                            <div className="space-y-2 pl-2 border-l-2 border-gray-200">
-                              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Tareas</p>
-                              {(sub.tareas ?? []).map((tarea, tareaIdx) => {
-                                const imagenesDeLaTarea = imagenes.filter(
-                                  img => img.edtRef === (item.edtRefId ?? '') && img.tareaRef === tarea.tareaRefId
-                                )
-                                const claveGaleria = `tarea:${tarea.tareaRefId ?? `${edtIdx}-${subIdx}-${tareaIdx}`}`
-                                return (
-                                  <div key={tarea.tareaRefId ?? tareaIdx} className="space-y-1">
-                                    <div className="flex items-start gap-1">
-                                      <span className="text-[10px] text-muted-foreground mt-1.5 shrink-0">•</span>
-                                      <Textarea
-                                        value={tarea.texto}
-                                        onChange={e => updateTarea(edtIdx, subIdx, tareaIdx, { texto: e.target.value })}
-                                        rows={1}
-                                        className="text-xs resize-none min-h-0 py-1"
-                                        placeholder={tarea.nombre}
-                                      />
-                                      {item.tipoDetalle === 'detallado' && (
-                                        <div className="mt-1.5 shrink-0">
-                                          <HintFotoSugerida
-                                            value={tarea.fotoSugerida ?? ''}
-                                            editable
-                                            activo={Boolean(tarea.fotoSugerida) && imagenesDeLaTarea.length === 0}
-                                            onChange={v => updateTarea(edtIdx, subIdx, tareaIdx, { fotoSugerida: v })}
-                                            onSubir={() => galeriaRefs.current.get(claveGaleria)?.abrirSelectorArchivo()}
-                                            onElegirBiblioteca={() => galeriaRefs.current.get(claveGaleria)?.abrirPicker()}
+                          {(sub.tareas ?? []).length > 0 && (() => {
+                            const conIndice = (sub.tareas ?? []).map((tarea, tareaIdx) => ({ tarea, tareaIdx }))
+                            const visibles = conIndice.filter(x => !x.tarea.excluida)
+                            const ocultas = conIndice.filter(x => x.tarea.excluida)
+                            return (
+                              <div className="space-y-2 pl-2 border-l-2 border-gray-200">
+                                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Tareas</p>
+                                {visibles.map(({ tarea, tareaIdx }, posVisible) => {
+                                  const imagenesDeLaTarea = imagenes.filter(
+                                    img => img.edtRef === (item.edtRefId ?? '') && img.tareaRef === tarea.tareaRefId
+                                  )
+                                  const claveGaleria = `tarea:${tarea.tareaRefId ?? `${edtIdx}-${subIdx}-${tareaIdx}`}`
+                                  return (
+                                    <div key={tarea.tareaRefId ?? tareaIdx} className="space-y-1">
+                                      <div className="flex items-start gap-1">
+                                        <span className="text-[10px] text-muted-foreground mt-1.5 shrink-0">•</span>
+                                        <Textarea
+                                          value={tarea.texto}
+                                          onChange={e => updateTarea(edtIdx, subIdx, tareaIdx, { texto: e.target.value })}
+                                          rows={1}
+                                          className="text-xs resize-none min-h-0 py-1"
+                                          placeholder={tarea.nombre}
+                                        />
+                                        {item.tipoDetalle === 'detallado' && (
+                                          <div className="mt-1.5 shrink-0">
+                                            <HintFotoSugerida
+                                              value={tarea.fotoSugerida ?? ''}
+                                              editable
+                                              activo={Boolean(tarea.fotoSugerida) && imagenesDeLaTarea.length === 0}
+                                              onChange={v => updateTarea(edtIdx, subIdx, tareaIdx, { fotoSugerida: v })}
+                                              onSubir={() => galeriaRefs.current.get(claveGaleria)?.abrirSelectorArchivo()}
+                                              onElegirBiblioteca={() => galeriaRefs.current.get(claveGaleria)?.abrirPicker()}
+                                            />
+                                          </div>
+                                        )}
+                                        <div className="flex shrink-0 mt-1">
+                                          <Button variant="ghost" size="sm" className="h-5 w-5 p-0" disabled={posVisible === 0} onClick={() => moverTarea(edtIdx, subIdx, tareaIdx, -1)}>
+                                            <ChevronUp size={11} />
+                                          </Button>
+                                          <Button variant="ghost" size="sm" className="h-5 w-5 p-0" disabled={posVisible === visibles.length - 1} onClick={() => moverTarea(edtIdx, subIdx, tareaIdx, 1)}>
+                                            <ChevronDown size={11} />
+                                          </Button>
+                                          <DeleteAlertDialog
+                                            title="¿Quitar esta tarea del plan?"
+                                            description="Se oculta de este documento (viñeta, imágenes y foto sugerida). El cronograma real del proyecto NO se modifica — podés restaurarla luego desde 'tareas ocultas'."
+                                            onConfirm={() => excluirTarea(edtIdx, subIdx, tareaIdx)}
+                                            trigger={
+                                              <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-red-500">
+                                                <Trash2 size={11} />
+                                              </Button>
+                                            }
+                                          />
+                                        </div>
+                                      </div>
+                                      {item.tipoDetalle === 'detallado' && tarea.tareaRefId && (
+                                        <div className="pl-3">
+                                          <GaleriaImagenesAlcance
+                                            ref={el => { galeriaRefs.current.set(claveGaleria, el) }}
+                                            proyectoId={proyectoId}
+                                            edtRef={item.edtRefId ?? ''}
+                                            tareaRef={tarea.tareaRefId}
+                                            nombreDefault={tarea.nombre}
+                                            textosContexto={[...textosHerramientas, tarea.texto, tarea.nombre]}
+                                            imagenes={imagenes}
+                                            onChanged={onImagenesChanged}
                                           />
                                         </div>
                                       )}
                                     </div>
-                                    {item.tipoDetalle === 'detallado' && tarea.tareaRefId && (
-                                      <div className="pl-3">
-                                        <GaleriaImagenesAlcance
-                                          ref={el => { galeriaRefs.current.set(claveGaleria, el) }}
-                                          proyectoId={proyectoId}
-                                          edtRef={item.edtRefId ?? ''}
-                                          tareaRef={tarea.tareaRefId}
-                                          nombreDefault={tarea.nombre}
-                                          textosContexto={[...textosHerramientas, tarea.texto, tarea.nombre]}
-                                          imagenes={imagenes}
-                                          onChanged={onImagenesChanged}
-                                        />
-                                      </div>
-                                    )}
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          )}
+                                  )
+                                })}
+                                {ocultas.length > 0 && (
+                                  <Collapsible>
+                                    <CollapsibleTrigger asChild>
+                                      <Button variant="ghost" size="sm" className="h-6 text-[10px] text-muted-foreground">
+                                        <EyeOff size={11} className="mr-1" /> {ocultas.length} tarea{ocultas.length > 1 ? 's' : ''} oculta{ocultas.length > 1 ? 's' : ''}
+                                      </Button>
+                                    </CollapsibleTrigger>
+                                    <CollapsibleContent className="space-y-1 pl-1 pt-1">
+                                      {ocultas.map(({ tarea, tareaIdx }) => (
+                                        <div key={tarea.tareaRefId ?? tareaIdx} className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                                          <span className="line-through truncate flex-1">{tarea.texto || tarea.nombre}</span>
+                                          <Button variant="outline" size="sm" className="h-5 text-[10px] px-1.5 shrink-0" onClick={() => restaurarTarea(edtIdx, subIdx, tareaIdx)}>
+                                            Restaurar
+                                          </Button>
+                                        </div>
+                                      ))}
+                                    </CollapsibleContent>
+                                  </Collapsible>
+                                )}
+                              </div>
+                            )
+                          })()}
 
                           {item.tipoDetalle === 'detallado' && sub.actividadRefId && (
                             <GaleriaImagenesAlcance

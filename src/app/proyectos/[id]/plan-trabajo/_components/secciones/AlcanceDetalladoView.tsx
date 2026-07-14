@@ -135,9 +135,9 @@ export function AlcanceDetalladoView({ plan, proyectoId, imagenes }: Props) {
                               )}
                             </p>
                           )}
-                          {(sub.tareas ?? []).length > 0 && (
+                          {(sub.tareas ?? []).filter(t => !t.excluida).length > 0 && (
                             <ul className="list-disc list-inside space-y-1.5 pl-1">
-                              {(sub.tareas ?? []).map((tarea, ti) => {
+                              {(sub.tareas ?? []).filter(t => !t.excluida).map((tarea, ti) => {
                                 const imagenesDeLaTarea = imagenes.filter(
                                   img => img.edtRef === (item.edtRefId ?? '') && img.tareaRef === tarea.tareaRefId
                                 )

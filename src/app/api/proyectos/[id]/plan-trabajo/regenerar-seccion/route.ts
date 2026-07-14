@@ -16,9 +16,9 @@ import { PLAN_TRABAJO_SYSTEM_INSTRUCCIONES } from '@/lib/planTrabajo/prompts/gen
 import { buildPromptRegeneracion } from '@/lib/planTrabajo/prompts/regenerarSeccion'
 import { parseJsonIA } from '@/lib/planTrabajo/parseJsonIA'
 import { calcularDatosEtapa1 } from '@/lib/planTrabajo/calcularDatos'
-import { generarAlcanceDetallado } from '@/lib/planTrabajo/generarAlcanceDetallado'
+import { generarAlcanceDetallado, preservarEstadoManualTareas } from '@/lib/planTrabajo/generarAlcanceDetallado'
 import { esSeccionEtapa1, etapa1Completa } from '@/lib/planTrabajo/etapas'
-import type { SeccionRegenerable, PlanPersonal } from '@/types/planTrabajo'
+import type { SeccionRegenerable, PlanPersonal, PlanAlcanceDetalladoEdt } from '@/types/planTrabajo'
 
 export const maxDuration = 300
 export const dynamic = 'force-dynamic'
@@ -288,8 +288,13 @@ export async function POST(req: NextRequest, { params }: Ctx) {
             proyectoId
           )
 
+          // Preserva tareas excluidas del plan + su orden manual (Bloque 4.2 sesión 3)
+          // a través de esta regeneración — nunca resucita lo que el usuario borró.
+          const estructuraAnterior = (planActual.alcanceDetallado as PlanAlcanceDetalladoEdt[] | null) ?? []
+          const dataConEstadoManual = preservarEstadoManualTareas(data, estructuraAnterior)
+
           send('status', { fase: 'validacion', mensaje: 'Validando estructura del resultado...' })
-          const { data: validado, error } = validarSeccionIndividual(seccion, { alcanceDetallado: data })
+          const { data: validado, error } = validarSeccionIndividual(seccion, { alcanceDetallado: dataConEstadoManual })
           if (error) {
             send('error', { mensaje: `Validación fallida para "${seccion}": ${error}` })
             return

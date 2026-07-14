@@ -11,6 +11,15 @@ export interface PlanAlcanceDetalladoTarea {
   texto: string
   /** 1 línea sugiriendo qué foto tomar para documentar ESTA tarea (Bloque 4.2 sesión 2, Tarea 2) — solo UI, nunca se exporta al docx. */
   fotoSugerida?: string
+  /**
+   * El usuario la eliminó del PLAN (Bloque 4.2 sesión 3) — borrado lógico,
+   * NUNCA borra la tarea del cronograma real del proyecto (el plan es un
+   * documento, no la fuente de verdad de la planificación). Se filtra del
+   * export y de la vista; sobrevive a un regenerar de sección (ver
+   * preservarEstadoManualTareas en generarAlcanceDetallado.ts) salvo que el
+   * usuario la restaure explícitamente desde el editor.
+   */
+  excluida?: boolean
 }
 
 // ─── Alcance detallado (formato nuevo — basado en EDTs del cronograma) ───

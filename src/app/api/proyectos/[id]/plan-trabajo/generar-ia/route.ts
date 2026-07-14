@@ -14,12 +14,12 @@ import { guardarSeccionParalela, recalcularCompletitud } from '@/lib/planTrabajo
 import { RESUMEN_PROYECTO_PROMPT } from '@/lib/planTrabajo/prompts/resumirProyecto'
 import { parseJsonIA } from '@/lib/planTrabajo/parseJsonIA'
 import { etapa1Completa } from '@/lib/planTrabajo/etapas'
-import { generarAlcanceDetallado } from '@/lib/planTrabajo/generarAlcanceDetallado'
+import { generarAlcanceDetallado, preservarEstadoManualTareas } from '@/lib/planTrabajo/generarAlcanceDetallado'
 import {
   PLAN_TRABAJO_SYSTEM_INSTRUCCIONES,
   SECCIONES_CONFIG,
 } from '@/lib/planTrabajo/prompts/generarPlan'
-import type { PlanTrabajoContexto, PlanPersonal } from '@/types/planTrabajo'
+import type { PlanTrabajoContexto, PlanPersonal, PlanAlcanceDetalladoEdt } from '@/types/planTrabajo'
 
 export const maxDuration = 300
 export const dynamic = 'force-dynamic'
@@ -312,7 +312,12 @@ export async function POST(req: NextRequest, { params }: Ctx) {
             )
             for (const adv of advAlcance) console.warn(`[generar-ia] alcanceDetallado: ${adv}`)
 
-            const { secciones: seccionValidada, errores: erroresValidacion } = validarSeccionesPlan({ [id]: valor })
+            // Preserva tareas excluidas del plan + su orden manual (Bloque 4.2 sesión 3)
+            // si ya existía un alcanceDetallado previo (re-generación total sobre un plan existente).
+            const estructuraAnterior = (planTrabajo.alcanceDetallado as PlanAlcanceDetalladoEdt[] | null) ?? []
+            const valorConEstadoManual = preservarEstadoManualTareas(valor, estructuraAnterior)
+
+            const { secciones: seccionValidada, errores: erroresValidacion } = validarSeccionesPlan({ [id]: valorConEstadoManual })
             if (Object.keys(seccionValidada).length > 0) {
               await guardarSeccionParalela(proyectoId, seccionValidada)
               seccionesGuardadas.push(id)

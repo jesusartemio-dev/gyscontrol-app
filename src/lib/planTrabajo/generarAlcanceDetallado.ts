@@ -9,7 +9,7 @@ import {
   SYSTEM_DETALLE_EDT,
   buildUserDetalleEdt,
 } from './prompts/alcanceDetallado'
-import type { CronogramaContexto, PlanAlcanceDetalladoEdt, PlanPersonal } from '@/types/planTrabajo'
+import type { CronogramaContexto, PlanAlcanceDetalladoEdt, PlanAlcanceDetalladoTarea, PlanPersonal } from '@/types/planTrabajo'
 import type { ResultadoCalculo } from './calcularDatos'
 
 /**
@@ -101,6 +101,53 @@ export function mergearDescripcionesEnEstructura(
       subItems,
     }
   })
+}
+
+/**
+ * Preserva el estado manual del usuario (tareas excluidas del plan + su orden
+ * personalizado, Bloque 4.2 sesión 3) a través de una regeneración —
+ * `calcularEstructuraAlcanceDetallado` reconstruye toda la estructura desde el
+ * cronograma real en su orden natural, sin saber nada de estos ajustes. Acá
+ * se matchea por `tareaRefId` contra el estado ANTERIOR del plan (antes de
+ * sobrescribirlo): una tarea marcada `excluida` sigue excluida, y el orden
+ * relativo del usuario se reaplica. Una tarea nueva en el cronograma (no
+ * existía en el estado anterior) se agrega al final, en su orden natural.
+ * Pura y testeable: no decide nada por IA, solo reconcilia dos estructuras.
+ */
+export function preservarEstadoManualTareas(
+  estructuraNueva: PlanAlcanceDetalladoEdt[],
+  estructuraAnterior: PlanAlcanceDetalladoEdt[]
+): PlanAlcanceDetalladoEdt[] {
+  const tareasAnterioresPorSubItem = new Map<string, PlanAlcanceDetalladoTarea[]>()
+  for (const edt of estructuraAnterior) {
+    for (const s of edt.subItems ?? []) {
+      if (s.actividadRefId) tareasAnterioresPorSubItem.set(s.actividadRefId, s.tareas ?? [])
+    }
+  }
+
+  return estructuraNueva.map(edt => ({
+    ...edt,
+    subItems: (edt.subItems ?? []).map(s => {
+      const anteriores = s.actividadRefId ? tareasAnterioresPorSubItem.get(s.actividadRefId) : undefined
+      if (!anteriores || anteriores.length === 0) return s
+
+      const ordenAnterior = new Map(anteriores.map((t, i) => [t.tareaRefId, i]))
+      const excluidasPorId = new Map(anteriores.map(t => [t.tareaRefId, t.excluida ?? false]))
+
+      const conExclusionYPosicion = (s.tareas ?? [])
+        .map(t => ({ ...t, excluida: t.tareaRefId ? (excluidasPorId.get(t.tareaRefId) ?? false) : false }))
+        .map((t, i) => ({ t, i, pos: t.tareaRefId ? ordenAnterior.get(t.tareaRefId) : undefined }))
+
+      conExclusionYPosicion.sort((a, b) => {
+        if (a.pos !== undefined && b.pos !== undefined) return a.pos - b.pos
+        if (a.pos !== undefined) return -1
+        if (b.pos !== undefined) return 1
+        return a.i - b.i // ambas nuevas — mantener el orden natural del cronograma
+      })
+
+      return { ...s, tareas: conExclusionYPosicion.map(({ t }) => t) }
+    }),
+  }))
 }
 
 function extraerTexto(response: Anthropic.Message): string {
