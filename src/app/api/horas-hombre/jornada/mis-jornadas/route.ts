@@ -107,9 +107,9 @@ export async function GET(request: NextRequest) {
     // Transformar datos con estadísticas calculadas
     const jornadasConEstadisticas = jornadas.map(j => {
       // cantidadMiembros/totalHoras sobre TODAS las tareas (incluida la placeholder de
-      // asistencia); cantidadTareas y `tareas` visibles la excluyen.
-      const tareasVisibles = j.tareas.filter(t => !t.esAutoAsistencia)
-      const cantidadTareas = tareasVisibles.length
+      // asistencia). cantidadTareas cuenta solo tareas reales, pero `tareas` sí incluye
+      // la placeholder para que el supervisor la vea y pueda editar esas horas normalmente.
+      const cantidadTareas = j.tareas.filter(t => !t.esAutoAsistencia).length
       const cantidadMiembros = new Set(
         j.tareas.flatMap(t => t.miembros.map(m => m.usuarioId))
       ).size
@@ -136,13 +136,14 @@ export async function GET(request: NextRequest) {
         cantidadTareas,
         cantidadMiembros,
         totalHoras,
-        tareas: tareasVisibles.map(t => ({
+        tareas: j.tareas.map(t => ({
           id: t.id,
           proyectoTarea: t.proyectoTarea,
           nombreTareaExtra: t.nombreTareaExtra,
           descripcion: t.descripcion,
           porcentajeInicial: t.porcentajeInicial,
           porcentajeFinal: t.porcentajeFinal,
+          esAutoAsistencia: t.esAutoAsistencia,
           miembros: t.miembros.map(m => ({
             id: m.id,
             usuario: m.usuario,

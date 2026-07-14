@@ -64,20 +64,22 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     // Calcular totales. cantidadMiembros/totalHoras sobre TODAS las tareas
-    // (incluida la placeholder de asistencia); cantidadTareas y `tareas` la excluyen.
-    const tareasVisibles = registro.tareas.filter(t => !t.esAutoAsistencia)
-    const cantidadTareas = tareasVisibles.length
+    // (incluida la placeholder de asistencia). cantidadTareas cuenta solo tareas
+    // reales, pero `tareasFormateadas` SÍ incluye la placeholder para que el
+    // supervisor la vea y pueda editar esas horas con el flujo normal.
+    const cantidadTareas = registro.tareas.filter(t => !t.esAutoAsistencia).length
     const todosLosMiembros = registro.tareas.flatMap(t => t.miembros)
     const miembrosUnicos = new Set(todosLosMiembros.map(m => m.usuarioId))
     const totalHoras = todosLosMiembros.reduce((sum, m) => sum + m.horas, 0)
 
     // Formatear tareas con sus totales
-    const tareasFormateadas = tareasVisibles.map(t => ({
+    const tareasFormateadas = registro.tareas.map(t => ({
       id: t.id,
       proyectoTareaId: t.proyectoTareaId,
       nombreTareaExtra: t.nombreTareaExtra,
       descripcion: t.descripcion,
       proyectoTarea: t.proyectoTarea,
+      esAutoAsistencia: t.esAutoAsistencia,
       miembros: t.miembros,
       totalHoras: t.miembros.reduce((sum, m) => sum + m.horas, 0)
     }))

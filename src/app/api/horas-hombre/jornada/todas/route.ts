@@ -123,9 +123,10 @@ export async function GET(request: NextRequest) {
       // cantidadMiembros/totalHoras se calculan sobre TODAS las tareas (incluida la
       // placeholder "Asistencia (auto)"), para que el headcount refleje a quienes
       // marcaron ingreso aunque aún no tengan horas cargadas en una tarea real.
-      // cantidadTareas y el array `tareas` visible excluyen la placeholder.
-      const tareasVisibles = j.tareas.filter(t => !t.esAutoAsistencia)
-      const cantidadTareas = tareasVisibles.length
+      // cantidadTareas cuenta solo tareas reales, pero el array `tareas` SÍ incluye
+      // la placeholder (con su nombre) para que el supervisor pueda verla y editar
+      // las horas de esas personas con el flujo normal de edición de tareas.
+      const cantidadTareas = j.tareas.filter(t => !t.esAutoAsistencia).length
       const cantidadMiembros = new Set(
         j.tareas.flatMap(t => t.miembros.map(m => m.usuarioId))
       ).size
@@ -154,7 +155,7 @@ export async function GET(request: NextRequest) {
         cantidadTareas,
         cantidadMiembros,
         totalHoras,
-        tareas: tareasVisibles.map(t => ({
+        tareas: j.tareas.map(t => ({
           id: t.id,
           proyectoTareaId: t.proyectoTareaId,
           proyectoTarea: t.proyectoTarea,
@@ -162,6 +163,7 @@ export async function GET(request: NextRequest) {
           descripcion: t.descripcion,
           porcentajeInicial: t.porcentajeInicial,
           porcentajeFinal: t.porcentajeFinal,
+          esAutoAsistencia: t.esAutoAsistencia,
           miembros: t.miembros.map(m => ({
             id: m.id,
             usuario: m.usuario,

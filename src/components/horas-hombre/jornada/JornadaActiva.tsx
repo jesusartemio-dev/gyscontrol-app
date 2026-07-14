@@ -80,6 +80,9 @@ interface TareaJornada {
   } | null
   nombreTareaExtra?: string | null
   descripcion?: string | null
+  // Tarea placeholder auto-generada al marcar asistencia (check-in) — agrupa el
+  // headcount de asistencia, no es trabajo real del cronograma.
+  esAutoAsistencia?: boolean
   miembros: MiembroTarea[]
 }
 
@@ -360,7 +363,7 @@ export function JornadaActiva({
 
         {/* Lista de tareas - compact: single line per task */}
         <div className="border-t border-gray-100">
-          {cantidadTareas > 0 ? (
+          {jornada.tareas.length > 0 ? (
             <div className="divide-y divide-gray-50">
               {jornada.tareas.map(tarea => {
                 const pct = tarea.proyectoTarea?.porcentajeCompletado
@@ -385,6 +388,11 @@ export function JornadaActiva({
                     {/* Task name + members inline */}
                     <div className="flex-1 min-w-0 flex items-baseline gap-1.5">
                       <span className="font-medium text-sm truncate">{getNombreTarea(tarea)}</span>
+                      {tarea.esAutoAsistencia && (
+                        <span className="text-[10px] px-1.5 py-0 rounded-full bg-amber-100 text-amber-700 flex-shrink-0">
+                          asistencia
+                        </span>
+                      )}
                       <span className="text-[11px] text-gray-400 truncate hidden sm:inline">{miembrosStr}</span>
                     </div>
 

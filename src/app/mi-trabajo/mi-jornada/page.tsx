@@ -87,6 +87,7 @@ interface TareaJornada {
   } | null
   nombreTareaExtra?: string | null
   descripcion?: string | null
+  esAutoAsistencia?: boolean
   miembros: MiembroTarea[]
 }
 

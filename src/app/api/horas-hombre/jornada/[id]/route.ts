@@ -65,9 +65,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
     }
 
     // Calcular estadísticas. cantidadMiembros/totalHoras sobre TODAS las tareas
-    // (incluida la placeholder de asistencia); cantidadTareas y `tareas` la excluyen.
-    const tareasVisibles = jornada.tareas.filter(t => !t.esAutoAsistencia)
-    const cantidadTareas = tareasVisibles.length
+    // (incluida la placeholder de asistencia). cantidadTareas cuenta solo tareas
+    // reales, pero `jornada.tareas` (sin tocar) SÍ incluye la placeholder para que
+    // el supervisor la vea y pueda editar esas horas con el flujo normal.
+    const cantidadTareas = jornada.tareas.filter(t => !t.esAutoAsistencia).length
     const cantidadMiembros = new Set(
       jornada.tareas.flatMap(t => t.miembros.map(m => m.usuarioId))
     ).size
@@ -80,7 +81,6 @@ export async function GET(request: NextRequest, context: RouteContext) {
       success: true,
       data: {
         ...jornada,
-        tareas: tareasVisibles,
         cantidadTareas,
         cantidadMiembros,
         totalHoras
