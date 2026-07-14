@@ -162,7 +162,7 @@ describe('construirDataBag — alcanceDetallado.subItems', () => {
     // El fixture del subItem[0] trae fotoSugerida (ver arriba) — confirma que
     // construirDataBag no la incluye en ningún campo del objeto mapeado.
     expect(con.subItems[0]).not.toHaveProperty('fotoSugerida')
-    expect(Object.keys(con.subItems[0])).toEqual(['numeracion', 'actividadNombre', 'descripcion', 'tareas', 'imagenes'])
+    expect(Object.keys(con.subItems[0])).toEqual(['numeracion', 'actividadNombre', 'descripcion', 'tareas', 'imagenesSubItem'])
   })
 
   it('(Tarea 2, sesión 2) fotoSugerida de tarea NUNCA llega al dataBag — es solo UI, no se exporta al docx', () => {
@@ -202,11 +202,14 @@ describe('construirDataBag — imágenes por tarea (Tarea 3, sesión 2)', () => 
     imagenFixture({ id: 'img-tarea-1b', tareaRef: 'tarea-1', orden: 1 }),
     // 1 imagen del subItem act-1 (no de ninguna tarea)
     imagenFixture({ id: 'img-subitem', subItemRef: 'act-1', orden: 0 }),
+    // 1 imagen del EDT (ni subItemRef ni tareaRef)
+    imagenFixture({ id: 'img-edt', orden: 0 }),
   ]
   const imagenesResueltas = new Map<string, ImagenResueltaTag | null>([
     ['img-tarea-1a', imagenResuelta],
     ['img-tarea-1b', imagenResuelta],
     ['img-subitem', imagenResuelta],
+    ['img-edt', imagenResuelta],
   ])
 
   const dataBag = construirDataBag({
@@ -218,7 +221,8 @@ describe('construirDataBag — imágenes por tarea (Tarea 3, sesión 2)', () => 
   })
   const alcance = dataBag.alcanceDetallado as Array<{
     edtNombre: string
-    subItems: { actividadRefId?: string; imagenes: unknown[]; tareas: { imagenes: unknown[] }[] }[]
+    imagenes: unknown[]
+    subItems: { actividadRefId?: string; imagenesSubItem: unknown[]; tareas: { imagenes: unknown[] }[] }[]
   }>
   const con = alcance.find(a => a.edtNombre === 'Construcción')!
 
@@ -226,12 +230,22 @@ describe('construirDataBag — imágenes por tarea (Tarea 3, sesión 2)', () => 
     expect(con.subItems[0].tareas[0].imagenes).toHaveLength(2)
   })
 
-  it('las imágenes de una tarea NO aparecen en el array de imágenes del subItem', () => {
-    expect(con.subItems[0].imagenes).toHaveLength(1)
+  it('las imágenes de un subItem se reciben bajo imagenesSubItem (plantilla v6, {#imagenesSubItem})', () => {
+    expect(con.subItems[0].imagenesSubItem).toHaveLength(1)
   })
 
   it('las demás tareas del mismo subItem no reciben imágenes ajenas', () => {
     expect(con.subItems[0].tareas[1].imagenes).toHaveLength(0)
     expect(con.subItems[0].tareas[2].imagenes).toHaveLength(0)
+  })
+
+  it('los tres niveles (EDT, subItem, tarea) no se mezclan entre sí', () => {
+    // 1 imagen de EDT, 1 de subItem, 2 de tarea — cada una SOLO en su propio nivel.
+    expect(con.imagenes).toHaveLength(1) // solo la del EDT
+    expect(con.subItems[0].imagenesSubItem).toHaveLength(1) // solo la del subItem
+    expect(con.subItems[0].tareas[0].imagenes).toHaveLength(2) // solo las de la tarea-1
+    // Los demás subItems/tareas no reciben ninguna imagen ajena.
+    expect(con.subItems[1].imagenesSubItem).toHaveLength(0)
+    expect(con.subItems[2].imagenesSubItem).toHaveLength(0)
   })
 })

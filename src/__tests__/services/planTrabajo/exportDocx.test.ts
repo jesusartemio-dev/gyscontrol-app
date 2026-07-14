@@ -300,6 +300,45 @@ describe('renderizarPlanTrabajoDocx — viñetas de tareas por subItem (Bloque 4
   })
 })
 
+describe('renderizarPlanTrabajoDocx — imágenes por subItem (plantilla v6, {#imagenesSubItem}, micro-fix)', () => {
+  it('el docx real renderiza una imagen de subItem dentro de {#imagenesSubItem}, sin dejar tags crudos ni fallar el nullGetter estricto', async () => {
+    const imagenSubItem = {
+      ...imagenFixture('img-subitem'),
+      subItemRef: 'act-1',
+    } as unknown as PlanTrabajoImagen
+    const imagenesResueltas = new Map<string, ImagenResueltaTag | null>([
+      ['img-subitem', { data: `data:image/png;base64,${PNG_1X1_BASE64}`, width: 300, height: 180 }],
+    ])
+
+    const dataBag = construirDataBag({
+      plan: planFixture([edtDetalladoConTareas()]),
+      proyecto: proyectoFixture,
+      organigramaPngBase64: `data:image/png;base64,${PNG_1X1_BASE64}`,
+      imagenesAlcance: [imagenSubItem],
+      imagenesResueltas,
+    })
+
+    const alcance = dataBag.alcanceDetallado as Array<{
+      edtNombre: string
+      subItems: { imagenesSubItem: { caption: string }[]; tareas: { imagenes: unknown[] }[] }[]
+    }>
+    const con = alcance.find(a => a.edtNombre === 'Construcción')!
+    expect(con.subItems[0].imagenesSubItem).toHaveLength(1)
+    expect(con.subItems[0].tareas[0].imagenes).toHaveLength(0)
+    expect(con.subItems[0].tareas[1].imagenes).toHaveLength(0)
+
+    const buffer = await renderizarPlanTrabajoDocx({ dataBag })
+    const partes = asertarPaqueteBienFormado(buffer)
+    const documentXml = partes.find(p => p.nombre === 'word/document.xml')!.contenido
+
+    expect(documentXml).not.toMatch(/\{#imagenesSubItem\}|\{\/imagenesSubItem\}/)
+    for (const { cx, cy } of extentsDeImagenes(documentXml)) {
+      expect(cx).toBeGreaterThan(0)
+      expect(cy).toBeGreaterThan(0)
+    }
+  })
+})
+
 describe('renderizarPlanTrabajoDocx — personalRequerido condicional (plantilla v5, {#tienePersonalRequerido})', () => {
   const LINEA_INTRO_PERSONAL = 'Para el desarrollo de los trabajos se necesitará la intervención del siguiente personal:'
 
