@@ -191,12 +191,16 @@ export default function MarcarPage() {
 
   // Pre-solicitar GPS al cargar para que aparezca el mapa de sedes sin que el usuario
   // tenga que tocar "Marcar" primero. Aplica a todos (incluido confianza, donde el
-  // mapa es informativo). Si el permiso esta denegado no insistimos.
+  // mapa es informativo).
+  // Ojo: NO nos guiamos por `permisoGps === 'denied'` para decidir si intentar —
+  // `navigator.permissions.query({name:'geolocation'})` es conocido por reportar
+  // estados incorrectos/obsoletos en Safari/iOS (puede decir "denied" aunque el
+  // permiso real esté concedido). Intentamos siempre; si de verdad está denegado,
+  // el navegador falla rápido sin mostrar un prompt nuevo (ya lo recuerda por origen).
   useEffect(() => {
-    if (permisoGps === 'denied') return
     if (geo.coords) return
     geo.solicitar()
-  }, [permisoGps, geo.coords, geo.solicitar])
+  }, [geo.coords, geo.solicitar])
 
   async function enviarMarcaje(
     tipo: TipoBotón,
@@ -252,7 +256,10 @@ export default function MarcarPage() {
 
   async function abrirDialogVisitaExterna(tipo: TipoBotón) {
     setTipoSel(tipo)
-    if (permisoGps === 'denied') {
+    // permisoGps viene de navigator.permissions.query, que en Safari/iOS puede
+    // reportar 'denied' de forma incorrecta incluso con geo.coords ya obtenido
+    // (bug conocido de WebKit) — por eso solo bloqueamos si además no hay coords.
+    if (permisoGps === 'denied' && !geo.coords) {
       setDialogGpsBloqueado(true)
       return
     }
@@ -294,7 +301,9 @@ export default function MarcarPage() {
       return
     }
     // Presencial: si el navegador tiene GPS bloqueado, no tiene sentido intentar.
-    if (permisoGps === 'denied') {
+    // (permisoGps puede reportar 'denied' incorrectamente en Safari/iOS aunque el GPS
+    // sí funcione — por eso no bloqueamos si ya tenemos coords reales)
+    if (permisoGps === 'denied' && !geo.coords) {
       setDialogGpsBloqueado(true)
       return
     }
@@ -336,7 +345,7 @@ export default function MarcarPage() {
   // Para remotos que van a oficina: abrir el scanner aunque su modalidad sea remota.
   async function abrirScannerDesdeRemoto(tipo: TipoBotón) {
     setTipoSel(tipo)
-    if (permisoGps === 'denied') {
+    if (permisoGps === 'denied' && !geo.coords) {
       setDialogGpsBloqueado(true)
       return
     }
@@ -658,7 +667,7 @@ export default function MarcarPage() {
         </Card>
       )}
 
-      {!scannerOpen && permisoGps === 'denied' && !modoHoy?.esConfianza && !modoHoy?.esRemoto && (
+      {!scannerOpen && permisoGps === 'denied' && !geo.coords && !modoHoy?.esConfianza && !modoHoy?.esRemoto && (
         <Card className="mb-4 border-2 border-red-500 bg-red-50">
           <CardContent className="flex items-start gap-3 py-4">
             <AlertTriangle className="h-6 w-6 shrink-0 text-red-600" />
@@ -712,7 +721,7 @@ export default function MarcarPage() {
             {TIPOS.map(t => {
               const Icon = t.icon
               const gpsBloqueadoYRequerido =
-                permisoGps === 'denied' && !modoHoy?.esConfianza && !modoHoy?.esRemoto
+                permisoGps === 'denied' && !geo.coords && !modoHoy?.esConfianza && !modoHoy?.esRemoto
               return (
                 <Button
                   key={t.value}
