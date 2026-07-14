@@ -55,7 +55,8 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
   const file = formData.get('file')
   const edtRef = formData.get('edtRef')
-  const subItemRef = formData.get('subItemRef')
+  const subItemRefRaw = formData.get('subItemRef')
+  const tareaRefRaw = formData.get('tareaRef')
   const caption = formData.get('caption')
 
   if (!(file instanceof File)) {
@@ -71,15 +72,16 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: `La imagen supera el límite de ${MAX_TAMANO_BYTES / 1024 / 1024}MB` }, { status: 400 })
   }
 
+  // Exactamente un nivel: EDT, subItem o tarea (Bloque 4.2 sesión 2, Tarea 3) —
+  // si viene tareaRef, subItemRef siempre queda null.
+  const tareaRef = typeof tareaRefRaw === 'string' && tareaRefRaw ? tareaRefRaw : null
+  const subItemRef = !tareaRef && typeof subItemRefRaw === 'string' && subItemRefRaw ? subItemRefRaw : null
+
   const original = Buffer.from(await file.arrayBuffer())
   const buffer = await redimensionarImagen(original, file.type)
 
   const ultima = await prisma.planTrabajoImagen.findFirst({
-    where: {
-      planTrabajoId: plan.id,
-      edtRef,
-      subItemRef: typeof subItemRef === 'string' && subItemRef ? subItemRef : null,
-    },
+    where: { planTrabajoId: plan.id, edtRef, subItemRef, tareaRef },
     orderBy: { orden: 'desc' },
     select: { orden: true },
   })
@@ -97,7 +99,8 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     data: {
       planTrabajoId: plan.id,
       edtRef,
-      subItemRef: typeof subItemRef === 'string' && subItemRef ? subItemRef : null,
+      subItemRef,
+      tareaRef,
       nombreArchivo: file.name,
       urlArchivo: driveFile.webViewLink ?? '',
       driveFileId: driveFile.id ?? null,

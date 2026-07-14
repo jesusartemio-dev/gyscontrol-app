@@ -5913,7 +5913,8 @@ model PlanTrabajoImagen {
   planTrabajo   PlanTrabajo @relation(fields: [planTrabajoId], references: [id], onDelete: Cascade)
 
   edtRef     String // edtRefId del EDT de alcanceDetallado al que pertenece
-  subItemRef String? // actividadRefId del subItem — null si la imagen es a nivel EDT
+  subItemRef String? // actividadRefId del subItem — null si la imagen es a nivel EDT o de una tarea
+  tareaRef   String? // tareaRefId de la tarea (Bloque 4.2 sesión 2, Tarea 3) — si está seteado, subItemRef es null (exactamente uno de los tres niveles: EDT, subItem o tarea)
 
   nombreArchivo String
   urlArchivo    String

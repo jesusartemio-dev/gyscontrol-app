@@ -15,9 +15,11 @@ interface Props {
   proyectoId: string
   edtRef: string
   subItemRef?: string
-  /** Nombre del EDT o de la actividad (subItem) al que pertenece esta galería — default del caption al subir (Bloque 4.2, Tarea 1; antes era el filename). */
+  /** tareaRefId de la tarea (Bloque 4.2 sesión 2, Tarea 3) — si está seteado, la galería es de ESA tarea (ignora subItemRef para filtrar). Una imagen pertenece a EXACTAMENTE un nivel: EDT, subItem o tarea. */
+  tareaRef?: string
+  /** Nombre del EDT, de la actividad (subItem) o de la tarea al que pertenece esta galería — default del caption al subir (Bloque 4.2, Tarea 1; antes era el filename). */
   nombreDefault: string
-  /** Nombres de herramientas/equipos del plan + nombre/tareas de la actividad — usado para sugerir imágenes del catálogo global (Bloque 4.2, Tarea 6). Vacío/omitido = sin sugerencias. */
+  /** Nombres de herramientas/equipos del plan + nombre/tareas de la actividad (o de la tarea individual) — usado para sugerir imágenes del catálogo global (Bloque 4.2, Tarea 6). Vacío/omitido = sin sugerencias. */
   textosContexto?: string[]
   imagenes: PlanTrabajoImagen[]
   onChanged: () => Promise<void>
@@ -26,11 +28,12 @@ interface Props {
 const MAX_IMAGENES = 10
 
 /**
- * Galería de imágenes de un EDT/subItem de fase EJECUCIÓN (Bloque 4, Tarea 3).
- * Las imágenes NUNCA pasan por IA — solo suben/reordenan/borran vía estos
+ * Galería de imágenes de un EDT/subItem/tarea de fase EJECUCIÓN (Bloque 4,
+ * Tarea 3; nivel tarea agregado en Bloque 4.2 sesión 2, Tarea 3). Las
+ * imágenes NUNCA pasan por IA — solo suben/reordenan/borran vía estos
  * endpoints REST directos a Google Drive (mismo patrón que evidencias/seguridad).
  */
-export function GaleriaImagenesAlcance({ proyectoId, edtRef, subItemRef, nombreDefault, textosContexto = [], imagenes, onChanged }: Props) {
+export function GaleriaImagenesAlcance({ proyectoId, edtRef, subItemRef, tareaRef, nombreDefault, textosContexto = [], imagenes, onChanged }: Props) {
   const [subiendo, setSubiendo] = useState(false)
   const [procesandoId, setProcesandoId] = useState<string | null>(null)
   const [catalogo, setCatalogo] = useState<CatalogoImagen[]>([])
@@ -46,8 +49,15 @@ export function GaleriaImagenesAlcance({ proyectoId, edtRef, subItemRef, nombreD
       .catch(() => setCatalogo([]))
   }, [])
 
+  // Exactamente un nivel por imagen: si esta galería es de una TAREA, filtra
+  // solo por tareaRef (ignora subItemRef); si no, filtra por subItemRef y
+  // excluye las que sí tienen tareaRef (esas son de una tarea, no del subItem).
   const propias = imagenes
-    .filter(img => img.edtRef === edtRef && (img.subItemRef ?? undefined) === subItemRef)
+    .filter(img => {
+      if (img.edtRef !== edtRef) return false
+      if (tareaRef) return img.tareaRef === tareaRef
+      return !img.tareaRef && (img.subItemRef ?? undefined) === subItemRef
+    })
     .sort((a, b) => a.orden - b.orden)
 
   const sugeridas = matchearSugerenciasCatalogoImagen(catalogo, [nombreDefault, ...textosContexto])
@@ -62,7 +72,7 @@ export function GaleriaImagenesAlcance({ proyectoId, edtRef, subItemRef, nombreD
       const res = await fetch(`/api/proyectos/${proyectoId}/plan-trabajo/alcance-imagenes/desde-biblioteca`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ edtRef, subItemRef, catalogoImagenId }),
+        body: JSON.stringify({ edtRef, subItemRef: tareaRef ? undefined : subItemRef, tareaRef, catalogoImagenId }),
       })
       if (!res.ok) {
         const e = await res.json().catch(() => ({}))
@@ -96,7 +106,11 @@ export function GaleriaImagenesAlcance({ proyectoId, edtRef, subItemRef, nombreD
         const formData = new FormData()
         formData.append('file', file)
         formData.append('edtRef', edtRef)
-        if (subItemRef) formData.append('subItemRef', subItemRef)
+        if (tareaRef) {
+          formData.append('tareaRef', tareaRef)
+        } else if (subItemRef) {
+          formData.append('subItemRef', subItemRef)
+        }
         formData.append('caption', nombreDefault)
 
         const res = await fetch(`/api/proyectos/${proyectoId}/plan-trabajo/alcance-imagenes`, {

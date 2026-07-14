@@ -22,15 +22,22 @@ function GaleriaSoloLectura({
   proyectoId,
   edtRef,
   subItemRef,
+  tareaRef,
   imagenes,
 }: {
   proyectoId: string
   edtRef: string
   subItemRef?: string
+  /** tareaRefId de la tarea (Bloque 4.2 sesión 2, Tarea 3) — si está presente, filtra SOLO por tareaRef. */
+  tareaRef?: string
   imagenes: PlanTrabajoImagen[]
 }) {
   const propias = imagenes
-    .filter(img => img.edtRef === edtRef && (img.subItemRef ?? undefined) === subItemRef)
+    .filter(img => {
+      if (img.edtRef !== edtRef) return false
+      if (tareaRef) return img.tareaRef === tareaRef
+      return !img.tareaRef && (img.subItemRef ?? undefined) === subItemRef
+    })
     .sort((a, b) => a.orden - b.orden)
 
   if (propias.length === 0) return null
@@ -121,21 +128,36 @@ export function AlcanceDetalladoView({ plan, proyectoId, imagenes }: Props) {
                             <p className="text-xs text-gray-500 leading-relaxed">{sub.descripcion}</p>
                           )}
                           {(sub.tareas ?? []).length > 0 && (
-                            <ul className="list-disc list-inside space-y-1 pl-1">
-                              {(sub.tareas ?? []).map((tarea, ti) => (
-                                <li key={tarea.tareaRefId ?? ti} className="text-xs text-gray-500 leading-relaxed">
-                                  {tarea.texto || tarea.nombre}
-                                  {item.tipoDetalle === 'detallado' && tarea.fotoSugerida && (
-                                    <p className="text-[10px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 mt-0.5 list-none">
-                                      📷 <strong>Foto sugerida:</strong> {tarea.fotoSugerida}
-                                    </p>
-                                  )}
-                                </li>
-                              ))}
+                            <ul className="list-disc list-inside space-y-1.5 pl-1">
+                              {(sub.tareas ?? []).map((tarea, ti) => {
+                                const imagenesDeLaTarea = imagenes.filter(
+                                  img => img.edtRef === (item.edtRefId ?? '') && img.tareaRef === tarea.tareaRefId
+                                )
+                                return (
+                                  <li key={tarea.tareaRefId ?? ti} className="text-xs text-gray-500 leading-relaxed">
+                                    {tarea.texto || tarea.nombre}
+                                    {item.tipoDetalle === 'detallado' && tarea.fotoSugerida && imagenesDeLaTarea.length === 0 && (
+                                      <p className="text-[10px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 mt-0.5 list-none">
+                                        📷 <strong>Foto sugerida:</strong> {tarea.fotoSugerida}
+                                      </p>
+                                    )}
+                                    {item.tipoDetalle === 'detallado' && tarea.tareaRefId && (
+                                      <div className="list-none mt-1">
+                                        <GaleriaSoloLectura
+                                          proyectoId={proyectoId}
+                                          edtRef={item.edtRefId ?? ''}
+                                          tareaRef={tarea.tareaRefId}
+                                          imagenes={imagenes}
+                                        />
+                                      </div>
+                                    )}
+                                  </li>
+                                )
+                              })}
                             </ul>
                           )}
                           {item.tipoDetalle === 'detallado' && sub.fotoSugerida &&
-                            imagenes.filter(img => img.edtRef === (item.edtRefId ?? '') && (img.subItemRef ?? undefined) === sub.actividadRefId).length === 0 && (
+                            imagenes.filter(img => img.edtRef === (item.edtRefId ?? '') && !img.tareaRef && (img.subItemRef ?? undefined) === sub.actividadRefId).length === 0 && (
                               <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1">
                                 📷 <strong>Foto sugerida:</strong> {sub.fotoSugerida}
                               </p>

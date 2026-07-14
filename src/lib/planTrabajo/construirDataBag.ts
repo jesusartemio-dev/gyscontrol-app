@@ -41,15 +41,26 @@ export interface ConstruirDataBagOpciones {
   histogramaHHPng?: ImagenResueltaTag | null
 }
 
+/**
+ * Imágenes de UN nodo — EDT, subItem O tarea (Bloque 4.2 sesión 2, Tarea 3).
+ * Exactamente un nivel por imagen: si `tareaRef` está presente, filtra SOLO
+ * por tareaRef (ignora subItemRef); si no, filtra por subItemRef excluyendo
+ * las que sí tienen tareaRef (esas pertenecen a una tarea, no al subItem).
+ */
 function construirImagenesDeNodo(
   edtRef: string,
   subItemRef: string | undefined,
+  tareaRef: string | undefined,
   nombreDefault: string,
   imagenesAlcance: PlanTrabajoImagen[],
   imagenesResueltas: Map<string, ImagenResueltaTag | null>
 ): { img: ImagenResueltaTag; caption: string }[] {
   return imagenesAlcance
-    .filter(img => img.edtRef === edtRef && (img.subItemRef ?? undefined) === subItemRef)
+    .filter(img => {
+      if (img.edtRef !== edtRef) return false
+      if (tareaRef) return img.tareaRef === tareaRef
+      return !img.tareaRef && (img.subItemRef ?? undefined) === subItemRef
+    })
     .sort((a, b) => a.orden - b.orden)
     .map(img => ({
       // NUNCA null acá — un {%img} con valor null/falsy rompe doc.renderAsync
@@ -57,7 +68,7 @@ function construirImagenesDeNodo(
       // → placeholder 1x1, mismo resultado visual que antes.
       img: imagenesResueltas.get(img.id) ?? IMAGEN_PLACEHOLDER,
       // Migración suave (Bloque 4.2, Tarea 1): si el caption persistido es el
-      // filename subido, se sustituye por el nombre de la actividad/EDT.
+      // filename subido, se sustituye por el nombre de la actividad/EDT/tarea.
       caption: captionEfectivo(img, nombreDefault),
     }))
 }
@@ -347,7 +358,7 @@ export function construirDataBag({
           // {#personalRequerido} — sin el flag, docxtemplater no renderiza el bloque
           // condicional cuando personalRequerido está vacío.
           tienePersonalRequerido: (n.personalRequerido ?? []).length > 0,
-          imagenes: n.edtRefId ? construirImagenesDeNodo(n.edtRefId, undefined, n.edtNombre, imagenesAlcance, imagenesResueltas) : [],
+          imagenes: n.edtRefId ? construirImagenesDeNodo(n.edtRefId, undefined, undefined, n.edtNombre, imagenesAlcance, imagenesResueltas) : [],
           // Mismos nombres que el builder/validador/editor (numeracion/actividadNombre/
           // descripcion) — NUNCA renombrar acá. La plantilla .docx ya usa estos nombres
           // dentro de {#subItems}; renombrarlos hacía que docxtemplater, al no encontrar
@@ -359,12 +370,18 @@ export function construirDataBag({
             descripcion: s.descripcion,
             // Viñetas de tareas por subItem (plantilla v4, {#tareas}{texto}{/tareas},
             // Bloque 4.2, Tarea 4) — texto redactado por IA, fallback = nombre de la
-            // tarea (ver textoFallbackTarea en generarAlcanceDetallado.ts).
-            // imagenes: [] por ahora (restaura el export, Tarea 0 de esta sesión);
-            // la Tarea 3 las puebla desde PlanTrabajoImagen.tareaRef.
-            tareas: (s.tareas ?? []).map(t => ({ texto: t.texto || t.nombre, imagenes: [] as { img: ImagenResueltaTag; caption: string }[] })),
+            // tarea (ver textoFallbackTarea en generarAlcanceDetallado.ts). Las fotos
+            // se intercalan tras cada viñeta (plantilla v6, {#tareas}{#imagenes},
+            // Bloque 4.2 sesión 2, Tarea 3) — caption default = nombre corto de la
+            // tarea del cronograma, nunca la viñeta redactada completa.
+            tareas: (s.tareas ?? []).map(t => ({
+              texto: t.texto || t.nombre,
+              imagenes: n.edtRefId && t.tareaRefId
+                ? construirImagenesDeNodo(n.edtRefId, undefined, t.tareaRefId, t.nombre, imagenesAlcance, imagenesResueltas)
+                : [],
+            })),
             imagenes: n.edtRefId && s.actividadRefId
-              ? construirImagenesDeNodo(n.edtRefId, s.actividadRefId, s.actividadNombre, imagenesAlcance, imagenesResueltas)
+              ? construirImagenesDeNodo(n.edtRefId, s.actividadRefId, undefined, s.actividadNombre, imagenesAlcance, imagenesResueltas)
               : [],
           })),
         }

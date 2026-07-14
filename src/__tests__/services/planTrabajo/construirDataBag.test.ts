@@ -1,6 +1,7 @@
 import { construirDataBag } from '@/lib/planTrabajo/construirDataBag'
+import type { ImagenResueltaTag } from '@/lib/planTrabajo/exportDocx'
 import type { PlanAlcanceDetalladoEdt } from '@/types/planTrabajo'
-import type { PlanTrabajo, Cliente, Proyecto } from '@prisma/client'
+import type { PlanTrabajo, Cliente, Proyecto, PlanTrabajoImagen } from '@prisma/client'
 
 /**
  * Integración a nivel dataBag (no solo builder) — regresión del bug auditado
@@ -169,5 +170,68 @@ describe('construirDataBag — alcanceDetallado.subItems', () => {
     const primeraTarea = con.subItems[0].tareas[0] as Record<string, unknown>
     expect(primeraTarea).not.toHaveProperty('fotoSugerida')
     expect(Object.keys(primeraTarea)).toEqual(['texto', 'imagenes'])
+  })
+})
+
+describe('construirDataBag — imágenes por tarea (Tarea 3, sesión 2)', () => {
+  function imagenFixture(overrides: Partial<PlanTrabajoImagen>): PlanTrabajoImagen {
+    return {
+      id: 'img-default',
+      planTrabajoId: 'plan-1',
+      edtRef: 'edt-con',
+      subItemRef: null,
+      tareaRef: null,
+      nombreArchivo: 'foto.jpg',
+      urlArchivo: '',
+      driveFileId: 'drive-1',
+      tipoArchivo: null,
+      tamano: null,
+      caption: null,
+      orden: 0,
+      createdById: 'user-1',
+      createdAt: new Date('2026-01-01'),
+      ...overrides,
+    } as unknown as PlanTrabajoImagen
+  }
+
+  const imagenResuelta: ImagenResueltaTag = { data: 'base64', width: 100, height: 100 }
+
+  const imagenesAlcance: PlanTrabajoImagen[] = [
+    // 2 imágenes de la tarea-1 (subItem act-1)
+    imagenFixture({ id: 'img-tarea-1a', tareaRef: 'tarea-1', orden: 0 }),
+    imagenFixture({ id: 'img-tarea-1b', tareaRef: 'tarea-1', orden: 1 }),
+    // 1 imagen del subItem act-1 (no de ninguna tarea)
+    imagenFixture({ id: 'img-subitem', subItemRef: 'act-1', orden: 0 }),
+  ]
+  const imagenesResueltas = new Map<string, ImagenResueltaTag | null>([
+    ['img-tarea-1a', imagenResuelta],
+    ['img-tarea-1b', imagenResuelta],
+    ['img-subitem', imagenResuelta],
+  ])
+
+  const dataBag = construirDataBag({
+    plan: planFixture([edtDetallado()]),
+    proyecto: proyectoFixture,
+    organigramaPngBase64: '',
+    imagenesAlcance,
+    imagenesResueltas,
+  })
+  const alcance = dataBag.alcanceDetallado as Array<{
+    edtNombre: string
+    subItems: { actividadRefId?: string; imagenes: unknown[]; tareas: { imagenes: unknown[] }[] }[]
+  }>
+  const con = alcance.find(a => a.edtNombre === 'Construcción')!
+
+  it('una tarea con 2 imágenes las recibe bajo tareas[].imagenes (no bajo el subItem)', () => {
+    expect(con.subItems[0].tareas[0].imagenes).toHaveLength(2)
+  })
+
+  it('las imágenes de una tarea NO aparecen en el array de imágenes del subItem', () => {
+    expect(con.subItems[0].imagenes).toHaveLength(1)
+  })
+
+  it('las demás tareas del mismo subItem no reciben imágenes ajenas', () => {
+    expect(con.subItems[0].tareas[1].imagenes).toHaveLength(0)
+    expect(con.subItems[0].tareas[2].imagenes).toHaveLength(0)
   })
 })

@@ -200,42 +200,58 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                           {(sub.tareas ?? []).length > 0 && (
                             <div className="space-y-2 pl-2 border-l-2 border-gray-200">
                               <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Tareas</p>
-                              {(sub.tareas ?? []).map((tarea, tareaIdx) => (
-                                <div key={tarea.tareaRefId ?? tareaIdx} className="space-y-1">
-                                  <div className="flex items-start gap-1">
-                                    <span className="text-[10px] text-muted-foreground mt-1.5 shrink-0">•</span>
-                                    <Textarea
-                                      value={tarea.texto}
-                                      onChange={e => updateTarea(edtIdx, subIdx, tareaIdx, { texto: e.target.value })}
-                                      rows={1}
-                                      className="text-xs resize-none min-h-0 py-1"
-                                      placeholder={tarea.nombre}
-                                    />
-                                  </div>
-                                  {item.tipoDetalle === 'detallado' && (
-                                    <div className="pl-3 space-y-1">
-                                      {tarea.fotoSugerida && (
-                                        <div className="flex items-start gap-1.5 rounded bg-amber-50 border border-amber-200 px-2 py-1 text-[10px] text-amber-800">
-                                          <Camera size={11} className="shrink-0 mt-0.5" />
-                                          <span><strong>Foto sugerida:</strong> {tarea.fotoSugerida}</span>
-                                        </div>
-                                      )}
-                                      <Input
-                                        value={tarea.fotoSugerida ?? ''}
-                                        onChange={e => updateTarea(edtIdx, subIdx, tareaIdx, { fotoSugerida: e.target.value })}
-                                        className="h-6 text-[10px]"
-                                        placeholder="Foto sugerida para esta tarea (opcional, no se exporta al docx)"
+                              {(sub.tareas ?? []).map((tarea, tareaIdx) => {
+                                const imagenesDeLaTarea = imagenes.filter(
+                                  img => img.edtRef === (item.edtRefId ?? '') && img.tareaRef === tarea.tareaRefId
+                                )
+                                return (
+                                  <div key={tarea.tareaRefId ?? tareaIdx} className="space-y-1">
+                                    <div className="flex items-start gap-1">
+                                      <span className="text-[10px] text-muted-foreground mt-1.5 shrink-0">•</span>
+                                      <Textarea
+                                        value={tarea.texto}
+                                        onChange={e => updateTarea(edtIdx, subIdx, tareaIdx, { texto: e.target.value })}
+                                        rows={1}
+                                        className="text-xs resize-none min-h-0 py-1"
+                                        placeholder={tarea.nombre}
                                       />
                                     </div>
-                                  )}
-                                </div>
-                              ))}
+                                    {item.tipoDetalle === 'detallado' && (
+                                      <div className="pl-3 space-y-1">
+                                        {tarea.fotoSugerida && imagenesDeLaTarea.length === 0 && (
+                                          <div className="flex items-start gap-1.5 rounded bg-amber-50 border border-amber-200 px-2 py-1 text-[10px] text-amber-800">
+                                            <Camera size={11} className="shrink-0 mt-0.5" />
+                                            <span><strong>Foto sugerida:</strong> {tarea.fotoSugerida}</span>
+                                          </div>
+                                        )}
+                                        <Input
+                                          value={tarea.fotoSugerida ?? ''}
+                                          onChange={e => updateTarea(edtIdx, subIdx, tareaIdx, { fotoSugerida: e.target.value })}
+                                          className="h-6 text-[10px]"
+                                          placeholder="Foto sugerida para esta tarea (opcional, no se exporta al docx)"
+                                        />
+                                        {tarea.tareaRefId && (
+                                          <GaleriaImagenesAlcance
+                                            proyectoId={proyectoId}
+                                            edtRef={item.edtRefId ?? ''}
+                                            tareaRef={tarea.tareaRefId}
+                                            nombreDefault={tarea.nombre}
+                                            textosContexto={[...textosHerramientas, tarea.texto, tarea.nombre]}
+                                            imagenes={imagenes}
+                                            onChanged={onImagenesChanged}
+                                          />
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              })}
                             </div>
                           )}
 
                           {item.tipoDetalle === 'detallado' && (() => {
                             const imagenesDelSubItem = imagenes.filter(
-                              img => img.edtRef === (item.edtRefId ?? '') && (img.subItemRef ?? undefined) === sub.actividadRefId
+                              img => img.edtRef === (item.edtRefId ?? '') && !img.tareaRef && (img.subItemRef ?? undefined) === sub.actividadRefId
                             )
                             return (
                               <>

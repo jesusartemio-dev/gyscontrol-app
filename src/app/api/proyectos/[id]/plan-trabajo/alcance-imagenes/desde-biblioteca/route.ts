@@ -48,9 +48,10 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   } catch {
     return NextResponse.json({ error: 'Body inválido' }, { status: 400 })
   }
-  const { edtRef, subItemRef, catalogoImagenId } = (body ?? {}) as {
+  const { edtRef, subItemRef, tareaRef, catalogoImagenId } = (body ?? {}) as {
     edtRef?: unknown
     subItemRef?: unknown
+    tareaRef?: unknown
     catalogoImagenId?: unknown
   }
   if (typeof edtRef !== 'string' || !edtRef.trim()) {
@@ -65,10 +66,13 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: 'Imagen de catálogo no encontrada o inactiva' }, { status: 404 })
   }
 
-  const subItemRefFinal = typeof subItemRef === 'string' && subItemRef ? subItemRef : null
+  // Exactamente un nivel: EDT, subItem o tarea (Bloque 4.2 sesión 2, Tarea 3) —
+  // si viene tareaRef, subItemRef siempre queda null.
+  const tareaRefFinal = typeof tareaRef === 'string' && tareaRef ? tareaRef : null
+  const subItemRefFinal = !tareaRefFinal && typeof subItemRef === 'string' && subItemRef ? subItemRef : null
 
   const ultima = await prisma.planTrabajoImagen.findFirst({
-    where: { planTrabajoId: plan.id, edtRef, subItemRef: subItemRefFinal },
+    where: { planTrabajoId: plan.id, edtRef, subItemRef: subItemRefFinal, tareaRef: tareaRefFinal },
     orderBy: { orden: 'desc' },
     select: { orden: true },
   })
@@ -79,6 +83,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       planTrabajoId: plan.id,
       edtRef,
       subItemRef: subItemRefFinal,
+      tareaRef: tareaRefFinal,
       nombreArchivo: catalogoImagen.nombre,
       urlArchivo: '',
       driveFileId: catalogoImagen.driveFileId,
