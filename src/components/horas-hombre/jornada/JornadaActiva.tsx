@@ -18,7 +18,8 @@ import {
   AlertCircle,
   Pencil,
   Settings,
-  MoreVertical
+  MoreVertical,
+  UserPlus
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -28,6 +29,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useToast } from '@/hooks/use-toast'
 import { AgregarTareaModal } from './AgregarTareaModal'
+import { AgregarPersonaModal } from './AgregarPersonaModal'
 import { EditarTareaModal } from './EditarTareaModal'
 import { JornadaFormModal } from './JornadaFormModal'
 import { CerrarJornadaModal } from './CerrarJornadaModal'
@@ -126,6 +128,7 @@ export function JornadaActiva({
 
   // Estados
   const [agregarTareaOpen, setAgregarTareaOpen] = useState(false)
+  const [agregarPersonaOpen, setAgregarPersonaOpen] = useState(false)
   const [editarTareaOpen, setEditarTareaOpen] = useState(false)
   const [editarJornadaOpen, setEditarJornadaOpen] = useState(false)
   const [tareaSeleccionada, setTareaSeleccionada] = useState<TareaJornada | null>(null)
@@ -322,6 +325,10 @@ export function JornadaActiva({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={() => setTimeout(() => setAgregarPersonaOpen(true), 0)}>
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Agregar persona (sin asistencia)
+                  </DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => setTimeout(() => setEditarJornadaOpen(true), 0)}>
                     <Settings className="h-4 w-4 mr-2" />
                     Editar jornada
@@ -433,6 +440,13 @@ export function JornadaActiva({
       </div>
 
       {/* Modales */}
+      <AgregarPersonaModal
+        open={agregarPersonaOpen}
+        onOpenChange={setAgregarPersonaOpen}
+        jornadaId={jornada.id}
+        onSuccess={onRefresh}
+      />
+
       <AgregarTareaModal
         open={agregarTareaOpen}
         onOpenChange={setAgregarTareaOpen}
