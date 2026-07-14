@@ -81,6 +81,20 @@ function edtDetallado(): PlanAlcanceDetalladoEdt {
   }
 }
 
+function edtResumido(): PlanAlcanceDetalladoEdt {
+  return {
+    numeracion: '11.1',
+    edtNombre: 'Planificación General',
+    edtCodigo: 'PLAN',
+    faseNombre: 'PLANIFICACIÓN',
+    faseAbreviatura: 'PLANIFICACIÓN',
+    descripcion: 'Descripción general del EDT de Planificación.',
+    tipoDetalle: 'resumido',
+    edtRefId: 'edt-plan',
+    subItems: [],
+  }
+}
+
 function edtDetalladoConTareas(): PlanAlcanceDetalladoEdt {
   return {
     numeracion: '11.2',
@@ -283,5 +297,34 @@ describe('renderizarPlanTrabajoDocx — viñetas de tareas por subItem (Bloque 4
     expect(documentXml).toContain('Desenergizar y bloquear la alimentación mediante dispositivos DAE.')
     expect(documentXml).toContain('Delimitar el área de trabajo con cinta de seguridad y señalización visible.')
     expect(documentXml).not.toMatch(/\{#tareas\}|\{\/tareas\}|\{texto\}/)
+  })
+})
+
+describe('renderizarPlanTrabajoDocx — personalRequerido condicional (plantilla v5, {#tienePersonalRequerido})', () => {
+  it('un EDT con personalRequerido renderiza el párrafo + la fila de personal, sin tags crudos', async () => {
+    const dataBag = construirDataBag({
+      plan: planFixture([edtDetallado()]),
+      proyecto: proyectoFixture,
+      organigramaPngBase64: `data:image/png;base64,${PNG_1X1_BASE64}`,
+    })
+
+    const buffer = await renderizarPlanTrabajoDocx({ dataBag })
+    const partes = asertarPaqueteBienFormado(buffer)
+    const documentXml = partes.find(p => p.nombre === 'word/document.xml')!.contenido
+
+    expect(documentXml).toContain('Técnico Operario')
+    expect(documentXml).not.toMatch(/\{#tienePersonalRequerido\}|\{\/tienePersonalRequerido\}/)
+  })
+
+  it('un EDT sin personalRequerido no rompe el export (bloque condicional simplemente no se renderiza)', async () => {
+    const dataBag = construirDataBag({
+      plan: planFixture([edtResumido()]),
+      proyecto: proyectoFixture,
+      organigramaPngBase64: `data:image/png;base64,${PNG_1X1_BASE64}`,
+    })
+
+    const buffer = await renderizarPlanTrabajoDocx({ dataBag })
+    expect(Buffer.isBuffer(buffer)).toBe(true)
+    asertarPaqueteBienFormado(buffer)
   })
 })

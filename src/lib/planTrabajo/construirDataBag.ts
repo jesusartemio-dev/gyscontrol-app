@@ -343,6 +343,10 @@ export function construirDataBag({
           ubicacion: n.ubicacion ?? '',
           // personalRequerido/imagenes solo existen en EDTs 'detallado' (Bloque 4, Tarea 1/4)
           personalRequerido: n.personalRequerido ?? [],
+          // Plantilla v5: {#tienePersonalRequerido} envuelve el párrafo + el loop
+          // {#personalRequerido} — sin el flag, docxtemplater no renderiza el bloque
+          // condicional cuando personalRequerido está vacío.
+          tienePersonalRequerido: (n.personalRequerido ?? []).length > 0,
           imagenes: n.edtRefId ? construirImagenesDeNodo(n.edtRefId, undefined, n.edtNombre, imagenesAlcance, imagenesResueltas) : [],
           // Mismos nombres que el builder/validador/editor (numeracion/actividadNombre/
           // descripcion) — NUNCA renombrar acá. La plantilla .docx ya usa estos nombres
@@ -356,7 +360,9 @@ export function construirDataBag({
             // Viñetas de tareas por subItem (plantilla v4, {#tareas}{texto}{/tareas},
             // Bloque 4.2, Tarea 4) — texto redactado por IA, fallback = nombre de la
             // tarea (ver textoFallbackTarea en generarAlcanceDetallado.ts).
-            tareas: (s.tareas ?? []).map(t => ({ texto: t.texto || t.nombre })),
+            // imagenes: [] por ahora (restaura el export, Tarea 0 de esta sesión);
+            // la Tarea 3 las puebla desde PlanTrabajoImagen.tareaRef.
+            tareas: (s.tareas ?? []).map(t => ({ texto: t.texto || t.nombre, imagenes: [] as { img: ImagenResueltaTag; caption: string }[] })),
             imagenes: n.edtRefId && s.actividadRefId
               ? construirImagenesDeNodo(n.edtRefId, s.actividadRefId, s.actividadNombre, imagenesAlcance, imagenesResueltas)
               : [],
@@ -375,6 +381,7 @@ export function construirDataBag({
         descripcion: l.descripcion ?? '',
         ubicacion: l.ubicacion ?? '',
         personalRequerido: [],
+        tienePersonalRequerido: false,
         imagenes: [],
         subItems: [],
       }

@@ -108,10 +108,17 @@ describe('construirDataBag — alcanceDetallado.subItems', () => {
   const alcance = dataBag.alcanceDetallado as Array<{
     edtNombre: string
     descripcion: string
+    personalRequerido: { cantidad: number; cargo: string }[]
+    tienePersonalRequerido: boolean
     subItems: { numeracion: string; actividadNombre: string; descripcion: string; tareas: { texto: string }[] }[]
   }>
   const con = alcance.find(a => a.edtNombre === 'Construcción')!
   const plan = alcance.find(a => a.edtNombre === 'Planificación General')!
+
+  it('tienePersonalRequerido es true cuando el EDT trae personalRequerido, y false cuando no (plantilla v5, {#tienePersonalRequerido})', () => {
+    expect(con.tienePersonalRequerido).toBe(true)
+    expect(plan.tienePersonalRequerido).toBe(false)
+  })
 
   it('cada subItem tiene su propia numeración incremental (no la del EDT padre)', () => {
     expect(con.subItems.map(s => s.numeracion)).toEqual(['11.2.1', '11.2.2', '11.2.3'])
