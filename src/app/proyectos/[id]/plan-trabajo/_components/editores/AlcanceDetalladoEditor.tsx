@@ -11,10 +11,13 @@ import { Textarea } from '@/components/ui/textarea'
 import { Plus, Trash2, PlusCircle, Camera } from 'lucide-react'
 import { GaleriaImagenesAlcance } from './GaleriaImagenesAlcance'
 import type { PlanTrabajoImagen } from '@prisma/client'
+import type { PlanHerramientasYEquipos } from '@/types/planTrabajo'
 
 interface Props {
   proyectoId: string
   valor: PlanAlcanceDetalladoEdt[]
+  /** Nombres de equipos/herramientas/materiales del plan — señal para sugerir imágenes del catálogo global (Bloque 4.2, Tarea 6). */
+  herramientasYEquipos: PlanHerramientasYEquipos
   imagenes: PlanTrabajoImagen[]
   onImagenesChanged: () => Promise<void>
   onSave: (v: PlanAlcanceDetalladoEdt[]) => Promise<void>
@@ -39,11 +42,19 @@ const subItemVacio = (numeracionPadre: string, idx: number): PlanAlcanceDetallad
   descripcion: '',
 })
 
-export function AlcanceDetalladoEditor({ proyectoId, valor, imagenes, onImagenesChanged, onSave, onCancel }: Props) {
+export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos, imagenes, onImagenesChanged, onSave, onCancel }: Props) {
   const [items, setItems] = useState<PlanAlcanceDetalladoEdt[]>(
     valor.length > 0 ? valor : [edtVacio()]
   )
   const [saving, setSaving] = useState(false)
+
+  // Nombres de equipos/herramientas/materiales del plan — señal de contexto para
+  // sugerir imágenes del catálogo global en cada galería (Bloque 4.2, Tarea 6).
+  const textosHerramientas = [
+    ...herramientasYEquipos.equipos,
+    ...herramientasYEquipos.herramientas,
+    ...herramientasYEquipos.materiales,
+  ].map(h => h.nombre)
 
   const updateItem = (idx: number, patch: Partial<PlanAlcanceDetalladoEdt>) =>
     setItems(prev => prev.map((it, i) => i === idx ? { ...it, ...patch } : it))
@@ -150,6 +161,7 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, imagenes, onImagenes
                       proyectoId={proyectoId}
                       edtRef={item.edtRefId}
                       nombreDefault={item.edtNombre}
+                      textosContexto={textosHerramientas}
                       imagenes={imagenes}
                       onChanged={onImagenesChanged}
                     />
@@ -196,6 +208,7 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, imagenes, onImagenes
                               edtRef={item.edtRefId ?? ''}
                               subItemRef={sub.actividadRefId}
                               nombreDefault={sub.actividadNombre}
+                              textosContexto={[...textosHerramientas, ...(sub.tareas ?? []).map(t => t.texto || t.nombre)]}
                               imagenes={imagenes}
                               onChanged={onImagenesChanged}
                             />

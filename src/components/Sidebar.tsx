@@ -67,6 +67,7 @@ import {
   CalendarDays,
   CalendarRange,
   Wallet,
+  Images,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -439,6 +440,7 @@ export default function Sidebar() {
         { href: '/catalogo/unidades', label: 'Unidades Equipos', icon: Calculator },
         { href: '/catalogo/unidades-servicio', label: 'Unidades Servicio', icon: Calculator },
         { href: '/catalogo/recursos', label: 'Recursos HH', icon: Wrench },
+        { href: '/catalogo/imagenes', label: 'Biblioteca de Imágenes', icon: Images },
         // 👥 RRHH - Personal y estructura organizacional
         { href: '/admin/personal', label: 'Personal (RRHH)', icon: UserCheck },
         { href: '/configuracion/cargos', label: 'Cargos', icon: Briefcase },

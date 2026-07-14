@@ -611,6 +611,7 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
         <AlcanceDetalladoEditor
           proyectoId={proyectoId}
           valor={(plan.alcanceDetallado as PlanAlcanceDetalladoEdt[] | null) ?? []}
+          herramientasYEquipos={(plan.herramientasYEquipos as PlanHerramientasYEquipos | null) ?? { equipos: [], herramientas: [], materiales: [] }}
           imagenes={plan.imagenes}
           onImagenesChanged={fetchContexto}
           onSave={(v) => handleSaveSeccion('alcanceDetallado', v)}

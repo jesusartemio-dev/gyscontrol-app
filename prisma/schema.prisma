@@ -2085,6 +2085,7 @@ model User {
   orgNodos                                 ProyectoOrgNodo[]
   planTrabajoGeneraciones                  PlanTrabajoGeneracion[]
   planTrabajoImagenes                      PlanTrabajoImagen[]
+  catalogoImagenesCreadas                  CatalogoImagen[]
   proyectoCronogramaGeneracionesIA         ProyectoCronogramaGeneracionIA[]
   cronogramaIATareaDecisiones              CronogramaIATareaDecision[]
   cronogramaIASugerenciasAceptadas         CronogramaIASugerenciaAceptada[]
@@ -5928,6 +5929,32 @@ model PlanTrabajoImagen {
 
   @@index([planTrabajoId, edtRef])
   @@map("plan_trabajo_imagen")
+}
+
+/**
+ * Catálogo GLOBAL de imágenes de referencia (Bloque 4.2, Tarea 6) —
+ * transversal a todos los proyectos, para reutilizar las mismas fotos de
+ * equipos/herramientas estándar (roscadora, escalera dieléctrica, etc.)
+ * entre planes de trabajo. Vive en una subcarpeta del mismo Drive
+ * compartido que ya usa la app (getOrCreateCatalogoImagenesFolder.ts) —
+ * nunca duplica el archivo: PlanTrabajoImagen solo referencia su driveFileId.
+ */
+model CatalogoImagen {
+  id            String   @id @default(cuid())
+  nombre        String
+  keywords      String[] @default([])
+  categoria     String // 'EQUIPO' | 'HERRAMIENTA' | 'EPP' | 'OTRO'
+  driveFileId   String
+  thumbnailUrl  String?
+  activo        Boolean  @default(true)
+
+  createdAt   DateTime @default(now())
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id])
+  updatedAt   DateTime @updatedAt
+
+  @@index([categoria])
+  @@map("catalogo_imagen")
 }
 
 // ─── IPERC (Identificación de Peligros, Evaluación de Riesgos y Controles) ──

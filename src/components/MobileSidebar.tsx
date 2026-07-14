@@ -73,6 +73,7 @@ import {
   PieChart,
   Briefcase,
   Sparkles,
+  Images,
 } from 'lucide-react'
 import type { RolUsuario, SidebarSection, NotificationBadgeType } from '@/types/modelos'
 
@@ -404,6 +405,7 @@ export default function MobileSidebar() {
         { href: '/catalogo/unidades', label: 'Unidades Equipos', icon: Calculator },
         { href: '/catalogo/unidades-servicio', label: 'Unidades Servicio', icon: Calculator },
         { href: '/catalogo/recursos', label: 'Recursos HH', icon: Wrench },
+        { href: '/catalogo/imagenes', label: 'Biblioteca de Imágenes', icon: Images },
         { href: '/admin/personal', label: 'Personal (RRHH)', icon: UserCheck },
         { href: '/configuracion/cargos', label: 'Cargos', icon: Briefcase },
         { href: '/configuracion/departamentos', label: 'Departamentos', icon: Building2 },
